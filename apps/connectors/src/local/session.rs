@@ -70,6 +70,8 @@ impl Session {
             let mut selectors = json!({});
             for field in [
                 "adapter",
+                "connector",
+                "instance",
                 "profile",
                 "connection",
                 "expected_revision",
@@ -128,7 +130,8 @@ impl Session {
                 selection.context.state_dir.as_deref(),
             )
             .ok()?;
-            let bootstrap = owner::cached(&paths, selection.selectors["adapter"].as_str()?).ok()?;
+            let alias = super::select::alias_at(&selection.selectors, &paths).ok()?;
+            let bootstrap = owner::cached(&paths, &alias).ok()?;
             let operation = selection.selectors["operation"].as_str()?;
             Some(
                 bootstrap
@@ -166,7 +169,7 @@ impl Session {
         let selection = self.selection.as_ref().ok_or(Code::InvalidInput)?;
         if !matches!(
             selection.callable.as_str(),
-            "connections-connect" | "connections-repair"
+            "connections-connect" | "connections-reconnect"
         ) || self.captured.is_some()
         {
             return Err(Code::InvalidInput.into());
@@ -181,18 +184,20 @@ impl Session {
             return Err(Code::InvalidInput.into());
         }
         let text = |key| selection.selectors.get(key).and_then(Value::as_str);
-        let alias = text("adapter").ok_or(Code::InvalidInput)?;
+        let alias = super::select::alias_at(&selection.selectors, &paths)?;
+        let alias = alias.as_str();
+        let connection = reconnected(&selection.callable, &paths, alias, text("connection"))?;
         owner::admit_capture(
             &paths,
             alias,
             text("profile"),
-            text("connection"),
+            connection.as_deref(),
             text("expected_revision"),
         )?;
         let capture = owner::Client::connect(&paths, true)?.begin(
             alias,
             text("profile").map(str::to_owned),
-            text("connection").map(str::to_owned),
+            connection,
             text("expected_revision").map(str::to_owned),
         )?;
         let result = match source {
@@ -219,7 +224,7 @@ impl Session {
         self.captured = Some((capture, secret));
         Ok(MARKER.into())
     }
-    /// `connections connect` or `repair` with no protected source. Under the
+    /// `connections connect` or `reconnect` with no protected source. Under the
     /// read-only `mounted_secret` binding the owner reads the item
     /// `<adapter alias>/<profile>` itself and no bytes pass through this
     /// process; under a platform binding a source is required.
@@ -238,18 +243,19 @@ impl Session {
         }
         let text = |key| call.input.get(key).and_then(Value::as_str);
         let alias = text("adapter").ok_or(Code::InvalidInput)?;
+        let connection = reconnected(call.callable, &paths, alias, text("connection"))?;
         owner::admit_capture(
             &paths,
             alias,
             text("profile"),
-            text("connection"),
+            connection.as_deref(),
             text("expected_revision"),
         )?;
         owner::Client::connect(&paths, true)?
             .begin(
                 alias,
                 text("profile").map(str::to_owned),
-                text("connection").map(str::to_owned),
+                connection,
                 text("expected_revision").map(str::to_owned),
             )?
             .complete_mounted()
@@ -263,7 +269,20 @@ impl Session {
         {
             return Err(Code::InvalidInput.into());
         }
-        for field in ["adapter", "profile", "connection", "expected_revision"] {
+        // The handler's input names the alias the preparsed selector named.
+        let paths = Paths::resolve(
+            call.context.config.as_deref(),
+            call.context.state_dir.as_deref(),
+        )?;
+        if call.input.get("adapter")
+            != Some(&json!(super::select::alias_at(
+                &selection.selectors,
+                &paths
+            )?))
+        {
+            return Err(Code::InvalidInput.into());
+        }
+        for field in ["profile", "connection", "expected_revision"] {
             if call.input.get(field) != selection.selectors.get(field) {
                 return Err(Code::InvalidInput.into());
             }
@@ -369,8 +388,8 @@ impl DynamicValidator for NativeValidator {
                 call.context.config.as_deref(),
                 call.context.state_dir.as_deref(),
             )?;
-            let alias = call.input["adapter"].as_str().ok_or(Code::InvalidInput)?;
-            let bootstrap = owner::operation_snapshot(&paths, alias, &call.input)?;
+            let alias = super::select::alias_at(&call.input, &paths)?;
+            let bootstrap = owner::operation_snapshot(&paths, &alias, &call.input)?;
             let descriptor = bootstrap.descriptor()?;
             let operation = descriptor
                 .operation(call.input["operation"].as_str().ok_or(Code::InvalidInput)?)
@@ -409,5 +428,24 @@ impl DynamicValidator for NativeValidator {
             self.0.borrow_mut().early = Some((call.callable.into(), call.context.clone(), error));
             kind
         })
+    }
+}
+
+/// The connection a `connections reconnect` reconnects: the one it names, or
+/// else the instance's one published non-revoked connection
+/// (story:connect-refused-while-instance-holds-connection). A connect names
+/// none.
+fn reconnected(
+    callable: &str,
+    paths: &Paths,
+    alias: &str,
+    named: Option<&str>,
+) -> owner::Result<Option<String>> {
+    match named {
+        Some(connection) => Ok(Some(connection.to_owned())),
+        None if callable == "connections-reconnect" => {
+            super::connections::held_one(paths, alias).map(Some)
+        }
+        None => Ok(None),
     }
 }

@@ -42,6 +42,8 @@ mod basic_auth_adversary_pass2;
 mod cli_journey;
 #[path = "../../../crates/connectors-host/tests/fixtures/clock/server.rs"]
 mod clock_fixture;
+#[path = "local_runtime/derived_instance.rs"]
+mod derived_instance;
 #[path = "local_runtime/oauth2_refresh.rs"]
 mod oauth2_refresh;
 #[path = "local_runtime/oauth2_refresh_adversary.rs"]

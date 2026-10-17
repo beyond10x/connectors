@@ -1,0 +1,19 @@
+{
+  "format": "connectors-catalog-connector/1",
+  "connector_id": "opsgenie",
+  "provider_id": "opsgenie",
+  "adapter_id": "catalog",
+  "catalog_provider": "opsgenie",
+  "default_endpoint": "https://api.opsgenie.com",
+  "selection": "operations.json",
+  "profiles": [
+    {
+      "profile": "opsgenie.api-key",
+      "header": "Authorization",
+      "bearer": false,
+      "prefix": "GenieKey",
+      "label": "Opsgenie API integration key",
+      "identity": {"path": "v2/alerts", "kind": "opsgenie.integration", "source": "configuration"}
+    }
+  ]
+}

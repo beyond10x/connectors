@@ -208,6 +208,78 @@ pub(super) fn launch(call: &Invocation<'_>) -> Result<i32, HandlerReply> {
         .map_err(|error| owner_failure(owner::Error::from(error)))
 }
 
+/// The commands that select one existing connection and take `--connection`
+/// optionally. `connections reconnect` selects it before any handler runs
+/// (`held_one`).
+const SELECTING: [&str; 4] = [
+    "connections-describe",
+    "connections-revalidate",
+    "connections-revoke",
+    "connections-launch",
+];
+
+/// story:connect-refused-while-instance-holds-connection: `--connection` may be
+/// left out where the selected instance holds exactly one published
+/// non-revoked connection, which the command then selects. With none it is
+/// `not_found` at admission naming a connect; with more than one,
+/// `invalid_input` at arguments: `--connection` chooses. Runs on the input
+/// every handler reads, once the selectors named the alias. A configuration or
+/// alias that does not resolve is left to the handler's own refusal.
+pub(super) fn select(call: &Invocation<'_>, input: &mut Value) -> Result<(), HandlerReply> {
+    if !SELECTING.contains(&call.callable) || input.get("connection").is_some_and(|v| !v.is_null())
+    {
+        return Ok(());
+    }
+    let Some(alias) = input.get("adapter").and_then(Value::as_str) else {
+        return Ok(());
+    };
+    let Ok(paths) = resolved(call) else {
+        return Ok(());
+    };
+    let Ok(config) = Config::read(&paths.config) else {
+        return Ok(());
+    };
+    let Some(adapter) = config.adapters.get(alias) else {
+        return Ok(());
+    };
+    let held = Registry::with_system_clock(&paths.state)
+        .held(&adapter.instance_id, connectors_sdk::now_ms())
+        .map_err(registry_failure)?;
+    match held.as_slice() {
+        [one] => {
+            input["connection"] = json!(one);
+            Ok(())
+        }
+        [] => Err(failure(
+            "not_found",
+            "admission",
+            "create_connection",
+            false,
+        )),
+        _ => Err(failure("invalid_input", "arguments", "none", true)),
+    }
+}
+
+/// `select` for `connections reconnect`, whose protected entry is admitted
+/// before any handler runs: the alias's one published non-revoked connection,
+/// refused as `select` refuses.
+pub(super) fn held_one(paths: &Paths, alias: &str) -> owner::Result<String> {
+    let config = Config::load(&paths.config)?;
+    let adapter = config.adapters.get(alias).ok_or(owner::Code::NotFound)?;
+    let held = Registry::with_system_clock(&paths.state)
+        .held(&adapter.instance_id, connectors_sdk::now_ms())?;
+    match held.as_slice() {
+        [one] => Ok(one.clone()),
+        [] => {
+            // Nothing to reconnect: a connect makes the instance's connection.
+            let mut error = owner::Error::from(owner::Code::NotFound);
+            error.reconnect = true;
+            Err(error)
+        }
+        _ => Err(owner::Code::InvalidInput.into()),
+    }
+}
+
 fn summary(alias: &str, connection: &ObservedConnection) -> Value {
     json!({"adapter":alias,"instance_id":connection.instance,"connection":connection.reference,"profile":connection.profile,
         "revision":connection.revision,"state":connection.state})
@@ -253,6 +325,20 @@ pub(super) fn registry_failure(error: registry::Failure) -> HandlerReply {
             "lifecycle_conflict",
             "admission",
             "check_configuration",
+            false,
+        ),
+        // The instance holds its connection: reconnect replaces its credential.
+        InstanceConnected => (
+            "lifecycle_conflict",
+            "admission",
+            "repair_connection",
+            false,
+        ),
+        // What it holds no reconnect replaces: revoke it, then connect.
+        InstanceConnectionChanged => (
+            "lifecycle_conflict",
+            "admission",
+            "revoke_connection",
             false,
         ),
         Revoked => ("revoked", "admission", "create_connection", false),

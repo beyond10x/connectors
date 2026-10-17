@@ -1,3 +1,4 @@
+> This dated record predates the [connector vocabulary](../README.md#vocabulary) and keeps the terms of its date.
 # Independent review remediation — 2026-09-08
 
 This response answers all 24 rows from the two independent reviews under

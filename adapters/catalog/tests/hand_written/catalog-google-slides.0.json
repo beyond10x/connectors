@@ -1,0 +1,20 @@
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "google-slides",
+  "provider": "google-slides",
+  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
+  "api_base": "https://slides.googleapis.com",
+  "auth": {
+    "profile": "google.oauth",
+    "scheme": "oauth2_refresh",
+    "header": "Authorization",
+    "bearer": true,
+    "label": "Google refresh token",
+    "identity": {"source": "id_token", "kind": "google.user"},
+    "minimum_scopes": ["https://www.googleapis.com/auth/presentations.readonly"],
+    "token_url": "https://oauth2.googleapis.com/token",
+    "authorize_url": "https://accounts.google.com/o/oauth2/auth",
+    "requested_scopes": ["openid", "https://www.googleapis.com/auth/presentations.readonly"]
+  },
+  "operations_file": "/absolute/path/adapters/catalog/providers/google-slides/operations.json"
+}

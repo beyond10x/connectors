@@ -2,7 +2,22 @@ domain: connectors.declarations
 
 # Value declarations inside the Connectors-owned v2 adapter document. The v1
 # declarations remain usable without these optional v2 fields.
+# "decision N" below, unqualified, is story:ess-connector-vocabulary-model
+# § Decisions; "ADR decision N" is architecture-decision-record
+# connector-vocabulary.
 types:
+  # A provider or connector id: connectors_core::valid_id
+  # (crates/connectors-core/src/lib.rs:360-366), 1-128 bytes of ASCII
+  # alphanumerics and `-_.`; lowercase by convention (`vendor`, `mail`), not
+  # by rule (decision 2). Every character is one byte, so the count bounds the
+  # bytes.
+  - name: connectors.declarations.DeclarationId
+    kind: newtype
+    of: String
+    alphabet: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."
+    invariants:
+      - value.count >= 1
+      - value.count <= 128
   - name: connectors.declarations.UpstreamSource
     kind: struct
     fields:
@@ -112,7 +127,8 @@ types:
     kind: struct
     fields:
       # The service instance id; the ServiceConfiguration the host records at
-      # start carries it as `instance_id`.
+      # start carries it as `instance_id`. Vocabulary: the instance (design
+      # § Decision); the field keeps its name.
       - {name: instance, type: String}
       # A directory path. Required for a host that serves
       # POST /v1alpha2/invoke: the host keeps its execution-audit anchors and its
@@ -126,6 +142,10 @@ types:
 # Immutable declarations, not the lifecycle of a running process or connection.
 # Interaction and failure semantics are in contracts/service/v1alpha1/semantics.md.
 entities:
+  # Vocabulary: "adapter" is internal only (design § Decision): the
+  # implementation of a contract (its `adapter_id`) and its running
+  # process. It is not a user-facing noun; the user configures a Connector and
+  # its instances (ServiceConfiguration).
   - name: connectors.declarations.AdapterSpecification
     identity:
       name: adapter_id
@@ -156,6 +176,114 @@ entities:
       states: [Declared]
       terminal: [Declared]
 
+  # User vocabulary (docs/design/connector-vocabulary.md § Decision): a
+  # provider is the company or technology behind one or more connectors
+  # (`vendor`). Not today's `provider` value of an implementation's native
+  # configuration (`vendor-mail`; design § Why): that names one API, which is
+  # a Connector below (its native_provider).
+  # A provider is a declaration shipped with its connectors (the list of
+  # connectors an installation ships), never a configuration key: no configuration file names one
+  # (decision 1). provider_id is a DeclarationId (decision 2).
+  - name: connectors.declarations.Provider
+    identity:
+      name: provider_id
+      type: connectors.declarations.DeclarationId
+    fields: []
+    lifecycle:
+      initial: Declared
+      states: [Declared]
+      terminal: [Declared]
+
+  # User vocabulary (design § Decision; ADR connector-vocabulary decision 2): a
+  # connector is one service or app of a provider with one API (`mail`,
+  # `files`), enabled in configuration (`[connectors.<connector>]`, design
+  # § What changes, a sketch and not a schema). Many connectors per provider.
+  # It replaces the user-facing "adapter" alias; "adapter" stays the internal
+  # name of the implementation (AdapterSpecification) and of its process.
+  # connector_id is the short user-facing name (`mail`, `files`), a
+  # DeclarationId (decisions 2 and 3).
+  # Every connector an installation ships is a record whether or not it is
+  # enabled; `enabled` is set from configuration (`[connectors.<connector>]
+  # enabled = true`), not by a command of this model (decision 6). Shipping
+  # the declarations is a later story of epic connector-vocabulary.
+  - name: connectors.declarations.Connector
+    identity:
+      name: connector_id
+      type: connectors.declarations.DeclarationId
+    fields:
+      - name: provider_id
+        type: connectors.declarations.DeclarationId
+      # The implementation this connector runs on (decision 4). One
+      # implementation serves many connectors: one generic HTTP implementation
+      # serves every connector it ships.
+      - name: adapter_id
+        type: String
+      # The connector's `provider` value in its implementation's native
+      # configuration today (`vendor-mail`; design § Why). It, not
+      # connector_id, enters that implementation's configuration revision
+      # digest, so a migrated instance keeps its revision (decision 3, which
+      # names it after the implementation that carries it). Absent for a
+      # connector whose implementation has no such value.
+      - name: native_provider
+        type: Optional<String>
+      - name: enabled
+        type: Boolean
+      # The auth profiles this connector accepts, by their adapter-local
+      # authored profile id (`vendor.oauth`, `vendor.token`), each resolved under
+      # adapter_id as an AuthRequirement's profile is. Auth profiles stay
+      # declared on the implementation (AuthProfile, auth_bindings.yaml); the
+      # connector names which of them it accepts (decision 5). Not a relation:
+      # an AuthProfile record is keyed by its revision-qualified
+      # profile_record_ref, which a declaration does not name.
+      - name: profile_ids
+        type: List<String>
+      # The operation selection this connector's operations come from, the
+      # operations file name where its implementation reads one
+      # (`operations.json`).
+      # Every operation of that selection is available on every instance of
+      # the connector (ADR connector-vocabulary decision 5); no operation is
+      # grouped or filtered per instance (decision 5).
+      - name: selection
+        type: Optional<String>
+      # The endpoint an instance without `endpoint` uses (design § What
+      # changes: "An instance without `endpoint` uses the connector's default
+      # endpoint"). Optional: an HTTP API connector has its base URL, a stdio
+      # or credential-binary connector may have none. An instance of a
+      # connector without one must state `endpoint`; RecordServiceConfiguration
+      # refuses it otherwise (`endpoint-required`, decision 7).
+      - name: default_endpoint
+        type: Optional<String>
+      # Appended to an instance's endpoint to form the API base, for a
+      # connector whose users know the host and not the API under it (an
+      # endpoint `https://code.example.com` and an api_path `/api/v4` give
+      # the API base `https://code.example.com/api/v4`). An absolute path
+      # without a trailing `/`. Absent, the endpoint is the API base. An
+      # endpoint that already ends with it is refused, not doubled; a path
+      # under the host's root is kept in front of it.
+      - name: api_path
+        type: Optional<String>
+    relations:
+      - name: provider
+        kind: references
+        target: connectors.declarations.Provider
+        cardinality: one
+        via: provider_id
+      - name: implementation
+        kind: references
+        target: connectors.declarations.AdapterSpecification
+        cardinality: one
+        via: adapter_id
+    lifecycle:
+      initial: Declared
+      states: [Declared]
+      terminal: [Declared]
+
+  # Vocabulary: this is the operation, "one callable tool of a connector"
+  # (design § Decision). Every operation of an enabled connector is available
+  # on its instances; no grouping or per-instance filter. It stays declared on
+  # its implementation (adapter_id) and reaches a connector through that
+  # connector's adapter_id and selection (Connector, decision 5); it carries
+  # no connector_id.
   - name: connectors.declarations.OperationDeclaration
     identity:
       name: operation_id
@@ -187,6 +315,28 @@ entities:
       states: [Declared]
       terminal: [Declared]
 
+  # User vocabulary: this is the instance (design § Decision; ADR
+  # connector-vocabulary decision 3), the user's name for one configured
+  # connector. Reused, not a parallel entity: its identity is the
+  # `instance_id` of an `[adapters.<alias>]` entry
+  # (crates/connectors-host/src/local/config.rs:298), the host's
+  # `registry_instances` row (registry/lifecycle.rs:462), and the key
+  # Connection.instance_id references (auth_bindings.yaml). A migrated
+  # instance keeps that value byte for byte (migration-plan
+  # connector-vocabulary § Invariant, step 2). Old -> new: "adapter alias" /
+  # `--adapter <alias>` -> connector + instance (`--connector <name>
+  # --instance <name>`); ServiceConfiguration -> instance. The entity keeps its
+  # name in this pass; the rename is a later story.
+  # A new (not migrated) instance's instance_id is `<connector>.<instance>`
+  # (`mail.personal`), which passes the selector check
+  # (crates/connectors-host/src/local/config.rs selector, valid_id admits
+  # `.`); a migrated instance keeps its old instance_id (decision 10).
+  # An instance holds at most one published non-revoked connection; revoked
+  # connections and connections never published stay as history
+  # (decision-blocker instance-connection-cardinality, option A; decision
+  # 11). AllocateConnection (auth_bindings.yaml) states the refusal; the
+  # host's bound of 1000 connections per instance_id
+  # (registry/lifecycle.rs:569-581) stays the storage bound for that history.
   - name: connectors.declarations.ServiceConfiguration
     identity:
       name: instance_id
@@ -198,12 +348,39 @@ entities:
         type: String
       - name: registry_epoch
         type: Integer
+      # The connector this instance belongs to (design § Decision: "An
+      # instance belongs to one connector and is never shared across
+      # connectors"). Optional during the deprecation window: a legacy
+      # `[adapters.<alias>]` entry names no connector while both formats are
+      # read (migration-plan step 1). It becomes required in the release that
+      # ends the window (migration-plan step 9), a later change (decision 8).
+      - name: connector_id
+        type: Optional<connectors.declarations.DeclarationId>
+      # The user's free instance name (`private`, `work`; design § Decision),
+      # which addresses an instance within its connector. Absent on a legacy
+      # alias, whose name is its `[adapters.<alias>]` key. (connector_id,
+      # name) is unique among instances: RecordServiceConfiguration refuses a
+      # second instance with both equal (`name-taken`, decision 9).
+      - name: name
+        type: Optional<String>
+      # Absent: the connector's default_endpoint (design § What changes). An
+      # instance whose connector has no default_endpoint states one
+      # (`endpoint-required`, decision 7).
+      - name: endpoint
+        type: Optional<String>
+      - name: description
+        type: Optional<String>
     relations:
       - name: adapter
         kind: references
         target: connectors.declarations.AdapterSpecification
         cardinality: one
         via: adapter_id
+      - name: connector
+        kind: references
+        target: connectors.declarations.Connector
+        cardinality: one
+        via: connector_id
     lifecycle:
       initial: Declared
       states: [Declared]
@@ -227,13 +404,50 @@ commands:
   # /v1alpha2/invoke.
   # ESS-LIMIT: the start sequence spans a view read and several commands; ESS
   # has no host-procedure construct, so the sequence is a host obligation.
+  # The host records an instance's connector_id, name, endpoint and
+  # description, read from its configuration (`[connectors.<c>.instances.<i>]`),
+  # through this command (decision 10). All four are Optional: a legacy
+  # `[adapters.<alias>]` entry carries none of them (decision 8).
+  # connector_default_endpoint and name_held_by are the trusted owner's reads,
+  # inside the recording transaction, of the Connector declaration's
+  # default_endpoint and of another instance with the same connector_id and
+  # name; absent, the connector declares no default endpoint and no other
+  # instance holds the name. They are inputs as `decision` is elsewhere, the
+  # owner's decision taken inside the atomic operation, not caller authority.
+  # ESS-LIMIT: a guard reading the Connector row through the Optional
+  # connector_id (`when_related: {via: input.connector_id}`) or the other
+  # instances (`when_related: {entity, where}`) needs ess/22, and this
+  # specification is ess/18; the pinned Entity Runtime lowering refuses both
+  # for this lowered command (ess-entity-runtime 0.59.0
+  # RelatedGuardUnsupported, RowSetUnsupported).
   - name: connectors.declarations.RecordServiceConfiguration
     input:
       - {name: instance_id, type: String}
       - {name: adapter_id, type: String}
       - {name: revision, type: String}
       - {name: registry_epoch, type: Integer}
+      - {name: connector_id, type: "Optional<connectors.declarations.DeclarationId>"}
+      - {name: name, type: "Optional<String>"}
+      - {name: endpoint, type: "Optional<String>"}
+      - {name: description, type: "Optional<String>"}
+      - {name: connector_default_endpoint, type: "Optional<String>"}
+      - {name: name_held_by, type: "Optional<String>"}
     outcomes:
+      # Decision 9: (connector_id, name) is unique among instances.
+      - name: name-taken
+        when:
+          all: [defined(connector_id), defined(name), defined(name_held_by)]
+        error: connectors.declarations.InstanceNameTaken
+      # Decision 7: an instance of a connector without a default endpoint
+      # states its own.
+      - name: endpoint-required
+        when:
+          all:
+            - defined(connector_id)
+            - missing(endpoint)
+            - missing(connector_default_endpoint)
+            - any: [missing(name), missing(name_held_by)]
+        error: connectors.declarations.EndpointRequired
       - name: recorded
         creates: connectors.declarations.ServiceConfiguration
         instance: instance_id
@@ -245,6 +459,10 @@ commands:
           adapter_id: input.adapter_id
           revision: input.revision
           registry_epoch: input.registry_epoch
+          connector_id: input.connector_id
+          name: input.name
+          endpoint: input.endpoint
+          description: input.description
   - name: connectors.declarations.AdvanceRegistryEpoch
     input:
       - {name: instance_id, type: String}
@@ -313,6 +531,10 @@ events:
 errors:
   - name: connectors.declarations.RegistryEpochRegressed
     fields: [{name: instance_id, type: String}]
+  - name: connectors.declarations.InstanceNameTaken
+    fields: [{name: instance_id, type: String}]
+  - name: connectors.declarations.EndpointRequired
+    fields: [{name: instance_id, type: String}]
 
   # DEFERRED: multi-tenant SaaS ownership/assignment cardinality remains outside
   # this local, explicitly configured service slice. No tenant is caller-selected.
@@ -328,6 +550,10 @@ views:
       - {name: adapter_id, type: String}
       - {name: revision, type: String}
       - {name: registry_epoch, type: Integer}
+      - {name: connector_id, type: "Optional<connectors.declarations.DeclarationId>"}
+      - {name: name, type: "Optional<String>"}
+      - {name: endpoint, type: "Optional<String>"}
+      - {name: description, type: "Optional<String>"}
       - {name: state, type: connectors.declarations.ServiceConfiguration.State}
 
 actors:

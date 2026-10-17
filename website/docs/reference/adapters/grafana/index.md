@@ -23,7 +23,7 @@ Each record carries the data source's `uid`, `name`, plugin `type`, `access` mod
 secure fields never reach a result.
 
 A connection uses the profile `grafana.service_account`, a Grafana service-account token.
-Connect, repair and `connections revalidate` prove the token with `GET /api/datasources`; the
+Connect, reconnect and `connections revalidate` prove the token with `GET /api/datasources`; the
 identity is the configured connection. The configuration is HTTPS-only, may carry the sub-path
 Grafana is served under, and takes an optional private CA file.
 

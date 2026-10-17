@@ -310,7 +310,7 @@ fn catalog_cli_read_recollects_expired_evidence_without_reentry() {
     refusal(cli.run(&revalidate), "service_failure");
     assert_eq!(
         success(cli.run(&status))["connection"]["summary"]["state"],
-        "reauthorization_required"
+        "stale"
     );
     cli.shutdown();
     let before = provider.count();

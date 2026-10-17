@@ -120,7 +120,7 @@ fn mounted_selection_is_explicit() {
 /// `connect` takes no protected source under the read-only binding: the owner
 /// reads the item itself, the provider validates those bytes and the
 /// connection's reads use them. A source is `invalid_input`; a second
-/// connection of the profile is `custody_read_only`. Neither the mount nor
+/// connect on the instance is `lifecycle_conflict` naming a reconnect. Neither the mount nor
 /// the state directory gains a copy of the bytes.
 #[test]
 fn mounted_connect_reads_never_writes() {
@@ -159,14 +159,17 @@ fn mounted_connect_reads_never_writes() {
     let read = success(&container.invoke(&connection));
     assert_eq!(read["result"]["credential"], digest(SECRET), "{read}");
 
+    // The instance holds its connection: a second connect is refused before
+    // any validation, naming the reconnect that replaces its credential
+    // (story:connect-refused-while-instance-holds-connection).
     let (code, data) = refusal(&container.connect(PROFILE));
     assert_eq!(
         (code, &data["code"], &data["stage"], &data["next_action"]),
         (
             Some(1),
-            &json!("custody_read_only"),
-            &json!("custody"),
-            &json!("check_configuration")
+            &json!("lifecycle_conflict"),
+            &json!("admission"),
+            &json!("repair_connection")
         ),
         "{data}"
     );
@@ -366,10 +369,11 @@ fn configuration_refusal_names_rule() {
 
 /// Security review, story:mounted-secret-custody: one mounted item backs one
 /// connection, also when two `connections connect` for the same alias and
-/// profile run at once. The owner's `holds_profile` check reads only
-/// published connections, outside the transaction that publishes, so two
-/// connects that both pass it before either publishes would each publish a
-/// connection over the same item.
+/// profile run at once. A check that read only published connections,
+/// outside the transaction that publishes, would let two connects that both
+/// pass it before either publishes each publish a connection over the same
+/// item; `begin` refuses a connect beside one in flight, and the publishing
+/// commit refuses a second one.
 #[test]
 fn mounted_concurrent_connects_publish_one_connection() {
     let container = container("connectors-local/4", &Container::mounted());
@@ -389,4 +393,114 @@ fn mounted_concurrent_connects_publish_one_connection() {
         "one item backs one connection: {succeeded} connects succeeded, \
          {connections} connections listed: {listed}"
     );
+}
+
+/// Copy the directory tree `from` to `to`, modes included. A socket (the
+/// stopped owner's `owner.sock`) holds nothing and is left out.
+fn copy_tree(from: &std::path::Path, to: &std::path::Path) {
+    use std::os::unix::fs::FileTypeExt;
+    fs::create_dir(to).unwrap();
+    fs::set_permissions(to, fs::metadata(from).unwrap().permissions()).unwrap();
+    for entry in fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let kind = entry.file_type().unwrap();
+        let target = to.join(entry.file_name());
+        if kind.is_dir() {
+            copy_tree(&entry.path(), &target);
+        } else if kind.is_file() {
+            fs::copy(entry.path(), &target).unwrap();
+        } else {
+            assert!(kind.is_socket(), "{:?}", entry.path());
+        }
+    }
+}
+
+/// The envelope without observation times.
+fn steady(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(fields) => {
+            for (key, field) in fields.iter_mut() {
+                if key.ends_with("_ms") && field.is_i64() {
+                    *field = json!(0);
+                } else {
+                    steady(field);
+                }
+            }
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(steady),
+        _ => {}
+    }
+}
+
+/// story:connections-reconnect-verb: `connections reconnect` publishes the
+/// item's new bytes on the existing connection, keeping its identity, and its
+/// deprecated alias `connections repair` answers the same from the same state,
+/// differing only by its one `deprecations` entry.
+#[test]
+fn mounted_reconnect_publishes_the_new_credential_as_repair_does() {
+    let container = container("connectors-local/4", &Container::mounted());
+    let connected = success(&container.connect(PROFILE));
+    let summary = &connected["connection"]["summary"];
+    let connection = summary["connection"].as_str().unwrap().to_owned();
+    let revision = summary["revision"].as_str().unwrap().to_owned();
+    let read = success(&container.invoke(&connection));
+    assert_eq!(read["result"]["credential"], digest(SECRET), "{read}");
+    let rotated: &[u8] = b"fictional-mounted-token-0003";
+    container.rotate("..2026_10_15_00_00_00.000000003", rotated);
+    success(&container.run(&["setup", "owner-stop"]));
+    let state = container.path(STATE);
+    let saved = container.path("/srv/connectors/saved-state");
+    copy_tree(&state, &saved);
+    let mut answers = Vec::new();
+    for verb in ["reconnect", "repair"] {
+        fs::remove_dir_all(&state).unwrap();
+        copy_tree(&saved, &state);
+        let output = container.run(&[
+            "connections",
+            verb,
+            "--connector",
+            "catalog",
+            "--instance",
+            ALIAS,
+            "--connection",
+            &connection,
+            "--expected-revision",
+            &revision,
+        ]);
+        assert!(output.stderr.is_empty(), "{verb}: {output:?}");
+        let mut envelope: serde_json::Value =
+            serde_json::from_slice(&output.stdout).unwrap_or_else(|_| panic!("{verb}: {output:?}"));
+        assert_eq!(envelope["ok"], true, "{verb}: {envelope}");
+        let result = &envelope["result"]["connection"]["summary"];
+        assert_eq!(
+            result["connection"],
+            connection.as_str(),
+            "{verb}: {envelope}"
+        );
+        assert_eq!(result["state"], "ready", "{verb}: {envelope}");
+        assert_eq!(
+            container.seen("validations").last(),
+            Some(&digest(rotated)),
+            "{verb}"
+        );
+        let read = success(&container.invoke(&connection));
+        assert_eq!(
+            read["result"]["credential"],
+            digest(rotated),
+            "{verb}: {read}"
+        );
+        success(&container.run(&["setup", "owner-stop"]));
+        steady(&mut envelope);
+        answers.push(envelope);
+    }
+    let deprecations = answers[1]
+        .as_object_mut()
+        .unwrap()
+        .remove("deprecations")
+        .expect("repair is deprecated");
+    assert_eq!(
+        deprecations,
+        json!([{"command":"connections repair","replacement":["connections reconnect"]}])
+    );
+    assert_eq!(answers[0], answers[1]);
 }

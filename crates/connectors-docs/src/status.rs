@@ -18,7 +18,7 @@ pub const DATA: &str = "website/data/status.json";
 pub const PAGE: &str = "website/docs/status.md";
 
 /// The date the list below was last checked against the repository.
-const AS_OF: &str = "2026-10-10";
+const AS_OF: &str = "2026-10-16";
 
 /// One capability on the status page.
 pub struct Capability {
@@ -90,14 +90,14 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Service boundary",
         "Describe and invoke",
-        "An adapter service answers a typed descriptor and invokes its operations over HTTP; admission and freshness are checked before dispatch.",
+        "A connector's standalone service answers a typed descriptor and invokes its operations over HTTP; admission and freshness are checked before dispatch.",
         "crates/connectors-host/tests/service.rs::wire_admission_and_freshness_refuse_before_dispatch",
         "/docs/getting-started",
     ),
     shipped(
         "Service boundary",
         "One-hop federation",
-        "connectors serve puts one gateway in front of several adapter services, prefixes their operations and reports a downstream failure without retrying it.",
+        "connectors serve puts one gateway in front of several standalone services, prefixes their operations and reports a downstream failure without retrying it.",
         "crates/connectors-host/tests/service.rs::federation_preserves_result_and_reports_downstream_failure",
         "/docs/guides/federate-adapter-services",
     ),
@@ -137,8 +137,8 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Local runtime",
-        "Supervised adapters",
-        "A local owner starts the configured adapter executables, refuses a changed executable or configuration before provider work, and stops exact incarnations.",
+        "Supervised instances",
+        "A local owner starts the process that serves each configured instance, refuses a changed executable or configuration before provider work, and stops exact incarnations.",
         "adapters/catalog/tests/local_runtime.rs::catalog_child_validates_reads_and_stops_with_exact_incarnations",
         "/docs/concepts/local-runtime",
     ),
@@ -166,7 +166,7 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Local runtime",
         "Saved connections",
-        "connections connect validates a credential and keeps it in Secret Service custody; revalidate, repair and revoke manage it, and an unanswered revalidation is outcome_unknown.",
+        "connections connect validates a credential and keeps it in Secret Service custody; revalidate, reconnect and revoke manage it, and an unanswered revalidation is outcome_unknown.",
         "apps/connectors/tests/failed_connect.rs::a_revalidation_reply_that_never_arrives_is_outcome_unknown",
         "/docs/concepts/local-runtime",
     ),
@@ -176,6 +176,48 @@ pub const CAPABILITIES: &[Capability] = &[
         "A connection connected or revalidated once keeps serving reads across any number of evidence lifetimes: a read on lapsed evidence recollects it once from custody, with no re-entry, before it is served.",
         "apps/connectors/tests/connection_lease.rs::a_revalidated_connection_serves_reads_across_three_evidence_lifetimes",
         "/docs/concepts/local-runtime",
+    ),
+    shipped(
+        "Local runtime",
+        "Connector instances",
+        "A connectors-local/5 configuration enables connectors by name and names their instances; an instance that pins nothing is derived from the catalog provider installed beside the CLI.",
+        "apps/connectors/tests/derived_instance.rs::the_cli_derives_an_instance_named_alone_from_the_provider_beside_it",
+        "/docs/guides/set-up-the-local-cli#configure-instances",
+    ),
+    shipped(
+        "Local runtime",
+        "Selecting an instance",
+        "--connector and --instance select one instance; the deprecated --adapter reaches the same instance and says it is deprecated once.",
+        "apps/connectors/tests/connector_instance_selectors.rs::both_selectors_reach_one_instance_and_only_the_alias_is_deprecated",
+        "/docs/reference/cli",
+    ),
+    shipped(
+        "Local runtime",
+        "Renamed commands",
+        "instances replaces the adapters group and connections reconnect replaces connections repair; each old name runs as its new one and says it is deprecated once.",
+        "apps/connectors/tests/renamed_commands.rs::each_old_name_answers_as_its_new_name_and_says_it_is_deprecated_once",
+        "/docs/reference/cli",
+    ),
+    shipped(
+        "Local runtime",
+        "Stale connections",
+        "A connection whose stored credential the provider refused is Stale until connections reconnect publishes a new credential under the same reference.",
+        "crates/connectors-host/src/local/registry/stale_tests.rs::a_refused_read_makes_the_connection_stale_until_a_reconnect_publishes",
+        "/docs/concepts/local-runtime#saved-connections",
+    ),
+    shipped(
+        "Local runtime",
+        "One connection per instance",
+        "connections connect is refused while the instance holds a published Live or Stale connection, naming the reconnect, revalidation or revocation that helps.",
+        "crates/connectors-host/src/local/registry/cardinality_tests.rs::a_connect_is_refused_while_the_instance_holds_a_published_live_connection",
+        "/docs/concepts/local-runtime#saved-connections",
+    ),
+    shipped(
+        "Local runtime",
+        "Configuration migration",
+        "setup migrate moves each legacy catalog entry to an instance of its connector, keeping its instance id, revision, executable selection and custody items, and names why any other entry is kept.",
+        "apps/connectors/tests/setup_migrate.rs::each_kind_is_migrated_or_kept_naming_why_and_keeps_its_records",
+        "/docs/guides/set-up-the-local-cli#configure-instances",
     ),
     shipped(
         "Local runtime",

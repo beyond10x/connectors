@@ -301,29 +301,60 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
                 .env("CARGO_TARGET_DIR", target.join("msrv-1.91")),
         )?;
     }
+    authored_scenarios(root, ess, temp.path())?;
+    // Execute the local metadata authority's synthesized scenarios against the lowered
+    // definitions the host runs, not only the model.
+    let metadata_conformance = temp.path().join("metadata-conformance");
+    std::fs::create_dir_all(&metadata_conformance)?;
+    super::metadata_conformance::gate(root, &metadata_conformance)?;
+    let mut planning = Command::new(aep);
+    planning.current_dir(root).env("TMPDIR", temp.path());
+    execute(planning.args(["plan", "artifact", "validate"]))?;
+    println!("gate: all checks passed");
+    Ok(())
+}
+
+/// The authored scenario directories the gate compiles and executes.
+const AUTHORED_DIRECTORIES: &[&str] = &[
+    "contracts/operations/v1alpha1/scenarios",
+    "contracts/auth/acquisition/v1alpha1/scenarios",
+    "contracts/auth/evidence/v1alpha1/scenarios",
+    "contracts/auth/connection/v1alpha1/scenarios",
+    "contracts/service/v1alpha1/scenarios",
+    // Inbound only. These are `ess-scenario/1` and ESS owns them, so synthesising them
+    // against the shared IR is a real check.
+    //
+    // The outbound directory beside it is deliberately absent. Those files are
+    // `mcp-outbound-lifecycle/1`, a format this repository defined and ESS does not
+    // know — and ESS refuses an unknown key rather than ignoring it, so collecting
+    // them here fails the gate on every one of them. They are held by
+    // `mcp_outbound_connection_lifecycle`'s own package-scoped cases instead, which is
+    // a weaker guarantee than the shared IR gives the inbound set, and saying so here
+    // is the point: adding the directory would turn a stated gap into a broken gate.
+    "adapters/mcp/contracts/server/v1alpha1/scenarios",
+];
+
+/// Compiles the generated obligations with the authored traces of [`AUTHORED_DIRECTORIES`],
+/// then executes the authored traces against the model with the pinned ESS interpreter.
+fn authored_scenarios(root: &Path, ess: &Path, temp: &Path) -> Result<()> {
+    let checked = |cmd: &mut Command| -> Result<()> {
+        println!("gate: {:?}", cmd.get_args().collect::<Vec<_>>());
+        let status = cmd.status()?;
+        println!(
+            "gate: exit={status} {:?}",
+            cmd.get_args().collect::<Vec<_>>()
+        );
+        if !status.success() {
+            return Err(format!("gate command {:?} failed", cmd.get_program()).into());
+        }
+        Ok(())
+    };
     // The pinned ESS authoring reader is non-recursive. Collect each explicitly
     // registered directory with a unique prefix so none silently disappears.
-    let scenarios = temp.path().join("authored-scenarios");
+    let scenarios = temp.join("authored-scenarios");
     std::fs::create_dir(&scenarios)?;
-    for (index, directory) in [
-        "contracts/operations/v1alpha1/scenarios",
-        "contracts/auth/acquisition/v1alpha1/scenarios",
-        "contracts/auth/evidence/v1alpha1/scenarios",
-        // Inbound only. These are `ess-scenario/1` and ESS owns them, so synthesising them
-        // against the shared IR is a real check.
-        //
-        // The outbound directory beside it is deliberately absent. Those files are
-        // `mcp-outbound-lifecycle/1`, a format this repository defined and ESS does not
-        // know — and ESS refuses an unknown key rather than ignoring it, so collecting
-        // them here fails the gate on every one of them. They are held by
-        // `mcp_outbound_connection_lifecycle`'s own package-scoped cases instead, which is
-        // a weaker guarantee than the shared IR gives the inbound set, and saying so here
-        // is the point: adding the directory would turn a stated gap into a broken gate.
-        "adapters/mcp/contracts/server/v1alpha1/scenarios",
-    ]
-    .iter()
-    .enumerate()
-    {
+    let mut collected = 0;
+    for (index, directory) in AUTHORED_DIRECTORIES.iter().enumerate() {
         let mut files = std::fs::read_dir(root.join(directory))?
             .map(|entry| entry.map(|entry| entry.path()))
             .collect::<std::io::Result<Vec<_>>>()?;
@@ -348,12 +379,13 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             return Err(format!("{directory}: no authored scenarios").into());
         }
         println!("gate: collected {count} authored scenarios from {directory}; exit=0");
+        collected += count;
     }
     // Compile generated obligations and authored traces. This checks the model.
-    execute(
+    checked(
         Command::new(ess)
             .current_dir(root)
-            .env("TMPDIR", temp.path())
+            .env("TMPDIR", temp)
             .args([
                 "verify",
                 "conform",
@@ -366,18 +398,229 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             ])
             .arg(&scenarios)
             .arg("--out")
-            .arg(temp.path().join("contract-conformance.json")),
+            .arg(temp.join("contract-conformance.json")),
     )?;
-    // Execute the local metadata authority's synthesized scenarios against the lowered
-    // definitions the host runs, not only the model.
-    let metadata_conformance = temp.path().join("metadata-conformance");
-    std::fs::create_dir_all(&metadata_conformance)?;
-    super::metadata_conformance::gate(root, &metadata_conformance)?;
-    let mut planning = Command::new(aep);
-    planning.current_dir(root).env("TMPDIR", temp.path());
-    execute(planning.args(["plan", "artifact", "validate"]))?;
-    println!("gate: all checks passed");
+    // Execute the authored traces, not only compile them. Compilation resolves their names;
+    // only execution holds a timeline to the model, so a lifecycle the model contradicts (a
+    // move from a state it does not admit) passes the step above and fails here. `author`
+    // compiles the authored scenarios alone and refuses one it cannot read; the pinned ESS
+    // interpreter then runs exactly that suite against the model.
+    let authored = temp.join("authored-suite.json");
+    checked(
+        Command::new(ess)
+            .current_dir(root)
+            .env("TMPDIR", temp)
+            .args([
+                "verify",
+                "conform",
+                "author",
+                "--path",
+                "ess",
+                "--scenarios",
+            ])
+            .arg(&scenarios)
+            .arg("--out")
+            .arg(&authored),
+    )?;
+    let report = temp.join("authored-report.json");
+    // The run exits non-zero while a known failure remains; the report decides.
+    let status = Command::new(ess)
+        .current_dir(root)
+        .env("TMPDIR", temp)
+        .args([
+            "verify",
+            "conform",
+            "run",
+            "--target",
+            "interpreted",
+            "--path",
+            "ess",
+        ])
+        .arg("--suite")
+        .arg(&authored)
+        .args(["--report-format", "2", "--report-out"])
+        .arg(&report)
+        .status()?;
+    let outcomes: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(&report)
+            .map_err(|error| format!("authored execution wrote no report ({status}): {error}"))?,
+    )?;
+    let passed = authored_execution(&outcomes["outcomes"], collected)?;
+    println!(
+        "gate: executed {collected} authored scenarios, {passed} passed, {} known failing; exit=0",
+        collected - passed
+    );
     Ok(())
+}
+
+/// Authored scenarios that fail when the pinned ESS 0.59.0 interpreter executes them, measured
+/// 2026-10-16 when the gate first executed authored traces. Each needs its owner's triage; none
+/// is waived silently. Most claim an error field this ess/18 model never fills (`state`,
+/// `reason`: an error's fields need payload sources, ess/19); the mutations traces also
+/// expect outcomes the model answers differently (`subject-missing`, `wrong-state`). A listed
+/// scenario that starts passing fails the gate too, so the list cannot outlive its cause.
+const AUTHORED_KNOWN_FAILING: &[&str] = &[
+    "connectors.credential_evidence/authored/configured-replacement-identity",
+    "connectors.credential_evidence/authored/retained-lineage-expires-before-dispatch",
+    "connectors.credential_evidence/authored/revocation-before-dispatch",
+    "connectors.credential_evidence/authored/rotation-before-dispatch",
+    "connectors.credential_evidence/authored/same-identity-refresh",
+    "connectors.credential_evidence/authored/unvalidated-configured-replacement",
+    "connectors.idempotency/authored/idempotency-known-result-expiry",
+    "connectors.idempotency/authored/idempotency-namespace-values",
+    "connectors.idempotency/authored/idempotency-pending-no-expiry",
+    "connectors.idempotency/authored/idempotency-unknown-no-expiry",
+    "connectors.mutations/authored/deadline-after-gate",
+    "connectors.mutations/authored/deadline-before-gate",
+    "connectors.mutations/authored/definitive-refusal",
+    "connectors.mutations/authored/definitive-success",
+    "connectors.mutations/authored/indeterminate-is-terminal",
+    "connectors.mutations/authored/recovery-after-gate",
+    "connectors.mutations/authored/recovery-before-gate",
+    "connectors.refresh/authored/authorization-wins-fence-race",
+    "connectors.refresh/authored/authorized-owner-loss-no-second-exchange",
+    "connectors.refresh/authored/binding-replacement-before-publication",
+    "connectors.refresh/authored/durable-response-wins-owner-loss-race",
+    "connectors.refresh/authored/expired-candidate-before-publication",
+    "connectors.refresh/authored/late-response-after-quarantine",
+    "connectors.refresh/authored/published-reply-loss-no-reexchange",
+    "connectors.refresh/authored/recovery-owner-loss-never-reopens-source",
+    "connectors.refresh/authored/reserved-owner-fenced-before-successor",
+    "connectors.refresh/authored/revocation-before-authorization",
+    "connectors.refresh/authored/revocation-before-publication",
+    "connectors.refresh/authored/stored-response-recovery-rejects-stale-publisher",
+    "connectors.refresh/authored/two-replicas-one-authorization",
+    "connectors.sessions/authored/graceful-stdin-close-ends-the-session",
+    "connectors.sessions/authored/partial-result-never-reported-complete",
+    "connectors.sessions/authored/transport-drop-loses-the-session",
+    "connectors.sessions/authored/unsupported-version-denies-readiness",
+];
+
+/// Holds an `ess-conformance-run/2` report's `outcomes` to the authored scenarios the gate
+/// collected: every one ran, every one not in [`AUTHORED_KNOWN_FAILING`] passed, and every
+/// listed one still failed. Returns the number that passed.
+fn authored_execution(outcomes: &serde_json::Value, collected: usize) -> Result<usize> {
+    let names = |status: &str| -> Result<Vec<String>> {
+        outcomes[status]
+            .as_array()
+            .ok_or_else(|| format!("authored execution report has no `{status}` list"))?
+            .iter()
+            .map(|name| {
+                name.as_str()
+                    .map(str::to_owned)
+                    .ok_or_else(|| "authored execution report names a non-string".into())
+            })
+            .collect()
+    };
+    let passed = names("passed")?;
+    let failed = names("failed")?;
+    let mut ran = passed.len() + failed.len();
+    let mut problems = Vec::new();
+    for status in ["error", "unsupported", "skipped"] {
+        for name in names(status)? {
+            ran += 1;
+            problems.push(format!("{status}: {name}"));
+        }
+    }
+    for name in &failed {
+        if !AUTHORED_KNOWN_FAILING.contains(&name.as_str()) {
+            problems.push(format!("failed: {name}"));
+        }
+    }
+    for name in AUTHORED_KNOWN_FAILING {
+        if passed.iter().any(|passed| passed == name) {
+            problems.push(format!("passes but is listed as known failing: {name}"));
+        } else if !failed.iter().any(|failed| failed == name) {
+            problems.push(format!("listed as known failing but did not run: {name}"));
+        }
+    }
+    if ran != collected {
+        problems.push(format!(
+            "{collected} authored scenarios collected, {ran} executed"
+        ));
+    }
+    if problems.is_empty() {
+        Ok(passed.len())
+    } else {
+        Err(format!("authored scenario execution: {}", problems.join("; ")).into())
+    }
+}
+
+#[cfg(test)]
+mod authored_execution_tests {
+    use super::{AUTHORED_KNOWN_FAILING, authored_execution, authored_scenarios};
+    use serde_json::json;
+    use std::path::Path;
+
+    /// The gate's own lane over the repository's model and scenarios, with the pinned ESS: a
+    /// lifecycle mutant of `ess/` (`mark_stale` from Stale, `publish` or `revoke` not from
+    /// Stale) fails here.
+    #[test]
+    fn the_registered_authored_scenarios_execute_against_the_model() {
+        let ess = connectors_spec::toolchain::resolve(None).expect("pinned ess");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let temp = tempfile::tempdir().unwrap();
+        authored_scenarios(&root, &ess, temp.path()).unwrap();
+    }
+
+    fn report(passed: &[&str], failed: &[&str]) -> serde_json::Value {
+        json!({"passed": passed, "failed": failed, "error": [], "unsupported": [], "skipped": []})
+    }
+
+    #[test]
+    fn every_unlisted_scenario_must_pass() {
+        let failed: Vec<&str> = AUTHORED_KNOWN_FAILING
+            .iter()
+            .copied()
+            .chain(["connectors.auth_bindings/authored/stale"])
+            .collect();
+        let error = authored_execution(&report(&[], &failed), failed.len()).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("failed: connectors.auth_bindings/authored/stale")
+        );
+    }
+
+    #[test]
+    fn a_listed_scenario_that_passes_fails_the_gate() {
+        let error = authored_execution(
+            &report(&AUTHORED_KNOWN_FAILING[..1], &AUTHORED_KNOWN_FAILING[1..]),
+            AUTHORED_KNOWN_FAILING.len(),
+        )
+        .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("passes but is listed as known failing")
+        );
+    }
+
+    #[test]
+    fn a_scenario_that_did_not_run_fails_the_gate() {
+        let error = authored_execution(
+            &report(
+                &["connectors.declarations/authored/a"],
+                AUTHORED_KNOWN_FAILING,
+            ),
+            AUTHORED_KNOWN_FAILING.len() + 2,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("collected"));
+    }
+
+    #[test]
+    fn known_failures_and_passes_hold() {
+        let passed = ["connectors.declarations/authored/a"];
+        assert_eq!(
+            authored_execution(
+                &report(&passed, AUTHORED_KNOWN_FAILING),
+                AUTHORED_KNOWN_FAILING.len() + 1
+            )
+            .unwrap(),
+            1
+        );
+    }
 }
 
 #[cfg(test)]

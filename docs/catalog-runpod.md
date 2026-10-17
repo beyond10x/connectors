@@ -8,8 +8,10 @@ account key itself. Nothing here is Runpod-specific code: the pinned document is
 compiled into a bundle, a reviewed selection set exposes two reads and two
 writes, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
-Configuration, connection, approval and invocation work as described there;
-this page covers what differs for Runpod.
+Connection, approval and invocation work as described there; this page
+configures the `runpod` connector and covers what differs for Runpod.
+Connector, instance and connection are defined in
+[the README](../README.md#vocabulary).
 
 ## Source and bundle
 
@@ -93,11 +95,10 @@ one it does not accept.
 
 ## Writes: approval and outcomes
 
-Both writes are required-approval mutations. They are available only on an
-adapter entry with `private_protocol = "connectors-private/2"`, and only under
-a published approval policy that names them. For an unattended caller that
-holds the issuing key, publish this policy with
-`connectors approvals policy-set --adapter gpu --input-file policy.json`:
+Both writes are required-approval mutations. An instance of the `runpod`
+connector serves them only under a published approval policy that names them.
+For an unattended caller that holds the issuing key, publish this policy with
+`connectors approvals policy-set --connector runpod --instance gpu --input-file policy.json`:
 
 ```json
 {"operations": ["pod.create", "pod.terminate"]}
@@ -113,7 +114,7 @@ other body, and a proof for one `podId` is refused for any other.
 Each write sends exactly one request and is never sent again by the provider.
 `mutation.classification` reports what is known:
 
-| operation | answer | classification | what the caller concludes |
+| write | answer | classification | what the caller concludes |
 |---|---|---|---|
 | `pod.create` | `201` or `200` | `applied` | the pod exists; `result.body` is Runpod's pod, with its `id` |
 | `pod.create` | a definite refusal (`400`, `401`, `403`, `404`, `409`, `422`, …) whose `message` or `detail` names a lack of capacity (below) | `refused`, code `capacity` | no pod was created, because Runpod had no machine to place it on; the same workload may be placed elsewhere (another GPU type, data center or cloud type) or later |
@@ -156,50 +157,56 @@ The pinned document has no user or account read. Connecting proves the key
 with `GET /v1/pods`: a `200` admits it, a `401` refuses it as an invalid
 credential. The answer's body is not read, so an account with no pods connects
 too. The identity is therefore the configured connection, not a Runpod
-account: its kind is `runpod.connection` and its subject is the configuration's
-`instance` id (identity `source` `configuration`, see
-[the catalog provider guide](local-catalog-provider.md#configure-the-provider)).
-Repair and revalidate cannot tell two Runpod accounts apart: any key that lists
-pods is accepted as the same identity. After a repair with another account's
+account: its kind is `runpod.connection` and its subject is the instance id
+(identity `source` `configuration`).
+Reconnect and revalidate cannot tell two Runpod accounts apart: any key that lists
+pods is accepted as the same identity. After a reconnect with another account's
 key, every pod the first account still runs answers `pod.terminate` with `404`
-and stays billed. Use one `instance` per Runpod account, and repair it only with
+and stays billed. Use one instance per Runpod account, and reconnect it only with
 a key of that account.
 
-```json
-{
-  "format": "connectors-catalog-local/2",
-  "instance": "runpod",
-  "provider": "runpod",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
-  "api_base": "https://rest.runpod.io/v1",
-  "auth": {
-    "profile": "runpod.api-key",
-    "header": "Authorization",
-    "bearer": true,
-    "label": "Runpod API key",
-    "identity": {"source": "configuration", "path": "pods", "kind": "runpod.connection"}
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/runpod/operations.json"
-}
+The `runpod` connector declares that profile and the default endpoint
+`https://rest.runpod.io/v1`
+([`adapters/catalog/providers/runpod/connector.json`](../adapters/catalog/providers/runpod/connector.json)).
+Add to the host configuration (`~/.config/connectors/config.toml`, format
+`connectors-local/5`):
+
+```toml
+[connectors.runpod]
+enabled = true
+
+[connectors.runpod.instances.gpu]
 ```
 
-Bind it to the local CLI as [the catalog provider guide](local-catalog-provider.md#bind-the-provider-to-the-local-cli)
-describes, with `private_protocol = "connectors-private/2"`,
-`profiles = ["runpod.api-key"]` and
-`operations = ["pod.create", "pods.list", "billing.pods", "pod.terminate"]`, here under the
-adapter alias `gpu`. Connect with the credential document
-`{"token": "<Runpod API key>"}`:
+The bundle, the four operations, the profile and the provider executable are
+derived from the shipped connector, and the instance serves the two writes
+(its provider runs over `connectors-private/2`). The instance id, and so the
+connection's subject, is `runpod.gpu`:
+
+```console
+$ connectors instances list
+{"adapters":[{"adapter":"runpod.gpu","adapter_id":"catalog","connector":"runpod","instance":"gpu","instance_id":"runpod.gpu","restart":"never","startup":"on-demand"}],"source":"configuration"}
+```
+
+Connect with the credential document `{"token": "<Runpod API key>"}` in an
+owner-only file:
 
 ```sh
-connectors --output json connections connect --adapter gpu --profile runpod.api-key --credential-file /owner-only/runpod.json
+connectors connections connect --connector runpod --instance gpu \
+  --profile runpod.api-key --credential-file ~/private/runpod.json
 ```
+
+An installation configured before connectors were declared converts its
+entries with `connectors setup migrate`, which keeps each instance id and
+revision; the pinned form it writes is described in
+[the catalog provider guide](local-catalog-provider.md).
 
 ## Invoke
 
 List the running pods with one name:
 
 ```sh
-connectors operations invoke --adapter gpu --connection "$connection" \
+connectors operations invoke --connector runpod --instance gpu --connection "$connection" \
   --operation pods.list --schema "$schema" --revision "$revision" \
   --input-json '{"name":"worker-a","desiredStatus":"RUNNING"}' --output json
 ```
@@ -207,7 +214,7 @@ connectors operations invoke --adapter gpu --connection "$connection" \
 Read one pod's daily billing records (`billing.pods` is a read, so it needs no approval):
 
 ```sh
-connectors operations invoke --adapter gpu --connection "$connection" \
+connectors operations invoke --connector runpod --instance gpu --connection "$connection" \
   --operation billing.pods --schema "$schema" --revision "$revision" \
   --input-json '{"bucketSize":"day","podId":"<pod id>"}' --output json
 ```
@@ -222,7 +229,7 @@ Create a pod (`create.json`, approved as above):
 ```
 
 ```sh
-connectors operations invoke --adapter gpu --connection "$connection" \
+connectors operations invoke --connector runpod --instance gpu --connection "$connection" \
   --operation pod.create --schema "$schema" --revision "$revision" \
   --input-file create.json --approval-file "$proof_file" \
   --idempotency-key "$business_key" --output json
@@ -231,7 +238,7 @@ connectors operations invoke --adapter gpu --connection "$connection" \
 Terminate it (`terminate.json` is `{"podId": "<id from the create result>"}`):
 
 ```sh
-connectors operations invoke --adapter gpu --connection "$connection" \
+connectors operations invoke --connector runpod --instance gpu --connection "$connection" \
   --operation pod.terminate --schema "$schema" --revision "$revision" \
   --input-file terminate.json --approval-file "$proof_file" \
   --idempotency-key "$business_key" --output json
@@ -252,7 +259,7 @@ connectors operations invoke --adapter gpu --connection "$connection" \
 - No guard: neither write reads the pod first. A pod's state is not pinned
   before terminate.
 - `pod.show` (`GetPod`), stop, start, reset, update and every endpoint,
-  template, network volume, registry-auth and billing operation are not
+  template, network volume, registry-auth and billing operation but `billing.pods` are not
   selected.
 - The identity is the configured connection, not a Runpod account (see
   [Authentication](#authentication)).

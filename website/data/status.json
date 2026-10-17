@@ -1,17 +1,17 @@
 {
-  "asOf": "2026-10-10",
+  "asOf": "2026-10-16",
   "format": "b10x-status/1",
   "items": [
     {
       "area": "Service boundary",
-      "detail": "An adapter service answers a typed descriptor and invokes its operations over HTTP; admission and freshness are checked before dispatch.",
+      "detail": "A connector's standalone service answers a typed descriptor and invokes its operations over HTTP; admission and freshness are checked before dispatch.",
       "href": "/docs/getting-started",
       "label": "Describe and invoke",
       "status": "shipped"
     },
     {
       "area": "Service boundary",
-      "detail": "connectors serve puts one gateway in front of several adapter services, prefixes their operations and reports a downstream failure without retrying it.",
+      "detail": "connectors serve puts one gateway in front of several standalone services, prefixes their operations and reports a downstream failure without retrying it.",
       "href": "/docs/guides/federate-adapter-services",
       "label": "One-hop federation",
       "status": "shipped"
@@ -53,9 +53,9 @@
     },
     {
       "area": "Local runtime",
-      "detail": "A local owner starts the configured adapter executables, refuses a changed executable or configuration before provider work, and stops exact incarnations.",
+      "detail": "A local owner starts the process that serves each configured instance, refuses a changed executable or configuration before provider work, and stops exact incarnations.",
       "href": "/docs/concepts/local-runtime",
-      "label": "Supervised adapters",
+      "label": "Supervised instances",
       "status": "shipped"
     },
     {
@@ -81,16 +81,51 @@
     },
     {
       "area": "Local runtime",
-      "detail": "connections connect validates a credential and keeps it in Secret Service custody; revalidate, repair and revoke manage it, and an unanswered revalidation is outcome_unknown.",
+      "detail": "connections connect validates a credential and keeps it in Secret Service custody; revalidate, reconnect and revoke manage it, and an unanswered revalidation is outcome_unknown.",
       "href": "/docs/concepts/local-runtime",
       "label": "Saved connections",
       "status": "shipped"
     },
     {
       "area": "Local runtime",
-      "detail": "A connection connected or revalidated once keeps serving reads across any number of evidence lifetimes: a read on lapsed evidence recollects it once from custody, with no re-entry, before it is served.",
-      "href": "/docs/concepts/local-runtime",
-      "label": "Unattended reads",
+      "detail": "A connectors-local/5 configuration enables connectors by name and names their instances; an instance that pins nothing is derived from the catalog provider installed beside the CLI.",
+      "href": "/docs/guides/set-up-the-local-cli#configure-instances",
+      "label": "Connector instances",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "--connector and --instance select one instance; the deprecated --adapter reaches the same instance and says it is deprecated once.",
+      "href": "/docs/reference/cli",
+      "label": "Selecting an instance",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "instances replaces the adapters group and connections reconnect replaces connections repair; each old name runs as its new one and says it is deprecated once.",
+      "href": "/docs/reference/cli",
+      "label": "Renamed commands",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "A connection whose stored credential the provider refused is Stale until connections reconnect publishes a new credential under the same reference.",
+      "href": "/docs/concepts/local-runtime#saved-connections",
+      "label": "Stale connections",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "connections connect is refused while the instance holds a published Live or Stale connection, naming the reconnect, revalidation or revocation that helps.",
+      "href": "/docs/concepts/local-runtime#saved-connections",
+      "label": "One connection per instance",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "setup migrate moves each legacy catalog entry to an instance of its connector, keeping its instance id, revision, executable selection and custody items, and names why any other entry is kept.",
+      "href": "/docs/guides/set-up-the-local-cli#configure-instances",
+      "label": "Configuration migration",
       "status": "shipped"
     },
     {

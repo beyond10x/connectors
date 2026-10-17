@@ -252,7 +252,7 @@ and the checkpoint advances only when a use that may write returns a handle.
 
 | Open | What the provider verifies | What the host verifies before the handle answers |
 |---|---|---|
-| Any fresh open in any process: a command, a second process, the owner when it starts, recovery after a refused handle | a `ProviderTracked` open: the checkpoint and the suffix after it, or the whole store when there is no usable checkpoint | the whole store: a complete snapshot, which reads and verifies every event, bound blob and index row; Entity Runtime 0.29.0 treats a complete read as a complete verification (its CHANGELOG, and `CapturePolicy::ProviderTracked` in `entity-eventlog` `adapter/tracked.rs`), so no open uses a separate `FullVerification` policy |
+| Any fresh open in any process: a command, a second process, the owner when it starts, recovery after a refused handle | a `ProviderTracked` open: the checkpoint and the suffix after it, or the whole store when there is no usable checkpoint | the whole store: a complete snapshot, which reads and verifies every event, bound blob and index row; Entity Runtime 0.29.0 treats a complete read as a complete verification (its CHANGELOG, and `CapturePolicy::ProviderTracked` in the `entity-eventlog` internal module `adapter/tracked.rs`), so no open uses a separate `FullVerification` policy |
 | A pooled handle reused in the process that verified it | — | the events appended since its head, by subject, or a complete snapshot when one cannot be attributed; the physical page scan (`quick_check`, foreign keys) of its fresh open is not repeated |
 | A live `ProviderTracked` handle reading after another connection appended | the appended suffix, proven continuous by Eventlog's journal | — |
 
@@ -284,7 +284,7 @@ batch's receipt is read back; the projection check runs once, after the
 caller's batch. A refused or uncertain expiry batch leaves earlier ones
 committed and the caller's change unapplied; the next write records the rest.
 
-The local owner, adapter children and keyring remain separate processes with their
+The local owner, the processes serving instances and the keyring remain separate processes with their
 current socket, supervision, startup coalescing, bounded shutdown and explicit
 stop suppression contracts. Only metadata persistence changes. Public results,
 ordinary diagnostics and retained fixtures continue to exclude Secret Service

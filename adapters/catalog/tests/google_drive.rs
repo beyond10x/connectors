@@ -19,6 +19,8 @@
 //! write's method, route and body, so "no write was sent" is a count of what
 //! the fixture saw.
 #![cfg(unix)]
+mod hand_written;
+
 use connectors_catalog::{bundle, discovery};
 use connectors_catalog_provider::{
     Check, Effect, Engine, Expectation, Guard, Postflight, Preflight, ResponseKind, Selection,
@@ -401,7 +403,7 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
 }
 
 /// The guide cites each write with its request and guard, names the write
-/// scope, and names how an existing connection gains it.
+/// scope, and runs the writes on the one instance whose consent requests it.
 #[test]
 fn guide_cites_each_write_its_guard_and_the_write_scope() {
     let guide = fs::read_to_string(root().join("../../docs/catalog-google-drive.md")).unwrap();
@@ -435,29 +437,32 @@ fn guide_cites_each_write_its_guard_and_the_write_scope() {
         assert!(cited, "no row cites `{id}` as {request} with guard {guard}");
     }
     assert!(guide.contains(&format!("`{WRITE_SCOPE}`")));
-    // The write scope comes from a separate instance, connected afresh: a
-    // repair cannot widen a connection, whose binding holds the configuration
-    // revision and the profile.
+    // One instance per account requests the read and the write scope; an
+    // installation that held a read and a write entry connects it afresh,
+    // because a reconnect cannot widen a connection, whose binding holds the
+    // configuration revision and the profile.
     let flat = guide.split_whitespace().collect::<Vec<_>>().join(" ");
-    assert!(flat.contains("Writes use a separate instance"));
-    assert!(flat.contains("`google-drive-write`"));
-    assert!(flat.contains("then `connections connect` that instance with the Google client file"));
-    assert!(flat.contains("`connections repair` cannot add a scope"));
-    assert!(
-        !flat.contains("through `connections repair`")
-            && !flat.contains("with `connections repair`"),
-        "the guide still routes the write scope through `connections repair`"
-    );
+    assert!(guide.contains(&format!("`{DRIVE_SCOPE}`")));
+    assert!(flat.contains("Writes run on the same instance as the reads"));
+    assert!(flat.contains("One instance per Google account reads and writes"));
+    assert!(flat.contains("[connectors.drive.instances.private]"));
+    assert!(flat.contains("does not merge them"));
+    for stale in [
+        "Writes use a separate instance",
+        "`google-drive-write`",
+        "connections repair",
+    ] {
+        assert!(!flat.contains(stale), "the guide still says {stale}");
+    }
 }
 
-/// The guide's configuration example for this provider: the read-only one, or
-/// the one that also asks for the write scope.
+/// The configuration the guide showed before connectors were declared
+/// (`hand_written`): the read-only one, or the one that also asks for the
+/// write scope.
 fn documented(write: bool) -> Value {
-    let guide = fs::read_to_string(root().join("../../docs/catalog-google-drive.md")).unwrap();
-    let example = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
+    let blocks = hand_written::blocks("catalog-google-drive.md");
+    let example = blocks
+        .iter()
         .find(|body| {
             body.contains(&format!("\"provider\": \"{PROVIDER}\""))
                 && body.contains(WRITE_SCOPE) == write
@@ -469,7 +474,7 @@ fn documented_config() -> Value {
     documented(false)
 }
 
-/// The write configuration is a separate instance, `google-drive-write`: the
+/// The hand-written write configuration is a separate instance, `google-drive-write`: the
 /// read one with its own instance id and the write scope added to both
 /// `minimum_scopes` and `requested_scopes`, and nothing else changed.
 #[test]

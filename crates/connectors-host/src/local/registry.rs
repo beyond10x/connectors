@@ -9,7 +9,11 @@ pub use observation::{ObservedAcquisition, ObservedConnection, Page, PageOptions
 pub use revalidation::{Revalidation, RevalidationDispatch};
 pub use use_and_retirement::{DispatchedUse, InvalidCredential, ReadUse, Retirement};
 #[cfg(test)]
+mod cardinality_tests;
+#[cfg(test)]
 mod expiry_batch_tests;
+#[cfg(test)]
+mod stale_tests;
 #[cfg(test)]
 mod store_cost_tests;
 #[cfg(test)]
@@ -78,6 +82,17 @@ pub enum Failure {
     /// id can. Public code `lifecycle_conflict`, `next_action =
     /// check_configuration`.
     AuthenticationChanged,
+    /// The instance holds a published Live or Stale connection under the
+    /// configured binding, so a connect that would allocate another is refused
+    /// (`connectors.auth_bindings.AllocateConnection`, `instance-connected`);
+    /// a repair replaces that connection's credential. Public code
+    /// `lifecycle_conflict`, `next_action = repair_connection`.
+    InstanceConnected,
+    /// As `InstanceConnected`, but no repair can replace what the instance
+    /// holds: its one connection was admitted under another binding, or it
+    /// holds more than one from before the rule. Only a revocation clears it.
+    /// Public code `lifecycle_conflict`, `next_action = revoke_connection`.
+    InstanceConnectionChanged,
 }
 pub type Result<T> = std::result::Result<T, Failure>;
 
@@ -499,7 +514,7 @@ impl Registry {
             || row.generation.is_some() != row.material.is_some()
             || row.generation.is_some() != row.baseline.is_some()
             || !matches!(row.state.as_str(), "live" | "revoked")
-            || (row.state == "revoked" && row.material.is_some())
+            || (row.state == "revoked" && (row.material.is_some() || row.kept.stale))
         {
             return Err(Failure::MetadataUnavailable);
         }
@@ -733,14 +748,21 @@ fn host_failure(error: super::Failure) -> Failure {
 /// is recorded: `Connection.refused_configuration_revision`, the configured
 /// revision whose upgrade the new provider refused for the current credential,
 /// and `Connection.begun_at_instance_revision`, the instance's recorded
-/// revision when this unpublished connection was begun under another one.
+/// revision when this unpublished connection was begun under another one;
+/// and the `Stale` lifecycle state of a connection whose stored credential the
+/// provider refused (`MarkConnectionStale`), which the `state` column, `live`
+/// or `revoked`, records as `live` like every unrevoked connection.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct Kept {
     refused: Option<String>,
     begun_at: Option<String>,
+    stale: bool,
 }
 const REFUSED: &str = "refused_configuration_revision";
 const BEGUN_AT: &str = "begun_at_instance_revision";
+/// Present, as `"stale"`, only while the connection is Stale (metadata/er.rs).
+const LIFECYCLE: &str = "lifecycle";
+const STALE: &str = "stale";
 
 fn decode_stored(text: &str) -> Result<(Binding, Kept)> {
     let mut value: serde_json::Value = decode(text)?;
@@ -753,6 +775,11 @@ fn decode_stored(text: &str) -> Result<(Binding, Kept)> {
     let kept = Kept {
         refused: take(REFUSED)?,
         begun_at: take(BEGUN_AT)?,
+        stale: match take(LIFECYCLE)?.as_deref() {
+            None => false,
+            Some(STALE) => true,
+            Some(_) => return Err(Failure::MetadataUnavailable),
+        },
     };
     let binding = serde_json::from_value(value).map_err(|_| Failure::MetadataUnavailable)?;
     Ok((binding, kept))
@@ -774,6 +801,9 @@ fn encode_stored(binding: &Binding, kept: &Kept) -> Result<String> {
         if let Some(revision) = kept {
             object.insert(key.into(), revision.as_str().into());
         }
+    }
+    if kept.stale {
+        object.insert(LIFECYCLE.into(), STALE.into());
     }
     encode(&value)
 }

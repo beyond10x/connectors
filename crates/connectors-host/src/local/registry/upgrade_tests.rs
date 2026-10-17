@@ -2,7 +2,7 @@
 //! whose binding names an older configuration revision of its instance moves
 //! it to the configured revision without a credential entry, when the
 //! authentication it was admitted under is unchanged.
-use super::tests::{NOW, binding, fixture, prepared, publish_fixture};
+use super::tests::{NOW, binding, fixture, prepared, prepared_together, publish_fixture};
 use super::*;
 
 const LATER: u64 = NOW + 1;
@@ -125,6 +125,23 @@ fn connected(registry: &Registry, subject: &str) -> (String, String, custody::Ve
     let reference = publish_fixture(registry, candidate, NOW);
     let revision = observe(registry, "config-1", &reference, NOW).revision;
     (reference, revision, version)
+}
+
+/// Connections of one instance, as one held them before
+/// story:connect-refused-while-instance-holds-connection.
+fn connected_together(
+    registry: &Registry,
+    subjects: &[&str],
+) -> Vec<(String, String, custody::Version)> {
+    prepared_together(registry, subjects, NOW)
+        .into_iter()
+        .map(|candidate| {
+            let version = candidate.version();
+            let reference = publish_fixture(registry, candidate, NOW);
+            let revision = observe(registry, "config-1", &reference, NOW).revision;
+            (reference, revision, version)
+        })
+        .collect()
 }
 
 #[test]
@@ -327,13 +344,20 @@ fn a_new_connection_that_changes_authority_or_profile_needs_a_new_instance_id() 
             "revoked: {name}"
         );
     }
+    // The authentication check admits these; the instance's first connect is
+    // still in flight, which `begin` alone refuses
+    // (story:connect-refused-while-instance-holds-connection).
     let (_root, registry) = fixture();
     registry.begin(&binding(), NOW).unwrap();
     let mut other = upgraded();
     other.profile.id = "fixture-other".into();
     other.profile.revision = "profile-2".into();
-    registry.begin(&other, LATER).unwrap();
-    registry.begin(&upgraded(), LATER).unwrap();
+    assert_eq!(
+        registry.begin(&other, LATER).map(|_| ()),
+        Err(Failure::Conflict)
+    );
+    registry.begin_unchecked(&other, LATER).unwrap();
+    registry.begin_unchecked(&upgraded(), LATER).unwrap();
 }
 
 #[test]
@@ -409,8 +433,9 @@ fn a_revoked_connection_is_not_upgraded() {
 #[test]
 fn other_connections_of_the_instance_keep_their_revision_until_revalidated() {
     let (root, registry) = fixture();
-    let (first, first_revision, _) = connected(&registry, "one");
-    let (second, second_revision, _) = connected(&registry, "two");
+    let mut together = connected_together(&registry, &["one", "two"]).into_iter();
+    let (first, first_revision, _) = together.next().unwrap();
+    let (second, second_revision, _) = together.next().unwrap();
     let captured = registry
         .capture_revalidation(&upgraded(), &first, &first_revision, LATER, LATER + 1000)
         .unwrap();
@@ -448,7 +473,25 @@ fn other_connections_of_the_instance_keep_their_revision_until_revalidated() {
             State::Ready
         );
     }
-    // A new connection of the instance is now admitted under the new revision.
+    // A new connection of the instance is admitted under the new revision
+    // once both it holds are revoked (story:connect-refused-while-instance-
+    // holds-connection); until then the connect names their revocation.
+    assert_eq!(
+        registry.begin(&upgraded(), LATER).map(|_| ()),
+        Err(Failure::InstanceConnectionChanged)
+    );
+    for reference in [&first, &second] {
+        let revision = observe(&registry, "config-2", reference, LATER).revision;
+        registry
+            .revoke(
+                "fixture-instance",
+                "fixture-adapter",
+                reference,
+                &revision,
+                LATER,
+            )
+            .unwrap();
+    }
     registry.begin(&upgraded(), LATER).unwrap();
 }
 
@@ -459,8 +502,9 @@ fn other_connections_of_the_instance_keep_their_revision_until_revalidated() {
 #[test]
 fn adversary_a_revoked_sibling_does_not_block_the_upgrade_of_a_live_connection() {
     let (root, registry) = fixture();
-    let (live, live_revision, _) = connected(&registry, "one");
-    let (gone, gone_revision, _) = connected(&registry, "two");
+    let mut together = connected_together(&registry, &["one", "two"]).into_iter();
+    let (live, live_revision, _) = together.next().unwrap();
+    let (gone, gone_revision, _) = together.next().unwrap();
     registry
         .revoke(
             "fixture-instance",
@@ -547,11 +591,21 @@ fn a_stale_connection_names_the_step_that_clears_it() {
 /// and its approval keys then answer under the configured revision; the older
 /// connection keeps its own revision and can still follow the upgrade, which
 /// removes its recorded refusal.
+///
+/// story:connect-refused-while-instance-holds-connection: a connect beside the
+/// older connection is now refused naming its revocation, since no reconnect
+/// replaces it. The new connection here was begun while the older one was
+/// still in flight, as before that rule, so the rest of this record (both
+/// connections, the older one following later) is the one an instance from
+/// before the rule can still reach.
 #[test]
 fn a_new_connection_under_the_configured_revision_moves_the_instance() {
     use crate::local::approval_keys;
     let (root, registry) = fixture();
-    let (old, old_revision, _) = connected(&registry, "one");
+    let (_, old_candidate) = prepared(&registry, "one", NOW);
+    let acquisition = registry.begin_unchecked(&upgraded(), NOW).unwrap();
+    let old = publish_fixture(&registry, old_candidate, NOW);
+    let old_revision = observe(&registry, "config-1", &old, NOW).revision;
     let none = BTreeSet::new();
     let mut refused = recorded(root.path(), &old);
     refused.refused = Some("config-2".into());
@@ -596,8 +650,11 @@ fn a_new_connection_under_the_configured_revision_moves_the_instance() {
         keys("config-2").unwrap_err(),
         approval_keys::Failure::BindingChanged
     );
+    assert_eq!(
+        registry.begin(&upgraded(), LATER).map(|_| ()),
+        Err(Failure::InstanceConnectionChanged)
+    );
 
-    let acquisition = registry.begin(&upgraded(), LATER).unwrap();
     let claim = registry.consume(acquisition, LATER).unwrap();
     let candidate = registry
         .prepare(&claim, validated("two", LATER), 12, LATER)
@@ -671,9 +728,26 @@ fn adversary_a_stale_invalid_connection_is_not_sent_to_a_revalidation_that_refus
 #[test]
 fn adversary_a_failed_connect_under_the_configured_revision_does_not_move_the_instance() {
     let (root, registry) = fixture();
-    let (old, _, _) = connected(&registry, "one");
+    let (old, old_revision, _) = connected(&registry, "one");
     let before = recorded(root.path(), &old);
     assert_eq!(before.instance_revision, "config-1");
+    // The instance holds `old`, which can follow the upgrade, so a connect
+    // beside it names that revalidation; the connect under the configured
+    // revision follows its revocation
+    // (story:connect-refused-while-instance-holds-connection).
+    assert_eq!(
+        registry.begin(&upgraded(), LATER).map(|_| ()),
+        Err(Failure::UpgradeRequired)
+    );
+    registry
+        .revoke(
+            "fixture-instance",
+            "fixture-adapter",
+            &old,
+            &old_revision,
+            LATER,
+        )
+        .unwrap();
     let acquisition = registry.begin(&upgraded(), LATER).unwrap();
     let claim = registry.consume(acquisition, LATER).unwrap();
     // The new provider refuses the entered credential: nothing is published.
@@ -723,16 +797,25 @@ fn adversary_after_a_refused_upgrade_the_read_does_not_name_revalidation_again()
 fn adversary_a_connect_published_under_an_older_revision_does_not_move_the_instance_back() {
     use crate::local::approval_keys;
     let (root, registry) = fixture();
-    let _ = connected(&registry, "one");
+    // Three connects of the instance in flight at once, as before
+    // story:connect-refused-while-instance-holds-connection: `begin` now
+    // refuses the second while the first is in flight, so only an instance
+    // from before that rule reaches the publications below.
+    let (_, one) = prepared(&registry, "one", NOW);
+    assert_eq!(
+        registry.begin(&binding(), LATER).map(|_| ()),
+        Err(Failure::Conflict)
+    );
     // A connect under revision 1 is in progress when the instance is
     // reconfigured at revision 2.
-    let acquisition = registry.begin(&binding(), LATER).unwrap();
+    let acquisition = registry.begin_unchecked(&binding(), LATER).unwrap();
     let old_claim = registry.consume(acquisition, LATER).unwrap();
     let old_prepared = registry
         .prepare(&old_claim, validated("two", LATER), 12, LATER)
         .unwrap();
     // A connect under revision 2 publishes and moves the instance.
-    let acquisition = registry.begin(&upgraded(), LATER).unwrap();
+    let acquisition = registry.begin_unchecked(&upgraded(), LATER).unwrap();
+    publish_fixture(&registry, one, LATER);
     let claim = registry.consume(acquisition, LATER).unwrap();
     let prepared = registry
         .prepare(&claim, validated("three", LATER), 12, LATER)
@@ -890,6 +973,11 @@ fn connected_under(registry: &Registry, admitted: &Binding) -> (String, String) 
 /// under, so it is not upgraded in place: revalidate, a read and a repair name
 /// a new connection, connect under the same instance id admits it and moves
 /// the instance, and the old connection stays revocable.
+///
+/// story:connect-refused-while-instance-holds-connection: the instance holds
+/// the old connection, which no reconnect replaces, so the connect names its
+/// revocation; once revoked, the connect is admitted and moves the instance.
+/// Read, connect and revoke each name a step that leads on.
 #[test]
 fn an_evidence_lifetime_change_is_followed_by_a_new_connection() {
     let admitted = declared_binding("config-1", declared(60_000, &["read"], "Token"));
@@ -914,29 +1002,33 @@ fn an_evidence_lifetime_change_is_followed_by_a_new_connection() {
             .map(|_| ()),
         Err(Failure::BindingChanged)
     );
-
-    let acquisition = registry.begin(&configured, LATER).unwrap();
-    let claim = registry.consume(acquisition, LATER).unwrap();
-    let candidate = registry
-        .prepare(&claim, validated("one", LATER), 12, LATER)
-        .unwrap();
-    let fresh = publish_fixture(&registry, candidate, LATER);
-    let observed = observe(&registry, "config-2", &fresh, LATER);
-    assert_eq!(observed.state, State::Ready);
-    assert!(!observed.stale);
-    registry
-        .admit_read(&configured, &fresh, &none, LATER)
-        .unwrap();
-    assert_eq!(recorded(root.path(), &fresh).instance_revision, "config-2");
+    assert_eq!(
+        registry.begin(&configured, LATER).map(|_| ()),
+        Err(Failure::InstanceConnectionChanged)
+    );
     registry
         .revoke(
             "fixture-instance",
             "fixture-adapter",
             &reference,
             &revision,
-            LATER + 1,
+            LATER,
         )
         .unwrap();
+
+    let acquisition = registry.begin(&configured, LATER + 1).unwrap();
+    let claim = registry.consume(acquisition, LATER + 1).unwrap();
+    let candidate = registry
+        .prepare(&claim, validated("one", LATER + 1), 12, LATER + 1)
+        .unwrap();
+    let fresh = publish_fixture(&registry, candidate, LATER + 1);
+    let observed = observe(&registry, "config-2", &fresh, LATER + 1);
+    assert_eq!(observed.state, State::Ready);
+    assert!(!observed.stale);
+    registry
+        .admit_read(&configured, &fresh, &none, LATER + 1)
+        .unwrap();
+    assert_eq!(recorded(root.path(), &fresh).instance_revision, "config-2");
     // The lifetime alone is not proved by a declaration-less profile.
     let mut unproved = configured.profile.clone();
     unproved.declaration = None;
