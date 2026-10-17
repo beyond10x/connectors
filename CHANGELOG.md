@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- GitLab catalog reads `file.raw` and `project.languages`: a repository file's exact UTF-8 text at a ref (a file that is not UTF-8 is refused `upstream_protocol`, one over the 4 MiB provider response bound `capacity`, on its raw bytes) and a project's languages with their percentages; verified against fixtures only.
+
 ### Fixed
 
 - An owner no longer outlives its state directory. A Unix owner exits, as a shutdown request

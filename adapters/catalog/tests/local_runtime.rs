@@ -288,6 +288,12 @@ impl Provider {
                         continue;
                     }
                     let forced = forced_status.load(Ordering::SeqCst);
+                    if valid && forced == 0 && let Some((media_type, body)) = raw_answer(route, &path) {
+                        let header = format!("HTTP/1.1 200 fixture\r\nContent-Type: {media_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+                        let _ = stream.write_all(header.as_bytes()).await;
+                        let _ = stream.write_all(&body).await;
+                        continue;
+                    }
                     // A busy route answers `429`, naming `retry_after` when set;
                     // `seen` counts this route's requests, this one included.
                     let mut retry_after: Option<String> = None;
@@ -779,6 +785,48 @@ fn repository_page(route: &str, path: &str) -> Option<Value> {
         return None;
     };
     Some(Value::Array(items))
+}
+
+/// UTF-8 text the fixture serves raw at `ref=main`: a byte-order mark, CRLF
+/// and LF line endings, multi-byte characters, a NUL and no final newline.
+const RAW_TEXT: &[u8] =
+    "\u{feff}# Guide\r\nna\u{ef}ve caf\u{e9} \u{2014} \u{2713}\n\0tail".as_bytes();
+/// The same file at `ref=v1.0.0`.
+const RAW_TEXT_V1: &[u8] = b"# Guide\nfirst release\n";
+/// The language map the fixture's project answers, percentages included.
+fn fixture_languages() -> Value {
+    json!({"Rust": 71.42, "Shell": 20.0, "Dockerfile": 8.58})
+}
+
+/// The media type and bytes of a route the fixture answers with a body that is
+/// not one JSON document built here: the raw file reads (`docs%2Fguide.md` at
+/// `main` or `v1.0.0`, a Latin-1 file and one a byte over the 4 MiB provider
+/// response bound) and the project's languages. `None` for any other route.
+fn raw_answer(route: &str, path: &str) -> Option<(&'static str, Vec<u8>)> {
+    let query = path.split_once('?').map(|(_, query)| query).unwrap_or("");
+    let at = |name: &str| query.split('&').any(|pair| pair == name);
+    let files = "/api/v4/projects/org%2Fproject/repository/files/";
+    match route
+        .strip_prefix(files)
+        .and_then(|r| r.strip_suffix("/raw"))
+    {
+        Some("docs%2Fguide.md") if at("ref=main") => {
+            Some(("text/plain; charset=utf-8", RAW_TEXT.to_vec()))
+        }
+        Some("docs%2Fguide.md") if at("ref=v1.0.0") => {
+            Some(("text/plain; charset=utf-8", RAW_TEXT_V1.to_vec()))
+        }
+        Some("latin1.txt") => Some(("application/octet-stream", b"caf\xe9 \xff\xfe\n".to_vec())),
+        Some("huge.log") => Some((
+            "text/plain",
+            vec![b'a'; connectors_core::RESPONSE_LIMIT + 1],
+        )),
+        _ if route == "/api/v4/projects/org%2Fproject/languages" => Some((
+            "application/json",
+            serde_json::to_vec(&fixture_languages()).unwrap(),
+        )),
+        _ => None,
+    }
 }
 fn private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).unwrap();
@@ -1312,6 +1360,58 @@ fn repository_reads_send_the_declared_request_and_return_the_recorded_body() {
         );
         assert_eq!(result["provenance"]["instance"], "fixture-gitlab");
     }
+}
+
+/// story:catalog-gitlab-raw-file-and-languages, through the real child and the
+/// HTTPS fixture: `file.raw` answers a UTF-8 file's exact bytes as text at the
+/// `ref` sent, a different text at another ref; a file that is not UTF-8 is
+/// refused `upstream_protocol` and one over the 4 MiB provider response bound
+/// `capacity`; `project.languages` answers the language map unchanged.
+#[test]
+fn raw_file_text_and_project_languages_through_the_child() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let mut raw = |file_path: &str, reference: &str| {
+        invoke(
+            &mut child,
+            "file.raw",
+            "one",
+            &token(true),
+            json!({"id": "org/project", "file_path": file_path, "ref": reference}),
+        )
+    };
+    let main = raw("docs/guide.md", "main").unwrap();
+    assert_eq!(main["status"], 200);
+    assert_eq!(main["body"].as_str().unwrap().as_bytes(), RAW_TEXT);
+    let v1 = raw("docs/guide.md", "v1.0.0").unwrap();
+    assert_eq!(v1["body"].as_str().unwrap().as_bytes(), RAW_TEXT_V1);
+    assert_eq!(raw("latin1.txt", "main").unwrap_err(), Failure::Protocol);
+    assert_eq!(raw("huge.log", "main").unwrap_err(), Failure::Capacity);
+    let calls = provider.calls.lock().unwrap().clone();
+    assert_eq!(
+        calls,
+        [
+            "/api/v4/projects/org%2Fproject/repository/files/docs%2Fguide.md/raw?ref=main",
+            "/api/v4/projects/org%2Fproject/repository/files/docs%2Fguide.md/raw?ref=v1.0.0",
+            "/api/v4/projects/org%2Fproject/repository/files/latin1.txt/raw?ref=main",
+            "/api/v4/projects/org%2Fproject/repository/files/huge.log/raw?ref=main",
+        ]
+    );
+    let languages = invoke(
+        &mut child,
+        "project.languages",
+        "one",
+        &token(true),
+        json!({"id": "org/project"}),
+    )
+    .unwrap();
+    assert_eq!(languages["status"], 200);
+    assert_eq!(languages["body"], fixture_languages());
+    // The transport writes an empty query as a bare `?`.
+    assert_eq!(
+        provider.calls.lock().unwrap().last().unwrap(),
+        "/api/v4/projects/org%2Fproject/languages?"
+    );
 }
 
 #[test]
