@@ -5,7 +5,7 @@ see, a channel's messages and one thread — the workspace's users, the
 workspace itself, its custom emoji, the token's identity and the files the token
 can see, with their content, from the pinned Slack Web API document, posts
 messages, a direct message included, under approval, and, on a
-second connection with a user token, reads the conversations, history and
+second instance with a user token, reads the conversations, history and
 threads that user can read, the channels the bot is not in included, and
 searches messages. Nothing here is
 Slack-specific code: the Swagger 2.0 document is projected into OpenAPI 3.1.0, the projection is compiled into a
@@ -13,7 +13,12 @@ bundle, two reviewed selection sets expose ten reads and four writes for a bot
 token and five reads for a user token, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Configuration, connection, approval and invocation work as described there;
-this page covers what differs for Slack.
+this page covers what differs for Slack. The terms connector, instance and connection are those
+of the [vocabulary](../README.md#vocabulary).
+
+Slack runs as two pinned instances of the connector `slack`, one per selection set: a bot
+instance and a user instance ([Configure the two instances](#configure-the-two-instances)). The
+catalog provider ships no connector declaration for Slack, so neither is derived.
 
 ## Source and bundle
 
@@ -369,12 +374,12 @@ A bot token reads only the conversations the bot is a member of: Slack answers
 `not_in_channel`. A user token (`xoxp-…`) reads every conversation that user
 can read, and only a user token can search: the pinned `search.messages`
 requires the scope `search:read`, which Slack grants to a user token, not a bot
-token. A catalog connection holds one profile, so these reads are a second
-Slack connection: the same bundle and `api_base`, the profile `slack.user` with
+token. A catalog connection holds one profile and an instance holds one connection, so
+these reads are a second Slack instance: the same bundle and `api_base`, the profile `slack.user` with
 a user token, the same `auth.test` identity read — whose `user_id` is then the
 person's id — and the user selection set. It selects the three conversation
 reads, `users.list` and `search.messages`, and no write, so the user
-connection never posts, edits or deletes, and the bot connection never
+instance never posts, edits or deletes, and the bot instance never
 exposes search. Nothing in the local configuration ties a connection's profile
 to the bundle's recorded `auth_profile` (`slack.bot`), so this needs no change
 to the local host.
@@ -388,7 +393,7 @@ to the local host.
 | `search.messages` | `search_messages` | `GET /api/search.messages` | `search:read` | `page` and `count` (1–100), not a cursor |
 
 - **The conversation reads and `users.list`** take the same parameters, bounds
-  and end condition as on the bot connection ([above](#the-shipped-selection-set)):
+  and end condition as on the bot instance ([above](#the-shipped-selection-set)):
   `conversations.list` bounds `limit` to 1–1000, `conversations.history`
   requires `channel` and `conversations.replies` `channel` and `ts`, and each
   walk ends on an empty `response_metadata.next_cursor`. List the user's
@@ -429,61 +434,201 @@ to the local host.
 
 Connect with the credential document `{"token": "<user token>"}`.
 
-## Moving a local install off a credential-only adapter
+## Configure the two instances
 
-This section covers a local install that already reads Slack through the catalog provider:
-adapter `slack-bot` (profile `slack.bot`) serves the ten bot reads, adapter `slack-search`
-(profile `slack.user`) serves `search.messages`, and an older adapter `slack`, which serves no
-operations, still holds connections. It enables the two writes on `slack-bot`, retires `slack`
-without touching the credentials the other two use, and says what to do when an upgraded CLI meets
-an owner started by the previous build.
+Each instance names one of the two native configurations above, saved as `slack-bot.json` and
+`slack-user.json`, so it pins its entry as the
+[catalog provider guide](local-catalog-provider.md#bind-the-provider-to-the-local-cli)
+describes: print each file's bootstrap, hash the provider, then add both instances to a
+`connectors-local/5` configuration. The bot instance permits the writes too, so it selects
+private protocol two; the user instance has no write and stays on protocol one.
+
+```sh
+target/release/connectors-catalog-provider --local-config /absolute/path/slack-bot.json --print-local-bootstrap
+target/release/connectors-catalog-provider --local-config /absolute/path/slack-user.json --print-local-bootstrap
+sha256sum target/release/connectors-catalog-provider
+```
+
+```toml
+[connectors.slack]
+enabled = true
+
+[connectors.slack.instances.bot]
+alias = "slack"
+instance_id = "slack"
+adapter_id = "catalog"
+configuration_revision = "REPLACE_FROM_BOT_BOOTSTRAP"
+protocol = "v1alpha1"
+private_protocol = "connectors-private/2"
+startup = "on-demand"
+restart = "never"
+
+[connectors.slack.instances.bot.permissions]
+profiles = ["slack.bot"]
+operations = ["conversations.list", "conversations.history", "conversations.replies", "users.list", "team.info", "emoji.list", "auth.test", "files.list", "files.info", "file.download", "chat.postMessage", "conversations.open", "chat.update", "chat.delete"]
+
+[connectors.slack.instances.bot.executable]
+path = "/absolute/path/connectors-catalog-provider"
+sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
+args = ["--local-config", "/absolute/path/slack-bot.json"]
+
+[connectors.slack.instances.search]
+alias = "slack-search"
+instance_id = "slack-search"
+adapter_id = "catalog"
+configuration_revision = "REPLACE_FROM_USER_BOOTSTRAP"
+protocol = "v1alpha1"
+private_protocol = "connectors-private/1"
+startup = "on-demand"
+restart = "never"
+
+[connectors.slack.instances.search.permissions]
+profiles = ["slack.user"]
+operations = ["search.messages", "conversations.list", "conversations.history", "conversations.replies", "users.list"]
+
+[connectors.slack.instances.search.executable]
+path = "/absolute/path/connectors-catalog-provider"
+sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
+args = ["--local-config", "/absolute/path/slack-user.json"]
+```
+
+`instance_id` is each native file's `instance`. The connector name `slack` is a name only: a
+pinned instance's connector is not checked against a declaration. `--connector slack --instance
+bot` and `--connector slack --instance search` select them:
+
+```console
+$ connectors --output json setup check | jq -c '[.result.prerequisites[]|{name,state}]'
+[{"name":"configuration","state":"ready"},{"name":"metadata","state":"ready"},{"name":"artifact:slack","state":"ready"},{"name":"artifact:slack-search","state":"ready"},{"name":"keyring","state":"ready"},{"name":"persistent_custody_qualification","state":"ready"}]
+$ connectors --output json instances list | jq -c '[.. | objects | select(.instance_id) | {connector, instance, instance_id}]'
+[{"connector":"slack","instance":"bot","instance_id":"slack"},{"connector":"slack","instance":"search","instance_id":"slack-search"}]
+```
+
+Connect each with its own token, entered at the hidden prompt:
+
+```sh
+connectors --output json connections connect --connector slack --instance bot --profile slack.bot --credential-prompt
+connectors --output json connections connect --connector slack --instance search --profile slack.user --credential-prompt
+```
+
+A token Slack later refuses makes its connection `stale` until `connections reconnect` publishes
+a new one ([When Slack refuses a token](#when-slack-refuses-a-token)).
+
+## When Slack refuses a token
+
+Slack answers a revoked or invalid token with `"ok": false` and `invalid_auth` (or
+`token_revoked`), which the provider refuses as `unauthorized`. The connection then turns
+`stale`: it stays listed, revalidation cannot help, and `connections reconnect` replaces the
+token under the same connection reference and revision. In this run the fixture stopped
+accepting the bot token, then accepted it again:
+
+```console
+$ connectors operations invoke --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation conversations.list --schema 2771ae0cbcfa853c69da89e1603d017e397120ce4ffd0891c23ed0d0b5f3f365 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-json '{}'
+{"error":{"code":"failure","data":{"code":"service_failure","kind":"operational","next_action":"repair_connection","service_code":"unauthorized","service_reason":"invalid_auth","stage":"dispatch"}},"ok":false}
+$ connectors connections list --connector slack --instance bot | jq -c '[.result.connections[]|{connection,revision,state}]'
+[{"connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","revision":"691cd61d-0a34-4ba9-8ab2-f499f90c71f6","state":"stale"}]
+$ connectors connections revalidate --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --expected-revision 691cd61d-0a34-4ba9-8ab2-f499f90c71f6
+{"error":{"code":"failure","data":{"code":"not_granted","kind":"operational","next_action":"repair_connection","stage":"admission"}},"ok":false}
+$ connectors connections list --connector slack --instance bot | jq -c '[.result.connections[]|{connection,revision,state}]'
+[{"connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","revision":"691cd61d-0a34-4ba9-8ab2-f499f90c71f6","state":"stale"}]
+$ printf '{"token":"xoxb-fixture-token"}' | connectors connections reconnect --connector slack --instance bot --expected-revision 691cd61d-0a34-4ba9-8ab2-f499f90c71f6 --credential-stdin | jq -c '.result.connection.summary|{connector,instance,connection,revision,state}'
+{"connector":"slack","instance":"bot","connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","revision":"691cd61d-0a34-4ba9-8ab2-f499f90c71f6","state":"ready"}
+$ connectors connections list --connector slack --instance bot | jq -c '[.result.connections[]|{connection,revision,state}]'
+[{"connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","revision":"691cd61d-0a34-4ba9-8ab2-f499f90c71f6","state":"ready"}]
+```
+
+## Moving a local install off a credential-only instance
+
+This section covers a local install that already reads Slack through the catalog provider with
+three legacy `[adapters.<alias>]` entries: `slack-bot` (profile `slack.bot`) serves the ten bot
+reads, `slack-search` (profile `slack.user`) serves `search.messages` and the user reads, and an
+older `slack`, which serves no operations, still holds a connection. It moves the three entries to
+instances of the connector `slack`, enables the two writes on the bot instance, and retires the old
+instance without touching the credentials the other two use.
 
 The outputs below come from a run against a scratch `--config` and `--state-dir`, a private
 Secret Service and a local HTTPS fixture standing in for `https://slack.com/api` (synthetic token,
-synthetic ids). The commands are shown without `--config`, `--state-dir` and `--output json`; long
-answers are cut down with the `jq` filter shown. A connection id, revision or incarnation in your
-install differs: take each from the command before it.
+synthetic ids), with the native files in `~`. The commands are shown without `--config`,
+`--state-dir` and `--output json`, and answers are cut down with the `jq` filter shown. A
+connection id, revision or incarnation in your install differs: take each from the command before
+it.
 
-### Enable `chat.postMessage` and `conversations.open` on `slack-bot`
+### Move the entries to instances
+
+`setup migrate` keeps Slack entries where they are: the catalog provider ships no Slack
+connector declaration.
+
+```console
+$ connectors setup migrate --mode dry-run | jq -c '[.result.entries[]|{connector,instance,disposition,reason}]'
+[{"connector":"catalog","instance":"slack","disposition":"kept","reason":"connector_undeclared"},{"connector":"catalog","instance":"slack-bot","disposition":"kept","reason":"connector_undeclared"},{"connector":"catalog","instance":"slack-search","disposition":"kept","reason":"connector_undeclared"}]
+```
+
+Each entry keeps working as it is, selected as `--connector catalog --instance <alias>` or by the
+deprecated `--adapter <alias>`. To name it as a Slack instance, rewrite it by hand: change
+`format` to `"connectors-local/5"`, add `[connectors.slack]` with `enabled = true`, and rename
+each legacy table `[adapters.<alias>]` to `[connectors.slack.instances.<instance>]` with `alias =
+"<alias>"` as its first key, the `.permissions` and `.executable` tables with it. Every pin stays
+as it was, so the connections, the approval policy and the custody items stay valid. Here the
+instances are `bot` (`slack-bot`), `search` (`slack-search`) and `legacy` (`slack`):
+
+```toml
+[connectors.slack]
+enabled = true
+
+[connectors.slack.instances.bot]
+alias = "slack-bot"
+instance_id = "slack-bot"
+adapter_id = "catalog"
+# configuration_revision, protocol, private_protocol, startup, restart and the
+# .permissions and .executable tables exactly as in the legacy [adapters.slack-bot]
+```
+
+```console
+$ connectors setup check | jq -c '[.result.prerequisites[]|{name,state}]'
+[{"name":"configuration","state":"ready"},{"name":"metadata","state":"ready"},{"name":"artifact:slack","state":"ready"},{"name":"artifact:slack-bot","state":"ready"},{"name":"artifact:slack-search","state":"ready"},{"name":"keyring","state":"ready"},{"name":"persistent_custody_qualification","state":"ready"}]
+$ connectors instances list | jq -c '[.. | objects | select(.instance_id) | {connector, instance, instance_id}]'
+[{"connector":"slack","instance":"legacy","instance_id":"slack"},{"connector":"slack","instance":"bot","instance_id":"slack-bot"},{"connector":"slack","instance":"search","instance_id":"slack-search"}]
+$ connectors connections list --connector slack --instance bot | jq -c '[.result.connections[]|{connector,instance,connection,revision,state}]'
+[{"connector":"slack","instance":"bot","connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","revision":"8da8d006-a30a-41ae-b1d4-25030548c793","state":"ready"}]
+```
+
+### Enable `chat.postMessage` and `conversations.open` on `bot`
 
 Three things gate a write:
 
 - **The native configuration's selection contains it.** The shipped
   [`operations.json`](../adapters/catalog/providers/slack/operations.json) has the ten reads and both
   writes. A selection holding only the ten reads has to be replaced by it.
-- **The adapter entry selects private protocol two.** Under `connectors-private/1` the provider
+- **The instance selects private protocol two.** Under `connectors-private/1` the provider
   offers its reads only.
-- **The entry permits both ids.** An id missing from `permissions.operations` is denied.
+- **The instance permits both ids.** An id missing from `permissions.operations` is denied.
 
 The native configuration must stay owner-only (mode `0600`): a file other users can read is
 refused as `invalid_configuration` when the provider loads it.
 
-First check which revision the entry runs under and which selection the native configuration names:
+First check which selection the native configuration names and the revision it gives:
 
 ```console
-$ grep -A3 "^\[adapters.slack-bot\]" config.toml | grep configuration_revision
-configuration_revision = "b4b56da145dc78757a1e2c0eee1c0a451ced77268e502f22a7d2121cb504c792"
-$ connectors-catalog-provider --local-config slack-bot.json --print-local-bootstrap | jq -r .configuration_revision
-b4b56da145dc78757a1e2c0eee1c0a451ced77268e502f22a7d2121cb504c792
-$ jq -r .operations_file slack-bot.json
-~/.cache/connectors-w20261014b/slack-migration/run/bot-reads.json
+$ jq -r '.operations_file | split("/") | last' ~/slack-bot.json
+bot-reads.json
+$ connectors-catalog-provider --local-config ~/slack-bot.json --print-local-bootstrap | jq -r .configuration_revision
+29905332e2bb4fb92993fb5a5d5db2f6102475fde0b0fdbd2ac1b1588211236d
 ```
 
 That selection is a ten-read file, so point `operations_file` at the shipped `operations.json` and
 print the revision again:
 
 ```console
-$ connectors-catalog-provider --local-config slack-bot.json --print-local-bootstrap | jq -r .configuration_revision
-45d968e5336a983cdfa69595911151e63297584ef10169e31214b64f5dce4bee
+$ connectors-catalog-provider --local-config ~/slack-bot.json --print-local-bootstrap | jq -r .configuration_revision
+c83a994655247e5ca6c4806cece66436a0ed52062ea95bab223dc8ccb51788c5
 ```
 
 The revision digests the selected operations, so it moved. If `operations_file` already names the
-shipped file, it does not move, and only the adapter entry changes. Then change the adapter entry:
-the new revision, protocol two, and the two write ids. As a diff of the configuration used here:
+shipped file, it does not move, and only the instance changes. Then change the instance: the new
+revision, protocol two, and the two write ids. As a diff of the configuration used here:
 
 ```diff
--configuration_revision = "b4b56da145dc78757a1e2c0eee1c0a451ced77268e502f22a7d2121cb504c792"
-+configuration_revision = "45d968e5336a983cdfa69595911151e63297584ef10169e31214b64f5dce4bee"
+-configuration_revision = "29905332e2bb4fb92993fb5a5d5db2f6102475fde0b0fdbd2ac1b1588211236d"
++configuration_revision = "c83a994655247e5ca6c4806cece66436a0ed52062ea95bab223dc8ccb51788c5"
 -private_protocol = "connectors-private/1"
 +private_protocol = "connectors-private/2"
 -operations = ["conversations.list", "conversations.history", "conversations.replies", "users.list", "team.info", "emoji.list", "auth.test", "files.list", "files.info", "file.download"]
@@ -493,42 +638,26 @@ the new revision, protocol two, and the two write ids. As a diff of the configur
 When the revision moved, the existing connection is `pending` and the page is `stale`:
 
 ```console
-$ connectors connections list --adapter slack-bot
-{"ok":true,"result":{"connections":[{"adapter":"slack-bot","connection":"conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1","instance_id":"slack-bot","profile":"slack.bot","revision":"c838183e-bc2e-4e9e-8340-f5b5944b592a","state":"pending"}],"observed_at_ms":1791961826537,"source":"authority","stale":true,"valid_until_ms":1791961826537}}
+$ connectors connections list --connector slack --instance bot | jq -c '{stale: .result.stale, connections: [.result.connections[]|{connection,revision,state}]}'
+{"stale":true,"connections":[{"connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","revision":"8da8d006-a30a-41ae-b1d4-25030548c793","state":"pending"}]}
 ```
 
-An adapter child started before the edit keeps running the old entry, and while it runs,
-`connections revalidate` is refused, even when the revision did not move. The same refusal answered
-a change of `private_protocol` alone:
-
-```console
-$ connectors connections revalidate --adapter slack-bot --connection conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1 --expected-revision c838183e-bc2e-4e9e-8340-f5b5944b592a
-{"error":{"code":"failure","data":{"code":"lifecycle_conflict","kind":"operational","next_action":"retry_status","stage":"admission"}},"ok":false}
-```
-
-So after editing the entry, stop the running child with the exact values `adapters status` gives:
-
-```console
-$ connectors adapters status --adapter slack-bot
-{"ok":true,"result":{"observation":{"adapter":"slack-bot","child_incarnation":"65a272ad-ea37-46cb-8cd6-eedd18a726c6","configuration_revision":"b4b56da145dc78757a1e2c0eee1c0a451ced77268e502f22a7d2121cb504c792","host_incarnation":"b1bd440f-6cbb-4895-9387-f7a8702ae714","observed_at_ms":1791961843836,"state":"ready"}}}
-$ connectors adapters stop --adapter slack-bot --expected-revision b4b56da145dc78757a1e2c0eee1c0a451ced77268e502f22a7d2121cb504c792 --host-incarnation b1bd440f-6cbb-4895-9387-f7a8702ae714 --child-incarnation 65a272ad-ea37-46cb-8cd6-eedd18a726c6
-{"ok":true,"result":{"observation":{"adapter":"slack-bot","configuration_revision":"b4b56da145dc78757a1e2c0eee1c0a451ced77268e502f22a7d2121cb504c792","host_incarnation":"b1bd440f-6cbb-4895-9387-f7a8702ae714","observed_at_ms":1791961850631,"state":"suppressed"}}}
-```
-
-Then revalidate. The instance, the adapter id (`catalog`), the provider authority and the profile
+Revalidate. The instance id, `adapter_id` (`catalog`), the provider authority and the profile
 are unchanged, so revalidation upgrades the connection in place from its saved credential, with
-the same identity and no token entered
+the same identity and no token entered, and stops the process still running the earlier entry
 ([configuration upgrades](local-connection-registry.md#configuration-upgrades)):
 
 ```console
-$ connectors connections revalidate --adapter slack-bot --connection conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1 --expected-revision c838183e-bc2e-4e9e-8340-f5b5944b592a
-{"ok":true,"result":{"connection":{"external_identity":{"kind":"slack.user","subject":"U0000000001"},"observed_at_ms":1791961856801,"source":"authority","stale":false,"summary":{"adapter":"slack-bot","connection":"conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1","instance_id":"slack-bot","profile":"slack.bot","revision":"9559e85e-0df7-4808-ad1d-1b74b0d821f1","state":"ready"},"valid_until_ms":1791961916689}}}
-$ connectors operations list --adapter slack-bot | jq -c '[.result.operations[].id]'
+$ connectors connections revalidate --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --expected-revision 8da8d006-a30a-41ae-b1d4-25030548c793 | jq -c '.result.connection|{identity: .external_identity, summary: (.summary|{connector,instance,connection,revision,state})}'
+{"identity":{"kind":"slack.user","subject":"U0000000001"},"summary":{"connector":"slack","instance":"bot","connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","revision":"691cd61d-0a34-4ba9-8ab2-f499f90c71f6","state":"ready"}}
+$ connectors operations list --connector slack --instance bot | jq -c '[.result.operations[].id]'
 ["conversations.list","conversations.history","conversations.replies","users.list","team.info","emoji.list","auth.test","files.list","files.info","chat.postMessage","conversations.open","file.download"]
 ```
 
-When the revision did not move, the connection stays `ready` and keeps its revision: stop the child
-as above, and no upgrade happens.
+When the revision did not move, the connection stays `ready` and keeps its revision; stop the
+instance's running process with the exact values `instances status` gives (`instances stop
+--expected-revision --host-incarnation --child-incarnation`) so that the next command starts it
+under the edited entry.
 
 #### The approval policy
 
@@ -556,12 +685,12 @@ version = "roughtime-0x8000000c"
 [The clock](local-clock.md) lists the four public sources and how many a quorum needs.
 
 ```console
-$ connectors approvals key-init --adapter slack-bot
-{"ok":true,"result":{"adapter":"slack-bot","issuer":{"audience":"connectors.approval/a78448c8-e165-49d6-9c48-8c75059b154c","issuer":"connectors.local-issuer/a78448c8-e165-49d6-9c48-8c75059b154c","keys":[{"key_id":"b5ce5563-d1c2-42ce-a9a6-5f3e51b93c7e","public_key":"KdG6LVTO3-zt7m0fLwjoWc21Kxu2akWjkJ7TjHnA7Sk","state":"active"}],"revision":"915784f0-b489-4a53-b214-f92b8dd05dfb"}}}
-$ connectors approvals policy-status --adapter slack-bot
-{"ok":true,"result":{"adapter":"slack-bot","policy":null}}
-$ connectors approvals policy-set --adapter slack-bot --input-file ~/private/slack-policy.json
-{"ok":true,"result":{"adapter":"slack-bot","policy":{"instance_id":"slack-bot","issuer_id":"a78448c8-e165-49d6-9c48-8c75059b154c","operations":["chat.postMessage","conversations.open"],"owner_uid":1000,"policy_id":"f5c48325-633d-497a-a6da-f12b1efd34a9","revision":1,"selection":{"clock_configuration_sha256":"9075017ceec92b29c7ec5d5b4e98364d39dd767ed602dadd2aca6797e5496df9","configuration_revision":"45d968e5336a983cdfa69595911151e63297584ef10169e31214b64f5dce4bee","descriptor_revision":"7c95c126b092dcfb17f60a1fc88fc4d29965e58c132ba740d282206ade542074","executable_selection":"0faf637b88e5f5f047af137d0303688b5352b7b1de341bb58d0d867265949069"}}}}
+$ connectors approvals key-init --connector slack --instance bot | jq -c '.result|{connector,instance,keys: [.issuer.keys[]|{key_id,state}]}'
+{"connector":"slack","instance":"bot","keys":[{"key_id":"f0bfff44-1cde-46f3-8d2d-fca4522ef5d1","state":"active"}]}
+$ connectors approvals policy-status --connector slack --instance bot | jq -c '.result|{connector,instance,policy}'
+{"connector":"slack","instance":"bot","policy":null}
+$ connectors approvals policy-set --connector slack --instance bot --input-file ~/private/slack-policy.json | jq -c '.result.policy|{instance_id,operations,revision}'
+{"instance_id":"slack-bot","operations":["chat.postMessage","conversations.open"],"revision":1}
 ```
 
 `~/private/slack-policy.json` holds `{"operations":["chat.postMessage","conversations.open"]}`.
@@ -573,155 +702,132 @@ published under; after any of them changes, publish it again with
 
 Each write is approved by digest over its exact input, once. `approvals prepare` resolves the
 subject without the clock, the provider or the credential. Take `--schema` and `--revision` from
-`operations describe --adapter slack-bot --operation chat.postMessage`. The input is the JSON
-body under `body`:
+`operations describe --connector slack --instance bot --operation chat.postMessage`. The input is
+the JSON body under `body`:
 
 ```console
-$ connectors approvals prepare --adapter slack-bot --connection conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1 --operation chat.postMessage --schema 9788097415fc1581bd915c8a110908821e3ae8b6920057a5260605303141b19b --revision 7c95c126b092dcfb17f60a1fc88fc4d29965e58c132ba740d282206ade542074 --input-file ~/private/post.json
-{"ok":true,"result":{"adapter":"slack-bot","preparation":{"approval_policy":{"audience":"connectors.approval/a78448c8-e165-49d6-9c48-8c75059b154c","issuer":"connectors.local-issuer/a78448c8-e165-49d6-9c48-8c75059b154c","max_lifetime_seconds":300,"mode":"required"},"presentation":{"connection":"conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1","descriptor_revision":"7c95c126b092dcfb17f60a1fc88fc4d29965e58c132ba740d282206ade542074","instance":"slack-bot","operation":"chat.postMessage"},"subject":{"approval_mode":"required","authority":{"current_authority":{"id":"connectors.local-policy/f5c48325-633d-497a-a6da-f12b1efd34a9/1","sha256":"5a4479ef13c096a714e66d7f3cd1cbe67ec28a207bb5eb5d367e6cdc407952a8"},"executor":null,"scope":{"caller":"connectors.local-owner/a78448c8-e165-49d6-9c48-8c75059b154c/1000","executor":null,"realm":null,"tenant":null}},"canonicalization":"adapter-v1-canonical-json","format":"connectors.approval-subject/v1","input_sha256":"d2e5f6d34dcd6565d73b5795f797ec5205a091487e659e6503aaff05750b564e","origin":{"authority_ref":"slack-bot","kind":"direct"},"route":null,"target":{"configuration_revision":"45d968e5336a983cdfa69595911151e63297584ef10169e31214b64f5dce4bee","connection":"conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1","connection_revision":"9559e85e-0df7-4808-ad1d-1b74b0d821f1","contract":"operations/v1alpha1","descriptor_revision":"7c95c126b092dcfb17f60a1fc88fc4d29965e58c132ba740d282206ade542074","instance":"slack-bot","operation":"chat.postMessage","profile":"mutation"}},"subject_sha256":"6ad1f21f231cfc1d63eafe7b7f954461f60938ec50e4925c33c96a2a106baedd"}}}
+$ connectors approvals prepare --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation chat.postMessage --schema fd40561da56fd3a5b2f1cd9fe47106914c45c80dc7cc27dc4bdca4f9a45efae2 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-file ~/private/post.json | jq -c '.result.preparation|{subject_sha256, presentation}'
+{"subject_sha256":"5da23cd1ba119d43b499bb9689ab76e210e6dfbeec7dbda0ac65e025d299bf5d","presentation":{"connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","descriptor_revision":"87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6","instance":"slack-bot","operation":"chat.postMessage"}}
 ```
 
 `~/private/post.json` holds `{"body":{"channel":"C0000000001","text":"migration check"}}`.
-Approving the subject publishes a proof file, which the invocation then spends:
-
-```sh
-connectors approvals issue --adapter slack-bot --connection "$connection" \
-  --operation chat.postMessage --schema "$schema" --revision "$revision" \
-  --input-file ~/private/post.json --approve-subject "$subject_sha256" \
-  --proof-output ~/private/proof-post-1.json
-connectors operations invoke --adapter slack-bot --connection "$connection" \
-  --operation chat.postMessage --schema "$schema" --revision "$revision" \
-  --input-file ~/private/post.json --approval-file ~/private/proof-post-1.json \
-  --idempotency-key post-1
-```
-
-These two were not completed in the run. Issuing needs a fresh clock sample, and the configured
-clock source did not answer from the host the run used:
+Issuing needs a fresh clock sample, so run `approvals clock-check` first. Approving the subject
+publishes a proof file, which the invocation then spends; the fixture answered the post:
 
 ```console
-$ connectors approvals clock-check --adapter slack-bot
-{"error":{"code":"failure","data":{"code":"unavailable","kind":"operational","next_action":"check_configuration","stage":"observation"}},"ok":false}
-$ connectors approvals issue --adapter slack-bot --connection conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1 --operation chat.postMessage --schema 9788097415fc1581bd915c8a110908821e3ae8b6920057a5260605303141b19b --revision 7c95c126b092dcfb17f60a1fc88fc4d29965e58c132ba740d282206ade542074 --input-file ~/private/post.json --approve-subject 6ad1f21f231cfc1d63eafe7b7f954461f60938ec50e4925c33c96a2a106baedd --proof-output ~/private/proof-post-1.json
-{"error":{"code":"failure","data":{"code":"unavailable","kind":"operational","next_action":"retry_status","stage":"readiness"}},"ok":false}
+$ connectors approvals clock-check --connector slack --instance bot | jq -c '.result.observation.sources|map({address,result})'
+[{"address":"51.81.57.55:2002","result":"agreed"},{"address":"148.113.255.71:2002","result":"agreed"}]
+$ connectors approvals issue --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation chat.postMessage --schema fd40561da56fd3a5b2f1cd9fe47106914c45c80dc7cc27dc4bdca4f9a45efae2 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-file ~/private/post.json --approve-subject 5da23cd1ba119d43b499bb9689ab76e210e6dfbeec7dbda0ac65e025d299bf5d --proof-output ~/private/proof-post-1.json | jq -c '.result|{connector,instance,disposition,subject_sha256}'
+{"connector":"slack","instance":"bot","disposition":"published","subject_sha256":"5da23cd1ba119d43b499bb9689ab76e210e6dfbeec7dbda0ac65e025d299bf5d"}
+$ connectors operations invoke --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation chat.postMessage --schema fd40561da56fd3a5b2f1cd9fe47106914c45c80dc7cc27dc4bdca4f9a45efae2 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-file ~/private/post.json --approval-file ~/private/proof-post-1.json --idempotency-key post-1 | jq -c '.result|{classification: .mutation.classification, status: .result.status, body: .result.body}'
+{"classification":"applied","status":200,"body":{"channel":"C0000000001","message":{"text":"migration check","ts":"1780000700.000700"},"ok":true,"ts":"1780000700.000700"}}
 ```
 
-Run `approvals clock-check` first; issue only once it answers with an observation. The invocation
-sends a real message, which [Messages](#messages) describes.
+The invocation sends a real message, which [Messages](#messages) describes.
 
-### Retire the credential-only `slack` adapter
+### Retire the credential-only `legacy` instance
 
-The connections of `slack-bot` and `slack-search` do not share a credential with those of `slack`.
-A connection belongs to one instance and one adapter id, and each stored credential version belongs
-to exactly one connection. Revoking a connection retires only its own versions. Check that before
-removing anything.
+The connections of `bot` and `search` do not share a credential with that of `legacy`. A
+connection belongs to one instance, and each stored credential version belongs to exactly one
+connection. Revoking a connection retires only its own versions. Check that before removing
+anything.
 
 1. **Prove the survivors.** List them, then revalidate each. Revalidation reads the connection's
    saved credential from custody and runs the identity read, with nothing entered, so `ready` means
-   its own custody item is there. A read on `slack-bot` shows the connection in use:
+   its own custody item is there. A read on `bot` shows the connection in use:
 
    ```console
-   $ connectors connections list --adapter slack-bot | jq -c '[.result.connections[]|{connection,revision,state}]'
-   [{"connection":"conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1","revision":"9559e85e-0df7-4808-ad1d-1b74b0d821f1","state":"ready"}]
-   $ connectors connections list --adapter slack-search | jq -c '[.result.connections[]|{connection,revision,state}]'
-   [{"connection":"conn_c4789c790b6b4fdf944637d74f5317d7_86777214c6be441794c9de42108c2a51","revision":"70c4078a-4ae0-4a01-9a91-06a4f40d205e","state":"pending"}]
-   $ connectors connections revalidate --adapter slack-bot --connection conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1 --expected-revision 9559e85e-0df7-4808-ad1d-1b74b0d821f1 | jq -c '.result.connection|{state:.summary.state,revision:.summary.revision,identity:.external_identity}'
-   {"state":"ready","revision":"9559e85e-0df7-4808-ad1d-1b74b0d821f1","identity":{"kind":"slack.user","subject":"U0000000001"}}
-   $ connectors connections revalidate --adapter slack-search --connection conn_c4789c790b6b4fdf944637d74f5317d7_86777214c6be441794c9de42108c2a51 --expected-revision 70c4078a-4ae0-4a01-9a91-06a4f40d205e | jq -c '.result.connection|{state:.summary.state,revision:.summary.revision,identity:.external_identity}'
-   {"state":"ready","revision":"70c4078a-4ae0-4a01-9a91-06a4f40d205e","identity":{"kind":"slack.user","subject":"U0000000001"}}
-   $ connectors operations invoke --adapter slack-bot --connection conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1 --operation conversations.list --schema 78615e7dd183198086634e30537945d10a710dbdd26bb420c483716723fae8a0 --revision 7c95c126b092dcfb17f60a1fc88fc4d29965e58c132ba740d282206ade542074 --input-json '{}' | jq -c '.result.result|{status,body}'
-   {"status":200,"body":{"channels":[{"id":"C0000000001","name":"general"}],"ok":true,"response_metadata":{"next_cursor":""}}}
+$ connectors connections list --connector slack --instance bot | jq -c '[.result.connections[]|{connection,revision,state}]'
+[{"connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","revision":"691cd61d-0a34-4ba9-8ab2-f499f90c71f6","state":"ready"}]
+$ connectors connections list --connector slack --instance search | jq -c '[.result.connections[]|{connection,revision,state}]'
+[{"connection":"conn_352bbc77ccfb465fbef6d1648d68811a_c019ec9863e6448fa9d13fb2ad322cd8","revision":"87b27e15-155e-4ac5-953b-22b00189b442","state":"ready"}]
+$ connectors connections revalidate --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --expected-revision 691cd61d-0a34-4ba9-8ab2-f499f90c71f6 | jq -c '.result.connection|{state:.summary.state,revision:.summary.revision,identity:.external_identity}'
+{"state":"ready","revision":"691cd61d-0a34-4ba9-8ab2-f499f90c71f6","identity":{"kind":"slack.user","subject":"U0000000001"}}
+$ connectors connections revalidate --connector slack --instance search --connection conn_352bbc77ccfb465fbef6d1648d68811a_c019ec9863e6448fa9d13fb2ad322cd8 --expected-revision 87b27e15-155e-4ac5-953b-22b00189b442 | jq -c '.result.connection|{state:.summary.state,revision:.summary.revision,identity:.external_identity}'
+{"state":"ready","revision":"87b27e15-155e-4ac5-953b-22b00189b442","identity":{"kind":"slack.user","subject":"U0000000001"}}
+$ connectors operations invoke --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation conversations.list --schema 2771ae0cbcfa853c69da89e1603d017e397120ce4ffd0891c23ed0d0b5f3f365 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-json '{}' | jq -c '.result.result|{status,body}'
+{"status":200,"body":{"channels":[{"id":"C0000000001","name":"general"}],"ok":true,"response_metadata":{"next_cursor":""}}}
    ```
 
    `pending` is expired validation evidence, not a missing credential (60 seconds unless the profile
    sets `evidence_lifetime_ms`), and revalidation renews it. Stop here if either survivor does not
    end `ready`.
 
-2. **List the old connections** with their revisions:
+2. **List the old connection** with its revision:
 
    ```console
-   $ connectors connections list --adapter slack | jq -c '[.result.connections[]|{connection,revision,state}]'
-   [{"connection":"conn_c4789c790b6b4fdf944637d74f5317d7_3b913c5d2ecc44ff9b872060a553ecb8","revision":"d7308969-5b4f-4a21-80f2-2abeba0fd669","state":"pending"},{"connection":"conn_c4789c790b6b4fdf944637d74f5317d7_55b6b83832a3435eaff87937ce462f7d","revision":"639ca8a6-6768-4e19-a38b-bc45cf9f39ce","state":"pending"},{"connection":"conn_c4789c790b6b4fdf944637d74f5317d7_ddd028aecf0a4c87ae384a5bfdb8bd92","revision":"239a22a7-b7e5-4b61-ba45-016d2bd6e4d6","state":"pending"}]
+$ connectors connections list --connector slack --instance legacy | jq -c '[.result.connections[]|{connection,revision,state}]'
+[{"connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f544efc6c39448a59eac20bb7bb901a6","revision":"b92de992-263a-4a62-b8b0-0f1190bbbe2b","state":"ready"}]
    ```
 
-3. **Revoke each one.** Revocation is terminal and local. It asks nothing of Slack
+3. **Revoke it.** Revocation is terminal and local. It asks nothing of Slack
    (`provider_outcome` `not_requested`), so the token stays valid there; revoke it in the Slack
    app if it is to stop working.
 
    ```console
-   $ connectors connections revoke --adapter slack --connection conn_c4789c790b6b4fdf944637d74f5317d7_3b913c5d2ecc44ff9b872060a553ecb8 --expected-revision d7308969-5b4f-4a21-80f2-2abeba0fd669
-   {"ok":true,"result":{"adapter":"slack","connection":"conn_c4789c790b6b4fdf944637d74f5317d7_3b913c5d2ecc44ff9b872060a553ecb8","local_state":"revoked","provider_outcome":"not_requested","revision":"1a85150f-7f22-4d31-a64f-01d909ed0081"}}
-   $ connectors connections revoke --adapter slack --connection conn_c4789c790b6b4fdf944637d74f5317d7_55b6b83832a3435eaff87937ce462f7d --expected-revision 639ca8a6-6768-4e19-a38b-bc45cf9f39ce
-   {"ok":true,"result":{"adapter":"slack","connection":"conn_c4789c790b6b4fdf944637d74f5317d7_55b6b83832a3435eaff87937ce462f7d","local_state":"revoked","provider_outcome":"not_requested","revision":"0a2e3881-cf0e-46fb-b4e6-10066667f520"}}
-   $ connectors connections revoke --adapter slack --connection conn_c4789c790b6b4fdf944637d74f5317d7_ddd028aecf0a4c87ae384a5bfdb8bd92 --expected-revision 239a22a7-b7e5-4b61-ba45-016d2bd6e4d6
-   {"ok":true,"result":{"adapter":"slack","connection":"conn_c4789c790b6b4fdf944637d74f5317d7_ddd028aecf0a4c87ae384a5bfdb8bd92","local_state":"revoked","provider_outcome":"not_requested","revision":"eeb740a9-d080-400d-b4da-cd5648b2ed9d"}}
+$ connectors connections revoke --connector slack --instance legacy --connection conn_352bbc77ccfb465fbef6d1648d68811a_f544efc6c39448a59eac20bb7bb901a6 --expected-revision b92de992-263a-4a62-b8b0-0f1190bbbe2b | jq -c '.result|{connector,instance,connection,local_state,provider_outcome}'
+{"connector":"slack","instance":"legacy","connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f544efc6c39448a59eac20bb7bb901a6","local_state":"revoked","provider_outcome":"not_requested"}
    ```
 
-4. **Check again.** The old connections are `revoked`, and the survivors still revalidate to `ready`:
+4. **Check again.** The old connection is `revoked`, and the survivors still revalidate to `ready`:
 
    ```console
-   $ connectors connections list --adapter slack | jq -c '[.result.connections[]|{connection,state}]'
-   [{"connection":"conn_c4789c790b6b4fdf944637d74f5317d7_3b913c5d2ecc44ff9b872060a553ecb8","state":"revoked"},{"connection":"conn_c4789c790b6b4fdf944637d74f5317d7_55b6b83832a3435eaff87937ce462f7d","state":"revoked"},{"connection":"conn_c4789c790b6b4fdf944637d74f5317d7_ddd028aecf0a4c87ae384a5bfdb8bd92","state":"revoked"}]
-   $ connectors connections revalidate --adapter slack-bot --connection conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1 --expected-revision 9559e85e-0df7-4808-ad1d-1b74b0d821f1 | jq -r '.result.connection.summary.state'
-   ready
-   $ connectors connections revalidate --adapter slack-search --connection conn_c4789c790b6b4fdf944637d74f5317d7_86777214c6be441794c9de42108c2a51 --expected-revision 70c4078a-4ae0-4a01-9a91-06a4f40d205e | jq -r '.result.connection.summary.state'
-   ready
+$ connectors connections list --connector slack --instance legacy | jq -c '[.result.connections[]|{connection,state}]'
+[{"connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f544efc6c39448a59eac20bb7bb901a6","state":"revoked"}]
+$ connectors connections revalidate --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --expected-revision 691cd61d-0a34-4ba9-8ab2-f499f90c71f6 | jq -r '.result.connection.summary.state'
+ready
+$ connectors connections revalidate --connector slack --instance search --connection conn_352bbc77ccfb465fbef6d1648d68811a_c019ec9863e6448fa9d13fb2ad322cd8 --expected-revision 87b27e15-155e-4ac5-953b-22b00189b442 | jq -r '.result.connection.summary.state'
+ready
    ```
 
-5. **Remove `[adapters.slack]`** and its `.permissions` and `.executable` tables from the
-   configuration, then check:
+5. **Remove `[connectors.slack.instances.legacy]`** and its `.permissions` and `.executable`
+   tables from the configuration, then check:
 
    ```console
-   $ connectors setup check | jq -c '[.result.prerequisites[]|{name,state}]'
-   [{"name":"configuration","state":"ready"},{"name":"metadata","state":"ready"},{"name":"artifact:slack-bot","state":"ready"},{"name":"artifact:slack-search","state":"ready"},{"name":"keyring","state":"ready"},{"name":"persistent_custody_qualification","state":"ready"}]
-   $ connectors adapters list | jq -c '[.result.adapters[]|{adapter,instance_id}]'
-   [{"adapter":"slack-bot","instance_id":"slack-bot"},{"adapter":"slack-search","instance_id":"slack-search"}]
-   $ connectors connections list --adapter slack
-   {"error":{"code":"failure","data":{"code":"not_found","kind":"operational","next_action":"check_configuration","stage":"admission"}},"ok":false}
-   $ connectors connections revalidate --adapter slack-bot --connection conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1 --expected-revision 9559e85e-0df7-4808-ad1d-1b74b0d821f1 | jq -r '.result.connection.summary.state'
-   ready
-   $ connectors connections revalidate --adapter slack-search --connection conn_c4789c790b6b4fdf944637d74f5317d7_86777214c6be441794c9de42108c2a51 --expected-revision 70c4078a-4ae0-4a01-9a91-06a4f40d205e | jq -r '.result.connection.summary.state'
-   ready
-   $ connectors approvals policy-status --adapter slack-bot | jq -c '.result.policy.operations'
-   ["chat.postMessage","conversations.open"]
+$ connectors setup check | jq -c '[.result.prerequisites[]|{name,state}]'
+[{"name":"configuration","state":"ready"},{"name":"metadata","state":"ready"},{"name":"artifact:slack-bot","state":"ready"},{"name":"artifact:slack-search","state":"ready"},{"name":"keyring","state":"ready"},{"name":"persistent_custody_qualification","state":"ready"}]
+$ connectors instances list | jq -c '[.. | objects | select(.instance_id) | {connector, instance, instance_id}]'
+[{"connector":"slack","instance":"bot","instance_id":"slack-bot"},{"connector":"slack","instance":"search","instance_id":"slack-search"}]
+$ connectors connections list --connector slack --instance legacy
+{"error":{"code":"failure","data":{"code":"not_found","kind":"operational","next_action":"check_configuration","stage":"admission"}},"ok":false}
+$ connectors connections revalidate --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --expected-revision 691cd61d-0a34-4ba9-8ab2-f499f90c71f6 | jq -r '.result.connection.summary.state'
+ready
+$ connectors connections revalidate --connector slack --instance search --connection conn_352bbc77ccfb465fbef6d1648d68811a_c019ec9863e6448fa9d13fb2ad322cd8 --expected-revision 87b27e15-155e-4ac5-953b-22b00189b442 | jq -r '.result.connection.summary.state'
+ready
+$ connectors approvals policy-status --connector slack --instance bot | jq -c '.result.policy.operations'
+["chat.postMessage","conversations.open"]
    ```
 
-Revoke before removing the entry. Once the entry is gone, every connection command answers
-`not_found` for `--adapter slack`, as above. A connection left unrevoked then can no longer be
-revoked through the CLI, and its metadata and custody item stay behind. Revoked credential versions
-are kept for at least 24 hours after retirement before they may be deleted
+Revoke before removing the instance. Once it is gone, every connection command answers
+`not_found` for `--connector slack --instance legacy`, as above. A connection left unrevoked then
+can no longer be revoked through the CLI, and its metadata and custody item stay behind. Revoked
+credential versions are kept for at least 24 hours after retirement before they may be deleted
 ([retirement](local-connection-registry.md#read-use-and-retirement)). This run does not establish
-whether that deletion still happens once the entry is removed.
+whether that deletion still happens once the instance is removed.
 
 ### `owner_build_mismatch` after a CLI upgrade
 
 The owner is the background `connectors` process that serves a state directory. When the CLI is
 upgraded while an owner started by the previous build still runs, every command that would talk to
-that owner is refused, `adapters stop` and `connections revalidate` included. Passive reads of the
-store such as `connections list` still answer:
-
-```console
-$ connectors adapters status --adapter slack-bot
-{"error":{"code":"failure","data":{"code":"owner_build_mismatch","kind":"operational","next_action":"stop_owner","stage":"readiness"}},"ok":false}
-$ connectors adapters stop --adapter slack-bot --expected-revision 45d968e5336a983cdfa69595911151e63297584ef10169e31214b64f5dce4bee --host-incarnation b1bd440f-6cbb-4895-9387-f7a8702ae714 --child-incarnation 905d552e-87a7-46ae-bdae-a6f31ef7ccf2
-{"error":{"code":"failure","data":{"code":"owner_build_mismatch","kind":"operational","next_action":"stop_owner","stage":"readiness"}},"ok":false}
-$ connectors connections revalidate --adapter slack-bot --connection conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1 --expected-revision 9559e85e-0df7-4808-ad1d-1b74b0d821f1
-{"error":{"code":"failure","data":{"code":"owner_build_mismatch","kind":"operational","next_action":"stop_owner","stage":"readiness"}},"ok":false}
-```
+that owner is refused with `owner_build_mismatch`, stage `readiness`, `next_action: stop_owner`
+([owner contract](../contracts/cli/v1alpha1/owner.md)), `instances stop` and
+`connections revalidate` included. Passive reads of the store such as `connections list` still
+answer.
 
 `connectors setup owner-stop`, run with the same `--config` and `--state-dir`, asks that owner to
 drain and exit and waits up to 30 seconds for it; it answers `"disposition": "stopped"`, or
 `"no_owner"` when none runs, and never signals a process
 ([owner contract](../contracts/cli/v1alpha1/owner.md#stopping-an-owner),
 [CLI guide](../website/docs/guides/set-up-the-local-cli.md#after-an-upgrade)). An idle owner also
-exits by itself after 10 minutes with no connected client and no work in flight.
-
-The next command that needs an owner starts one from the current build. In this run, made before
-`setup owner-stop` existed, the older owner was stopped by its process instead:
+exits by itself after 10 minutes with no connected client and no work in flight. The next command
+that needs an owner starts one from the current build:
 
 ```console
-$ connectors connections revalidate --adapter slack-bot --connection conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1 --expected-revision 9559e85e-0df7-4808-ad1d-1b74b0d821f1 | jq -r '.result.connection.summary.state'
+$ connectors setup owner-stop | jq -c '.result.disposition'
+"stopped"
+$ connectors connections revalidate --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --expected-revision 691cd61d-0a34-4ba9-8ab2-f499f90c71f6 | jq -r '.result.connection.summary.state'
 ready
-$ connectors adapters status --adapter slack-bot | jq -r .result.observation.state
+$ connectors instances status --connector slack --instance bot | jq -r .result.observation.state
 ready
 ```
 
@@ -736,7 +842,7 @@ ready
   `ratelimited` answer sent once more only when its `Retry-After` fits the
   deadline, an answer without a boolean `ok` refused as unreadable, every JSON
   read of both sets refused on a token Slack answers `invalid_auth`, the
-  `auth.test` identity read and its refusal, and, on a second connection with a
+  `auth.test` identity read and its refusal, and, on a second instance with a
   user token, search, the three conversation reads and `users.list`, a
   private channel the bot is not in included. The file reads are checked the same way: a two-page
   `files.list` walk, `files.info` of one file, and the download of a

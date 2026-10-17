@@ -1,7 +1,7 @@
 # Local CLI foundation
 
 The production `connectors` binary consumes the generated local CLI parser for
-setup, adapter and connection management, protected connect/repair, cached
+setup, instance and connection management, protected connect/reconnect, cached
 operation discovery, saved-credential revalidation and supervised GitLab reads.
 This is incremental work under
 `initiative:complete-local-connectors` and `story:persistent-gitlab-journey`.
@@ -16,7 +16,7 @@ The separately installed older `connectors` is not upgraded by this command.
 ```sh
 target/debug/connectors --output json setup init
 target/debug/connectors --output json setup check
-target/debug/connectors --output json adapters list
+target/debug/connectors --output json instances list
 ```
 
 An explicit absolute `--config` and `--state-dir` select another local placement.
@@ -39,13 +39,13 @@ a `connectors-local/1` file; an entry added to an initialized file also carries
 `private_protocol`, as described below.
 Use actual installed executable paths and digests when adding entries. The
 example's fictional executables are not runnable artifacts. Inspection never
-installs or starts an adapter, and `setup check` reports unavailable or changed
+installs or starts an instance's process, and `setup check` reports unavailable or changed
 artifacts as failed prerequisites. Credentials never belong in configuration or
 executable arguments.
 
 Setup writes `connectors-local/2`, and the parser still accepts an existing
-`connectors-local/1` configuration. Every adapter in version two requires
-`private_protocol`, exactly `connectors-private/1` or `connectors-private/2`.
+`connectors-local/1` configuration. Every legacy `[adapters.<alias>]` entry in version two
+requires `private_protocol`, exactly `connectors-private/1` or `connectors-private/2`.
 Version one refuses that field and keeps its implicit private version one;
 loading never rewrites a file. An explicit
 selection changes the executable selection digest and requires fresh admission.
@@ -54,9 +54,19 @@ one-use pending writes. Production GitLab does not select it yet: approval issua
 and the host write coordinator must be integrated first. See the
 [private mutation binding](../contracts/cli/v1alpha1/private-mutations.md).
 
-`adapters describe --adapter ALIAS` reports the configured entry and its cached
-descriptor when available; cache facts are always stale. `adapters status --adapter
-ALIAS` asks only an existing owner, or reports `owner_unavailable` when absent.
+A `connectors-local/5` file configures instances under `[connectors]`, in the terms of the
+[vocabulary](../README.md#vocabulary): `[connectors.<connector>.instances.<instance>]`. An
+instance of a catalog connector that ships a declaration names only its own keys and the
+installed catalog provider derives the rest (the [catalog provider guide](local-catalog-provider.md));
+any other instance pins its entry, as the [Kubernetes guide](local-kubernetes-cli.md) shows.
+`setup migrate --mode dry-run` prints how an existing file's legacy `[adapters.<alias>]` entries
+would move to instances, and `--mode apply` writes it. Entries it cannot map stay where
+they are and are selected as `--connector <adapter_id> --instance <alias>`, or by the
+deprecated `--adapter <alias>`.
+
+`instances describe --connector C --instance I` reports the configured instance and its
+cached descriptor when available; cache facts are always stale. `instances status --connector
+C --instance I` asks only an existing owner, or reports `owner_unavailable` when absent.
 It never starts a process or infers readiness from a PID/cache. Inventory contains at most 64
 entries. Its default page bound is 100; limits outside 1–500 are invalid. Until
 the cursor owner is implemented, a limit smaller than the configured inventory
@@ -148,20 +158,20 @@ filesystem synchronization. Its disposable daemon tests exercise crash/restart a
 failure handling. The registry binds publication and guarded retirement, with
 separate native tests covering both and CLI acquisition status/revoke after restart.
 
-Protected connect/repair sources require current configuration, profile permission,
+Protected connect/reconnect sources require current configuration, profile permission,
 target metadata, qualified custody and an admitted owner capture before reading a
 file, deliberate stdin pipe or foreground controlling terminal. The generated
 parser receives only a nonsecret marker; the paired handler consumes the clearing
 buffer and private capture channel once. The owner validates the document through
-the native adapter, then coordinates durable custody and metadata publication.
+the instance's process, then coordinates durable custody and metadata publication.
 Unsafe sources return `protected_entry_unavailable`; interruption restores terminal
 echo and exits 130. No generated demonstration capture is used in production.
-`connections list --adapter ALIAS` returns safe authoritative summaries and bounded
+`connections list --connector C --instance I` returns safe authoritative summaries and bounded
 opaque cursors. `describe --connection REF`, `status --connection REF` or
 `status --acquisition REF` observe the selected owner records. `revoke --connection
 REF --expected-revision REV` commits terminal local revocation, even without a
-keyring or provider. These subcommands also require `--adapter ALIAS`. They never
-launch an adapter. Missing or unrecognized registry state returns
+keyring or provider. These subcommands also require `--connector C --instance I`. They never
+launch an instance's process. Missing or unrecognized registry state returns
 `metadata_unavailable`; missing references return `not_found`. Operation discovery
 reads the exact cached bootstrap, with `description_unavailable` before the first
 admitted launch. Invocation requires the descriptor revision, schema identity,
@@ -176,7 +186,8 @@ They use the existing service binding described in [running services](running-se
 
 ## Verification
 
-The host now supplies a [private adapter binding](../contracts/cli/v1alpha1/private-adapter.md)
+The host now supplies a private binding of the instance process
+(the internal [private adapter binding](../contracts/cli/v1alpha1/private-adapter.md))
 with a sealed, digest-verified executable snapshot, inherited Unix channel, exact
 child ownership and bounded bootstrap/request handling. The catalog provider's
 `--local-config` mode uses it for the declared identity and scope probes and the
@@ -189,7 +200,7 @@ children on persistent worker threads, and exposes bounded same-UID sockets.
 Stop compares exact incarnation/configuration coordinates, commits suppression and
 signals only the retained pidfd. Its control path remains responsive during a
 provider read. Earlier queued jobs and pending captures cannot undo the stop fence.
-Only a later admitted explicit connect/repair/revalidate/invoke resumes the entry.
+Only a later admitted explicit connect/reconnect/revalidate/invoke resumes the entry.
 
 The production-process tests cover fresh setup and metadata reuse across CLI
 processes, exclusive initialization, configured inventory and passive status,
@@ -199,7 +210,7 @@ future schema refusal and owner/migration tampering. The registry and native
 custody tests have separate scope described in their linked binding documents.
 Additional production CLI fixtures combine a disposable GitLab HTTPS service and
 qualified private keyring. They exercise protected entry, persisted reads, owner
-and keyring restart, concurrent startup, failed repair, permission/schema refusal,
+and keyring restart, concurrent startup, failed reconnect, permission/schema refusal,
 busy stop and terminal local revoke. PTY tests check hidden input and restored echo
 after SIGINT. These fixtures do not satisfy dedicated provider sandbox acceptance
 or qualify a different custody implementation. Actual commands and results belong

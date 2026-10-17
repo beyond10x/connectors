@@ -1,0 +1,18 @@
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "jira-cloud",
+  "provider": "jira",
+  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
+  "api_base": "https://api.atlassian.com/ex/jira/your-cloud-id/rest/api/3",
+  "request_prefix": "/ex/jira/your-cloud-id",
+  "auth": {
+    "profile": "atlassian.basic",
+    "scheme": "basic",
+    "header": "Authorization",
+    "bearer": false,
+    "account_label": "Account email",
+    "label": "API token",
+    "identity": {"path": "myself", "kind": "atlassian.account", "subject_pointer": "/accountId"}
+  },
+  "operations_file": "/absolute/path/adapters/catalog/providers/jira/operations.json"
+}

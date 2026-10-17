@@ -9,14 +9,14 @@ custom_edit_url: null
 
 # Status
 
-As of 2026-10-10: 57 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. A release page carries the source archives and Linux and macOS binaries of `connectors` and `connectors-catalog-provider`; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
+As of 2026-10-16: 63 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. A release page carries the source archives and Linux and macOS binaries of `connectors` and `connectors-catalog-provider`; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
 
 ## Service boundary
 
 | Capability | Status | What it means |
 |---|---|---|
-| [Describe and invoke](./getting-started.md) | ● shipped | An adapter service answers a typed descriptor and invokes its operations over HTTP; admission and freshness are checked before dispatch. |
-| [One-hop federation](./guides/federate-adapter-services.md) | ● shipped | connectors serve puts one gateway in front of several adapter services, prefixes their operations and reports a downstream failure without retrying it. |
+| [Describe and invoke](./getting-started.md) | ● shipped | A connector's standalone service answers a typed descriptor and invokes its operations over HTTP; admission and freshness are checked before dispatch. |
+| [One-hop federation](./guides/federate-adapter-services.md) | ● shipped | connectors serve puts one gateway in front of several standalone services, prefixes their operations and reports a downstream failure without retrying it. |
 | [Audited v1alpha2 invoke](./concepts/governed-invocation.md) | ● shipped | A host whose service configuration names a state directory serves POST /v1alpha2/invoke: every admitted invocation is anchored in the execution audit before dispatch (since 0.35.0). |
 | [The attempt a write produced](./concepts/governed-invocation.md) | ● shipped | An admitted write records its attempt before its one dispatch and answers it as mutation; a lost answer is outcome_unknown and is never sent again (since 0.35.0). |
 | [Rust client for v1alpha2](./concepts/governed-invocation.md) | ● shipped | connectors_client::Client::invoke_v1alpha2 returns the attempt the host recorded and reports an older host as unsupported instead of falling back. |
@@ -27,11 +27,17 @@ As of 2026-10-10: 57 capabilities are shipped, 3 are decided and 5 are planned. 
 | Capability | Status | What it means |
 |---|---|---|
 | [Setup and metadata store](./guides/set-up-the-local-cli.md) | ● shipped | setup init creates a private configuration and an Entity Runtime metadata store over Eventlog SQLite, with durable open checkpoints (since 0.33.0). |
-| [Supervised adapters](./concepts/local-runtime.md) | ● shipped | A local owner starts the configured adapter executables, refuses a changed executable or configuration before provider work, and stops exact incarnations. |
+| [Supervised instances](./concepts/local-runtime.md) | ● shipped | A local owner starts the process that serves each configured instance, refuses a changed executable or configuration before provider work, and stops exact incarnations. |
 | [Stopping an owner after an upgrade](./guides/set-up-the-local-cli.md#after-an-upgrade) | ● shipped | setup owner-stop asks the state directory's running owner, of any build, to drain and exit within 30 seconds, answers no_owner when none runs, and never signals a process. |
 | [Configuration upgrades](./concepts/local-runtime.md) | ● shipped | After a configuration change each saved connection has one working path: revalidate, a new connection under the same instance id after an evidence lifetime change, or a new instance id after a changed provider authority or profile. |
 | [Approval clock refusals](./concepts/local-runtime.md) | ● shipped | approvals clock-check names why the quorum formed no answer (below quorum, split or too imprecise) with its next action, and each source's result: unreachable, unverified or verified at any radius; only the combined answer is capped. |
-| [Saved connections](./concepts/local-runtime.md) | ● shipped | connections connect validates a credential and keeps it in Secret Service custody; revalidate, repair and revoke manage it, and an unanswered revalidation is outcome_unknown. |
+| [Saved connections](./concepts/local-runtime.md) | ● shipped | connections connect validates a credential and keeps it in Secret Service custody; revalidate, reconnect and revoke manage it, and an unanswered revalidation is outcome_unknown. |
+| [Connector instances](./guides/set-up-the-local-cli.md#configure-instances) | ● shipped | A connectors-local/5 configuration enables connectors by name and names their instances; an instance that pins nothing is derived from the catalog provider installed beside the CLI. |
+| [Selecting an instance](./reference/cli.md) | ● shipped | --connector and --instance select one instance; the deprecated --adapter reaches the same instance and says it is deprecated once. |
+| [Renamed commands](./reference/cli.md) | ● shipped | instances replaces the adapters group and connections reconnect replaces connections repair; each old name runs as its new one and says it is deprecated once. |
+| [Stale connections](./concepts/local-runtime.md#saved-connections) | ● shipped | A connection whose stored credential the provider refused is Stale until connections reconnect publishes a new credential under the same reference. |
+| [One connection per instance](./concepts/local-runtime.md#saved-connections) | ● shipped | connections connect is refused while the instance holds a published Live or Stale connection, naming the reconnect, revalidation or revocation that helps. |
+| [Configuration migration](./guides/set-up-the-local-cli.md#configure-instances) | ● shipped | setup migrate moves each legacy catalog entry to an instance of its connector, keeping its instance id, revision, executable selection and custody items, and names why any other entry is kept. |
 | [Mounted-secret custody](./guides/set-up-the-local-cli.md) | ● shipped | An owner configuration can explicitly select read-only mounted-secret custody (mounted_secret, Linux): connect, list and a credentialed invoke run under an empty environment in a container, reading a Kubernetes-style Secret volume and writing nothing; rotation needs a revalidation. |
 | [Approved writes](./concepts/local-runtime.md) | ● shipped | approvals policy-set, prepare and issue bind a write's whole input to a protected proof before the host dispatches it once. |
 | [Approval-signing keys](./concepts/local-runtime.md) | ● shipped | Approval-signing keys are initialized, rotated, recovered, revoked and retired through the CLI; status reads never touch custody. |

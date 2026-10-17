@@ -7,9 +7,9 @@ documents how to reproduce the checks. No external publication was performed.
 
 ## Delivered surface
 
-The website combines authored introductions and adapter guides with 40 selected
+The website combines authored introductions and guides to internal adapters with 40 selected
 canonical contract pages and 48 ESS model pages from six explicit model roots.
-Navigation is Home / Introduction, Contracts and Adapters. Source ownership,
+Navigation is Home / Introduction, Contracts and Adapters (the internal adapters). Source ownership,
 digests and implementation status remain visible. Historical evidence sections
 are excluded from the public contract view; unpublished source links become notes.
 
@@ -73,12 +73,12 @@ Local command logs and screenshots are retained under
 
 The operator requested a recognizable federation/authentication story in place of
 the introductory rule exercises. `/introduction/examples` now follows a fictional
-GitLab issue request from a laptop through a remote gateway and adapter to GitLab,
+GitLab issue request from a laptop through a remote gateway and internal adapter to GitLab,
 with the result traveling back. The two independently labeled journeys show
 configured access available today and specified user authorization. The latter
 pauses after connection setup and requires a separate **Read issues** action.
 
-Each has three failure variants. Provider credentials stay at the adapter boundary;
+Each has three failure variants. Provider credentials stay at the internal adapter boundary;
 application identity, service credentials, delegation and provider consent are
 distinct. The identity service is depicted outside the laptop. A Rust walkthrough
 session drives the illustration; it is not a service implementation, OAuth flow or
@@ -105,7 +105,7 @@ Rechecked results:
 | Full repository gate with MSRV | Passed; 66 workspace tests, including descriptor-fixture validation, and unchanged 315-scenario conformance synthesis |
 | Desktop/mobile screenshots | Inspected for readable deployment boundaries, request arrows and text |
 
-Canonical contracts, shared ESS and production adapters are unchanged. The work
+Canonical contracts, shared ESS and production internal adapters are unchanged. The work
 is local and uncommitted, and the existing preview process remains running.
 Revision logs/screenshots are under `.local/tmp/docs-walkthrough-20260909/`.
 
@@ -114,13 +114,13 @@ Revision logs/screenshots are under `.local/tmp/docs-walkthrough-20260909/`.
 The operator selected the main b10x Website style and unified browsing plus local
 full-text search. This revision reuses `@beyond10x/docs-system` at the main site's
 exact commit `1ef1890272ce308eb6fec5446091f93afd14046f`, with Pagefind 1.5.2. The
-homepage, authored guides, generated references, adapter catalog and examples now
+homepage, authored guides, generated references, catalog of internal adapters and examples now
 share the b10x typography, semantic colors and navigation conventions. The existing
 URLs, canonical text and anchors remain. Canonical source h1 headings render as h2
 beneath the reference page title; a Rust regression test checks text/id preservation.
 
 The shared documentation frame supplies navigation, active state, breadcrumbs,
-mobile browsing and contents controls. The adapter catalog shows all 12 documented
+mobile browsing and contents controls. The catalog of internal adapters shows all 12 documented
 owners, with three working first slices distinguished from broader specification
 coverage. Search covers 109 public pages with section, document-type and owner
 filters, excerpts, pagination and URL state. Result URLs work in development and
@@ -136,7 +136,7 @@ and updates a development-only cache without interrupting hot reload.
 | `npm run search:refresh` with dev server running | Pass; isolated output and generation; preview stays available |
 | `npm run test:examples` | Pass; 15 Rust example tests |
 | `npm run test:browser` on the dev server | Pass; both walkthroughs, six failures, advanced labs and unavailable WASM |
-| `npm run test:ui` on the dev server | Pass; reference family/active navigation, adapter filters, search filters/results/URL restoration/pagination/clean links, mobile menus, themes, zoom, keyboard focus and unavailable search |
+| `npm run test:ui` on the dev server | Pass; reference family/active navigation, internal adapter filters, search filters/results/URL restoration/pagination/clean links, mobile menus, themes, zoom, keyboard focus and unavailable search |
 | `CONNECTORS_WEBSITE_URL=http://127.0.0.1:3101 npm run test:browser` | Pass against the built production artifact |
 | Production search check | Filtered GitLab results open the clean `/adapters/gitlab` route |
 | `connectors-build gate --msrv` | Pass; 67 workspace tests, formatting, Clippy, MSRV, generation, boundaries and planning |
@@ -144,7 +144,7 @@ and updates a development-only cache without interrupting hot reload.
 | `git diff --check` | Pass |
 
 Responsive checks cover 1440, 1024, 768 and 390px widths in both themes, plus zoom
-and mobile keyboard navigation. Representative homepage, adapter, contract,
+and mobile keyboard navigation. Representative homepage, internal adapter, contract,
 walkthrough and search screenshots were inspected. Visible text on those pages
 has a 12px minimum; body text is at least 16px. The themes now keep Docusaurus and
 shared-component canvas colors identical. The final build emits four non-fatal

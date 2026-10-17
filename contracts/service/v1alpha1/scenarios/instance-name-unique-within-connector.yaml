@@ -1,0 +1,68 @@
+# Ledger expectations only: name_held_by is the trusted owner's read, inside
+# the recording transaction, of another instance with the same connector_id
+# and name. See ess/domains/declarations.yaml RecordServiceConfiguration.
+type: ess-scenario/1
+domain: connectors.declarations
+scenario: instance-name-unique-within-connector
+summary: 'A second instance with the connector and name of an existing one is refused; the same name under another connector is recorded.'
+timeline:
+- at: '2026-10-16T14:00:00Z'
+  command: connectors.declarations.RecordServiceConfiguration
+  input:
+    instance_id: gmail-write
+    adapter_id: catalog
+    revision: r1
+    registry_epoch: 1
+    connector_id: gmail
+    name: private
+    connector_default_endpoint: https://gmail.googleapis.com
+  outcome: recorded
+  events:
+  - event: connectors.declarations.ServiceConfigurationRecorded
+    payload:
+      instance_id: gmail-write
+- at: '2026-10-16T14:00:01Z'
+  command: connectors.declarations.RecordServiceConfiguration
+  input:
+    instance_id: gmail.private
+    adapter_id: catalog
+    revision: r1
+    registry_epoch: 1
+    connector_id: gmail
+    name: private
+    connector_default_endpoint: https://gmail.googleapis.com
+    name_held_by: gmail-write
+  outcome: name-taken
+  error:
+    name: connectors.declarations.InstanceNameTaken
+  no_events:
+  - connectors.declarations.ServiceConfigurationRecorded
+- at: '2026-10-16T14:00:02Z'
+  command: connectors.declarations.RecordServiceConfiguration
+  input:
+    instance_id: drive.private
+    adapter_id: catalog
+    revision: r1
+    registry_epoch: 1
+    connector_id: drive
+    name: private
+    connector_default_endpoint: https://www.googleapis.com/drive/v3
+  outcome: recorded
+  events:
+  - event: connectors.declarations.ServiceConfigurationRecorded
+    payload:
+      instance_id: drive.private
+assert:
+- view: connectors.declarations.ServiceConfigurations
+  contains:
+    instance_id: gmail-write
+    connector_id: gmail
+    name: private
+- view: connectors.declarations.ServiceConfigurations
+  excludes:
+    instance_id: gmail.private
+- view: connectors.declarations.ServiceConfigurations
+  contains:
+    instance_id: drive.private
+    connector_id: drive
+    name: private

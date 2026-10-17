@@ -18,6 +18,17 @@ use std::{
 
 const BOUND: Duration = Duration::from_secs(5);
 
+/// The owner socket as this test binds and connects it: through the open state directory on
+/// Linux, as the host does, so a long checkout path does not push it past `SUN_LEN`.
+fn socket_path(state: &fs::File, root: &Path) -> std::path::PathBuf {
+    if cfg!(target_os = "linux") {
+        use std::os::fd::AsRawFd;
+        format!("/proc/self/fd/{}/owner.sock", state.as_raw_fd()).into()
+    } else {
+        root.join("state/owner.sock")
+    }
+}
+
 fn command(root: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_connectors"))
         .args(["--output", "json", "--config"])
@@ -156,7 +167,8 @@ fn a_lost_owner_waits_for_a_connected_client_and_no_longer_than_the_drain_bound(
     let top = tempfile::tempdir().unwrap();
     init(top.path());
     let mut owner = start_owner(top.path());
-    let socket = top.path().join("state/owner.sock");
+    let state = fs::File::open(top.path().join("state")).unwrap();
+    let socket = socket_path(&state, top.path());
     let client = UnixStream::connect(&socket).unwrap();
     // Give the owner time to accept and count the client.
     std::thread::sleep(Duration::from_millis(300));
@@ -188,7 +200,8 @@ fn an_owner_exits_once_its_socket_is_replaced_by_another_socket() {
     let top = tempfile::tempdir().unwrap();
     init(top.path());
     let mut owner = start_owner(top.path());
-    let socket = top.path().join("state/owner.sock");
+    let state = fs::File::open(top.path().join("state")).unwrap();
+    let socket = socket_path(&state, top.path());
     fs::remove_file(&socket).unwrap();
     let _stand_in = UnixListener::bind(&socket).unwrap();
     assert!(

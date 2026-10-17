@@ -248,7 +248,7 @@ fn an_owner_of_the_same_build_that_sheds_one_connection_is_not_reported_as_anoth
         greetings
     });
 
-    let output = command(&root, &["adapters", "status", "--adapter", "forge"]);
+    let output = command(&root, &["instances", "status", "--adapter", "forge"]);
     let greetings = server.join().unwrap();
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(

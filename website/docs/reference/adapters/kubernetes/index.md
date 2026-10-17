@@ -42,7 +42,7 @@ standalone service ([Getting started](../../../getting-started.md) starts one) o
 CLI with a saved bearer token, validated by one SelfSubjectReview.
 
 Real k3s acceptance on 2026-10-02 covered selected reads across restart, authenticated RBAC
-denial versus empty results, continuation scope and revision binding, and local repair,
+denial versus empty results, continuation scope and revision binding, and local reconnect,
 revocation, custody and child-stop controls. These observations do not establish per-operation
 SelfSubjectAccessReview checks, which are not implemented, or the remaining execution and Helm
 workflows.

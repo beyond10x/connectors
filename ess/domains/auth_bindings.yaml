@@ -83,6 +83,13 @@ types:
     # under the same instance id, not by moving the existing one.
 
 entities:
+  # Vocabulary: this record and its ProfileDeclaration are the auth profile,
+  # "one way to authenticate that a connector declares" (`vendor.oauth`,
+  # `vendor.token`; docs/design/connector-vocabulary.md § Decision). It ships
+  # with the connector and an instance names it. It stays declared on the
+  # implementation (adapter_id); a connector names the profiles it accepts by
+  # profile_id (declarations.yaml Connector.profile_ids,
+  # story:ess-connector-vocabulary-model decision 5).
   - name: connectors.auth_bindings.AuthProfile
     identity: {name: profile_record_ref, type: String}
     fields:
@@ -100,6 +107,12 @@ entities:
     # Exact immutable (adapter_id, profile_id, declaration_revision) key.
     # No delete command or cascade into referencing Connections is selected.
 
+  # Vocabulary: the connection, "the stored credential of one instance,
+  # obtained through one auth profile" (design § Decision). `instance` below
+  # references the instance (ServiceConfiguration) by instance_id; the
+  # lifecycle carries the design's `Stale` (§ Connection lifecycle).
+  # "decision N" below, unqualified, is story:ess-connector-vocabulary-model
+  # § Decisions.
   - name: connectors.auth_bindings.Connection
     identity: {name: connection_ref, type: String}
     fields:
@@ -133,7 +146,7 @@ entities:
       - {name: active_generation, kind: references, target: connectors.credentials.CredentialGeneration, cardinality: one, via: active_generation_id}
       - {name: active_custody_version, kind: references, target: connectors.auth_bindings.CustodyVersion, cardinality: one, via: active_custody_version_ref}
       - {name: superseded_custody_versions, kind: references, target: connectors.auth_bindings.CustodyVersion, cardinality: many, via: superseded_custody_version_refs}
-    # connection semantics.md:140-143: active custody requires an active
+    # connection semantics.md:166-169: active custody requires an active
     # generation; a material-free access mode has neither.
     invariants:
       - any:
@@ -144,12 +157,41 @@ entities:
           - none: [defined(active_generation_id), defined(active_custody_version_ref)]
     lifecycle:
       initial: Live
-      states: [Live, Revoked]
+      states: [Live, Stale, Revoked]
       terminal: [Revoked]
       transitions:
-        - {name: publish, from: [Live], to: Live}
-        - {name: revoke, from: [Live], to: Revoked}
-    # Live is administrative non-revocation, not readiness/publication/permission.
+        - {name: publish, from: [Live, Stale], to: Live}
+        - {name: mark_stale, from: [Live], to: Stale}
+        - {name: record_candidate, from: [Stale], to: Stale}
+        - {name: revoke, from: [Live, Stale], to: Revoked}
+    # Live and Stale are both administrative non-revocation; neither is
+    # readiness, publication or permission. Stale (operator decision
+    # 2026-10-16) is a connection whose stored credential the provider refused
+    # (an OAuth refresh token expired or revoked at the provider, a changed
+    # password: invalid_grant or unauthorized on refresh), so a retry cannot
+    # succeed. The way out is a reconnect: the same consent or credential entry
+    # on the same instance and connection_ref, today `connections repair` (an
+    # Acquisition with repair_connection_ref, then PublishBinding), whose
+    # publication of a new credential moves it back to Live. Before that
+    # publication the reconnect records its candidate custody version on the
+    # Stale connection (RecordConnectionCandidate, which keeps it Stale), and a
+    # reconnect that fails after it leaves the connection Stale with the
+    # candidate listed. Revocation stays terminal and is admitted from Live
+    # and Stale.
+    # contracts/auth/connection/v1alpha1/semantics.md §4.1-§4.2 name Stale and
+    # these transitions (decision 12). Stale is the one provider observation
+    # the lifecycle persists; the §4.1 status reduction reports a Stale
+    # connection with its own status, `stale` (connection_admission.yaml
+    # ConnectionState), ahead of every status but `revoked` and `disabled`.
+    # The host code that records the refusal (MarkConnectionStale) and stores
+    # Stale is story:connection-stale-state (decision 13).
+    # Any allowed PublishBinding leaves Stale: a publication means the provider
+    # accepted a credential, through a reconnect or a revalidation the
+    # provider now accepts (decision 14).
+    # At most one published Live or Stale connection per instance (decision
+    # 11): AllocateConnection refuses while the instance holds one, so a
+    # replacement under the same instance id follows the revocation of the
+    # connection it replaces. A connection never published does not count.
     # Optional via carriers mean zero-or-one, as in RefreshAttempt's candidate.
     # baseline_evidence is one current-generation material baseline value, not a
     # history or operation-permission cache: at most six distinct baseline checks
@@ -277,6 +319,8 @@ errors:
     fields: [{name: reason, type: String}]
   - name: connectors.auth_bindings.ConnectionStateConflict
     fields: [{name: state, type: connectors.auth_bindings.Connection.State}]
+  - name: connectors.auth_bindings.InstanceConnected
+    fields: [{name: instance_id, type: String}]
   - name: connectors.auth_bindings.AcquisitionStateConflict
     fields: [{name: state, type: connectors.auth_bindings.Acquisition.State}]
   - name: connectors.auth_bindings.CustodyStateConflict
@@ -316,12 +360,40 @@ commands:
       - {name: owner_scope, type: String}
       - {name: access_mode, type: connectors.auth_access.AccessMode}
       - {name: publication_fence, type: String}
+      # The instance's published Live or Stale connection (published true)
+      # the owner found inside the allocating transaction; absent when it
+      # holds none.
+      - {name: held_connection_ref, type: "Optional<String>"}
+    # At most one published non-revoked connection per instance
+    # (decision-blocker instance-connection-cardinality, option A;
+    # story:ess-connector-vocabulary-model decision 11): an allocation is
+    # refused while the instance holds a published Live or Stale connection,
+    # and allowed again once that connection is Revoked; revoked connections
+    # stay as history. A connection allocated and never published (a connect
+    # that failed before publication) does not count: it holds no credential,
+    # the host cannot revoke it, and its own publication checks count only
+    # published non-revoked connections (registry/lifecycle.rs:194, :515).
+    # An instance that held more than one published non-revoked connection
+    # before this rule keeps them all (connection refs stay byte for byte) and
+    # is refused a new one until the extra ones are revoked. The host's bound
+    # of 1000 connections per instance_id (registry/lifecycle.rs:569-581) stays
+    # the storage bound for revoked history.
+    # held_connection_ref is the owner's read, an input as `decision` is.
+    # ESS-LIMIT: a guard over the instance's other Connections
+    # (`when_related: {entity, where}`) needs ess/22, and this specification
+    # is ess/18; the pinned Entity Runtime lowering refuses it for this lowered
+    # command (ess-entity-runtime 0.59.0 RowSetUnsupported).
     outcomes:
-      # connection semantics.md:120-126: the allocated binding keeps its admitted
+      - name: instance-connected
+        when:
+          all: [decision == allow, defined(held_connection_ref)]
+        error: connectors.auth_bindings.InstanceConnected
+      # connection semantics.md:122-128: the allocated binding keeps its admitted
       # instance, profile record, owner scope, fixed access mode and the private
       # publication fence the owner allocated with it (registry/lifecycle.rs begin).
       - name: allocated
-        when: decision == allow
+        when:
+          all: [decision == allow, missing(held_connection_ref)]
         creates: connectors.auth_bindings.Connection
         instance: connection_ref
         sets:
@@ -343,6 +415,53 @@ commands:
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.ConnectionStateConflict}
+  - name: connectors.auth_bindings.MarkConnectionStale
+    # The provider refused this connection's stored credential: an OAuth
+    # refresh answered invalid_grant, or the provider answered unauthorized for
+    # it (apps/connectors/src/local.rs invoke_failure: service_failure with
+    # service_code unauthorized names repair_connection). A trusted host
+    # observation like InvalidateCustodyVersion, which records a revalidation's
+    # refusal on the custody version and cannot move the Connection under
+    # format ess/18.
+    # A refusal of an already Stale connection answers wrong-state, as the
+    # operator's lifecycle moves only Live to Stale.
+    # Decisions 13-17 are story:ess-connector-vocabulary-model § Decisions.
+    # Every credential the provider refuses as unauthorized makes the
+    # connection Stale, whatever the profile's scheme: an OAuth refresh token,
+    # a personal access token, a basic or a bearer entry (decision 15).
+    # A refused cached OAuth access token alone does not: the adapter drops it
+    # and refreshes once, and only a refused refresh makes the connection
+    # Stale (decision 16).
+    # Revalidation (registry/revalidation.rs finish_revalidation) makes the
+    # connection Stale for each outcome a reconnect fixes: `invalid` (the
+    # provider refused the credential), `insufficient` (granted scope below the
+    # profile minimum) and `missing` (a lost keyring entry) (decision 17).
+    # Another identity on a repair or reconnect is refused and leaves the
+    # connection as it was: no MarkConnectionStale, no publication.
+    # The host code that sends this command is story:connection-stale-state
+    # (decision 13).
+    input:
+      - {name: connection_ref, type: String}
+    outcomes:
+      - {name: marked-stale, moves: connectors.auth_bindings.Connection.mark_stale, instance: connection_ref, emits: [connectors.auth_bindings.ConnectionMarkedStale], payload: {connectors.auth_bindings.ConnectionMarkedStale: {connection_ref: input.connection_ref}}}
+      - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.ConnectionStateConflict}
+  - name: connectors.auth_bindings.RecordConnectionCandidate
+    # A reconnect of a Stale connection has allocated its candidate custody
+    # version for this connection (registry/lifecycle.rs prepare), which adds
+    # it to superseded_custody_version_refs before the publication that leaves
+    # Stale. The connection stays Stale: the candidate grants no material use
+    # and no publication. A trusted host observation like
+    # RecordAcquisitionCandidate, recorded in the same metadata batch.
+    # On a Live connection the same change is part of the publication's own
+    # update (PublishBinding, Live to Live); on Revoked there is no reconnect.
+    # The host sends it only when the change adds exactly one custody version
+    # and changes nothing else (metadata/er.rs update_command).
+    input:
+      - {name: connection_ref, type: String}
+      - {name: candidate_custody_version_ref, type: String}
+    outcomes:
+      - {name: candidate-recorded, moves: connectors.auth_bindings.Connection.record_candidate, instance: connection_ref, emits: [connectors.auth_bindings.ConnectionCandidateRecorded], payload: {connectors.auth_bindings.ConnectionCandidateRecorded: {connection_ref: input.connection_ref, candidate_custody_version_ref: input.candidate_custody_version_ref}}}
+      - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.ConnectionStateConflict}
   - name: connectors.auth_bindings.PublishBinding
     # Names an acknowledged host metadata update, not another lifecycle or a
     # substitute for RefreshAttempt's consumed-source/publication protocol.
@@ -351,7 +470,7 @@ commands:
       - {name: connection_ref, type: String}
       - {name: publication, type: connectors.auth_bindings.BindingPublication}
     outcomes:
-      # connection semantics.md:140-141 and docs/design.md:1358: publication is
+      # connection semantics.md:166-167 and docs/design.md:1358: publication is
       # compare-and-set on the private fence and advances it.
       - name: stale-fence
         when_subject:
@@ -370,8 +489,11 @@ commands:
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.ConnectionStateConflict}
     # DECIDED 2026-09-27: PublishBinding with decision allow on a Revoked Connection refuses
     # with ConnectionStateConflict, as RevokeConnection does; input guards decide first (refuse → Refused, unknown → Unavailable).
-    # The host (crates/connectors-host/src/local/metadata/er.rs:2989-2994) maps no
+    # The host (crates/connectors-host/src/local/metadata/er.rs:4245-4258) maps no
     # Revoked row change to this command, so no code states another answer.
+    # On a Stale Connection any allowed publication moves it back to Live: the
+    # provider accepted a credential, through a reconnect or a revalidation it
+    # now accepts (story:ess-connector-vocabulary-model decision 14).
   - name: connectors.auth_bindings.BeginAcquisition
     # Owner refuses static_config, expired/unsupported flows and capacity before
     # creation. No business operation, public callback or material read is implied.
@@ -515,7 +637,7 @@ commands:
       - {name: version_ref, type: String}
       - {name: acknowledged_at, type: Timestamp}
     outcomes:
-      # custody semantics.md:86 and docs/local-connection-registry.md:32: the
+      # custody semantics.md:86 and docs/local-connection-registry.md:34: the
       # acknowledgement, invalidity and retirement facts are recorded.
       - name: stored
         when: decision == allow
@@ -580,6 +702,12 @@ events:
     fields: [{name: connection_ref, type: String}]
   - name: connectors.auth_bindings.ConnectionRevoked
     fields: [{name: connection_ref, type: String}]
+  - name: connectors.auth_bindings.ConnectionMarkedStale
+    fields: [{name: connection_ref, type: String}]
+  - name: connectors.auth_bindings.ConnectionCandidateRecorded
+    fields:
+      - {name: connection_ref, type: String}
+      - {name: candidate_custody_version_ref, type: String}
   - name: connectors.auth_bindings.BindingPublished
     fields: [{name: connection_ref, type: String}]
   - name: connectors.auth_bindings.AcquisitionBegan
@@ -729,8 +857,10 @@ actors:
       - connectors.auth_bindings.ExpireAcquisition
       - connectors.auth_bindings.FailAcquisition
       - connectors.auth_bindings.InvalidateCustodyVersion
+      - connectors.auth_bindings.MarkConnectionStale
       - connectors.auth_bindings.PublishBinding
       - connectors.auth_bindings.RecordAcquisitionCandidate
+      - connectors.auth_bindings.RecordConnectionCandidate
       - connectors.auth_bindings.RecordCustodyVersion
       - connectors.auth_bindings.RecordProfile
       - connectors.auth_bindings.RetireCustodyVersion

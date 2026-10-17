@@ -1,0 +1,19 @@
+{
+  "format": "connectors-catalog-connector/1",
+  "connector_id": "jira",
+  "provider_id": "atlassian",
+  "adapter_id": "catalog",
+  "catalog_provider": "jira",
+  "selection": "operations.json",
+  "profiles": [
+    {
+      "profile": "atlassian.basic",
+      "scheme": "basic",
+      "header": "Authorization",
+      "bearer": false,
+      "account_label": "Account email",
+      "label": "API token",
+      "identity": {"path": "myself", "kind": "atlassian.account", "subject_pointer": "/accountId"}
+    }
+  ]
+}

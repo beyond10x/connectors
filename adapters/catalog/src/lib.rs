@@ -492,7 +492,7 @@ impl Guard {
 /// in exactly one of two forms: a range, `maximum` and an optional `minimum`,
 /// within which the value must be a decimal integer, such as a provider's
 /// page-size cap; or `values`, the allowed strings, one of which the value's
-/// sent text must be, such as GitLab's project search held to `scope` `blobs`.
+/// sent text must be, such as a provider's project search held to `scope` `blobs`.
 /// A bound naming neither `maximum` nor `values` is not read; the engine
 /// refuses one with both forms, or neither, when it loads.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

@@ -1,4 +1,4 @@
-//! Self-contained list cursors for `adapters list` and `operations list`.
+//! Self-contained list cursors for `instances list` and `operations list`.
 //!
 //! A cursor is base64url (no padding) of `{version, digest, offset, issued_at}`.
 //! The digest covers the list's source and the page limit, so a cursor answers

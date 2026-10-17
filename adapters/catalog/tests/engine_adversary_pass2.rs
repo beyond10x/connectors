@@ -5,7 +5,7 @@
 #![cfg(unix)]
 use connectors_catalog::bundle;
 use connectors_host::local::{
-    filesystem, metadata::Metadata, registry::Registry, runtime::Bootstrap,
+    filesystem, metadata::Metadata, owner, registry, registry::Registry, runtime::Bootstrap,
 };
 use serde_json::{Value, json};
 use std::{
@@ -118,16 +118,19 @@ fn bootstrap(bundles: &Path, scratch: &Path) -> Bootstrap {
 /// tells an operator what the rebuilt bundles require of an existing GitLab,
 /// Jira or Confluence instance.
 ///
-/// The rebuild moves the configuration revision the host binds. An instance
-/// connected before it can be revalidated onto the new revision, or connected
-/// again under the same instance id: a new connection is admitted under the
-/// configured revision and moves the instance to it when it publishes
-/// (`registry/lifecycle.rs` `register` and publication;
-/// `docs/local-connection-registry.md`, "Configuration upgrades"). The adapter
-/// entry's `configuration_revision` must still be copied from the bootstrap
-/// again, or the adapter does not start (`runtime/process.rs` readiness check).
+/// The rebuild moves the configuration revision the host binds, and the
+/// instance id stays. An instance holds at most one connection, and a connect
+/// is refused while another connect of the same instance is in flight
+/// (`registry/lifecycle.rs` `admit_allocation`,
+/// decision-blocker:instance-connection-cardinality option A). The first
+/// connect below is consumed but never published, so it is still in flight
+/// when the rebuilt binding asks for a second: that is `Conflict`, which the
+/// owner reports as `lifecycle_conflict`. The adapter entry's
+/// `configuration_revision` must still be copied from the bootstrap again, or
+/// the adapter does not start (`runtime/process.rs` readiness check).
 #[test]
-fn adversary2_an_instance_connected_before_the_rebuild_connects_again_under_the_same_id_after_it() {
+fn adversary2_a_second_connect_of_an_instance_after_the_rebuild_is_refused_while_the_first_is_in_flight()
+ {
     let scratch = tempfile::tempdir().unwrap();
     let base: PathBuf = scratch.path().join("base-bundles");
     base_gitlab(&base);
@@ -152,14 +155,16 @@ fn adversary2_an_instance_connected_before_the_rebuild_connects_again_under_the_
     registry.consume(connected, NOW).unwrap();
 
     let again = registry.begin(&after.binding("gitlab.pat").unwrap(), NOW + 1);
-    assert!(
-        again.is_ok(),
-        "instance `{}` connected under configuration revision {} is refused a new connection \
-         under {} after the bundle rebuild ({:?}); docs/local-catalog-provider.md (\"Array and \
-         required query parameters\") says it connects again under the same instance id",
+    assert_eq!(
+        again.as_ref().err(),
+        Some(&registry::Failure::Conflict),
+        "instance `{}` connected under configuration revision {} asks for a second \
+         connection under {} after the bundle rebuild while the first is in flight",
         after.instance,
         before.configuration_revision,
         after.configuration_revision,
-        again.err(),
     );
+    let error = owner::Error::from(again.err().unwrap());
+    assert_eq!(error.code, owner::Code::LifecycleConflict);
+    assert!(!error.held && !error.revoke && !error.reconnect && !error.revalidate);
 }

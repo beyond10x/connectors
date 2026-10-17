@@ -1,3 +1,4 @@
+> This dated record predates the [connector vocabulary](../README.md#vocabulary) and keeps the terms of its date.
 # Recent agent usage: the local Connectors acceptance baseline
 
 Recorded 2026-09-09. Design evidence for

@@ -13,7 +13,8 @@ fn root() -> PathBuf {
 }
 
 /// The `auth` profile, with an `identity`, of every JSON example in `docs/`, whole
-/// configurations and `"auth": {…}` excerpts alike, with the guide it came from.
+/// configurations and `"auth": {…}` excerpts alike, with the guide it came from, and every
+/// profile a shipped connector declaration (`providers/<name>/connector.json`) carries.
 fn documented() -> Vec<(String, Value)> {
     let mut guides: Vec<PathBuf> = std::fs::read_dir(root().join("docs"))
         .unwrap()
@@ -39,6 +40,28 @@ fn documented() -> Vec<(String, Value)> {
                 .and_then(|v| v.get("auth"))
                 .filter(|auth| auth.get("identity").is_some())
             {
+                found.push((name.clone(), auth.clone()));
+            }
+        }
+    }
+    // A guide that configures a shipped connector shows its instance and links the connector's
+    // declaration, which carries the profiles: each of those is documented the same way.
+    let providers = root().join("adapters/catalog/providers");
+    let mut declarations: Vec<PathBuf> = std::fs::read_dir(&providers)
+        .unwrap()
+        .map(|entry| entry.unwrap().path().join("connector.json"))
+        .filter(|path| path.is_file())
+        .collect();
+    declarations.sort();
+    for path in declarations {
+        let declaration: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let name = path
+            .strip_prefix(root().join("adapters/catalog"))
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        for auth in declaration["profiles"].as_array().unwrap() {
+            if auth.get("identity").is_some() {
                 found.push((name.clone(), auth.clone()));
             }
         }
@@ -150,16 +173,21 @@ fn every_documented_identity_probe_is_a_value_of_the_catalog_identity_model() {
         }
     }
     assert!(
-        documented
-            .iter()
-            .any(|(guide, auth)| guide == "catalog-opsgenie.md" && auth["prefix"] == "GenieKey"),
+        documented.iter().any(|(guide, auth)| [
+            "catalog-opsgenie.md",
+            "providers/opsgenie/connector.json"
+        ]
+        .contains(&guide.as_str())
+            && auth["prefix"] == "GenieKey"),
         "the Opsgenie guide's prefixed profile was not read"
     );
     assert!(
-        documented
-            .iter()
-            .any(|(guide, auth)| guide == "catalog-runpod.md"
-                && auth["identity"]["source"] == "configuration"),
+        documented.iter().any(|(guide, auth)| [
+            "catalog-runpod.md",
+            "providers/runpod/connector.json"
+        ]
+        .contains(&guide.as_str())
+            && auth["identity"]["source"] == "configuration"),
         "the Runpod guide's configured identity was not read"
     );
 }

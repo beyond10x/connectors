@@ -1,0 +1,21 @@
+{
+  "format": "connectors-catalog-connector/1",
+  "connector_id": "gitlab",
+  "provider_id": "gitlab",
+  "adapter_id": "catalog",
+  "catalog_provider": "gitlab",
+  "default_endpoint": "https://gitlab.com",
+  "api_path": "/api/v4",
+  "selection": "operations.json",
+  "profiles": [
+    {
+      "profile": "gitlab.pat",
+      "header": "PRIVATE-TOKEN",
+      "bearer": false,
+      "label": "GitLab personal access token",
+      "identity": {"path": "user", "kind": "gitlab.user", "subject_pointer": "/id"},
+      "scopes": {"path": "personal_access_tokens/self", "pointer": "/scopes"},
+      "minimum_scopes": ["api"]
+    }
+  ]
+}

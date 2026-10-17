@@ -5,17 +5,19 @@ comments from the pinned Confluence Cloud REST v2 OpenAPI document. Nothing here
 is Confluence-specific code: the pinned document is compiled into a bundle, a
 reviewed selection set exposes four reads, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
-Configuration, connection, approval and invocation work exactly as described
-there; this page covers what differs for Confluence. Jira and Confluence share
+Connection and invocation work as described there; this page configures the
+`confluence` and `confluence-v1` connectors and covers what differs for
+Confluence. Connector, instance and connection are defined in
+[the README](../README.md#vocabulary). Jira and Confluence share
 one Atlassian credential and one authentication profile, `atlassian.basic`; see
 [Authentication](#authentication) and [the Jira guide](catalog-jira.md).
 
 The same reads, CQL search and the space reads are also served from Confluence
-Cloud REST v1, under a second provider id, `confluence-v1`, built from a source
+Cloud REST v1, under a second connector, `confluence-v1`, built from a source
 document this repository writes itself; see [REST v1](#rest-v1). A token that
 carries only classic scopes reads Confluence through v1 alone; [Moving a local
 install onto REST v1](#moving-a-local-install-onto-rest-v1) adds it to an install that runs the
-v2 adapter.
+v2 connector.
 
 ## Source and bundle
 
@@ -170,28 +172,17 @@ Atlassian ESS model names both sets (`ConfluenceV1Read`, `ConfluenceV2Read` in
 - **`page.comments`** takes the content `id`; `location=footer` limits it to
   footer comments, and `expand=body.storage` adds their bodies.
 
-The configuration differs from REST v2 in `provider`, `operations_file` and the
-access read, which is a v1 space list:
+The `confluence-v1` connector
+([`adapters/catalog/providers/confluence-v1/connector.json`](../adapters/catalog/providers/confluence-v1/connector.json))
+declares the same `atlassian.basic` profile as `confluence`; only its access
+read differs, a v1 space list. An instance names the same `/wiki` root:
 
-```json
-{
-  "format": "connectors-catalog-local/2",
-  "instance": "confluence-cloud-v1",
-  "provider": "confluence-v1",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
-  "api_base": "https://your-domain.atlassian.net/wiki",
-  "auth": {
-    "profile": "atlassian.basic",
-    "scheme": "basic",
-    "header": "Authorization",
-    "bearer": false,
-    "account_label": "Account email",
-    "label": "API token",
-    "identity": {"path": "rest/api/user/current", "kind": "atlassian.account", "subject_pointer": "/accountId"},
-    "access": {"path": "rest/api/space", "query": {"limit": "1"}}
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/confluence-v1/operations.json"
-}
+```toml
+[connectors.confluence-v1]
+enabled = true
+
+[connectors.confluence-v1.instances.work]
+endpoint = "https://your-domain.atlassian.net/wiki"
 ```
 
 Verified against a local HTTPS fixture in the v1 response shape only
@@ -206,53 +197,63 @@ name and have not been checked against a site. The page anchors in
 
 Jira and Confluence use one Atlassian API token with the account email, over
 HTTP basic, and one profile, `atlassian.basic`. The profile id, scheme, labels
-and identity kind are the same in both configurations; only the identity read
+and identity kind are the same for both connectors; only the identity read
 differs, because each product answers it at its own path. Both name the same
-subject, the Atlassian `accountId`, so one credential connects both adapters as
-one identity (`atlassian.account`).
+subject, the Atlassian `accountId`, so one credential connects an instance of
+each as one identity (`atlassian.account`).
 
 The pinned v2 document has no read that names the current user, so the
 Confluence identity read is `GET /wiki/rest/api/user/current`, a REST v1 read
 that is not part of the pinned document and not an operation of this provider;
-it is only the profile's identity probe. For that reason `api_base` is the
+it is only the profile's identity probe. For that reason the endpoint is the
 site's `/wiki` root, not `/wiki/api/v2`. Atlassian API tokens expose no scope
 list, so the profile declares no `scopes` read and no `minimum_scopes`.
 
-```json
-{
-  "format": "connectors-catalog-local/2",
-  "instance": "confluence-cloud",
-  "provider": "confluence",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
-  "api_base": "https://your-domain.atlassian.net/wiki",
-  "auth": {
-    "profile": "atlassian.basic",
-    "scheme": "basic",
-    "header": "Authorization",
-    "bearer": false,
-    "account_label": "Account email",
-    "label": "API token",
-    "identity": {"path": "rest/api/user/current", "kind": "atlassian.account", "subject_pointer": "/accountId"},
-    "access": {"path": "api/v2/pages", "query": {"limit": "1"}}
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/confluence/operations.json"
-}
+The `confluence` connector declares that profile with an access read of one
+v2 page
+([`adapters/catalog/providers/confluence/connector.json`](../adapters/catalog/providers/confluence/connector.json))
+and no default endpoint: an instance names its site's `/wiki` root. Add to the
+host configuration (`~/.config/connectors/config.toml`, format
+`connectors-local/5`), beside the `jira` connector of
+[the Jira guide](catalog-jira.md#authentication):
+
+```toml
+[connectors.confluence]
+enabled = true
+
+[connectors.confluence.instances.work]
+endpoint = "https://your-domain.atlassian.net/wiki"
 ```
 
-`access` makes validation also read one page through the v2 API. An Atlassian
-API token whose scopes allow the v1 identity read but not the v2 page reads
-then refuses to connect as `insufficient_scope` instead of connecting and
+The bundle, the four reads, the profile and the provider executable are
+derived from the shipped connector:
+
+```console
+$ connectors instances list
+{"adapters":[{"adapter":"confluence.work","adapter_id":"catalog","connector":"confluence","instance":"work","instance_id":"confluence.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+```
+
+The access read makes validation also read one page through the v2 API. An
+Atlassian API token whose scopes allow the v1 identity read but not the v2 page
+reads then refuses to connect as `insufficient_scope` instead of connecting and
 answering `unauthorized` on every read (observed 2026-10-06, #102). Create the
 token with the Confluence page scopes the shipped reads need.
 
-Connect each adapter with the same credential document
+Connect each instance with the same credential document
 `{"account": "<email>", "token": "<API token>"}` and the same profile; every
 request then carries `Authorization: Basic base64(<email>:<API token>)`:
 
 ```sh
-target/release/connectors --output json connections connect --adapter jira --profile atlassian.basic --credential-file /owner-only/atlassian.json
-target/release/connectors --output json connections connect --adapter confluence --profile atlassian.basic --credential-file /owner-only/atlassian.json
+connectors connections connect --connector jira --instance work \
+  --profile atlassian.basic --credential-file ~/private/atlassian.json
+connectors connections connect --connector confluence --instance work \
+  --profile atlassian.basic --credential-file ~/private/atlassian.json
 ```
+
+An installation configured before connectors were declared converts its
+entries with `connectors setup migrate`, which keeps each instance id and
+revision; the pinned form it writes is described in
+[the catalog provider guide](local-catalog-provider.md).
 
 ### Through the API gateway
 
@@ -266,18 +267,20 @@ pinned paths (`/wiki/api/v2/…`) are checked against what follows the prefix, a
 every request goes to the full `api_base`, the identity read included:
 `GET /ex/confluence/<cloud id>/wiki/rest/api/user/current`.
 
+No connector declaration fixes `request_prefix`, so a gateway instance is not
+derived: it is a pinned instance, whose native configuration file is written as
+[the catalog provider guide](local-catalog-provider.md) describes, with the
+site form's fields and these values.
+
 A service-account API token uses the same `atlassian.basic` profile as on the
 site, with the service account's email as the account and the credential
 document `{"account": "<service account email>", "token": "<API token>"}`. The
 same credential then connects Jira and Confluence as one identity. This form was
-checked live for Jira on 2026-09-30, not yet for Confluence.
+checked live for Jira on 2026-09-30, not yet for Confluence. The gateway form
+reads no page at validation:
 
 ```json
 {
-  "format": "connectors-catalog-local/2",
-  "instance": "confluence-cloud",
-  "provider": "confluence",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
   "api_base": "https://api.atlassian.com/ex/confluence/your-cloud-id/wiki",
   "request_prefix": "/ex/confluence/your-cloud-id",
   "auth": {
@@ -288,20 +291,16 @@ checked live for Jira on 2026-09-30, not yet for Confluence.
     "account_label": "Account email",
     "label": "API token",
     "identity": {"path": "rest/api/user/current", "kind": "atlassian.account", "subject_pointer": "/accountId"}
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/confluence/operations.json"
+  }
 }
 ```
 
-An OAuth 2.0 (3LO) access token is sent as a bearer token, with the credential
-document, expiry and scopes as in the Jira guide. **Not verified live.**
+An OAuth 2.0 (3LO) access token is sent as a bearer token, under a profile the
+`confluence` connector does not declare, with the credential document, expiry
+and scopes as in the Jira guide. **Not verified live.**
 
 ```json
 {
-  "format": "connectors-catalog-local/2",
-  "instance": "confluence-cloud",
-  "provider": "confluence",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
   "api_base": "https://api.atlassian.com/ex/confluence/your-cloud-id/wiki",
   "request_prefix": "/ex/confluence/your-cloud-id",
   "auth": {
@@ -310,197 +309,114 @@ document, expiry and scopes as in the Jira guide. **Not verified live.**
     "bearer": true,
     "label": "Atlassian access token",
     "identity": {"path": "rest/api/user/current", "kind": "atlassian.account", "subject_pointer": "/accountId"}
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/confluence/operations.json"
+  }
 }
 ```
 
 ## Moving a local install onto REST v1
 
-This section covers a local install that already reads Confluence through the catalog provider
-with adapter `confluence`, on the REST v2 provider (`confluence`, profile `atlassian.basic`). It
-adds a second adapter, `confluence-v1`, on the REST v1 provider, connects it with the same
-credential, reads through it, and says how to retire `confluence` if it is no longer wanted. The
-`confluence` entry stays unless you retire it; the two adapters run side by side.
+This section covers a local install that already reads Confluence through the `confluence`
+connector (REST v2, profile `atlassian.basic`). It adds an instance of the `confluence-v1`
+connector, connects it with the same credential, reads through it, and says how to retire the
+`confluence` instance if it is no longer wanted. The two connectors' instances run side by side.
 
-The outputs below come from a run against a scratch `--config` and `--state-dir`, a private
-Secret Service and a local HTTPS fixture standing in for the Confluence site (synthetic email,
-token, account id and space ids). The commands are shown without `--config`, `--state-dir` and
-`--output json`; long answers are cut down with the `jq` filter shown. A connection id, revision or
-schema in your install differs: take each from the command before it. The fixture answers by path
-and does not check the `Authorization` header; the header each v1 read sends is checked in
-`adapters/catalog/tests/confluence_v1.rs`. Nothing in this section was run against a live site.
-
-### Which provider a token needs
+### Which connector a token needs
 
 Atlassian answers a REST v2 read with `401` and the message `Unauthorized; scope does not match`
 when the token does not carry the scopes v2 needs, while the REST v1 reads answer `200` with the
-same token; a token that carries only classic scopes behaves this way. In the run, the
-`confluence` connection was made while the fixture still answered v2 reads, and the fixture was
-then switched to answer v2 with that `401` and v1 with `200`. A v2 read on the existing connection
-is then refused as `unauthorized`, with Atlassian's message as `service_reason`:
+same token; a token that carries only classic scopes behaves this way. A v2 read on an existing
+`confluence` connection is then refused as `unauthorized`, with Atlassian's message as
+`service_reason`. This answer was observed on 2026-10-15 against a local HTTPS fixture standing in
+for the site, not against a live site:
 
-```console
-$ connectors operations invoke --adapter confluence --connection conn_45354c2a8bca4b7ba52d1ca57c317711_24003a1419404feeac4d71fd71fa1e13 --operation space.pages --schema ad5ebd68ea3cd7e786974a08520c8e0c590a60bf4fb2cdd1a951ef78fc08d476 --revision cb622835084ffe1f256ddc6dafcdb01d8dc38fd4f0a826fd6254becd0a0765b5 --input-json '{"id":"65538"}'
+```json
 {"error":{"code":"failure","data":{"code":"service_failure","kind":"operational","next_action":"repair_connection","service_code":"unauthorized","service_reason":"Unauthorized; scope does not match","stage":"dispatch"}},"ok":false}
 ```
 
-Revalidation reads one v2 page as its access read, so it is refused too, and the connection then
-waits for a credential:
-
-```console
-$ connectors connections revalidate --adapter confluence --connection conn_45354c2a8bca4b7ba52d1ca57c317711_24003a1419404feeac4d71fd71fa1e13 --expected-revision 91dbf8ef-60cb-4c75-8135-7bfbd0bbf5d3
-{"error":{"code":"failure","data":{"code":"not_granted","kind":"operational","next_action":"repair_connection","stage":"admission"}},"ok":false}
-$ connectors connections list --adapter confluence | jq -c '[.result.connections[]|{connection,revision,state}]'
-[{"connection":"conn_45354c2a8bca4b7ba52d1ca57c317711_24003a1419404feeac4d71fd71fa1e13","revision":"91dbf8ef-60cb-4c75-8135-7bfbd0bbf5d3","state":"reauthorization_required"}]
-```
-
-A token with these answers reads Confluence through `confluence-v1`, whose access read is the v1
-space list. A token whose v2 reads answer `200` can stay on `confluence`; `spaces.list`,
+The refusal leaves the connection in the `stale` state, which `connections list` shows: the
+provider refused its credential, and no read is admitted on it until a reconnect publishes a new
+one. A token with these answers reads Confluence through `confluence-v1`, whose access read is the
+v1 space list. A token whose v2 reads answer `200` can stay on `confluence`; `spaces.list`,
 `space.get` and `content.search` are served by `confluence-v1` only.
 
-### 1. Write the native configuration
+### 1. Add the `confluence-v1` instance
 
-Write the configuration [REST v1](#rest-v1) shows to its own file, with your site's `/wiki` root as
-`api_base` and absolute paths into your checkout or release for `bundle_directory` and
-`operations_file`:
-
-```json
-{
-  "format": "connectors-catalog-local/2",
-  "instance": "confluence-cloud-v1",
-  "provider": "confluence-v1",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
-  "api_base": "https://your-domain.atlassian.net/wiki",
-  "auth": {
-    "profile": "atlassian.basic",
-    "scheme": "basic",
-    "header": "Authorization",
-    "bearer": false,
-    "account_label": "Account email",
-    "label": "API token",
-    "identity": {"path": "rest/api/user/current", "kind": "atlassian.account", "subject_pointer": "/accountId"},
-    "access": {"path": "rest/api/space", "query": {"limit": "1"}}
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/confluence-v1/operations.json"
-}
-```
-
-Its `instance` must differ from the `confluence` adapter's (`confluence-cloud` in the REST v2
-example). The run's file also named the fixture's certificate as `ca_file`; a Confluence Cloud site
-needs none. The file must stay owner-only (mode `0600`): a file other users can read is refused as
-`invalid_configuration` when the provider loads it.
-
-```console
-$ stat -c %a confluence-v1.json
-600
-```
-
-### 2. Print its configuration revision
-
-`--local-config` takes an absolute path; a relative one is refused:
-
-```console
-$ connectors-catalog-provider --local-config confluence-v1.json --print-local-bootstrap
-InvalidConfiguration
-$ connectors-catalog-provider --local-config "$PWD/confluence-v1.json" --print-local-bootstrap | jq -r .configuration_revision
-219744f75efd0f60840c20cf0400f8655bb3aa5d3c5c6346b3254645aa3ac132
-```
-
-The revision digests the configuration, so yours differs; print it again after any edit to the
-file.
-
-### 3. Add the `[adapters.confluence-v1]` entry
-
-Add the entry beside `[adapters.confluence]`, which stays as it is. The entry carries the revision
-from step 2, the shared profile and the seven read ids; an id missing from
-`permissions.operations` is denied. `connectors-private/1` is enough, because every
-`confluence-v1` operation is a read. The entry of the run, with its two paths and the executable's
-digest written as placeholders:
+Add the connector and an instance with your site's `/wiki` root, beside the `confluence` one,
+which stays as it is:
 
 ```toml
-[adapters.confluence-v1]
-instance_id = "confluence-cloud-v1"
-adapter_id = "catalog"
-configuration_revision = "219744f75efd0f60840c20cf0400f8655bb3aa5d3c5c6346b3254645aa3ac132"
-protocol = "v1alpha1"
-private_protocol = "connectors-private/1"
-startup = "on-demand"
-restart = "never"
+[connectors.confluence-v1]
+enabled = true
 
-[adapters.confluence-v1.permissions]
-profiles = ["atlassian.basic"]
-operations = ["spaces.list", "space.get", "space.pages", "pages.changed", "page.get", "page.comments", "content.search"]
-
-[adapters.confluence-v1.executable]
-path = "/absolute/path/connectors-catalog-provider"
-sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
-args = ["--local-config", "/absolute/path/confluence-v1.json"]
+[connectors.confluence-v1.instances.work]
+endpoint = "https://your-domain.atlassian.net/wiki"
 ```
 
-`instance_id` is the native configuration's `instance`; `path` and `sha256` are the same as in
-`[adapters.confluence.executable]` when both adapters run the same provider executable.
+Nothing else is written: the bundle, the seven reads, the shared profile with its v1 access read
+and the provider executable come from the shipped connector, and every `confluence-v1` operation
+is a read. Both instances are then configured:
 
 ```console
-$ connectors setup check | jq -c '[.result.prerequisites[]|{name,state}]'
-[{"name":"configuration","state":"ready"},{"name":"metadata","state":"ready"},{"name":"artifact:confluence","state":"ready"},{"name":"artifact:confluence-v1","state":"ready"},{"name":"keyring","state":"ready"},{"name":"persistent_custody_qualification","state":"ready"}]
+$ connectors instances list
+{"adapters":[{"adapter":"confluence-v1.work","adapter_id":"catalog","connector":"confluence-v1","instance":"work","instance_id":"confluence-v1.work","restart":"never","startup":"on-demand"},{"adapter":"confluence.work","adapter_id":"catalog","connector":"confluence","instance":"work","instance_id":"confluence.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
 ```
 
-### 4. Connect and read
+### 2. Connect and read
 
-Connect with the credential document the `confluence` adapter uses,
+Connect with the credential document the `confluence` instance uses,
 `{"account": "<email>", "token": "<API token>"}`, and the same profile. The connection names the
 same Atlassian account as the `confluence` one:
 
-```console
-$ connectors connections connect --adapter confluence-v1 --profile atlassian.basic --credential-file ~/private/atlassian.json
-{"ok":true,"result":{"connection":{"external_identity":{"kind":"atlassian.account","subject":"557058:00000000-0000-0000-0000-000000000001"},"observed_at_ms":1792082151063,"source":"authority","stale":false,"summary":{"adapter":"confluence-v1","connection":"conn_45354c2a8bca4b7ba52d1ca57c317711_cc802ec777de45a2a56a33c5263f6642","instance_id":"confluence-cloud-v1","profile":"atlassian.basic","revision":"bfeb3248-84c3-4fd6-99ac-14969c623322","state":"ready"},"valid_until_ms":1792082210212}}}
-$ connectors operations list --adapter confluence-v1 | jq -c '[.result.operations[].id]'
-["spaces.list","space.get","space.pages","pages.changed","page.get","page.comments","content.search"]
+```sh
+connectors connections connect --connector confluence-v1 --instance work \
+  --profile atlassian.basic --credential-file ~/private/atlassian.json
+connectors operations list --connector confluence-v1 --instance work
 ```
 
-A read needs no approval. Take `--schema` and `--revision` from `operations describe`, then invoke:
+The operations are `spaces.list`, `space.get`, `space.pages`, `pages.changed`, `page.get`,
+`page.comments` and `content.search`. A read needs no approval: take `--schema` and `--revision`
+from `operations describe`, then invoke, here with the connection id `connections connect`
+answered:
 
-```console
-$ connectors operations describe --adapter confluence-v1 --operation spaces.list | jq -c '.result|{schema,revision}'
-{"schema":"5439e900f48a6baede73aa22e2274f618faea7f24197b0d02899fe7861191ea9","revision":"2e132d5cc5287cd6781cd2b6a209affc3a81fbfcd5fe95a4bf1004e32a1c7e5d"}
-$ connectors operations invoke --adapter confluence-v1 --connection conn_45354c2a8bca4b7ba52d1ca57c317711_cc802ec777de45a2a56a33c5263f6642 --operation spaces.list --schema 5439e900f48a6baede73aa22e2274f618faea7f24197b0d02899fe7861191ea9 --revision 2e132d5cc5287cd6781cd2b6a209affc3a81fbfcd5fe95a4bf1004e32a1c7e5d --input-json '{"limit":25}' | jq -c '.result.result|{status,body}'
-{"status":200,"body":{"_links":{"base":"https://your-domain.atlassian.net/wiki","context":"/wiki"},"limit":25,"results":[{"_links":{"webui":"/spaces/DOCS"},"id":65538,"key":"DOCS","name":"Documentation","status":"current","type":"global"},{"_links":{"webui":"/spaces/OPS"},"id":98305,"key":"OPS","name":"Operations","status":"current","type":"global"}],"size":2,"start":0}}
+```sh
+connectors operations describe --connector confluence-v1 --instance work --operation spaces.list
+connectors operations invoke --connector confluence-v1 --instance work \
+  --connection "$connection" --operation spaces.list \
+  --schema "$schema" --revision "$revision" --input-json '{"limit":25}'
 ```
 
 Validation evidence lasts 60 seconds; after that a read is refused until `connections revalidate`
 renews it ([the catalog provider guide](local-catalog-provider.md)). Note that `space.pages` takes
 a space key under v1 (`spaceKey`, such as `DOCS`) where v2 takes the numeric `id`.
 
-### 5. Retire `confluence` (optional)
+The connect, describe and invoke above have not been run against a live site; each v1 read's
+request and answer are checked against a local HTTPS fixture in
+`adapters/catalog/tests/confluence_v1.rs`.
 
-Removing the REST v2 adapter is optional; it changes nothing for `confluence-v1`, whose connection
-holds its own credential version. To retire it, revoke each of its connections first, then remove
-`[adapters.confluence]` and its `.permissions` and `.executable` tables from the configuration.
-Revocation is local and asks nothing of Atlassian (`provider_outcome` `not_requested`); the API
-token stays valid and keeps serving `confluence-v1`.
+### 3. Retire the `confluence` instance (optional)
 
-```console
-$ connectors connections revoke --adapter confluence --connection conn_45354c2a8bca4b7ba52d1ca57c317711_24003a1419404feeac4d71fd71fa1e13 --expected-revision 91dbf8ef-60cb-4c75-8135-7bfbd0bbf5d3
-{"ok":true,"result":{"adapter":"confluence","connection":"conn_45354c2a8bca4b7ba52d1ca57c317711_24003a1419404feeac4d71fd71fa1e13","local_state":"revoked","provider_outcome":"not_requested","revision":"85fd7771-2812-44f0-a20b-8fe9b5a0ae83"}}
+Removing the REST v2 instance is optional; it changes nothing for `confluence-v1.work`, whose
+connection holds its own credential version. To retire it, revoke each of its connections first,
+then remove `[connectors.confluence.instances.work]`, and `[connectors.confluence]` with it when
+it holds no other instance. Revocation is local and asks nothing of Atlassian
+(`provider_outcome` `not_requested`); the API token stays valid and keeps serving
+`confluence-v1`.
+
+```sh
+connectors connections revoke --connector confluence --instance work \
+  --connection "$connection" --expected-revision "$revision"
 ```
 
-After removing the entry:
+Revoke before removing the instance: once it is gone, every connection command answers
+`not_found` for `--connector confluence --instance work`, and a connection left unrevoked can no
+longer be revoked through the CLI. With only the `confluence-v1` instance left:
 
 ```console
-$ connectors setup check | jq -c '[.result.prerequisites[]|{name,state}]'
-[{"name":"configuration","state":"ready"},{"name":"metadata","state":"ready"},{"name":"artifact:confluence-v1","state":"ready"},{"name":"keyring","state":"ready"},{"name":"persistent_custody_qualification","state":"ready"}]
-$ connectors adapters list | jq -c '[.result.adapters[]|{adapter,instance_id}]'
-[{"adapter":"confluence-v1","instance_id":"confluence-cloud-v1"}]
-$ connectors connections list --adapter confluence
-{"error":{"code":"failure","data":{"code":"not_found","kind":"operational","next_action":"check_configuration","stage":"admission"}},"ok":false}
-$ connectors connections revalidate --adapter confluence-v1 --connection conn_45354c2a8bca4b7ba52d1ca57c317711_cc802ec777de45a2a56a33c5263f6642 --expected-revision bfeb3248-84c3-4fd6-99ac-14969c623322 | jq -r '.result.connection.summary.state'
-ready
+$ connectors instances list
+{"adapters":[{"adapter":"confluence-v1.work","adapter_id":"catalog","connector":"confluence-v1","instance":"work","instance_id":"confluence-v1.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+$ connectors connections list --connector confluence --instance work
+failure: {"code":"not_found","kind":"operational","next_action":"check_configuration","stage":"admission"}
 ```
-
-Revoke before removing the entry: once it is gone, every connection command answers `not_found`
-for `--adapter confluence`, as above, and a connection left unrevoked can no longer be revoked
-through the CLI.
 
 ## Limits
 

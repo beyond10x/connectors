@@ -1,0 +1,71 @@
+# Ledger expectations only: MarkConnectionStale stands for the host's record of
+# a provider refusal of the stored credential, PublishBinding for the
+# publication a reconnect (or a revalidation the provider now accepts) makes.
+type: ess-scenario/1
+domain: connectors.auth_bindings
+scenario: stale-connection-returns-live-on-publication
+summary: 'A provider refusal makes a Live connection Stale, a second refusal changes nothing, and a publication on the same connection returns it to Live.'
+arrange:
+- instance: connection
+  entity: connectors.auth_bindings.Connection
+timeline:
+- at: '2026-10-16T11:00:00Z'
+  command: connectors.auth_bindings.AllocateConnection
+  input:
+    decision: allow
+    instance_id: gmail.private
+    profile_record_ref: catalog/google.oauth/r1
+    owner_scope: local
+    access_mode: credential
+    publication_fence: fence-1
+  outcome: allocated
+  events:
+  - event: connectors.auth_bindings.ConnectionAllocated
+  capture:
+    instance: connection
+    event: connectors.auth_bindings.ConnectionAllocated
+    field: connection_ref
+- at: '2026-10-16T11:00:01Z'
+  command: connectors.auth_bindings.MarkConnectionStale
+  input:
+    connection_ref:
+      $instance: connection
+  outcome: marked-stale
+  events:
+  - event: connectors.auth_bindings.ConnectionMarkedStale
+    payload:
+      connection_ref:
+        $instance: connection
+- at: '2026-10-16T11:00:02Z'
+  command: connectors.auth_bindings.MarkConnectionStale
+  input:
+    connection_ref:
+      $instance: connection
+  outcome: wrong-state
+  error:
+    name: connectors.auth_bindings.ConnectionStateConflict
+  no_events:
+  - connectors.auth_bindings.ConnectionMarkedStale
+- at: '2026-10-16T11:00:03Z'
+  command: connectors.auth_bindings.PublishBinding
+  input:
+    decision: allow
+    connection_ref:
+      $instance: connection
+    publication:
+      connection_ref:
+        $instance: connection
+      expected_publication_fence: fence-1
+      profile_record_ref: catalog/google.oauth/r1
+  outcome: published
+  events:
+  - event: connectors.auth_bindings.BindingPublished
+    payload:
+      connection_ref:
+        $instance: connection
+assert:
+- view: connectors.auth_bindings.Connections
+  contains:
+    connection_ref:
+      $instance: connection
+    state: Live
