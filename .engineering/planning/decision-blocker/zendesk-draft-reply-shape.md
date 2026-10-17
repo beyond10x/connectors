@@ -4,6 +4,8 @@ id: decision-blocker:zendesk-draft-reply-shape
 kind: decision-blocker
 status: open
 title: What a Zendesk draft reply is, with no draft endpoint upstream
+relations:
+- blocks: story:catalog-zendesk-ticket-writes
 revision: 1
 ---
 ## Question
