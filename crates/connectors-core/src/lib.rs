@@ -26,6 +26,11 @@ pub enum ErrorCode {
     Timeout,
     UpstreamProtocol,
     Internal,
+    /// The provider answered a write that its target changed since the caller
+    /// read it, so nothing was applied (`connectors.service_wire.ErrorCode`
+    /// `conflict`, contracts/service/compatibility.md §5). Not a v1alpha1 wire
+    /// code: the service bindings carry it as `InvalidInput`.
+    Conflict,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, thiserror::Error)]

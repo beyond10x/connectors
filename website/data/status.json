@@ -256,7 +256,7 @@
     },
     {
       "area": "Catalog provider",
-      "detail": "Tickets, users and organizations changed since a start time, one of each by id, and a ticket's comments, with OAuth client credentials or an API token.",
+      "detail": "Tickets, users and organizations changed since a start time, one of each by id, and a ticket's comments, with OAuth client credentials or an API token; a ticket update, a private note and a draft reply behind an approval, refused as a conflict when the ticket changed since it was read.",
       "href": "/docs/reference/adapters/catalog",
       "label": "Zendesk Support",
       "status": "shipped"

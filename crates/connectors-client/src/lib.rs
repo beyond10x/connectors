@@ -309,7 +309,7 @@ fn http_status(code: v1alpha2::ErrorCode) -> u16 {
         | InsufficientScope => 403,
         NotFound => 404,
         StaleDescription | StaleCursor | ApprovalReplayed | IdempotencyConflict
-        | StaleAuthority | ConnectionNotReady | SessionNotReady | OfferRejected => 409,
+        | StaleAuthority | ConnectionNotReady | SessionNotReady | OfferRejected | Conflict => 409,
         SessionLost | OfferExpired | LeaseExpired | Revoked => 410,
         Capacity => 413,
         RateLimited => 429,
@@ -337,6 +337,7 @@ fn extended(code: ErrorCode) -> v1alpha2::ErrorCode {
         ErrorCode::Timeout => E::Timeout,
         ErrorCode::UpstreamProtocol => E::UpstreamProtocol,
         ErrorCode::Internal => E::Internal,
+        ErrorCode::Conflict => E::Conflict,
     }
 }
 

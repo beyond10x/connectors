@@ -2,25 +2,38 @@ domain: connectors_catalog.selection
 summary: The members of a selection in a `connectors-catalog-operations/1` file that bound its query parameters, those of a selected write that close, type, require and fix its JSON body, which the engine holds before it sends the request, and the success envelope a read's answer is held to after it.
 
 # Normative owner: docs/local-catalog-provider.md, "Configure the provider" (`bounds`, `body_keys`,
-# `body_types`, `body_required`, `body_nonempty`, `body_fixed`, `envelope`, `refusal_texts`). The engine reads these as members of a
+# `body_types`, `body_required`, `body_nonempty`, `body_fixed`, `body_enums`, `body_any_of`, `body_prefixes`,
+# `conflict_status`, `envelope`, `refusal_texts`). The engine reads these as members of a
 # selection; each is omitted when empty, so a selection without it keeps its serialised form.
 #
 # The bundle records no request body schema, so every name here is declared by the selection
 # from the pinned document and not checked against it. What the engine refuses when a selection
-# loads beyond these invariants (an empty, dotted or repeated key, a key the other members name
-# that `body_keys` does not admit, a fixed key a guard reads or `body_required` or `body_nonempty`
-# names, a `body_nonempty` key `body_types` does not type as a string, a fixed
+# loads beyond these invariants (an empty, dotted or repeated key, a pointer with an empty or `~`
+# segment, a key inside another admitted key, a key the other members name that `body_keys` does
+# not admit, an enum or prefix key that is fixed or not typed as a string, an any-of key that is
+# fixed, any-of keys under more than one parent, an empty enum set or an empty or repeated enum
+# value, an empty prefix, a fixed key a guard reads or `body_required` or `body_nonempty` names, a `body_nonempty` key `body_types` does not type as a string, a fixed
 # value that is not a string, an integer or a boolean, or not of the key's `body_types` type) is
 # stated in the owner and pinned by the engine's tests; ESS 0.57 has no set-membership
 # constraint between two members, and no untagged scalar to type a fixed value by.
 
 types:
   # The JSON type a closed body key takes, as the provider's request body schema types it.
+  # `string_list` is a JSON array whose every element is a string, such as Zendesk's ticket
+  # `tags`.
   - name: connectors_catalog.selection.BodyType
     kind: enum
-    variants: [string, integer, boolean]
+    variants: [string, integer, boolean, string_list]
 
-  # `body_keys` closes the body to exactly those top-level keys. `body_types` types some of them
+  # Every name below that addresses a body value is a closed body key: a plain top-level name
+  # (`title`), or an RFC 6901 pointer led by `/` addressing a value nested in objects
+  # (`/ticket/comment/body`), each segment a plain name with no `~` or `.`, and none empty. A
+  # plain name `k` and the pointer `/k` are the same key. Each object above a nested key is
+  # closed in turn: it may carry only the segments that lead to an admitted key, and it must be
+  # a JSON object; a key may not lie inside another admitted key. Such as Zendesk's ticket
+  # update, whose body is `{"ticket": {...}}` closed to the named members of `ticket`.
+  #
+  # `body_keys` closes the body to exactly those keys. `body_types` types some of them
   # and `body_required` requires some of them, of the caller's body. `body_nonempty` holds some
   # string keys non-empty: a caller's body carrying one as the empty string is refused before
   # any request, as a mistyped key is. It names only keys `body_types` types as `string` that the
@@ -35,7 +48,28 @@ types:
   # merge with `auto_merge: true` (wait for the pipeline) or its update with
   # `state_event: reopen`. A fixed key must be admitted by `body_keys`, so a fixed write's body
   # is always closed: the caller cannot add a key beside it that would change what it does. When
-  # every admitted key is fixed, the caller's `body` may be omitted.
+  # every admitted key is fixed, the caller's `body` may be omitted. A fixed nested key is sent
+  # inside the objects above it, which the engine creates when the caller's body lacks them.
+  #
+  # `body_enums` holds a string key to a set of allowed values, as the provider's request body
+  # schema enumerates them, such as Zendesk's ticket `priority` (`urgent`, `high`, `normal`,
+  # `low`): a value outside the set is refused as `invalid_input` naming the key, before any
+  # request, and the declaration gives the key that `enum`. It names only keys `body_types`
+  # types as `string` that the selection does not fix.
+  #
+  # `body_any_of` names keys of which a caller's body must carry at least one, beside one
+  # parent object: for a write that changes whichever of several members the caller sends and
+  # means nothing with none of them, such as Zendesk's ticket update of `group_id`, `tags`,
+  # `priority` or `type`. A body with none of them is refused before any request, and the
+  # declaration requires one of them. Every named key shares one parent object, is admitted,
+  # is not fixed, and is named once; at least two.
+  #
+  # `body_prefixes` fixes the start of a caller's string: the engine sends the prefix followed
+  # by the caller's value under that key, so the sent value always begins with it, whatever the
+  # caller gives. It is for a write whose meaning rests on a marker in a text the caller writes,
+  # such as a Zendesk draft reply, a private note whose first line marks it as a draft. It names
+  # only keys `body_types` types as `string` that the selection does not fix; a prefix is never
+  # empty. The declaration types the caller's part alone.
   - name: connectors_catalog.selection.ClosedBody
     kind: struct
     fields:
@@ -44,11 +78,32 @@ types:
       - {name: body_required, type: "Optional<List<String>>"}
       - {name: body_nonempty, type: "Optional<List<String>>"}
       - {name: body_fixed, type: "Optional<Map<String, Json>>"}
+      - {name: body_enums, type: "Optional<Map<String, List<String>>>"}
+      - {name: body_any_of, type: "Optional<List<String>>"}
+      - {name: body_prefixes, type: "Optional<Map<String, String>>"}
     invariants:
       - any: [{not: defined(body_types)}, defined(body_keys)]
       - any: [{not: defined(body_required)}, defined(body_keys)]
       - any: [{not: defined(body_nonempty)}, defined(body_types)]
       - any: [{not: defined(body_fixed)}, defined(body_keys)]
+      - any: [{not: defined(body_enums)}, defined(body_types)]
+      - any: [{not: defined(body_any_of)}, defined(body_keys)]
+      - any: [{not: defined(body_any_of)}, {body_any_of.count: {gte: 2}}]
+      - any: [{not: defined(body_prefixes)}, defined(body_types)]
+
+  # The status by which a provider answers a write that its target changed since the caller
+  # read it, so nothing was applied: such as Zendesk's `409` to a ticket update sent with
+  # `safe_update` and an `updated_stamp` older than the ticket. A write answered with it is
+  # refused as `conflict` (the shared `connectors_core` `ErrorCode`), the provider's own answer,
+  # never retried, in place of the `invalid_input` its status otherwise gives. Only `409` or
+  # `412`, the precondition statuses the engine already treats as a definite refusal; only on
+  # a write.
+  - name: connectors_catalog.selection.ConflictStatus
+    kind: struct
+    fields:
+      - {name: conflict_status, type: "Optional<Integer>"}
+    invariants:
+      - any: [{not: defined(conflict_status)}, conflict_status == 409, conflict_status == 412]
 
   # `bounds` narrows a query parameter the source declares, keyed by its name. Exactly one form per
   # parameter:
@@ -192,3 +247,106 @@ types:
     kind: struct
     fields:
       - {name: envelope, type: "Optional<connectors_catalog.selection.Envelope>"}
+
+  # The form a folded caller value must take before it joins a fixed query value. `timestamp`
+  # is an ISO 8601 calendar date `YYYY-MM-DD`, or a date-time `YYYY-MM-DDTHH:MM:SS` followed by
+  # `Z` or an offset `+HH:MM` / `-HH:MM`: digits, `-`, `:`, `T`, `Z` and `+` only, so a folded
+  # value can never add a word, a qualifier or a quote to the value it joins.
+  - name: connectors_catalog.selection.FoldFormat
+    kind: enum
+    variants: [timestamp]
+
+  # One caller input folded into a fixed query value. The input is declared under the fold's
+  # own key, an optional string of the fold's `format`, and is not a parameter of the operation.
+  # When the caller sends it, the engine appends one space, `prefix` and the value to the fixed
+  # value of the query parameter `into`; when the caller omits it, the fixed value is sent
+  # alone. Such as GitHub's search `q`, fixed to `is:pr is:open review-requested:@me`, with
+  # `since` folded as `updated:>=<since>`.
+  - name: connectors_catalog.selection.QueryFold
+    kind: struct
+    fields:
+      - {name: into, type: String}
+      - {name: prefix, type: String}
+      - {name: format, type: connectors_catalog.selection.FoldFormat}
+    invariants:
+      - into.count >= 1
+      - prefix.count >= 1
+      - {not: {prefix: {contains: " "}}}
+
+  # The members of a read selection that fix query values. `query_fixed` fixes a query parameter
+  # the source declares to one string: the engine sends exactly that value under that name on
+  # every request, the parameter is not declared in the caller's input schema, and an input
+  # carrying it is refused as `invalid_input` before any request, so a caller cannot widen what
+  # the read reaches. `query_folds` keys each folded caller input by its declared name, and
+  # every fold joins a fixed value (`into` names a key of `query_fixed`). What the engine refuses
+  # when the selection loads beyond these invariants (a fixed or folded value on a write, a fixed
+  # name that is not a query parameter of the operation or that the selection also bounds,
+  # requires, withholds or names as a credential, an empty fixed value, a fold key that is a
+  # parameter of the operation or not an id, a fold whose `into` the selection does not fix, two
+  # folds into one value, more than eight fixed values) is stated in the owner and pinned by the
+  # engine's tests; ESS 0.59 has no set-membership constraint between two members.
+  - name: connectors_catalog.selection.FixedQuery
+    kind: struct
+    fields:
+      - {name: query_fixed, type: "Optional<Map<String, String>>"}
+      - {name: query_folds, type: "Optional<Map<String, connectors_catalog.selection.QueryFold>>"}
+    invariants:
+      - any: [{not: defined(query_folds)}, defined(query_fixed)]
+
+  # A read whose 2xx JSON answer carries a file as base64 text, such as GitHub's contents and
+  # README reads (`content`, `encoding: base64`, `size`). The engine answers with the file's
+  # text in place of the provider's JSON. Each member but `max_bytes` is an RFC 6901 pointer into
+  # the answer: `content` the base64 string (ASCII whitespace inside it is ignored, as GitHub
+  # wraps it), `encoding` a string that must be exactly `base64`, and `size`, when declared, the
+  # file's length as a JSON integer, read before anything is decoded. A file longer than
+  # `max_bytes`, by `size` or once decoded, is refused as `capacity` by name, never truncated. A
+  # file whose bytes are not UTF-8, or that holds a NUL byte, is not text and is refused as
+  # `unsupported`. An answer that is not a JSON object, whose `encoding` is absent or another
+  # value, or whose `content` is absent or not base64, is an answer the engine cannot read
+  # (`upstream_protocol`). What the engine refuses when the selection loads beyond these
+  # invariants (embedded text on a write, beside a `response`, an `envelope`, a `binary` or a
+  # `download`, a pointer without a leading `/`) is stated in the owner and pinned by the
+  # engine's tests.
+  - name: connectors_catalog.selection.EmbeddedText
+    kind: struct
+    fields:
+      - {name: content, type: String}
+      - {name: encoding, type: String}
+      - {name: size, type: "Optional<String>"}
+      - {name: max_bytes, type: Integer}
+    invariants:
+      - content.count >= 1
+      - encoding.count >= 1
+      - any: [{not: defined(size)}, {size.count: {gte: 1}}]
+      - max_bytes >= 1
+      - max_bytes <= 2097152
+
+  # The member of a read selection that declares its embedded text.
+  - name: connectors_catalog.selection.ReadEmbeddedText
+    kind: struct
+    fields:
+      - {name: embedded_text, type: "Optional<connectors_catalog.selection.EmbeddedText>"}
+
+  # The headers by which a provider says its rate limit is spent, such as GitHub's
+  # `x-ratelimit-remaining` and `x-ratelimit-reset`. A `403` or `429` answer whose `remaining`
+  # header is exactly `0` is `rate_limited`, for a read and for a write's definite refusal,
+  # whatever its body; its `reset` header, a Unix time in whole seconds, names the wait as
+  # `retry_after_seconds` (the seconds from now to that time, none for a time already past),
+  # unless the answer also carries `Retry-After`, which is read first. Every other `403` keeps the
+  # classification `rate_limit_reasons` or its status gives. What the engine refuses when the
+  # selection loads beyond these invariants (a header name that is not a token, or the same
+  # header twice without regard to case) is stated in the owner and pinned by the engine's tests.
+  - name: connectors_catalog.selection.RateLimitHeaders
+    kind: struct
+    fields:
+      - {name: remaining, type: String}
+      - {name: reset, type: String}
+    invariants:
+      - remaining.count >= 1
+      - reset.count >= 1
+
+  # The member of a selection that declares its rate-limit headers.
+  - name: connectors_catalog.selection.QuotaHeaders
+    kind: struct
+    fields:
+      - {name: rate_limit_headers, type: "Optional<connectors_catalog.selection.RateLimitHeaders>"}

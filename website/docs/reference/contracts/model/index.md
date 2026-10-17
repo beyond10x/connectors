@@ -39,18 +39,18 @@ flowchart TB
         who16["connectors.mutations.ServiceHost"]
     end
     subgraph unit0["feed-binding"]
-        cmd59["connectors.feed.AddContainer"]
-        cmd60["connectors.feed.AddItem"]
-        cmd61["connectors.feed.ListContainers"]
-        cmd62["connectors.feed.ReadItems"]
-        cmd63["connectors.feed.RemoveItem"]
-        cmd64["connectors.feed.RestoreItem"]
-        cmd65["connectors.feed.ReviseItem"]
-        evt55["connectors.feed.ContainerAdded"]
-        evt56["connectors.feed.ItemAdded"]
-        evt57["connectors.feed.ItemRemoved"]
-        evt58["connectors.feed.ItemRestored"]
-        evt59["connectors.feed.ItemRevised"]
+        cmd57["connectors.feed.AddContainer"]
+        cmd58["connectors.feed.AddItem"]
+        cmd59["connectors.feed.ListContainers"]
+        cmd60["connectors.feed.ReadItems"]
+        cmd61["connectors.feed.RemoveItem"]
+        cmd62["connectors.feed.RestoreItem"]
+        cmd63["connectors.feed.ReviseItem"]
+        evt53["connectors.feed.ContainerAdded"]
+        evt54["connectors.feed.ItemAdded"]
+        evt55["connectors.feed.ItemRemoved"]
+        evt56["connectors.feed.ItemRestored"]
+        evt57["connectors.feed.ItemRevised"]
     end
     subgraph unit1["local-metadata-authority"]
         cmd0["connectors.approval_issuers.AdvanceIssuerRevision"]
@@ -69,79 +69,77 @@ flowchart TB
         cmd13["connectors.auth_bindings.ExpireAcquisition"]
         cmd14["connectors.auth_bindings.FailAcquisition"]
         cmd15["connectors.auth_bindings.InvalidateCustodyVersion"]
-        cmd16["connectors.auth_bindings.MarkConnectionStale"]
-        cmd17["connectors.auth_bindings.PublishBinding"]
-        cmd18["connectors.auth_bindings.RecordAcquisitionCandidate"]
-        cmd19["connectors.auth_bindings.RecordConnectionCandidate"]
-        cmd20["connectors.auth_bindings.RecordCustodyVersion"]
-        cmd21["connectors.auth_bindings.RecordProfile"]
-        cmd22["connectors.auth_bindings.RetireCustodyVersion"]
-        cmd23["connectors.auth_bindings.RevokeConnection"]
-        cmd24["connectors.cli.ExpireConnectionListCursor"]
-        cmd25["connectors.cli.RaiseStoreWriter"]
-        cmd26["connectors.cli.RecordConnectionListCursor"]
-        cmd27["connectors.cli.RecordLocalRuntime"]
-        cmd28["connectors.cli.RecordStoreWriter"]
-        cmd29["connectors.cli.RememberLocalRuntimeBootstrap"]
-        cmd30["connectors.cli.SetLocalRuntimeSuppression"]
-        cmd31["connectors.clock.AdvanceLocalClockFloor"]
-        cmd32["connectors.clock.RecordLocalClockFloor"]
-        cmd33["connectors.credential_evidence.AdmitGeneration"]
-        cmd34["connectors.credential_evidence.CaptureReadUse"]
-        cmd35["connectors.credential_evidence.DispatchGeneration"]
-        cmd36["connectors.credential_evidence.DispatchReadUse"]
-        cmd37["connectors.credential_evidence.ExpireReadUse"]
-        cmd38["connectors.credential_evidence.InspectGeneration"]
-        cmd39["connectors.credential_evidence.RejectAdmission"]
-        cmd40["connectors.credential_evidence.ReleaseReadUse"]
-        cmd41["connectors.credentials.RecordCredentialGeneration"]
-        cmd42["connectors.declarations.AdvanceRegistryEpoch"]
-        cmd43["connectors.declarations.RecordServiceConfiguration"]
-        cmd44["connectors.declarations.UpgradeServiceConfiguration"]
-        cmd45["connectors.delegation.RecordApprovalRedemption"]
-        cmd56["connectors.execution_audit.AcknowledgeAnchor"]
-        cmd57["connectors.execution_audit.AppendFinalObservation"]
-        cmd58["connectors.execution_audit.LinkAnchorAttempt"]
-        cmd66["connectors.idempotency.ExpireResult"]
-        cmd67["connectors.idempotency.QuarantineKey"]
-        cmd68["connectors.idempotency.ReserveKey"]
-        cmd69["connectors.idempotency.RetainResult"]
-        cmd70["connectors.local_approval_policy.ConfigureLocalApprovalPolicy"]
-        cmd71["connectors.local_approval_policy.ReviseLocalApprovalPolicy"]
-        cmd72["connectors.mutations.AbortPrepared"]
-        cmd73["connectors.mutations.OpenDispatch"]
-        cmd74["connectors.mutations.PrepareAttempt"]
-        cmd75["connectors.mutations.RecordCompletion"]
-        cmd76["connectors.mutations.RecordRefusal"]
-        cmd77["connectors.mutations.RecordUncertainty"]
+        cmd16["connectors.auth_bindings.PublishBinding"]
+        cmd17["connectors.auth_bindings.RecordAcquisitionCandidate"]
+        cmd18["connectors.auth_bindings.RecordCustodyVersion"]
+        cmd19["connectors.auth_bindings.RecordProfile"]
+        cmd20["connectors.auth_bindings.RetireCustodyVersion"]
+        cmd21["connectors.auth_bindings.RevokeConnection"]
+        cmd22["connectors.cli.ExpireConnectionListCursor"]
+        cmd23["connectors.cli.RaiseStoreWriter"]
+        cmd24["connectors.cli.RecordConnectionListCursor"]
+        cmd25["connectors.cli.RecordLocalRuntime"]
+        cmd26["connectors.cli.RecordStoreWriter"]
+        cmd27["connectors.cli.RememberLocalRuntimeBootstrap"]
+        cmd28["connectors.cli.SetLocalRuntimeSuppression"]
+        cmd29["connectors.clock.AdvanceLocalClockFloor"]
+        cmd30["connectors.clock.RecordLocalClockFloor"]
+        cmd31["connectors.credential_evidence.AdmitGeneration"]
+        cmd32["connectors.credential_evidence.CaptureReadUse"]
+        cmd33["connectors.credential_evidence.DispatchGeneration"]
+        cmd34["connectors.credential_evidence.DispatchReadUse"]
+        cmd35["connectors.credential_evidence.ExpireReadUse"]
+        cmd36["connectors.credential_evidence.InspectGeneration"]
+        cmd37["connectors.credential_evidence.RejectAdmission"]
+        cmd38["connectors.credential_evidence.ReleaseReadUse"]
+        cmd39["connectors.credentials.RecordCredentialGeneration"]
+        cmd40["connectors.declarations.AdvanceRegistryEpoch"]
+        cmd41["connectors.declarations.RecordServiceConfiguration"]
+        cmd42["connectors.declarations.UpgradeServiceConfiguration"]
+        cmd43["connectors.delegation.RecordApprovalRedemption"]
+        cmd54["connectors.execution_audit.AcknowledgeAnchor"]
+        cmd55["connectors.execution_audit.AppendFinalObservation"]
+        cmd56["connectors.execution_audit.LinkAnchorAttempt"]
+        cmd64["connectors.idempotency.ExpireResult"]
+        cmd65["connectors.idempotency.QuarantineKey"]
+        cmd66["connectors.idempotency.ReserveKey"]
+        cmd67["connectors.idempotency.RetainResult"]
+        cmd68["connectors.local_approval_policy.ConfigureLocalApprovalPolicy"]
+        cmd69["connectors.local_approval_policy.ReviseLocalApprovalPolicy"]
+        cmd70["connectors.mutations.AbortPrepared"]
+        cmd71["connectors.mutations.OpenDispatch"]
+        cmd72["connectors.mutations.PrepareAttempt"]
+        cmd73["connectors.mutations.RecordCompletion"]
+        cmd74["connectors.mutations.RecordRefusal"]
+        cmd75["connectors.mutations.RecordUncertainty"]
     end
     subgraph unowned["owned by no component"]
-        cmd46["connectors.discovery_state.AllocateCollection"]
-        cmd47["connectors.discovery_state.AllocateObservation"]
-        cmd48["connectors.discovery_state.ObserveEqualIncarnation"]
-        cmd49["connectors.discovery_state.ObservePublication"]
-        cmd50["connectors.discovery_state.PublishView"]
-        cmd51["connectors.discovery_state.RetainStaleObservation"]
-        cmd52["connectors.discovery_state.RetireCollection"]
-        cmd53["connectors.discovery_state.RetireObservation"]
-        cmd54["connectors.discovery_state.RetireView"]
-        cmd55["connectors.discovery_state.WithdrawObservation"]
-        cmd78["connectors.refresh.AuthorizeExchange"]
-        cmd79["connectors.refresh.DiscardCandidate"]
-        cmd80["connectors.refresh.FenceReserved"]
-        cmd81["connectors.refresh.PublishRefresh"]
-        cmd82["connectors.refresh.QuarantineRefresh"]
-        cmd83["connectors.refresh.RecoverStoredResponse"]
-        cmd84["connectors.refresh.ReserveRefresh"]
-        cmd85["connectors.refresh.StoreResponse"]
-        cmd86["connectors.sessions.AcceptOffer"]
-        cmd87["connectors.sessions.BeginClose"]
-        cmd88["connectors.sessions.EstablishReady"]
-        cmd89["connectors.sessions.FinishTeardown"]
-        cmd90["connectors.sessions.LoseContinuity"]
-        cmd91["connectors.sessions.OfferSession"]
-        cmd92["connectors.sessions.PermitData"]
-        cmd93["connectors.sessions.RenewDataLease"]
+        cmd44["connectors.discovery_state.AllocateCollection"]
+        cmd45["connectors.discovery_state.AllocateObservation"]
+        cmd46["connectors.discovery_state.ObserveEqualIncarnation"]
+        cmd47["connectors.discovery_state.ObservePublication"]
+        cmd48["connectors.discovery_state.PublishView"]
+        cmd49["connectors.discovery_state.RetainStaleObservation"]
+        cmd50["connectors.discovery_state.RetireCollection"]
+        cmd51["connectors.discovery_state.RetireObservation"]
+        cmd52["connectors.discovery_state.RetireView"]
+        cmd53["connectors.discovery_state.WithdrawObservation"]
+        cmd76["connectors.refresh.AuthorizeExchange"]
+        cmd77["connectors.refresh.DiscardCandidate"]
+        cmd78["connectors.refresh.FenceReserved"]
+        cmd79["connectors.refresh.PublishRefresh"]
+        cmd80["connectors.refresh.QuarantineRefresh"]
+        cmd81["connectors.refresh.RecoverStoredResponse"]
+        cmd82["connectors.refresh.ReserveRefresh"]
+        cmd83["connectors.refresh.StoreResponse"]
+        cmd84["connectors.sessions.AcceptOffer"]
+        cmd85["connectors.sessions.BeginClose"]
+        cmd86["connectors.sessions.EstablishReady"]
+        cmd87["connectors.sessions.FinishTeardown"]
+        cmd88["connectors.sessions.LoseContinuity"]
+        cmd89["connectors.sessions.OfferSession"]
+        cmd90["connectors.sessions.PermitData"]
+        cmd91["connectors.sessions.RenewDataLease"]
         evt0["connectors.approval_issuers.IssuerBound"]
         evt1["connectors.approval_issuers.IssuerRevisionAdvanced"]
         evt2["connectors.approval_issuers.KeyDeleted"]
@@ -157,76 +155,74 @@ flowchart TB
         evt12["connectors.auth_bindings.AcquisitionFailed"]
         evt13["connectors.auth_bindings.BindingPublished"]
         evt14["connectors.auth_bindings.ConnectionAllocated"]
-        evt15["connectors.auth_bindings.ConnectionCandidateRecorded"]
-        evt16["connectors.auth_bindings.ConnectionMarkedStale"]
-        evt17["connectors.auth_bindings.ConnectionRevoked"]
-        evt18["connectors.auth_bindings.CustodyCandidateRecorded"]
-        evt19["connectors.auth_bindings.CustodyDeleted"]
-        evt20["connectors.auth_bindings.CustodyInvalidated"]
-        evt21["connectors.auth_bindings.CustodyRetiring"]
-        evt22["connectors.auth_bindings.CustodyWritten"]
-        evt23["connectors.auth_bindings.ProfileRecorded"]
-        evt24["connectors.cli.ConnectionListCursorExpired"]
-        evt25["connectors.cli.ConnectionListCursorRecorded"]
-        evt26["connectors.cli.LocalRuntimeBootstrapRemembered"]
-        evt27["connectors.cli.LocalRuntimeRecorded"]
-        evt28["connectors.cli.LocalRuntimeSuppressionSet"]
-        evt29["connectors.cli.StoreWriterRaised"]
-        evt30["connectors.cli.StoreWriterRecorded"]
-        evt31["connectors.clock.LocalClockFloorAdvanced"]
-        evt32["connectors.clock.LocalClockFloorRecorded"]
-        evt33["connectors.credential_evidence.AdmissionRefused"]
-        evt34["connectors.credential_evidence.GenerationAdmitted"]
-        evt35["connectors.credential_evidence.GenerationDispatched"]
-        evt36["connectors.credential_evidence.GenerationInspected"]
-        evt37["connectors.credential_evidence.ReadUseCaptured"]
-        evt38["connectors.credential_evidence.ReadUseDispatched"]
-        evt39["connectors.credential_evidence.ReadUseExpired"]
-        evt40["connectors.credential_evidence.ReadUseReleased"]
-        evt41["connectors.credentials.CredentialGenerationRecorded"]
-        evt42["connectors.declarations.RegistryEpochAdvanced"]
-        evt43["connectors.declarations.ServiceConfigurationRecorded"]
-        evt44["connectors.declarations.ServiceConfigurationUpgraded"]
-        evt45["connectors.delegation.ApprovalRedemptionRecorded"]
-        evt46["connectors.discovery_state.CollectionAllocated"]
-        evt47["connectors.discovery_state.CollectionRetired"]
-        evt48["connectors.discovery_state.ObservationChanged"]
-        evt49["connectors.discovery_state.PublicationObserved"]
-        evt50["connectors.discovery_state.ViewPublished"]
-        evt51["connectors.discovery_state.ViewRetired"]
-        evt52["connectors.execution_audit.AttemptLinked"]
-        evt53["connectors.execution_audit.AuditAnchored"]
-        evt54["connectors.execution_audit.FinalObservationRecorded"]
-        evt60["connectors.idempotency.KeyQuarantined"]
-        evt61["connectors.idempotency.KeyReserved"]
-        evt62["connectors.idempotency.ResultExpired"]
-        evt63["connectors.idempotency.ResultRetained"]
-        evt64["connectors.local_approval_policy.LocalApprovalPolicyConfigured"]
-        evt65["connectors.local_approval_policy.LocalApprovalPolicyRevised"]
-        evt66["connectors.mutations.AttemptAborted"]
-        evt67["connectors.mutations.AttemptCompleted"]
-        evt68["connectors.mutations.AttemptIndeterminate"]
-        evt69["connectors.mutations.AttemptPrepared"]
-        evt70["connectors.mutations.AttemptRefused"]
-        evt71["connectors.mutations.DispatchOpened"]
-        evt72["connectors.refresh.ExchangeAuthorized"]
-        evt73["connectors.refresh.RefreshCandidateDiscarded"]
-        evt74["connectors.refresh.RefreshPublished"]
-        evt75["connectors.refresh.RefreshReserved"]
-        evt76["connectors.refresh.RefreshResponseStored"]
-        evt77["connectors.refresh.RefreshUncertain"]
-        evt78["connectors.refresh.ReservedOwnerFenced"]
-        evt79["connectors.refresh.StoredResponseRecovered"]
-        evt80["connectors.sessions.ClosingBegun"]
-        evt81["connectors.sessions.ContinuityLost"]
-        evt82["connectors.sessions.DataAuthorityTerminated"]
-        evt83["connectors.sessions.DataLeaseRenewed"]
-        evt84["connectors.sessions.DataPermitted"]
-        evt85["connectors.sessions.LocalCleanupUnaccounted"]
-        evt86["connectors.sessions.LocalResourcesReleased"]
-        evt87["connectors.sessions.OfferAccepted"]
-        evt88["connectors.sessions.SessionOffered"]
-        evt89["connectors.sessions.SessionReady"]
+        evt15["connectors.auth_bindings.ConnectionRevoked"]
+        evt16["connectors.auth_bindings.CustodyCandidateRecorded"]
+        evt17["connectors.auth_bindings.CustodyDeleted"]
+        evt18["connectors.auth_bindings.CustodyInvalidated"]
+        evt19["connectors.auth_bindings.CustodyRetiring"]
+        evt20["connectors.auth_bindings.CustodyWritten"]
+        evt21["connectors.auth_bindings.ProfileRecorded"]
+        evt22["connectors.cli.ConnectionListCursorExpired"]
+        evt23["connectors.cli.ConnectionListCursorRecorded"]
+        evt24["connectors.cli.LocalRuntimeBootstrapRemembered"]
+        evt25["connectors.cli.LocalRuntimeRecorded"]
+        evt26["connectors.cli.LocalRuntimeSuppressionSet"]
+        evt27["connectors.cli.StoreWriterRaised"]
+        evt28["connectors.cli.StoreWriterRecorded"]
+        evt29["connectors.clock.LocalClockFloorAdvanced"]
+        evt30["connectors.clock.LocalClockFloorRecorded"]
+        evt31["connectors.credential_evidence.AdmissionRefused"]
+        evt32["connectors.credential_evidence.GenerationAdmitted"]
+        evt33["connectors.credential_evidence.GenerationDispatched"]
+        evt34["connectors.credential_evidence.GenerationInspected"]
+        evt35["connectors.credential_evidence.ReadUseCaptured"]
+        evt36["connectors.credential_evidence.ReadUseDispatched"]
+        evt37["connectors.credential_evidence.ReadUseExpired"]
+        evt38["connectors.credential_evidence.ReadUseReleased"]
+        evt39["connectors.credentials.CredentialGenerationRecorded"]
+        evt40["connectors.declarations.RegistryEpochAdvanced"]
+        evt41["connectors.declarations.ServiceConfigurationRecorded"]
+        evt42["connectors.declarations.ServiceConfigurationUpgraded"]
+        evt43["connectors.delegation.ApprovalRedemptionRecorded"]
+        evt44["connectors.discovery_state.CollectionAllocated"]
+        evt45["connectors.discovery_state.CollectionRetired"]
+        evt46["connectors.discovery_state.ObservationChanged"]
+        evt47["connectors.discovery_state.PublicationObserved"]
+        evt48["connectors.discovery_state.ViewPublished"]
+        evt49["connectors.discovery_state.ViewRetired"]
+        evt50["connectors.execution_audit.AttemptLinked"]
+        evt51["connectors.execution_audit.AuditAnchored"]
+        evt52["connectors.execution_audit.FinalObservationRecorded"]
+        evt58["connectors.idempotency.KeyQuarantined"]
+        evt59["connectors.idempotency.KeyReserved"]
+        evt60["connectors.idempotency.ResultExpired"]
+        evt61["connectors.idempotency.ResultRetained"]
+        evt62["connectors.local_approval_policy.LocalApprovalPolicyConfigured"]
+        evt63["connectors.local_approval_policy.LocalApprovalPolicyRevised"]
+        evt64["connectors.mutations.AttemptAborted"]
+        evt65["connectors.mutations.AttemptCompleted"]
+        evt66["connectors.mutations.AttemptIndeterminate"]
+        evt67["connectors.mutations.AttemptPrepared"]
+        evt68["connectors.mutations.AttemptRefused"]
+        evt69["connectors.mutations.DispatchOpened"]
+        evt70["connectors.refresh.ExchangeAuthorized"]
+        evt71["connectors.refresh.RefreshCandidateDiscarded"]
+        evt72["connectors.refresh.RefreshPublished"]
+        evt73["connectors.refresh.RefreshReserved"]
+        evt74["connectors.refresh.RefreshResponseStored"]
+        evt75["connectors.refresh.RefreshUncertain"]
+        evt76["connectors.refresh.ReservedOwnerFenced"]
+        evt77["connectors.refresh.StoredResponseRecovered"]
+        evt78["connectors.sessions.ClosingBegun"]
+        evt79["connectors.sessions.ContinuityLost"]
+        evt80["connectors.sessions.DataAuthorityTerminated"]
+        evt81["connectors.sessions.DataLeaseRenewed"]
+        evt82["connectors.sessions.DataPermitted"]
+        evt83["connectors.sessions.LocalCleanupUnaccounted"]
+        evt84["connectors.sessions.LocalResourcesReleased"]
+        evt85["connectors.sessions.OfferAccepted"]
+        evt86["connectors.sessions.SessionOffered"]
+        evt87["connectors.sessions.SessionReady"]
     end
     who0 -->|"may invoke"| cmd0
     who0 -->|"may invoke"| cmd1
@@ -250,57 +246,55 @@ flowchart TB
     who1 -->|"may invoke"| cmd19
     who1 -->|"may invoke"| cmd20
     who1 -->|"may invoke"| cmd21
-    who1 -->|"may invoke"| cmd22
-    who1 -->|"may invoke"| cmd23
+    who2 -->|"may invoke"| cmd22
+    who2 -->|"may invoke"| cmd23
     who2 -->|"may invoke"| cmd24
     who2 -->|"may invoke"| cmd25
     who2 -->|"may invoke"| cmd26
     who2 -->|"may invoke"| cmd27
     who2 -->|"may invoke"| cmd28
-    who2 -->|"may invoke"| cmd29
-    who2 -->|"may invoke"| cmd30
-    who3 -->|"may invoke"| cmd31
-    who3 -->|"may invoke"| cmd32
+    who3 -->|"may invoke"| cmd29
+    who3 -->|"may invoke"| cmd30
+    who4 -->|"may invoke"| cmd32
     who4 -->|"may invoke"| cmd34
-    who4 -->|"may invoke"| cmd36
-    who4 -->|"may invoke"| cmd37
-    who4 -->|"may invoke"| cmd40
-    who5 -->|"may invoke"| cmd41
+    who4 -->|"may invoke"| cmd35
+    who4 -->|"may invoke"| cmd38
+    who5 -->|"may invoke"| cmd39
+    who6 -->|"may invoke"| cmd40
+    who6 -->|"may invoke"| cmd41
     who6 -->|"may invoke"| cmd42
-    who6 -->|"may invoke"| cmd43
-    who6 -->|"may invoke"| cmd44
-    who7 -->|"may invoke"| cmd43
-    who7 -->|"may invoke"| cmd44
-    who8 -->|"may invoke"| cmd45
-    who9 -->|"may invoke"| cmd56
-    who9 -->|"may invoke"| cmd57
+    who7 -->|"may invoke"| cmd41
+    who7 -->|"may invoke"| cmd42
+    who8 -->|"may invoke"| cmd43
+    who9 -->|"may invoke"| cmd54
+    who9 -->|"may invoke"| cmd55
+    who10 -->|"may invoke"| cmd54
+    who10 -->|"may invoke"| cmd55
     who10 -->|"may invoke"| cmd56
-    who10 -->|"may invoke"| cmd57
-    who10 -->|"may invoke"| cmd58
-    who11 -->|"may invoke"| cmd61
-    who11 -->|"may invoke"| cmd62
-    who12 -->|"may invoke"| cmd59
-    who12 -->|"may invoke"| cmd60
+    who11 -->|"may invoke"| cmd59
+    who11 -->|"may invoke"| cmd60
+    who12 -->|"may invoke"| cmd57
+    who12 -->|"may invoke"| cmd58
+    who12 -->|"may invoke"| cmd61
+    who12 -->|"may invoke"| cmd62
     who12 -->|"may invoke"| cmd63
-    who12 -->|"may invoke"| cmd64
-    who12 -->|"may invoke"| cmd65
+    who13 -->|"may invoke"| cmd64
+    who13 -->|"may invoke"| cmd65
     who13 -->|"may invoke"| cmd66
     who13 -->|"may invoke"| cmd67
-    who13 -->|"may invoke"| cmd68
-    who13 -->|"may invoke"| cmd69
-    who14 -->|"may invoke"| cmd70
-    who14 -->|"may invoke"| cmd71
+    who14 -->|"may invoke"| cmd68
+    who14 -->|"may invoke"| cmd69
+    who15 -->|"may invoke"| cmd70
+    who15 -->|"may invoke"| cmd71
     who15 -->|"may invoke"| cmd72
     who15 -->|"may invoke"| cmd73
     who15 -->|"may invoke"| cmd74
     who15 -->|"may invoke"| cmd75
-    who15 -->|"may invoke"| cmd76
-    who15 -->|"may invoke"| cmd77
+    who16 -->|"may invoke"| cmd70
+    who16 -->|"may invoke"| cmd71
     who16 -->|"may invoke"| cmd72
     who16 -->|"may invoke"| cmd73
-    who16 -->|"may invoke"| cmd74
     who16 -->|"may invoke"| cmd75
-    who16 -->|"may invoke"| cmd77
     cmd0 -->|"advanced"| evt1
     cmd1 -->|"bound"| evt0
     cmd2 -->|"deleted"| evt2
@@ -308,95 +302,93 @@ flowchart TB
     cmd4 -->|"retiring"| evt4
     cmd5 -->|"revoked"| evt5
     cmd6 -->|"staged"| evt6
-    cmd7 -->|"deleted"| evt19
-    cmd8 -->|"stored"| evt22
+    cmd7 -->|"deleted"| evt17
+    cmd8 -->|"stored"| evt20
     cmd9 -->|"allocated"| evt14
     cmd10 -->|"pending"| evt7
     cmd11 -->|"completed"| evt9
     cmd12 -->|"consumed"| evt10
     cmd13 -->|"expired"| evt11
     cmd14 -->|"failed"| evt12
-    cmd15 -->|"invalidated"| evt20
-    cmd16 -->|"marked-stale"| evt16
-    cmd17 -->|"published"| evt13
-    cmd18 -->|"candidate-recorded"| evt8
-    cmd19 -->|"candidate-recorded"| evt15
-    cmd20 -->|"candidate"| evt18
-    cmd21 -->|"recorded"| evt23
-    cmd22 -->|"retiring"| evt21
-    cmd23 -->|"revoked"| evt17
-    cmd24 -->|"expired"| evt24
-    cmd25 -->|"raised"| evt29
-    cmd26 -->|"recorded"| evt25
-    cmd27 -->|"recorded"| evt27
-    cmd28 -->|"recorded"| evt30
-    cmd29 -->|"remembered"| evt26
-    cmd30 -->|"updated"| evt28
-    cmd31 -->|"advanced"| evt31
-    cmd32 -->|"recorded"| evt32
-    cmd33 -->|"admitted"| evt34
-    cmd34 -->|"captured"| evt37
-    cmd35 -->|"dispatched"| evt35
-    cmd36 -->|"dispatched"| evt38
-    cmd37 -->|"expired"| evt39
-    cmd38 -->|"inspected"| evt36
-    cmd39 -->|"refused"| evt33
-    cmd40 -->|"released"| evt40
+    cmd15 -->|"invalidated"| evt18
+    cmd16 -->|"published"| evt13
+    cmd17 -->|"candidate-recorded"| evt8
+    cmd18 -->|"candidate"| evt16
+    cmd19 -->|"recorded"| evt21
+    cmd20 -->|"retiring"| evt19
+    cmd21 -->|"revoked"| evt15
+    cmd22 -->|"expired"| evt22
+    cmd23 -->|"raised"| evt27
+    cmd24 -->|"recorded"| evt23
+    cmd25 -->|"recorded"| evt25
+    cmd26 -->|"recorded"| evt28
+    cmd27 -->|"remembered"| evt24
+    cmd28 -->|"updated"| evt26
+    cmd29 -->|"advanced"| evt29
+    cmd30 -->|"recorded"| evt30
+    cmd31 -->|"admitted"| evt32
+    cmd32 -->|"captured"| evt35
+    cmd33 -->|"dispatched"| evt33
+    cmd34 -->|"dispatched"| evt36
+    cmd35 -->|"expired"| evt37
+    cmd36 -->|"inspected"| evt34
+    cmd37 -->|"refused"| evt31
+    cmd38 -->|"released"| evt38
+    cmd39 -->|"recorded"| evt39
+    cmd40 -->|"advanced"| evt40
     cmd41 -->|"recorded"| evt41
-    cmd42 -->|"advanced"| evt42
+    cmd42 -->|"upgraded"| evt42
     cmd43 -->|"recorded"| evt43
-    cmd44 -->|"upgraded"| evt44
-    cmd45 -->|"recorded"| evt45
-    cmd46 -->|"allocated"| evt46
-    cmd47 -->|"allocated"| evt48
-    cmd48 -->|"observed"| evt48
-    cmd49 -->|"current-commit-observed"| evt49
-    cmd50 -->|"published"| evt50
-    cmd51 -->|"stale"| evt48
-    cmd52 -->|"retired"| evt47
-    cmd53 -->|"retired"| evt48
-    cmd54 -->|"retired"| evt51
-    cmd55 -->|"withdrawn"| evt48
-    cmd56 -->|"anchored"| evt53
-    cmd57 -->|"recorded"| evt54
-    cmd58 -->|"linked"| evt52
-    cmd59 -->|"added"| evt55
-    cmd60 -->|"added"| evt56
-    cmd63 -->|"removed"| evt57
-    cmd64 -->|"restored"| evt58
-    cmd65 -->|"revised"| evt59
-    cmd66 -->|"expired"| evt62
-    cmd67 -->|"quarantined"| evt60
-    cmd68 -->|"reserved"| evt61
-    cmd69 -->|"retained"| evt63
-    cmd70 -->|"configured"| evt64
-    cmd71 -->|"revised"| evt65
-    cmd72 -->|"aborted"| evt66
-    cmd73 -->|"opened"| evt71
-    cmd74 -->|"prepared"| evt69
-    cmd75 -->|"completed"| evt67
-    cmd76 -->|"refused"| evt70
-    cmd77 -->|"indeterminate"| evt68
-    cmd78 -->|"authorized"| evt72
-    cmd79 -->|"discarded"| evt73
-    cmd80 -->|"fenced"| evt78
-    cmd81 -->|"published"| evt74
-    cmd82 -->|"uncertain"| evt77
-    cmd83 -->|"recovered"| evt79
-    cmd84 -->|"reserved"| evt75
-    cmd85 -->|"stored"| evt76
-    cmd86 -->|"accepted"| evt87
-    cmd87 -->|"closing"| evt80
-    cmd88 -->|"ready"| evt89
-    cmd88 -->|"authority-terminated"| evt82
-    cmd89 -->|"closed"| evt86
-    cmd89 -->|"lost"| evt85
-    cmd90 -->|"lost"| evt81
-    cmd91 -->|"offered"| evt88
-    cmd92 -->|"permitted"| evt84
-    cmd92 -->|"authority-terminated"| evt82
-    cmd93 -->|"renewed"| evt83
-    cmd93 -->|"authority-terminated"| evt82
+    cmd44 -->|"allocated"| evt44
+    cmd45 -->|"allocated"| evt46
+    cmd46 -->|"observed"| evt46
+    cmd47 -->|"current-commit-observed"| evt47
+    cmd48 -->|"published"| evt48
+    cmd49 -->|"stale"| evt46
+    cmd50 -->|"retired"| evt45
+    cmd51 -->|"retired"| evt46
+    cmd52 -->|"retired"| evt49
+    cmd53 -->|"withdrawn"| evt46
+    cmd54 -->|"anchored"| evt51
+    cmd55 -->|"recorded"| evt52
+    cmd56 -->|"linked"| evt50
+    cmd57 -->|"added"| evt53
+    cmd58 -->|"added"| evt54
+    cmd61 -->|"removed"| evt55
+    cmd62 -->|"restored"| evt56
+    cmd63 -->|"revised"| evt57
+    cmd64 -->|"expired"| evt60
+    cmd65 -->|"quarantined"| evt58
+    cmd66 -->|"reserved"| evt59
+    cmd67 -->|"retained"| evt61
+    cmd68 -->|"configured"| evt62
+    cmd69 -->|"revised"| evt63
+    cmd70 -->|"aborted"| evt64
+    cmd71 -->|"opened"| evt69
+    cmd72 -->|"prepared"| evt67
+    cmd73 -->|"completed"| evt65
+    cmd74 -->|"refused"| evt68
+    cmd75 -->|"indeterminate"| evt66
+    cmd76 -->|"authorized"| evt70
+    cmd77 -->|"discarded"| evt71
+    cmd78 -->|"fenced"| evt76
+    cmd79 -->|"published"| evt72
+    cmd80 -->|"uncertain"| evt75
+    cmd81 -->|"recovered"| evt77
+    cmd82 -->|"reserved"| evt73
+    cmd83 -->|"stored"| evt74
+    cmd84 -->|"accepted"| evt85
+    cmd85 -->|"closing"| evt78
+    cmd86 -->|"ready"| evt87
+    cmd86 -->|"authority-terminated"| evt80
+    cmd87 -->|"closed"| evt84
+    cmd87 -->|"lost"| evt83
+    cmd88 -->|"lost"| evt79
+    cmd89 -->|"offered"| evt86
+    cmd90 -->|"permitted"| evt82
+    cmd90 -->|"authority-terminated"| evt80
+    cmd91 -->|"renewed"| evt81
+    cmd91 -->|"authority-terminated"| evt80
 ```
 
 A command is accepted by the component that owns its context, emits the events one of its outcomes declares, and a dashed edge is a binding carrying an event into the next command. Design §9 begins one step earlier, at the actor who invokes the first command, and so does this graph: a solid edge out of an actor is a grant, and an actor drawn with no edge at all may invoke nothing — which is something the model says, not an arrow somebody forgot.
@@ -406,14 +398,14 @@ A command is accepted by the component that owns its context, emits the events o
 - **[approval_issuers](./domains/connectors-approval_issuers.md)** (`connectors.approval_issuers`) — Local issuer identities and immutable signing-key versions with guarded publication. Two types, two entities, two views, seven commands, seven events, three errors and one actor.
 - **[artifact_provenance](./domains/connectors-artifact_provenance.md)** (`connectors.artifact_provenance`) — Immutable shared source and bundle declarations; optional distribution publication is separate. Nine types, two entities, no views, no commands, no events, no errors and no actors.
 - **[auth_access](./domains/connectors-auth_access.md)** (`connectors.auth_access`) — Proposed access selection, acquisition declaration and exact permission-budget values; no runtime or persistent owner. 15 types, no entities, no views, no commands, no events, no errors and no actors.
-- **[auth_bindings](./domains/connectors-auth_bindings.md)** (`connectors.auth_bindings`) — Proposed host-private auth records and acknowledged lifecycle boundaries. Eight types, four entities, seven views, 17 commands, 17 events, eight errors and one actor.
-- **[cli](./domains/connectors-cli.md)** (`connectors.cli`) — Selected local CLI presentation values and the existing local configuration owner's durable runtime facts. 134 types, three entities, two views, seven commands, seven events, one error and one actor.
+- **[auth_bindings](./domains/connectors-auth_bindings.md)** (`connectors.auth_bindings`) — Proposed host-private auth records and acknowledged lifecycle boundaries. Eight types, four entities, seven views, 15 commands, 15 events, seven errors and one actor.
+- **[cli](./domains/connectors-cli.md)** (`connectors.cli`) — Selected local CLI presentation values and the existing local configuration owner's durable runtime facts. 125 types, three entities, two views, seven commands, seven events, one error and one actor.
 - **[clock](./domains/connectors-clock.md)** (`connectors.clock`) — Explicitly trusted local clock configuration, bounded observations and owner anti-regression floors. Eight types, one entity, one view, two commands, two events, one error and one actor.
 - **[connection_admission](./domains/connectors-connection_admission.md)** (`connectors.connection_admission`) — Proposed connection viability, request eligibility and host management target values; no runtime checker or persistent connection lifecycle. 13 types, no entities, no views, no commands, no events, no errors and no actors.
 - **[credential_evidence](./domains/connectors-credential_evidence.md)** (`connectors.credential_evidence`) — Proposed generation-bound evidence values and transient dispatch admission decisions. Eight types, two entities, two views, eight commands, eight events, three errors and one actor.
 - **[credentials](./domains/connectors-credentials.md)** (`connectors.credentials`) — Host-private immutable credential snapshot identities shared by refresh and evidence. Three types, one entity, one view, one command, one event, no errors and one actor.
 - **[datasource_reads](./domains/connectors-datasource_reads.md)** (`connectors.datasource_reads`) — Proposed bounded datasource selection and read-decision values; no runtime or persistent provider owner. 10 types, no entities, no views, no commands, no events, no errors and no actors.
-- **[declarations](./domains/connectors-declarations.md)** (`connectors.declarations`) 13 types, five entities, one view, three commands, three events, three errors and two actors.
+- **[declarations](./domains/connectors-declarations.md)** (`connectors.declarations`) 12 types, three entities, one view, three commands, three events, one error and two actors.
 - **[delegation](./domains/connectors-delegation.md)** (`connectors.delegation`) — One-hop approval subjects and immutable receiver receipts; private host approval binding, no delegated ingress runtime. 22 types, two entities, one view, one command, one event, no errors and one actor.
 - **[discovery](./domains/connectors-discovery.md)** (`connectors.discovery`) — Discovery scope, publication, fixed route and immutable composition values; persistent collection ownership is in discovery_state. 23 types, no entities, no views, no commands, no events, no errors and no actors.
 - **[discovery_state](./domains/connectors-discovery_state.md)** (`connectors.discovery_state`) — Host-owned scope epochs, bounded observation records and atomic publication selections; no provider Resource entity. Eight types, two entities, no views, 10 commands, six events, three errors and no actors.
@@ -434,7 +426,7 @@ A component is a unit of ownership, not a deployment. How many of each runs, and
 
 **`feed-binding`** — Any adapter that binds datasource.feed/v1alpha1; a fixture binding realises it for conformance, its Provider commands seeding the source it reads. It owns [`connectors.feed`](./domains/connectors-feed.md). It accepts `connectors.feed.AddContainer`, `connectors.feed.AddItem`, `connectors.feed.ListContainers`, `connectors.feed.ReadItems`, `connectors.feed.RemoveItem`, `connectors.feed.RestoreItem` and `connectors.feed.ReviseItem`. It publishes `connectors.feed.ContainerAdded`, `connectors.feed.ItemAdded`, `connectors.feed.ItemRemoved`, `connectors.feed.ItemRestored` and `connectors.feed.ItemRevised`.
 
-**`local-metadata-authority`** — Owns the local host decisions retained by the recorded metadata authority. It owns [`connectors.approval_issuers`](./domains/connectors-approval_issuers.md), [`connectors.auth_bindings`](./domains/connectors-auth_bindings.md), [`connectors.cli`](./domains/connectors-cli.md), [`connectors.clock`](./domains/connectors-clock.md), [`connectors.credential_evidence`](./domains/connectors-credential_evidence.md), [`connectors.credentials`](./domains/connectors-credentials.md), [`connectors.declarations`](./domains/connectors-declarations.md), [`connectors.delegation`](./domains/connectors-delegation.md), [`connectors.execution_audit`](./domains/connectors-execution_audit.md), [`connectors.idempotency`](./domains/connectors-idempotency.md), [`connectors.local_approval_policy`](./domains/connectors-local_approval_policy.md) and [`connectors.mutations`](./domains/connectors-mutations.md). It accepts `connectors.approval_issuers.AdvanceIssuerRevision`, `connectors.approval_issuers.BindIssuer`, `connectors.approval_issuers.ConfirmKeyDeletion`, `connectors.approval_issuers.PublishKey`, `connectors.approval_issuers.RetireKey`, `connectors.approval_issuers.RevokeKey`, `connectors.approval_issuers.StageKey`, `connectors.auth_bindings.AcknowledgeCustodyDeletion`, `connectors.auth_bindings.AcknowledgeCustodyWrite`, `connectors.auth_bindings.AllocateConnection`, `connectors.auth_bindings.BeginAcquisition`, `connectors.auth_bindings.CompleteAcquisition`, `connectors.auth_bindings.ConsumeAcquisition`, `connectors.auth_bindings.ExpireAcquisition`, `connectors.auth_bindings.FailAcquisition`, `connectors.auth_bindings.InvalidateCustodyVersion`, `connectors.auth_bindings.MarkConnectionStale`, `connectors.auth_bindings.PublishBinding`, `connectors.auth_bindings.RecordAcquisitionCandidate`, `connectors.auth_bindings.RecordConnectionCandidate`, `connectors.auth_bindings.RecordCustodyVersion`, `connectors.auth_bindings.RecordProfile`, `connectors.auth_bindings.RetireCustodyVersion`, `connectors.auth_bindings.RevokeConnection`, `connectors.cli.ExpireConnectionListCursor`, `connectors.cli.RaiseStoreWriter`, `connectors.cli.RecordConnectionListCursor`, `connectors.cli.RecordLocalRuntime`, `connectors.cli.RecordStoreWriter`, `connectors.cli.RememberLocalRuntimeBootstrap`, `connectors.cli.SetLocalRuntimeSuppression`, `connectors.clock.AdvanceLocalClockFloor`, `connectors.clock.RecordLocalClockFloor`, `connectors.credential_evidence.AdmitGeneration`, `connectors.credential_evidence.CaptureReadUse`, `connectors.credential_evidence.DispatchGeneration`, `connectors.credential_evidence.DispatchReadUse`, `connectors.credential_evidence.ExpireReadUse`, `connectors.credential_evidence.InspectGeneration`, `connectors.credential_evidence.RejectAdmission`, `connectors.credential_evidence.ReleaseReadUse`, `connectors.credentials.RecordCredentialGeneration`, `connectors.declarations.AdvanceRegistryEpoch`, `connectors.declarations.RecordServiceConfiguration`, `connectors.declarations.UpgradeServiceConfiguration`, `connectors.delegation.RecordApprovalRedemption`, `connectors.execution_audit.AcknowledgeAnchor`, `connectors.execution_audit.AppendFinalObservation`, `connectors.execution_audit.LinkAnchorAttempt`, `connectors.idempotency.ExpireResult`, `connectors.idempotency.QuarantineKey`, `connectors.idempotency.ReserveKey`, `connectors.idempotency.RetainResult`, `connectors.local_approval_policy.ConfigureLocalApprovalPolicy`, `connectors.local_approval_policy.ReviseLocalApprovalPolicy`, `connectors.mutations.AbortPrepared`, `connectors.mutations.OpenDispatch`, `connectors.mutations.PrepareAttempt`, `connectors.mutations.RecordCompletion`, `connectors.mutations.RecordRefusal` and `connectors.mutations.RecordUncertainty`. It publishes no events.
+**`local-metadata-authority`** — Owns the local host decisions retained by the recorded metadata authority. It owns [`connectors.approval_issuers`](./domains/connectors-approval_issuers.md), [`connectors.auth_bindings`](./domains/connectors-auth_bindings.md), [`connectors.cli`](./domains/connectors-cli.md), [`connectors.clock`](./domains/connectors-clock.md), [`connectors.credential_evidence`](./domains/connectors-credential_evidence.md), [`connectors.credentials`](./domains/connectors-credentials.md), [`connectors.declarations`](./domains/connectors-declarations.md), [`connectors.delegation`](./domains/connectors-delegation.md), [`connectors.execution_audit`](./domains/connectors-execution_audit.md), [`connectors.idempotency`](./domains/connectors-idempotency.md), [`connectors.local_approval_policy`](./domains/connectors-local_approval_policy.md) and [`connectors.mutations`](./domains/connectors-mutations.md). It accepts `connectors.approval_issuers.AdvanceIssuerRevision`, `connectors.approval_issuers.BindIssuer`, `connectors.approval_issuers.ConfirmKeyDeletion`, `connectors.approval_issuers.PublishKey`, `connectors.approval_issuers.RetireKey`, `connectors.approval_issuers.RevokeKey`, `connectors.approval_issuers.StageKey`, `connectors.auth_bindings.AcknowledgeCustodyDeletion`, `connectors.auth_bindings.AcknowledgeCustodyWrite`, `connectors.auth_bindings.AllocateConnection`, `connectors.auth_bindings.BeginAcquisition`, `connectors.auth_bindings.CompleteAcquisition`, `connectors.auth_bindings.ConsumeAcquisition`, `connectors.auth_bindings.ExpireAcquisition`, `connectors.auth_bindings.FailAcquisition`, `connectors.auth_bindings.InvalidateCustodyVersion`, `connectors.auth_bindings.PublishBinding`, `connectors.auth_bindings.RecordAcquisitionCandidate`, `connectors.auth_bindings.RecordCustodyVersion`, `connectors.auth_bindings.RecordProfile`, `connectors.auth_bindings.RetireCustodyVersion`, `connectors.auth_bindings.RevokeConnection`, `connectors.cli.ExpireConnectionListCursor`, `connectors.cli.RaiseStoreWriter`, `connectors.cli.RecordConnectionListCursor`, `connectors.cli.RecordLocalRuntime`, `connectors.cli.RecordStoreWriter`, `connectors.cli.RememberLocalRuntimeBootstrap`, `connectors.cli.SetLocalRuntimeSuppression`, `connectors.clock.AdvanceLocalClockFloor`, `connectors.clock.RecordLocalClockFloor`, `connectors.credential_evidence.AdmitGeneration`, `connectors.credential_evidence.CaptureReadUse`, `connectors.credential_evidence.DispatchGeneration`, `connectors.credential_evidence.DispatchReadUse`, `connectors.credential_evidence.ExpireReadUse`, `connectors.credential_evidence.InspectGeneration`, `connectors.credential_evidence.RejectAdmission`, `connectors.credential_evidence.ReleaseReadUse`, `connectors.credentials.RecordCredentialGeneration`, `connectors.declarations.AdvanceRegistryEpoch`, `connectors.declarations.RecordServiceConfiguration`, `connectors.declarations.UpgradeServiceConfiguration`, `connectors.delegation.RecordApprovalRedemption`, `connectors.execution_audit.AcknowledgeAnchor`, `connectors.execution_audit.AppendFinalObservation`, `connectors.execution_audit.LinkAnchorAttempt`, `connectors.idempotency.ExpireResult`, `connectors.idempotency.QuarantineKey`, `connectors.idempotency.ReserveKey`, `connectors.idempotency.RetainResult`, `connectors.local_approval_policy.ConfigureLocalApprovalPolicy`, `connectors.local_approval_policy.ReviseLocalApprovalPolicy`, `connectors.mutations.AbortPrepared`, `connectors.mutations.OpenDispatch`, `connectors.mutations.PrepareAttempt`, `connectors.mutations.RecordCompletion`, `connectors.mutations.RecordRefusal` and `connectors.mutations.RecordUncertainty`. It publishes no events.
 
 ## The other pages
 
@@ -471,4 +463,4 @@ A component is a unit of ownership, not a deployment. How many of each runs, and
 
 ---
 
-Generated from connectors v1 · model digest `ad712103497e609774d0b59655f3d3fa484f77cf8079f001ea4e04f20f945b05` · contract digest `3d525ce3505cfc135ef81730e30b61b7acf04405d48c3beb955ae4e140b16b91`. Do not edit this file; change the specification and regenerate it with `ess generate`.
+Generated from connectors v1 · model digest `e63ac7e11c155bf118f4b39ff7c9f779947979640b9c8f53e0baab6c81a7ef53` · contract digest `0c11aab1b7aa9b01423e1265304e3649e30fb5fd91353850a4da716e768e2c13`. Do not edit this file; change the specification and regenerate it with `ess generate`.

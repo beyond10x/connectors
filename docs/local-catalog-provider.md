@@ -745,6 +745,62 @@ The complete configuration used against the sandbox is
   `error.status` is `rate_limited`, for a read and for a write's definite
   refusal; every other `403` stays `forbidden`. An empty reason is refused
   when the selection loads.
+- `rate_limit_headers` is optional: `{"remaining": "<header>", "reset":
+  "<header>"}` names the headers by which a provider says its rate limit is
+  spent, such as GitHub's `x-ratelimit-remaining` and `x-ratelimit-reset`. A
+  `403` or `429` whose `remaining` header is exactly `0` is `rate_limited`,
+  for a read and for a write's definite refusal, whatever its body. Its
+  `retry_after_seconds` comes from `Retry-After` when the answer carries one,
+  and otherwise is the number of seconds from now to the Unix time the `reset`
+  header names (none for a time already past or a value that is not whole
+  seconds). Every other `403` keeps the classification `rate_limit_reasons`
+  or its status gives. A read answered so is sent once more only under the
+  rule in [Limits](#limits); a reset an hour away is never waited for. A header
+  name that is empty or not an HTTP token, or the same name twice without
+  regard to case, is refused when the selection loads. The member is modelled
+  as `connectors_catalog.selection.QuotaHeaders` in `adapters/catalog/spec/ess`.
+- `query_fixed` is optional, for a read: `{"<query parameter>": "<value>"}`
+  fixes query parameters the source declares to one string each. The provider
+  sends exactly that value under that name on every request; the parameter is
+  left out of the declared input schema, and an input carrying it is refused
+  as `invalid_input` before any request, so a caller cannot widen what the
+  read reaches. It is for a read whose meaning is one query, such as GitHub's
+  search fixed to `q` `is:pr is:open review-requested:@me`. A fixed value on a
+  write, an empty value, a name that is not a query parameter of the operation,
+  one the selection also bounds, marks `required`, withholds or names as a
+  `credential`, or more than eight fixed values is refused when the selection
+  loads.
+- `query_folds` is optional, beside `query_fixed`: `{"<input>": {"into":
+  "<fixed parameter>", "prefix": "<text>", "format": "timestamp"}}` declares a
+  caller input that joins a fixed value. The input is declared under its own
+  name as an optional string of the `format`, and is not a parameter of the
+  operation; when the caller sends it, the provider appends one space,
+  `prefix` and the value to the fixed value of `into`, and sends the fixed
+  value alone otherwise. `timestamp` admits an ISO 8601 date `YYYY-MM-DD` or a
+  date-time `YYYY-MM-DDTHH:MM:SS` followed by `Z` or `+HH:MM`/`-HH:MM`, and
+  nothing else, so a folded value never adds a word or a qualifier; a value of
+  any other form is refused as `invalid_input` before any request. GitHub's
+  `review_requests.list` folds `since` as `updated:>=<since>`. A fold whose
+  `into` the selection does not fix, two folds into one value, a fold named
+  like a parameter of the operation or not an id, an empty `prefix` or one
+  holding a space is refused when the selection loads. Both are modelled as
+  `connectors_catalog.selection.FixedQuery`.
+- `embedded_text` is optional, for a read answering JSON: `{"content":
+  "<pointer>", "encoding": "<pointer>", "size": "<pointer>", "max_bytes":
+  <bytes>}` reads a file the provider's JSON answer carries as base64, such as
+  GitHub's contents and README reads, and answers with its text as `body`, in
+  place of the provider's JSON. The string at `encoding` must be exactly
+  `base64`; the string at `content` is decoded with ASCII whitespace ignored.
+  `size`, optional, is read first: a JSON integer above `max_bytes` (1 to
+  2,097,152) is refused as `capacity` before anything is decoded, and so is a
+  decoded file longer than `max_bytes`, never truncated. A file whose bytes
+  are not UTF-8 or hold a NUL byte is not text and is refused as
+  `unsupported`. An answer that is not a JSON object (a directory's listing,
+  for instance), whose `encoding` is absent or another value, or whose
+  `content` is absent or not base64, is `upstream_protocol`. Embedded text on
+  a write, beside `response`, `envelope`, `binary` or `download`, or a pointer
+  without a leading `/` is refused when the selection loads. The member is
+  modelled as `connectors_catalog.selection.ReadEmbeddedText`.
 - `refusal_texts` is optional, for a write: `[{"pointers": ["<pointer>", …],
   "contains": ["<text>", …], "code": "capacity"}, …]`. It is for a provider
   that documents no distinct status for a refusal and whose own clients
@@ -792,14 +848,24 @@ The complete configuration used against the sandbox is
   no guard reads takes any JSON value and is compared by nothing: closing the
   body only keeps out keys outside the set. It is for a write whose provider
   would act on a body field the guard does not compare, such as a Gmail draft
-  send given a replacement message. A read, an operation
-  without a request body, an empty, dotted or repeated name, or a guard reading
-  a `body.<key>` the set does not admit is refused when the selection loads.
+  send given a replacement message. A key is a plain top-level name or an RFC
+  6901 pointer led by `/` naming a value nested in objects, such as
+  `/ticket/comment/body`; `title` and `/title` are the same key, and every
+  member below names keys the same way. Each object above a nested key is
+  closed in turn: it must be a JSON object carrying only the segments that lead
+  to an admitted key, so `{"ticket": {"status": "solved"}}` is refused when only
+  `/ticket/priority` is admitted, and the declaration nests the same closed
+  objects. A guard reads a nested key through its dotted path
+  (`body.ticket.updated_stamp` is `/ticket/updated_stamp`). A read, an operation
+  without a request body, an empty, dotted or repeated name, a pointer with an
+  empty segment or a `~`, a key inside another admitted key, or a guard reading
+  a `body.<path>` the set does not admit is refused when the selection loads.
   The bundle records no body schema, so the names are not checked against the
   provider's.
 - `body_types` is optional, beside `body_keys`: `{"<key>": "string" | "integer"
-  | "boolean"}` gives a closed body key the JSON type the provider's request
-  body schema gives it. A typed key present in a body must be a JSON value of
+  | "boolean" | "string_list"}` gives a closed body key the JSON type the
+  provider's request body schema gives it; `string_list` is an array of
+  strings, such as Zendesk's ticket `tags`. A typed key present in a body must be a JSON value of
   exactly that type, with no string spelling of a boolean or an integer and no
   `null`, or the write is refused as `invalid_input` before any request; the
   declared input schema types it the same, also where a guard reads it. One
@@ -838,10 +904,43 @@ The complete configuration used against the sandbox is
   that is not a string, an integer or a boolean or not of the key's
   `body_types` type, a key `body_required` names and a key a guard reads are
   refused when the selection loads: a guard compares a fixed value as a
-  `literal`. `body_keys`, `body_types`, `body_required`, `body_nonempty` and
-  `body_fixed` are modelled as `connectors_catalog.selection.ClosedBody` in
-  `adapters/catalog/spec/ess`, and every shipped selection is checked against
-  it.
+  `literal`. A fixed nested key is sent inside the objects above it, which the
+  provider creates when the caller's body lacks them, such as Zendesk's
+  `/ticket/comment/public` fixed to `false` for a private note.
+- `body_enums` is optional, beside `body_types`: `{"<key>": ["<value>", …]}`
+  holds a string key to the values the provider's request body schema
+  enumerates, such as Zendesk's ticket `priority`. A value outside the set is
+  refused as `invalid_input` naming the key, before any request, and the
+  declared input schema gives the key that `enum`. A key `body_types` does not
+  type as `string`, a fixed key, an empty set, or an empty or repeated value is
+  refused when the selection loads.
+- `body_any_of` is optional, beside `body_keys`: `["<key>", …]` names keys of
+  which a body must carry at least one, for a write that changes whichever
+  members the caller sends, such as Zendesk's ticket update of `group_id`,
+  `tags`, `priority` or `type`. A body with none of them is refused as
+  `invalid_input` before any request, and the declared input schema requires
+  one of them (`anyOf`). Fewer than two keys, a key `body_keys` does not admit,
+  a fixed or repeated key, or keys under more than one parent object are
+  refused when the selection loads.
+- `body_prefixes` is optional, beside `body_types`: `{"<key>": "<prefix>"}`
+  fixes the start of a string the caller writes. The provider sends the prefix
+  followed by the caller's value under that key, so the sent value always
+  begins with it, whatever the caller gives; the declared input schema types
+  the caller's part alone. Zendesk's `ticket.draft_reply` prefixes the comment
+  body with a first line marking it a draft. A key `body_types` does not type as
+  `string`, a fixed key or an empty prefix is refused when the selection loads.
+  `body_keys`, `body_types`, `body_required`, `body_nonempty`, `body_fixed`,
+  `body_enums`, `body_any_of` and `body_prefixes` are modelled as
+  `connectors_catalog.selection.ClosedBody` in `adapters/catalog/spec/ess`, and
+  every shipped selection is checked against it.
+- `conflict_status` is optional, for a write: `409` or `412`, the status by
+  which the provider answers that the write's target changed since the caller
+  read it, so nothing was applied, such as Zendesk's `409` to a ticket update
+  sent with `safe_update` and an older `updated_stamp`. A write answered with
+  it is refused as `conflict`, the provider's own answer, and never sent again;
+  without it a `409` or `412` stays `invalid_input`. Any other status, or the
+  member on a read, is refused when the selection loads. It is modelled as
+  `connectors_catalog.selection.ConflictStatus`.
 - `guard` is optional and declarative. The preflight reads another GET from the
   bundle, binding its parameters from the write's input, and refuses before any
   request unless every check holds. A check compares the scalar at a JSON
@@ -855,7 +954,12 @@ The complete configuration used against the sandbox is
   loads, on every check: the bundle does not record an answer member's type,
   and as text it would hold for a look-alike string where a boolean is meant.
   GitLab's `/resolvable` and `/merge_when_pipeline_succeeds` and Jira's
-  `/transitions/0/isAvailable` are compared with `{"boolean": true}`. The
+  `/transitions/0/isAvailable` are compared with `{"boolean": true}`. A check that
+  differs refuses the write unsent as `forbidden`; a preflight declaring
+  `"mismatch": "conflict"` refuses it as `conflict` instead, the provider's own
+  answer read before the write (`connectors_catalog.guard.MismatchCode`), for a
+  read that proves the target changed since the caller read it, such as
+  Zendesk's ticket `updated_at` against the caller's `updated_stamp`. The
   postflight applies its checks to the write's own response; a difference there leaves the outcome uncertain and
   never refused, because the provider may already have applied the write. No
   corrective request is ever issued. This is the C14 boundary the operator

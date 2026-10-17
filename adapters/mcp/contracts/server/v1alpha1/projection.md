@@ -270,6 +270,7 @@ existing envelope permits; no invented audit acknowledgement or attempt ID.
 | offer_rejected | tool-error | rpc-error | rpc-error | Preserve offer_rejected and the admitted envelope; no retry authority. |
 | lease_expired | tool-error | rpc-error | rpc-error | Preserve lease_expired and the admitted envelope; no retry authority. |
 | revoked | tool-error | rpc-error | rpc-error | Preserve revoked and the admitted envelope; no retry authority. |
+| conflict | tool-error | rpc-error | rpc-error | Preserve conflict and the admitted envelope; no retry authority. |
 
 `outcome_unknown` preserves unknown effect; timeout/unavailable alone cannot prove
 not_attempted. An applied effect remains applied even on an error. Replay is an
