@@ -86,10 +86,13 @@ const REVALIDATION_PAUSES: [Duration; 2] = [Duration::from_millis(200), Duration
 /// What must remain before the deadline after a pause and an attempt as long as
 /// the last one.
 const REVALIDATION_MARGIN: Duration = Duration::from_millis(500);
-/// What a read whose current evidence would lapse early keeps of that
-/// evidence for itself: its recollection ends this long before the evidence
-/// does, so that a recollection that fails or hangs leaves the read time to be
-/// served on the evidence it was admitted on (contracts/cli/v1alpha1/semantics.md).
+/// The least a read whose current evidence would lapse early keeps of that
+/// evidence for itself. It keeps half of what is left: its recollection ends
+/// halfway to the evidence's expiry, so that a recollection that fails or
+/// hangs leaves the read time to relaunch its adapter and be served on the
+/// evidence it was admitted on (contracts/cli/v1alpha1/semantics.md). Evidence
+/// with no more than twice this left is too short for that, and is recollected
+/// within the read's own deadline, never skipped.
 const EARLY_READ_MARGIN_MS: u64 = 2_000;
 
 /// The transient class of a failed validation, which a revalidation sends
@@ -332,9 +335,10 @@ type JoinKey = (String, String, String);
 enum Answer {
     /// Its own answer: the connection summary, or its refusal.
     Joined(Result<Value>),
-    /// A read's recollection that published no new evidence. Its refusal is
-    /// the read's, not a revalidation's (a read never re-pins changed mounted
-    /// material), so each joiner runs a revalidation of its own.
+    /// A read's recollection that ended with no answer a revalidation would
+    /// give: changed mounted material, which a read never re-pins and an
+    /// explicit revalidation does, or a recollection that ended before it
+    /// answered. Each joiner runs a revalidation of its own.
     Rerun,
 }
 /// The answer of one revalidation in flight. The first one published is the
@@ -1199,15 +1203,25 @@ fn worker(
                             let recollected = (|| -> Result<()> {
                                 let now = connectors_sdk::now_ms();
                                 // Early, it is bounded by the evidence the read
-                                // was admitted on, less what the read keeps for
-                                // itself, never by the read's own deadline: a
+                                // was admitted on, less the half the read keeps
+                                // for itself, never by the read's own deadline: a
                                 // hanging probe then still leaves the read
-                                // served on that evidence.
+                                // served on that evidence. Evidence too short
+                                // to leave the recollection as long as the read
+                                // keeps is too short to serve the read on
+                                // after a failed one: the recollection then
+                                // runs as for lapsed evidence, within the
+                                // read's deadline, and is never skipped
+                                // (contracts/cli/v1alpha1/semantics.md: the
+                                // read "recollects it first").
                                 let bound = match &early {
-                                    Some(early) => {
-                                        early.expires_at_ms().saturating_sub(EARLY_READ_MARGIN_MS)
+                                    Some(early)
+                                        if early.expires_at_ms().saturating_sub(now)
+                                            > 2 * EARLY_READ_MARGIN_MS =>
+                                    {
+                                        now + (early.expires_at_ms() - now) / 2
                                     }
-                                    None => job.deadline,
+                                    _ => job.deadline,
                                 };
                                 let expires = bound.min(now.saturating_add(30_000));
                                 let recollection = registry.capture_recollection(
@@ -1230,7 +1244,8 @@ fn worker(
                                     ),
                                     Answer::Rerun,
                                 )?;
-                                revalidate(
+                                let joiners = std::cell::Cell::new(None);
+                                let revalidated = revalidate(
                                     &Scope {
                                         paths: &paths,
                                         alias: &job.alias,
@@ -1246,12 +1261,24 @@ fn worker(
                                     &registry,
                                     &binding,
                                     recollection,
-                                    Admission::ReadRecollection,
-                                )?;
+                                    Admission::ReadRecollection { joiners: &joiners },
+                                );
                                 // Its joiners answer what an explicit
-                                // revalidation answers. Ended without new
-                                // evidence, it answers them nothing, and each
-                                // runs its own.
+                                // revalidation answers: its refusal, a
+                                // transient one included, so that none runs a
+                                // probe of its own. Only a refusal an explicit
+                                // revalidation goes on past (changed mounted
+                                // material, which it re-pins) answers them
+                                // nothing, and each runs its own: a flight this
+                                // recollection leads answers them that as it
+                                // is dropped, and a queued revalidation whose
+                                // flight it joined runs its own job.
+                                if let Err(error) = revalidated {
+                                    if let Some(answer @ Answer::Joined(_)) = joiners.take() {
+                                        member.answer(answer);
+                                    }
+                                    return Err(error);
+                                }
                                 if let Ok(observed) = registry.describe(
                                     &current.instance_id,
                                     &current.adapter_id,
@@ -1438,7 +1465,13 @@ enum Admission<'a> {
     },
     /// The one recollection a read runs, first in its own job, when only its
     /// connection's evidence lapsed (contracts/cli/v1alpha1/semantics.md).
-    ReadRecollection,
+    /// A failed one leaves in `joiners` what the revalidations that joined it
+    /// answer: the refusal an explicit revalidation gives (owner.md), or
+    /// [`Answer::Rerun`] where only an explicit one goes on, re-pinning changed
+    /// mounted material.
+    ReadRecollection {
+        joiners: &'a std::cell::Cell<Option<Answer>>,
+    },
 }
 
 /// The job a revalidation runs in, on the instance's serialized worker.
@@ -1470,12 +1503,16 @@ fn revalidate(
     captured: registry::Revalidation,
     admission: Admission<'_>,
 ) -> Result<()> {
-    let explicit = matches!(admission, Admission::Explicit { .. });
     // Only `connections revalidate` carries `cause` and `attempts`
     // (contracts/cli/v1alpha1/semantics.md, "Revalidation retries"); a read's
-    // recollection answers the read's own failure without them.
+    // recollection answers the read's own failure without them, and its
+    // joiners, revalidations themselves, the failure with them.
     let answer = |mut error: Error| -> Error {
-        if !explicit {
+        if let Admission::ReadRecollection { joiners } = admission {
+            let joined = joiners
+                .take()
+                .unwrap_or_else(|| Answer::Joined(Err(error.clone())));
+            joiners.set(Some(joined));
             error.cause = None;
             error.attempts = None;
         }
@@ -1538,7 +1575,11 @@ fn revalidate_inner(
                 revision,
             } = admission
             else {
-                // A read never re-pins changed material.
+                // A read never re-pins changed material; each revalidation
+                // that joined its recollection goes on to re-pin it.
+                if let Admission::ReadRecollection { joiners } = admission {
+                    joiners.set(Some(Answer::Rerun));
+                }
                 return Err(super::read_error(&selection, custody::Failure::Missing));
             };
             let acquired =
@@ -1600,7 +1641,10 @@ fn revalidate_inner(
             }
             return Err(match admission {
                 Admission::Explicit { .. } => Code::CustodyUnavailable.into(),
-                Admission::ReadRecollection => super::read_error(&selection, error),
+                Admission::ReadRecollection { joiners } => {
+                    joiners.set(Some(Answer::Joined(Err(Code::CustodyUnavailable.into()))));
+                    super::read_error(&selection, error)
+                }
             });
         }
     };
