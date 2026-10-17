@@ -7,7 +7,7 @@ This repository advances these objectives from `atlas/ROADMAP.md`:
 - **O1 — governed reach.** Every third-party effect runs through a declared
   connection, an admitted operation and an approval the record can name; a call
   outside that is a refusal by name, not an untracked request.
-- **O5 — the generic agent platform.** The local CLI, the adapters and the catalog
+- **O5 — the generic agent platform.** The local CLI, the connectors and the catalog
   provider are the integration surface a tenant configures, connects and invokes.
 
 ## Establish scope and authority
@@ -19,7 +19,7 @@ operator explicitly requests external publication or deployment.
 
 Read [docs/design.md](docs/design.md) before proposing implementation. Start with
 [README.md](README.md) for current runtime support and [VISION.md](VISION.md) for
-direction, then read the affected contract and adapter sources. Design sections
+direction, then read the affected contract and implementation sources (`adapters/`). Design sections
 include dated sketches and historical tool observations; check the owning contract,
 current source and pinned tool before treating a sketch as an interface.
 
@@ -30,7 +30,7 @@ Use these ownership rules:
 | Shared semantics | [contracts/](contracts/README.md) owns generic, versioned guarantees and conformance inputs. |
 | Shared typed model | [ess/system.yaml](ess/system.yaml) and its domains model shared types, entities and relations. |
 | Native behavior | [adapters/](adapters/README.md) owns provider contracts, authored ESS, upstream inputs, fixtures, design and implementation. |
-| Adapter specification kind | [spec-kinds/adapter/](spec-kinds/adapter/) belongs to Connectors; do not add provider vocabulary to ESS itself. |
+| Implementation specification kind | [spec-kinds/adapter/](spec-kinds/adapter/), the internal adapter kind, belongs to Connectors; do not add provider vocabulary to ESS itself. |
 | Generated output | Change its owning inputs and regenerate; never repair generated files by hand. |
 | Historical evidence | Preserve review records and dated observations; add a new result rather than rewriting history. |
 
@@ -38,6 +38,56 @@ If code, model and contract disagree, identify the discrepancy and resolve it un
 the current task. Do not silently change semantics to match existing code or make
 a tool accept a document. A reviewed specification, structural compilation,
 executable example and runtime conformance establish different facts.
+
+## Vocabulary
+
+The words a user meets (provider, connector, auth profile, instance, connection,
+operation) are defined once, in [README.md § Vocabulary](README.md#vocabulary).
+Link there; do not restate the definitions in another file.
+
+"Adapter" is the internal name of an implementation (the catalog engine, a
+credential binary, the Kubernetes or SQL service) and of the process that serves
+an instance. It is never the name of the configured thing. In text a user reads
+(the README, the site's hand-written pages, the guides under `docs/`, CLI help and
+messages) the configured thing is an instance of a connector. The deprecated
+`--adapter` option, the deprecated `adapters` group and `connections repair`, and the
+legacy `[adapters.<alias>]` table appear only where the text says so.
+
+`connectors-docs vocabulary` checks a set of files. It fails on a line that names
+the internal term without one of `adapters/`, `adapter_id`, `` `adapter` ``,
+`deprecated`, `legacy` or `internal`; on a term's table row outside the README; and
+on a README without the `## Vocabulary` table or an AGENTS.md without the link.
+Given the README, it also fails when a connector of the README's support table (the
+table headed `| Connector |`) has no onboarding page under `website/docs/connectors/`
+or does not link it on the site, when a page there lacks the eight onboarding sections
+in order, and when a page has no row unless it is marked `:::caution[Planned]` (MCP)
+(`crates/connectors-docs/src/onboarding.rs`). `--no-pins` also refuses
+`configuration_revision`, `sha256` and `bundle_directory`, and `--one-instance` a second
+`[connectors.<c>.instances.<i>]` table:
+
+```sh
+cargo run --locked -p connectors-docs -- vocabulary README.md AGENTS.md \
+  website/product.json website/data/terminal.json website/docs/index.md \
+  website/docs/getting-started.md website/docs/guides/*.md \
+  website/docs/concepts/catalog-provider.md website/docs/concepts/contracts.md \
+  website/docs/concepts/governed-invocation.md website/docs/concepts/local-runtime.md \
+  website/docs/connectors/*.md
+```
+
+`crates/connectors-docs/src/vocabulary.rs::the_readme_agents_and_site_speak_the_vocabulary`
+holds that set in `cargo test -p connectors-docs`, every concept page but the one on
+internal implementations included. Those pages, `website/docs/concepts/adapters.md`
+and `website/docs/reference/adapters/*/index.md`, are not in it. CLI help and messages
+are held to the same deprecated-only rule by
+`apps/connectors/tests/vocabulary_text.rs::help_says_adapter_only_on_a_deprecated_line` (deprecated
+names only).
+
+`crates/connectors-docs/src/onboarding.rs::every_support_table_connector_has_an_onboarding_page`
+holds the onboarding rule. A connector added to the README's support table, or a catalog
+connector declared under `adapters/catalog/providers/`, needs its page under
+`website/docs/connectors/` with front matter `connectors` naming it, and its row links that
+page on the site; `generate` writes the index from the declarations and the hand-written
+rows in `onboarding.rs`.
 
 ## Plan and implement
 
@@ -59,7 +109,8 @@ runtime entity.
 
 Keep provider semantics out of shared contracts and shared ESS. Native models
 compile independently. Keep generic client and host libraries independent of
-concrete adapters; keep adapter libraries independent of sibling adapters.
+concrete implementations (the internal adapter libraries), and keep each of those
+libraries independent of its siblings.
 Composition owns concrete pairings. The [adapter boundary gate](adapters/README.md#boundary-gate)
 checks these boundaries; do not add exceptions merely to pass it.
 
@@ -97,7 +148,7 @@ consistency; do not rerun unrelated live-provider tests. Report actual commands,
 results and material limitations. Relay AEP validation output as its skill requires.
 
 The website follows [docs/website-design.md](docs/website-design.md):
-explicitly selected public inputs, adapter-owned native content, and distinct
+explicitly selected public inputs, native content owned under `adapters/`, and distinct
 specification, example and runtime support claims. Use [website checks](website/README.md#build-and-verify)
 for presentation, reference tooling or example changes. Browser examples are
 bounded teaching implementations; they do not authorize production runtime work.

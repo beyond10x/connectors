@@ -2,10 +2,12 @@
 
 **MCP runtime unavailable.** This guide selects a future local command spelling;
 it is not an executable MCP walkthrough. The current CLI has no `server` command,
-MCP adapter configuration, MCP connection profile or MCP operation binding.
+MCP instance configuration, MCP connection profile or MCP operation binding.
 [Compatibility metadata](../apps/connectors/spec/compatibility.json) remains
 `mcp: deferred`. The [authored inventory](../adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.json)
 is static documentation, not CLI output or a runtime discovery endpoint.
+
+Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
 
 For working provider journeys today, use the [catalog provider](local-catalog-provider.md),
 [Kubernetes](local-kubernetes-cli.md) or [guarded GitLab merge](local-gitlab-merge.md)
@@ -42,7 +44,7 @@ grant to execute an operation.
 
 **Unavailable step:** configure the MCP projection and launch that command from
 your client. No complete MCP configuration schema or launch handler is selected
-by this guide. Do not paste an invented adapter stanza into a working installation.
+by this guide. Do not paste an invented instance table into a working installation.
 Multi-caller/tenant-to-Connection assignment and cloud placement remain unresolved.
 The local single-owner intent does not close either decision.
 
@@ -60,11 +62,13 @@ exists, including its protected approval source and explicit business key.
 
 The grouped CLI grammar below already exists in the
 [presentation source](../apps/connectors/spec/cli.yaml). All MCP uses of these
-patterns are **unavailable**. `ADAPTER`, `PROFILE`, `CONNECTION`, `OPERATION`,
-`SCHEMA` and `REVISION` must eventually come from an implemented, admitted binding;
-this guide supplies none. An alias is configured selection, not an adapter name.
-Do not assume `mcp`, `mcp.oauth` or a remote method such as `tools/call` is a local
-adapter, profile or operation identifier.
+patterns are **unavailable**. `CONNECTOR`, `INSTANCE`, `PROFILE`, `CONNECTION`,
+`OPERATION`, `SCHEMA` and `REVISION` must eventually come from an implemented,
+admitted binding; this guide supplies none. An instance name is the operator's
+configured selection. Do not assume `mcp.oauth` or a remote method such as
+`tools/call` is a local profile or operation identifier. An MCP instance would take
+the pinned form `[connectors.mcp.instances.<instance>]` of the
+[Kubernetes guide](local-kubernetes-cli.md), but none can be configured yet.
 
 Each pattern may use the existing generic globals `--config CONFIG`,
 `--state-dir STATE_DIR` and `--output json` before its command path. JSON output
@@ -72,14 +76,14 @@ here belongs to ordinary grouped commands, never the selected stdio server.
 
 | Current generic command path | Flags used by the intended MCP journey | MCP availability |
 |---|---|---|
-| `connections connect` | `--adapter ADAPTER --profile PROFILE`; exactly one existing static source: `--credential-prompt`, `--credential-file FILE` or `--credential-stdin` | unresolved-binding |
-| `connections status` | `--adapter ADAPTER`; exactly one of `--connection CONNECTION` or `--acquisition ACQUISITION` | unresolved-binding |
-| `connections revalidate` | `--adapter ADAPTER --connection CONNECTION --expected-revision REVISION` | unresolved-binding |
-| `connections repair` | `--adapter ADAPTER --connection CONNECTION --expected-revision REVISION`; exactly one existing static source: `--credential-prompt`, `--credential-file FILE` or `--credential-stdin` | unresolved-binding |
-| `connections revoke` | `--adapter ADAPTER --connection CONNECTION --expected-revision REVISION` | unresolved-binding |
-| `operations list` | `--adapter ADAPTER`; optional `--limit LIMIT`, `--cursor CURSOR` | unresolved-binding |
-| `operations describe` | `--adapter ADAPTER --operation OPERATION` | unresolved-binding |
-| `operations invoke` | `--adapter ADAPTER --operation OPERATION --schema SCHEMA --revision REVISION`; `--connection CONNECTION` when required; exactly one of `--input-json JSON`, `--input-file FILE`, `--input-stdin`; `--approval-file FILE` and `--idempotency-key KEY` only under their selected mutation profile | unresolved-binding |
+| `connections connect` | `--connector CONNECTOR --instance INSTANCE --profile PROFILE`; exactly one existing static source: `--credential-prompt`, `--credential-file FILE` or `--credential-stdin` | unresolved-binding |
+| `connections status` | `--connector CONNECTOR --instance INSTANCE`; exactly one of `--connection CONNECTION` or `--acquisition ACQUISITION` | unresolved-binding |
+| `connections revalidate` | `--connector CONNECTOR --instance INSTANCE --connection CONNECTION --expected-revision REVISION` | unresolved-binding |
+| `connections reconnect` | `--connector CONNECTOR --instance INSTANCE --connection CONNECTION --expected-revision REVISION`; exactly one existing static source: `--credential-prompt`, `--credential-file FILE` or `--credential-stdin` | unresolved-binding |
+| `connections revoke` | `--connector CONNECTOR --instance INSTANCE --connection CONNECTION --expected-revision REVISION` | unresolved-binding |
+| `operations list` | `--connector CONNECTOR --instance INSTANCE`; optional `--limit LIMIT`, `--cursor CURSOR` | unresolved-binding |
+| `operations describe` | `--connector CONNECTOR --instance INSTANCE --operation OPERATION` | unresolved-binding |
+| `operations invoke` | `--connector CONNECTOR --instance INSTANCE --operation OPERATION --schema SCHEMA --revision REVISION`; `--connection CONNECTION` when required; exactly one of `--input-json JSON`, `--input-file FILE`, `--input-stdin`; `--approval-file FILE` and `--idempotency-key KEY` only under their selected mutation profile | unresolved-binding |
 
 **Unavailable step: acquire and persist an MCP server credential.** The static
 source flags above document existing generic grammar. They do not implement MCP
@@ -97,11 +101,11 @@ local operation/schema/revision selection once a binding publishes it. The
 [outbound invocation contract](../adapters/mcp/contracts/client/v1alpha1/invocation.md)
 covers remote `tools/call`, `resources/read` and `prompts/get`; those protocol names
 are not a selected local CLI namespace. Preserve bounded content, partialness,
-peer errors and uncertain effects. Neither discovery nor a repaired credential
+peer errors and uncertain effects. Neither discovery nor a reconnected credential
 authorizes an automatic business retry.
 
-**Unavailable step: repair or revoke an MCP association.** Missing, expired,
-revoked and custody-unavailable remain distinct auth observations. Repair must
+**Unavailable step: reconnect or revoke an MCP association.** Missing, expired,
+revoked and custody-unavailable remain distinct auth observations. A reconnect must
 preserve identity; local revocation needs definite durable cutoff and is separate
 from any provider revocation. An uncertain rotating refresh cannot be exchanged
 again; committed response recovery may only publish that candidate. These are

@@ -11,7 +11,9 @@
 //!   selected ESS model, from the pinned `ess generate --kind docs`;
 //! - `website/data/status.json` (`b10x-status/1`) and `website/docs/status.md` ([`status`]), where
 //!   every shipped capability names the test that holds it and generation fails when that test is
-//!   gone.
+//!   gone;
+//! - `website/docs/connectors/index.md`, every connector with its provider, reads, writes and
+//!   auth profiles, from the catalog declarations and the hand-written rows ([`onboarding`]).
 //!
 //! `generate --check` writes nothing and fails on a missing, stale, hand-edited or orphaned
 //! generated file. Both also check every page ([`pages`]): front matter, bracketed admonition
@@ -19,14 +21,20 @@
 //!
 //! `provenance` writes `.well-known/b10x-site.json` and the route inventory
 //! `.well-known/b10x-routes.json` into a built site ([`routes`]).
+//!
+//! `vocabulary` checks that the given files speak the connector vocabulary `README.md` defines
+//! ([`vocabulary`]), and, given `README.md`, that every connector of its support table has an
+//! onboarding page with the eight onboarding sections ([`onboarding`]).
 
 mod cli;
 mod crates;
 mod markdown;
+mod onboarding;
 mod pages;
 mod reference;
 mod routes;
 mod status;
+mod vocabulary;
 
 use std::{
     collections::BTreeMap,
@@ -78,6 +86,23 @@ enum Action {
         #[arg(long)]
         commit: String,
     },
+    /// Fail when a file says "adapter" for the configured thing, defines a term outside
+    /// `README.md`, or (README.md, AGENTS.md) does not define or link the vocabulary.
+    Vocabulary {
+        /// Also fail on a pinned value a user would copy by hand: `configuration_revision`,
+        /// `sha256` or `bundle_directory`.
+        #[arg(long)]
+        no_pins: bool,
+        /// Also fail when more than one `[connectors.<c>.instances.<i>]` table is shown.
+        #[arg(long)]
+        one_instance: bool,
+        /// Repository root, whose `README.md` and `AGENTS.md` define and link the terms.
+        #[arg(long, default_value = ".")]
+        root: PathBuf,
+        /// The files to check.
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+    },
 }
 
 /// Generated files keyed by their path relative to the repository root.
@@ -89,6 +114,7 @@ fn outputs(root: &Path, ess: &Path) -> Result<Outputs> {
     outputs.insert(crates::PAGE.to_owned(), crates::page(root)?);
     outputs.insert(status::DATA.to_owned(), status::data(root)?);
     outputs.insert(status::PAGE.to_owned(), status::page(root)?);
+    outputs.insert(onboarding::INDEX.to_owned(), onboarding::index(root)?);
     for (relative, content) in reference::outputs(root, ess)? {
         if outputs.insert(relative.clone(), content).is_some() {
             return Err(format!("{relative} is generated twice"));
@@ -210,6 +236,28 @@ fn main() -> ExitCode {
         }),
         Action::Provenance { site, commit } => write_provenance(&site, &commit)
             .map(|()| println!("{}: bound to {commit}", site.display())),
+        Action::Vocabulary {
+            no_pins,
+            one_instance,
+            root,
+            files,
+        } => {
+            let options = vocabulary::Options {
+                no_pins,
+                one_instance,
+            };
+            vocabulary::check(&root, &files, options).and_then(|problems| {
+                if problems.is_empty() {
+                    println!("{} files: vocabulary checked", files.len());
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "files do not speak the connector vocabulary (README.md#vocabulary):\n  {}",
+                        problems.join("\n  ")
+                    ))
+                }
+            })
+        }
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

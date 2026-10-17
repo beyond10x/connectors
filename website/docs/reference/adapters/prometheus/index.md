@@ -26,7 +26,7 @@ reads, each one GET against Prometheus's HTTP API through a saved connection:
 Sample values stay Prometheus's strings (`NaN`, `+Inf`). A provider warning makes the result
 partial and is returned with it.
 
-A connection uses the bearer profile `prometheus.bearer`. Connect, repair and
+A connection uses the bearer profile `prometheus.bearer`. Connect, reconnect and
 `connections revalidate` prove the token with `GET api/v1/status/buildinfo`, which runs no query;
 Prometheus names no account, so the identity is the configured connection. The configuration is
 HTTPS-only, may carry a path prefix, and takes an optional private CA file.

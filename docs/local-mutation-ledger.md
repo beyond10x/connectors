@@ -26,7 +26,7 @@ The trusted host supplies resolved namespace and fingerprint values. They are
 never deserialized from a public request as caller authority. The exact key is
 the contract's tagged `mutation-key/v1` JSON array, preserving nulls and opaque
 key bytes. Fingerprints use `mutation-request/v2` with every coordinate retained;
-the operation is qualified by a tagged tuple of instance, adapter and operation.
+the operation is qualified by a tagged tuple of instance, implementation (`adapter_id`) and operation.
 Digests alone do not decide tuple equality. Registry instance and connection
 references retain historical meaning after revocation; no cascading delete or
 unqualified operation foreign key is introduced.
@@ -125,10 +125,10 @@ and the target declares no custody target of its own. The table is omitted when
 empty, so existing configurations keep their bytes.
 
 Before any provider work the owner admits the target: configured, granting the
-profile, not stopped, with an available and writable custody binding. The adapter
+profile, not stopped, with an available and writable custody binding. The internal adapter
 marks each operation that creates a credential in its bootstrap; a marked operation
 with no target, or a target for an unmarked one, is refused `invalid_configuration`.
-A failure there is a refusal with nothing sent. After the native commit the adapter hands the created
+A failure there is a refusal with nothing sent. After the native commit the internal adapter hands the created
 bytes over in the protected slot of its `write_result` frame, beside a public result
 that holds none of them; an unexpected or missing secret is a protocol fault on an
 applied write. Before the attempt settles, the owner builds the protected document the

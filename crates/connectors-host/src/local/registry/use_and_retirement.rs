@@ -1,4 +1,4 @@
-use super::lifecycle::{bump, custody_version};
+use super::lifecycle::{bump, custody_version, mark_stale};
 use super::*;
 
 fn admitted_read(
@@ -98,6 +98,11 @@ impl ReadUse {
 }
 pub struct DispatchedUse {
     id: String,
+    /// The connection, custody version and publication fence the read carried,
+    /// which a provider refusal names even after the use row was swept.
+    connection: String,
+    version: String,
+    fence: String,
 }
 
 #[derive(Clone, Copy)]
@@ -223,7 +228,7 @@ impl Registry {
                 || captured.version!=custody_version(authority,&row.scope_id,&version)? { return Err(Failure::Conflict); }
             if observation::readiness(tx,&row,now,true)?!=State::Ready { return Err(Failure::NotReady); }
             tx.execute("UPDATE registry_uses SET dispatched=1 WHERE use_id=?1", [&captured.id]).map_err(db)?;
-            Ok(DispatchedUse {id:captured.id})
+            Ok(DispatchedUse {id:captured.id,connection:reference,version,fence})
         })
     }
 
@@ -234,6 +239,32 @@ impl Registry {
                 [&dispatched.id],
             )
             .map_err(db)?;
+            Ok(())
+        })
+    }
+
+    /// The provider refused the credential this dispatched read carried as
+    /// unauthorized: the use is released and, while that credential is still
+    /// the connection's published one, the connection is Stale
+    /// (`lifecycle::mark_stale`). A credential a publication has replaced
+    /// since the read was captured says nothing about the current one. The
+    /// refusal is about the credential, not the use: a use another capture
+    /// already swept as expired is released as `release_read` releases it.
+    pub fn refuse_read(&self, dispatched: DispatchedUse, now: u64) -> Result<()> {
+        self.transaction(now, false, |tx, _, _| {
+            tx.execute(
+                "UPDATE registry_uses SET released=1 WHERE use_id=?1 AND dispatched=1",
+                [&dispatched.id],
+            )
+            .map_err(db)?;
+            let row = Self::connection(tx, &dispatched.connection)?;
+            if row.material.as_deref() == Some(dispatched.version.as_str())
+                && row.fence == dispatched.fence
+                && !row.kept.stale
+            {
+                mark_stale(tx, &row)?;
+                bump(tx, &row.binding.instance_id)?;
+            }
             Ok(())
         })
     }
@@ -263,7 +294,7 @@ impl Registry {
             if captured.version!=custody_version(authority,&row.scope_id,&version)? { return Err(Failure::Conflict); }
             tx.execute("UPDATE registry_materials SET invalid_reason=COALESCE(invalid_reason,?2) WHERE version_id=?1", params![version,reason.value()]).map_err(db)?;
             tx.execute("UPDATE registry_uses SET released=1 WHERE version_id=?1 AND dispatched=0", [&version]).map_err(db)?;
-            if row.material.as_deref()==Some(&version) { bump(tx,&row.binding.instance_id)?; }
+            if row.material.as_deref()==Some(&version) { mark_stale(tx,&row)?; bump(tx,&row.binding.instance_id)?; }
             Ok(())
         })
     }

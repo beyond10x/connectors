@@ -1,0 +1,27 @@
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "gmail.private",
+  "provider": "google-gmail",
+  "bundle_directory": "generated/bundles",
+  "api_base": "https://gmail.googleapis.com",
+  "auth": {
+    "profile": "google.oauth",
+    "scheme": "oauth2_refresh",
+    "header": "Authorization",
+    "bearer": true,
+    "label": "Google refresh token",
+    "identity": {"source": "id_token", "kind": "google.user"},
+    "minimum_scopes": [
+      "https://www.googleapis.com/auth/gmail.compose",
+      "https://www.googleapis.com/auth/gmail.readonly"
+    ],
+    "token_url": "https://oauth2.googleapis.com/token",
+    "authorize_url": "https://accounts.google.com/o/oauth2/auth",
+    "requested_scopes": [
+      "openid",
+      "https://www.googleapis.com/auth/gmail.compose",
+      "https://www.googleapis.com/auth/gmail.readonly"
+    ]
+  },
+  "operations_file": "providers/google-gmail/operations.json"
+}

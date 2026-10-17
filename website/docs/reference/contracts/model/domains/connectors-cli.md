@@ -49,9 +49,11 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `AdapterDescribeInput`
 
-`connectors.cli.AdapterDescribeInput` is a record of one field:
+`connectors.cli.AdapterDescribeInput` is a record of three fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 
 ### `AdapterDescribeResult`
 
@@ -79,9 +81,11 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `AdapterObservation`
 
-`connectors.cli.AdapterObservation` is a record of seven fields:
+`connectors.cli.AdapterObservation` is a record of nine fields:
 
 - `adapter` — `String`
+- `connector` — `String`
+- `instance` — `String`
 - `configuration_revision` — `String`
 - `state` — `connectors.cli.LifecycleState`
 - `host_incarnation` — `Optional<String>`, which may be absent
@@ -91,9 +95,11 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `AdapterStatusInput`
 
-`connectors.cli.AdapterStatusInput` is a record of one field:
+`connectors.cli.AdapterStatusInput` is a record of three fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 
 ### `AdapterStatusResult`
 
@@ -103,9 +109,11 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `AdapterStopInput`
 
-`connectors.cli.AdapterStopInput` is a record of four fields:
+`connectors.cli.AdapterStopInput` is a record of six fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 - `expected_revision` — `String`
 - `host_incarnation` — `String`
 - `child_incarnation` — `String`
@@ -118,9 +126,11 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `AdapterSummary`
 
-`connectors.cli.AdapterSummary` is a record of five fields:
+`connectors.cli.AdapterSummary` is a record of seven fields:
 
 - `adapter` — `String`
+- `connector` — `String`
+- `instance` — `String`
 - `instance_id` — `String`
 - `adapter_id` — `String`
 - `startup` — `connectors.cli.StartupMode`
@@ -128,15 +138,19 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ApprovalClockCheckInput`
 
-`connectors.cli.ApprovalClockCheckInput` is a record of one field:
+`connectors.cli.ApprovalClockCheckInput` is a record of three fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 
 ### `ApprovalClockCheckResult`
 
-`connectors.cli.ApprovalClockCheckResult` is a record of two fields:
+`connectors.cli.ApprovalClockCheckResult` is a record of four fields:
 
 - `adapter` — `String`
+- `connector` — `String`
+- `instance` — `String`
 - `observation` — `connectors.clock.Observation`
 
 ### `ApprovalIssueDisposition`
@@ -145,9 +159,11 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ApprovalIssueInput`
 
-`connectors.cli.ApprovalIssueInput` is a record of eight fields:
+`connectors.cli.ApprovalIssueInput` is a record of 10 fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 - `connection` — `String`
 - `operation` — `String`
 - `schema` — `String`
@@ -158,9 +174,11 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ApprovalIssueResult`
 
-`connectors.cli.ApprovalIssueResult` is a record of four fields:
+`connectors.cli.ApprovalIssueResult` is a record of six fields:
 
 - `adapter` — `String`
+- `connector` — `String`
+- `instance` — `String`
 - `reference` — `String`
 - `subject_sha256` — `String`
 - `disposition` — `connectors.cli.ApprovalIssueDisposition`
@@ -176,40 +194,50 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ApprovalKeyInitInput`
 
-`connectors.cli.ApprovalKeyInitInput` is a record of two fields:
+`connectors.cli.ApprovalKeyInitInput` is a record of four fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 - `expected_revision` — `Optional<String>`, which may be absent
 
 ### `ApprovalKeyRecoverInput`
 
-`connectors.cli.ApprovalKeyRecoverInput` is a record of three fields:
+`connectors.cli.ApprovalKeyRecoverInput` is a record of five fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 - `expected_revision` — `String`
 - `candidate` — `String`
 
 ### `ApprovalKeyRetireInput`
 
-`connectors.cli.ApprovalKeyRetireInput` is a record of three fields:
+`connectors.cli.ApprovalKeyRetireInput` is a record of five fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 - `expected_revision` — `String`
 - `key` — `String`
 
 ### `ApprovalKeyRevokeInput`
 
-`connectors.cli.ApprovalKeyRevokeInput` is a record of three fields:
+`connectors.cli.ApprovalKeyRevokeInput` is a record of five fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 - `expected_revision` — `String`
 - `expected_key` — `String`
 
 ### `ApprovalKeyRotateInput`
 
-`connectors.cli.ApprovalKeyRotateInput` is a record of three fields:
+`connectors.cli.ApprovalKeyRotateInput` is a record of five fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 - `expected_revision` — `String`
 - `expected_key` — `String`
 
@@ -219,9 +247,11 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ApprovalKeyStatusInput`
 
-`connectors.cli.ApprovalKeyStatusInput` is a record of one field:
+`connectors.cli.ApprovalKeyStatusInput` is a record of three fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 
 ### `ApprovalKeyView`
 
@@ -233,31 +263,39 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ApprovalKeysResult`
 
-`connectors.cli.ApprovalKeysResult` is a record of two fields:
+`connectors.cli.ApprovalKeysResult` is a record of four fields:
 
 - `adapter` — `String`
+- `connector` — `String`
+- `instance` — `String`
 - `issuer` — `Optional<connectors.cli.ApprovalIssuerView>`, which may be absent
 
 ### `ApprovalPolicyResult`
 
-`connectors.cli.ApprovalPolicyResult` is a record of two fields:
+`connectors.cli.ApprovalPolicyResult` is a record of four fields:
 
 - `adapter` — `String`
+- `connector` — `String`
+- `instance` — `String`
 - `policy` — `Optional<connectors.cli.ApprovalPolicyView>`, which may be absent
 
 ### `ApprovalPolicySetInput`
 
-`connectors.cli.ApprovalPolicySetInput` is a record of three fields:
+`connectors.cli.ApprovalPolicySetInput` is a record of five fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 - `expected_revision` — `Optional<Integer>`, which may be absent
 - `input_file` — `String`
 
 ### `ApprovalPolicyStatusInput`
 
-`connectors.cli.ApprovalPolicyStatusInput` is a record of one field:
+`connectors.cli.ApprovalPolicyStatusInput` is a record of three fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 
 ### `ApprovalPolicyView`
 
@@ -273,9 +311,11 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ApprovalPrepareInput`
 
-`connectors.cli.ApprovalPrepareInput` is a record of six fields:
+`connectors.cli.ApprovalPrepareInput` is a record of eight fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 - `connection` — `String`
 - `operation` — `String`
 - `schema` — `String`
@@ -284,9 +324,11 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ApprovalPrepareResult`
 
-`connectors.cli.ApprovalPrepareResult` is a record of two fields:
+`connectors.cli.ApprovalPrepareResult` is a record of four fields:
 
 - `adapter` — `String`
+- `connector` — `String`
+- `instance` — `String`
 - `preparation` — `connectors.delegation.ApprovalPreparation`
 
 ### `AttemptReference`
@@ -310,11 +352,11 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ConfigurationFormat`
 
-`connectors.cli.ConfigurationFormat` is one of `connectors-local/1`, `connectors-local/2`, `connectors-local/3` and `connectors-local/4`.
+`connectors.cli.ConfigurationFormat` is one of `connectors-local/1`, `connectors-local/2`, `connectors-local/3`, `connectors-local/4` and `connectors-local/5`.
 
 ### `ConfigurationRule`
 
-`connectors.cli.ConfigurationRule` is one of `config_path_unresolved`, `config_missing`, `config_not_private`, `owner_uid_mismatch` and `approval_clock_format_retired`.
+`connectors.cli.ConfigurationRule` is one of `config_path_unresolved`, `config_missing`, `config_not_private`, `owner_uid_mismatch`, `approval_clock_format_retired` and `config_too_large`.
 
 ### `ConfiguredExecutable`
 
@@ -326,9 +368,11 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ConnectionConnectInput`
 
-`connectors.cli.ConnectionConnectInput` is a record of three fields:
+`connectors.cli.ConnectionConnectInput` is a record of five fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 - `profile` — `String`
 - `credential_document` — `Optional<String>`, which may be absent
 
@@ -348,10 +392,12 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ConnectionDescribeInput`
 
-`connectors.cli.ConnectionDescribeInput` is a record of two fields:
+`connectors.cli.ConnectionDescribeInput` is a record of four fields:
 
-- `adapter` — `String`
-- `connection` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
+- `connection` — `Optional<String>`, which may be absent
 
 ### `ConnectionDescribeResult`
 
@@ -372,10 +418,12 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ConnectionLaunchInput`
 
-`connectors.cli.ConnectionLaunchInput` is a record of four fields:
+`connectors.cli.ConnectionLaunchInput` is a record of six fields:
 
-- `adapter` — `String`
-- `connection` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
+- `connection` — `Optional<String>`, which may be absent
 - `consumer` — `String`
 - `args` — `Optional<String>`, which may be absent
 
@@ -388,9 +436,11 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ConnectionListInput`
 
-`connectors.cli.ConnectionListInput` is a record of three fields:
+`connectors.cli.ConnectionListInput` is a record of five fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 - `limit` — `Optional<Integer>`, which may be absent
 - `cursor` — `Optional<String>`, which may be absent
 
@@ -405,36 +455,40 @@ Selected local CLI presentation values and the existing local configuration owne
 - `source` — `connectors.cli.MetadataSource`
 - `stale` — `Boolean`
 
-### `ConnectionRepairInput`
+### `ConnectionReconnectInput`
 
-`connectors.cli.ConnectionRepairInput` is a record of four fields:
+`connectors.cli.ConnectionReconnectInput` is a record of six fields:
 
-- `adapter` — `String`
-- `connection` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
+- `connection` — `Optional<String>`, which may be absent
 - `expected_revision` — `String`
 - `credential_document` — `Optional<String>`, which may be absent
 
-### `ConnectionRepairRequest`
+### `ConnectionReconnectRequest`
 
-`connectors.cli.ConnectionRepairRequest` is a record of three fields:
+`connectors.cli.ConnectionReconnectRequest` is a record of three fields:
 
 - `adapter` — `String`
 - `connection` — `String`
 - `expected_revision` — `String`
 
-### `ConnectionRepairResult`
+### `ConnectionReconnectResult`
 
-`connectors.cli.ConnectionRepairResult` is a record of two fields:
+`connectors.cli.ConnectionReconnectResult` is a record of two fields:
 
 - `connection` — `connectors.cli.ConnectionDescription`
 - `acquisition` — `Optional<String>`, which may be absent
 
 ### `ConnectionRevalidateInput`
 
-`connectors.cli.ConnectionRevalidateInput` is a record of three fields:
+`connectors.cli.ConnectionRevalidateInput` is a record of five fields:
 
-- `adapter` — `String`
-- `connection` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
+- `connection` — `Optional<String>`, which may be absent
 - `expected_revision` — `String`
 
 ### `ConnectionRevalidateResult`
@@ -445,17 +499,21 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ConnectionRevokeInput`
 
-`connectors.cli.ConnectionRevokeInput` is a record of three fields:
+`connectors.cli.ConnectionRevokeInput` is a record of five fields:
 
-- `adapter` — `String`
-- `connection` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
+- `connection` — `Optional<String>`, which may be absent
 - `expected_revision` — `String`
 
 ### `ConnectionRevokeResult`
 
-`connectors.cli.ConnectionRevokeResult` is a record of five fields:
+`connectors.cli.ConnectionRevokeResult` is a record of seven fields:
 
 - `adapter` — `String`
+- `connector` — `String`
+- `instance` — `String`
 - `connection` — `String`
 - `revision` — `String`
 - `local_state` — `connectors.cli.RevocationState`
@@ -463,9 +521,11 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ConnectionStatusInput`
 
-`connectors.cli.ConnectionStatusInput` is a record of three fields:
+`connectors.cli.ConnectionStatusInput` is a record of five fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 - `connection` — `Optional<String>`, which may be absent
 - `acquisition` — `Optional<String>`, which may be absent
 
@@ -478,9 +538,11 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ConnectionSummary`
 
-`connectors.cli.ConnectionSummary` is a record of six fields:
+`connectors.cli.ConnectionSummary` is a record of eight fields:
 
 - `adapter` — `String`
+- `connector` — `String`
+- `instance` — `String`
 - `instance_id` — `String`
 - `connection` — `String`
 - `profile` — `String`
@@ -507,7 +569,7 @@ Every value satisfies `(delivery == inherited_handle or not (defined(handle_vari
 
 ### `Failure`
 
-`connectors.cli.Failure` is a record of 23 fields:
+`connectors.cli.Failure` is a record of 25 fields:
 
 - `kind` — `connectors.cli.FailureKind`
 - `code` — `connectors.cli.FailureCode`
@@ -524,6 +586,8 @@ Every value satisfies `(delivery == inherited_handle or not (defined(handle_vari
 - `configuration_format` — `Optional<connectors.cli.ConfigurationFormat>`, which may be absent
 - `instance_id` — `Optional<String>`, which may be absent
 - `configuration_rule` — `Optional<connectors.cli.ConfigurationRule>`, which may be absent
+- `configuration_bytes` — `Optional<Integer>`, which may be absent
+- `configuration_limit` — `Optional<Integer>`, which may be absent
 - `store_version` — `Optional<String>`, which may be absent
 - `binary_version` — `Optional<String>`, which may be absent
 - `custody` — `Optional<connectors.mutations.CustodyOutcome>`, which may be absent
@@ -681,7 +745,7 @@ Every value satisfies `(binding == mounted_secret or not (defined(directory)))`,
 
 ### `LocalRevalidationAdmission`
 
-`connectors.cli.LocalRevalidationAdmission` is a record of seven fields:
+`connectors.cli.LocalRevalidationAdmission` is a record of six fields:
 
 - `connection` — `String`
 - `generation` — `String`
@@ -689,15 +753,52 @@ Every value satisfies `(binding == mounted_secret or not (defined(directory)))`,
 - `publication_fence` — `String`
 - `captured_at_ms` — `Timestamp`
 - `expires_at_ms` — `Timestamp`
-- `cause` — `connectors.cli.LocalRevalidationCause`
-
-### `LocalRevalidationCause`
-
-`connectors.cli.LocalRevalidationCause` is one of `explicit` and `read_recollection`.
 
 ### `MetadataSource`
 
 `connectors.cli.MetadataSource` is one of `configuration`, `cached` and `authority`.
+
+### `MigrateDisposition`
+
+`connectors.cli.MigrateDisposition` is one of `planned`, `applied` and `unchanged`.
+
+### `MigrateEntry`
+
+`connectors.cli.MigrateEntry` is a record of eight fields:
+
+- `adapter` — `String`
+- `connector` — `String`
+- `instance` — `String`
+- `disposition` — `connectors.cli.MigrateEntryDisposition`
+- `reason` — `Optional<connectors.cli.MigrateKeptReason>`, which may be absent
+- `differing_field` — `Optional<connectors.cli.MigrateField>`, which may be absent
+- `before` — `connectors.cli.MigrateSelection`
+- `after` — `connectors.cli.MigrateSelection`
+
+### `MigrateEntryDisposition`
+
+`connectors.cli.MigrateEntryDisposition` is one of `migrated` and `kept`.
+
+### `MigrateField`
+
+`connectors.cli.MigrateField` is one of `instance_id`, `configuration_revision`, `adapter_id`, `protocol`, `private_protocol`, `startup`, `restart`, `executable`, `permissions`, `instance`, `enabled`, `description`, `endpoint`, `profile` and `format`.
+
+### `MigrateKeptReason`
+
+`connectors.cli.MigrateKeptReason` is one of `implementation_unmapped`, `connector_undeclared`, `gateway_prefix`, `native_configuration_unreadable`, `instance_conflict` and `selection_changes`.
+
+### `MigrateMode`
+
+`connectors.cli.MigrateMode` is one of `dry-run` and `apply`.
+
+### `MigrateSelection`
+
+`connectors.cli.MigrateSelection` is a record of four fields:
+
+- `instance_id` — `String`
+- `configuration_revision` — `String`
+- `executable_selection` — `String`
+- `custody_items` — `List<String>`
 
 ### `MutationObservation`
 
@@ -711,7 +812,7 @@ Every value satisfies `(binding == mounted_secret or not (defined(directory)))`,
 
 ### `NextAction`
 
-`connectors.cli.NextAction` is one of `check_configuration`, `select_protected_source`, `unlock_keyring`, `retry_status`, `repair_connection`, `revalidate_connection`, `create_connection`, `refresh_description`, `request_permission`, `retry_explicitly`, `stop_owner`, `upgrade`, `choose_clock_source` and `none`.
+`connectors.cli.NextAction` is one of `check_configuration`, `select_protected_source`, `unlock_keyring`, `retry_status`, `repair_connection`, `revalidate_connection`, `create_connection`, `revoke_connection`, `refresh_description`, `request_permission`, `retry_explicitly`, `stop_owner`, `upgrade`, `choose_clock_source` and `none`.
 
 ### `OperatingSystem`
 
@@ -719,16 +820,20 @@ Every value satisfies `(binding == mounted_secret or not (defined(directory)))`,
 
 ### `OperationDescribeInput`
 
-`connectors.cli.OperationDescribeInput` is a record of two fields:
+`connectors.cli.OperationDescribeInput` is a record of four fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 - `operation` — `String`
 
 ### `OperationDescribeResult`
 
-`connectors.cli.OperationDescribeResult` is a record of six fields:
+`connectors.cli.OperationDescribeResult` is a record of eight fields:
 
 - `adapter` — `String`
+- `connector` — `String`
+- `instance` — `String`
 - `revision` — `String`
 - `schema` — `String`
 - `operation` — `connectors.cli.OperationDescription`
@@ -748,9 +853,11 @@ Every value satisfies `(binding == mounted_secret or not (defined(directory)))`,
 
 ### `OperationInvokeInput`
 
-`connectors.cli.OperationInvokeInput` is a record of eight fields:
+`connectors.cli.OperationInvokeInput` is a record of 10 fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 - `connection` — `Optional<String>`, which may be absent
 - `operation` — `String`
 - `schema` — `String`
@@ -761,9 +868,11 @@ Every value satisfies `(binding == mounted_secret or not (defined(directory)))`,
 
 ### `OperationInvokeResult`
 
-`connectors.cli.OperationInvokeResult` is a record of seven fields:
+`connectors.cli.OperationInvokeResult` is a record of nine fields:
 
 - `adapter` — `String`
+- `connector` — `String`
+- `instance` — `String`
 - `operation` — `String`
 - `revision` — `String`
 - `result` — `Json`
@@ -773,18 +882,22 @@ Every value satisfies `(binding == mounted_secret or not (defined(directory)))`,
 
 ### `OperationListInput`
 
-`connectors.cli.OperationListInput` is a record of four fields:
+`connectors.cli.OperationListInput` is a record of six fields:
 
-- `adapter` — `String`
+- `adapter` — `Optional<String>`, which may be absent
+- `connector` — `Optional<String>`, which may be absent
+- `instance` — `Optional<String>`, which may be absent
 - `family` — `Optional<String>`, which may be absent
 - `limit` — `Optional<Integer>`, which may be absent
 - `cursor` — `Optional<String>`, which may be absent
 
 ### `OperationListResult`
 
-`connectors.cli.OperationListResult` is a record of six fields:
+`connectors.cli.OperationListResult` is a record of eight fields:
 
 - `adapter` — `String`
+- `connector` — `String`
+- `instance` — `String`
 - `revision` — `String`
 - `operations` — `List<connectors.cli.OperationSummary>`
 - `next_cursor` — `Optional<String>`, which may be absent
@@ -961,6 +1074,25 @@ Every value satisfies `(support == weaker or not (defined(weaker_form)))`, `(not
 - `state_path` — `String`
 - `os` — `connectors.cli.OperatingSystem`
 
+### `SetupMigrateInput`
+
+`connectors.cli.SetupMigrateInput` is a record of one field:
+
+- `mode` — `connectors.cli.MigrateMode`
+
+### `SetupMigrateResult`
+
+`connectors.cli.SetupMigrateResult` is a record of eight fields:
+
+- `mode` — `connectors.cli.MigrateMode`
+- `disposition` — `connectors.cli.MigrateDisposition`
+- `config_path` — `String`
+- `format_before` — `String`
+- `format_after` — `String`
+- `backup_path` — `Optional<String>`, which may be absent
+- `configuration` — `String`
+- `entries` — `List<connectors.cli.MigrateEntry>`
+
 ### `SetupOwnerStopResult`
 
 `connectors.cli.SetupOwnerStopResult` is a record of three fields:
@@ -973,7 +1105,7 @@ Every value satisfies `(support == weaker or not (defined(weaker_form)))`, `(not
 
 `connectors.cli.StartupMode` is one of `on-demand` and `automatic`.
 
-70 of the types above are reached by nothing else in this system: `connectors.cli.AdapterDescribeInput`, `connectors.cli.AdapterDescribeResult`, `connectors.cli.AdapterListInput`, `connectors.cli.AdapterListResult`, `connectors.cli.AdapterStatusInput`, `connectors.cli.AdapterStatusResult`, `connectors.cli.AdapterStopInput`, `connectors.cli.AdapterStopResult`, `connectors.cli.ApprovalClockCheckInput`, `connectors.cli.ApprovalClockCheckResult`, `connectors.cli.ApprovalIssueInput`, `connectors.cli.ApprovalIssueResult`, `connectors.cli.ApprovalKeyInitInput`, `connectors.cli.ApprovalKeyRecoverInput`, `connectors.cli.ApprovalKeyRetireInput`, `connectors.cli.ApprovalKeyRevokeInput`, `connectors.cli.ApprovalKeyRotateInput`, `connectors.cli.ApprovalKeyStatusInput`, `connectors.cli.ApprovalKeysResult`, `connectors.cli.ApprovalPolicyResult`, `connectors.cli.ApprovalPolicySetInput`, `connectors.cli.ApprovalPolicyStatusInput`, `connectors.cli.ApprovalPrepareInput`, `connectors.cli.ApprovalPrepareResult`, `connectors.cli.ConnectionConnectInput`, `connectors.cli.ConnectionConnectResult`, `connectors.cli.ConnectionCreateRequest`, `connectors.cli.ConnectionDescribeInput`, `connectors.cli.ConnectionDescribeResult`, `connectors.cli.ConnectionLaunchInput`, `connectors.cli.ConnectionLaunchResult`, `connectors.cli.ConnectionListInput`, `connectors.cli.ConnectionListResult`, `connectors.cli.ConnectionRepairInput`, `connectors.cli.ConnectionRepairRequest`, `connectors.cli.ConnectionRepairResult`, `connectors.cli.ConnectionRevalidateInput`, `connectors.cli.ConnectionRevalidateResult`, `connectors.cli.ConnectionRevokeInput`, `connectors.cli.ConnectionRevokeResult`, `connectors.cli.ConnectionStatusInput`, `connectors.cli.ConnectionStatusResult`, `connectors.cli.ConsumerCredentialDeliveryStatement`, `connectors.cli.LegacyDescribeInput`, `connectors.cli.LegacyDescribeResult`, `connectors.cli.LegacyInvokeInput`, `connectors.cli.LegacyInvokeResult`, `connectors.cli.LocalCaptureAdmission`, `connectors.cli.LocalCustodyBinding`, `connectors.cli.LocalOperationPolicy`, `connectors.cli.LocalOwnerBuild`, `connectors.cli.LocalOwnerBuildRequest`, `connectors.cli.LocalOwnerCached`, `connectors.cli.LocalOwnerCachedRequest`, `connectors.cli.LocalOwnerGreeting`, `connectors.cli.LocalOwnerHello`, `connectors.cli.LocalRevalidationAdmission`, `connectors.cli.OperationDescribeInput`, `connectors.cli.OperationDescribeResult`, `connectors.cli.OperationInvokeInput`, `connectors.cli.OperationInvokeResult`, `connectors.cli.OperationListInput`, `connectors.cli.OperationListResult`, `connectors.cli.PlatformGuaranteeStatement`, `connectors.cli.PrivateBaseline`, `connectors.cli.SetupCheckResult`, `connectors.cli.SetupCheckpointsEnableInput`, `connectors.cli.SetupCheckpointsEnableResult`, `connectors.cli.SetupInitResult` and `connectors.cli.SetupOwnerStopResult`. No entity, view, command, event, error or crossing names them, so it is either vocabulary something outside this specification uses or a leftover — and only a person can tell which.
+72 of the types above are reached by nothing else in this system: `connectors.cli.AdapterDescribeInput`, `connectors.cli.AdapterDescribeResult`, `connectors.cli.AdapterListInput`, `connectors.cli.AdapterListResult`, `connectors.cli.AdapterStatusInput`, `connectors.cli.AdapterStatusResult`, `connectors.cli.AdapterStopInput`, `connectors.cli.AdapterStopResult`, `connectors.cli.ApprovalClockCheckInput`, `connectors.cli.ApprovalClockCheckResult`, `connectors.cli.ApprovalIssueInput`, `connectors.cli.ApprovalIssueResult`, `connectors.cli.ApprovalKeyInitInput`, `connectors.cli.ApprovalKeyRecoverInput`, `connectors.cli.ApprovalKeyRetireInput`, `connectors.cli.ApprovalKeyRevokeInput`, `connectors.cli.ApprovalKeyRotateInput`, `connectors.cli.ApprovalKeyStatusInput`, `connectors.cli.ApprovalKeysResult`, `connectors.cli.ApprovalPolicyResult`, `connectors.cli.ApprovalPolicySetInput`, `connectors.cli.ApprovalPolicyStatusInput`, `connectors.cli.ApprovalPrepareInput`, `connectors.cli.ApprovalPrepareResult`, `connectors.cli.ConnectionConnectInput`, `connectors.cli.ConnectionConnectResult`, `connectors.cli.ConnectionCreateRequest`, `connectors.cli.ConnectionDescribeInput`, `connectors.cli.ConnectionDescribeResult`, `connectors.cli.ConnectionLaunchInput`, `connectors.cli.ConnectionLaunchResult`, `connectors.cli.ConnectionListInput`, `connectors.cli.ConnectionListResult`, `connectors.cli.ConnectionReconnectInput`, `connectors.cli.ConnectionReconnectRequest`, `connectors.cli.ConnectionReconnectResult`, `connectors.cli.ConnectionRevalidateInput`, `connectors.cli.ConnectionRevalidateResult`, `connectors.cli.ConnectionRevokeInput`, `connectors.cli.ConnectionRevokeResult`, `connectors.cli.ConnectionStatusInput`, `connectors.cli.ConnectionStatusResult`, `connectors.cli.ConsumerCredentialDeliveryStatement`, `connectors.cli.LegacyDescribeInput`, `connectors.cli.LegacyDescribeResult`, `connectors.cli.LegacyInvokeInput`, `connectors.cli.LegacyInvokeResult`, `connectors.cli.LocalCaptureAdmission`, `connectors.cli.LocalCustodyBinding`, `connectors.cli.LocalOperationPolicy`, `connectors.cli.LocalOwnerBuild`, `connectors.cli.LocalOwnerBuildRequest`, `connectors.cli.LocalOwnerCached`, `connectors.cli.LocalOwnerCachedRequest`, `connectors.cli.LocalOwnerGreeting`, `connectors.cli.LocalOwnerHello`, `connectors.cli.LocalRevalidationAdmission`, `connectors.cli.OperationDescribeInput`, `connectors.cli.OperationDescribeResult`, `connectors.cli.OperationInvokeInput`, `connectors.cli.OperationInvokeResult`, `connectors.cli.OperationListInput`, `connectors.cli.OperationListResult`, `connectors.cli.PlatformGuaranteeStatement`, `connectors.cli.PrivateBaseline`, `connectors.cli.SetupCheckResult`, `connectors.cli.SetupCheckpointsEnableInput`, `connectors.cli.SetupCheckpointsEnableResult`, `connectors.cli.SetupInitResult`, `connectors.cli.SetupMigrateInput`, `connectors.cli.SetupMigrateResult` and `connectors.cli.SetupOwnerStopResult`. No entity, view, command, event, error or crossing names them, so it is either vocabulary something outside this specification uses or a leftover — and only a person can tell which.
 
 ## Entities
 
@@ -1369,4 +1501,4 @@ It may invoke [`ExpireConnectionListCursor`](#expireconnectionlistcursor), [`Rai
 
 ---
 
-Generated from connectors v1 · model digest `8226427fcbc5e60e4db49a4c62b63c11d37bf83aa303ab1a7281d5a53246958e` · contract digest `slice-sha256/2:84af374f744c74155058e55134cc294a38fddbd1fa55a8ff41f6db9c931bb68f`. Do not edit this file; change the specification and regenerate it with `ess generate`.
+Generated from connectors v1 · model digest `ad712103497e609774d0b59655f3d3fa484f77cf8079f001ea4e04f20f945b05` · contract digest `slice-sha256/2:4b83139bddaa026d10f72ce5424f0fd64f8246e21248cb16a805108fb4f2893c`. Do not edit this file; change the specification and regenerate it with `ess generate`.

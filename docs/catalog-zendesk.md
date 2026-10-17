@@ -5,8 +5,9 @@ organizations from the pinned Zendesk Support API OpenAPI document. Nothing
 here is Zendesk-specific code: the pinned document is compiled into a bundle, a
 reviewed selection set exposes seven reads, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
-Configuration, connection, approval and invocation work exactly as described
-there; this page covers what differs for Zendesk.
+Connection and invocation work as described there; this page configures the
+`zendesk` connector and covers what differs for Zendesk. Connector, instance
+and connection are defined in [the README](../README.md#vocabulary).
 
 ## Source and bundle
 
@@ -118,6 +119,39 @@ been checked against a live account here. Every other query parameter the pinned
 document declares for an operation is accepted by name; one it does not declare
 is refused before any request.
 
+## Configuration
+
+The `zendesk` connector has no default endpoint: an instance names its
+account's `https://<subdomain>.zendesk.com`. It declares two auth profiles,
+`zendesk.oauth` and `zendesk.basic`
+([`adapters/catalog/providers/zendesk/connector.json`](../adapters/catalog/providers/zendesk/connector.json)),
+so the instance names the one it uses with `profile`. Add to the host
+configuration (`~/.config/connectors/config.toml`, format
+`connectors-local/5`):
+
+```toml
+[connectors.zendesk]
+enabled = true
+
+[connectors.zendesk.instances.support]
+endpoint = "https://your-subdomain.zendesk.com"
+profile = "zendesk.oauth"
+```
+
+Everything else is derived from the shipped connector: the bundle, the seven
+reads, the profile's fields and the provider executable. The instance id is
+`zendesk.support`:
+
+```console
+$ connectors instances list
+{"adapters":[{"adapter":"zendesk.support","adapter_id":"catalog","connector":"zendesk","instance":"support","instance_id":"zendesk.support","restart":"never","startup":"on-demand"}],"source":"configuration"}
+```
+
+An installation configured before connectors were declared converts its
+entries with `connectors setup migrate`, which keeps each instance id and
+revision; the pinned form it writes is described in
+[the catalog provider guide](local-catalog-provider.md).
+
 ## Authentication
 
 Use an OAuth client with the client-credentials grant. Zendesk is retiring API
@@ -133,31 +167,18 @@ which `oauth2_refresh` refuses.
 Create a confidential OAuth client in Admin Center (**Apps and integrations >
 APIs > OAuth clients**), as the admin, or a dedicated service user, whose
 actions the reads should be attributed to: Zendesk attributes a
-client-credentials token to the user who created the client. Then declare:
+client-credentials token to the user who created the client. The profile
+requests tokens at `<endpoint>/oauth/tokens` with the scope `read`, and its
+identity read is `GET /api/v2/users/me`. Connect the instance with the client's
+credentials, `{"client_id": "<unique identifier>", "client_secret": "<secret>"}`,
+in an owner-only file:
 
-```json
-{
-  "format": "connectors-catalog-local/2",
-  "instance": "zendesk-support",
-  "provider": "zendesk",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
-  "api_base": "https://your-subdomain.zendesk.com",
-  "auth": {
-    "profile": "zendesk.oauth",
-    "scheme": "oauth2_client_credentials",
-    "header": "Authorization",
-    "bearer": true,
-    "label": "OAuth client secret",
-    "identity": {"path": "api/v2/users/me", "kind": "zendesk.user", "subject_pointer": "/user/id"},
-    "token_url": "https://your-subdomain.zendesk.com/oauth/tokens",
-    "requested_scopes": ["read"]
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/zendesk/operations.json"
-}
+```sh
+connectors connections connect --connector zendesk --instance support \
+  --profile zendesk.oauth --credential-file ~/private/zendesk-oauth.json
 ```
 
-`connections connect` takes `{"client_id": "<unique identifier>", "client_secret":
-"<secret>"}` once. Every access token is requested with
+The client's credentials are stored once. Every access token is requested with
 `grant_type=client_credentials` and `scope=read`. Zendesk gives clients created
 on or after 2026-04-30 a 30-minute default lifetime; an older client's answer
 carries no `expires_in`, and the provider then uses the token for at most 24
@@ -175,35 +196,17 @@ a live account. Nothing here has run against a live account yet.
 The pinned document declares one security scheme, HTTP basic (`basicAuth`). With
 a Zendesk API token, the user name is the account email followed by `/token`
 and the password is the token (Zendesk's API authentication guide; not checked
-against a live account here). Declare the basic profile `zendesk.basic`. The identity
+against a live account here). An instance that uses it states
+`profile = "zendesk.basic"`. The identity
 read is `GET /api/v2/users/me` (`ShowCurrentUser`), whose `user.id` names the
 credential's subject. The pinned document allows that read to anonymous users;
 an answer without a user id refuses the connection. Zendesk API tokens expose no
 scope list, so the profile declares no `scopes` read and no `minimum_scopes`.
 The incremental exports are allowed to admins only (pinned "Allowed For").
 
-```json
-{
-  "format": "connectors-catalog-local/2",
-  "instance": "zendesk-support",
-  "provider": "zendesk",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
-  "api_base": "https://your-subdomain.zendesk.com",
-  "auth": {
-    "profile": "zendesk.basic",
-    "scheme": "basic",
-    "header": "Authorization",
-    "bearer": false,
-    "account_label": "Account email followed by /token",
-    "label": "API token",
-    "identity": {"path": "api/v2/users/me", "kind": "zendesk.user", "subject_pointer": "/user/id"}
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/zendesk/operations.json"
-}
-```
-
-`connections connect` takes the credential document
-`{"account": "<email>/token", "token": "<API token>"}`; every request then
+Connect it with the credential document
+`{"account": "<email>/token", "token": "<API token>"}` and
+`--profile zendesk.basic`; every request then
 carries `Authorization: Basic base64(<email>/token:<API token>)`.
 
 ## Limits

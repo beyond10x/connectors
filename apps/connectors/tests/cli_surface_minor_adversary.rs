@@ -229,7 +229,7 @@ fn every_list_cursor_this_tree_cannot_honour_is_stale_cursor() {
     let (root, _) = configured();
     let mut wrong = Vec::new();
     for args in [
-        &["adapters", "list", "--cursor", "c1"][..],
+        &["instances", "list", "--cursor", "c1"][..],
         &[
             "connections",
             "list",

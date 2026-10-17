@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-16T11:22:20Z",
+  "actor": "human:timo",
+  "artifact": "story:setup-migrate-adapter-entries",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:connector-vocabulary-parallel-r1",
+    "review": "review-result:connector-vocabulary-parallel-r1",
+    "outcome": "fixed"
+  }
+}

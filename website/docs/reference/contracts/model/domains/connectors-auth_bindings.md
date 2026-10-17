@@ -243,7 +243,7 @@ It references at most one [`connectors.declarations.ServiceConfiguration`](./con
 
 Every instance satisfies `(defined(active_generation_id) or not (defined(active_custody_version_ref)))` and `(access_mode == credential or not ((defined(active_generation_id) or defined(active_custody_version_ref))))` — a predicate over this entity's own fields, checked against them rather than stored as a sentence, so an invariant reading something the entity does not have is refused instead of documented.
 
-Its state is a `connectors.auth_bindings.Connection.State`, one of `Live` and `Revoked`. That enum is synthesised from the lifecycle rather than declared beside it, so the states a view's filter compares and the states drawn below cannot disagree.
+Its state is a `connectors.auth_bindings.Connection.State`, one of `Live`, `Revoked` and `Stale`. That enum is synthesised from the lifecycle rather than declared beside it, so the states a view's filter compares and the states drawn below cannot disagree.
 
 An instance is created in `Live`. `Revoked` is terminal, so an instance may rest there forever. That is declared rather than inferred from having no way out: an entity that cannot leave a state is either finished or stuck, and only its author knows which.
 
@@ -251,13 +251,19 @@ An instance is created in `Live`. `Revoked` is terminal, so an instance may rest
 stateDiagram-v2
     [*] --> Live
     Live --> Live: publish (PublishBinding)
+    Stale --> Live: publish (PublishBinding)
+    Live --> Stale: mark_stale (MarkConnectionStale)
+    Stale --> Stale: record_candidate (RecordConnectionCandidate)
     Live --> Revoked: revoke (RevokeConnection)
+    Stale --> Revoked: revoke (RevokeConnection)
     Revoked --> [*]
 ```
 
 Each move is taken by a declared command outcome, and a move nothing takes is refused as `missing_causation` rather than left as a state change nobody can trigger:
 
 - `publish` — taken by `connectors.auth_bindings.PublishBinding` on its `published` outcome
+- `mark_stale` — taken by `connectors.auth_bindings.MarkConnectionStale` on its `marked-stale` outcome
+- `record_candidate` — taken by `connectors.auth_bindings.RecordConnectionCandidate` on its `candidate-recorded` outcome
 - `revoke` — taken by `connectors.auth_bindings.RevokeConnection` on its `revoked` outcome
 
 An instance is brought into existence by `connectors.auth_bindings.AllocateConnection` on its `allocated` outcome.
@@ -265,6 +271,7 @@ An instance is brought into existence by `connectors.auth_bindings.AllocateConne
 Illegal transitions are illegal by absence: no rule forbids them, there is simply no arrow, because a rule would be a second place for the same truth to live. A diagram cannot show an absence, so the pairs it does not connect are listed here, derived from the same transitions — anything named below is a move this specification does not permit.
 
 - `Revoked` may not become `Live`
+- `Revoked` may not become `Stale`
 
 Two views project it: [`ConnectionStates`](#connectionstates) and [`Connections`](#connections).
 
@@ -554,10 +561,13 @@ It takes:
 - `owner_scope` — `String`
 - `access_mode` — `connectors.auth_access.AccessMode`
 - `publication_fence` — `String`
+- `held_connection_ref` — `Optional<String>`, which may be absent
 
-It has three outcomes.
+It has four outcomes.
 
-**`allocated`** — Taken when `decision == allow` holds of the input. It creates a `connectors.auth_bindings.Connection`, which starts in `Live`. The new instance's identity is published as `connection_ref` on `connectors.auth_bindings.ConnectionAllocated`. It emits `connectors.auth_bindings.ConnectionAllocated`. It sets `instance_id` from `input.instance_id`, `profile_record_ref` from `input.profile_record_ref`, `owner_scope` from `input.owner_scope`, `access_mode` from `input.access_mode` and `publication_fence` from `input.publication_fence`. A test reaches it by constructing an input that satisfies that condition.
+**`instance-connected`** — Taken when `(decision == allow and defined(held_connection_ref))` holds of the input. No entity in this specification changes. It reports `connectors.auth_bindings.InstanceConnected`, carrying `instance_id`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
+
+**`allocated`** — Taken when `(decision == allow and not (defined(held_connection_ref)))` holds of the input. It creates a `connectors.auth_bindings.Connection`, which starts in `Live`. The new instance's identity is published as `connection_ref` on `connectors.auth_bindings.ConnectionAllocated`. It emits `connectors.auth_bindings.ConnectionAllocated`. It sets `instance_id` from `input.instance_id`, `profile_record_ref` from `input.profile_record_ref`, `owner_scope` from `input.owner_scope`, `access_mode` from `input.access_mode` and `publication_fence` from `input.publication_fence`. A test reaches it by constructing an input that satisfies that condition.
 
 **`unavailable`** — Taken when `decision == unknown` holds of the input. No entity in this specification changes. It reports `connectors.auth_bindings.Unavailable`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
 
@@ -680,6 +690,20 @@ It has two outcomes.
 
 **`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.auth_bindings.CustodyVersion` in `Deleted`, `Invalid` and `Retiring`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.auth_bindings.CustodyStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
 
+### `MarkConnectionStale`
+
+`connectors.auth_bindings.MarkConnectionStale`.
+
+It takes:
+
+- `connection_ref` — `String`
+
+It has two outcomes.
+
+**`marked-stale`** — The default branch, taken when no other outcome's condition matched. It moves a `connectors.auth_bindings.Connection` from `Live` to `Stale`, along the declared move `mark_stale`. The instance is the one named by the input field `connection_ref`. It emits `connectors.auth_bindings.ConnectionMarkedStale`. A test reaches it by constructing an input that satisfies no other outcome's condition.
+
+**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.auth_bindings.Connection` in `Revoked` and `Stale`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.auth_bindings.ConnectionStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
+
 ### `PublishBinding`
 
 `connectors.auth_bindings.PublishBinding`.
@@ -694,7 +718,7 @@ It has five outcomes.
 
 **`stale-fence`** — Taken when the existing subject's stored fields satisfy `publication_fence != input.publication.expected_publication_fence`. No entity in this specification changes. It reports `connectors.auth_bindings.PublicationFenceConflict`, carrying `connection_ref`. It emits nothing. A test establishes and independently observes the subject enum fact before selecting this branch.
 
-**`published`** — Taken when `decision == allow` holds of the input. It moves a `connectors.auth_bindings.Connection` from `Live` to `Live`, along the declared move `publish`. The instance is the one named by the input field `connection_ref`. It emits `connectors.auth_bindings.BindingPublished`. It sets `publication_fence` from `implementation-generated`. A test reaches it by constructing an input that satisfies that condition.
+**`published`** — Taken when `decision == allow` holds of the input. It moves a `connectors.auth_bindings.Connection` from `Live` and `Stale` to `Live`, along the declared move `publish`. The instance is the one named by the input field `connection_ref`. It emits `connectors.auth_bindings.BindingPublished`. It sets `publication_fence` from `implementation-generated`. A test reaches it by constructing an input that satisfies that condition.
 
 **`unavailable`** — Taken when `decision == unknown` holds of the input. No entity in this specification changes. It reports `connectors.auth_bindings.Unavailable`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
 
@@ -716,6 +740,21 @@ It has two outcomes.
 **`candidate-recorded`** — The default branch, taken when no other outcome's condition matched. It moves a `connectors.auth_bindings.Acquisition` from `Completing` to `Completing`, along the declared move `record_candidate`. The instance is the one named by the input field `acquisition_ref`. It emits `connectors.auth_bindings.AcquisitionCandidateRecorded`. A test reaches it by constructing an input that satisfies no other outcome's condition.
 
 **`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.auth_bindings.Acquisition` in `Completed`, `Expired`, `Failed` and `Pending`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.auth_bindings.AcquisitionStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
+
+### `RecordConnectionCandidate`
+
+`connectors.auth_bindings.RecordConnectionCandidate`.
+
+It takes:
+
+- `connection_ref` — `String`
+- `candidate_custody_version_ref` — `String`
+
+It has two outcomes.
+
+**`candidate-recorded`** — The default branch, taken when no other outcome's condition matched. It moves a `connectors.auth_bindings.Connection` from `Stale` to `Stale`, along the declared move `record_candidate`. The instance is the one named by the input field `connection_ref`. It emits `connectors.auth_bindings.ConnectionCandidateRecorded`. A test reaches it by constructing an input that satisfies no other outcome's condition.
+
+**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.auth_bindings.Connection` in `Live` and `Revoked`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.auth_bindings.ConnectionStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
 
 ### `RecordCustodyVersion`
 
@@ -781,7 +820,7 @@ It takes:
 
 It has four outcomes.
 
-**`revoked`** — Taken when `decision == allow` holds of the input. It moves a `connectors.auth_bindings.Connection` from `Live` to `Revoked`, along the declared move `revoke`. The instance is the one named by the input field `connection_ref`. It emits `connectors.auth_bindings.ConnectionRevoked`. A test reaches it by constructing an input that satisfies that condition.
+**`revoked`** — Taken when `decision == allow` holds of the input. It moves a `connectors.auth_bindings.Connection` from `Live` and `Stale` to `Revoked`, along the declared move `revoke`. The instance is the one named by the input field `connection_ref`. It emits `connectors.auth_bindings.ConnectionRevoked`. A test reaches it by constructing an input that satisfies that condition.
 
 **`unavailable`** — Taken when `decision == unknown` holds of the input. No entity in this specification changes. It reports `connectors.auth_bindings.Unavailable`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
 
@@ -887,6 +926,31 @@ It carries:
 - `connection_ref` — `String`
 
 Emitted by `connectors.auth_bindings.AllocateConnection` on its `allocated` outcome.
+
+Nothing in this system reacts to it.
+
+### `ConnectionCandidateRecorded`
+
+`connectors.auth_bindings.ConnectionCandidateRecorded`.
+
+It carries:
+
+- `connection_ref` — `String`
+- `candidate_custody_version_ref` — `String`
+
+Emitted by `connectors.auth_bindings.RecordConnectionCandidate` on its `candidate-recorded` outcome.
+
+Nothing in this system reacts to it.
+
+### `ConnectionMarkedStale`
+
+`connectors.auth_bindings.ConnectionMarkedStale`.
+
+It carries:
+
+- `connection_ref` — `String`
+
+Emitted by `connectors.auth_bindings.MarkConnectionStale` on its `marked-stale` outcome.
 
 Nothing in this system reacts to it.
 
@@ -1007,7 +1071,11 @@ It carries:
 
 - `state` — `connectors.auth_bindings.Connection.State`
 
+Reported by `connectors.auth_bindings.MarkConnectionStale` on its `wrong-state` outcome.
+
 Reported by `connectors.auth_bindings.PublishBinding` on its `wrong-state` outcome.
+
+Reported by `connectors.auth_bindings.RecordConnectionCandidate` on its `wrong-state` outcome.
 
 Reported by `connectors.auth_bindings.RevokeConnection` on its `wrong-state` outcome.
 
@@ -1024,6 +1092,14 @@ Reported by `connectors.auth_bindings.AcknowledgeCustodyWrite` on its `wrong-sta
 Reported by `connectors.auth_bindings.InvalidateCustodyVersion` on its `wrong-state` outcome.
 
 Reported by `connectors.auth_bindings.RetireCustodyVersion` on its `wrong-state` outcome.
+
+### `InstanceConnected`
+
+It carries:
+
+- `instance_id` — `String`
+
+Reported by `connectors.auth_bindings.AllocateConnection` on its `instance-connected` outcome.
 
 ### `PublicationFenceConflict`
 
@@ -1097,9 +1173,9 @@ An actor is who may ask this context for something. Every grant below points at 
 
 `connectors.auth_bindings.LocalHost`.
 
-It may invoke [`AcknowledgeCustodyDeletion`](#acknowledgecustodydeletion), [`AcknowledgeCustodyWrite`](#acknowledgecustodywrite), [`AllocateConnection`](#allocateconnection), [`BeginAcquisition`](#beginacquisition), [`CompleteAcquisition`](#completeacquisition), [`ConsumeAcquisition`](#consumeacquisition), [`ExpireAcquisition`](#expireacquisition), [`FailAcquisition`](#failacquisition), [`InvalidateCustodyVersion`](#invalidatecustodyversion), [`PublishBinding`](#publishbinding), [`RecordAcquisitionCandidate`](#recordacquisitioncandidate), [`RecordCustodyVersion`](#recordcustodyversion), [`RecordProfile`](#recordprofile), [`RetireCustodyVersion`](#retirecustodyversion) and [`RevokeConnection`](#revokeconnection).
+It may invoke [`AcknowledgeCustodyDeletion`](#acknowledgecustodydeletion), [`AcknowledgeCustodyWrite`](#acknowledgecustodywrite), [`AllocateConnection`](#allocateconnection), [`BeginAcquisition`](#beginacquisition), [`CompleteAcquisition`](#completeacquisition), [`ConsumeAcquisition`](#consumeacquisition), [`ExpireAcquisition`](#expireacquisition), [`FailAcquisition`](#failacquisition), [`InvalidateCustodyVersion`](#invalidatecustodyversion), [`MarkConnectionStale`](#markconnectionstale), [`PublishBinding`](#publishbinding), [`RecordAcquisitionCandidate`](#recordacquisitioncandidate), [`RecordConnectionCandidate`](#recordconnectioncandidate), [`RecordCustodyVersion`](#recordcustodyversion), [`RecordProfile`](#recordprofile), [`RetireCustodyVersion`](#retirecustodyversion) and [`RevokeConnection`](#revokeconnection).
 
 
 ---
 
-Generated from connectors v1 · model digest `8226427fcbc5e60e4db49a4c62b63c11d37bf83aa303ab1a7281d5a53246958e` · contract digest `slice-sha256/2:fa34811cbcb5c6bf1d81182ea441975759f8acc9e5d3bd0f57574fb2bcda7db6`. Do not edit this file; change the specification and regenerate it with `ess generate`.
+Generated from connectors v1 · model digest `ad712103497e609774d0b59655f3d3fa484f77cf8079f001ea4e04f20f945b05` · contract digest `slice-sha256/2:2028f9d2e4fce7cfdf0bdf6d62646db82fa6560f6e2ea01ec98e6389ab7bb187`. Do not edit this file; change the specification and regenerate it with `ess generate`.

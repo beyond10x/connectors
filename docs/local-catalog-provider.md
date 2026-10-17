@@ -10,8 +10,63 @@ This is the `provider` realization of
 [the catalog design](../adapters/catalog/design.md) and applies
 `architecture-decision-record:declarative-http-provider-runtime`. The host keeps
 what it already owns: connection admission, approval policy and proofs, audit,
-the attempt ledger, dispatch and recovery. The provider is one more adapter
-executable behind the same private protocol as the Kubernetes adapter.
+the attempt ledger, dispatch and recovery. The provider is one more executable
+behind the same private protocol as `connectors-kubernetes`.
+
+The terms connector, instance and connection are those of the
+[vocabulary](../README.md#vocabulary).
+
+## Set up a GitLab instance
+
+GitLab is a catalog connector with a shipped declaration
+([`connector.json`](../adapters/catalog/providers/gitlab/connector.json)): it names the
+profile `gitlab.pat`, the default endpoint `https://gitlab.com` and the selection set. An
+instance of it names only what is yours, and the installed `connectors-catalog-provider`
+beside `connectors` derives the rest: the executable and its SHA-256, the configuration
+revision and every operation of the connector, writes included, under
+`connectors-private/2`.
+
+```sh
+CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-catalog-provider
+target/release/connectors --output json setup init
+```
+
+In the configuration created by setup, change the `format` line to
+`format = "connectors-local/5"`, enable the connector and add an instance. `endpoint` is the
+GitLab host; without it the instance uses `https://gitlab.com`. A second account or host is a
+second instance with its own name.
+
+```toml
+[connectors.gitlab]
+enabled = true
+
+[connectors.gitlab.instances.forge]
+endpoint = "https://gitlab.example.com"
+```
+
+`setup check` derives the instance and checks its executable; `instances list` names it:
+
+```console
+$ target/release/connectors --output json setup check | jq -c '[.result.prerequisites[]|{name,state}]'
+[{"name":"configuration","state":"ready"},{"name":"metadata","state":"ready"},{"name":"artifact:gitlab.forge","state":"ready"},{"name":"keyring","state":"ready"},{"name":"persistent_custody_qualification","state":"ready"}]
+$ target/release/connectors --output json instances list
+{"ok":true,"result":{"adapters":[{"adapter":"gitlab.forge","adapter_id":"catalog","connector":"gitlab","instance":"forge","instance_id":"gitlab.forge","restart":"never","startup":"on-demand"}],"source":"configuration"}}
+```
+
+Connect with the hidden token prompt, then describe an operation:
+
+```sh
+target/release/connectors --output json connections connect --connector gitlab --instance forge --profile gitlab.pat --credential-prompt
+target/release/connectors --output json operations describe --connector gitlab --instance forge --operation project.get
+```
+
+An instance holds one connection. A token GitLab later refuses makes the connection `stale`;
+`connections reconnect --connector gitlab --instance forge --expected-revision REVISION
+--credential-prompt` replaces it under the same connection reference
+([Bind the provider to the local CLI](#bind-the-provider-to-the-local-cli) has the details).
+A derived instance takes no `ca_file`, so a GitLab behind a private CA needs a pinned
+instance, below. The rest of this guide describes the bundle, the selection set, the native
+configuration a pinned instance names, and invocation.
 
 ## Build the bundle
 
@@ -112,7 +167,7 @@ in [the Jira guide](catalog-jira.md), Confluence Cloud in
 [the Slack guide](catalog-slack.md) and Opsgenie alerts and incidents in
 [the Opsgenie guide](catalog-opsgenie.md). The GitLab set,
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
-every operation the retired native GitLab adapter exposed, so one configuration
+every operation the retired native GitLab implementation (an internal adapter) exposed, so one configuration
 serves the provider from the pinned source alone, plus eleven repository reads
 and one unguarded write, `issue.create`, the merge-request note and discussion
 operations ([the guarded merge guide](local-gitlab-merge.md#notes-and-discussions)), the
@@ -160,7 +215,8 @@ requests changed since a watermark (`getApiV4ProjectsId`, then
 project is listed `private`, every merge request has a null `url`, and deleted
 merge requests are not observed; the profile statement is
 [gitlab.md](../adapters/catalog/contracts/feed/v1alpha1/gitlab.md). Add both ids
-to an adapter's permitted operations to read the feed;
+to a pinned instance's `permissions.operations` to read the feed (a derived instance
+permits every operation);
 `operations list --family datasource.feed/v1alpha1` then names them.
 
 The repository reads other than `repository.compare` and `commit.get` list one page per call. Each takes `page` and `per_page`;
@@ -291,7 +347,7 @@ against the local HTTPS GitLab fixture (the ignored test
 `adapters/catalog/tests/local_runtime.rs`), whose files and languages are
 synthetic. Its disposable tree is named with `--config` and `--state-dir`, which
 the commands omit, and `$schema` and `$revision` come from
-`connectors --output json operations describe --adapter gitlab --operation <id>`.
+`operations describe --operation <id>`, with the deprecated `--adapter gitlab` selector the run used.
 
 ```sh
 connectors --output json operations invoke --adapter gitlab --connection "$connection" \
@@ -310,7 +366,7 @@ A file that is not UTF-8 (`latin1.txt` in the fixture) fails with exit status 1:
 ```
 
 A file of 4 MiB and one byte (`huge.log`) fails with exit status 1; the
-transport refuses the body while reading it, before the adapter answers:
+transport refuses the body while reading it, before the catalog provider answers:
 
 ```json
 {"error":{"code":"failure","data":{"code":"capacity","kind":"operational","next_action":"retry_explicitly","stage":"admission"}},"ok":false}
@@ -370,7 +426,10 @@ fails the gate. The native
 
 ## Configure the provider
 
-Build the executable and write an owner-only native configuration:
+A derived instance needs no native configuration: its connector's declaration carries the
+authentication profile and the selection. A pinned instance names one
+([Bind the provider to the local CLI](#bind-the-provider-to-the-local-cli)), and this section is
+its reference. Build the executable and write an owner-only native configuration:
 
 ```sh
 CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-catalog-provider
@@ -491,7 +550,7 @@ The complete configuration used against the sandbox is
   scope read, as `{"path": "...", "query": {"name": "value"}}` relative to the
   provider authority, with no `?` in the path and at most 16 query pairs. A `401`
   or `403` refuses the connection as `insufficient_scope`: the credential
-  identified its holder but may not read what the selection needs, which a repair
+  identified its holder but may not read what the selection needs, which a reconnect
   with the same credential cannot change. Any other non-2xx answer is refused as
   the identity read refuses it. The body is not read. Omitted, nothing changes and
   existing configuration revisions hold. Confluence declares a v2 page read here
@@ -514,11 +573,11 @@ The complete configuration used against the sandbox is
   account read, such as Runpod ([Runpod guide](catalog-runpod.md#authentication)).
   The read at `path` must answer `200`, which proves the credential, and its body
   is not read; the subject is the configuration's `instance` id, so the identity
-  is the configured connection, not a provider account, and repair or revalidate
+  is the configured connection, not a provider account, and reconnect or revalidate
   accepts any credential the read admits. It names a `path` and no
   `subject_pointer`, and is only for a static credential (`token` or `basic`):
   under `oauth2_refresh` or `oauth2_client_credentials` it is refused at load,
-  because repair would then accept another holder's OAuth credential as the same
+  because a reconnect would then accept another holder's OAuth credential as the same
   identity. Anything else is refused at load too. The rules are modeled as
   `connectors_catalog.identity.Probe` and `connectors_catalog.identity.Profile`
   in `adapters/catalog/spec/ess`.
@@ -899,36 +958,37 @@ revision, and with it the descriptor revision, of every GitLab, Jira and
 Confluence instance, including one whose selections have no repeated
 parameter. After upgrading:
 
-1. Print the bootstrap again and copy its `configuration_revision` into the
-   adapter entry (see [Bind the provider to the local
-   CLI](#bind-the-provider-to-the-local-cli)). Until then the adapter does not
-   start: the host refuses a bootstrap whose revision differs from the entry's.
+1. A derived instance needs nothing: its revision is derived from the installed
+   provider. For a pinned instance, print the bootstrap again and copy its
+   `configuration_revision` into the instance (see [Bind the provider to the local
+   CLI](#bind-the-provider-to-the-local-cli)). Until then its process does not
+   start: the host refuses a bootstrap whose revision differs from the instance's.
 2. Run `connections revalidate` on each connection of an instance that was
    already connected. It moves the connection to the new configuration revision
    with the credential already in custody, and asks for no credential, when the
    provider host and the `auth` profile are unchanged and the provider still
-   answers the same identity. No owner restart is needed: when the adapter
+   answers the same identity. No owner restart is needed: when the
    process of the earlier entry still runs, revalidate stops it and starts the
    configured one. Until then the connection reports `pending` and reads, and
-   `connections repair`, refuse with `lifecycle_conflict` and `next_action =
+   `connections reconnect`, refuse with `lifecycle_conflict` and `next_action =
    revalidate_connection`. A change to `evidence_lifetime_ms` alone keeps the
    connection's identity, but the saved connection stays bound to the profile it
-   was saved under: revalidate, repair and reads answer `lifecycle_conflict` with
-   `next_action = create_connection`, and `connections connect` under the same
-   `instance` id answers `ready` with the new lifetime; revoke the old
-   connection with `connections revoke`. When the provider host or any other `auth` field of
-   the profile changed, revalidate, repair, reads and `connections connect` all
+   was saved under: revalidate, reconnect and reads answer `lifecycle_conflict` with
+   `next_action = create_connection`. An instance holds one connection, so
+   `connections revoke` the old connection first; `connections connect` under the
+   same `instance` id then answers `ready` with the new lifetime. When the provider host or any other `auth` field of
+   the profile changed, revalidate, reconnect, reads and `connections connect` all
    refuse with `lifecycle_conflict` and `next_action = check_configuration`:
    only a new `instance` id helps. Give the instance a new id in the native
-   configuration and the adapter entry, copy the new revision, and connect;
-   then revoke the old connection through the same adapter alias with
+   configuration and the instance's `instance_id`, copy the new revision, and
+   connect; then revoke the old connection through the same instance with
    `connections revoke`, which still reaches it. A changed `auth.profile` id
    is answered like a lifetime change: connect with the new `--profile`. When
    the provider answers another identity, or refuses the credential, revalidate
    answers its own code and `next_action = create_connection`. The credential is
    not invalidated; the refusal is recorded, and reads then name
-   `create_connection` too. Connect again: under the same `instance` id a new
-   connection is admitted under the configured revision and moves the instance
+   `create_connection` too. Revoke that connection and connect again: under the
+   same `instance` id a new connection is admitted under the configured revision and moves the instance
    to it when it publishes. See [Configuration
    upgrades](local-connection-registry.md#configuration-upgrades).
 3. Issue every write approval policy bound to the instance again.
@@ -942,6 +1002,13 @@ and `merge_requests.list` (`assignee_username`, `not[assignee_username]`,
 
 ## Bind the provider to the local CLI
 
+A derived instance ([Set up a GitLab instance](#set-up-a-gitlab-instance)) is the usual
+binding. This section is the reference for the other one, a pinned instance: it names a native
+configuration of its own, as above, and pins its executable, configuration revision and
+permissions. Existing installations use it, and so does a connector the catalog provider ships
+no declaration for, such as Slack ([the Slack guide](catalog-slack.md)), or an instance that
+needs what an instance table cannot state, such as a `ca_file` or a narrower selection.
+
 The local CLI requires Linux x86_64 and the
 [qualified Secret Service binding](local-secret-service.md). Use the optimized
 build for the local owner: startup copies and verifies the executable within a
@@ -954,12 +1021,17 @@ target/release/connectors-catalog-provider --local-config /absolute/path/gitlab-
 sha256sum target/release/connectors-catalog-provider
 ```
 
-Add an adapter entry to the configuration created by setup, with the bootstrap's
-exact `configuration_revision`, the executable's SHA-256 and absolute paths. The
-operation ids are the selection ids; omitted permission sets deny access.
+Add the instance to the configuration created by setup: change its `format` line to
+`format = "connectors-local/5"` and add the instance with the bootstrap's exact
+`configuration_revision`, the executable's SHA-256 and absolute paths. The operation ids are
+the selection ids; omitted permission sets deny access.
 
 ```toml
-[adapters.forge]
+[connectors.gitlab]
+enabled = true
+
+[connectors.gitlab.instances.forge]
+alias = "forge"
 instance_id = "gitlab-sandbox"
 adapter_id = "catalog"
 configuration_revision = "REPLACE_FROM_BOOTSTRAP"
@@ -968,15 +1040,50 @@ private_protocol = "connectors-private/2"
 startup = "on-demand"
 restart = "never"
 
-[adapters.forge.permissions]
+[connectors.gitlab.instances.forge.permissions]
 profiles = ["gitlab.pat"]
 operations = ["project.get", "issues.list", "file.get", "branch.get", "merge_requests.list", "merge_request.get", "pipelines.list", "pipeline.get", "pipeline.jobs", "job.get", "job.trace", "issue.create", "merge_request.create", "merge_request.update", "merge_request.merge"]
 
-[adapters.forge.executable]
+[connectors.gitlab.instances.forge.executable]
 path = "/absolute/path/connectors-catalog-provider"
 sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
 args = ["--local-config", "/absolute/path/gitlab-catalog.json"]
 ```
+
+An instance table with any of these pins must carry all of them, `alias` included; one with
+none is derived. `alias` is the name the deprecated `--adapter` selector and mounted custody
+items use. The connector name of a pinned instance is a name only: it is not checked against a
+declaration.
+
+### Existing installations
+
+A configuration written before `connectors-local/5` holds legacy `[adapters.<alias>]` entries
+in the same shape. They keep working: each is selected as `--connector <adapter_id> --instance
+<alias>` (here `--connector catalog --instance forge`) or by the deprecated `--adapter <alias>`.
+`setup migrate` moves every entry whose native configuration names a provider with a shipped
+declaration to `[connectors.<connector>.instances.<alias>]`, with every pin unchanged, so its
+connections and approval policy stay valid. The dry run writes nothing; this one ran on a file
+with a GitLab entry `forge`, a Kubernetes entry `cluster` and a Slack entry `slack-bot`:
+
+```console
+$ connectors --output json setup migrate --mode dry-run | jq -c '.result | {disposition, format_before, format_after, entries: [.entries[] | {connector, instance, disposition, reason}]}'
+{"disposition":"planned","format_before":"connectors-local/2","format_after":"connectors-local/5","entries":[{"connector":"kubernetes","instance":"cluster","disposition":"kept","reason":"implementation_unmapped"},{"connector":"gitlab","instance":"forge","disposition":"migrated","reason":null},{"connector":"catalog","instance":"slack-bot","disposition":"kept","reason":"connector_undeclared"}]}
+$ connectors --output json setup migrate --mode apply | jq -c '.result | {disposition, format_after, entries: [.entries[] | {connector, instance, disposition}]}'
+{"disposition":"applied","format_after":"connectors-local/5","entries":[{"connector":"kubernetes","instance":"cluster","disposition":"kept"},{"connector":"gitlab","instance":"forge","disposition":"migrated"},{"connector":"catalog","instance":"slack-bot","disposition":"kept"}]}
+$ connectors --output json instances list | jq -c '[.. | objects | select(.instance_id) | {connector, instance, instance_id}]'
+[{"connector":"kubernetes","instance":"cluster","instance_id":"kubernetes-local"},{"connector":"gitlab","instance":"forge","instance_id":"gitlab-sandbox"},{"connector":"catalog","instance":"slack-bot","instance_id":"slack-bot"}]
+```
+
+`--mode apply` keeps the file it read beside the configuration as
+`config.toml.before-migrate-<UTC timestamp>` and names it in `backup_path`; restoring it is the
+rollback. The migrated `forge` is the pinned instance above. The entries it keeps say why in
+`reason` ([migrating legacy adapter entries](../contracts/cli/v1alpha1/semantics.md#migrating-adapter-entries)):
+Kubernetes and the other non-catalog implementations can be rewritten by hand as the
+[Kubernetes guide](local-kubernetes-cli.md) shows, and Slack as [the Slack guide](catalog-slack.md)
+shows. Moving a migrated instance to a derived one is a new instance: its instance id and
+configuration revision change, so it needs a new connection.
+
+### Connect and keep the connection ready
 
 Credentials never belong in TOML, native configuration, executable arguments or
 environment variables. Connect with the hidden token prompt on your controlling
@@ -985,8 +1092,8 @@ terminal, or `--credential-file` / `--credential-stdin` carrying the protected
 profile) from an owner-only source:
 
 ```sh
-target/release/connectors --output json connections connect --adapter forge --profile gitlab.pat --credential-prompt
-target/release/connectors --output json operations describe --adapter forge --operation project.get
+target/release/connectors --output json connections connect --connector gitlab --instance forge --profile gitlab.pat --credential-prompt
+target/release/connectors --output json operations describe --connector gitlab --instance forge --operation project.get
 ```
 
 Connect runs the declared identity and scope reads and refuses a token below
@@ -994,14 +1101,15 @@ Connect runs the declared identity and scope reads and refuses a token below
 (60 seconds when omitted, at most 300 000 ms); after expiry the
 connection reports `pending`. The next `operations invoke` of a read recollects
 the evidence once from the credential already in custody, with no re-entry, as
-`connections revalidate --adapter forge --connection CONNECTION --expected-revision REVISION`
+`connections revalidate --connector gitlab --instance forge --connection CONNECTION --expected-revision REVISION`
 would, and is then served: a connection connected or revalidated once keeps
 serving reads with no caller revalidation for as long as its credential stays
 valid. A read is refused with `not_granted` at `admission` and
 `next_action: revalidate_connection` only when the evidence is still not current
 after that recollection.
 A credential the provider refused or one below an operation's scopes still
-answers `next_action: repair_connection`. `connections repair` replaces an invalid
+answers `next_action: repair_connection`; a credential the provider refused makes the
+connection `stale` until a new one is published. `connections reconnect` replaces an invalid
 credential and refuses a changed identity; `connections revoke` is terminal local
 revocation and does not revoke the token at GitLab. Lists, descriptions and status
 start nothing. Writes need `private_protocol = "connectors-private/2"` and an
@@ -1017,7 +1125,7 @@ binary read), and provenance whose `source_revision` is the pinned source's
 SHA-256.
 
 ```sh
-connectors operations invoke --adapter forge --connection "$connection" \
+connectors operations invoke --connector gitlab --instance forge --connection "$connection" \
   --operation merge_request.get --schema "$schema" --revision "$revision" \
   --input-json '{"id":"group/project","merge_request_iid":9}'
 ```
