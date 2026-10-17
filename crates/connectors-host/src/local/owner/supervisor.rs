@@ -86,6 +86,11 @@ const REVALIDATION_PAUSES: [Duration; 2] = [Duration::from_millis(200), Duration
 /// What must remain before the deadline after a pause and an attempt as long as
 /// the last one.
 const REVALIDATION_MARGIN: Duration = Duration::from_millis(500);
+/// What a read whose current evidence would lapse early keeps of that
+/// evidence for itself: its recollection ends this long before the evidence
+/// does, so that a recollection that fails or hangs leaves the read time to be
+/// served on the evidence it was admitted on (contracts/cli/v1alpha1/semantics.md).
+const EARLY_READ_MARGIN_MS: u64 = 2_000;
 
 /// The transient class of a failed validation, which a revalidation sends
 /// again; `None` for every other failure, a credential (401), permission (403),
@@ -176,7 +181,7 @@ struct Job {
     adapter: Adapter,
     task: Task,
     deadline: u64,
-    reply: mpsc::Sender<Result<Output>>,
+    reply: Reply,
     epoch: u64,
     queued: Option<JobQueued>,
     dispatch: Dispatch,
@@ -312,34 +317,52 @@ pub(super) struct Pool {
     /// custody target's worker. Weak, so a worker never keeps its pool alive;
     /// empty for a pool not built by [`Pool::shared`].
     this: Weak<Pool>,
-    /// The revalidations queued or running, by instance, connection and
-    /// expected revision: a revalidation of the same key joins the one in
+    /// The revalidations queued or running, explicit ones and reads'
+    /// recollections alike: a revalidation of the same key joins the one in
     /// flight instead of queueing behind it (contracts/cli/v1alpha1/owner.md).
-    revalidations: Mutex<BTreeMap<JoinKey, Arc<Joined>>>,
+    revalidations: Flights,
 }
+/// The revalidations in flight, by instance, connection and semantic
+/// revision. Shared with the workers, whose jobs keep their entries listed.
+type Flights = Arc<Mutex<BTreeMap<JoinKey, Arc<Joined>>>>;
 /// A revalidation's instance, connection and expected semantic revision.
 type JoinKey = (String, String, String);
-/// The answer of one revalidation in flight, which every revalidation that
-/// joined it answers too.
+/// What a revalidation in flight answers the revalidations that joined it.
+#[derive(Clone)]
+enum Answer {
+    /// Its own answer: the connection summary, or its refusal.
+    Joined(Result<Value>),
+    /// A read's recollection that published no new evidence. Its refusal is
+    /// the read's, not a revalidation's (a read never re-pins changed mounted
+    /// material), so each joiner runs a revalidation of its own.
+    Rerun,
+}
+/// The answer of one revalidation in flight. The first one published is the
+/// one every joiner reads.
 #[derive(Default)]
 struct Joined {
-    answer: Mutex<Option<Result<Value>>>,
+    answer: Mutex<Option<Answer>>,
     wake: Condvar,
 }
 impl Joined {
-    fn publish(&self, answer: Result<Value>) {
-        if let Ok(mut slot) = self.answer.lock() {
+    fn publish(&self, answer: Answer) {
+        if let Ok(mut slot) = self.answer.lock()
+            && slot.is_none()
+        {
             *slot = Some(answer);
         }
         self.wake.notify_all();
     }
+    fn answered(&self) -> Option<Answer> {
+        self.answer.lock().ok().and_then(|slot| slot.clone())
+    }
     /// The joined revalidation's answer, or `outcome_unknown` once this
-    /// joiner's own deadline passes first, as for an unanswered revalidation.
-    fn wait(&self, deadline: u64) -> Result<Value> {
+    /// waiter's own deadline passes first, as for an unanswered revalidation.
+    fn wait(&self, deadline: u64) -> Result<Answer> {
         let mut slot = self.answer.lock().map_err(|_| Code::Unavailable)?;
         loop {
             if let Some(answer) = slot.as_ref() {
-                return answer.clone();
+                return Ok(answer.clone());
             }
             let left = until(deadline)
                 .map_err(|_| Error::from(Code::OutcomeUnknown))?
@@ -352,25 +375,98 @@ impl Joined {
         }
     }
 }
-/// The revalidation others join, while it is in flight. Dropped, it leaves
-/// the flight, so a revalidation arriving later runs its own, and answers its
-/// joiners: its own answer, or `outcome_unknown` if it never had one.
-struct Leading<'a> {
-    pool: &'a Pool,
+/// One revalidation in flight. It stays listed for as long as its work can
+/// still run: an explicit revalidation's for as long as its worker holds its
+/// job (not as long as its caller waits), a read's recollection until it
+/// ends. Answered, it leaves the list first, so a revalidation arriving after
+/// the answer runs its own; dropped unanswered, it leaves and answers
+/// `fallback`.
+struct Flight {
+    flights: Flights,
     key: JoinKey,
     joined: Arc<Joined>,
-    answer: Option<Result<Value>>,
+    fallback: Answer,
 }
-impl Drop for Leading<'_> {
-    fn drop(&mut self) {
-        if let Ok(mut flight) = self.pool.revalidations.lock() {
-            flight.remove(&self.key);
+/// What finding a key in flight makes of a revalidation.
+enum Member {
+    Leading(Flight),
+    Joined(Arc<Joined>),
+}
+impl Member {
+    /// A read's recollection answers the flight it leads, or the queued
+    /// revalidation's flight it found listed under its key.
+    fn answer(&self, answer: Answer) {
+        match self {
+            Member::Leading(flight) => flight.answer(answer),
+            Member::Joined(joined) => joined.publish(answer),
         }
-        let answer = self
-            .answer
-            .take()
-            .unwrap_or_else(|| Err(Code::OutcomeUnknown.into()));
+    }
+}
+impl Flight {
+    /// Joins the revalidation listed under `key`, or lists a new one.
+    fn lead_or_join(flights: &Flights, key: JoinKey, fallback: Answer) -> Result<Member> {
+        let mut listed = flights.lock().map_err(|_| Code::Unavailable)?;
+        if let Some(joined) = listed.get(&key) {
+            return Ok(Member::Joined(joined.clone()));
+        }
+        let joined = Arc::new(Joined::default());
+        listed.insert(key.clone(), joined.clone());
+        Ok(Member::Leading(Flight {
+            flights: flights.clone(),
+            key,
+            joined,
+            fallback,
+        }))
+    }
+    fn leave(&self) {
+        if let Ok(mut listed) = self.flights.lock()
+            && listed
+                .get(&self.key)
+                .is_some_and(|joined| Arc::ptr_eq(joined, &self.joined))
+        {
+            listed.remove(&self.key);
+        }
+    }
+    /// Its work's answer: it leaves the list, then answers its joiners.
+    fn answer(&self, answer: Answer) {
+        self.leave();
         self.joined.publish(answer);
+    }
+}
+impl Drop for Flight {
+    fn drop(&mut self) {
+        self.leave();
+        self.joined.publish(self.fallback.clone());
+    }
+}
+/// A job's reply channel. An explicit revalidation's job also holds its
+/// flight, so that the flight stays listed while the worker holds the job,
+/// and the reply answers its joiners as it answers its caller.
+struct Reply {
+    sender: mpsc::Sender<Result<Output>>,
+    flight: Option<Arc<Flight>>,
+}
+impl Reply {
+    /// Answers the job's flight, then its caller. A caller that stopped
+    /// waiting has dropped its receiver; the answer then reaches only the
+    /// flight's joiners.
+    fn send(self, result: Result<Output>) {
+        if let Some(flight) = &self.flight {
+            flight.answer(Answer::Joined(match &result {
+                Ok(Output::Value(value)) => Ok(value.clone()),
+                Ok(_) => Err(Code::Unavailable.into()),
+                Err(error) => Err(error.clone()),
+            }));
+        }
+        let _ = self.sender.send(result);
+    }
+    /// The answer a read's recollection gave this job's flight before the
+    /// worker reached the job: the job runs no probe of its own.
+    fn answered(&self) -> Option<Result<Value>> {
+        match self.flight.as_ref()?.joined.answered()? {
+            Answer::Joined(answer) => Some(answer),
+            Answer::Rerun => None,
+        }
     }
 }
 impl Pool {
@@ -393,7 +489,7 @@ impl Pool {
             shutdown_lock: Mutex::new(()),
             settled: Arc::new(AtomicU64::new(0)),
             this,
-            revalidations: Mutex::new(BTreeMap::new()),
+            revalidations: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
     fn send(
@@ -402,6 +498,7 @@ impl Pool {
         adapter: &Adapter,
         task: Task,
         deadline: u64,
+        flight: Option<Arc<Flight>>,
     ) -> Result<(mpsc::Receiver<Result<Output>>, Dispatch)> {
         until(deadline)?;
         let mut workers = self.workers.lock().map_err(|_| Code::Unavailable)?;
@@ -427,11 +524,13 @@ impl Pool {
             let recovery_pending = Arc::new(AtomicBool::new(false));
             let instance = adapter.instance_id.clone();
             let pool = self.this.clone();
+            let flights = self.revalidations.clone();
             let thread = std::thread::Builder::new()
                 .name("connectors-adapter-owner".into())
                 .spawn(move || {
                     worker(
                         paths, launches, shared, stopped, activity, instance, receiver, pool,
+                        flights,
                     )
                 })
                 .map_err(|_| Code::Unavailable)?;
@@ -470,7 +569,10 @@ impl Pool {
                 adapter: adapter.clone(),
                 task,
                 deadline,
-                reply,
+                reply: Reply {
+                    sender: reply,
+                    flight,
+                },
                 epoch: control.epoch,
                 queued: Some(JobQueued::new(&worker.queued)),
                 dispatch: dispatch.clone(),
@@ -482,9 +584,10 @@ impl Pool {
         Ok((receiver, dispatch))
     }
     /// Runs a job on its instance's worker. A revalidation that finds one of
-    /// the same connection at the same expected revision queued or running
-    /// joins it: it sends no job, runs no identity probe and answers that
-    /// revalidation's own answer (contracts/cli/v1alpha1/owner.md).
+    /// the same connection at the same expected revision queued or running,
+    /// an explicit one or a read's recollection, joins it: it sends no job,
+    /// runs no identity probe and answers that revalidation's own answer
+    /// (contracts/cli/v1alpha1/owner.md).
     pub fn run(&self, alias: &str, adapter: &Adapter, task: Task, deadline: u64) -> Result<Output> {
         let Task::Revalidate {
             connection,
@@ -499,38 +602,40 @@ impl Pool {
             connection.clone(),
             revision.clone(),
         );
-        let mut leading = {
-            let mut flight = self.revalidations.lock().map_err(|_| Code::Unavailable)?;
-            if let Some(joined) = flight.get(&key) {
-                let joined = joined.clone();
-                drop(flight);
-                return joined.wait(deadline).map(Output::Value);
-            }
-            let joined = Arc::new(Joined::default());
-            flight.insert(key.clone(), joined.clone());
-            Leading {
-                pool: self,
-                key,
-                joined,
-                answer: None,
+        let flight = loop {
+            let fallback = Answer::Joined(Err(Code::OutcomeUnknown.into()));
+            match Flight::lead_or_join(&self.revalidations, key.clone(), fallback)? {
+                Member::Leading(flight) => break Arc::new(flight),
+                Member::Joined(joined) => match joined.wait(deadline)? {
+                    Answer::Joined(answer) => return answer.map(Output::Value),
+                    // A read's recollection that ended without new evidence.
+                    Answer::Rerun => continue,
+                },
             }
         };
-        let answer = self.run_job(alias, adapter, task, deadline);
-        leading.answer = Some(match &answer {
-            Ok(Output::Value(value)) => Ok(value.clone()),
-            Ok(_) => Err(Code::Unavailable.into()),
-            Err(error) => Err(error.clone()),
-        });
-        answer
+        let joined = flight.joined.clone();
+        if let Err(error) = self.send(alias, adapter, task, deadline, Some(flight.clone())) {
+            joined.publish(Answer::Joined(Err(error.clone())));
+            return Err(error);
+        }
+        // The job now holds the flight; it stays listed until the worker lets
+        // the job go, whether or not this wait outlasts it.
+        drop(flight);
+        match joined.wait(deadline) {
+            Ok(Answer::Joined(answer)) => answer.map(Output::Value),
+            // The worker may still commit this revalidation after the wait
+            // ends; its joiners answer the same `outcome_unknown`.
+            Ok(Answer::Rerun) | Err(_) => {
+                joined.publish(Answer::Joined(Err(Code::OutcomeUnknown.into())));
+                Err(Code::OutcomeUnknown.into())
+            }
+        }
     }
     fn run_job(&self, alias: &str, adapter: &Adapter, task: Task, deadline: u64) -> Result<Output> {
-        // The worker may still commit a revalidation after this wait ends.
-        let committing = matches!(task, Task::Revalidate { .. });
-        let (receiver, dispatch) = self.send(alias, adapter, task, deadline)?;
+        let (receiver, dispatch) = self.send(alias, adapter, task, deadline, None)?;
         receiver
             .recv_timeout(until(deadline)?.saturating_duration_since(Instant::now()))
             .map_err(|e| match e {
-                _ if committing => Code::OutcomeUnknown.into(),
                 // A read its worker already dispatched: the request may have
                 // reached the provider, so its deadline is the provider's.
                 mpsc::RecvTimeoutError::Timeout if dispatch.abandon() => Error {
@@ -643,6 +748,7 @@ impl Pool {
                     adapter,
                     Task::Ensure { resume: false },
                     connectors_sdk::now_ms() + 120_000,
+                    None,
                 );
             }
         }
@@ -739,6 +845,7 @@ fn worker(
     instance: String,
     receiver: mpsc::Receiver<Work>,
     pool: Weak<Pool>,
+    flights: Flights,
 ) {
     let Activity {
         busy,
@@ -775,6 +882,11 @@ fn worker(
         // `busy` now covers this job; it is no longer queued.
         drop(job.queued.take());
         let result = (|| {
+            // A read's recollection of the same connection and revision ran
+            // while this revalidation was queued, and this one joined it.
+            if let Some(answer) = job.reply.answered() {
+                return answer.map(Output::Value);
+            }
             until(job.deadline)?;
             if stopped.load(Ordering::SeqCst) {
                 return Err(Code::Unavailable.into());
@@ -903,29 +1015,17 @@ fn worker(
                 state.suppress(&current.instance_id, false)?;
             }
             drop(guard);
+            let launch = Launch {
+                control: &control,
+                launches: &launches,
+                state: &state,
+                stopped: &stopped,
+                current: &current,
+                epoch: job.epoch,
+            };
             if child.is_none() {
-                {
-                    let mut guard = control.lock().map_err(|_| Code::Unavailable)?;
-                    guard.check(job.epoch)?;
-                    guard.starting = true;
-                }
-                let _permit = launches.acquire(job.deadline)?;
-                let new = runtime::Child::spawn_until(&current, until(job.deadline)?)?;
-                let mut guard = control.lock().map_err(|_| Code::Unavailable)?;
-                guard.check(job.epoch)?;
-                if stopped.load(Ordering::SeqCst) {
-                    return Err(Code::Unavailable.into());
-                }
-                state.remember(&current.selection(), new.bootstrap())?;
+                child = Some(launch.run(job.deadline)?);
                 selection = current.selection();
-                guard.child = Some(lifecycle::Owned {
-                    handle: new.termination_handle()?,
-                    incarnation: new.incarnation().into(),
-                    revision: new.bootstrap().configuration_revision.clone(),
-                });
-                guard.failed = false;
-                guard.starting = false;
-                child = Some(new);
             }
             until(job.deadline)?;
             let active = child.as_mut().ok_or(Code::Unavailable)?;
@@ -1098,12 +1198,37 @@ fn worker(
                             let early = result.ok();
                             let recollected = (|| -> Result<()> {
                                 let now = connectors_sdk::now_ms();
-                                let expires = job.deadline.min(now.saturating_add(30_000));
+                                // Early, it is bounded by the evidence the read
+                                // was admitted on, less what the read keeps for
+                                // itself, never by the read's own deadline: a
+                                // hanging probe then still leaves the read
+                                // served on that evidence.
+                                let bound = match &early {
+                                    Some(early) => {
+                                        early.expires_at_ms().saturating_sub(EARLY_READ_MARGIN_MS)
+                                    }
+                                    None => job.deadline,
+                                };
+                                let expires = bound.min(now.saturating_add(30_000));
                                 let recollection = registry.capture_recollection(
                                     &binding,
                                     &connection,
                                     now,
                                     expires,
+                                )?;
+                                // This is the same recollection a revalidation
+                                // runs: a revalidation of this connection at
+                                // this revision joins it, and one already
+                                // queued behind this job takes its answer
+                                // (contracts/cli/v1alpha1/owner.md).
+                                let member = Flight::lead_or_join(
+                                    &flights,
+                                    (
+                                        job.adapter.instance_id.clone(),
+                                        connection.clone(),
+                                        recollection.revision().to_owned(),
+                                    ),
+                                    Answer::Rerun,
                                 )?;
                                 revalidate(
                                     &Scope {
@@ -1122,7 +1247,24 @@ fn worker(
                                     &binding,
                                     recollection,
                                     Admission::ReadRecollection,
-                                )
+                                )?;
+                                // Its joiners answer what an explicit
+                                // revalidation answers. Ended without new
+                                // evidence, it answers them nothing, and each
+                                // runs its own.
+                                if let Ok(observed) = registry.describe(
+                                    &current.instance_id,
+                                    &current.adapter_id,
+                                    &current.configuration_revision,
+                                    &connection,
+                                    connectors_sdk::now_ms(),
+                                    true,
+                                ) {
+                                    member.answer(Answer::Joined(Ok(json!({
+                                        "connection": connection_value(&job.alias, observed)
+                                    }))));
+                                }
+                                Ok(())
                             })();
                             match (recollected, early) {
                                 (Ok(()), early) => {
@@ -1148,6 +1290,19 @@ fn worker(
                                     if admitted.is_err() {
                                         registry.cancel_read(early, connectors_sdk::now_ms())?;
                                         return Err(error);
+                                    }
+                                    // A probe that timed out ended the adapter
+                                    // process; the read is served by a new one,
+                                    // launched within that evidence.
+                                    if !active.running()? {
+                                        match launch.run(early.expires_at_ms()) {
+                                            Ok(new) => *active = new,
+                                            Err(error) => {
+                                                registry
+                                                    .cancel_read(early, connectors_sdk::now_ms())?;
+                                                return Err(error);
+                                            }
+                                        }
                                     }
                                     early
                                 }
@@ -1229,7 +1384,45 @@ fn worker(
             guard.failed = true;
         }
         busy.store(false, Ordering::SeqCst);
-        let _ = job.reply.send(result);
+        job.reply.send(result);
+    }
+}
+
+/// What a job launches its instance's adapter process under.
+struct Launch<'a> {
+    control: &'a Mutex<lifecycle::Control>,
+    launches: &'a Launches,
+    state: &'a runtime::state::State,
+    stopped: &'a AtomicBool,
+    current: &'a Adapter,
+    epoch: u64,
+}
+impl Launch<'_> {
+    /// Launches the configured adapter process by `deadline` and records it
+    /// as the instance's child, under this job's epoch.
+    fn run(&self, deadline: u64) -> Result<runtime::Child> {
+        {
+            let mut guard = self.control.lock().map_err(|_| Code::Unavailable)?;
+            guard.check(self.epoch)?;
+            guard.starting = true;
+        }
+        let _permit = self.launches.acquire(deadline)?;
+        let new = runtime::Child::spawn_until(self.current, until(deadline)?)?;
+        let mut guard = self.control.lock().map_err(|_| Code::Unavailable)?;
+        guard.check(self.epoch)?;
+        if self.stopped.load(Ordering::SeqCst) {
+            return Err(Code::Unavailable.into());
+        }
+        self.state
+            .remember(&self.current.selection(), new.bootstrap())?;
+        guard.child = Some(lifecycle::Owned {
+            handle: new.termination_handle()?,
+            incarnation: new.incarnation().into(),
+            revision: new.bootstrap().configuration_revision.clone(),
+        });
+        guard.failed = false;
+        guard.starting = false;
+        Ok(new)
     }
 }
 
@@ -1845,7 +2038,7 @@ mod revalidate_wait_tests {
                 if let Work::Invoke(job) = work {
                     let n = taken.fetch_add(1, Ordering::SeqCst) + 1;
                     std::thread::sleep(delay);
-                    let _ = job.reply.send(Ok(Output::Value(json!(n))));
+                    job.reply.send(Ok(Output::Value(json!(n))));
                 }
             }
         });
@@ -1932,6 +2125,92 @@ mod revalidate_wait_tests {
             assert!(leader.join().unwrap().is_ok());
         });
         pool.shutdown().unwrap();
+    }
+
+    /// A revalidation whose own wait ended `outcome_unknown` stays in flight
+    /// while its worker still holds its job: a revalidation arriving then
+    /// joins it and answers the same `outcome_unknown` (owner.md), sending no
+    /// second job. Once the worker lets the job go, the next one runs its own.
+    #[test]
+    fn a_revalidation_stays_in_flight_while_its_worker_holds_the_job() {
+        let (pool, jobs) = answering(Duration::from_millis(1_000));
+        let run = |ms: u64| {
+            pool.run(
+                "alias",
+                &adapter(),
+                task("revision"),
+                connectors_sdk::now_ms() + ms,
+            )
+        };
+        let unknown = |output: Result<Output>| match output {
+            Err(error) => assert_eq!(error.code, Code::OutcomeUnknown),
+            Ok(_) => panic!("the in-flight revalidation's wait ended outcome_unknown"),
+        };
+        unknown(run(300));
+        // The leader stopped waiting; its job still runs on the worker.
+        assert_eq!(pool.revalidations.lock().unwrap().len(), 1);
+        let started = Instant::now();
+        unknown(run(5_000));
+        assert!(started.elapsed() < Duration::from_millis(300));
+        std::thread::sleep(Duration::from_millis(1_000));
+        assert_eq!(jobs.load(Ordering::SeqCst), 1, "a second job was sent");
+        assert!(pool.revalidations.lock().unwrap().is_empty());
+        assert!(
+            run(5_000).is_ok(),
+            "a revalidation after the job ran its own"
+        );
+        assert_eq!(jobs.load(Ordering::SeqCst), 2);
+        pool.shutdown().unwrap();
+    }
+
+    fn key() -> JoinKey {
+        ("instance".into(), "connection".into(), "revision".into())
+    }
+
+    /// A read's recollection that finds an explicit revalidation of its key
+    /// queued behind its own job answers that revalidation's flight, so the
+    /// queued job runs no probe of its own.
+    #[test]
+    fn a_reads_recollection_answers_a_queued_revalidation_of_its_key() {
+        let flights: Flights = Arc::default();
+        let fallback = || Answer::Joined(Err(Code::OutcomeUnknown.into()));
+        let Member::Leading(flight) = Flight::lead_or_join(&flights, key(), fallback()).unwrap()
+        else {
+            panic!("nothing was in flight");
+        };
+        let (sender, _receiver) = mpsc::channel();
+        let reply = Reply {
+            sender,
+            flight: Some(Arc::new(flight)),
+        };
+        assert!(reply.answered().is_none());
+        let read = Flight::lead_or_join(&flights, key(), Answer::Rerun).unwrap();
+        assert!(matches!(read, Member::Joined(_)));
+        read.answer(Answer::Joined(Ok(json!("summary"))));
+        drop(read);
+        assert_eq!(reply.answered().unwrap().unwrap(), json!("summary"));
+        // Listed until the worker lets the job go.
+        assert_eq!(flights.lock().unwrap().len(), 1);
+        drop(reply);
+        assert!(flights.lock().unwrap().is_empty());
+    }
+
+    /// A read's recollection that ends without new evidence answers its
+    /// joiners nothing of its own: each runs its own revalidation.
+    #[test]
+    fn a_reads_recollection_without_new_evidence_has_its_joiners_rerun() {
+        let flights: Flights = Arc::default();
+        let read = Flight::lead_or_join(&flights, key(), Answer::Rerun).unwrap();
+        let Member::Joined(joined) = Flight::lead_or_join(&flights, key(), Answer::Rerun).unwrap()
+        else {
+            panic!("the read's recollection was in flight");
+        };
+        drop(read);
+        assert!(flights.lock().unwrap().is_empty());
+        assert!(matches!(
+            joined.wait(connectors_sdk::now_ms() + 1_000).unwrap(),
+            Answer::Rerun
+        ));
     }
 }
 

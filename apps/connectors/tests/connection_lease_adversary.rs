@@ -152,7 +152,10 @@ fn adversary_a_revalidation_during_a_reads_recollection_joins_it_within_the_boun
         String::from_utf8_lossy(&revalidated.stderr)
     );
     let answer = success(&revalidated);
-    assert_eq!(answer["connection"]["summary"]["state"], "ready", "{answer}");
+    assert_eq!(
+        answer["connection"]["summary"]["state"], "ready",
+        "{answer}"
+    );
     assert_eq!(
         container.seen("validations").len() - probes,
         1,
