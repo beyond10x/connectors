@@ -55,19 +55,84 @@ pub struct ConfigField {
     pub values: Option<Vec<String>>,
 }
 
-/// `connectors_definitions.definition.AuthScheme`.
+/// The schema identifier of a shared auth file, `auth/<name>.yaml`.
+pub const AUTH_SCHEMA: &str = "urn:beyond10x:connectors-auth:1";
+/// The file the lowering writes every auth profile into.
+pub const AUTH_FORMAT: &str = "connectors-catalog-auth/1";
+
+/// `connectors_definitions.definition.AuthScheme`: `basic` sends
+/// `Authorization: Basic`, `bearer` `Authorization: Bearer`, `header` the token
+/// in `header`, behind `prefix` when one is given.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AuthScheme {
     Basic,
     Bearer,
+    Header,
 }
 
-/// `connectors_definitions.definition.Auth`.
+/// `connectors_definitions.definition.AuthIdentity`: the read that names who
+/// holds the credential.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuthIdentity {
+    pub path: Option<String>,
+    pub kind: Option<String>,
+    pub subject: Option<String>,
+}
+
+/// `connectors_definitions.definition.AuthScopes`: the read that names the
+/// granted scopes, and those a connection must hold.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuthScopes {
+    pub path: String,
+    pub pointer: String,
+    pub minimum: Option<Vec<String>>,
+}
+
+/// `connectors_definitions.definition.AuthAccess`: a read whose `200` proves
+/// the credential reaches what the selection needs.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuthAccess {
+    pub path: String,
+    pub query: Option<BTreeMap<String, String>>,
+}
+
+/// `connectors_definitions.definition.Auth`: one profile. With `use`, the
+/// profile of the same id in `auth/<use>.yaml` is the base, and every field
+/// given here replaces its counterpart; `identity` field by field.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Auth {
-    pub scheme: AuthScheme,
+    #[serde(rename = "use")]
+    pub library: Option<String>,
+    pub default: Option<bool>,
+    pub scheme: Option<AuthScheme>,
+    pub header: Option<String>,
+    pub prefix: Option<String>,
+    pub label: Option<String>,
+    pub account_label: Option<String>,
+    pub identity: Option<AuthIdentity>,
+    pub scopes: Option<AuthScopes>,
+    pub access: Option<AuthAccess>,
+}
+
+/// `connectors_definitions.definition.AuthLibraryId`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AuthLibraryId {
+    #[serde(rename = "urn:beyond10x:connectors-auth:1")]
+    V1,
+}
+
+/// `connectors_definitions.definition.AuthLibrary`: profiles several providers
+/// share, `auth/<name>.yaml`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuthLibrary {
+    pub schema: AuthLibraryId,
+    pub profiles: BTreeMap<String, Auth>,
 }
 
 /// `connectors_definitions.definition.Effect`.
@@ -166,8 +231,17 @@ pub enum Refusal {
     UnknownField(String),
     /// A `schema` other than [`SCHEMA`].
     WrongSchema(String),
-    /// `auth` with other than exactly one entry; v1 lowers one profile.
-    AuthCount(usize),
+    /// No auth profile, or more than one and other than exactly one marked
+    /// `default: true`; the count is how many are marked.
+    AuthDefault(usize),
+    /// A shared auth file that cannot be read, or is not a valid
+    /// `urn:beyond10x:connectors-auth:1` file, or a `use` that is not a plain
+    /// file name.
+    AuthLibrary(String),
+    /// A profile `use`s a shared file that has no profile of the same id.
+    AuthProfileMissing { key: String, library: String },
+    /// A profile, after `use`, lacks a field its scheme needs.
+    AuthIncomplete { key: String, field: String },
     /// A `{variable}` in `base_url` that `config` does not declare.
     UndeclaredVariable(String),
     /// A `source` path that is absolute or leaves the definitions root.
@@ -222,7 +296,10 @@ impl Refusal {
             Self::Malformed(_) => "malformed",
             Self::UnknownField(_) => "unknown_field",
             Self::WrongSchema(_) => "wrong_schema",
-            Self::AuthCount(_) => "auth_count",
+            Self::AuthDefault(_) => "auth_default",
+            Self::AuthLibrary(_) => "auth_library",
+            Self::AuthProfileMissing { .. } => "auth_profile_missing",
+            Self::AuthIncomplete { .. } => "auth_incomplete",
             Self::UndeclaredVariable(_) => "undeclared_variable",
             Self::SourceOutsideRoot(_) => "source_outside_root",
             Self::SourceNotGzip(_) => "source_not_gzip",
@@ -252,11 +329,20 @@ impl std::fmt::Display for Refusal {
             | Self::SourceOutsideRoot(detail)
             | Self::SourceNotGzip(detail)
             | Self::SourceTooLarge(detail)
+            | Self::AuthLibrary(detail)
             | Self::Pipeline(detail)
             | Self::Write(detail) => write!(f, "{name}: {detail}"),
             Self::WrongSchema(schema) => write!(f, "{name}: `{schema}`, expected `{SCHEMA}`"),
-            Self::AuthCount(count) => {
-                write!(f, "{name}: {count} auth entries; v1 lowers exactly one")
+            Self::AuthDefault(count) => write!(
+                f,
+                "{name}: {count} auth profiles marked default; with more than one profile, exactly one is"
+            ),
+            Self::AuthProfileMissing { key, library } => write!(
+                f,
+                "{name}: auth profile `{key}` uses `auth/{library}.yaml`, which has no profile `{key}`"
+            ),
+            Self::AuthIncomplete { key, field } => {
+                write!(f, "{name}: auth profile `{key}` has no `{field}`")
             }
             Self::UndeclaredVariable(variable) => write!(
                 f,
@@ -362,6 +448,8 @@ pub struct Lowered {
     pub entry: bundle::Entry,
     pub bundle: PathBuf,
     pub operations: PathBuf,
+    /// `<provider>.auth.json`: every profile as the provider's `auth` block.
+    pub auth: PathBuf,
 }
 
 /// One row of the selection, in the shape the catalog provider's `Selection`
@@ -603,6 +691,157 @@ fn summary(document: &Value, operation_id: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// `base` with every field `over` gives replacing its counterpart, `identity`
+/// field by field.
+fn merged(base: &Auth, over: &Auth) -> Auth {
+    let identity = match (&base.identity, &over.identity) {
+        (Some(base), Some(over)) => Some(AuthIdentity {
+            path: over.path.clone().or_else(|| base.path.clone()),
+            kind: over.kind.clone().or_else(|| base.kind.clone()),
+            subject: over.subject.clone().or_else(|| base.subject.clone()),
+        }),
+        (base, over) => over.clone().or_else(|| base.clone()),
+    };
+    Auth {
+        library: None,
+        default: over.default.or(base.default),
+        scheme: over.scheme.or(base.scheme),
+        header: over.header.clone().or_else(|| base.header.clone()),
+        prefix: over.prefix.clone().or_else(|| base.prefix.clone()),
+        label: over.label.clone().or_else(|| base.label.clone()),
+        account_label: over
+            .account_label
+            .clone()
+            .or_else(|| base.account_label.clone()),
+        identity,
+        scopes: over.scopes.clone().or_else(|| base.scopes.clone()),
+        access: over.access.clone().or_else(|| base.access.clone()),
+    }
+}
+
+/// Every profile of the definition with its `use` resolved, and the one the
+/// bundle records: the only one, or the one marked `default: true`.
+fn resolve_auth(
+    definition: &ProviderDefinition,
+    root: &Path,
+) -> Result<(String, BTreeMap<String, Auth>), Refusal> {
+    let mut resolved = BTreeMap::new();
+    for (id, entry) in &definition.auth {
+        let profile = match &entry.library {
+            None => entry.clone(),
+            Some(library) => {
+                if library.is_empty()
+                    || !library
+                        .bytes()
+                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+                {
+                    return Err(Refusal::AuthLibrary(format!(
+                        "`use: {library}` is not a plain lowercase name"
+                    )));
+                }
+                let path = under_root(root, &format!("auth/{library}.yaml"))
+                    .map_err(|refusal| Refusal::AuthLibrary(refusal.to_string()))?;
+                let bytes = std::fs::read(&path).map_err(|error| {
+                    Refusal::AuthLibrary(format!("auth/{library}.yaml: {error}"))
+                })?;
+                let shared: AuthLibrary = serde_yaml_ng::from_slice(&bytes).map_err(|error| {
+                    Refusal::AuthLibrary(format!("auth/{library}.yaml: {error}"))
+                })?;
+                let base = shared
+                    .profiles
+                    .get(id)
+                    .ok_or_else(|| Refusal::AuthProfileMissing {
+                        key: id.clone(),
+                        library: library.clone(),
+                    })?;
+                if base.library.is_some() || base.default.is_some() {
+                    return Err(Refusal::AuthLibrary(format!(
+                        "auth/{library}.yaml profile `{id}` carries `use` or `default`, which only a provider's profile may"
+                    )));
+                }
+                merged(base, entry)
+            }
+        };
+        resolved.insert(id.clone(), profile);
+    }
+    let marked: Vec<&String> = resolved
+        .iter()
+        .filter(|(_, profile)| profile.default == Some(true))
+        .map(|(id, _)| id)
+        .collect();
+    let default = match (resolved.len(), &marked[..]) {
+        (1, []) => resolved.keys().next().cloned(),
+        (_, [only]) => Some((*only).clone()),
+        _ => None,
+    }
+    .ok_or(Refusal::AuthDefault(marked.len()))?;
+    Ok((default, resolved))
+}
+
+/// One resolved profile as the catalog provider's `auth` block.
+fn auth_block(id: &str, profile: &Auth) -> Result<Value, Refusal> {
+    let missing = |field: &str| Refusal::AuthIncomplete {
+        key: id.to_owned(),
+        field: field.to_owned(),
+    };
+    let scheme = profile.scheme.ok_or_else(|| missing("scheme"))?;
+    let label = profile.label.as_ref().ok_or_else(|| missing("label"))?;
+    let identity = profile
+        .identity
+        .as_ref()
+        .ok_or_else(|| missing("identity"))?;
+    let mut block = serde_json::json!({
+        "profile": id,
+        "label": label,
+        "identity": {
+            "path": identity.path.as_ref().ok_or_else(|| missing("identity.path"))?,
+            "kind": identity.kind.as_ref().ok_or_else(|| missing("identity.kind"))?,
+        },
+    });
+    if let Some(subject) = &identity.subject {
+        block["identity"]["subject_pointer"] = Value::from(subject.as_str());
+    }
+    let header = profile.header.clone();
+    match scheme {
+        AuthScheme::Basic => {
+            block["scheme"] = Value::from("basic");
+            block["header"] = Value::from(header.unwrap_or_else(|| "Authorization".to_owned()));
+            block["bearer"] = Value::Bool(false);
+            block["account_label"] = Value::from(
+                profile
+                    .account_label
+                    .as_ref()
+                    .ok_or_else(|| missing("account_label"))?
+                    .as_str(),
+            );
+        }
+        AuthScheme::Bearer => {
+            block["header"] = Value::from(header.unwrap_or_else(|| "Authorization".to_owned()));
+            block["bearer"] = Value::Bool(true);
+        }
+        AuthScheme::Header => {
+            block["header"] = Value::from(header.ok_or_else(|| missing("header"))?);
+            block["bearer"] = Value::Bool(false);
+            if let Some(prefix) = &profile.prefix {
+                block["prefix"] = Value::from(prefix.as_str());
+            }
+        }
+    }
+    if let Some(scopes) = &profile.scopes {
+        block["scopes"] = serde_json::json!({"path": scopes.path, "pointer": scopes.pointer});
+        if let Some(minimum) = &scopes.minimum {
+            block["minimum_scopes"] = serde_json::json!(minimum);
+        }
+    }
+    if let Some(access) = &profile.access {
+        block["access"] = serde_json::json!({"path": access.path});
+        if let Some(query) = &access.query {
+            block["access"]["query"] = serde_json::json!(query);
+        }
+    }
+    Ok(block)
+}
+
 /// Lower one definition. Every check that can refuse runs before the output
 /// directory is touched: the bundle is compiled into a staging directory under
 /// `scratch`, the selection is resolved against it, and only then are the bundle
@@ -618,9 +857,12 @@ pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
         .and_then(|stem| stem.to_str())
         .ok_or_else(|| Refusal::Unreadable(format!("{shown}: no file stem")))?;
 
-    let [auth_profile] = definition.auth.keys().collect::<Vec<_>>()[..] else {
-        return Err(Refusal::AuthCount(definition.auth.len()));
-    };
+    let (default_profile, profiles) = resolve_auth(&definition, request.root)?;
+    let auth_profile = default_profile.as_str();
+    let mut blocks = serde_json::Map::new();
+    for (id, profile) in &profiles {
+        blocks.insert(id.clone(), auth_block(id, profile)?);
+    }
     for variable in variables(&definition.base_url)? {
         if !definition
             .config
@@ -794,10 +1036,21 @@ pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
         .map_err(|error| Refusal::Write(error.to_string()))?;
     let operations_path = request.out.join(format!("{provider}.operations.json"));
     std::fs::write(&operations_path, selection).map_err(write)?;
+    let mut auth = serde_json::to_vec_pretty(&serde_json::json!({
+        "format": AUTH_FORMAT,
+        "provider": provider,
+        "default": auth_profile,
+        "profiles": blocks,
+    }))
+    .map_err(|error| Refusal::Write(error.to_string()))?;
+    auth.push(b'\n');
+    let auth_path = request.out.join(format!("{provider}.auth.json"));
+    std::fs::write(&auth_path, auth).map_err(write)?;
     Ok(Lowered {
         provider: provider.to_owned(),
         bundle: request.out.join(&entry.file_name),
         entry,
         operations: operations_path,
+        auth: auth_path,
     })
 }

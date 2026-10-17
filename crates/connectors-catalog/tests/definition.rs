@@ -234,14 +234,43 @@ fn a_non_get_operation_without_effect_is_refused() {
 }
 
 #[test]
-fn an_auth_with_other_than_exactly_one_entry_is_refused() {
-    let two = jira_text().replace(
-        "  atlassian.basic: {scheme: basic}\n",
-        "  atlassian.basic: {scheme: basic}\n  atlassian.bearer: {scheme: bearer}\n",
+fn two_profiles_need_exactly_one_default_and_none_is_refused() {
+    let bearer = "  atlassian.bearer: {scheme: bearer, label: Atlassian access token, identity: {path: myself, kind: atlassian.account}}\n";
+    let two = insert_profile(&jira_text(), bearer);
+    assert!(matches!(lower(&two).refusal(), Refusal::AuthDefault(0)));
+    let both = insert_profile(
+        &jira_text(),
+        &bearer.replace("{scheme: bearer,", "{default: true, scheme: bearer,"),
+    )
+    .replace("{scheme: basic,", "{default: true, scheme: basic,");
+    assert!(matches!(lower(&both).refusal(), Refusal::AuthDefault(2)));
+    let marked = insert_profile(
+        &jira_text(),
+        &bearer.replace("{scheme: bearer,", "{default: true, scheme: bearer,"),
     );
-    assert!(matches!(lower(&two).refusal(), Refusal::AuthCount(2)));
-    let none = jira_text().replace("auth:\n  atlassian.basic: {scheme: basic}\n", "auth: {}\n");
-    assert!(matches!(lower(&none).refusal(), Refusal::AuthCount(0)));
+    let lowering = lower(&marked);
+    let lowered = lowering.outcome.as_ref().expect("one default lowers");
+    let bundle: Value = serde_json::from_slice(&std::fs::read(&lowered.bundle).unwrap()).unwrap();
+    assert_eq!(bundle["auth_profile"], "atlassian.bearer");
+    let none = jira_text()
+        .lines()
+        .filter(|line| !line.starts_with("  atlassian.basic:"))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .replace("auth:\n", "auth: {}\n");
+    assert!(matches!(lower(&none).refusal(), Refusal::AuthDefault(0)));
+}
+
+/// `text` with `profile` added as the second entry of `auth`.
+fn insert_profile(text: &str, profile: &str) -> String {
+    let mut out = String::new();
+    for line in text.split_inclusive('\n') {
+        out.push_str(line);
+        if line.starts_with("  atlassian.basic:") {
+            out.push_str(profile);
+        }
+    }
+    out
 }
 
 #[test]
@@ -249,7 +278,7 @@ fn an_unknown_field_is_refused() {
     for text in [
         jira_text().replace("operations:\n", "datasources: {}\noperations:\n"),
         jira_text().replace("{op: getIssue}", "{op: getIssue, retry: {}}"),
-        jira_text().replace("{scheme: basic}", "{scheme: basic, token: x}"),
+        jira_text().replace("{scheme: basic,", "{scheme: basic, token: x,"),
         jira_text().replace("{type: string}", "{type: string, secret: true}"),
         jira_text().replace("  sha256:", "  format: openapi\n  sha256:"),
     ] {
@@ -275,7 +304,7 @@ fn a_schema_other_than_v1_is_refused() {
 #[test]
 fn a_value_outside_the_schema_vocabulary_is_malformed() {
     for text in [
-        jira_text().replace("{scheme: basic}", "{scheme: oauth2}"),
+        jira_text().replace("{scheme: basic,", "{scheme: oauth2,"),
         jira_text().replace("{op: getIssue}", "{op: getIssue, effect: delete}"),
         jira_text().replace("{type: string}", "{type: integer}"),
         jira_text().replace(JIRA_SHA256, &JIRA_SHA256.to_uppercase()),
@@ -408,7 +437,18 @@ fn every_refusal_has_a_distinct_name() {
         Refusal::Malformed(String::new()).name(),
         Refusal::UnknownField(String::new()).name(),
         Refusal::WrongSchema(String::new()).name(),
-        Refusal::AuthCount(0).name(),
+        Refusal::AuthDefault(0).name(),
+        Refusal::AuthLibrary(String::new()).name(),
+        Refusal::AuthProfileMissing {
+            key: String::new(),
+            library: String::new(),
+        }
+        .name(),
+        Refusal::AuthIncomplete {
+            key: String::new(),
+            field: String::new(),
+        }
+        .name(),
         Refusal::UndeclaredVariable(String::new()).name(),
         Refusal::SourceOutsideRoot(String::new()).name(),
         Refusal::SourceNotGzip(String::new()).name(),

@@ -96,7 +96,7 @@ base_url: https://{hostname}
 config:
   hostname: {type: string, default: gitlab.com}
 auth:
-  gitlab.pat: {scheme: bearer}
+  gitlab.pat: {scheme: header, header: PRIVATE-TOKEN, label: GitLab personal access token, identity: {path: user, kind: gitlab.user, subject: /id}, scopes: {path: personal_access_tokens/self, pointer: /scopes, minimum: [api]}}
 paging:
   pages: {request: page, next: "header:x-next-page", limit: per_page, max: 100}
 operations:

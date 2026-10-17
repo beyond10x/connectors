@@ -6,7 +6,7 @@ base_url: https://{site}.atlassian.net
 config:
   site: {type: string}
 auth:
-  atlassian.basic: {scheme: basic}
+  atlassian.basic: {scheme: basic, label: API token, account_label: Account email, identity: {path: myself, kind: atlassian.account, subject: /accountId}}
 operations:
   issue.get: {op: getIssue}
   issue.comments: {op: getComments}

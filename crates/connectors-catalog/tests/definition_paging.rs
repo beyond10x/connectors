@@ -64,7 +64,7 @@ base_url: https://{site}.atlassian.net
 config:
   site: {type: string}
 auth:
-  atlassian.basic: {scheme: basic}
+  atlassian.basic: {scheme: basic, label: API token, account_label: Account email, identity: {path: myself, kind: atlassian.account, subject: /accountId}}
 paging:
   token: {request: nextPageToken, next: /nextPageToken, limit: maxResults, last: /isLast}
   offset: {request: startAt, limit: maxResults, total: /total}
@@ -105,7 +105,7 @@ base_url: https://{hostname}
 config:
   hostname: {type: string, default: gitlab.com}
 auth:
-  gitlab.pat: {scheme: bearer}
+  gitlab.pat: {scheme: header, header: PRIVATE-TOKEN, label: GitLab personal access token, identity: {path: user, kind: gitlab.user, subject: /id}, scopes: {path: personal_access_tokens/self, pointer: /scopes, minimum: [api]}}
 paging:
   pages: {request: page, next: \"header:x-next-page\", limit: per_page, max: 100}
 operations:
