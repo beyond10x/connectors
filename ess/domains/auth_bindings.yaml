@@ -146,7 +146,7 @@ entities:
       - {name: active_generation, kind: references, target: connectors.credentials.CredentialGeneration, cardinality: one, via: active_generation_id}
       - {name: active_custody_version, kind: references, target: connectors.auth_bindings.CustodyVersion, cardinality: one, via: active_custody_version_ref}
       - {name: superseded_custody_versions, kind: references, target: connectors.auth_bindings.CustodyVersion, cardinality: many, via: superseded_custody_version_refs}
-    # connection semantics.md:140-143: active custody requires an active
+    # connection semantics.md:166-169: active custody requires an active
     # generation; a material-free access mode has neither.
     invariants:
       - any:
@@ -372,11 +372,11 @@ commands:
     # stay as history. A connection allocated and never published (a connect
     # that failed before publication) does not count: it holds no credential,
     # the host cannot revoke it, and its own publication checks count only
-    # published non-revoked connections (registry/lifecycle.rs:188, :285).
+    # published non-revoked connections (registry/lifecycle.rs:194, :515).
     # An instance that held more than one published non-revoked connection
     # before this rule keeps them all (connection refs stay byte for byte) and
     # is refused a new one until the extra ones are revoked. The host's bound
-    # of 1000 connections per instance_id (registry/lifecycle.rs:20-22) stays
+    # of 1000 connections per instance_id (registry/lifecycle.rs:569-581) stays
     # the storage bound for revoked history.
     # held_connection_ref is the owner's read, an input as `decision` is.
     # ESS-LIMIT: a guard over the instance's other Connections
@@ -388,7 +388,7 @@ commands:
         when:
           all: [decision == allow, defined(held_connection_ref)]
         error: connectors.auth_bindings.InstanceConnected
-      # connection semantics.md:120-126: the allocated binding keeps its admitted
+      # connection semantics.md:122-128: the allocated binding keeps its admitted
       # instance, profile record, owner scope, fixed access mode and the private
       # publication fence the owner allocated with it (registry/lifecycle.rs begin).
       - name: allocated
@@ -470,7 +470,7 @@ commands:
       - {name: connection_ref, type: String}
       - {name: publication, type: connectors.auth_bindings.BindingPublication}
     outcomes:
-      # connection semantics.md:140-141 and docs/design.md:1358: publication is
+      # connection semantics.md:166-167 and docs/design.md:1358: publication is
       # compare-and-set on the private fence and advances it.
       - name: stale-fence
         when_subject:
@@ -489,7 +489,7 @@ commands:
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.ConnectionStateConflict}
     # DECIDED 2026-09-27: PublishBinding with decision allow on a Revoked Connection refuses
     # with ConnectionStateConflict, as RevokeConnection does; input guards decide first (refuse → Refused, unknown → Unavailable).
-    # The host (crates/connectors-host/src/local/metadata/er.rs:2989-2994) maps no
+    # The host (crates/connectors-host/src/local/metadata/er.rs:4245-4258) maps no
     # Revoked row change to this command, so no code states another answer.
     # On a Stale Connection any allowed publication moves it back to Live: the
     # provider accepted a credential, through a reconnect or a revalidation it
@@ -637,7 +637,7 @@ commands:
       - {name: version_ref, type: String}
       - {name: acknowledged_at, type: Timestamp}
     outcomes:
-      # custody semantics.md:86 and docs/local-connection-registry.md:32: the
+      # custody semantics.md:86 and docs/local-connection-registry.md:34: the
       # acknowledgement, invalidity and retirement facts are recorded.
       - name: stored
         when: decision == allow

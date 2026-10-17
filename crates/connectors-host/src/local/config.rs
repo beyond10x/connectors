@@ -1691,12 +1691,15 @@ impl Executable {
                 _ => break None,
             }
         };
+        // The group goes when the provider ends, so a descendant holding the
+        // output closes it now rather than at the deadline; what the provider
+        // wrote before it ended stays in the pipe for the reader.
+        stop(&mut child);
         let printed = status.and_then(|_| {
             received
                 .recv_timeout(until.saturating_duration_since(Instant::now()))
                 .ok()
         });
-        stop(&mut child);
         match (status, printed) {
             (Some(status), _) if !status.success() => Err(Unprinted::Refused),
             (Some(_), Some(Ok(printed))) if printed.len() as u64 <= LIMIT => Ok(printed),
@@ -2665,16 +2668,16 @@ mod derived_instance_tests {
         assert_eq!(fixture.read(&format!("{taken}{ZENDESK}")).err(), INVALID);
     }
 
-    /// The provider is started in its own process group; at the deadline the
-    /// group is killed and its output abandoned, so a descendant holding the
-    /// output open does not hold the load, and nothing else is asked.
+    /// The provider is started in its own process group, which is killed when
+    /// the provider ends, so a descendant holding the output open does not
+    /// hold the load until the ten-second deadline, and nothing else is asked.
     #[test]
     fn printing_the_bootstrap_is_bounded_when_a_descendant_keeps_the_output() {
         let fixture = Fixture::gmail("gmail.private");
         fixture.behave("sleep 25 &\nexit 0");
         let started = std::time::Instant::now();
         assert_eq!(fixture.read(GMAIL).err(), INVALID);
-        assert!(started.elapsed() < std::time::Duration::from_secs(12));
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
         assert_eq!(fixture.args().matches("--connector").count(), 1);
     }
 

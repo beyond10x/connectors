@@ -249,7 +249,7 @@ struct Declaration {
     #[serde(default)]
     default_endpoint: Option<String>,
     /// Appended to the endpoint to form `api_base`, for a connector whose users
-    /// know the host (`https://gitlab.example.com`), not the API under it. An
+    /// know the host (`https://code.example.com`), not the API under it. An
     /// absolute path without a trailing `/`; absent, the endpoint is `api_base`.
     #[serde(default)]
     api_path: Option<String>,
@@ -357,7 +357,7 @@ fn derived(instance: &Instance<'_>) -> Result<(Configuration, Sources)> {
         .ok_or(Failure::InvalidConfiguration)?
         .to_owned();
     // An endpoint that is already the API base is refused, not doubled. A
-    // relative-root install (`https://example.com/gitlab`) serves the API under
+    // relative-root install (`https://example.com/code`) serves the API under
     // its root, which is then a request prefix in front of the bundle's paths.
     let (api_base, request_prefix) = match declaration.api_path.as_deref() {
         None => (endpoint.clone(), None),
@@ -1848,12 +1848,62 @@ mod tests {
         rustls::{self, pki_types::PrivatePkcs8KeyDer},
     };
 
-    /// A derived GitLab instance whose endpoint is a bare host validates by
-    /// `GET /api/v4/user` and `GET /api/v4/personal_access_tokens/self` on that
-    /// host. Everything but the fixture's trust root is derived; a derived
-    /// configuration names no `ca_file` of its own.
+    /// A JSON document holding `value` at the JSON pointer `pointer`.
+    fn at_pointer(pointer: &str, value: Value) -> Value {
+        let keys: Vec<&str> = pointer.split('/').skip(1).collect();
+        keys.into_iter()
+            .rev()
+            .fold(value, |inner, key| json!({ key: inner }))
+    }
+
+    /// Every shipped connector whose declaration names an `api_path` is found
+    /// by that field, not by name: a derived instance whose endpoint is a bare
+    /// host validates by the profile's identity and scope reads under
+    /// `<host><api_path>`. The connector's own rule is data in its
+    /// declaration, which this engine reads generically.
     #[test]
-    fn a_bare_gitlab_host_is_probed_under_its_api_base() {
+    fn a_bare_host_is_probed_under_the_declared_api_path() {
+        let hosted: Vec<Declaration> = shipped::CONNECTORS
+            .iter()
+            .map(|(_, text, _)| connectors_core::read_json::<Declaration>(text.as_bytes()).unwrap())
+            .filter(|declaration| declaration.api_path.is_some())
+            .collect();
+        assert!(
+            !hosted.is_empty(),
+            "no shipped declaration names an api_path"
+        );
+        for declaration in hosted {
+            a_bare_host_is_probed_under(declaration);
+        }
+    }
+
+    /// Everything but the fixture's trust root is derived; a derived
+    /// configuration names no `ca_file` of its own.
+    fn a_bare_host_is_probed_under(declaration: Declaration) {
+        let connector = declaration.connector_id.clone();
+        let api_path = declaration.api_path.clone().unwrap();
+        let auth = declaration
+            .profiles
+            .iter()
+            .find(|profile| profile.scheme == Scheme::Token)
+            .unwrap_or_else(|| panic!("{connector}: no token profile to probe"))
+            .clone();
+        let under = |path: &str| format!("{api_path}/{}", path.trim_start_matches('/'));
+        let mut answers = BTreeMap::new();
+        let identity = auth.identity.path.as_deref().expect("an API identity");
+        let subject = auth.identity.subject_pointer.as_deref().unwrap_or("/id");
+        answers.insert(under(identity), at_pointer(subject, json!(7)));
+        if let Some(scopes) = &auth.scopes {
+            let granted: Vec<&String> = auth.minimum_scopes.iter().collect();
+            answers.insert(
+                under(&scopes.path),
+                at_pointer(&scopes.pointer, json!(granted)),
+            );
+        }
+        if let Some(access) = &auth.access {
+            answers.insert(under(&access.path), json!({}));
+        }
+        let expected: BTreeSet<String> = answers.keys().cloned().collect();
         let directory = tempfile::tempdir().unwrap();
         let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
         let ca = directory.path().join("ca.pem");
@@ -1880,6 +1930,7 @@ mod tests {
             let acceptor = TlsAcceptor::from(Arc::new(tls));
             let targets = Arc::new(Mutex::new(Vec::<String>::new()));
             let seen = targets.clone();
+            let served = answers.clone();
             let server = tokio::spawn(async move {
                 while let Ok((stream, _)) = listener.accept().await {
                     let Ok(mut stream) = acceptor.accept(stream).await else {
@@ -1896,10 +1947,9 @@ mod tests {
                     let target = head.split_whitespace().nth(1).unwrap_or_default();
                     let target = target.split('?').next().unwrap_or_default();
                     seen.lock().unwrap().push(target.to_owned());
-                    let (status, body) = match target {
-                        "/api/v4/user" => (200, json!({"id": 7})),
-                        "/api/v4/personal_access_tokens/self" => (200, json!({"scopes": ["api"]})),
-                        _ => (404, json!({"message": "404 Not Found"})),
+                    let (status, body) = match served.get(target) {
+                        Some(body) => (200, body.clone()),
+                        None => (404, json!({"message": "404 Not Found"})),
                     };
                     let body = serde_json::to_vec(&body).unwrap();
                     let reply = format!(
@@ -1913,27 +1963,26 @@ mod tests {
             });
             let endpoint = format!("https://localhost:{port}");
             let (mut config, sources) = derived(&Instance {
-                connector: "gitlab",
+                connector: &connector,
                 name: "work",
                 endpoint: Some(&endpoint),
-                profile: None,
+                profile: Some(&auth.profile),
             })
             .unwrap();
-            assert_eq!(config.api_base, format!("{endpoint}/api/v4"));
+            assert_eq!(config.api_base, format!("{endpoint}{api_path}"), "{connector}");
             config.ca_file = Some(ca.clone());
             let local = Local::configure(config, Some(sources)).unwrap();
             let validated = local
                 .validate(
-                    "gitlab.pat",
-                    Secret(br#"{"token":"fixture-gitlab-token"}"#.to_vec()),
+                    &auth.profile,
+                    Secret(br#"{"token":"fixture-token"}"#.to_vec()),
                 )
                 .await;
             server.abort();
-            assert_eq!(
-                *targets.lock().unwrap(),
-                ["/api/v4/user", "/api/v4/personal_access_tokens/self"]
-            );
-            assert!(validated.is_ok(), "{:?}", validated.err());
+            let probed: BTreeSet<String> = targets.lock().unwrap().iter().cloned().collect();
+            assert_eq!(probed, expected, "{connector}");
+            assert_eq!(targets.lock().unwrap().len(), expected.len(), "{connector}");
+            assert!(validated.is_ok(), "{connector}: {:?}", validated.err());
         });
     }
 }
