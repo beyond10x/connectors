@@ -165,13 +165,6 @@
     },
     {
       "area": "Catalog provider",
-      "detail": "file.raw answers a repository file's exact UTF-8 text at a ref, refusing a file that is not UTF-8 as upstream_protocol and one over the 4 MiB provider response bound as capacity; project.languages answers each language with its percentage; verified against fixtures, not a live GitLab.",
-      "href": "/docs/reference/adapters/gitlab",
-      "label": "GitLab raw file text and languages",
-      "status": "shipped"
-    },
-    {
-      "area": "Catalog provider",
       "detail": "GitLab binds datasource.feed/v1alpha1 as profile gitlab-merge-requests/1, checked against recorded GitLab answers (since 0.32.0).",
       "href": "/docs/reference/adapters/catalog/contracts/feed",
       "label": "GitLab merge-request feed",
