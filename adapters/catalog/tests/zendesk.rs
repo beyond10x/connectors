@@ -107,7 +107,11 @@ const WRITES: [(&str, &str, &str); 3] = [
         "/api/v2/tickets/{ticket_id}",
     ),
     ("ticket.note", "UpdateTicket", "/api/v2/tickets/{ticket_id}"),
-    ("ticket.update", "UpdateTicket", "/api/v2/tickets/{ticket_id}"),
+    (
+        "ticket.update",
+        "UpdateTicket",
+        "/api/v2/tickets/{ticket_id}",
+    ),
 ];
 
 /// The first line of every draft reply, fixed by the selection.
@@ -1114,7 +1118,11 @@ fn the_three_writes_are_write_requirements_only_on_protocol_two() {
     let child = Child::spawn(&one.selection()).unwrap();
     for (id, _, _) in WRITES {
         assert!(
-            child.bootstrap().requirements.iter().all(|r| r.operation != id),
+            child
+                .bootstrap()
+                .requirements
+                .iter()
+                .all(|r| r.operation != id),
             "protocol one lists `{id}`"
         );
     }
@@ -1157,11 +1165,7 @@ fn each_approved_write_sends_its_preflight_and_exactly_one_put_with_the_exact_bo
             "`{id}` requests"
         );
         assert_eq!(result["status"], 200, "`{id}`");
-        let served = updated(
-            "/api/v2/tickets/101",
-            &serde_json::to_vec(&body).unwrap(),
-        )
-        .1;
+        let served = updated("/api/v2/tickets/101", &serde_json::to_vec(&body).unwrap()).1;
         assert_eq!(result["body"], served, "`{id}` body");
         assert_eq!(result["provenance"]["instance"], "fixture-zendesk");
     }
@@ -1229,24 +1233,38 @@ fn an_update_outside_the_pinned_values_is_refused_naming_the_field_before_any_re
     let provider = Provider::writing();
     let mut child = Child::spawn(&provider.selection()).unwrap();
     for (ticket, named) in [
-        (json!({"priority": "critical", "updated_stamp": STAMP}), "priority"),
+        (
+            json!({"priority": "critical", "updated_stamp": STAMP}),
+            "priority",
+        ),
         (json!({"type": "bug", "updated_stamp": STAMP}), "type"),
         (json!({"tags": "vip", "updated_stamp": STAMP}), "tags"),
         (json!({"group_id": "7", "updated_stamp": STAMP}), "group_id"),
         (json!({"updated_stamp": STAMP}), "group_id"),
-        (json!({"priority": "high", "status": "solved", "updated_stamp": STAMP}), ""),
+        (
+            json!({"priority": "high", "status": "solved", "updated_stamp": STAMP}),
+            "",
+        ),
     ] {
         let input = json!({"ticket_id": 101, "body": {"ticket": ticket}});
         // The engine names the field; the private boundary carries the code.
         let error = match tokio::runtime::Builder::new_current_thread()
             .build()
             .unwrap()
-            .block_on(engine.prepare(&Unreachable, "fixture-zendesk", "ticket.update", input.clone()))
-        {
+            .block_on(engine.prepare(
+                &Unreachable,
+                "fixture-zendesk",
+                "ticket.update",
+                input.clone(),
+            )) {
             Ok(_) => panic!("{input} admitted"),
             Err(error) => error,
         };
-        assert_eq!(error.code, connectors_core::ErrorCode::InvalidInput, "{input}");
+        assert_eq!(
+            error.code,
+            connectors_core::ErrorCode::InvalidInput,
+            "{input}"
+        );
         assert!(error.message.contains(named), "{input}: {}", error.message);
         let outcome = write(&mut child, "ticket.update", &input);
         assert!(
@@ -1303,7 +1321,10 @@ fn a_note_or_draft_cannot_be_made_public_and_the_draft_marker_is_always_first() 
         .find(|s| s.id == "ticket.draft_reply")
         .unwrap();
     assert_eq!(
-        draft.body_prefixes.get("/ticket/comment/body").map(String::as_str),
+        draft
+            .body_prefixes
+            .get("/ticket/comment/body")
+            .map(String::as_str),
         Some(DRAFT_MARKER)
     );
     let provider = Provider::writing();
@@ -1325,7 +1346,10 @@ fn a_note_or_draft_cannot_be_made_public_and_the_draft_marker_is_always_first() 
         }
         let input = json!({"ticket_id": 101, "body": {"ticket": {
             "comment": {"body": "text"}, "updated_stamp": STAMP, "safe_update": false}}});
-        assert!(matches!(write(&mut child, id, &input), Err(Failure::InvalidInput)), "`{id}`");
+        assert!(
+            matches!(write(&mut child, id, &input), Err(Failure::InvalidInput)),
+            "`{id}`"
+        );
     }
     assert!(provider.requests().is_empty(), "a request was sent");
     // A caller who writes the marker itself still gets it first, once more.
