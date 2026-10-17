@@ -1077,17 +1077,48 @@ the Kubernetes token review) is classified separately and not by this rule: a
 `service_code = upstream_protocol` at `dispatch` and
 `next_action = retry_explicitly`.
 
-A read on `operations invoke` refused before dispatch only because the
-connection's validation evidence expired, while its credential is intact (the
-connection reports `pending`), is `code = not_granted` at `stage = admission`
-with `next_action = revalidate_connection`. `connections revalidate`
-recollects the evidence from the credential already in custody, with no
-re-entry, and the same invoke is then admitted. The invoke never revalidates
-on its own: a business read runs no implicit identity probe. A connection whose
-credential the provider refused or is known invalid (`stale`), one whose
-credential expired (`reauthorization_required`), and a credential below the
-operation's scopes, keep `code = not_granted` with
-`next_action = repair_connection`.
+A read on `operations invoke` whose connection's validation evidence expired
+while its credential is intact (the connection reports `pending`) recollects
+that evidence once before it is admitted, as `connections revalidate` does: the
+owner, on the instance's serialized worker, captures the retained custody
+version, runs the profile's identity probe on exactly those bytes, publishes
+the new baseline under the unchanged generation and revision, and then admits
+the read against it. Evidence still current that would lapse before the read
+could use it counts as lapsed: a read whose evidence has less than half its
+own lifetime left (from its collection to its `valid_until`, which the provider's
+identity probe may set below the profile's `evidence_lifetime_ms`, never the
+profile's bound), and less than the read's own remaining deadline, recollects it
+first, because a read's use and its provider deadline never outlast the
+evidence it was admitted on. Evidence fresh from a recollection therefore
+admits its read without another one. Evidence that still lapses between the
+read's capture and its dispatch is refused as expired evidence (below), never
+as the read's own `timeout`. The caller revalidates nothing: a connection connected or
+revalidated once keeps serving reads for as long as its credential stays valid,
+across any number of evidence lifetimes. The recollection asks for no
+credential, writes no custody version and never follows changed material: a
+mounted item whose bytes changed still refuses the read with
+`code = custody_unavailable` and `next_action = revalidate_connection`, and
+only `connections revalidate` re-pins it. A credential the provider refuses in
+the recollection is cut off as an explicit revalidation cuts it off, and the
+read answers as for a stored credential the provider refuses on a read:
+`code = service_failure`, `service_code = unauthorized` with
+`next_action = repair_connection`; the business read is not dispatched. A
+recollection run only because the evidence would lapse early, while it is
+still current, keeps the read admitted on that evidence: when it fails with
+anything but such a credential refusal (the provider or custody briefly
+unavailable, a timeout), the read is served on the evidence it was admitted
+on, for as long as that evidence stays current, because a transient failure
+preserves the still-valid baseline. Any other failure of the recollection of
+expired evidence is the read's own answer, before dispatch.
+Only a read still refused for expired evidence after its one recollection
+answers `code = not_granted` at `stage = admission` with
+`next_action = revalidate_connection`. A consumer launch
+(`connections launch`) recollects nothing and keeps its own refusal
+(consumer-launch.md). A connection whose credential the provider refused
+or is known invalid (`stale`), one whose credential expired
+(`reauthorization_required`), and a credential below the operation's scopes,
+keep `code = not_granted` with `next_action = repair_connection` and recollect
+nothing.
 
 A connection saved under another configuration revision of its instance also
 reports `pending` (`stale = true`), and no status change is pending for it: a

@@ -88,6 +88,13 @@
     },
     {
       "area": "Local runtime",
+      "detail": "A connection connected or revalidated once keeps serving reads across any number of evidence lifetimes: a read on lapsed evidence recollects it once from custody, with no re-entry, before it is served.",
+      "href": "/docs/concepts/local-runtime",
+      "label": "Unattended reads",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
       "detail": "A connectors-local/5 configuration enables connectors by name and names their instances; an instance that pins nothing is derived from the catalog provider installed beside the CLI.",
       "href": "/docs/guides/set-up-the-local-cli#configure-instances",
       "label": "Connector instances",
