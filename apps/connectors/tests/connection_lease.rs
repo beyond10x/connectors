@@ -171,13 +171,20 @@ fn a_read_recollection_never_repins_rotated_mounted_material() {
 
 /// Acceptance 2: two revalidations of one connection started together both
 /// answer `ready`, each within the admission bound. The adapter's identity
-/// probe takes as long as a live provider's does, and the evidence lifetime is
-/// the 60 s default.
+/// probe takes 18 s, more than half the bound (the downstream report has a live
+/// revalidation answering after 24.5 s), and the evidence lifetime is the 60 s
+/// default: two revalidations queued one behind the other, each running its
+/// own probe, would need 36 s, so only the second joining the first answers
+/// both in time, and the provider sees one probe for the pair
+/// (contracts/cli/v1alpha1/owner.md).
 #[test]
 fn concurrent_revalidations_both_answer_ready_within_the_admission_bound() {
+    const PROBE: Duration = Duration::from_secs(18);
+    assert!(2 * PROBE > ADMISSION_BOUND && PROBE < ADMISSION_BOUND);
     let (container, connection, revision) = connected();
     container.set_knob("evidence_ms", 60_000);
-    container.set_knob("probe_ms", 2_000);
+    container.set_knob("probe_ms", PROBE.as_millis() as u64);
+    let probes = container.seen("validations").len();
     let timed = || {
         let started = Instant::now();
         let output = container.revalidate(&connection, &revision);
@@ -204,4 +211,9 @@ fn concurrent_revalidations_both_answer_ready_within_the_admission_bound() {
             "a concurrent revalidation answered after {elapsed:?}"
         );
     }
+    assert_eq!(
+        container.seen("validations").len() - probes,
+        1,
+        "the second revalidation ran its own probe instead of joining the first"
+    );
 }
