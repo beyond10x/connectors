@@ -625,7 +625,7 @@ mod adversary_tests {
 mod adversary_pass2_tests {
     use super::cargo;
     use std::{
-        os::unix::process::ExitStatusExt,
+        os::unix::process::{CommandExt, ExitStatusExt},
         path::Path,
         process::{Command, Output},
     };
@@ -651,14 +651,30 @@ mod adversary_pass2_tests {
     /// `<runner...> <binary> <args...>`, exactly as Cargo spawns a test binary.
     fn run(root: &str, binary: &str, args: &[&str]) -> Output {
         let argv = runner(root);
-        Command::new(&argv[0])
+        let mut command = Command::new(&argv[0]);
+        command
             .args(&argv[1..])
             .arg(binary)
             .args(args)
             .env_clear()
-            .env("PATH", "/usr/bin:/bin")
-            .output()
-            .expect("spawn runner")
+            .env("PATH", "/usr/bin:/bin");
+        // A child killed by SIGABRT or SIGSEGV would otherwise leave a `core` file in the
+        // working directory; the signal is what the tests observe, not the dump.
+        // SAFETY: `setrlimit` is async-signal-safe and the closure touches no other state.
+        unsafe {
+            command.pre_exec(|| {
+                let none = libc::rlimit {
+                    rlim_cur: 0,
+                    rlim_max: 0,
+                };
+                if libc::setrlimit(libc::RLIMIT_CORE, &none) == 0 {
+                    Ok(())
+                } else {
+                    Err(std::io::Error::last_os_error())
+                }
+            });
+        }
+        command.output().expect("spawn runner")
     }
 
     const ROOT: &str = "/checkout/.local/tmp/gate-AbCdEf";
