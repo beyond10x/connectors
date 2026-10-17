@@ -37,7 +37,7 @@ scope:
   path: docs/catalog-github.md
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 20
+revision: 21
 ---
 ## Outcome
 
@@ -47,7 +47,7 @@ The same provider serves a second consumer that reads public repository metadata
 
 ## Source
 
-GitHub's published REST OpenAPI description (github/rest-api-description, MIT licensed), the api.github.com description pinned by SHA-256 under `adapters/github/upstream/` with its licence, redacted by `connectors-build redact` if its examples carry credentials or personal data. Provider id `github`. Auth: a bearer token (fine-grained or classic, minimal public-read scope for the repository reads) held in custody, identity `GET /user`, subject `/id`; and an anonymous profile for public reads (`repos.list`, `repo.get`, releases, `readme.raw`, `file.raw`) with no credential. A run of the second consumer makes about 110 calls, so the anonymous limit (60 per hour) is never the only path; the token profile is the default.
+GitHub's published REST OpenAPI description (github/rest-api-description, MIT licensed), the api.github.com description pinned by SHA-256 under `adapters/github/upstream/` with its licence, redacted by `connectors-build redact` if its examples carry credentials or personal data. Provider id `github`. Auth: a bearer token (fine-grained or classic, minimal public-read scope for the repository reads) held in custody, identity `GET /user`, subject `/id`. A run of the second consumer makes about 110 calls, which the anonymous limit (60 per hour) could not carry anyway.
 
 ## Operations (each `effect: read`)
 
@@ -71,8 +71,10 @@ The exact query shape of `review_requests.list` is fixed in the operation (not c
 Modelled first in `adapters/catalog/spec/ess/domains/selection.yaml` and `contracts/catalog/v1alpha1/semantics.md`, then implemented in `adapters/catalog/src/lib.rs`; new fields serialize only when set, so other bundles keep their bytes:
 
 1. A fixed query value per selection (`q` for `review_requests.list`), which the caller cannot send, and a caller input folded into it (`since` appended as `updated:>=<since>`).
-. Text answers: `readme.raw` and `file.raw` return the file as text. Either a per-selection media type (`application/vnd.github.raw+json`) or decoding the JSON answer's base64 `content`; the choice is made in the specification, with a size bound and a refusal for a binary or oversized file.
-4. An anonymous auth profile (no credential, no identity probe) beside the token profile, if the catalog has none.
+2. A header-keyed rate-limit rule: a 403 or 429 with `x-ratelimit-remaining: 0` is `rate_limited`, with the wait from `Retry-After` or `x-ratelimit-reset`.
+3. Text answers: `readme.raw` and `file.raw` return the file as text. Either a per-selection media type (`application/vnd.github.raw+json`) or decoding the JSON answer's base64 `content`; the choice is made in the specification, with a size bound and a refusal for a binary or oversized file. Decided in the specification: decode the JSON answer's base64 `content` (`embedded_text`).
+
+The anonymous profile is not in this story: the local host admits no profile without a credential (`crates/connectors-host/src/local/runtime.rs:601-607`) and every invocation needs a connection with a secret, so it needs a host model change of its own. The token profile serves all ten reads.
 
 Paging stays caller-driven (`page`, `per_page`); the end condition (a short page) is stated per operation, as for Zendesk and GitLab; the `Link` header is not read.
 
@@ -84,3 +86,7 @@ Paging stays caller-driven (`page`, `per_page`); the end condition (a short page
 - A rate-limit answer (403/429 with `x-ratelimit-remaining: 0`) is `refused` code `rate_limited` with the reset time, never retried in a loop.
 - `docs/catalog-github.md` documents each operation, the token scopes needed (notifications need `notifications` or a classic token), the config block and the commands that set up a local install, with the release link.
 - Bundle drift reproduces the bundle byte for byte; the gate needs no live credential.
+
+## Pinned source (2026-10-17)
+
+github/rest-api-description release `v2.1.0` (2022-10-25, the newest release tag), `api.github.com.yaml`, 8,380,323 bytes before redaction. Its examples carry a real address and example `ghu_`/`ghs_` tokens, so it is pinned redacted. Specification step: commit `4e0bb26e8` on unit/github-reads.
