@@ -1,0 +1,13 @@
+schema: urn:beyond10x:connectors-definition:1
+source:
+  openapi: adapters/atlassian/upstream/vendor/jira-platform-v3.json.gz
+  sha256: 655b4790a5c8543c81755c8250c6a8b8f58ee62712168a39d628d6d927549709
+base_url: https://{site}.atlassian.net
+config:
+  site: {type: string}
+auth:
+  atlassian.basic: {scheme: basic}
+operations:
+  issue.get: {op: getIssue}
+  issue.comments: {op: getComments}
+  issues.search: {op: searchAndReconsileIssuesUsingJql}

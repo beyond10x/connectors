@@ -7,6 +7,7 @@ pub mod amendment;
 pub mod authored;
 pub mod bundle;
 pub mod coverage;
+pub mod definition;
 pub mod derived;
 pub mod discovery;
 pub mod inventory;

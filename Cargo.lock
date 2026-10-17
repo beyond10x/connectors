@@ -621,6 +621,7 @@ name = "connectors-catalog"
 version = "0.52.0"
 dependencies = [
  "connectors-core",
+ "flate2",
  "hex",
  "openapiv3",
  "serde",
