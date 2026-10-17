@@ -7,7 +7,7 @@ title: Connector definitions repository, lowerers, install, runtime roles and th
 relations:
 - designs: architecture-decision-record:provider-definitions-and-runtimes
 - informed_by: architecture-decision-record:declarative-http-provider-runtime
-revision: 7
+revision: 8
 ---
 ## 1. Purpose
 
@@ -269,31 +269,44 @@ defaults, which the bundle has no field for. Schema v2 adds them section by sect
 
 ## 14. Catalog coverage and what is not lowered
 
-State on 2026-10-17, branch `impl/definition-lowerer` over `74d8d857d`.
+State on 2026-10-17, branch `impl/definition-lowerer` with `origin/main` 0.53.1 merged in.
 
-Every selection the catalog ships at that base, 14 files under `adapters/catalog/providers/`, has a
-definition in `beyond10x/connectors-definitions` (`connectors/<name>.yaml`; Slack's user selection
-is `slack-user.yaml` with `catalog: slack`). `connectors-build definition import` wrote them from the
+Every selection the catalog ships, 15 files under `adapters/catalog/providers/`, has a definition in
+`beyond10x/connectors-definitions` (`connectors/<name>.yaml`; Slack's user selection is
+`slack-user.yaml` with `catalog: slack`). `connectors-build definition import` wrote them from the
 shipped files; authored additions were made by hand afterwards. Held by
-`crates/connectors-catalog/tests/definition_import.rs`: for each of the 14, the import lowers to a
+`crates/connectors-catalog/tests/definition_import.rs`: for each of the 15, the import lowers to a
 bundle byte-identical to `adapters/catalog/generated/bundles/<catalog>.bundle.json` and a selection
 equal to the shipped file as a JSON value on every field (feed included), and the committed
 definition itself lowers to the same two files. `task check` in the definitions repository
 validates every definition and shared auth file.
 
-| Connector | Lines | Connector | Lines |
-|---|---|---|---|
-| confluence | 27 | google-slides | 34 |
-| confluence-v1 | 34 | hubspot | 17 |
-| gitlab | 349 | jira | 76 |
-| google-calendar | 40 | opsgenie | 49 |
-| google-drive | 49 | runpod | 38 |
-| google-gmail | 51 | slack | 123 |
-| slack-user | 60 | zendesk | 40 |
+| Connector | Lines | Connector | Lines | Connector | Lines |
+|---|---|---|---|---|---|
+| confluence | 27 | google-gmail | 51 | opsgenie | 49 |
+| confluence-v1 | 34 | google-slides | 34 | runpod | 50 |
+| gitlab | 356 | hubspot | 17 | slack | 123 |
+| google-calendar | 40 | jira | 76 | slack-user | 60 |
+| google-drive | 49 | openrouter | 32 | zendesk | 40 |
 
 GitLab and Slack are long because the shipped selections carry a curated description per operation
 and per-operation guards; a definition writes a description only where it differs from the source's
 `summary`.
+
+## Declared but not lowered
+
+| What | Why |
+|---|---|
+| Paging walk fields `next`, `total`, `last` | the engine pages feeds only (`adapters/catalog/src/feed.rs:92`); for ordinary operations the caller walks. `limit` and `max` lower to bounds |
+| Datasource `filters` (GitLab `mine_open`) | the feed declaration has no presets |
+| `references`, `views` (Jira, GitLab) | `contracts/references/v1alpha1` is proposed; no runtime serves it. The lowerer enforces its rules: patterns compile in Rust `regex` (linear time), URL templates share `base_url`'s origin, the resolve operation is a declared GET whose path parameters are all bound, every value it uses is bound by every match |
+| Auth profiles | lowered to `<name>.auth.json`, an interim file; `connector.json` replaces it after the rebase onto `connector-vocabulary` (D11) |
+| More than one feed per connector | the selection file carries one `feed` (`feed_count`) |
+| OpenRouter's second documented label ("inference key") | the guide documents `openrouter.api-key` twice with two labels; the definition carries the first |
+
+## Not yet held
+
+- `connector.json` byte identity: waits for the rebase onto `connector-vocabulary` (DEC-20261017-26).
 
 ## Declared but not lowered
 

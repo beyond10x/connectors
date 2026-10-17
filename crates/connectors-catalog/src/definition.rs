@@ -420,12 +420,43 @@ pub struct Bound {
     pub values: Option<Vec<String>>,
 }
 
+/// `connectors_definitions.definition.TextRefusalCode`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TextRefusalCode {
+    Capacity,
+}
+
+/// `connectors_definitions.definition.TextRefusal`, the engine's
+/// `connectors_catalog.selection.TextRefusal`, carried as written: a definite
+/// 4xx refusal of a write whose body holds, at one of `pointers`, a string
+/// containing one of `contains` is refused with `code`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TextRefusal {
+    pub pointers: Vec<String>,
+    pub contains: Vec<String>,
+    pub code: TextRefusalCode,
+}
+
+/// `connectors_definitions.definition.Custody`, the engine's
+/// `connectors_catalog.selection.Custody`, carried as written: the pointer of
+/// the credential a write's answer carries that the write created, and the
+/// public members the caller receives in its place.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Custody {
+    pub secret: String,
+    pub returns: BTreeMap<String, String>,
+}
+
 /// `connectors_definitions.definition.Defaults`: the fields an operation
 /// carries to the engine as written, given once for every operation that
 /// does not set the field itself. `envelope` applies only to the reads that
 /// answer JSON (no `response` other than `json`, no `download`), the only
-/// operations the engine admits one on; every other field applies to every
-/// operation.
+/// operations the engine admits one on; `refusal_texts` and `custody` apply only
+/// to writes, the only operations the engine admits them on; every other field
+/// applies to every operation.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Defaults {
@@ -447,6 +478,10 @@ pub struct Defaults {
     pub envelope: Option<Envelope>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rate_limit_reasons: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refusal_texts: Option<Vec<TextRefusal>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custody: Option<Custody>,
 }
 
 /// `connectors_definitions.definition.DatasourceKind`.
@@ -546,7 +581,7 @@ pub struct Datasource {
 }
 
 /// `connectors_definitions.definition.Operation`. `op` is absent only for a
-/// `download`. The fields from `required` to `rate_limit_reasons` reach the
+/// `download`. The fields from `required` to `custody` reach the
 /// engine as written, and each takes its value from `defaults` when not set.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -578,6 +613,10 @@ pub struct Operation {
     pub envelope: Option<Envelope>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rate_limit_reasons: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refusal_texts: Option<Vec<TextRefusal>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custody: Option<Custody>,
     /// The closed body of a write, by key: `string`, `integer`, `boolean` or
     /// `any`; a `string` followed by `+` must not be empty, and a trailing `!`
     /// requires the key; or `=<value>`, sent fixed.
@@ -1021,6 +1060,8 @@ pub struct SelectionEntry {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub rate_limit_reasons: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub refusal_texts: Vec<TextRefusal>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub body_keys: Vec<String>,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub body_types: BTreeMap<String, String>,
@@ -1032,6 +1073,8 @@ pub struct SelectionEntry {
     pub body_fixed: BTreeMap<String, Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub guard: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custody: Option<Custody>,
 }
 
 /// The `connectors-catalog-operations/1` file a definition lowers to.
@@ -1729,6 +1772,8 @@ struct Carried {
     download: Option<Download>,
     envelope: Option<Envelope>,
     rate_limit_reasons: Vec<String>,
+    refusal_texts: Vec<TextRefusal>,
+    custody: Option<Custody>,
 }
 
 fn carried(definition: &ProviderDefinition, operation: &Operation) -> Carried {
@@ -1743,6 +1788,7 @@ fn carried(definition: &ProviderDefinition, operation: &Operation) -> Carried {
         .clone()
         .or_else(|| defaults.download.clone());
     let effect = operation.effect.unwrap_or(Effect::Read);
+    let writes = effect == Effect::Write;
     let answers_json = effect == Effect::Read
         && matches!(response, None | Some(ResponseKind::Json))
         && download.is_none();
@@ -1759,6 +1805,15 @@ fn carried(definition: &ProviderDefinition, operation: &Operation) -> Carried {
             .clone()
             .or_else(|| answers_json.then(|| defaults.envelope.clone()).flatten()),
         rate_limit_reasons: list(&operation.rate_limit_reasons, &defaults.rate_limit_reasons),
+        refusal_texts: operation
+            .refusal_texts
+            .clone()
+            .or_else(|| writes.then(|| defaults.refusal_texts.clone()).flatten())
+            .unwrap_or_default(),
+        custody: operation
+            .custody
+            .clone()
+            .or_else(|| writes.then(|| defaults.custody.clone()).flatten()),
     }
 }
 
@@ -1933,12 +1988,14 @@ pub fn select(
             withhold: carried.withhold,
             credential: carried.credential,
             rate_limit_reasons: carried.rate_limit_reasons,
+            refusal_texts: carried.refusal_texts,
             body_keys: declared_body.keys,
             body_types: declared_body.types,
             body_required: declared_body.required,
             body_nonempty: declared_body.nonempty,
             body_fixed: declared_body.fixed,
             guard,
+            custody: carried.custody,
         });
     }
     check_references(definition, inventory)?;

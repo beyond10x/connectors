@@ -36,10 +36,10 @@
 
 use crate::definition::{
     self, Auth, AuthAccess, AuthIdentity, AuthLibrary, AuthLibraryId, AuthScheme, AuthScopes,
-    Binary, Bound, ConfigField, ConfigType, Datasource, DatasourceKind, Defaults, Download, Effect,
-    Envelope, FeedAuthor, FeedBody, FeedContainers, FeedCursor, FeedItems, FeedPosition, Guard,
-    GuardAfter, GuardBefore, GuardRead, GuardRefusal, IdentitySource, Operation, PagingStyle,
-    ProviderDefinition, ResponseKind, SchemaId, Source,
+    Binary, Bound, ConfigField, ConfigType, Custody, Datasource, DatasourceKind, Defaults,
+    Download, Effect, Envelope, FeedAuthor, FeedBody, FeedContainers, FeedCursor, FeedItems,
+    FeedPosition, Guard, GuardAfter, GuardBefore, GuardRead, GuardRefusal, IdentitySource,
+    Operation, PagingStyle, ProviderDefinition, ResponseKind, SchemaId, Source, TextRefusal,
 };
 use crate::inventory::{Inventory, Location};
 use indexmap::IndexMap;
@@ -188,6 +188,10 @@ struct ShippedOperation {
     credential: Option<Vec<String>>,
     #[serde(default)]
     rate_limit_reasons: Option<Vec<String>>,
+    #[serde(default)]
+    refusal_texts: Option<Vec<TextRefusal>>,
+    #[serde(default)]
+    custody: Option<Custody>,
     #[serde(default)]
     envelope: Option<Envelope>,
     #[serde(default)]
@@ -1310,6 +1314,9 @@ fn defaults(operations: &mut IndexMap<String, Operation>) -> Option<Defaults> {
         },
         |o| &mut o.envelope,
     );
+    let writes = |o: &Operation| o.effect == Some(Effect::Write);
+    defaults.refusal_texts = shared(operations, writes, |o| &mut o.refusal_texts);
+    defaults.custody = shared(operations, writes, |o| &mut o.custody);
     (defaults != Defaults::default()).then_some(defaults)
 }
 
@@ -1808,6 +1815,11 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
             download: operation.download.clone(),
             envelope: operation.envelope.clone(),
             rate_limit_reasons: unless_empty(&operation.rate_limit_reasons),
+            refusal_texts: operation
+                .refusal_texts
+                .clone()
+                .filter(|texts| !texts.is_empty()),
+            custody: operation.custody.clone(),
             body: body_notation(operation)?,
             guard,
             description: (operation.description != summary)
