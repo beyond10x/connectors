@@ -24,7 +24,7 @@ out here. A command that needs a GitLab account is shown without output.
 
 | | Operations |
 |---|---|
-| Reads (30) | `projects.list`, `project.get`, `project.events`, `issues.list`, `file.get`, `repository.tree`, `branch.get`, `branches.list`, `tags.list`, `tag.get`, `releases.list`, `release.get`, `release.links`, `commits.list`, `commit.get`, `commit.diff`, `repository.compare`, `search.blobs`, `deployments.list`, `environments.list`, `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace`, `merge_requests.list`, `merge_request.get`, `merge_request.diffs`, `merge_request.discussions`, `merge_request.discussion.get` |
+| Reads (32) | `projects.list`, `project.get`, `project.events`, `project.languages`, `issues.list`, `file.get`, `file.raw`, `repository.tree`, `branch.get`, `branches.list`, `tags.list`, `tag.get`, `releases.list`, `release.get`, `release.links`, `commits.list`, `commit.get`, `commit.diff`, `repository.compare`, `search.blobs`, `deployments.list`, `environments.list`, `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace`, `merge_requests.list`, `merge_request.get`, `merge_request.diffs`, `merge_request.discussions`, `merge_request.discussion.get` |
 | Writes (21) | `issue.create`, `merge_request.create`, `merge_request.update`, `merge_request.merge`, `merge_request.auto_merge`, `merge_request.reopen`, `merge_request.note.create`, `merge_request.discussion.reply`, `merge_request.discussion.resolve`, `tag.create`, `tag.delete`, `release.create`, `release.update`, `pipeline.retry`, `pipeline.cancel`, `pipeline.create`, `commit.create`, `file.update`, `branch.create`, `branch.delete`, `project.create` |
 
 Most writes are guarded: the merge is refused before any request unless the merge request is

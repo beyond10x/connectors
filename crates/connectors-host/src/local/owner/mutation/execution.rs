@@ -10,6 +10,9 @@ pub(in crate::local::owner) struct Control<'a> {
     pub lifecycle: &'a Mutex<super::super::lifecycle::Control>,
     pub epoch: u64,
     pub stopped: &'a AtomicBool,
+    /// The pool this worker belongs to, through which a created credential is
+    /// held on its custody target's own worker, never this one.
+    pub pool: &'a std::sync::Weak<super::super::supervisor::Pool>,
 }
 pub(in crate::local::owner) struct Invocation<'a> {
     pub request: issuance::Request<'a>,
@@ -182,6 +185,11 @@ pub(in crate::local::owner) fn execute(
         if requirement.effect != runtime::Effect::Write {
             return Err(Code::Unsupported.into());
         }
+        // A created credential that could not be held is foreseeable here,
+        // before any provider work.
+        if let Some(target) = super::custody::expected(&current.adapter.permissions, requirement)? {
+            super::custody::admit(paths, target)?;
+        }
         let registry = registry::Registry::with_system_clock(&paths.state);
         let remaining = until
             .saturating_duration_since(Instant::now())
@@ -249,6 +257,10 @@ pub(in crate::local::owner) fn execute(
         let clock = time(&current, until)?;
         let final_current = issuance::resolve(paths, alias, request, until)?;
         unchanged(&current, &final_current)?;
+        // The commit expects created bytes exactly as the configuration it
+        // runs under and the adapter agree, whatever changed since admission.
+        let custody_target =
+            super::custody::expected(&final_current.adapter.permissions, requirement)?.cloned();
         Ok((
             evidence,
             final_current,
@@ -257,33 +269,35 @@ pub(in crate::local::owner) fn execute(
             native,
             audit,
             facts,
+            custody_target,
         ))
     })();
-    let (evidence, current, clock, mut connection_use, native, audit, facts) = match initial {
-        Ok(value) => value,
-        Err(error) => {
-            let observed = observe_as(
-                paths,
-                alias,
-                request,
-                key,
-                until,
-                &request_id,
-                audit_reference.as_ref(),
-            );
-            if let Ok(Some(existing)) = observed {
-                return Ok(existing);
+    let (evidence, current, clock, mut connection_use, native, audit, facts, custody_target) =
+        match initial {
+            Ok(value) => value,
+            Err(error) => {
+                let observed = observe_as(
+                    paths,
+                    alias,
+                    request,
+                    key,
+                    until,
+                    &request_id,
+                    audit_reference.as_ref(),
+                );
+                if let Ok(Some(existing)) = observed {
+                    return Ok(existing);
+                }
+                let mut value = failure(&first, &request_id, Classification::NotAttempted, error);
+                if let Some(reference) = audit_reference {
+                    finish_audit(&audits, reference, &mut value, until);
+                }
+                // Current disclosure may be revoked while native preflight runs.
+                // Complete our admitted audit before propagating that refusal.
+                observed?;
+                return Ok(value);
             }
-            let mut value = failure(&first, &request_id, Classification::NotAttempted, error);
-            if let Some(reference) = audit_reference {
-                finish_audit(&audits, reference, &mut value, until);
-            }
-            // Current disclosure may be revoked while native preflight runs.
-            // Complete our admitted audit before propagating that refusal.
-            observed?;
-            return Ok(value);
-        }
-    };
+        };
     let reference = audit_reference.ok_or(Code::MetadataUnavailable)?;
     let leases: Result<_, Failure> = (|| {
         let ledger = store(paths, ClockRef(&clock))?;
@@ -462,17 +476,30 @@ pub(in crate::local::owner) fn execute(
                 .map(|_| ())
                 .map_err(|_| Code::OutcomeUnknown.into())
         });
-    let native_result = if final_check.is_ok() {
-        native.commit()
-    } else {
+    let (native_result, created) = if final_check.is_err() {
         let _ = native.cancel();
-        runtime::WriteResult {
-            effect: runtime::WriteEffect::Unknown,
-            result: Err(runtime::Failure::Timeout),
-        }
+        (
+            runtime::WriteResult {
+                effect: runtime::WriteEffect::Unknown,
+                result: Err(runtime::Failure::Timeout),
+            },
+            None,
+        )
+    } else if custody_target.is_some() {
+        native.commit_holding()
+    } else {
+        (native.commit(), None)
     };
     drop(control_guard);
     let (classification, outcome) = native_outcome(native_result);
+    // Held before the attempt settles, on the target's own worker. Whatever
+    // befalls custody, the write stays applied.
+    let outcome = match (custody_target, created, outcome) {
+        (Some(target), Some(secret), Ok(value)) if classification == Classification::Applied => {
+            super::custody::hold(paths, control.pool, &target, secret, value, until)
+        }
+        (_, _, outcome) => outcome,
+    };
     let outcome = StoredOutcome::from(outcome);
     let payload = stored_value(&outcome)?;
     let settled = ledger.settle(

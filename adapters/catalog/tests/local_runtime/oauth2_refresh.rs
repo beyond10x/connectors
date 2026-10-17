@@ -600,9 +600,11 @@ fn assert_no_material_at_rest(provider: &OAuthProvider) {
     assert!(!children.is_empty(), "no provider child observed");
     for pid in children {
         let cmdline = fs::read(format!("/proc/{pid}/cmdline")).unwrap();
-        let environ = fs::read(format!("/proc/{pid}/environ")).unwrap();
         assert!(!carries_oauth_material(&cmdline), "argv of {pid}");
-        assert!(!carries_oauth_material(&environ), "environment of {pid}");
+        assert!(
+            !carries_oauth_material(&child_environ(pid)),
+            "environment of {pid}"
+        );
     }
 }
 

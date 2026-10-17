@@ -704,9 +704,22 @@ impl PreparedInvocation<'_> {
     /// approval, audit, attempt, credential-dispatch and gate acknowledgements.
     /// Every failure from here is possible-write uncertainty, including expiry
     /// before the send. The caller must retain/quarantine its attempt, not retry.
-    pub fn commit(mut self) -> WriteResult {
+    pub fn commit(self) -> WriteResult {
+        self.finish(false).0
+    }
+    /// [`PreparedInvocation::commit`] for a write whose answer carries a
+    /// credential it created (`connectors.mutations.CredentialCustody`): the
+    /// bytes the child sent in the protected slot beside an applied success.
+    /// An applied success without them, or bytes beside anything else, is a
+    /// protocol fault that keeps the reported effect, drops the bytes and
+    /// terminates the child; so are bytes on a commit that expects none.
+    pub fn commit_holding(self) -> (WriteResult, Option<Secret>) {
+        self.finish(true)
+    }
+    fn finish(mut self, holding: bool) -> (WriteResult, Option<Secret>) {
+        let unknown = |code| (WriteResult::unknown(code), None);
         if let Err(code) = self.remaining() {
-            return WriteResult::unknown(code);
+            return unknown(code);
         }
         let response = channel::write(
             &mut self.child.channel,
@@ -719,10 +732,12 @@ impl PreparedInvocation<'_> {
             self.until,
         )
         .and_then(|_| {
+            // The protected slot is read whether or not bytes are expected, so a
+            // child that sends them anyway keeps the effect it reports.
             channel::read::<writes::WriteReply>(
                 &mut self.child.channel,
                 self.until,
-                false,
+                true,
                 RESULT_LIMIT,
             )
         });
@@ -732,39 +747,47 @@ impl PreparedInvocation<'_> {
             // our socket's monotonic timer fires. Recheck the original bounds;
             // an early transport loss stays unavailable, and neither grants retry.
             Err(Failure::Unavailable) => {
-                return WriteResult::unknown(
-                    self.remaining().err().unwrap_or(Failure::Unavailable),
-                );
+                return unknown(self.remaining().err().unwrap_or(Failure::Unavailable));
             }
-            Err(code) => return WriteResult::unknown(code),
+            Err(code) => return unknown(code),
         };
         let writes::WriteReply::WriteResult { id, effect } = frame.control else {
-            return WriteResult::unknown(Failure::Protocol);
+            return unknown(Failure::Protocol);
         };
         if id != self.id || channel::depth(&frame.document).is_err() {
-            return WriteResult::unknown(Failure::Protocol);
+            return unknown(Failure::Protocol);
         }
         let document: writes::ResultDocument = match connectors_core::read_json(&frame.document) {
             Ok(value) => value,
-            Err(_) => return WriteResult::unknown(Failure::Protocol),
+            Err(_) => return unknown(Failure::Protocol),
         };
+        // Retain definite effect knowledge; discard an invalid safe payload or
+        // misplaced bytes and terminate the peer that sent them.
+        let faulted = || {
+            (
+                WriteResult {
+                    effect,
+                    result: Err(Failure::Protocol),
+                },
+                None,
+            )
+        };
+        let secret = Some(frame.secret).filter(|secret| !secret.0.is_empty());
         let result = match document {
-            writes::ResultDocument::Failure { code } => Err(code),
+            writes::ResultDocument::Failure { code } if secret.is_none() => Err(code),
             writes::ResultDocument::Success { value } if effect == WriteEffect::Applied => {
-                if connectors_sdk::validate_write_value(&self.output_schema, &value).is_err() {
-                    // Retain definite applied knowledge; discard an invalid safe
-                    // payload and terminate the peer that violated its schema.
-                    return WriteResult {
-                        effect,
-                        result: Err(Failure::Protocol),
-                    };
+                if connectors_sdk::validate_write_value(&self.output_schema, &value).is_err()
+                    || secret.is_some() != holding
+                {
+                    return faulted();
                 }
                 Ok(value)
             }
-            _ => return WriteResult::unknown(Failure::Protocol),
+            writes::ResultDocument::Failure { .. } => return faulted(),
+            _ => return unknown(Failure::Protocol),
         };
         self.finished = true;
-        WriteResult { effect, result }
+        (WriteResult { effect, result }, secret)
     }
 }
 impl Drop for PreparedInvocation<'_> {
@@ -797,7 +820,7 @@ mod tests {
                 fields:vec![EntryField{name:"token".into(),label:"Fictional credential".into(),max_bytes:100}],
                 acquisition:None,
             }],
-            requirements:vec![Requirement{operation:"read".into(),profile:"fixture".into(),scopes:BTreeSet::new(),effect:Effect::Read}],
+            requirements:vec![Requirement{operation:"read".into(),custody:false,profile:"fixture".into(),scopes:BTreeSet::new(),effect:Effect::Read}],
         }
     }
 

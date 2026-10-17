@@ -65,6 +65,17 @@ const BASIC_HEADER: &str =
     "Basic Zml4dHVyZS1hY2NvdW50QGV4YW1wbGUudGVzdDpmaXh0dXJlLWFwaS10b2tlbi1vbmU=";
 const BASIC_PROFILE: &str = "fixture.basic";
 
+/// The group token create route: a write whose answer carries the token it
+/// created, shown once.
+const CREATE_ROUTE: &str = "/api/v4/groups/org/access_tokens";
+/// The token the create route mints: the fixture's second accepted PAT, so a
+/// read through the connection holding it proves which credential it sent.
+const CREATED_TOKEN: &str = "fixture-pat-two";
+/// A token the create route mints in mode `2`, which the fixture refuses.
+const UNACCEPTED_TOKEN: &str = "fixture-minted-unaccepted";
+/// The public identifier the create route answers beside the token.
+const CREATED_HASH: &str = "fixture-hash-one";
+
 /// Route and `Authorization` header of each fixture request.
 type Authorizations = Arc<Mutex<Vec<(String, Option<String>)>>>;
 
@@ -87,6 +98,14 @@ struct Provider {
     merge_effects: Arc<AtomicUsize>,
     merge_held: Arc<AtomicUsize>,
     merge_preflight_merged: Arc<std::sync::atomic::AtomicBool>,
+    /// How the group token create route answers ([`CREATE_ROUTE`]): `0` creates
+    /// and answers [`CREATED_TOKEN`], `1` holds the answer after receipt,
+    /// `2` creates a token this fixture never accepts.
+    create_mode: Arc<AtomicU8>,
+    /// Every create the fixture received.
+    create_effects: Arc<AtomicUsize>,
+    /// The route and `PRIVATE-TOKEN` header of every request; only compared.
+    tokens: Authorizations,
 }
 impl Provider {
     fn new() -> Self {
@@ -140,6 +159,12 @@ impl Provider {
         let held = merge_held.clone();
         let merge_preflight_merged = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let preflight_merged = merge_preflight_merged.clone();
+        let create_mode = Arc::new(AtomicU8::new(0));
+        let create_behavior = create_mode.clone();
+        let create_effects = Arc::new(AtomicUsize::new(0));
+        let created = create_effects.clone();
+        let tokens = Arc::new(Mutex::new(Vec::new()));
+        let observed_tokens = tokens.clone();
         let thread = std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -208,6 +233,10 @@ impl Provider {
                         .lock()
                         .unwrap()
                         .push((route.to_owned(), authorization.clone()));
+                    observed_tokens
+                        .lock()
+                        .unwrap()
+                        .push((route.to_owned(), credential.clone()));
                     if route == "/api/v4/projects/org%2Fproject/merge_requests/4" {
                         while merge_behavior.load(Ordering::SeqCst) == 4 {
                             tokio::select! { _=&mut stopped=>return, _=tokio::time::sleep(Duration::from_millis(10))=>{} }
@@ -242,7 +271,31 @@ impl Provider {
                         let _ = stream.write_all(&body).await;
                         continue;
                     }
+                    if valid && method == "POST" && route == CREATE_ROUTE {
+                        created.fetch_add(1, Ordering::SeqCst);
+                        let mode = create_behavior.load(Ordering::SeqCst);
+                        if mode == 1 {
+                            // Received, never answered: the caller's deadline passes.
+                            while create_behavior.load(Ordering::SeqCst) == 1 {
+                                tokio::select! { _=&mut stopped=>return, _=tokio::time::sleep(Duration::from_millis(10))=>{} }
+                            }
+                            continue;
+                        }
+                        let token = if mode == 2 { UNACCEPTED_TOKEN } else { CREATED_TOKEN };
+                        let body = serde_json::to_vec(&json!({"id":5,"name":"tenant","scopes":["api"],
+                            "token":token,"hash":CREATED_HASH})).unwrap();
+                        let header = format!("HTTP/1.1 201 fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+                        let _ = stream.write_all(header.as_bytes()).await;
+                        let _ = stream.write_all(&body).await;
+                        continue;
+                    }
                     let forced = forced_status.load(Ordering::SeqCst);
+                    if valid && forced == 0 && let Some((media_type, body)) = raw_answer(route, &path) {
+                        let header = format!("HTTP/1.1 200 fixture\r\nContent-Type: {media_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+                        let _ = stream.write_all(header.as_bytes()).await;
+                        let _ = stream.write_all(&body).await;
+                        continue;
+                    }
                     // A busy route answers `429`, naming `retry_after` when set;
                     // `seen` counts this route's requests, this one included.
                     let mut retry_after: Option<String> = None;
@@ -455,12 +508,20 @@ impl Provider {
             merge_effects,
             merge_held,
             merge_preflight_merged,
+            create_mode,
+            create_effects,
+            tokens,
         }
     }
     fn selection(&self) -> Adapter {
+        self.selection_of(&self.config, "fixture-gitlab")
+    }
+    /// The adapter entry of the catalog configuration at `config`, whose
+    /// instance is `instance`.
+    fn selection_of(&self, config: &Path, instance: &str) -> Adapter {
         let output = Command::new(env!("CARGO_BIN_EXE_connectors-catalog-provider"))
             .arg("--local-config")
-            .arg(&self.config)
+            .arg(config)
             .arg("--print-local-bootstrap")
             .output()
             .unwrap();
@@ -478,7 +539,7 @@ impl Provider {
         Adapter {
             private_protocol: None,
             permissions: Default::default(),
-            instance_id: "fixture-gitlab".into(),
+            instance_id: instance.into(),
             adapter_id: "catalog".into(),
             configuration_revision: bootstrap.configuration_revision,
             protocol: "v1alpha1".into(),
@@ -487,10 +548,7 @@ impl Provider {
             executable: Executable {
                 sha256: hex::encode(Sha256::digest(fs::read(&binary).unwrap())),
                 path: binary,
-                args: vec![
-                    "--local-config".into(),
-                    self.config.to_str().unwrap().into(),
-                ],
+                args: vec!["--local-config".into(), config.to_str().unwrap().into()],
             },
         }
     }
@@ -730,6 +788,48 @@ fn repository_page(route: &str, path: &str) -> Option<Value> {
     };
     Some(Value::Array(items))
 }
+
+/// UTF-8 text the fixture serves raw at `ref=main`: a byte-order mark, CRLF
+/// and LF line endings, multi-byte characters, a NUL and no final newline.
+const RAW_TEXT: &[u8] =
+    "\u{feff}# Guide\r\nna\u{ef}ve caf\u{e9} \u{2014} \u{2713}\n\0tail".as_bytes();
+/// The same file at `ref=v1.0.0`.
+const RAW_TEXT_V1: &[u8] = b"# Guide\nfirst release\n";
+/// The language map the fixture's project answers, percentages included.
+fn fixture_languages() -> Value {
+    json!({"Rust": 71.42, "Shell": 20.0, "Dockerfile": 8.58})
+}
+
+/// The media type and bytes of a route the fixture answers with a body that is
+/// not one JSON document built here: the raw file reads (`docs%2Fguide.md` at
+/// `main` or `v1.0.0`, a Latin-1 file and one a byte over the 4 MiB provider
+/// response bound) and the project's languages. `None` for any other route.
+fn raw_answer(route: &str, path: &str) -> Option<(&'static str, Vec<u8>)> {
+    let query = path.split_once('?').map(|(_, query)| query).unwrap_or("");
+    let at = |name: &str| query.split('&').any(|pair| pair == name);
+    let files = "/api/v4/projects/org%2Fproject/repository/files/";
+    match route
+        .strip_prefix(files)
+        .and_then(|r| r.strip_suffix("/raw"))
+    {
+        Some("docs%2Fguide.md") if at("ref=main") => {
+            Some(("text/plain; charset=utf-8", RAW_TEXT.to_vec()))
+        }
+        Some("docs%2Fguide.md") if at("ref=v1.0.0") => {
+            Some(("text/plain; charset=utf-8", RAW_TEXT_V1.to_vec()))
+        }
+        Some("latin1.txt") => Some(("application/octet-stream", b"caf\xe9 \xff\xfe\n".to_vec())),
+        Some("huge.log") => Some((
+            "text/plain",
+            vec![b'a'; connectors_core::RESPONSE_LIMIT + 1],
+        )),
+        _ if route == "/api/v4/projects/org%2Fproject/languages" => Some((
+            "application/json",
+            serde_json::to_vec(&fixture_languages()).unwrap(),
+        )),
+        _ => None,
+    }
+}
 fn private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).unwrap();
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
@@ -785,9 +885,31 @@ fn assert_children_carry_no_basic_material(config: &Path) {
     assert!(!children.is_empty(), "no provider child observed");
     for pid in children {
         let cmdline = fs::read(format!("/proc/{pid}/cmdline")).unwrap();
-        let environ = fs::read(format!("/proc/{pid}/environ")).unwrap();
         assert!(!carries_basic_material(&cmdline), "argv of {pid}");
-        assert!(!carries_basic_material(&environ), "environment of {pid}");
+        assert!(
+            !carries_basic_material(&child_environ(pid)),
+            "environment of {pid}"
+        );
+    }
+}
+/// The environment of child `pid` as this user can read it. A child that marked
+/// itself not dumpable (`core_dumps::forbid`) has its `/proc/<pid>/environ`
+/// owned by root, so no process of the same user reads it at all; that is
+/// asserted and counts as an environment that carries nothing.
+fn child_environ(pid: u32) -> Vec<u8> {
+    use std::os::unix::fs::MetadataExt;
+    let path = format!("/proc/{pid}/environ");
+    match fs::read(&path) {
+        Ok(environ) => environ,
+        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+            assert_eq!(
+                fs::metadata(&path).unwrap().uid(),
+                0,
+                "{path} is unreadable but not hidden by the kernel"
+            );
+            Vec::new()
+        }
+        Err(error) => panic!("{path}: {error}"),
     }
 }
 fn deadline() -> u64 {
@@ -1240,6 +1362,58 @@ fn repository_reads_send_the_declared_request_and_return_the_recorded_body() {
         );
         assert_eq!(result["provenance"]["instance"], "fixture-gitlab");
     }
+}
+
+/// story:catalog-gitlab-raw-file-and-languages, through the real child and the
+/// HTTPS fixture: `file.raw` answers a UTF-8 file's exact bytes as text at the
+/// `ref` sent, a different text at another ref; a file that is not UTF-8 is
+/// refused `upstream_protocol` and one over the 4 MiB provider response bound
+/// `capacity`; `project.languages` answers the language map unchanged.
+#[test]
+fn raw_file_text_and_project_languages_through_the_child() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let mut raw = |file_path: &str, reference: &str| {
+        invoke(
+            &mut child,
+            "file.raw",
+            "one",
+            &token(true),
+            json!({"id": "org/project", "file_path": file_path, "ref": reference}),
+        )
+    };
+    let main = raw("docs/guide.md", "main").unwrap();
+    assert_eq!(main["status"], 200);
+    assert_eq!(main["body"].as_str().unwrap().as_bytes(), RAW_TEXT);
+    let v1 = raw("docs/guide.md", "v1.0.0").unwrap();
+    assert_eq!(v1["body"].as_str().unwrap().as_bytes(), RAW_TEXT_V1);
+    assert_eq!(raw("latin1.txt", "main").unwrap_err(), Failure::Protocol);
+    assert_eq!(raw("huge.log", "main").unwrap_err(), Failure::Capacity);
+    let calls = provider.calls.lock().unwrap().clone();
+    assert_eq!(
+        calls,
+        [
+            "/api/v4/projects/org%2Fproject/repository/files/docs%2Fguide.md/raw?ref=main",
+            "/api/v4/projects/org%2Fproject/repository/files/docs%2Fguide.md/raw?ref=v1.0.0",
+            "/api/v4/projects/org%2Fproject/repository/files/latin1.txt/raw?ref=main",
+            "/api/v4/projects/org%2Fproject/repository/files/huge.log/raw?ref=main",
+        ]
+    );
+    let languages = invoke(
+        &mut child,
+        "project.languages",
+        "one",
+        &token(true),
+        json!({"id": "org/project"}),
+    )
+    .unwrap();
+    assert_eq!(languages["status"], 200);
+    assert_eq!(languages["body"], fixture_languages());
+    // The transport writes an empty query as a bare `?`.
+    assert_eq!(
+        provider.calls.lock().unwrap().last().unwrap(),
+        "/api/v4/projects/org%2Fproject/languages?"
+    );
 }
 
 #[test]

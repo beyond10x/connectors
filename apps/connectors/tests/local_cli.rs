@@ -637,6 +637,18 @@ fn start_owner_with(
     root: &tempfile::TempDir,
     idle_ms: Option<u64>,
 ) -> OwnerProcess {
+    start_owner_in(binary, root, root, idle_ms)
+}
+
+/// As [`start_owner_with`], reading the configuration of `config_root` and
+/// serving the state directory of `root`.
+#[cfg(unix)]
+fn start_owner_in(
+    binary: &std::path::Path,
+    config_root: &tempfile::TempDir,
+    root: &tempfile::TempDir,
+    idle_ms: Option<u64>,
+) -> OwnerProcess {
     use std::os::{
         fd::AsRawFd,
         unix::{fs::OpenOptionsExt, net::UnixStream},
@@ -668,7 +680,7 @@ fn start_owner_with(
         .arg("-c")
         .arg(r#"exec "$0" __connectors-owner "$1" "$2" 3<&0 4<&1 </dev/null >/dev/null"#)
         .arg(binary)
-        .arg(root.path().join("config/config.toml"))
+        .arg(config_root.path().join("config/config.toml"))
         .arg(&state)
         .stdin(std::process::Stdio::from(std::os::fd::OwnedFd::from(
             owner_end,
@@ -930,6 +942,30 @@ fn adversary_owner_root() -> tempfile::TempDir {
     root
 }
 
+/// A second root whose state directory is a copy of `root`'s, taken before any
+/// owner runs: an owner started there with `root`'s configuration answers a CLI
+/// of `root` (same authority, same configuration path) while `root`'s socket
+/// path stays free for a relay.
+#[cfg(unix)]
+fn adversary2_owner_root(root: &tempfile::TempDir) -> tempfile::TempDir {
+    use std::os::unix::fs::DirBuilderExt;
+    fn copy(from: &std::path::Path, to: &std::path::Path) {
+        fs::DirBuilder::new().mode(0o700).create(to).unwrap();
+        for entry in fs::read_dir(from).unwrap() {
+            let entry = entry.unwrap();
+            let target = to.join(entry.file_name());
+            if entry.file_type().unwrap().is_dir() {
+                copy(&entry.path(), &target);
+            } else {
+                fs::copy(entry.path(), target).unwrap();
+            }
+        }
+    }
+    let owner_root = tempfile::tempdir().unwrap();
+    copy(&root.path().join("state"), &owner_root.path().join("state"));
+    owner_root
+}
+
 /// Owner-channel frame: three big-endian u32 section sizes, then the sections.
 #[cfg(unix)]
 fn adversary_frame(control: &Value) -> Vec<u8> {
@@ -1033,17 +1069,18 @@ fn adversary_read_control(stream: &mut std::os::unix::net::UnixStream) -> Value 
 fn adversary_a_transient_greeting_refusal_from_the_same_build_is_not_a_build_mismatch() {
     use std::os::unix::net::UnixStream;
     let root = adversary_owner_root();
+    let owner_root = adversary2_owner_root(&root);
     let started = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
-    let _owner = start_owner(started, &root);
+    let _owner = start_owner_in(started, &root, &owner_root, None);
     let state = root.path().join("state");
-    fs::rename(state.join("owner.sock"), state.join("real.sock")).unwrap();
     let directory = sockets::Directory::open(&state);
+    let owner_directory = sockets::Directory::open(&owner_root.path().join("state"));
     let listener = directory.bind("owner.sock");
     fs::set_permissions(state.join("owner.sock"), fs::Permissions::from_mode(0o600)).unwrap();
-    let real = directory.path("real.sock");
+    let real = owner_directory.path("owner.sock");
     std::thread::spawn(move || {
         // `real` names the socket through this descriptor.
-        let _directory = &directory;
+        let _directory = (&directory, &owner_directory);
         let mut first = true;
         for stream in listener.incoming() {
             let Ok(client) = stream else { return };
@@ -1224,28 +1261,31 @@ fn protected_sources_are_not_consumed_before_configuration_admission() {
     assert_eq!(refusal["error"]["data"]["code"], "invalid_configuration");
 }
 
-/// Adversary pass 2: a relay in front of the real owner's socket. `drop_first`
-/// decides, from the first frame's control JSON, whether this connection is
+/// Adversary pass 2: a relay in front of the real owner's socket. The owner runs
+/// in `owner_root`'s state directory and the relay listens at `root`'s, so no
+/// owner's socket is replaced (an owner exits once its socket path names another
+/// socket). `drop_first` decides, from the first frame's control JSON, whether this connection is
 /// closed without a reply; every other connection is relayed byte for byte.
 /// Returns the number of connections relayed to the real owner.
 #[cfg(unix)]
 fn adversary2_relay(
     root: &tempfile::TempDir,
+    owner_root: &tempfile::TempDir,
     drop_first: impl Fn(usize, &Value) -> bool + Send + 'static,
 ) -> std::sync::Arc<std::sync::atomic::AtomicUsize> {
     use std::io::{Read, Write};
     use std::os::unix::net::UnixStream;
     let state = root.path().join("state");
-    fs::rename(state.join("owner.sock"), state.join("real.sock")).unwrap();
     let directory = sockets::Directory::open(&state);
+    let owner_directory = sockets::Directory::open(&owner_root.path().join("state"));
     let listener = directory.bind("owner.sock");
     fs::set_permissions(state.join("owner.sock"), fs::Permissions::from_mode(0o600)).unwrap();
-    let real = directory.path("real.sock");
+    let real = owner_directory.path("owner.sock");
     let relayed = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let counter = relayed.clone();
     std::thread::spawn(move || {
         // `real` names the socket through this descriptor.
-        let _directory = &directory;
+        let _directory = (&directory, &owner_directory);
         for (index, stream) in listener.incoming().enumerate() {
             let Ok(mut client) = stream else { return };
             let mut sizes = [0u8; 12];
@@ -1355,11 +1395,12 @@ fn adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_run
 #[test]
 fn adversary2_the_build_probe_against_an_owner_at_capacity_reports_capacity() {
     let root = adversary_owner_root();
+    let owner_root = adversary2_owner_root(&root);
     let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
-    let _owner = start_owner(binary, &root);
-    let _relayed = adversary2_relay(&root, |index, _| index == 0);
-    let directory = sockets::Directory::open(&root.path().join("state"));
-    let held = fill_owner(&directory, "real.sock");
+    let _owner = start_owner_in(binary, &root, &owner_root, None);
+    let _relayed = adversary2_relay(&root, &owner_root, |index, _| index == 0);
+    let directory = sockets::Directory::open(&owner_root.path().join("state"));
+    let held = fill_owner(&directory, "owner.sock");
     let filled = std::time::Instant::now();
     let output = command(&root, &["instances", "status", "--adapter", "forge"]);
     // A slot frees only when a held client reaches the owner's 10-second
@@ -1384,9 +1425,12 @@ fn adversary2_the_build_probe_against_an_owner_at_capacity_reports_capacity() {
 #[test]
 fn adversary2_the_identification_retry_loop_ends_at_its_deadline_without_flooding_the_owner() {
     let root = adversary_owner_root();
+    let owner_root = adversary2_owner_root(&root);
     let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
-    let mut owner = start_owner(binary, &root);
-    let relayed = adversary2_relay(&root, |_, control| control.get("build").is_some());
+    let mut owner = start_owner_in(binary, &root, &owner_root, None);
+    let relayed = adversary2_relay(&root, &owner_root, |_, control| {
+        control.get("build").is_some()
+    });
     let started = std::time::Instant::now();
     let output = command(&root, &["instances", "status", "--adapter", "forge"]);
     let elapsed = started.elapsed();

@@ -147,7 +147,8 @@ fn refusal(config: &Value) -> String {
 /// `file.update` proved its write by reading the branch, not the revision
 /// `commits/{branch}` that a same-named tag wins, and again when the guards of
 /// `merge_request.discussion.resolve` and `merge_request.auto_merge` compared
-/// `/resolvable` and `/merge_when_pipeline_succeeds` as JSON booleans.
+/// `/resolvable` and `/merge_when_pipeline_succeeds` as JSON booleans, and
+/// again when it gained the text read `file.raw` and `project.languages`.
 /// The Jira example loads its shipped selection set too, so its pair was
 /// re-pinned when that set gained `issue.get`, `issue.create_meta` and
 /// `users.search`, again when it gained `issue.transitions`, and again when it
@@ -159,8 +160,8 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
         "gitlab",
-        "79a7cf2b033dab759f522a27c4c09349d91da7cbe3f8dd0db9139bd12bce6390",
-        "4579dfff70a4d1d107c2e71f56f96210bbee67243126d65b61dc0e51b3c2bd96",
+        "ae21bf2222058538c7eb9036973fe8612b04feef04628ace4a5394d59a0f4fd0",
+        "46e04a9d96d0c783771ca07baf47995e159e6d2f3a8dfa461b541f45dd35d9cb",
     ),
     (
         "catalog-jira.md",

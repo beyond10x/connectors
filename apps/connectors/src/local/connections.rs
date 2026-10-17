@@ -30,15 +30,30 @@ pub(super) fn execute(
             owner::Client::connect(paths, true)
                 .map_err(owner_failure)?
                 .revalidate(alias, reference, revision, deadline)
-                .map_err(|error| match error.code {
-                    // The owner's own definite answer to a dispatched
-                    // revalidation; a lost reply is already `outcome_unknown`.
-                    owner::Code::Unavailable | owner::Code::Timeout => {
-                        let code = serde_json::to_value(error.code).unwrap_or_default();
-                        let code = code.as_str().unwrap_or("unavailable").to_owned();
-                        failure(&code, "dispatch", "retry_explicitly", false)
+                .map_err(|error| {
+                    // The class of a transient failure the owner retried, and
+                    // how many validations it sent (semantics.md §6
+                    // "Revalidation retries").
+                    let (cause, attempts) = (error.cause, error.attempts);
+                    let mut reply = match error.code {
+                        // The owner's own definite answer to a dispatched
+                        // revalidation; a lost reply is already `outcome_unknown`.
+                        owner::Code::Unavailable | owner::Code::Timeout => {
+                            let code = serde_json::to_value(error.code).unwrap_or_default();
+                            let code = code.as_str().unwrap_or("unavailable").to_owned();
+                            failure(&code, "dispatch", "retry_explicitly", false)
+                        }
+                        _ => owner_failure(error),
+                    };
+                    if let (Some(cause), HandlerReply::Error { data, .. }) = (cause, &mut reply)
+                        && data["stage"] == "dispatch"
+                    {
+                        data["cause"] = json!(cause);
+                        if let Some(attempts) = attempts {
+                            data["attempts"] = json!(attempts);
+                        }
                     }
-                    _ => owner_failure(error),
+                    reply
                 })
         }
         "connections-list" => {

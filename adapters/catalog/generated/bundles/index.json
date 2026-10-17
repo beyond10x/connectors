@@ -73,6 +73,14 @@
       "unsupported": 0
     },
     {
+      "provider": "openrouter",
+      "file_name": "openrouter.bundle.json",
+      "bundle_sha256": "3c89b976a5a8fb115d057273398ea5ece5ba39f93df50a28c545dc9e5c450577",
+      "source_sha256": "fe4f1ad414f5bd25e69b387598d23f3abd24fe74801cd157c633e30bbf766142",
+      "operations": 150,
+      "unsupported": 2
+    },
+    {
       "provider": "opsgenie",
       "file_name": "opsgenie.bundle.json",
       "bundle_sha256": "2583af617c9dea416b254107723e497d2b5e4362edbdfde66acfe8e712fab3e0",
