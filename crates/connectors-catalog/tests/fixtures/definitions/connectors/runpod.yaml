@@ -12,6 +12,15 @@ operations:
   pod.create:
     op: CreatePod
     effect: write
+    refusal_texts:
+      - pointers: [/message, /detail]
+        contains:
+          - no longer any instances available
+          - resources to deploy your pod
+          - insufficient capacity
+          - no available machine
+          - out of stock
+        code: capacity
     body:
       name: any
       imageName: any
@@ -28,10 +37,13 @@ operations:
       dockerStartCmd: any
       dockerEntrypoint: any
       networkVolumeId: any
-    description: Create and deploy one pod from body; a definite 4xx refusal created nothing, while a lost connection or a 5xx after the request was sent leaves the pod possibly created, so check pods.list by name before creating again
+    description: Create and deploy one pod from body; a definite 4xx refusal created nothing, and one naming a lack of capacity is refused as capacity, so the workload may be placed elsewhere, while a lost connection or a 5xx after the request was sent leaves the pod possibly created, so check pods.list by name before creating again
   pods.list:
     op: ListPods
     description: List the account's pods in one answer, filtered by the declared query parameters such as name, desiredStatus or id
+  billing.pods:
+    op: PodBilling
+    description: Read the account's pod billing records in one answer, aggregated by bucketSize and filtered by the declared query parameters such as podId, gpuTypeId or startTime
   pod.terminate:
     op: DeletePod
     effect: write

@@ -1,0 +1,32 @@
+schema: urn:beyond10x:connectors-definition:1
+source:
+  openapi: upstream/openrouter/openrouter-openapi.json.gz
+  sha256: fe4f1ad414f5bd25e69b387598d23f3abd24fe74801cd157c633e30bbf766142
+base_url: https://openrouter.ai/api/v1
+auth:
+  openrouter.api-key:
+    scheme: bearer
+    label: OpenRouter management key
+    identity: {path: key, kind: openrouter.key, subject: /data/label}
+operations:
+  key.get:
+    op: getCurrentKey
+    description: "Read the connection's own key record: its label, limits, usage and whether it is a management key"
+  workspaces.list:
+    op: listWorkspaces
+    description: List the account's workspaces, one page per call, paged by offset and limit
+  keys.list:
+    op: list
+    description: List the account's API keys by hash, label, limits and usage, one page per call, filtered by workspace_id and paged by offset; never their secrets
+  key.create:
+    op: createKeys
+    effect: write
+    custody: {secret: /key, returns: {hash: /data/hash}}
+    body:
+      name: string+!
+      limit: any
+      limit_reset: any
+      include_byok_in_limit: boolean
+      expires_at: any
+      workspace_id: string
+    description: "Create one API key from body; OpenRouter requires body.name. The new key, shown once, is held in custody as a new connection of the configured target alias and never returned: the result is that connection and the key's hash. Unguarded: nothing exists to compare before a create, so the same input approved and sent again creates a second key. body.limit sets its spending limit in USD, body.limit_reset its reset period, body.expires_at its expiry and body.workspace_id its workspace"

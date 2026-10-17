@@ -60,7 +60,7 @@ fn every_lowered_auth_profile_loads_in_the_catalog_provider() {
         .filter(|path| path.extension().is_some_and(|e| e == "yaml"))
         .collect();
     files.sort();
-    assert_eq!(files.len(), 14, "one definition per shipped selection");
+    assert_eq!(files.len(), 15, "one definition per shipped selection");
     let mut loaded = 0;
     for file in &files {
         let name = file.file_stem().unwrap().to_str().unwrap();
@@ -99,5 +99,5 @@ fn every_lowered_auth_profile_loads_in_the_catalog_provider() {
             loaded += 1;
         }
     }
-    assert_eq!(loaded, 18, "every profile of every definition is loaded");
+    assert_eq!(loaded, 19, "every profile of every definition is loaded");
 }

@@ -31,7 +31,7 @@ struct Shipped {
     selection: &'static str,
 }
 
-const SHIPPED: [Shipped; 14] = [
+const SHIPPED: [Shipped; 15] = [
     Shipped {
         name: "confluence",
         catalog: "confluence",
@@ -76,6 +76,11 @@ const SHIPPED: [Shipped; 14] = [
         name: "jira",
         catalog: "jira",
         selection: "jira/operations.json",
+    },
+    Shipped {
+        name: "openrouter",
+        catalog: "openrouter",
+        selection: "openrouter/operations.json",
     },
     Shipped {
         name: "opsgenie",
@@ -330,6 +335,7 @@ connectors! {
     google_slides_round_trips, google_slides_is_committed => "google-slides";
     hubspot_round_trips, hubspot_is_committed => "hubspot";
     jira_round_trips, jira_is_committed => "jira";
+    openrouter_round_trips, openrouter_is_committed => "openrouter";
     opsgenie_round_trips, opsgenie_is_committed => "opsgenie";
     runpod_round_trips, runpod_is_committed => "runpod";
     slack_round_trips, slack_is_committed => "slack";
