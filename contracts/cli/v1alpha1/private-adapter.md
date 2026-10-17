@@ -69,7 +69,9 @@ stdout/stderr are never forwarded.
 
 Native invocation distinguishes a missing provider resource from an absent local
 selection. Its closed failure includes `provider_not_found`,
-`provider_rate_limited` and `provider_internal`; the host projects their existing
+`provider_rate_limited`, `provider_internal` and `provider_conflict` (a write the
+provider refused because its target changed since it was read; additive, so a host
+that predates it refuses the reply as unreadable); the host projects their
 `connectors.service_wire.ErrorCode` values into
 `connectors.cli.Failure.service_code`, with `code=service_failure`. In particular,
 provider `not_found`, `rate_limited` and `internal` must not become local selection
