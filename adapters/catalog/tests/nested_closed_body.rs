@@ -214,7 +214,10 @@ async fn send(
 /// Prepare an input that must be refused before anything is sent: no read.
 async fn refused(engine: &Engine, id: &str, input: Value) -> connectors_core::Error {
     let http = reads(vec![]);
-    let error = match engine.prepare(http.as_ref(), "fixture", id, input.clone()).await {
+    let error = match engine
+        .prepare(http.as_ref(), "fixture", id, input.clone())
+        .await
+    {
         Ok(_) => panic!("`{id}` admitted {input}"),
         Err(error) => error,
     };
@@ -260,7 +263,10 @@ fn pointer_keys_declare_nested_closed_objects_without_the_fixed_values() {
         .collect();
     names.sort();
     // `safe_update` is fixed: the selection's, never the caller's.
-    assert_eq!(names, ["group_id", "priority", "tags", "type", "updated_stamp"]);
+    assert_eq!(
+        names,
+        ["group_id", "priority", "tags", "type", "updated_stamp"]
+    );
     assert_eq!(ticket["properties"]["group_id"], json!({"type": "integer"}));
     assert_eq!(
         ticket["properties"]["tags"],
@@ -304,8 +310,10 @@ async fn fixed_values_are_sent_at_their_pointers_and_the_prefix_leads_the_caller
     .await;
     assert_eq!(
         bodies,
-        [json!({"ticket": {"priority": "high", "tags": ["vip", "billing"],
-                           "updated_stamp": STAMP, "safe_update": true}})]
+        [
+            json!({"ticket": {"priority": "high", "tags": ["vip", "billing"],
+                           "updated_stamp": STAMP, "safe_update": true}})
+        ]
     );
     assert!(matches!(outcome, WriteOutcome::Applied(Ok(_))));
 
@@ -319,8 +327,10 @@ async fn fixed_values_are_sent_at_their_pointers_and_the_prefix_leads_the_caller
     .await;
     assert_eq!(
         bodies,
-        [json!({"ticket": {"comment": {"body": format!("{MARKER}Hello,\nthanks."), "public": false},
-                           "updated_stamp": STAMP, "safe_update": true}})]
+        [
+            json!({"ticket": {"comment": {"body": format!("{MARKER}Hello,\nthanks."), "public": false},
+                           "updated_stamp": STAMP, "safe_update": true}})
+        ]
     );
     assert!(matches!(outcome, WriteOutcome::Applied(Ok(_))));
 }
@@ -335,46 +345,98 @@ async fn a_nested_body_outside_its_closed_shape_is_refused_before_any_request() 
     };
     for (id, input, named) in [
         // A member of `ticket` the selection does not admit.
-        ("ticket.update", ticket(json!({"priority": "high", "status": "solved"})), ""),
+        (
+            "ticket.update",
+            ticket(json!({"priority": "high", "status": "solved"})),
+            "",
+        ),
         // A top-level key beside `ticket`.
-        ("ticket.update", json!({"ticket_id": 101, "body": {"ticket": {"priority": "high", "updated_stamp": STAMP}, "system_metadata": {}}}), ""),
+        (
+            "ticket.update",
+            json!({"ticket_id": 101, "body": {"ticket": {"priority": "high", "updated_stamp": STAMP}, "system_metadata": {}}}),
+            "",
+        ),
         // An object above a key that is not an object.
-        ("ticket.update", json!({"ticket_id": 101, "body": {"ticket": "high"}}), ""),
+        (
+            "ticket.update",
+            json!({"ticket_id": 101, "body": {"ticket": "high"}}),
+            "",
+        ),
         // A fixed nested value, with its own value or any other.
-        ("ticket.update", ticket(json!({"priority": "high", "safe_update": true})), "safe_update"),
-        ("ticket.update", ticket(json!({"priority": "high", "safe_update": false})), "safe_update"),
-        ("ticket.draft_reply", ticket(json!({"comment": {"body": "x", "public": true}})), "public"),
-        ("ticket.draft_reply", ticket(json!({"comment": {"body": "x", "public": false}})), "public"),
+        (
+            "ticket.update",
+            ticket(json!({"priority": "high", "safe_update": true})),
+            "safe_update",
+        ),
+        (
+            "ticket.update",
+            ticket(json!({"priority": "high", "safe_update": false})),
+            "safe_update",
+        ),
+        (
+            "ticket.draft_reply",
+            ticket(json!({"comment": {"body": "x", "public": true}})),
+            "public",
+        ),
+        (
+            "ticket.draft_reply",
+            ticket(json!({"comment": {"body": "x", "public": false}})),
+            "public",
+        ),
         // A value outside its enum names its key.
-        ("ticket.update", ticket(json!({"priority": "critical"})), "priority"),
+        (
+            "ticket.update",
+            ticket(json!({"priority": "critical"})),
+            "priority",
+        ),
         ("ticket.update", ticket(json!({"type": "bug"})), "type"),
         // None of the four changes.
         ("ticket.update", ticket(json!({})), ""),
         // A typed value of another type.
-        ("ticket.update", ticket(json!({"group_id": "7"})), "group_id"),
+        (
+            "ticket.update",
+            ticket(json!({"group_id": "7"})),
+            "group_id",
+        ),
         ("ticket.update", ticket(json!({"tags": "vip"})), "tags"),
         ("ticket.update", ticket(json!({"tags": ["vip", 7]})), "tags"),
         // The note's text is required and not empty.
         ("ticket.draft_reply", ticket(json!({"comment": {}})), "body"),
-        ("ticket.draft_reply", ticket(json!({"comment": {"body": ""}})), "body"),
+        (
+            "ticket.draft_reply",
+            ticket(json!({"comment": {"body": ""}})),
+            "body",
+        ),
         // The guard's stamp is required.
-        ("ticket.update", json!({"ticket_id": 101, "body": {"ticket": {"priority": "high"}}}), ""),
+        (
+            "ticket.update",
+            json!({"ticket_id": 101, "body": {"ticket": {"priority": "high"}}}),
+            "",
+        ),
     ] {
         let error = refused(&engine, id, input.clone()).await;
         assert_eq!(error.code, ErrorCode::InvalidInput, "`{id}` {input}");
-        assert!(error.message.contains(named), "`{id}` {input}: {}", error.message);
+        assert!(
+            error.message.contains(named),
+            "`{id}` {input}: {}",
+            error.message
+        );
     }
 }
 
 #[tokio::test]
 async fn a_declared_conflict_status_is_a_conflict_refusal_and_is_not_retried() {
     let engine = engine(&[update()]).unwrap();
-    let input = json!({"ticket_id": 101, "body": {"ticket": {"priority": "high", "updated_stamp": STAMP}}});
+    let input =
+        json!({"ticket_id": 101, "body": {"ticket": {"priority": "high", "updated_stamp": STAMP}}});
     let (bodies, outcome) = send(
         &engine,
         "ticket.update",
         input.clone(),
-        response(409, json!({"error": "UpdateConflict", "description": "Safe Update prevented the update"})),
+        response(
+            409,
+            json!({"error": "UpdateConflict", "description": "Safe Update prevented the update"}),
+        ),
     )
     .await;
     assert_eq!(bodies.len(), 1, "sent once");
@@ -417,11 +479,17 @@ async fn a_stale_stamp_is_refused_by_the_preflight_with_nothing_sent() {
         Err(error) => error,
     };
     assert_eq!(code(&error), "conflict");
-    assert!(error.upstream_answer, "the provider's own answer, read before the write");
+    assert!(
+        error.upstream_answer,
+        "the provider's own answer, read before the write"
+    );
     assert_eq!(http.calls.lock().unwrap().len(), 1, "one preflight read");
     // Without `mismatch` a differing check stays the `forbidden` it was.
     let mut plain = update();
-    plain["guard"]["preflight"].as_object_mut().unwrap().remove("mismatch");
+    plain["guard"]["preflight"]
+        .as_object_mut()
+        .unwrap()
+        .remove("mismatch");
     let engine = engine_of(plain);
     let http = reads(vec![response(200, ticket("2026-10-16T11:00:00Z"))]);
     let error = match engine
@@ -447,50 +515,137 @@ fn malformed_nested_members_are_refused_when_the_selection_loads() {
         selection
     };
     let cases: Vec<(&str, Value)> = vec![
-        ("an empty segment", change(&|s| s["body_keys"][0] = json!("/ticket//group_id"))),
-        ("a `~` segment", change(&|s| s["body_keys"][0] = json!("/ticket/group~1id"))),
-        ("a trailing slash", change(&|s| s["body_keys"][0] = json!("/ticket/group_id/"))),
-        ("a key inside another", change(&|s| s["body_keys"].as_array_mut().unwrap().push(json!("/ticket")))),
-        ("a plain name and its pointer", change(&|s| {
-            s["body_keys"].as_array_mut().unwrap().extend([json!("system_metadata"), json!("/system_metadata")])
-        })),
-        ("an enum on an integer", change(&|s| s["body_enums"]["/ticket/group_id"] = json!(["1"]))),
-        ("an enum on an untyped key", change(&|s| {
-            s["body_types"].as_object_mut().unwrap().remove("/ticket/priority");
-        })),
-        ("an empty enum", change(&|s| s["body_enums"]["/ticket/priority"] = json!([]))),
-        ("a repeated enum value", change(&|s| s["body_enums"]["/ticket/priority"] = json!(["high", "high"]))),
-        ("an empty enum value", change(&|s| s["body_enums"]["/ticket/priority"] = json!(["high", ""]))),
-        ("an enum on a fixed key", change(&|s| {
-            s["body_types"]["/ticket/safe_update"] = json!("string");
-            s["body_fixed"]["/ticket/safe_update"] = json!("yes");
-            s["body_enums"]["/ticket/safe_update"] = json!(["yes"]);
-        })),
-        ("an any-of of one key", change(&|s| s["body_any_of"] = json!(["/ticket/priority"]))),
-        ("an any-of key not admitted", change(&|s| s["body_any_of"][0] = json!("/ticket/status"))),
-        ("an any-of key fixed", change(&|s| s["body_any_of"][0] = json!("/ticket/safe_update"))),
-        ("a repeated any-of key", change(&|s| s["body_any_of"][1] = json!("/ticket/group_id"))),
-        ("any-of keys under two parents", change(&|s| {
-            s["body_keys"].as_array_mut().unwrap().push(json!("/other"));
-            s["body_any_of"][0] = json!("/other");
-        })),
-        ("a prefix on an untyped key", change(&|s| {
-            s["body_keys"].as_array_mut().unwrap().push(json!("/ticket/note"));
-            s["body_prefixes"] = json!({"/ticket/note": "x"});
-        })),
-        ("a prefix on a list", change(&|s| s["body_prefixes"] = json!({"/ticket/tags": "x"}))),
-        ("an empty prefix", change(&|s| s["body_prefixes"] = json!({"/ticket/priority": ""}))),
-        ("a prefix not admitted", change(&|s| s["body_prefixes"] = json!({"/ticket/status": "x"}))),
-        ("a conflict status of 400", change(&|s| s["conflict_status"] = json!(400))),
-        ("a conflict status of 500", change(&|s| s["conflict_status"] = json!(500))),
-        ("a guard reading an unadmitted nested key", change(&|s| {
-            s["guard"]["preflight"]["checks"][0]["expect"]["input"] = json!("body.ticket.stamp")
-        })),
+        (
+            "an empty segment",
+            change(&|s| s["body_keys"][0] = json!("/ticket//group_id")),
+        ),
+        (
+            "a `~` segment",
+            change(&|s| s["body_keys"][0] = json!("/ticket/group~1id")),
+        ),
+        (
+            "a trailing slash",
+            change(&|s| s["body_keys"][0] = json!("/ticket/group_id/")),
+        ),
+        (
+            "a key inside another",
+            change(&|s| {
+                s["body_keys"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!("/ticket"))
+            }),
+        ),
+        (
+            "a plain name and its pointer",
+            change(&|s| {
+                s["body_keys"]
+                    .as_array_mut()
+                    .unwrap()
+                    .extend([json!("system_metadata"), json!("/system_metadata")])
+            }),
+        ),
+        (
+            "an enum on an integer",
+            change(&|s| s["body_enums"]["/ticket/group_id"] = json!(["1"])),
+        ),
+        (
+            "an enum on an untyped key",
+            change(&|s| {
+                s["body_types"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("/ticket/priority");
+            }),
+        ),
+        (
+            "an empty enum",
+            change(&|s| s["body_enums"]["/ticket/priority"] = json!([])),
+        ),
+        (
+            "a repeated enum value",
+            change(&|s| s["body_enums"]["/ticket/priority"] = json!(["high", "high"])),
+        ),
+        (
+            "an empty enum value",
+            change(&|s| s["body_enums"]["/ticket/priority"] = json!(["high", ""])),
+        ),
+        (
+            "an enum on a fixed key",
+            change(&|s| {
+                s["body_types"]["/ticket/safe_update"] = json!("string");
+                s["body_fixed"]["/ticket/safe_update"] = json!("yes");
+                s["body_enums"]["/ticket/safe_update"] = json!(["yes"]);
+            }),
+        ),
+        (
+            "an any-of of one key",
+            change(&|s| s["body_any_of"] = json!(["/ticket/priority"])),
+        ),
+        (
+            "an any-of key not admitted",
+            change(&|s| s["body_any_of"][0] = json!("/ticket/status")),
+        ),
+        (
+            "an any-of key fixed",
+            change(&|s| s["body_any_of"][0] = json!("/ticket/safe_update")),
+        ),
+        (
+            "a repeated any-of key",
+            change(&|s| s["body_any_of"][1] = json!("/ticket/group_id")),
+        ),
+        (
+            "any-of keys under two parents",
+            change(&|s| {
+                s["body_keys"].as_array_mut().unwrap().push(json!("/other"));
+                s["body_any_of"][0] = json!("/other");
+            }),
+        ),
+        (
+            "a prefix on an untyped key",
+            change(&|s| {
+                s["body_keys"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!("/ticket/note"));
+                s["body_prefixes"] = json!({"/ticket/note": "x"});
+            }),
+        ),
+        (
+            "a prefix on a list",
+            change(&|s| s["body_prefixes"] = json!({"/ticket/tags": "x"})),
+        ),
+        (
+            "an empty prefix",
+            change(&|s| s["body_prefixes"] = json!({"/ticket/priority": ""})),
+        ),
+        (
+            "a prefix not admitted",
+            change(&|s| s["body_prefixes"] = json!({"/ticket/status": "x"})),
+        ),
+        (
+            "a conflict status of 400",
+            change(&|s| s["conflict_status"] = json!(400)),
+        ),
+        (
+            "a conflict status of 500",
+            change(&|s| s["conflict_status"] = json!(500)),
+        ),
+        (
+            "a guard reading an unadmitted nested key",
+            change(&|s| {
+                s["guard"]["preflight"]["checks"][0]["expect"]["input"] = json!("body.ticket.stamp")
+            }),
+        ),
     ];
     for (name, selection) in cases {
         let outcome = engine(&[selection.clone()]);
         assert!(outcome.is_err(), "{name}: {selection}");
-        assert_eq!(outcome.err().unwrap().code, ErrorCode::InvalidInput, "{name}");
+        assert_eq!(
+            outcome.err().unwrap().code,
+            ErrorCode::InvalidInput,
+            "{name}"
+        );
     }
     // A conflict status on a read.
     let read = json!({"id": "ticket.show", "operation_id": "ShowTicket", "effect": "read",
@@ -508,9 +663,15 @@ fn the_new_members_are_omitted_when_absent_and_read_back_unchanged() {
             .retain(|key, value| !value.is_null() || raw.get(key).is_some());
         assert_eq!(back, raw);
     }
-    let plain = written(json!({"id": "ticket.show", "operation_id": "ShowTicket", "effect": "read"}));
+    let plain =
+        written(json!({"id": "ticket.show", "operation_id": "ShowTicket", "effect": "read"}));
     let back = serde_json::to_value(&plain).unwrap();
-    for member in ["body_enums", "body_any_of", "body_prefixes", "conflict_status"] {
+    for member in [
+        "body_enums",
+        "body_any_of",
+        "body_prefixes",
+        "conflict_status",
+    ] {
         assert!(back.get(member).is_none(), "`{member}` written when absent");
     }
 }

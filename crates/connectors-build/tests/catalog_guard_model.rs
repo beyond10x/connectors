@@ -159,7 +159,11 @@ fn every_shipped_closed_body_is_a_value_of_the_catalog_selection_model() {
         invariants.contains("defined(body_fixed)"),
         "the model no longer requires a fixed key's body to be closed: {invariants}"
     );
-    for clause in ["defined(body_enums)", "body_any_of.count", "defined(body_prefixes)"] {
+    for clause in [
+        "defined(body_enums)",
+        "body_any_of.count",
+        "defined(body_prefixes)",
+    ] {
         assert!(
             invariants.contains(clause),
             "the model no longer states `{clause}` of a closed body: {invariants}"
@@ -396,9 +400,9 @@ fn every_shipped_refusal_text_is_a_value_of_the_catalog_selection_model() {
 #[test]
 fn every_shipped_conflict_status_is_a_value_of_the_catalog_selection_model() {
     let schema = compiled("connectors_catalog.selection.ConflictStatus");
-    let invariants = schema["$defs"]["connectors_catalog.selection.ConflictStatus"]
-        ["x-ess-invariants"]
-        .to_string();
+    let invariants =
+        schema["$defs"]["connectors_catalog.selection.ConflictStatus"]["x-ess-invariants"]
+            .to_string();
     for clause in ["conflict_status == 409", "conflict_status == 412"] {
         assert!(
             invariants.contains(clause),

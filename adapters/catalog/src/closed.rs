@@ -34,7 +34,8 @@ fn inside(inner: &[String], outer: &[String]) -> bool {
 
 /// The value at a path in a body, if every object above it carries it.
 fn at<'a>(body: &'a Value, path: &[String]) -> Option<&'a Value> {
-    path.iter().try_fold(body, |value, segment| value.get(segment))
+    path.iter()
+        .try_fold(body, |value, segment| value.get(segment))
 }
 
 /// The value at a path, creating the objects above it; `None` when a value
@@ -135,10 +136,7 @@ impl Closed {
         {
             for dotted in guarded_body_paths(guard) {
                 let read: Path = dotted.split('.').map(str::to_owned).collect();
-                let Some((key, _)) = closed
-                    .keys
-                    .iter()
-                    .find(|(key, _)| read.starts_with(key))
+                let Some((key, _)) = closed.keys.iter().find(|(key, _)| read.starts_with(key))
                 else {
                     return Err(refuse(format!(
                         "guard of `{id}` reads `body.{dotted}`, which its body_keys do not admit"
@@ -180,7 +178,11 @@ impl Closed {
                 }
             }
         }
-        let fixed_names: BTreeSet<Path> = selection.body_fixed.keys().filter_map(|k| path(k)).collect();
+        let fixed_names: BTreeSet<Path> = selection
+            .body_fixed
+            .keys()
+            .filter_map(|k| path(k))
+            .collect();
         let string = |path: &Path| closed.types.get(path) == Some(&BodyType::String);
         // A non-empty key is a caller's string: admitted, typed as a
         // string, not fixed, and named once.
@@ -188,7 +190,9 @@ impl Closed {
         for name in &selection.body_nonempty {
             match admitted(name) {
                 Some(path)
-                    if string(&path) && !fixed_names.contains(&path) && nonempty.insert(path.clone()) =>
+                    if string(&path)
+                        && !fixed_names.contains(&path)
+                        && nonempty.insert(path.clone()) =>
                 {
                     closed.nonempty.push(path)
                 }
@@ -257,13 +261,14 @@ impl Closed {
             let paths: Option<Vec<Path>> = selection
                 .body_any_of
                 .iter()
-                .map(|name| admitted(name).filter(|p| !fixed_names.contains(p) && seen.insert(p.clone())))
+                .map(|name| {
+                    admitted(name).filter(|p| !fixed_names.contains(p) && seen.insert(p.clone()))
+                })
                 .collect();
             let parent = |path: &Path| path[..path.len() - 1].to_vec();
             match paths {
                 Some(paths)
-                    if paths.len() >= 2
-                        && paths.iter().all(|p| parent(p) == parent(&paths[0])) =>
+                    if paths.len() >= 2 && paths.iter().all(|p| parent(p) == parent(&paths[0])) =>
                 {
                     closed.any_of = paths
                 }
@@ -276,7 +281,9 @@ impl Closed {
         }
         for (name, prefix) in &selection.body_prefixes {
             match admitted(name) {
-                Some(path) if string(&path) && !fixed_names.contains(&path) && !prefix.is_empty() => {
+                Some(path)
+                    if string(&path) && !fixed_names.contains(&path) && !prefix.is_empty() =>
+                {
                     closed.prefixes.push((path, prefix.clone()))
                 }
                 _ => {
