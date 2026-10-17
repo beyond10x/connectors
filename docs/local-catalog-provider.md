@@ -789,14 +789,24 @@ The complete configuration used against the sandbox is
   no guard reads takes any JSON value and is compared by nothing: closing the
   body only keeps out keys outside the set. It is for a write whose provider
   would act on a body field the guard does not compare, such as a Gmail draft
-  send given a replacement message. A read, an operation
-  without a request body, an empty, dotted or repeated name, or a guard reading
-  a `body.<key>` the set does not admit is refused when the selection loads.
+  send given a replacement message. A key is a plain top-level name or an RFC
+  6901 pointer led by `/` naming a value nested in objects, such as
+  `/ticket/comment/body`; `title` and `/title` are the same key, and every
+  member below names keys the same way. Each object above a nested key is
+  closed in turn: it must be a JSON object carrying only the segments that lead
+  to an admitted key, so `{"ticket": {"status": "solved"}}` is refused when only
+  `/ticket/priority` is admitted, and the declaration nests the same closed
+  objects. A guard reads a nested key through its dotted path
+  (`body.ticket.updated_stamp` is `/ticket/updated_stamp`). A read, an operation
+  without a request body, an empty, dotted or repeated name, a pointer with an
+  empty segment or a `~`, a key inside another admitted key, or a guard reading
+  a `body.<path>` the set does not admit is refused when the selection loads.
   The bundle records no body schema, so the names are not checked against the
   provider's.
 - `body_types` is optional, beside `body_keys`: `{"<key>": "string" | "integer"
-  | "boolean"}` gives a closed body key the JSON type the provider's request
-  body schema gives it. A typed key present in a body must be a JSON value of
+  | "boolean" | "string_list"}` gives a closed body key the JSON type the
+  provider's request body schema gives it; `string_list` is an array of
+  strings, such as Zendesk's ticket `tags`. A typed key present in a body must be a JSON value of
   exactly that type, with no string spelling of a boolean or an integer and no
   `null`, or the write is refused as `invalid_input` before any request; the
   declared input schema types it the same, also where a guard reads it. One
@@ -835,10 +845,43 @@ The complete configuration used against the sandbox is
   that is not a string, an integer or a boolean or not of the key's
   `body_types` type, a key `body_required` names and a key a guard reads are
   refused when the selection loads: a guard compares a fixed value as a
-  `literal`. `body_keys`, `body_types`, `body_required`, `body_nonempty` and
-  `body_fixed` are modelled as `connectors_catalog.selection.ClosedBody` in
-  `adapters/catalog/spec/ess`, and every shipped selection is checked against
-  it.
+  `literal`. A fixed nested key is sent inside the objects above it, which the
+  provider creates when the caller's body lacks them, such as Zendesk's
+  `/ticket/comment/public` fixed to `false` for a private note.
+- `body_enums` is optional, beside `body_types`: `{"<key>": ["<value>", …]}`
+  holds a string key to the values the provider's request body schema
+  enumerates, such as Zendesk's ticket `priority`. A value outside the set is
+  refused as `invalid_input` naming the key, before any request, and the
+  declared input schema gives the key that `enum`. A key `body_types` does not
+  type as `string`, a fixed key, an empty set, or an empty or repeated value is
+  refused when the selection loads.
+- `body_any_of` is optional, beside `body_keys`: `["<key>", …]` names keys of
+  which a body must carry at least one, for a write that changes whichever
+  members the caller sends, such as Zendesk's ticket update of `group_id`,
+  `tags`, `priority` or `type`. A body with none of them is refused as
+  `invalid_input` before any request, and the declared input schema requires
+  one of them (`anyOf`). Fewer than two keys, a key `body_keys` does not admit,
+  a fixed or repeated key, or keys under more than one parent object are
+  refused when the selection loads.
+- `body_prefixes` is optional, beside `body_types`: `{"<key>": "<prefix>"}`
+  fixes the start of a string the caller writes. The provider sends the prefix
+  followed by the caller's value under that key, so the sent value always
+  begins with it, whatever the caller gives; the declared input schema types
+  the caller's part alone. Zendesk's `ticket.draft_reply` prefixes the comment
+  body with a first line marking it a draft. A key `body_types` does not type as
+  `string`, a fixed key or an empty prefix is refused when the selection loads.
+  `body_keys`, `body_types`, `body_required`, `body_nonempty`, `body_fixed`,
+  `body_enums`, `body_any_of` and `body_prefixes` are modelled as
+  `connectors_catalog.selection.ClosedBody` in `adapters/catalog/spec/ess`, and
+  every shipped selection is checked against it.
+- `conflict_status` is optional, for a write: `409` or `412`, the status by
+  which the provider answers that the write's target changed since the caller
+  read it, so nothing was applied, such as Zendesk's `409` to a ticket update
+  sent with `safe_update` and an older `updated_stamp`. A write answered with
+  it is refused as `conflict`, the provider's own answer, and never sent again;
+  without it a `409` or `412` stays `invalid_input`. Any other status, or the
+  member on a read, is refused when the selection loads. It is modelled as
+  `connectors_catalog.selection.ConflictStatus`.
 - `guard` is optional and declarative. The preflight reads another GET from the
   bundle, binding its parameters from the write's input, and refuses before any
   request unless every check holds. A check compares the scalar at a JSON

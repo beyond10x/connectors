@@ -11,6 +11,9 @@ summary: The declarative guard of a selected write, the optional `guard` of an o
 
 types:
   # An input reference: a top-level input key, or `body.<key>` (a path through the body, dotted).
+  # A dotted path names a nested closed body key by its segments: `body.ticket.updated_stamp` reads
+  # the key `/ticket/updated_stamp`, which the closed body then requires, as Zendesk's ticket
+  # writes compare the caller's stamp with the ticket's `updated_at` before they are sent.
   - name: connectors_catalog.guard.Reference
     kind: newtype
     of: String

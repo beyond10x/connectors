@@ -2,25 +2,38 @@ domain: connectors_catalog.selection
 summary: The members of a selection in a `connectors-catalog-operations/1` file that bound its query parameters, those of a selected write that close, type, require and fix its JSON body, which the engine holds before it sends the request, and the success envelope a read's answer is held to after it.
 
 # Normative owner: docs/local-catalog-provider.md, "Configure the provider" (`bounds`, `body_keys`,
-# `body_types`, `body_required`, `body_nonempty`, `body_fixed`, `envelope`, `refusal_texts`). The engine reads these as members of a
+# `body_types`, `body_required`, `body_nonempty`, `body_fixed`, `body_enums`, `body_any_of`, `body_prefixes`,
+# `conflict_status`, `envelope`, `refusal_texts`). The engine reads these as members of a
 # selection; each is omitted when empty, so a selection without it keeps its serialised form.
 #
 # The bundle records no request body schema, so every name here is declared by the selection
 # from the pinned document and not checked against it. What the engine refuses when a selection
-# loads beyond these invariants (an empty, dotted or repeated key, a key the other members name
-# that `body_keys` does not admit, a fixed key a guard reads or `body_required` or `body_nonempty`
-# names, a `body_nonempty` key `body_types` does not type as a string, a fixed
+# loads beyond these invariants (an empty, dotted or repeated key, a pointer with an empty or `~`
+# segment, a key inside another admitted key, a key the other members name that `body_keys` does
+# not admit, an enum or prefix key that is fixed or not typed as a string, an any-of key that is
+# fixed, any-of keys under more than one parent, an empty enum set or an empty or repeated enum
+# value, an empty prefix, a fixed key a guard reads or `body_required` or `body_nonempty` names, a `body_nonempty` key `body_types` does not type as a string, a fixed
 # value that is not a string, an integer or a boolean, or not of the key's `body_types` type) is
 # stated in the owner and pinned by the engine's tests; ESS 0.57 has no set-membership
 # constraint between two members, and no untagged scalar to type a fixed value by.
 
 types:
   # The JSON type a closed body key takes, as the provider's request body schema types it.
+  # `string_list` is a JSON array whose every element is a string, such as Zendesk's ticket
+  # `tags`.
   - name: connectors_catalog.selection.BodyType
     kind: enum
-    variants: [string, integer, boolean]
+    variants: [string, integer, boolean, string_list]
 
-  # `body_keys` closes the body to exactly those top-level keys. `body_types` types some of them
+  # Every name below that addresses a body value is a closed body key: a plain top-level name
+  # (`title`), or an RFC 6901 pointer led by `/` addressing a value nested in objects
+  # (`/ticket/comment/body`), each segment a plain name with no `~` or `.`, and none empty. A
+  # plain name `k` and the pointer `/k` are the same key. Each object above a nested key is
+  # closed in turn: it may carry only the segments that lead to an admitted key, and it must be
+  # a JSON object; a key may not lie inside another admitted key. Such as Zendesk's ticket
+  # update, whose body is `{"ticket": {...}}` closed to the named members of `ticket`.
+  #
+  # `body_keys` closes the body to exactly those keys. `body_types` types some of them
   # and `body_required` requires some of them, of the caller's body. `body_nonempty` holds some
   # string keys non-empty: a caller's body carrying one as the empty string is refused before
   # any request, as a mistyped key is. It names only keys `body_types` types as `string` that the
@@ -35,7 +48,28 @@ types:
   # merge with `auto_merge: true` (wait for the pipeline) or its update with
   # `state_event: reopen`. A fixed key must be admitted by `body_keys`, so a fixed write's body
   # is always closed: the caller cannot add a key beside it that would change what it does. When
-  # every admitted key is fixed, the caller's `body` may be omitted.
+  # every admitted key is fixed, the caller's `body` may be omitted. A fixed nested key is sent
+  # inside the objects above it, which the engine creates when the caller's body lacks them.
+  #
+  # `body_enums` holds a string key to a set of allowed values, as the provider's request body
+  # schema enumerates them, such as Zendesk's ticket `priority` (`urgent`, `high`, `normal`,
+  # `low`): a value outside the set is refused as `invalid_input` naming the key, before any
+  # request, and the declaration gives the key that `enum`. It names only keys `body_types`
+  # types as `string` that the selection does not fix.
+  #
+  # `body_any_of` names keys of which a caller's body must carry at least one, beside one
+  # parent object: for a write that changes whichever of several members the caller sends and
+  # means nothing with none of them, such as Zendesk's ticket update of `group_id`, `tags`,
+  # `priority` or `type`. A body with none of them is refused before any request, and the
+  # declaration requires one of them. Every named key shares one parent object, is admitted,
+  # is not fixed, and is named once; at least two.
+  #
+  # `body_prefixes` fixes the start of a caller's string: the engine sends the prefix followed
+  # by the caller's value under that key, so the sent value always begins with it, whatever the
+  # caller gives. It is for a write whose meaning rests on a marker in a text the caller writes,
+  # such as a Zendesk draft reply, a private note whose first line marks it as a draft. It names
+  # only keys `body_types` types as `string` that the selection does not fix; a prefix is never
+  # empty. The declaration types the caller's part alone.
   - name: connectors_catalog.selection.ClosedBody
     kind: struct
     fields:
@@ -44,11 +78,32 @@ types:
       - {name: body_required, type: "Optional<List<String>>"}
       - {name: body_nonempty, type: "Optional<List<String>>"}
       - {name: body_fixed, type: "Optional<Map<String, Json>>"}
+      - {name: body_enums, type: "Optional<Map<String, List<String>>>"}
+      - {name: body_any_of, type: "Optional<List<String>>"}
+      - {name: body_prefixes, type: "Optional<Map<String, String>>"}
     invariants:
       - any: [{not: defined(body_types)}, defined(body_keys)]
       - any: [{not: defined(body_required)}, defined(body_keys)]
       - any: [{not: defined(body_nonempty)}, defined(body_types)]
       - any: [{not: defined(body_fixed)}, defined(body_keys)]
+      - any: [{not: defined(body_enums)}, defined(body_types)]
+      - any: [{not: defined(body_any_of)}, defined(body_keys)]
+      - any: [{not: defined(body_any_of)}, {body_any_of.count: {gte: 2}}]
+      - any: [{not: defined(body_prefixes)}, defined(body_types)]
+
+  # The status by which a provider answers a write that its target changed since the caller
+  # read it, so nothing was applied: such as Zendesk's `409` to a ticket update sent with
+  # `safe_update` and an `updated_stamp` older than the ticket. A write answered with it is
+  # refused as `conflict` (the shared `connectors_core` `ErrorCode`), the provider's own answer,
+  # never retried, in place of the `invalid_input` its status otherwise gives. Only `409` or
+  # `412`, the precondition statuses the engine already treats as a definite refusal; only on
+  # a write.
+  - name: connectors_catalog.selection.ConflictStatus
+    kind: struct
+    fields:
+      - {name: conflict_status, type: "Optional<Integer>"}
+    invariants:
+      - any: [{not: defined(conflict_status)}, conflict_status == 409, conflict_status == 412]
 
   # `bounds` narrows a query parameter the source declares, keyed by its name. Exactly one form per
   # parameter:
