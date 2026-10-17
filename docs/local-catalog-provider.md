@@ -686,6 +686,62 @@ The complete configuration used against the sandbox is
   `error.status` is `rate_limited`, for a read and for a write's definite
   refusal; every other `403` stays `forbidden`. An empty reason is refused
   when the selection loads.
+- `rate_limit_headers` is optional: `{"remaining": "<header>", "reset":
+  "<header>"}` names the headers by which a provider says its rate limit is
+  spent, such as GitHub's `x-ratelimit-remaining` and `x-ratelimit-reset`. A
+  `403` or `429` whose `remaining` header is exactly `0` is `rate_limited`,
+  for a read and for a write's definite refusal, whatever its body. Its
+  `retry_after_seconds` comes from `Retry-After` when the answer carries one,
+  and otherwise is the number of seconds from now to the Unix time the `reset`
+  header names (none for a time already past or a value that is not whole
+  seconds). Every other `403` keeps the classification `rate_limit_reasons`
+  or its status gives. A read answered so is sent once more only under the
+  rule in [Limits](#limits); a reset an hour away is never waited for. A header
+  name that is empty or not an HTTP token, or the same name twice without
+  regard to case, is refused when the selection loads. The member is modelled
+  as `connectors_catalog.selection.QuotaHeaders` in `adapters/catalog/spec/ess`.
+- `query_fixed` is optional, for a read: `{"<query parameter>": "<value>"}`
+  fixes query parameters the source declares to one string each. The provider
+  sends exactly that value under that name on every request; the parameter is
+  left out of the declared input schema, and an input carrying it is refused
+  as `invalid_input` before any request, so a caller cannot widen what the
+  read reaches. It is for a read whose meaning is one query, such as GitHub's
+  search fixed to `q` `is:pr is:open review-requested:@me`. A fixed value on a
+  write, an empty value, a name that is not a query parameter of the operation,
+  one the selection also bounds, marks `required`, withholds or names as a
+  `credential`, or more than eight fixed values is refused when the selection
+  loads.
+- `query_folds` is optional, beside `query_fixed`: `{"<input>": {"into":
+  "<fixed parameter>", "prefix": "<text>", "format": "timestamp"}}` declares a
+  caller input that joins a fixed value. The input is declared under its own
+  name as an optional string of the `format`, and is not a parameter of the
+  operation; when the caller sends it, the provider appends one space,
+  `prefix` and the value to the fixed value of `into`, and sends the fixed
+  value alone otherwise. `timestamp` admits an ISO 8601 date `YYYY-MM-DD` or a
+  date-time `YYYY-MM-DDTHH:MM:SS` followed by `Z` or `+HH:MM`/`-HH:MM`, and
+  nothing else, so a folded value never adds a word or a qualifier; a value of
+  any other form is refused as `invalid_input` before any request. GitHub's
+  `review_requests.list` folds `since` as `updated:>=<since>`. A fold whose
+  `into` the selection does not fix, two folds into one value, a fold named
+  like a parameter of the operation or not an id, an empty `prefix` or one
+  holding a space is refused when the selection loads. Both are modelled as
+  `connectors_catalog.selection.FixedQuery`.
+- `embedded_text` is optional, for a read answering JSON: `{"content":
+  "<pointer>", "encoding": "<pointer>", "size": "<pointer>", "max_bytes":
+  <bytes>}` reads a file the provider's JSON answer carries as base64, such as
+  GitHub's contents and README reads, and answers with its text as `body`, in
+  place of the provider's JSON. The string at `encoding` must be exactly
+  `base64`; the string at `content` is decoded with ASCII whitespace ignored.
+  `size`, optional, is read first: a JSON integer above `max_bytes` (1 to
+  2,097,152) is refused as `capacity` before anything is decoded, and so is a
+  decoded file longer than `max_bytes`, never truncated. A file whose bytes
+  are not UTF-8 or hold a NUL byte is not text and is refused as
+  `unsupported`. An answer that is not a JSON object (a directory's listing,
+  for instance), whose `encoding` is absent or another value, or whose
+  `content` is absent or not base64, is `upstream_protocol`. Embedded text on
+  a write, beside `response`, `envelope`, `binary` or `download`, or a pointer
+  without a leading `/` is refused when the selection loads. The member is
+  modelled as `connectors_catalog.selection.ReadEmbeddedText`.
 - `refusal_texts` is optional, for a write: `[{"pointers": ["<pointer>", …],
   "contains": ["<text>", …], "code": "capacity"}, …]`. It is for a provider
   that documents no distinct status for a refusal and whose own clients
