@@ -9,8 +9,8 @@
 //! redacted digest. The gate re-reads every record that names a rule and refuses a file
 //! whose digest drifted or which the rule would still change.
 //!
-//! Rule `upstream-redaction/3` is `/2` plus the two items marked below; `/2` stays
-//! readable so a record that names it is still checked by the `/2` rule. Applied to the
+//! Rule `upstream-redaction/4` is `/3` plus the `/4` item below; `/2` and `/3` stay
+//! readable so a record that names one is still checked by that rule. Applied to the
 //! whole file (`/1` was the first two items alone):
 //!
 //! - every credential value becomes `example-redacted-token`: the value of a key,
@@ -28,7 +28,12 @@
 //! - (`/3`) the quoted value of a JSON key named exactly `key` or `key_hash`, when it
 //!   is one scalar without whitespace, and every `sk-or-v<N>-…` OpenRouter key, in full
 //!   or in its abbreviated `sk-or-v1-abc...123` form, wherever it stands, become
-//!   `example-redacted-token`.
+//!   `example-redacted-token`;
+//! - (`/4`) every PEM private key block (`-----BEGIN … PRIVATE KEY-----` through
+//!   `-----END … PRIVATE KEY-----`, written as a block or inline with `\n` escapes, folded
+//!   across lines or not) becomes `example-redacted-private-key`; and the value of a YAML
+//!   key named exactly `key`, when it is one unquoted scalar of 32 or more characters of
+//!   `A-Za-z0-9+/=`, becomes `example-redacted-token`.
 use super::Result;
 use regex::{Captures, Regex};
 use serde::Deserialize;
@@ -39,10 +44,12 @@ use std::{
 };
 
 /// The rule's name as a manifest records it.
-pub const RULE: &str = "upstream-redaction/3";
-/// The previous rule, still accepted for records pinned under it.
+pub const RULE: &str = "upstream-redaction/4";
+/// The previous rules, still accepted for records pinned under them.
+pub const RULE_V3: &str = "upstream-redaction/3";
 pub const RULE_V2: &str = "upstream-redaction/2";
 pub const CREDENTIAL: &str = "example-redacted-token";
+pub const PRIVATE_KEY: &str = "example-redacted-private-key";
 pub const EMAIL: &str = "user@example.com";
 pub const PHONE: &str = "+15555550100";
 pub const PHONE_FORMATTED: &str = "+1 555-555-0100";
@@ -67,6 +74,18 @@ static KEY_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
 });
 static OPENROUTER_KEY_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"sk-or-v[0-9]+-[A-Za-z0-9._-]+").expect("openrouter key pattern"));
+/// A PEM private key block. The words between the markers may be folded across lines by
+/// a YAML scalar, so whitespace of any kind separates them; the body is anything.
+static PEM_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"-----BEGIN\s+(?:[A-Z]+\s+)*PRIVATE\s+KEY-----(?s:.*?)-----END\s+(?:[A-Z]+\s+)*PRIVATE\s+KEY-----",
+    )
+    .expect("pem pattern")
+});
+static YAML_KEY_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?m)^([ \t]*(?:-[ \t]+)?key:[ \t]+)([A-Za-z0-9+/=]{32,})([ \t]*\r?)$")
+        .expect("yaml key pattern")
+});
 static JWT_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]+)?")
         .expect("token pattern")
@@ -157,11 +176,28 @@ pub fn redact(text: &str) -> (String, Counts) {
     redact_under(text, RULE)
 }
 
-/// Apply the named rule (`/2` or `/3`) to a whole document.
+/// Apply the named rule (`/2`, `/3` or `/4`) to a whole document.
 pub fn redact_under(text: &str, rule: &str) -> (String, Counts) {
     let mut counts = Counts::default();
-    let mut text = redact_credentials(text, &mut counts);
+    let mut text = text.to_owned();
     if rule == RULE {
+        text = PEM_PATTERN
+            .replace_all(&text, |_: &Captures| {
+                counts.credentials += 1;
+                PRIVATE_KEY.to_owned()
+            })
+            .into_owned();
+    }
+    let mut text = redact_credentials(&text, &mut counts);
+    if rule == RULE {
+        text = YAML_KEY_PATTERN
+            .replace_all(&text, |captures: &Captures| {
+                counts.credentials += 1;
+                format!("{}{CREDENTIAL}{}", &captures[1], &captures[3])
+            })
+            .into_owned();
+    }
+    if rule != RULE_V2 {
         text = KEY_PATTERN
             .replace_all(&text, |captures: &Captures| {
                 if &captures[2] == CREDENTIAL {
@@ -288,7 +324,7 @@ pub fn run(root: &Path) -> Result<usize> {
                 continue;
             };
             let label = format!("{}: {}", manifest.display(), record.file);
-            if rule != RULE && rule != RULE_V2 {
+            if rule != RULE && rule != RULE_V3 && rule != RULE_V2 {
                 return Err(format!("{label}: names redaction `{rule}`, not `{RULE}`").into());
             }
             if record.upstream_sha256.is_none() {
@@ -307,7 +343,7 @@ pub fn run(root: &Path) -> Result<usize> {
             let (_, counts) = redact_under(text, rule);
             if counts != Counts::default() {
                 return Err(format!(
-                    "{label}: {RULE} would still replace {} credential(s), {} email \
+                    "{label}: {rule} would still replace {} credential(s), {} email \
                      address(es) and {} phone number(s)",
                     counts.credentials, counts.emails, counts.phones
                 )
@@ -425,6 +461,51 @@ mod tests {
     }
 
     #[test]
+    fn pem_private_keys_are_replaced_whole_under_the_current_rule_only() {
+        let block = "pem: |\n  -----BEGIN RSA PRIVATE\x20KEY-----\n  AAAA\n  BBBB\n  -----END RSA PRIVATE KEY-----\nnext: 1\n";
+        let inline = "example: '\"-----BEGIN RSA PRIVATE\x20KEY-----\\nAAAA\\nBBBB\\n-----END\n  RSA PRIVATE KEY-----\\n\"'\n";
+        let (out, counts) = redact(block);
+        assert_eq!(out, "pem: |\n  example-redacted-private-key\nnext: 1\n");
+        assert_eq!(counts.credentials, 1);
+        let (out, counts) = redact(inline);
+        assert_eq!(out, "example: '\"example-redacted-private-key\\n\"'\n");
+        assert_eq!(counts.credentials, 1);
+        let (out, _) =
+            redact("k: -----BEGIN PRIVATE\x20KEY-----\nAAAA\n-----END PRIVATE KEY-----\n");
+        assert_eq!(out, "k: example-redacted-private-key\n");
+        // A public key is not a private key; `/3` leaves a block alone.
+        let public = "-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----\n";
+        assert_eq!(redact(public).1, Counts::default());
+        assert_eq!(redact_under(block, RULE_V3).1, Counts::default());
+        assert_eq!(redact(&redact(block).0).1, Counts::default());
+    }
+
+    #[test]
+    fn yaml_key_values_of_key_shape_are_replaced_under_the_current_rule_only() {
+        let text = "a:\n  key_id: '012345678912345678'\n  key: fixture+fixture/fixture+fixture/fixture=\n\
+                    - key: fixture+fixture/fixture+fixture/fixture9\n\
+                    b:\n  key: ssh-rsa AAA...\n  key: Linux-node-958aff96db2d75d67787d1e634ae70b659de937b\n\
+                    \x20 key: short\n  key:\n    type: string\n  keyboard: fixture+fixture/fixture+fixture/fixture=\n\
+                    \x20 key: 'fixture+fixture/fixture+fixture/fixture='\n\
+                    \x20 key: \"fixture+fixture/fixture+fixture/fixture=\"\n\
+                    \x20 key: fixture+fixture/fixture+fixture\n";
+        let (out, counts) = redact(text);
+        assert_eq!(
+            out,
+            "a:\n  key_id: '012345678912345678'\n  key: example-redacted-token\n\
+             - key: example-redacted-token\n\
+             b:\n  key: ssh-rsa AAA...\n  key: Linux-node-958aff96db2d75d67787d1e634ae70b659de937b\n\
+             \x20 key: short\n  key:\n    type: string\n  keyboard: fixture+fixture/fixture+fixture/fixture=\n\
+             \x20 key: 'fixture+fixture/fixture+fixture/fixture='\n\
+             \x20 key: \"fixture+fixture/fixture+fixture/fixture=\"\n\
+             \x20 key: fixture+fixture/fixture+fixture\n"
+        );
+        assert_eq!(counts.credentials, 2);
+        assert_eq!(redact_under(text, RULE_V3).1, Counts::default());
+        assert_eq!(redact(&out).1, Counts::default());
+    }
+
+    #[test]
     fn a_redacted_document_is_a_fixed_point() {
         let (once, _) = redact(
             "a: p@vendor.com +16617480240 +44 207-946-0000\naccess_token: fixture-seven\n\
@@ -440,13 +521,13 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let upstream = temp.path().join("adapters/vendor/upstream");
         fs::create_dir_all(&upstream).unwrap();
-        let record = |body: &[u8]| {
+        let record_under = |rule: &str, body: &[u8]| {
             fs::write(upstream.join("doc.yaml"), body).unwrap();
             fs::write(
                 upstream.join("vendor-source-hashes.json"),
                 format!(
                     r#"[{{"file":"doc.yaml","url":"https://example.invalid/doc.yaml",
-                         "upstream_sha256":"00","redaction":"{RULE}",
+                         "upstream_sha256":"00","redaction":"{rule}",
                          "sha256":"{}","bytes":{}}}]"#,
                     super::super::source_hashes::digest(body).unwrap(),
                     body.len()
@@ -454,9 +535,31 @@ mod tests {
             )
             .unwrap();
         };
+        let record = |body: &[u8]| record_under(RULE, body);
         record(b"email: user@example.com\n");
         assert_eq!(run(temp.path()).unwrap(), 1);
         record(b"email: person@vendor.com\n");
+        assert!(run(temp.path()).is_err());
+
+        // A record pinned under an earlier rule is checked by that rule, not the current
+        // one: what only `/4` replaces passes a `/3` record, and what only `/3` replaces
+        // passes a `/2` record.
+        let pem = b"k: -----BEGIN PRIVATE\x20KEY-----\nAAAA\n-----END PRIVATE KEY-----\n";
+        record(pem);
+        let refusal = run(temp.path()).unwrap_err().to_string();
+        assert!(refusal.contains(RULE), "{refusal}");
+        record_under(RULE_V3, pem);
+        assert_eq!(run(temp.path()).unwrap(), 1);
+        let key = b"{\"key\": \"sk-or-v1-0123abcd\"}\n";
+        record_under(RULE_V3, key);
+        let refusal = run(temp.path()).unwrap_err().to_string();
+        assert!(refusal.contains(RULE_V3), "{refusal}");
+        record_under(RULE_V2, key);
+        assert_eq!(run(temp.path()).unwrap(), 1);
+        record_under(RULE_V2, b"email: person@vendor.com\n");
+        let refusal = run(temp.path()).unwrap_err().to_string();
+        assert!(refusal.contains(RULE_V2), "{refusal}");
+        record_under("upstream-redaction/1", b"email: user@example.com\n");
         assert!(run(temp.path()).is_err());
     }
 }

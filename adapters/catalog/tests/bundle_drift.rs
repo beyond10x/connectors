@@ -25,7 +25,7 @@ use std::path::Path;
 /// pinned upstream; it describes only the shipped reads and has no gap.
 /// OpenRouter's 2 are one write whose own `servers` override the document's and
 /// `listInterns`'s `status` array (`explode: false`); no shipped read is among them.
-const SOURCES: [(&str, &str, Option<&str>, &str, usize); 14] = [
+const SOURCES: [(&str, &str, Option<&str>, &str, usize); 15] = [
     (
         "confluence",
         "../atlassian/upstream/confluence/confluence-v2.json",
@@ -39,6 +39,13 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 14] = [
         None,
         "atlassian.basic",
         0,
+    ),
+    (
+        "github",
+        "../github/upstream/api.github.com.yaml",
+        None,
+        "github.token",
+        GITHUB_UNSUPPORTED,
     ),
     (
         "gitlab",
@@ -134,6 +141,9 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 14] = [
 /// `tags` on two alert writes), each sent as one value as given. No shipped
 /// read is among them.
 const OPSGENIE_UNSUPPORTED: usize = 76;
+/// GitHub's 1 is `repos/upload-release-asset`, whose own `servers`
+/// (`uploads.github.com`) override the document's; no shipped read is among them.
+const GITHUB_UNSUPPORTED: usize = 1;
 
 /// The cited amendments applied to a provider's pinned source, relative to this
 /// crate. A provider absent here is built from its source as written.

@@ -106,7 +106,8 @@ The repository reviews and ships one selection set per provider under
 `adapters/catalog/providers/<provider>/operations.json`; Jira Cloud is described
 in [the Jira guide](catalog-jira.md), Confluence Cloud in
 [the Confluence guide](catalog-confluence.md), HubSpot CRM in
-[the HubSpot guide](catalog-hubspot.md), Zendesk Support in
+[the HubSpot guide](catalog-hubspot.md), GitHub REST reads in
+[the GitHub guide](catalog-github.md), Zendesk Support in
 [the Zendesk guide](catalog-zendesk.md), Runpod pods in
 [the Runpod guide](catalog-runpod.md), Slack conversations and messages in
 [the Slack guide](catalog-slack.md) and Opsgenie alerts and incidents in

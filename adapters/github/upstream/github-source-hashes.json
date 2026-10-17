@@ -1,0 +1,11 @@
+[
+  {
+    "file": "api.github.com.yaml",
+    "url": "https://raw.githubusercontent.com/github/rest-api-description/v2.1.0/descriptions/api.github.com/api.github.com.yaml",
+    "upstream_sha256": "4a5394a12ecd1dd0f386ab0eddc133befca3ab831f56f902d25767d64c41684c",
+    "upstream_bytes": 8380323,
+    "redaction": "upstream-redaction/4",
+    "sha256": "5e9edc27c465626b020eb6d9b4d5892e93b4e96f8c7af53ff952ac59b48c0df9",
+    "bytes": 8372769
+  }
+]

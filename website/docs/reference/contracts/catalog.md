@@ -116,6 +116,10 @@ Status to safe `ErrorCode` for **generic reads only** (base vocabulary in `crate
 | non-JSON body, oversize body, redirect | `UpstreamProtocol` |
 | 2xx under a selection's declared success envelope whose success member is `false` | the code the envelope's refusals give the body's error name, else its `otherwise` code (`InvalidInput`, `Unauthorized`, `Forbidden`, `NotFound`, `RateLimited` with `retry_after_seconds` from `Retry-After`, or `Internal`); never a success |
 | 2xx under a declared success envelope that is not a JSON object or whose success member is absent or not a boolean | `UpstreamProtocol` |
+| 403 or 429 under a selection's declared rate-limit headers whose `remaining` header is exactly `0` | `RateLimited`, `retry_after_seconds` from `Retry-After` when present, else the seconds from now to the Unix time its `reset` header names (absent for a time already past or a value that is not whole seconds) |
+| 2xx under a selection's declared embedded text: a file longer than its `max_bytes`, by the declared size or once decoded | `Capacity` |
+| 2xx under a declared embedded text whose decoded bytes are not UTF-8 or hold a NUL byte | `Unsupported` |
+| 2xx under a declared embedded text that is not a JSON object, or whose encoding is not `base64` or whose content is absent or not base64 | `UpstreamProtocol` |
 
 The public `Error.message` is a host-selected safe classification, bounded to 512 UTF-8 bytes. Never copy raw provider messages, codes, response bodies, URLs or credential material into it. Declared error-envelope pointers may contribute to a reviewed operation-specific classifier; they do not authorize public disclosure or select a core code automatically.
 
@@ -230,6 +234,7 @@ The [service compatibility limits](./compatibility.md#7-limits-and-compatibility
 
 - New contract; new profile strings `generic-http` and `generic-http-page`.
 - `connectors-catalog-operations/1` gains the optional `feed` (section 3.3). A selection file without it loads, and its configuration revision is computed, exactly as before; one with it is refused by a reader older than this section, which denies unknown fields.
+- A selection gains the optional `query_fixed` and `query_folds` (a query value the caller cannot send, and a caller input folded into it, `connectors_catalog.selection.FixedQuery`), `embedded_text` (a JSON answer's base64 file read as text, `connectors_catalog.selection.EmbeddedText`) and `rate_limit_headers` (`connectors_catalog.selection.RateLimitHeaders`), each owned by the catalog provider guide. Each is omitted when absent, so every selection without it keeps its bytes and its configuration revision; one with it is refused by an older reader, which denies unknown fields.
 - [Service compatibility](./compatibility.md) owns the extended descriptor fields, singular profile, auth alternatives and generic limits. These require the proposed `v1alpha2` codec. Index, adapter-kind, bundle and configuration readers retain their own independent version decisions; a service-wire bump does not extend them.
 - Old `catalog/<id>.catalog.json` documents and `catalog.pack` bytes are not preserved (`docs/design.md:911`). Old operation ids are preserved only where the migration contract selects them (`docs/design.md:1095`).
 - The predecessor's published catalog-reader crate has no successor in this design; its consumers need an explicit migration decision (`docs/design.md:151`).

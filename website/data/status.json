@@ -221,6 +221,13 @@
     },
     {
       "area": "Catalog provider",
+      "detail": "Review requests, assigned issues and pull requests, notifications and the authenticated user, and an organization's repositories, one repository, its releases, its README and single files as text, with a bearer token; read only; exercised against local fixtures only.",
+      "href": "/docs/reference/adapters/catalog",
+      "label": "GitHub REST",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
       "detail": "Reads and guarded writes from Discovery documents projected to OpenAPI, with a refresh token from browser consent; exercised against local fixtures only.",
       "href": "/docs/reference/adapters/catalog",
       "label": "Google Drive, Slides, Calendar and Gmail",
