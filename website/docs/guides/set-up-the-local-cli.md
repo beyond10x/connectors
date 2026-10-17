@@ -193,7 +193,7 @@ configuration unchanged:
 ```
 
 It then connects in that state directory, passing the same `--state-dir` to `connections connect`
-and to every later command, as the connector guides below show. A connection is recorded in the
+and to every later command. A connection is recorded in the
 state directory it was made in: connections, list cursors, approvals and cached instance
 descriptions in another state directory do not carry over, so the pinned consumer connects once
 more there.
@@ -233,12 +233,9 @@ file of another user is refused as `forbidden`, each at stage `stop`.
 
 `connections connect --connector <connector> --instance <instance>` validates a credential
 through the instance's auth profile and saves it in custody; each instance holds one connection.
-The repository's guides walk through one connector each:
-
-- [GitLab through the catalog provider](https://github.com/beyond10x/connectors/blob/main/docs/local-catalog-provider.md)
-- [Kubernetes through the local CLI](https://github.com/beyond10x/connectors/blob/main/docs/local-kubernetes-cli.md)
-- [PostgreSQL through the local CLI](https://github.com/beyond10x/connectors/blob/main/docs/local-postgres-cli.md)
-- [Tavily](https://github.com/beyond10x/connectors/blob/main/docs/local-tavily.md)
-
 [The local runtime](../concepts/local-runtime.md) explains what the owner, custody and the
 metadata store guarantee, and the [CLI reference](../reference/cli.md) lists every command.
+
+Every connector has a page that takes it from the provider's prerequisites through an instance,
+a connection and a first read to a first approved write: start at
+[Connectors](../connectors/index.md).
