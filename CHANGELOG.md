@@ -1,5 +1,207 @@
 # Changelog
 
+## 0.53.1 — 2026-10-17
+
+### Changed
+
+- A Runpod `pod.create` refused for lack of capacity is now `refused` with code `capacity`, not
+  `invalid_input`: a 4xx whose `message` or `detail` contains one of the stock-out texts Runpod's own
+  clients recognise (case-insensitive; a 5xx stays `unknown`), declared through the new catalog
+  selection member `refusal_texts` (modelled as `connectors_catalog.selection.WriteRefusalTexts`).
+
+### Limitations
+
+- The stock-out texts are taken from Runpod's own clients and verified against a local fixture
+  only; no real stock-out answer has been recorded yet.
+
+## 0.53.0 — 2026-10-17
+
+### Added
+
+- OpenRouter management through the catalog provider (`openrouter`, profile
+  `openrouter.api-key`, pinned OpenRouter OpenAPI document): the reads `key.get`,
+  `workspaces.list` and `keys.list`, and the required-approval write `key.create`
+  (docs/catalog-openrouter.md).
+- A write that creates a credential holds it in custody. `key.create` sends the create once;
+  the key OpenRouter returns once goes straight into the protected store as a new connection
+  of the alias and profile `[adapters.<alias>.permissions.custody]` names for the operation,
+  and the caller receives only that connection's reference and the key's hash, never the key.
+  A create with no custody target, or a declaration and target that disagree, is refused
+  before anything is sent; a timeout or crash after dispatch is an unknown outcome that is
+  never re-sent (docs/local-mutation-ledger.md, "Created credentials").
+- Runpod: the read `billing.pods` (`PodBilling`, `GET /v1/billing/pods`) beside `pods.list`.
+- GitLab catalog reads `file.raw` and `project.languages`: a repository file's exact UTF-8 text at a ref (a file that is not UTF-8 is refused `upstream_protocol`, one over the 4 MiB provider response bound `capacity`, on its raw bytes) and a project's languages with their percentages; verified against fixtures only.
+
+### Fixed
+
+- An owner no longer outlives its state directory. A Unix owner exits, as a shutdown request
+  stops it, once its socket is no longer in its state directory or the state directory's path no
+  longer names the directory it opened (removed or replaced); it checks at least every 250 ms and
+  lets connected clients finish for at most 5 seconds. Such an owner was unreachable and, with its
+  directory deleted, never became idle, so it ran until killed. A Windows owner holds its state
+  directory open, so that directory cannot be removed beneath it; it has no such check. Idle
+  retirement after 10 minutes is unchanged.
+- Journey tests stop the owners they start (#175). A CLI built with debug assertions passes
+  `CONNECTORS_TEST_OWNER_PARENT` to the owner it starts on Unix, and that owner exits once the named
+  process has ended; a release build reads no such variable. The catalog journey harness names its
+  own test process, so its owners end with it however it ends, and on drop, pass or panic, it stops
+  every owner of its state directory: an owner that has not exited within 5 seconds of the
+  harness's shutdown request is killed through its pidfd (Linux) and waited for.
+
+### Limitations
+
+- A custody store that answers `outcome_unknown` while holding a created key is reported as
+  custody `failed`, though the connection may have been published; check `connections list` on
+  the custody alias before creating again.
+- The HTTP client's buffers that held OpenRouter's answer are not wiped after the key moves into
+  custody.
+- An owner crash between OpenRouter's applied answer and the settle recovers the attempt as
+  `unknown`, with the key's hash recorded nowhere; nothing is re-sent, and the created key is
+  visible (by hash and label) in `keys.list`.
+- The ignored CLI journeys, custody included, run in no CI job.
+
+## 0.52.1 — 2026-10-16
+
+### Fixed
+
+- `connections revalidate` no longer fails `unavailable` at `dispatch` when the provider closed
+  the adapter's idle keep-alive connection (beyond10x/connectors#174). The adapter child kept the
+  connection a connect or an earlier probe left in its pool; once the provider's keep-alive
+  timeout had closed it, the next identity probe went out on it and failed, the owner recorded
+  the revalidation as failed, and only a second command, on a new connection, succeeded. The
+  owner now sends a revalidation's validation again when it fails transiently (the adapter's
+  `unavailable`, a provider timeout, rate limit, internal error or capacity answer; the catalog
+  provider's probe also on a 429 or 5xx): at most three attempts, 200 ms and then 1 s apart, only
+  while the adapter runs, the owner is not stopping and the next attempt can end before the
+  revalidation's 30 s deadline. A credential (401), permission (403), scope, identity or protocol
+  refusal is never sent again. A revalidation that still fails keeps its code, stage and next
+  action and now names `cause` (`connectors.cli.FailureCause`: `provider_unavailable`,
+  `provider_timeout`, `provider_rate_limited`, `provider_internal`, `provider_capacity`,
+  `adapter_exited`, `owner_stopping`) and `attempts` in its error data; no other command or
+  failure carries them (contracts/cli/v1alpha1/semantics.md §6, "Revalidation retries"). A
+  provider that is down for longer than the deadline still fails the revalidation, now after
+  three probes instead of one. A provider's Retry-After is not read; a rate-limited probe is
+  re-sent after 200 ms and 1 s.
+
+## 0.52.0 — 2026-10-15
+
+### Added
+
+- Confluence Cloud REST v1 reads as their own provider configuration, `confluence-v1`, chosen by
+  `provider` in the native configuration beside the REST v2 provider `confluence`. Its selection
+  set (`adapters/catalog/providers/confluence-v1/operations.json`, profile `atlassian.basic`)
+  selects seven reads and no write: `spaces.list`, `space.get`, `space.pages`, `pages.changed`
+  (CQL with `lastmodified`), `page.get`, `page.comments` and `content.search` (CQL search). The
+  source is a contract this repository writes itself from Atlassian's public REST v1 reference
+  pages (`adapters/atlassian/contracts/confluence-rest-v1/confluence-rest-v1.yaml`); no Atlassian
+  v1 document is vendored, because Atlassian's declares no licence. Its access read is the v1
+  space list, so a token with classic scopes only, whose v2 reads answer `401` "scope does not
+  match", connects and reads through it. Verified against a local fixture only; no live site has
+  been read through REST v1. A local install moves with the steps in
+  [docs/catalog-confluence.md, "Moving a local install onto REST v1"](docs/catalog-confluence.md#moving-a-local-install-onto-rest-v1).
+- Slack history and threads on a user token. The user-token selection set
+  (`adapters/catalog/providers/slack/user-operations.json`, profile `slack.user`) selects
+  `conversations.list`, `conversations.history`, `conversations.replies` and `users.list` beside
+  `search.messages`, and still no write. A bot token reads only the channels the bot is a member
+  of (Slack answers `not_in_channel` elsewhere); a connection on a user token reads every
+  conversation that user can read, under the user scopes `channels:read`, `groups:read`,
+  `channels:history`, `groups:history`, `im:history`, `mpim:history` and `users:read`. A user
+  is looked up by reading `users.list`; `users.info` and `users.lookupByEmail` are not selected.
+  An existing `slack.user` connection serves the new reads once the adapter reloads the file; its
+  configuration revision changes. The parity page scores the history, thread, channel-list and
+  user-list rows by the user profile. Verified against a local fixture only.
+- Kubernetes reads of statefulsets (`apps/v1`), nodes (`nodes.list`, the full Node objects of
+  `GET /api/v1/nodes`) and configured custom resources (`custom_resources.list`, one namespaced
+  collection by group, version and plural). `nodes.list` is offered only when the native
+  configuration sets `node_reads`, and refused as `forbidden` with no request otherwise; a custom
+  resource collection or namespace outside `custom_resources` is `forbidden` before any request,
+  and an unserved collection is `not_found`. An existing binding that sets neither keeps its
+  configuration revision. Setup and permissions: [the Kubernetes guide](docs/local-kubernetes-cli.md),
+  "Read statefulsets, nodes and custom resources".
+- Kubernetes connections through an `exec` credential plugin, such as `aws eks get-token`, on
+  Linux. The native configuration pins the plugin (`exec_plugin.path`, `exec_plugin.sha256`); the
+  adapter verifies the file from an opened descriptor (regular, not group or other writable, no
+  set-ID bit, no `security.capability` attribute, owned by root or the adapter's user), runs that
+  descriptor from an empty environment in its own process group with no inherited descriptor, and
+  passes only the allow-listed variables; an exact list of loader, interpreter, shell start-up and
+  library module names is refused. The token is held zeroized until its `expirationTimestamp`; the
+  deadline or more than 64 KiB of output ends the run and kills the plugin and its process group.
+  The kubeconfig command must name the pinned path byte for byte or its bare file name. Off Linux
+  no plugin runs. Setup: [the Kubernetes guide](docs/local-kubernetes-cli.md),
+  "Authenticate through an exec credential plugin". Verified against local plugins and a recorded
+  API session; no live EKS cluster was read.
+- `connectors-build live-read-loop` runs a declared set of reads through the command line for a
+  bounded time with no revalidation, and writes a report of every call's outcome and latency
+  without inputs or results ([the development guide](docs/development.md)).
+
+### Changed
+
+- The approval clock answers from a quorum of Roughtime sources instead of one trusted source.
+  `[approval_clock]` takes `format = "roughtime-quorum/1"`, a `quorum` (2 to 8) and two to
+  eight `[[approval_clock.sources]]`, each with a numeric `address`, its `public_key` and the
+  one wire `version` it speaks (only `roughtime-0x8000000c`; no negotiation; any other
+  version, `roughtime-1` included, is refused as unknown, since no source answered RFC
+  10049's version and no reply at it could be recorded). No
+  two sources share an address or a key (an IPv4-mapped IPv6 address is its IPv4 address).
+  All sources are asked in parallel under one shared
+  two-second deadline, with no retries; the answer is the hull of the instants at least
+  `quorum` verified sources' intervals contain, so one lying source among honest ones cannot
+  move it off true time and one unreachable source does not stop it while a quorum remains.
+  A verified source counts at any radius; only the combined answer is capped. A source whose
+  interval is disjoint from the answer, or whose signed values give no interval, is an
+  `outlier` and never refuses the clock. The UTC-midnight refusal starts from the answer as
+  acquired, back-dated to the earliest exchange start, never from one source's interval: an
+  outlier or a wide source on another UTC day refuses nothing, and a reading refuses once it
+  reaches past the first UTC midnight after the samples were taken. The width cap
+  moves from 4,000 ms to 8,000 ms for the clock answer, the approval proof and the
+  mutation ledger alike (the delegation contract's "at most eight seconds"). The observation
+  adds `sources`, one line per source (`agreed`, `outlier`, `unreachable` or `unverified`,
+  with the signed `radius_ms` when the reply verified). A refusal's
+  `clock_refusal` is now the combined `below_quorum`, `split` or `too_imprecise` (the answer
+  over 8,000 ms; never a single source), and
+  `clock_sources` replaces `clock_radius_ms` with every source's line.
+  **Limitation:** of the four public sources in `docs/local-clock.md`, only int08h (signed
+  radius 5 s) and time.txryan.com (3 s) answered on 2026-10-14; Cloudflare and roughtime.se
+  were unreachable at `roughtime-0x8000000c`. That configuration is a quorum of two of two:
+  it answers, but tolerates no outage and no lying source until a third source answers.
+  **Migration:** the single-source `roughtime-clock/1` table is retired. It still parses, so a
+  configuration that carries it loads and every command that does not use the clock keeps
+  working, but `clock-check`, approval issuance and approved writes refuse it as
+  `invalid_configuration` with `configuration_rule` `approval_clock_format_retired`. Rewrite
+  it as `roughtime-quorum/1` with at least two sources (`docs/local-clock.md`); the new table
+  has a new configuration digest. The live check is now `independent_live_quorum`.
+  This replaces the 0.51.0 `clock_refusal` causes `unreachable` and `unverified`, which are now
+  per-source results on `clock_sources` lines.
+- A Slack read answered `200` with `{"ok": false, "error": "<name>"}` is a refusal, no longer a
+  successful invocation with Slack's body. Every JSON read of both Slack selection sets declares
+  the new selection member `envelope`: `missing_scope`, `not_in_channel`, `no_permission` and
+  `user_is_bot` are `forbidden`; `not_authed`, `invalid_auth`, `account_inactive` and
+  `token_revoked` are `unauthorized`; an unknown channel, thread, file or user is `not_found`;
+  `ratelimited` is `rate_limited` with the delay its `Retry-After` names, sent once more when that
+  fits the deadline, as a `429` is; a cursor or argument Slack refuses is `invalid_input`; any other
+  name is `internal`. Slack's `error` is the provider's reason, and an answer without a boolean
+  `ok` is `upstream_protocol`. The member is generic: any read answering JSON may declare
+  `envelope` for a provider that signals failure in the body of a `2xx` answer
+  ([the catalog provider guide](docs/local-catalog-provider.md#configure-the-provider)).
+  Migration: a caller that read `body.ok` of a Slack read now receives a refusal with exit status
+  non-zero instead. Existing Slack connections take the change once the adapter reloads the
+  files; their configuration revision changes. Verified against a local fixture only.
+
+### Limitations
+
+- Confluence REST v1 is chosen per adapter in the operator's configuration (`confluence-v1`
+  beside `confluence`); the host does not yet probe a token and bind v1 or v2 by itself. The v1
+  source document is authored from Atlassian's reference pages and was checked against a local
+  fixture only; no live Confluence site was read through it.
+- The Kubernetes exec credential plugin runs on Linux only, and was checked against local
+  plugins and a recorded API session; no live EKS cluster was read. A process the plugin starts
+  that leaves its process group is not followed and keeps running.
+- The approval clock quorum is configured with the two public sources that answered on
+  2026-10-14, a quorum of two of two: it tolerates no outage and no lying source until a third
+  source answers. Slack writes stay behind it.
+- A connection still needs a manual `connections revalidate` after its lease lapses; the
+  10-minute unattended read loop `live-read-loop` measures waits on that change.
+
 ## 0.51.0 — 2026-10-15
 
 ### Added

@@ -66,52 +66,83 @@ fn success(output: &Output) -> Value {
     value["result"].clone()
 }
 
-#[test]
-fn clock_check_uses_current_configured_key_without_metadata_or_service_start() {
-    use base64::{Engine, engine::general_purpose::STANDARD};
-    use std::{net::UdpSocket, time::Duration};
+/// The fixtures' signed midpoint, in Unix seconds.
+const CLOCK_T: u64 = 1_789_076_475;
+
+/// A configuration whose `[approval_clock]` is `table`, with one adapter `forge`.
+fn clock_configuration(original: &str, table: &str) -> String {
+    format!(
+        "{original}\n{table}[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+        "a".repeat(64)
+    )
+}
+
+/// A set-up root whose `[approval_clock]` is `table`.
+fn clock_root(table: &str) -> tempfile::TempDir {
     let root = tempfile::tempdir().unwrap();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let original = fs::read_to_string(&config_path).unwrap();
-    let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
-    let address = socket.local_addr().unwrap();
-    let config = |key: String| {
-        format!(
-            "{original}\n[approval_clock]\nformat='roughtime-clock/1'\naddress='{address}'\npublic_key='{key}'\nmax_rate_error_ppm=10000\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
-            "a".repeat(64)
-        )
+    fs::write(&config_path, clock_configuration(&original, table)).unwrap();
+    root
+}
+
+/// A synthetic source signing `midpoint` and `radius` (seconds) with key `seed`.
+fn clock_source(seed: u8, midpoint: u64, radius: u32) -> clock_fixture::Server {
+    clock_fixture::Server::fixture(clock_fixture::Fixture {
+        seed,
+        midpoint,
+        radius,
+        ..Default::default()
+    })
+}
+
+/// `approvals clock-check` refused with `unavailable` at `stage = observation`;
+/// its `Failure`, after checking that nothing of the exchange leaks.
+fn clock_unavailable(root: &tempfile::TempDir) -> Value {
+    let refused = command(root, &["approvals", "clock-check", "--adapter", "forge"]);
+    assert_eq!(refused.status.code(), Some(1));
+    assert!(refused.stdout.is_empty());
+    let error = String::from_utf8(refused.stderr).unwrap();
+    // Never the observation's bounds, nor packet contents.
+    for leaked in ["lower_unix_ms", "upper_unix_ms", "ROUGHTIM", "midpoint"] {
+        assert!(!error.contains(leaked), "{leaked}: {error}");
+    }
+    let envelope: Value = serde_json::from_str(&error).unwrap();
+    let failure = envelope["error"]["data"].clone();
+    assert_eq!(failure["kind"], "operational", "{error}");
+    assert_eq!(failure["code"], "unavailable", "{error}");
+    assert_eq!(failure["stage"], "observation", "{error}");
+    assert!(failure.get("clock_radius_ms").is_none(), "{error}");
+    failure
+}
+
+/// Each line's `result`, in order.
+fn clock_results(lines: &Value) -> Vec<&str> {
+    lines
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|line| line["result"].as_str().unwrap())
+        .collect()
+}
+
+#[test]
+fn clock_check_uses_current_configured_key_without_metadata_or_service_start() {
+    let (a, b) = (clock_source(7, CLOCK_T, 1), clock_source(8, CLOCK_T, 1));
+    let table = |second: u8| {
+        clock_fixture::quorum_toml(2, 10_000, &[(&a.address, 7), (&b.address, second)])
     };
-    fs::write(
-        &config_path,
-        config(STANDARD.encode(clock_fixture::root_key())),
-    )
-    .unwrap();
+    let root = clock_root(&table(8));
+    let config_path = root.path().join("config/config.toml");
     success(&command(&root, &["adapters", "list"]));
     // The command needs configuration only, and cannot accidentally open SQLite.
     let state = root.path().join("state");
     let retired_state = root.path().join("unused-state");
     fs::rename(&state, &retired_state).unwrap();
-    socket.set_nonblocking(true).unwrap();
-    let mut packet = [0; 1024];
-    assert_eq!(
-        socket.recv_from(&mut packet).unwrap_err().kind(),
-        std::io::ErrorKind::WouldBlock
-    );
-    socket.set_nonblocking(false).unwrap();
-    socket
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .unwrap();
-    let fixture = std::thread::spawn(move || {
-        for _ in 0..2 {
-            let mut b = [0; 1024];
-            let (n, caller) = socket.recv_from(&mut b).unwrap();
-            assert_eq!(n, 1024);
-            socket
-                .send_to(&clock_fixture::Fixture::default().reply(&b[..n]), caller)
-                .unwrap();
-        }
-    });
+    for source in [&a, &b] {
+        assert_eq!(source.requests.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
     let view = success(&command(
         &root,
         &["approvals", "clock-check", "--adapter", "forge"],
@@ -125,101 +156,166 @@ fn clock_check_uses_current_configured_key_without_metadata_or_service_start() {
     assert!(
         observation["upper_unix_ms"].as_i64().unwrap()
             - observation["lower_unix_ms"].as_i64().unwrap()
-            <= 4000
+            <= 8000
     );
     assert!(!state.exists());
-    fs::write(&config_path, config(STANDARD.encode([17; 32]))).unwrap();
-    let refused = command(&root, &["approvals", "clock-check", "--adapter", "forge"]);
-    assert_eq!(refused.status.code(), Some(1));
-    assert!(refused.stdout.is_empty());
-    let error = String::from_utf8(refused.stderr).unwrap();
-    assert!(error.contains("unavailable"));
-    assert!(!error.contains("lower_unix_ms"));
+    let original = fs::read_to_string(&config_path).unwrap();
+    fs::write(&config_path, original.replace(&table(8), &table(17))).unwrap();
+    let failure = clock_unavailable(&root);
+    assert_eq!(failure["clock_refusal"], "below_quorum", "{failure}");
     assert!(!state.exists());
-    fixture.join().unwrap();
 }
 
-/// `approvals clock-check` against a local fixture source configured with `key`.
-/// `reply` answers the one request (`None`: the source never answers); the
-/// command's refusal `Failure` is returned.
-fn clock_refusal(key: [u8; 32], reply: Option<clock_fixture::Fixture>) -> Value {
+#[test]
+fn clock_check_reports_each_source() {
+    let (a, liar, b) = (
+        clock_source(7, CLOCK_T, 1),
+        clock_source(8, CLOCK_T + 20, 1),
+        clock_source(9, CLOCK_T, 2),
+    );
+    let root = clock_root(&clock_fixture::quorum_toml(
+        2,
+        10_000,
+        &[(&a.address, 7), (&liar.address, 8), (&b.address, 9)],
+    ));
+    let output = command(&root, &["approvals", "clock-check", "--adapter", "forge"]);
+    let text = String::from_utf8_lossy(&output.stdout).into_owned();
+    for leaked in ["ROUGHTIM", "midpoint", "nonce"] {
+        assert!(!text.contains(leaked), "{leaked}: {text}");
+    }
+    let view = success(&output);
+    let observation = &view["observation"];
+    let truth = i64::try_from(CLOCK_T * 1000).unwrap();
+    assert!(observation["lower_unix_ms"].as_i64().unwrap() <= truth);
+    assert!(observation["upper_unix_ms"].as_i64().unwrap() >= truth);
+    assert_eq!(
+        observation["sources"],
+        serde_json::json!([
+            {"index": 0, "address": a.address, "result": "agreed", "radius_ms": 1000},
+            {"index": 1, "address": liar.address, "result": "outlier", "radius_ms": 1000},
+            {"index": 2, "address": b.address, "result": "agreed", "radius_ms": 2000},
+        ])
+    );
+}
+
+#[test]
+fn clock_check_split_refusal() {
+    let (a, b) = (
+        clock_source(7, CLOCK_T, 1),
+        clock_source(8, CLOCK_T + 20, 1),
+    );
+    let root = clock_root(&clock_fixture::quorum_toml(
+        2,
+        10_000,
+        &[(&a.address, 7), (&b.address, 8)],
+    ));
+    let failure = clock_unavailable(&root);
+    assert_eq!(failure["clock_refusal"], "split", "{failure}");
+    assert_eq!(failure["next_action"], "choose_clock_source", "{failure}");
+    assert_eq!(
+        failure["clock_sources"],
+        serde_json::json!([
+            {"index": 0, "address": a.address, "result": "verified", "radius_ms": 1000},
+            {"index": 1, "address": b.address, "result": "verified", "radius_ms": 1000},
+        ])
+    );
+}
+
+#[test]
+fn clock_check_below_quorum_refusal() {
+    let good = clock_source(7, CLOCK_T, 1);
+    let silent = clock_fixture::Server::silent();
+    // Signed with seed 8, configured with seed 12's key.
+    let wrong_key = clock_source(8, CLOCK_T, 1);
+    // A 5 s signed radius is a 10 s interval, wider than the 8,000 ms cap: it
+    // still counts, since only the combined answer is capped.
+    let wide = clock_source(9, CLOCK_T, 5);
+    let (g, s, w, i) = (
+        (good.address.as_str(), 7),
+        (silent.address.as_str(), 10),
+        (wrong_key.address.as_str(), 12),
+        (wide.address.as_str(), 9),
+    );
+    // Every verified source counts, whatever its radius, so a row's quorum is
+    // set above its verified count; the wide line is verified with its radius.
+    for (sources, quorum, results, action) in [
+        (
+            vec![g, s, w, i],
+            3,
+            vec!["verified", "unreachable", "unverified", "verified"],
+            "check_configuration",
+        ),
+        (
+            vec![g, s, i],
+            3,
+            vec!["verified", "unreachable", "verified"],
+            "retry_explicitly",
+        ),
+        (
+            vec![g, s],
+            2,
+            vec!["verified", "unreachable"],
+            "retry_explicitly",
+        ),
+    ] {
+        let root = clock_root(&clock_fixture::quorum_toml(quorum, 10_000, &sources));
+        let failure = clock_unavailable(&root);
+        assert_eq!(failure["clock_refusal"], "below_quorum", "{failure}");
+        assert_eq!(failure["next_action"], action, "{failure}");
+        let lines = &failure["clock_sources"];
+        assert_eq!(clock_results(lines), results, "{failure}");
+        for (index, line) in lines.as_array().unwrap().iter().enumerate() {
+            assert_eq!(line["index"], index, "{failure}");
+            assert_eq!(line["address"], sources[index].0, "{failure}");
+            let radius = match line["result"].as_str().unwrap() {
+                "verified" if sources[index] == i => Some(5000),
+                "verified" => Some(1000),
+                _ => None,
+            };
+            assert_eq!(line["radius_ms"].as_i64(), radius, "{failure}");
+        }
+    }
+}
+
+#[test]
+fn clock_check_legacy_format_refusal() {
     use base64::{Engine, engine::general_purpose::STANDARD};
-    use std::{net::UdpSocket, time::Duration};
-    let root = tempfile::tempdir().unwrap();
-    success(&command(&root, &["setup", "init"]));
+    let source = clock_source(7, CLOCK_T, 1);
+    let root = clock_root(&format!(
+        "[approval_clock]\nformat='roughtime-clock/1'\naddress='{}'\npublic_key='{}'\nmax_rate_error_ppm=10000\n",
+        source.address,
+        STANDARD.encode(clock_fixture::root_key())
+    ));
+    // The retired table no longer fails the whole configuration.
+    let listed = success(&command(&root, &["adapters", "list"]));
+    assert_eq!(listed["adapters"][0]["adapter"], "forge", "{listed}");
+    let refused = command(&root, &["approvals", "clock-check", "--adapter", "forge"]);
+    assert_eq!(refused.status.code(), Some(2));
+    let error = String::from_utf8(refused.stderr).unwrap();
+    let envelope: Value = serde_json::from_str(&error).unwrap();
+    let failure = &envelope["error"]["data"];
+    assert_eq!(failure["kind"], "usage", "{error}");
+    assert_eq!(failure["code"], "invalid_configuration", "{error}");
+    assert_eq!(failure["stage"], "configuration", "{error}");
+    assert_eq!(failure["next_action"], "check_configuration", "{error}");
+    assert_eq!(
+        failure["configuration_rule"], "approval_clock_format_retired",
+        "{error}"
+    );
+    assert!(failure.get("clock_refusal").is_none(), "{error}");
+    // Never read as a one-source clock: the source is never asked.
+    assert_eq!(source.requests.load(std::sync::atomic::Ordering::SeqCst), 0);
+    // Any other format string still refuses the whole configuration.
     let config_path = root.path().join("config/config.toml");
-    let original = fs::read_to_string(&config_path).unwrap();
-    let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
-    let address = socket.local_addr().unwrap();
+    let text = fs::read_to_string(&config_path).unwrap();
     fs::write(
         &config_path,
-        format!(
-            "{original}\n[approval_clock]\nformat='roughtime-clock/1'\naddress='{address}'\npublic_key='{}'\nmax_rate_error_ppm=10000\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
-            STANDARD.encode(key),
-            "a".repeat(64)
-        ),
+        text.replace("roughtime-clock/1", "roughtime-clock/2"),
     )
     .unwrap();
-    socket
-        .set_read_timeout(Some(Duration::from_secs(10)))
-        .unwrap();
-    let source = std::thread::spawn(move || {
-        let mut b = [0; 1024];
-        let (n, caller) = socket.recv_from(&mut b).unwrap();
-        assert_eq!(n, 1024);
-        if let Some(fixture) = reply {
-            socket.send_to(&fixture.reply(&b[..n]), caller).unwrap();
-        }
-        // Held open until the request is answered or abandoned, so the
-        // silent source refuses nothing: the client's deadline expires.
-        socket
-    });
-    let refused = command(&root, &["approvals", "clock-check", "--adapter", "forge"]);
-    drop(source.join().unwrap());
-    assert_eq!(refused.status.code(), Some(1));
-    assert!(refused.stdout.is_empty());
-    let error = String::from_utf8(refused.stderr).unwrap();
-    // Never the observation's bounds, nor packet contents.
-    for leaked in ["lower_unix_ms", "upper_unix_ms", "ROUGHTIM", "midpoint"] {
-        assert!(!error.contains(leaked), "{leaked}: {error}");
-    }
-    let envelope: Value = serde_json::from_str(&error).unwrap();
-    let failure = envelope["error"]["data"].clone();
-    assert_eq!(failure["kind"], "operational", "{error}");
-    assert_eq!(failure["code"], "unavailable", "{error}");
-    assert_eq!(failure["stage"], "observation", "{error}");
-    failure
-}
-
-#[test]
-fn clock_check_names_an_unreachable_source() {
-    let failure = clock_refusal(clock_fixture::root_key(), None);
-    assert_eq!(failure["clock_refusal"], "unreachable", "{failure}");
-    assert_eq!(failure["next_action"], "retry_explicitly", "{failure}");
-    assert!(failure.get("clock_radius_ms").is_none(), "{failure}");
-}
-
-#[test]
-fn clock_check_names_a_reply_that_does_not_verify_against_the_configured_key() {
-    let failure = clock_refusal([17; 32], Some(clock_fixture::Fixture::default()));
-    assert_eq!(failure["clock_refusal"], "unverified", "{failure}");
-    assert_eq!(failure["next_action"], "check_configuration", "{failure}");
-    assert!(failure.get("clock_radius_ms").is_none(), "{failure}");
-}
-
-#[test]
-fn clock_check_names_a_verified_source_too_imprecise_for_the_width() {
-    // A 5 s signed radius is a 10 s interval: wider than the contract's 4,000 ms.
-    let failure = clock_refusal(
-        clock_fixture::root_key(),
-        Some(clock_fixture::Fixture {
-            radius: 5,
-            ..Default::default()
-        }),
-    );
-    assert_eq!(failure["clock_refusal"], "too_imprecise", "{failure}");
-    assert_eq!(failure["next_action"], "choose_clock_source", "{failure}");
-    assert_eq!(failure["clock_radius_ms"], 5000, "{failure}");
+    let listed = command(&root, &["adapters", "list"]);
+    assert_eq!(listed.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&listed.stderr).contains("invalid_configuration"));
 }
 
 #[test]
@@ -541,6 +637,18 @@ fn start_owner_with(
     root: &tempfile::TempDir,
     idle_ms: Option<u64>,
 ) -> OwnerProcess {
+    start_owner_in(binary, root, root, idle_ms)
+}
+
+/// As [`start_owner_with`], reading the configuration of `config_root` and
+/// serving the state directory of `root`.
+#[cfg(unix)]
+fn start_owner_in(
+    binary: &std::path::Path,
+    config_root: &tempfile::TempDir,
+    root: &tempfile::TempDir,
+    idle_ms: Option<u64>,
+) -> OwnerProcess {
     use std::os::{
         fd::AsRawFd,
         unix::{fs::OpenOptionsExt, net::UnixStream},
@@ -572,7 +680,7 @@ fn start_owner_with(
         .arg("-c")
         .arg(r#"exec "$0" __connectors-owner "$1" "$2" 3<&0 4<&1 </dev/null >/dev/null"#)
         .arg(binary)
-        .arg(root.path().join("config/config.toml"))
+        .arg(config_root.path().join("config/config.toml"))
         .arg(&state)
         .stdin(std::process::Stdio::from(std::os::fd::OwnedFd::from(
             owner_end,
@@ -834,6 +942,30 @@ fn adversary_owner_root() -> tempfile::TempDir {
     root
 }
 
+/// A second root whose state directory is a copy of `root`'s, taken before any
+/// owner runs: an owner started there with `root`'s configuration answers a CLI
+/// of `root` (same authority, same configuration path) while `root`'s socket
+/// path stays free for a relay.
+#[cfg(unix)]
+fn adversary2_owner_root(root: &tempfile::TempDir) -> tempfile::TempDir {
+    use std::os::unix::fs::DirBuilderExt;
+    fn copy(from: &std::path::Path, to: &std::path::Path) {
+        fs::DirBuilder::new().mode(0o700).create(to).unwrap();
+        for entry in fs::read_dir(from).unwrap() {
+            let entry = entry.unwrap();
+            let target = to.join(entry.file_name());
+            if entry.file_type().unwrap().is_dir() {
+                copy(&entry.path(), &target);
+            } else {
+                fs::copy(entry.path(), target).unwrap();
+            }
+        }
+    }
+    let owner_root = tempfile::tempdir().unwrap();
+    copy(&root.path().join("state"), &owner_root.path().join("state"));
+    owner_root
+}
+
 /// Owner-channel frame: three big-endian u32 section sizes, then the sections.
 #[cfg(unix)]
 fn adversary_frame(control: &Value) -> Vec<u8> {
@@ -937,17 +1069,18 @@ fn adversary_read_control(stream: &mut std::os::unix::net::UnixStream) -> Value 
 fn adversary_a_transient_greeting_refusal_from_the_same_build_is_not_a_build_mismatch() {
     use std::os::unix::net::UnixStream;
     let root = adversary_owner_root();
+    let owner_root = adversary2_owner_root(&root);
     let started = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
-    let _owner = start_owner(started, &root);
+    let _owner = start_owner_in(started, &root, &owner_root, None);
     let state = root.path().join("state");
-    fs::rename(state.join("owner.sock"), state.join("real.sock")).unwrap();
     let directory = sockets::Directory::open(&state);
+    let owner_directory = sockets::Directory::open(&owner_root.path().join("state"));
     let listener = directory.bind("owner.sock");
     fs::set_permissions(state.join("owner.sock"), fs::Permissions::from_mode(0o600)).unwrap();
-    let real = directory.path("real.sock");
+    let real = owner_directory.path("owner.sock");
     std::thread::spawn(move || {
         // `real` names the socket through this descriptor.
-        let _directory = &directory;
+        let _directory = (&directory, &owner_directory);
         let mut first = true;
         for stream in listener.incoming() {
             let Ok(client) = stream else { return };
@@ -1128,28 +1261,31 @@ fn protected_sources_are_not_consumed_before_configuration_admission() {
     assert_eq!(refusal["error"]["data"]["code"], "invalid_configuration");
 }
 
-/// Adversary pass 2: a relay in front of the real owner's socket. `drop_first`
-/// decides, from the first frame's control JSON, whether this connection is
+/// Adversary pass 2: a relay in front of the real owner's socket. The owner runs
+/// in `owner_root`'s state directory and the relay listens at `root`'s, so no
+/// owner's socket is replaced (an owner exits once its socket path names another
+/// socket). `drop_first` decides, from the first frame's control JSON, whether this connection is
 /// closed without a reply; every other connection is relayed byte for byte.
 /// Returns the number of connections relayed to the real owner.
 #[cfg(unix)]
 fn adversary2_relay(
     root: &tempfile::TempDir,
+    owner_root: &tempfile::TempDir,
     drop_first: impl Fn(usize, &Value) -> bool + Send + 'static,
 ) -> std::sync::Arc<std::sync::atomic::AtomicUsize> {
     use std::io::{Read, Write};
     use std::os::unix::net::UnixStream;
     let state = root.path().join("state");
-    fs::rename(state.join("owner.sock"), state.join("real.sock")).unwrap();
     let directory = sockets::Directory::open(&state);
+    let owner_directory = sockets::Directory::open(&owner_root.path().join("state"));
     let listener = directory.bind("owner.sock");
     fs::set_permissions(state.join("owner.sock"), fs::Permissions::from_mode(0o600)).unwrap();
-    let real = directory.path("real.sock");
+    let real = owner_directory.path("owner.sock");
     let relayed = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let counter = relayed.clone();
     std::thread::spawn(move || {
         // `real` names the socket through this descriptor.
-        let _directory = &directory;
+        let _directory = (&directory, &owner_directory);
         for (index, stream) in listener.incoming().enumerate() {
             let Ok(mut client) = stream else { return };
             let mut sizes = [0u8; 12];
@@ -1259,11 +1395,12 @@ fn adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_run
 #[test]
 fn adversary2_the_build_probe_against_an_owner_at_capacity_reports_capacity() {
     let root = adversary_owner_root();
+    let owner_root = adversary2_owner_root(&root);
     let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
-    let _owner = start_owner(binary, &root);
-    let _relayed = adversary2_relay(&root, |index, _| index == 0);
-    let directory = sockets::Directory::open(&root.path().join("state"));
-    let held = fill_owner(&directory, "real.sock");
+    let _owner = start_owner_in(binary, &root, &owner_root, None);
+    let _relayed = adversary2_relay(&root, &owner_root, |index, _| index == 0);
+    let directory = sockets::Directory::open(&owner_root.path().join("state"));
+    let held = fill_owner(&directory, "owner.sock");
     let filled = std::time::Instant::now();
     let output = command(&root, &["adapters", "status", "--adapter", "forge"]);
     // A slot frees only when a held client reaches the owner's 10-second
@@ -1288,9 +1425,12 @@ fn adversary2_the_build_probe_against_an_owner_at_capacity_reports_capacity() {
 #[test]
 fn adversary2_the_identification_retry_loop_ends_at_its_deadline_without_flooding_the_owner() {
     let root = adversary_owner_root();
+    let owner_root = adversary2_owner_root(&root);
     let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
-    let mut owner = start_owner(binary, &root);
-    let relayed = adversary2_relay(&root, |_, control| control.get("build").is_some());
+    let mut owner = start_owner_in(binary, &root, &owner_root, None);
+    let relayed = adversary2_relay(&root, &owner_root, |_, control| {
+        control.get("build").is_some()
+    });
     let started = std::time::Instant::now();
     let output = command(&root, &["adapters", "status", "--adapter", "forge"]);
     let elapsed = started.elapsed();

@@ -135,7 +135,7 @@ fn classify(suite: &Suite, name: &str) -> Entry {
                 entry.helper = true;
                 return entry;
             }
-            "local::clock::tests::independent_live_source" => Some((Live, vec![])),
+            "local::clock::tests::independent_live_quorum" => Some((Live, vec![])),
             "local::registry::tests::read_invoke_metadata_time"
             | "local::registry::store_cost_tests::read_invoke_cost_by_store_size"
             | "local::registry::store_cost_tests::batch_cost_by_subject"
@@ -181,8 +181,10 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "connectors-catalog-provider",
             "local_runtime",
             "cli_journey::guarded_merge::prepared_attempt_exit_fixture"
-            | "cli_journey::guarded_merge::owner_replay::catalog_same_image_owner_fixture",
-        ) => {
+            | "cli_journey::guarded_merge::owner_replay::catalog_same_image_owner_fixture"
+            | "cli_journey::serve_the_raw_file_fixture",
+        )
+        | ("connectors-catalog-provider", "openrouter", "serve_the_fixture") => {
             entry.helper = true;
             return entry;
         }
@@ -195,11 +197,23 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "connectors-catalog-provider",
             "local_runtime",
             "cli_journey::lifecycle::catalog_cli_failed_repair_and_busy_stop_preserve_authority"
+            | "cli_journey::owner_guard::a_journey_that_panics_after_its_owner_started_leaves_no_owner_alive"
+            | "cli_journey::owner_guard::a_journey_owner_exits_when_the_process_it_is_tied_to_ends"
             | "cli_journey::guarded_merge::catalog_cli_guarded_merge_applied_refused_and_lost_response_restart"
             | "cli_journey::guarded_merge::catalog_cli_guarded_merge_revocation_finishes_admitted_audit"
             | "cli_journey::guarded_merge::catalog_cli_recovers_abandoned_preparation_only_with_trusted_time"
             | "cli_journey::guarded_merge::catalog_cli_background_recovery_waits_for_live_work_and_recovers_unkeyed_attempts"
-            | "cli_journey::guarded_merge::catalog_cli_background_recovers_revoked_removed_target_without_disclosure",
+            | "cli_journey::guarded_merge::catalog_cli_background_recovers_revoked_removed_target_without_disclosure"
+            | "cli_journey::guarded_merge::custody_journey::a_create_that_times_out_after_receipt_is_unknown_and_never_sent_again"
+            | "cli_journey::guarded_merge::custody_journey::a_create_whose_operation_has_no_custody_target_is_refused_before_it_is_sent"
+            | "cli_journey::guarded_merge::custody_journey::a_created_token_custody_refuses_is_reported_by_its_hash_and_held_nowhere"
+            | "cli_journey::guarded_merge::custody_journey::a_created_token_is_held_as_a_new_connection_and_only_its_hash_is_returned"
+            | "cli_journey::revision_recovery::a_changed_evidence_lifetime_recovers_with_a_new_connection_in_two_commands"
+            | "cli_journey::revision_recovery::no_next_action_after_a_revision_change_returns_to_an_earlier_refusal"
+            | "cli_journey::revision_recovery::revalidate_replaces_the_adapter_process_of_an_earlier_entry"
+            | "cli_journey::revision_recovery_adversary::adversary_a_changed_profile_id_names_the_path_that_recovers"
+            | "cli_journey::revision_recovery_adversary::adversary_a_lifetime_changed_and_reverted_leaves_the_first_connection_usable"
+            | "cli_journey::revision_recovery_adversary::adversary_the_connection_left_by_a_changed_authentication_stays_revocable",
         ) => Some((Disposable, vec![CUSTODY, CLI])),
         (
             "connectors-catalog-provider",
@@ -1068,7 +1082,7 @@ mod local {{
     mod keyring {{ pub mod custody {{ mod tests {{
         #[test] #[ignore] fn disposable_secret_service_restart_and_failures() {{ assert!({}); }}
     }} }} }}
-    mod clock {{ mod tests {{ #[test] #[ignore] fn independent_live_source() {{ panic!("live never authorized"); }} }} }}
+    mod clock {{ mod tests {{ #[test] #[ignore] fn independent_live_quorum() {{ panic!("live never authorized"); }} }} }}
     mod audit {{ mod tests {{ #[test] #[ignore] fn crash_child() {{ panic!("helper never top level"); }} }} }}
 }}
 {}

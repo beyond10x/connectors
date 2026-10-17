@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-16T02:04:00Z",
+  "actor": "human:timo",
+  "artifact": "story:confluence-v1-authored-contract",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv on d77fe9108 (wave 20261015b, release 0.52.0): all checks passed, 2317 tests passed, 0 failed, 106 ignored, MSRV 1.88/1.91 checks and library boundaries held, plan validate passed",
+    "reference": "d77fe91085b2c03ef7c566ed91bbd8f49720ee70"
+  }
+}

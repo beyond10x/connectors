@@ -124,11 +124,14 @@ fn select(id: &str, operation_id: &str, effect: Effect) -> Selection {
         withhold: Vec::new(),
         credential: Vec::new(),
         rate_limit_reasons: Vec::new(),
+        refusal_texts: Vec::new(),
+        envelope: None,
         body_keys: Vec::new(),
         body_types: BTreeMap::new(),
         body_required: Vec::new(),
         body_nonempty: Vec::new(),
         body_fixed: BTreeMap::new(),
+        custody: None,
     }
 }
 fn mr_guard(values: &[(&str, &str)], preflight: Vec<Check>, postflight: Vec<Check>) -> Guard {
@@ -1720,6 +1723,166 @@ fn a_rate_limit_reason_must_be_a_nonempty_string() {
     }
     let plain = serde_json::to_value(select("file.export", "exportFile", Effect::Read)).unwrap();
     assert!(plain.get("rate_limit_reasons").is_none(), "{plain}");
+}
+
+/// A write declaring that a definite 4xx refusal whose `message` or `detail`
+/// contains `no room` or `sold out` is `capacity`.
+fn text_refusing_thing() -> Engine {
+    let selection = written(json!({
+        "id": "thing.create", "operation_id": "createThing", "effect": "write",
+        "refusal_texts": [{"pointers": ["/message", "/detail"],
+                           "contains": ["no room", "sold out"], "code": "capacity"}]
+    }));
+    Engine::new(&shapes_bundle(), "/v1", &[selection]).unwrap()
+}
+
+/// What one write of `thing.create` answered `status` with `body` comes to.
+async fn text_refusal_outcome(engine: &Engine, status: u16, body: &[u8]) -> WriteOutcome<Value> {
+    let http = reads(vec![]);
+    let prepared = engine
+        .prepare(
+            http.as_ref(),
+            "fixture",
+            "thing.create",
+            json!({"body": {}}),
+        )
+        .await
+        .unwrap();
+    prepared
+        .execute(Box::new(Send {
+            sent: Arc::default(),
+            response: Some(raw(status, body)),
+        }))
+        .await
+}
+
+/// A selection's `refusal_texts` reclassify a definite 4xx refusal whose
+/// declared member contains a declared text, without regard to case; every
+/// other answer keeps the classification its status gives.
+#[tokio::test]
+async fn a_declared_refusal_text_on_a_4xx_refuses_a_write_with_its_code() {
+    let engine = text_refusing_thing();
+    for (status, body) in [
+        (400, json!({"message": "There is NO ROOM left"})),
+        (409, json!({"message": "no room"})),
+        (409, json!({"status": 409, "detail": "GPU Sold Out today"})),
+        (422, json!({"detail": "sold out"})),
+        (403, json!({"message": "no room"})),
+    ] {
+        let outcome =
+            text_refusal_outcome(&engine, status, &serde_json::to_vec(&body).unwrap()).await;
+        let WriteOutcome::Refused(error) = outcome else {
+            panic!("{status} {body}: not refused");
+        };
+        assert_eq!(error.code, ErrorCode::Capacity, "{status} {body}");
+        assert!(error.upstream_answer, "{status} {body}");
+    }
+    for (status, body, code) in [
+        (
+            400,
+            json!({"message": "Invalid input"}),
+            ErrorCode::InvalidInput,
+        ),
+        // The text under a member the refusal does not name.
+        (400, json!({"error": "no room"}), ErrorCode::InvalidInput),
+        (
+            400,
+            json!({"message": {"text": "no room"}}),
+            ErrorCode::InvalidInput,
+        ),
+        (404, json!({"message": "nothing"}), ErrorCode::NotFound),
+    ] {
+        let outcome =
+            text_refusal_outcome(&engine, status, &serde_json::to_vec(&body).unwrap()).await;
+        let WriteOutcome::Refused(error) = outcome else {
+            panic!("{status} {body}: not refused");
+        };
+        assert_eq!(error.code, code, "{status} {body}");
+    }
+    // Not JSON: the status decides.
+    let WriteOutcome::Refused(error) = text_refusal_outcome(&engine, 400, b"no room").await else {
+        panic!("a plain-text 400 was not refused");
+    };
+    assert_eq!(error.code, ErrorCode::InvalidInput);
+    // An answer that leaves the effect possible stays unknown, whatever its text.
+    for status in [429, 500, 502, 503] {
+        let body = serde_json::to_vec(&json!({"message": "no room"})).unwrap();
+        let outcome = text_refusal_outcome(&engine, status, &body).await;
+        assert!(
+            matches!(outcome, WriteOutcome::Unknown(_)),
+            "{status} was not unknown"
+        );
+    }
+}
+
+/// `refusal_texts` loads only on a write, with every pointer an RFC 6901
+/// pointer and every text non-empty and not repeated in its refusal, at most
+/// sixteen refusals; an unknown code or member is not a selection at all. A
+/// selection without it serialises as before.
+#[test]
+fn refusal_texts_are_refused_when_they_cannot_hold() {
+    let rule = || json!({"pointers": ["/message"], "contains": ["no room"], "code": "capacity"});
+    let mut bad = Vec::new();
+    bad.push((
+        "on a read",
+        "file.export",
+        "exportFile",
+        "read",
+        json!([rule()]),
+    ));
+    for (what, change) in [
+        (
+            "pointer without a slash",
+            &(|r: &mut Value| r["pointers"] = json!(["message"])) as &dyn Fn(&mut Value),
+        ),
+        ("no pointer", &|r| r["pointers"] = json!([])),
+        ("no text", &|r| r["contains"] = json!([])),
+        ("an empty text", &|r| r["contains"] = json!(["no room", ""])),
+        ("a repeated text", &|r| {
+            r["contains"] = json!(["no room", "No Room"])
+        }),
+    ] {
+        let mut r = rule();
+        change(&mut r);
+        bad.push((what, "thing.create", "createThing", "write", json!([r])));
+    }
+    bad.push((
+        "seventeen",
+        "thing.create",
+        "createThing",
+        "write",
+        Value::Array((0..17).map(|_| rule()).collect()),
+    ));
+    for (what, id, operation, effect, texts) in bad {
+        let selection = written(json!({
+            "id": id, "operation_id": operation, "effect": effect, "refusal_texts": texts
+        }));
+        let error = Engine::new(&shapes_bundle(), "/v1", &[selection])
+            .err()
+            .unwrap_or_else(|| panic!("{what} loaded"));
+        assert_eq!(error.code, ErrorCode::InvalidInput, "{what}");
+        assert!(
+            error.message.contains("refusal_texts"),
+            "{what}: {}",
+            error.message
+        );
+    }
+    for change in [
+        &(|r: &mut Value| r["code"] = json!("invalid_input")) as &dyn Fn(&mut Value),
+        &|r| r["extra"] = json!(true),
+    ] {
+        let mut r = rule();
+        change(&mut r);
+        assert!(
+            serde_json::from_value::<Selection>(json!({
+                "id": "thing.create", "operation_id": "createThing", "effect": "write",
+                "refusal_texts": [r]
+            }))
+            .is_err()
+        );
+    }
+    let plain = serde_json::to_value(select("thing.create", "createThing", Effect::Write)).unwrap();
+    assert!(plain.get("refusal_texts").is_none(), "{plain}");
 }
 
 /// A write whose body is closed to `id`, as a draft send is.

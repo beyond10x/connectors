@@ -2,16 +2,17 @@
 format: aep.planning-md/3
 id: story:slack-ok-false-is-a-refusal
 kind: story
-status: active
+status: implemented
 title: A Slack ok:false answer is a typed refusal, never an empty read
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
 - depends_on: story:slack-user-token-history-reads
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-14T23:35:16Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-14T23:35:16Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-16T02:05:08Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

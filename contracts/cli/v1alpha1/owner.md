@@ -40,6 +40,34 @@ that may start an owner treats that as no owner, greets a newer owner already
 listening or waits for the lock and starts one, and a passive command reports
 no owner. Only a test build can shorten the 10 minutes.
 
+A Unix owner also exits once nothing can reach it or its state is gone: when the
+socket it listens on is no longer in its state directory (it was removed, or
+another file or socket now holds its name), or the state directory's path no
+longer names the directory the owner opened (it was removed or replaced, or an
+ancestor was, so that the path names nothing or can no longer be searched). The
+socket it listens on is the one it bound last: the socket idle retirement binds
+again when a client arrived or work began during retirement is that socket, not a
+replacement.
+A look at either path that fails for any other reason proves nothing, and the
+owner keeps serving. The owner checks both at least every 250 ms. It then accepts
+no further connection, lets the clients already connected finish for at most 5
+seconds, and stops recovery and its supervisor, idle children included, as a
+shutdown request does; a client whose exchange is still in flight then loses its
+connection without a reply, and an in-flight mutation's outcome is unknown to it,
+resolved only through status. It leaves the socket path alone, which another
+directory may now hold.
+A Windows owner keeps its state directory open, so that directory cannot be
+removed beneath it, and its pipe is not a file; it has neither check.
+
+Only a test build ties an owner to a process. A CLI built with debug assertions
+whose environment sets `CONNECTORS_TEST_OWNER_PARENT` to a process id passes that
+variable, alone, to an owner it starts on Unix, and that owner exits as above once
+the named process has ended (checked at least every 250 ms; an owner whose named
+process is already gone exits after answering its startup). A journey harness sets
+it to its own process, so an owner it started does not outlive it, however the
+harness ends. A release build reads no such variable: its owner stops only on a
+shutdown request, at idle retirement or by the checks above.
+
 Private requests reuse the bounded three-section framing of the
 [adapter binding](private-adapter.md), with distinct `connectors-owner/1` greetings.
 

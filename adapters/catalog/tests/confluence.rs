@@ -119,7 +119,7 @@ fn shipped_confluence_selections_are_exactly_the_four_reads() {
 fn a_selection_the_pinned_source_lacks_is_refused_at_load() {
     let bundle = bundle::load(&root().join("generated/bundles"), "confluence").unwrap();
     let mut selections = shipped();
-    // CQL search lives only in the v1 document, which is not pinned.
+    // CQL search lives only under REST v1, the authored `confluence-v1` source.
     selections[0].operation_id = "searchByCQL".into();
     assert!(Engine::new(&bundle, BASE, &selections).is_err());
 }

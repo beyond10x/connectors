@@ -37,6 +37,7 @@ fn bootstrap(write: bool) -> Bootstrap {
         bootstrap.descriptor = descriptor.to_string();
         bootstrap.requirements.push(Requirement {
             operation: "write".into(),
+            custody: false,
             profile: "fixture".into(),
             scopes: BTreeSet::new(),
             effect: Effect::Write,
@@ -160,6 +161,81 @@ impl PreparedWrite for Pending {
             }
             _ => WriteOutcome::Applied(Ok(self.input.clone())),
         }
+    }
+    /// `created` answers as a write whose answer carried a credential it
+    /// created: the public result, and the fictional created bytes beside it.
+    async fn execute_created(self: Box<Self>) -> WriteOutcome<Created> {
+        if self.mode == "created" {
+            record(&self.root, "send");
+            return WriteOutcome::Applied(Ok(Created {
+                result: self.input.clone(),
+                secret: Some(Secret(CREATED.to_vec())),
+            }));
+        }
+        self.execute().await.try_map(|result| {
+            Ok(Created {
+                result,
+                secret: None,
+            })
+        })
+    }
+}
+/// Fictional created material, never a real credential's shape.
+const CREATED: &[u8] = b"fictional-created-material";
+
+#[test]
+fn a_created_secret_crosses_only_in_the_protected_slot_of_a_commit_that_expects_it() {
+    // Expected: the secret arrives beside the validated public result, which
+    // holds none of it.
+    let root = temp();
+    let mut child = Child::spawn(&selection(root.path(), "created", PrivateProtocol::V2)).unwrap();
+    let (result, secret) = prepare(&mut child, HANG_BUDGET_MS)
+        .unwrap()
+        .commit_holding();
+    assert_eq!(result.effect, WriteEffect::Applied);
+    let value = result.result.unwrap();
+    assert_eq!(value, json!({"value":true}));
+    assert!(!value.to_string().contains("fictional-created"));
+    assert_eq!(secret.unwrap().0, CREATED);
+    assert!(child.live);
+    // Unexpected: a secret on a commit that expects none keeps the applied
+    // effect, discards the bytes and reaps the child that sent them.
+    let root = temp();
+    let mut child = Child::spawn(&selection(root.path(), "created", PrivateProtocol::V2)).unwrap();
+    let result = prepare(&mut child, HANG_BUDGET_MS).unwrap().commit();
+    assert_eq!(result.effect, WriteEffect::Applied);
+    assert_eq!(result.result.err(), Some(Failure::Protocol));
+    assert!(!child.live);
+    // Missing: an applied success without the expected secret is the same
+    // protocol fault on an applied write.
+    let root = temp();
+    let mut child = Child::spawn(&selection(root.path(), "applied", PrivateProtocol::V2)).unwrap();
+    let (result, secret) = prepare(&mut child, HANG_BUDGET_MS)
+        .unwrap()
+        .commit_holding();
+    assert_eq!(result.effect, WriteEffect::Applied);
+    assert_eq!(result.result.err(), Some(Failure::Protocol));
+    assert!(secret.is_none());
+    assert!(!child.live);
+    // A refused write expecting a secret carries none, and is still refused.
+    let root = temp();
+    let mut child = Child::spawn(&selection(root.path(), "refused", PrivateProtocol::V2)).unwrap();
+    let (result, secret) = prepare(&mut child, HANG_BUDGET_MS)
+        .unwrap()
+        .commit_holding();
+    assert_eq!(result.effect, WriteEffect::Refused);
+    assert!(secret.is_none());
+    // A peer that sends bytes beside anything but an applied success is
+    // refused, and its bytes are dropped.
+    for mode in ["peer-result-secret-refused", "peer-result-secret-failure"] {
+        let root = temp();
+        let mut child = Child::spawn(&selection(root.path(), mode, PrivateProtocol::V2)).unwrap();
+        let (result, secret) = prepare(&mut child, HANG_BUDGET_MS)
+            .unwrap()
+            .commit_holding();
+        assert_eq!(result.result.err(), Some(Failure::Protocol), "{mode}");
+        assert!(secret.is_none(), "{mode}");
+        assert!(!child.live, "{mode}");
     }
 }
 
@@ -299,7 +375,20 @@ fn peer_fixture(root: &Path, mode: &str) {
         }
         _ => (),
     }
-    channel::write(&mut stream, &reply, None, &document, until).unwrap();
+    let created = Secret(CREATED.to_vec());
+    let secret = match mode {
+        "peer-result-secret-refused" => {
+            reply["effect"] = json!("refused");
+            document = br#"{"kind":"failure","code":"forbidden"}"#.to_vec();
+            Some(&created)
+        }
+        "peer-result-secret-failure" => {
+            document = br#"{"kind":"failure","code":"protocol"}"#.to_vec();
+            Some(&created)
+        }
+        _ => None,
+    };
+    channel::write(&mut stream, &reply, secret, &document, until).unwrap();
     // The parent must reject and reap this exact live child after a bad reply.
     let _ = channel::read::<Value>(&mut stream, until, false, 0);
 }

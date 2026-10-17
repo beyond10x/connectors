@@ -3,10 +3,15 @@
   "provider": "runpod",
   "operations": [
     {"id": "pod.create", "operation_id": "CreatePod", "effect": "write",
-     "description": "Create and deploy one pod from body; a definite 4xx refusal created nothing, while a lost connection or a 5xx after the request was sent leaves the pod possibly created, so check pods.list by name before creating again",
-     "body_keys": ["name", "imageName", "gpuTypeIds", "gpuCount", "containerDiskInGb", "volumeInGb", "volumeMountPath", "ports", "env", "cloudType", "dataCenterIds", "interruptible", "dockerStartCmd", "dockerEntrypoint", "networkVolumeId"]},
+     "description": "Create and deploy one pod from body; a definite 4xx refusal created nothing, and one naming a lack of capacity is refused as capacity, so the workload may be placed elsewhere, while a lost connection or a 5xx after the request was sent leaves the pod possibly created, so check pods.list by name before creating again",
+     "body_keys": ["name", "imageName", "gpuTypeIds", "gpuCount", "containerDiskInGb", "volumeInGb", "volumeMountPath", "ports", "env", "cloudType", "dataCenterIds", "interruptible", "dockerStartCmd", "dockerEntrypoint", "networkVolumeId"],
+     "refusal_texts": [{"pointers": ["/message", "/detail"],
+                        "contains": ["no longer any instances available", "resources to deploy your pod", "insufficient capacity", "no available machine", "out of stock"],
+                        "code": "capacity"}]},
     {"id": "pods.list", "operation_id": "ListPods", "effect": "read",
      "description": "List the account's pods in one answer, filtered by the declared query parameters such as name, desiredStatus or id"},
+    {"id": "billing.pods", "operation_id": "PodBilling", "effect": "read",
+     "description": "Read the account's pod billing records in one answer, aggregated by bucketSize and filtered by the declared query parameters such as podId, gpuTypeId or startTime"},
     {"id": "pod.terminate", "operation_id": "DeletePod", "effect": "write",
      "description": "Terminate one pod by podId; Runpod answers 204, and a 404 means no pod with that id exists, so this call terminated nothing"}
   ]

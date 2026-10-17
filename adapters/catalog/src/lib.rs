@@ -19,7 +19,7 @@ use connectors_catalog::{
 };
 use connectors_core::{Error, ErrorCode, Result};
 use connectors_sdk::{
-    AuthenticatedHttp, AuthenticatedWrite, HttpResponse, WriteMethod, WriteOutcome,
+    AuthenticatedHttp, AuthenticatedWrite, HttpResponse, Secret, WriteMethod, WriteOutcome,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -134,6 +134,154 @@ impl RefusalCode {
             Self::NotFound => ErrorCode::NotFound,
         }
     }
+}
+
+/// The code a read's body-level refusal answers with, as the provider's own
+/// answer (`connectors_catalog.selection.EnvelopeCode`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EnvelopeCode {
+    InvalidInput,
+    Unauthorized,
+    Forbidden,
+    NotFound,
+    RateLimited,
+    Internal,
+}
+
+impl EnvelopeCode {
+    fn code(self) -> ErrorCode {
+        match self {
+            Self::InvalidInput => ErrorCode::InvalidInput,
+            Self::Unauthorized => ErrorCode::Unauthorized,
+            Self::Forbidden => ErrorCode::Forbidden,
+            Self::NotFound => ErrorCode::NotFound,
+            Self::RateLimited => ErrorCode::RateLimited,
+            Self::Internal => ErrorCode::Internal,
+        }
+    }
+}
+
+/// One classified body-level refusal
+/// (`connectors_catalog.selection.EnvelopeRefusal`): the provider's error
+/// name equal to one of `values` refuses the read with `code`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EnvelopeRefusal {
+    pub values: Vec<String>,
+    pub code: EnvelopeCode,
+}
+
+/// The success envelope of a read whose provider signals failure in the body
+/// of a 2xx answer (`connectors_catalog.selection.Envelope`), such as Slack's
+/// `{"ok": false, "error": "<name>"}`. A 2xx JSON answer is a success only
+/// when the value at the pointer `ok` is the JSON boolean `true`. `false`
+/// refuses the read with the code of the refusal naming the string at the
+/// pointer `error`, or `otherwise`, that string, as admitted, its reason; any
+/// other answer is one this engine cannot read.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Envelope {
+    pub ok: String,
+    pub error: String,
+    /// Omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refusals: Vec<EnvelopeRefusal>,
+    pub otherwise: EnvelopeCode,
+}
+
+impl Envelope {
+    /// The refusal a 2xx answer's JSON `body` carries under this envelope,
+    /// or `None` when it is a success.
+    fn refusal(&self, response: &HttpResponse, body: &Value) -> Option<Error> {
+        match body.pointer(&self.ok) {
+            Some(Value::Bool(true)) => return None,
+            Some(Value::Bool(false)) => {}
+            _ => {
+                return Some(Error::new(
+                    ErrorCode::UpstreamProtocol,
+                    "provider answered without its success member",
+                ));
+            }
+        }
+        let name = body.pointer(&self.error).and_then(Value::as_str);
+        let code = name
+            .and_then(|name| {
+                self.refusals
+                    .iter()
+                    .find(|refusal| refusal.values.iter().any(|value| value == name))
+            })
+            .map_or(self.otherwise, |refusal| refusal.code);
+        let mut error = Error::new(code.code(), "provider refused the request")
+            .answered()
+            .with_upstream_reason(name.and_then(connectors_core::reason::admit));
+        if code == EnvelopeCode::RateLimited {
+            error.retry_after_seconds = retry_after_header(response);
+        }
+        Some(error)
+    }
+}
+
+/// The code a refusal text answers with
+/// (`connectors_catalog.selection.TextRefusalCode`): `capacity` for a request
+/// the provider had no room to serve now.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TextRefusalCode {
+    Capacity,
+}
+
+impl TextRefusalCode {
+    fn code(self) -> ErrorCode {
+        match self {
+            Self::Capacity => ErrorCode::Capacity,
+        }
+    }
+}
+
+/// The most refusal texts a write may declare.
+pub const REFUSAL_TEXTS: usize = 16;
+
+/// One refusal a provider names only in its text
+/// (`connectors_catalog.selection.TextRefusal`): a definite 4xx refusal of a
+/// write whose JSON body holds, at one of `pointers`, a string containing one
+/// of `contains`, compared without regard to case, is refused with `code`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TextRefusal {
+    pub pointers: Vec<String>,
+    pub contains: Vec<String>,
+    pub code: TextRefusalCode,
+}
+
+impl TextRefusal {
+    /// Whether `body`, a refusal's JSON answer, carries one of the texts at
+    /// one of the pointers.
+    fn matches(&self, body: &Value) -> bool {
+        self.pointers.iter().any(|pointer| {
+            body.pointer(pointer)
+                .and_then(Value::as_str)
+                .is_some_and(|found| {
+                    let found = found.to_lowercase();
+                    self.contains
+                        .iter()
+                        .any(|text| found.contains(&text.to_lowercase()))
+                })
+        })
+    }
+}
+
+/// The code the first of `texts` matching a definite refusal's `body` gives,
+/// if any; a body that is not JSON matches none.
+fn text_refusal(texts: &[TextRefusal], body: &[u8]) -> Option<ErrorCode> {
+    if texts.is_empty() {
+        return None;
+    }
+    let body: Value = serde_json::from_slice(body).ok()?;
+    texts
+        .iter()
+        .find(|refusal| refusal.matches(&body))
+        .map(|refusal| refusal.code.code())
 }
 
 /// One declared refusal (`connectors_catalog.guard.Refusal`): the string at
@@ -454,6 +602,18 @@ pub struct Selection {
     /// `403` stays `forbidden`. Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rate_limit_reasons: Vec<String>,
+    /// The refusals a provider names only in the text of a write's definite
+    /// 4xx refusal ([`TextRefusal`]), the first match deciding; every other
+    /// answer keeps the classification its status gives. Only on a write.
+    /// Omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refusal_texts: Vec<TextRefusal>,
+    /// The success envelope of a read whose provider signals failure in the
+    /// body of a 2xx answer, such as Slack's `ok`: a 2xx JSON answer is a
+    /// success only when it holds `true` there, and is refused otherwise.
+    /// Only on a read answering JSON. Omitted when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub envelope: Option<Envelope>,
     /// The only top-level keys a write's JSON body may carry. When set, the
     /// declaration types `body` as an object with exactly these properties,
     /// and a body carrying any key outside the set is refused before any
@@ -497,6 +657,39 @@ pub struct Selection {
     /// Omitted when empty.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub body_fixed: BTreeMap<String, Value>,
+    /// The credential a write's answer carries that the write created, shown
+    /// once, and the public members the caller receives in its place
+    /// ([`Custody`]). Omitted when absent, so a selection without it keeps its
+    /// bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custody: Option<Custody>,
+}
+
+/// The member of a write selection whose 2xx JSON answer carries a credential
+/// the write created (`connectors_catalog.selection.Custody`, design §8a):
+/// `secret` is the RFC 6901 pointer of that credential, and `returns` names
+/// each public member the caller receives, keyed to its pointer. The engine
+/// reads the secret into protected memory and builds the result from `returns`
+/// alone; the owner holds the secret in custody. When it loads, the engine
+/// refuses custody on a read, beside a guard, on an answer that is not JSON, a
+/// pointer without a leading `/`, no returned member or more than
+/// [`CUSTODY_RETURNS`], a returned name that is no id or is `custody` or
+/// `connection`, and a returned pointer at, inside or around the secret.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Custody {
+    pub secret: String,
+    pub returns: BTreeMap<String, String>,
+}
+/// The most public members a custody write returns.
+pub const CUSTODY_RETURNS: usize = 8;
+
+/// A write's applied result, and the created credential its answer carried
+/// when its selection declares [`Custody`]. No `Debug`: the secret is never
+/// formatted.
+pub struct Held {
+    pub value: Value,
+    pub secret: Option<Secret>,
 }
 
 impl Selection {
@@ -730,6 +923,10 @@ pub struct Prepared {
     instance: String,
     source_revision: String,
     rate_limit_reasons: Vec<String>,
+    /// The selection's refusal texts, read from a definite refusal's body.
+    refusal_texts: Vec<TextRefusal>,
+    /// The created credential the answer carries, when the selection declares it.
+    custody: Option<Custody>,
 }
 
 impl Engine {
@@ -794,6 +991,9 @@ impl Engine {
                 )));
             }
             check_binary(selection)?;
+            check_envelope(selection)?;
+            check_refusal_texts(selection)?;
+            check_custody(selection)?;
             if let Some(download) = &selection.download {
                 check_download(selection, download)?;
                 downloads.push(Downloaded {
@@ -1244,10 +1444,19 @@ impl Engine {
                 )));
             }
             let mut declaration = declare(selection, &operation);
+            if let Some(custody) = &selection.custody {
+                declaration.output_schema = custody_schema(custody);
+            }
             if selection.binary.is_some() {
                 declaration.output_schema["properties"]["body"] = binary_body_schema();
             }
             let text = expects_text(selection, &operation);
+            if text && selection.envelope.is_some() {
+                return Err(refuse(format!(
+                    "selection `{}` declares an envelope on a text read",
+                    selection.id
+                )));
+            }
             exposed.push(Exposed {
                 selection: selection.clone(),
                 operation,
@@ -1302,6 +1511,15 @@ impl Engine {
             declarations.extend(feed.declarations());
         }
         declarations
+    }
+
+    /// Whether `id` is a write whose selection declares custody: its answer
+    /// carries a credential it created, which the owner holds only under a
+    /// custody target configured for it (design §8a).
+    pub fn declares_custody(&self, id: &str) -> bool {
+        self.exposed
+            .iter()
+            .any(|e| e.selection.id == id && e.selection.custody.is_some())
     }
 
     pub fn effect(&self, id: &str) -> Option<Effect> {
@@ -1463,6 +1681,16 @@ impl Engine {
             exposed.text,
             &exposed.selection.rate_limit_reasons,
         )?;
+        // A provider that refuses in the body of a 2xx answer is refused here,
+        // never returned as a success.
+        if let Some(refusal) = exposed
+            .selection
+            .envelope
+            .as_ref()
+            .and_then(|envelope| envelope.refusal(&response, &body))
+        {
+            return Err(refusal);
+        }
         Ok(json!({
             "status": response.status,
             "body": body,
@@ -1765,6 +1993,8 @@ impl Engine {
             instance: instance.to_owned(),
             source_revision: self.source_revision.clone(),
             rate_limit_reasons: exposed.selection.rate_limit_reasons.clone(),
+            refusal_texts: exposed.selection.refusal_texts.clone(),
+            custody: exposed.selection.custody.clone(),
         })
     }
 }
@@ -1809,11 +2039,65 @@ impl Prepared {
     }
 
     /// [`Prepared::execute`], with the capability the guard's read after the
-    /// write is issued through, once, after a 2xx.
+    /// write is issued through, once, after a 2xx. A write whose selection
+    /// declares [`Custody`] is refused here with nothing sent: its answer is
+    /// read only by [`Prepared::execute_holding`].
     pub async fn execute_reading(
         self,
         capability: Box<dyn AuthenticatedWrite>,
         reader: Option<&dyn AuthenticatedHttp>,
+    ) -> WriteOutcome<Value> {
+        if self.custody.is_some() {
+            return WriteOutcome::Refused(Error::new(
+                ErrorCode::Forbidden,
+                "a write that creates a credential is sent only to be held",
+            ));
+        }
+        self.dispatch(capability, reader).await
+    }
+
+    /// [`Prepared::execute_reading`], holding the credential the answer
+    /// carries when the selection declares [`Custody`]: the secret is moved out
+    /// of the answer into protected memory and the result is the declared
+    /// returned members alone. An applied answer without the secret or a
+    /// returned member as a non-empty string, or with a returned value holding
+    /// the secret's bytes, is applied and unreadable (`upstream_protocol`).
+    /// Without custody the result is [`Prepared::execute_reading`]'s and no
+    /// secret is held.
+    pub async fn execute_holding(
+        mut self,
+        capability: Box<dyn AuthenticatedWrite>,
+        reader: Option<&dyn AuthenticatedHttp>,
+    ) -> WriteOutcome<Held> {
+        let custody = self.custody.take();
+        let zeroize = custody.is_some();
+        let outcome = self.dispatch_zeroizing(capability, reader, zeroize).await;
+        match custody {
+            None => outcome.try_map(|value| {
+                Ok(Held {
+                    value,
+                    secret: None,
+                })
+            }),
+            Some(custody) => outcome.try_map(|mut value| hold(&custody, &mut value)),
+        }
+    }
+
+    async fn dispatch(
+        self,
+        capability: Box<dyn AuthenticatedWrite>,
+        reader: Option<&dyn AuthenticatedHttp>,
+    ) -> WriteOutcome<Value> {
+        self.dispatch_zeroizing(capability, reader, false).await
+    }
+
+    /// Send once and classify; with `zeroize`, the answer's bytes are
+    /// overwritten once they are read.
+    async fn dispatch_zeroizing(
+        self,
+        capability: Box<dyn AuthenticatedWrite>,
+        reader: Option<&dyn AuthenticatedHttp>,
+        zeroize: bool,
     ) -> WriteOutcome<Value> {
         let segments: Vec<&str> = self.segments.iter().map(String::as_str).collect();
         let query: Vec<(&str, String)> = self
@@ -1821,7 +2105,7 @@ impl Prepared {
             .iter()
             .map(|(k, v)| (k.as_str(), v.clone()))
             .collect();
-        let response = match capability
+        let mut response = match capability
             .send_json(self.method, &segments, &query, &self.body)
             .await
         {
@@ -1833,14 +2117,20 @@ impl Prepared {
             400 | 401 | 403 | 404 | 405 | 409 | 410 | 412 | 415 | 422
         ) {
             // The same split a read's refusal gets; each is the provider's answer.
-            let code = match response.status {
-                400 | 409 | 412 | 422 => ErrorCode::InvalidInput,
-                401 => ErrorCode::Unauthorized,
-                403 if quota(&response.body, &self.rate_limit_reasons) => ErrorCode::RateLimited,
-                403 => ErrorCode::Forbidden,
-                404 | 410 => ErrorCode::NotFound,
-                _ => ErrorCode::Forbidden,
-            };
+            // A declared refusal text names the cause the status does not.
+            let code =
+                text_refusal(&self.refusal_texts, &response.body).unwrap_or_else(|| match response
+                    .status
+                {
+                    400 | 409 | 412 | 422 => ErrorCode::InvalidInput,
+                    401 => ErrorCode::Unauthorized,
+                    403 if quota(&response.body, &self.rate_limit_reasons) => {
+                        ErrorCode::RateLimited
+                    }
+                    403 => ErrorCode::Forbidden,
+                    404 | 410 => ErrorCode::NotFound,
+                    _ => ErrorCode::Forbidden,
+                });
             return WriteOutcome::Refused(
                 Error::new(code, "provider refused the write")
                     .answered()
@@ -1853,7 +2143,12 @@ impl Prepared {
                 "unconfirmed write outcome",
             ));
         }
-        let body = match read_body(&response, false, &[]) {
+        let parsed = read_body(&response, false, &[]);
+        if zeroize {
+            use zeroize::Zeroize;
+            response.body.zeroize();
+        }
+        let body = match parsed {
             Ok(body) => body,
             Err(_) => {
                 return WriteOutcome::Unknown(Error::new(
@@ -2042,11 +2337,7 @@ fn read_body(response: &HttpResponse, text: bool, rate_limit_reasons: &[String])
             .answered()
             .with_upstream_reason(connectors_core::reason::from_body(&response.body));
         if response.status == 429 {
-            error.retry_after_seconds = response
-                .headers
-                .iter()
-                .find(|(name, _)| name.eq_ignore_ascii_case("retry-after"))
-                .and_then(|(_, value)| retry_after(value, std::time::SystemTime::now()));
+            error.retry_after_seconds = retry_after_header(response);
         }
         return Err(error);
     }
@@ -2065,12 +2356,40 @@ fn read_body(response: &HttpResponse, text: bool, rate_limit_reasons: &[String])
             "provider returned a body this engine cannot read",
         )
     };
+    // `connectors.transport.TextBodyOutcome` (`ess/domains/transport.yaml`):
+    // the provider response bound holds on the raw bytes, before decoding, so
+    // a port that does not bound its answer cannot hand on a larger text; then
+    // bytes that are not UTF-8 are refused by name, never decoded lossily.
     if text {
+        if response.body.len() > connectors_core::RESPONSE_LIMIT {
+            return Err(Error::new(
+                ErrorCode::Capacity,
+                format!(
+                    "text response of {} bytes exceeds the provider response bound of {} bytes",
+                    response.body.len(),
+                    connectors_core::RESPONSE_LIMIT
+                ),
+            ));
+        }
         return String::from_utf8(response.body.clone())
             .map(Value::String)
-            .map_err(|_| unreadable());
+            .map_err(|_| {
+                Error::new(
+                    ErrorCode::UpstreamProtocol,
+                    "provider returned a text body that is not UTF-8",
+                )
+            });
     }
     connectors_core::read_json(&response.body).map_err(|_| unreadable())
+}
+
+/// The delay an answer's `Retry-After` names, as [`retry_after`] reads it.
+fn retry_after_header(response: &HttpResponse) -> Option<u64> {
+    response
+        .headers
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("retry-after"))
+        .and_then(|(_, value)| retry_after(value, std::time::SystemTime::now()))
 }
 
 /// The delay a `Retry-After` value names, in whole seconds from `now`: either
@@ -2440,6 +2759,204 @@ fn declare_download(selection: &Selection, download: &Download) -> connectors_co
         }),
         output_schema,
     }
+}
+
+/// What a selection's envelope must be: on a read, not a download or a binary
+/// read (a text read is refused once its kind is known), with both pointers
+/// led by `/`, at most sixteen refusals, each naming at least one value, and
+/// each value non-empty and named by one refusal alone.
+fn check_envelope(selection: &Selection) -> Result<()> {
+    let Some(envelope) = &selection.envelope else {
+        return Ok(());
+    };
+    let problem = if selection.effect != Effect::Read {
+        Some("on a write")
+    } else if selection.download.is_some()
+        || selection.binary.is_some()
+        || selection.response == Some(ResponseKind::Binary)
+    {
+        Some("on a binary read")
+    } else if !envelope.ok.starts_with('/') || !envelope.error.starts_with('/') {
+        Some("with a pointer without a leading `/`")
+    } else if envelope.refusals.len() > 16 {
+        Some("with more than sixteen refusals")
+    } else {
+        let mut named = BTreeSet::new();
+        envelope
+            .refusals
+            .iter()
+            .any(|refusal| {
+                refusal.values.is_empty()
+                    || refusal
+                        .values
+                        .iter()
+                        .any(|value| value.is_empty() || !named.insert(value))
+            })
+            .then_some("with a refusal of no value, an empty value or a value two refusals name")
+    };
+    match problem {
+        Some(problem) => Err(refuse(format!(
+            "selection `{}` declares an envelope {problem}",
+            selection.id
+        ))),
+        None => Ok(()),
+    }
+}
+
+/// What a selection's refusal texts must be: on a write, at most
+/// [`REFUSAL_TEXTS`], each with at least one pointer, every pointer led by
+/// `/`, at least one text, and every text non-empty and not repeated within
+/// its refusal without regard to case.
+fn check_refusal_texts(selection: &Selection) -> Result<()> {
+    if selection.refusal_texts.is_empty() {
+        return Ok(());
+    }
+    let problem = if selection.effect != Effect::Write {
+        Some("on a read")
+    } else if selection.refusal_texts.len() > REFUSAL_TEXTS {
+        Some("more than sixteen")
+    } else if selection.refusal_texts.iter().any(|refusal| {
+        refusal.pointers.is_empty()
+            || refusal
+                .pointers
+                .iter()
+                .any(|pointer| !pointer.starts_with('/'))
+    }) {
+        Some("with no pointer or a pointer without a leading `/`")
+    } else if selection.refusal_texts.iter().any(|refusal| {
+        let mut seen = BTreeSet::new();
+        refusal.contains.is_empty()
+            || refusal
+                .contains
+                .iter()
+                .any(|text| text.is_empty() || !seen.insert(text.to_lowercase()))
+    }) {
+        Some("with no text, an empty text or a text repeated in one refusal")
+    } else {
+        None
+    };
+    match problem {
+        Some(problem) => Err(refuse(format!(
+            "selection `{}` declares refusal_texts {problem}",
+            selection.id
+        ))),
+        None => Ok(()),
+    }
+}
+
+/// What a selection's [`Custody`] must be, refused when it loads.
+fn check_custody(selection: &Selection) -> Result<()> {
+    let Some(custody) = &selection.custody else {
+        return Ok(());
+    };
+    // A pointer at, inside or around another: the one would read the other.
+    let overlaps = |a: &str, b: &str| {
+        a == b || a.starts_with(&format!("{b}/")) || b.starts_with(&format!("{a}/"))
+    };
+    let problem = if selection.effect != Effect::Write {
+        Some("on a read")
+    } else if selection.guard.is_some() {
+        Some("beside a guard")
+    } else if selection.download.is_some()
+        || selection.binary.is_some()
+        || matches!(
+            selection.response,
+            Some(ResponseKind::Text | ResponseKind::Binary)
+        )
+    {
+        Some("on an answer that is not JSON")
+    } else if custody.returns.is_empty() || custody.returns.len() > CUSTODY_RETURNS {
+        Some("returning no member or more than eight")
+    } else if custody.returns.keys().any(|name| {
+        !connectors_core::valid_id(name) || ["custody", "connection"].contains(&name.as_str())
+    }) {
+        Some("returning a member that is no id or is named `custody` or `connection`")
+    } else if !custody.secret.starts_with('/')
+        || custody
+            .returns
+            .values()
+            .any(|pointer| !pointer.starts_with('/'))
+    {
+        Some("with a pointer without a leading `/`")
+    } else if custody
+        .returns
+        .values()
+        .any(|pointer| overlaps(pointer, &custody.secret))
+    {
+        Some("returning a member at, inside or around the created credential")
+    } else {
+        None
+    };
+    match problem {
+        Some(problem) => Err(refuse(format!(
+            "selection `{}` declares custody {problem}",
+            selection.id
+        ))),
+        None => Ok(()),
+    }
+}
+
+/// The output schema of a [`Custody`] write: its returned members, and the
+/// owner's `custody` and `connection`, which only the owner adds. Nothing of
+/// the provider's answer schema is declared.
+fn custody_schema(custody: &Custody) -> Value {
+    let mut properties = serde_json::Map::new();
+    properties.insert(
+        "custody".into(),
+        json!({"type": "string", "enum": ["stored"]}),
+    );
+    properties.insert(
+        "connection".into(),
+        json!({"type": "string", "minLength": 1}),
+    );
+    for name in custody.returns.keys() {
+        properties.insert(name.clone(), json!({"type": "string"}));
+    }
+    json!({
+        "type": "object",
+        "properties": properties,
+        "required": custody.returns.keys().collect::<Vec<_>>(),
+        "additionalProperties": false,
+    })
+}
+
+/// Move the created credential out of an applied write's result and build the
+/// result from the declared returned members alone.
+fn hold(custody: &Custody, result: &mut Value) -> Result<Held> {
+    let unreadable = || {
+        Error::new(
+            ErrorCode::UpstreamProtocol,
+            "write applied; its answer does not carry the created credential and the returned members as declared",
+        )
+    };
+    let body = result.get_mut("body").ok_or_else(unreadable)?;
+    // Taken, not copied: the answer keeps no string holding the secret.
+    let secret = match body.pointer_mut(&custody.secret).map(Value::take) {
+        Some(Value::String(text)) => Secret(text.into_bytes()),
+        _ => return Err(unreadable()),
+    };
+    if secret.0.is_empty() {
+        return Err(unreadable());
+    }
+    let mut returned = serde_json::Map::new();
+    for (name, pointer) in &custody.returns {
+        let value = body
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .ok_or_else(unreadable)?;
+        if value
+            .as_bytes()
+            .windows(secret.0.len())
+            .any(|window| window == secret.0.as_slice())
+        {
+            return Err(unreadable());
+        }
+        returned.insert(name.clone(), Value::from(value));
+    }
+    Ok(Held {
+        value: Value::Object(returned),
+        secret: Some(secret),
+    })
 }
 
 /// What a selection's binary members must be, whatever it reads: `binary`

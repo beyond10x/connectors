@@ -998,6 +998,12 @@ fn spawn(
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+    // A test build ties the owner to the process a harness names (owner.md);
+    // this one variable is all of the CLI's environment the owner receives.
+    #[cfg(debug_assertions)]
+    if let Some(parent) = std::env::var_os(super::tether::PARENT) {
+        command.env(super::tether::PARENT, parent);
+    }
     // SAFETY: the hook uses only async-signal-safe syscalls and scalar fds. This
     // process intentionally outlives the CLI and starts a separate session.
     unsafe {
@@ -1054,6 +1060,8 @@ pub(super) fn in_owner() -> bool {
 
 pub fn serve(paths: Paths) -> Result<()> {
     bound_allocator();
+    // Before any protected input: the owner holds credentials in memory.
+    crate::local::core_dumps::forbid().map_err(|_| Error::from(Code::Unavailable))?;
     IN_OWNER.store(true, Ordering::SeqCst);
     // Duplicate before opening anything: a direct invocation with missing fds
     // must not mistake newly opened configuration files for inherited authority.
@@ -1108,6 +1116,13 @@ pub fn serve(paths: Paths) -> Result<()> {
         std::fs::remove_file(&socket).map_err(|_| Code::Unavailable)?;
     }
     let mut listener = listen(&socket)?;
+    // owner.md: a Unix owner whose socket or state directory is gone, or in a
+    // test build whose named process has ended, exits.
+    #[cfg(unix)]
+    let mut lifeline =
+        tether::Tether::new(&directory, &paths.state, &socket).ok_or(Code::Unavailable)?;
+    #[cfg(windows)]
+    let mut lifeline = Untethered;
     let paths = Arc::new(paths);
     let incarnation = uuid::Uuid::new_v4().to_string();
     let owner = Arc::new(Owner {
@@ -1115,7 +1130,7 @@ pub fn serve(paths: Paths) -> Result<()> {
         authority,
         incarnation: incarnation.clone(),
         build,
-        pool: Arc::new(supervisor::Pool::new(paths, incarnation)),
+        pool: supervisor::Pool::shared(paths, incarnation),
         shutdown: AtomicBool::new(false),
         clients: AtomicUsize::new(0),
     });
@@ -1126,7 +1141,14 @@ pub fn serve(paths: Paths) -> Result<()> {
     let recovery = maintenance::Background::start(owner.paths.clone(), owner.pool.clone())?;
     handle(owner.clone(), startup)?;
     owner.pool.automatic(&config);
-    let (mut result, retired) = accept(&owner, &recovery, &mut listener, &socket, idle_bound());
+    let (mut result, retired) = accept(
+        &owner,
+        &recovery,
+        &mut listener,
+        &socket,
+        idle_bound(),
+        &mut lifeline,
+    );
     drop(listener);
     if let Err(error) = recovery.stop() {
         result = Err(error);
@@ -1149,14 +1171,17 @@ pub fn serve(paths: Paths) -> Result<()> {
     }
     result
 }
-/// Serves connections until shutdown, a listener failure or idle retirement;
-/// the flag reports retirement, after which the socket is already gone.
+/// Serves connections until shutdown, a listener failure, idle retirement or
+/// `lifeline` reporting that the owner's socket, state directory or test parent is
+/// gone; the flag reports that the owner leaves its socket path alone: retired,
+/// the socket is already gone, and lost, the path may be another directory's.
 fn accept(
     owner: &Arc<Owner>,
     recovery: &maintenance::Background,
     listener: &mut Listener,
     socket: &std::path::Path,
     bound: Duration,
+    lifeline: &mut impl Lifeline,
 ) -> (Result<()>, bool) {
     let mut result = Ok(());
     let mut active_at = Instant::now();
@@ -1169,12 +1194,22 @@ fn accept(
                 let _ = handle(owner.clone(), stream);
             }
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                if lifeline.ended() {
+                    // Accept nothing more; let admitted clients finish, bounded.
+                    let until = Instant::now() + Duration::from_secs(5);
+                    while owner.clients.load(Ordering::SeqCst) > 0 && Instant::now() < until {
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    owner.shutdown.store(true, Ordering::SeqCst);
+                    retired = true;
+                    break;
+                }
                 let progress = owner.pool.settled();
                 if working(owner) || progress != settled {
                     settled = progress;
                     active_at = Instant::now();
                 } else if active_at.elapsed() >= bound && quiet(owner, recovery) {
-                    match retire(owner, recovery, listener, socket) {
+                    match retire(owner, recovery, listener, socket, lifeline) {
                         Retirement::Exit => {
                             retired = true;
                             break;
@@ -1275,6 +1310,32 @@ fn quiet(owner: &Owner, recovery: &maintenance::Background) -> bool {
         && !recovery.busy()
         && owner.pool.quiet().unwrap_or(false)
 }
+/// What else ends the owner's lifetime (owner.md): on Unix its
+/// [`tether::Tether`]; a Windows owner and the idle tests are tied to nothing.
+trait Lifeline {
+    /// Whether the socket, the state directory or a test parent is gone.
+    fn ended(&mut self) -> bool;
+    /// The listener was just bound again at the socket path.
+    fn relistened(&mut self);
+}
+#[cfg(unix)]
+impl Lifeline for tether::Tether {
+    fn ended(&mut self) -> bool {
+        self.lost().is_some()
+    }
+    fn relistened(&mut self) {
+        self.rebound();
+    }
+}
+#[cfg(any(windows, test))]
+struct Untethered;
+#[cfg(any(windows, test))]
+impl Lifeline for Untethered {
+    fn ended(&mut self) -> bool {
+        false
+    }
+    fn relistened(&mut self) {}
+}
 enum Retirement {
     Exit,
     Serve,
@@ -1290,6 +1351,7 @@ fn retire(
     recovery: &maintenance::Background,
     listener: &mut Listener,
     socket: &std::path::Path,
+    lifeline: &mut impl Lifeline,
 ) -> Retirement {
     if !unlink(listener, socket) {
         return Retirement::Serve;
@@ -1323,6 +1385,8 @@ fn retire(
                 let _ = handle(owner.clone(), stream);
             }
             *listener = next;
+            // The socket just bound is the owner's own, not a replacement.
+            lifeline.relistened();
             if arrived {
                 Retirement::Serve
             } else {
@@ -2668,7 +2732,7 @@ mod idle_sweep_tests {
                 .to_string(),
             incarnation: incarnation.clone(),
             build: "test",
-            pool: Arc::new(supervisor::Pool::new(paths.clone(), incarnation)),
+            pool: supervisor::Pool::shared(paths.clone(), incarnation),
             shutdown: AtomicBool::new(false),
             clients: AtomicUsize::new(0),
         });
@@ -2682,7 +2746,14 @@ mod idle_sweep_tests {
         let loop_thread = std::thread::spawn(move || {
             // Keeps the descriptor that `socket` names open while the loop uses it.
             let _directory = &directory;
-            let (result, retired) = accept(&serving, &recovery, &mut listener, &socket, bound);
+            let (result, retired) = accept(
+                &serving,
+                &recovery,
+                &mut listener,
+                &socket,
+                bound,
+                &mut Untethered,
+            );
             let _ = done.send(started.elapsed());
             recovery.stop().unwrap();
             (result, retired)
@@ -2705,6 +2776,53 @@ mod idle_sweep_tests {
         std::fs::set_permissions(&state, std::fs::Permissions::from_mode(0o700)).unwrap();
         drop(Metadata::initialize(&state).unwrap());
         (root, state)
+    }
+
+    /// owner.md: the socket idle retirement binds again when a client arrived
+    /// during retirement is the owner's own, so the tether does not take the
+    /// relisten for a replacement and the owner keeps serving.
+    #[test]
+    fn a_retirement_relisten_is_not_a_replaced_socket() {
+        let (_root, state) = state_dir();
+        let paths = Arc::new(Paths {
+            config: state.join("absent/config.toml"),
+            state: state.clone(),
+        });
+        let incarnation = uuid::Uuid::new_v4().to_string();
+        let owner = Arc::new(Owner {
+            paths: paths.clone(),
+            authority: Metadata::inspect(&state)
+                .unwrap()
+                .authority()
+                .unwrap()
+                .to_string(),
+            incarnation: incarnation.clone(),
+            build: "test",
+            pool: Arc::new(supervisor::Pool::new(paths.clone(), incarnation)),
+            shutdown: AtomicBool::new(false),
+            clients: AtomicUsize::new(0),
+        });
+        let recovery = maintenance::Background::start(paths, owner.pool.clone()).unwrap();
+        let directory = fs::directory(&state, false, true).unwrap();
+        let socket = socket_path(&directory);
+        let mut listener = listen(&socket).unwrap();
+        let mut tether = tether::Tether::new(&directory, &state, &socket).unwrap();
+        assert!(!tether.ended());
+        // Queued before the socket is removed: retirement serves it and listens again.
+        let client = UnixStream::connect(state.join("owner.sock")).unwrap();
+        let retirement = retire(&owner, &recovery, &mut listener, &socket, &mut tether);
+        assert!(matches!(retirement, Retirement::Serve));
+        assert!(state.join("owner.sock").exists(), "the owner listens again");
+        // Past the check interval, so the next look is a real one.
+        std::thread::sleep(Duration::from_millis(250));
+        assert!(
+            !tether.ended(),
+            "the owner's own relistened socket was taken for a replacement"
+        );
+        drop(client);
+        owner.shutdown.store(true, Ordering::SeqCst);
+        recovery.stop().unwrap();
+        owner.pool.shutdown().unwrap();
     }
 
     /// Nothing pending: the 5 s sweeps inside a 15 s bound are not work.

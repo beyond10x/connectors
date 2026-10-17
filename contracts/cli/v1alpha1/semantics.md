@@ -113,13 +113,20 @@ Admission order, delivery, process rules and the same-user boundary are in
 `approvals clock-check` performs the bounded authenticated exchange specified in
 [the clock binding](../../service/clock.md). Its public observation cannot be
 reused as time evidence; it starts no service and reads no secret or metadata.
-When no observation results it refuses `unavailable` at `stage = observation`, and
-its `Failure` names the cause in `clock_refusal` with that cause's next action:
-`unreachable` with `retry_explicitly`, `unverified` with `check_configuration`, and
-`too_imprecise` with `choose_clock_source` and the signed radius in
-`clock_radius_ms` ([refusals](../../service/clock.md#refusals)). A local timer,
-continuity or calendar refusal names no cause and keeps `check_configuration`. The
-refusal never carries the observation's bounds, the request or the reply.
+The observation carries one `sources` line per configured source. When the quorum
+forms no answer it refuses `unavailable` at `stage = observation`, and its `Failure`
+names the combined refusal in `clock_refusal` and each source's line in
+`clock_sources` ([refusals](../../service/clock.md#refusals)): `below_quorum` with
+`check_configuration` if a source is `unverified`, else `retry_explicitly`; `split`
+and `too_imprecise` (the combined answer over 8,000 ms; a verified source counts at
+any width and is never `too_imprecise` on its own) with `choose_clock_source`. A local timer, continuity or calendar refusal carries neither
+field and keeps `check_configuration`. The refusal never carries the observation's
+bounds, a source's own interval, the request or the reply. A retired
+`roughtime-clock/1` table refuses `invalid_configuration` at
+`stage = configuration` with `check_configuration` and `configuration_rule`
+`approval_clock_format_retired`, for `clock-check` and for every approval issuance,
+execution or recovery that needs the clock; commands that do not use the clock
+still load the configuration.
 
 `approvals policy-set` accepts only `--input-file`; its path is acquired by the
 production handler using the bounded document reader. `prepare` and `issue` use
@@ -949,6 +956,29 @@ An HTTP 429 stays `service_failure` with
 `service_code = rate_limited`, and with `retry_after_seconds` when the provider
 named a delay. `unsupported` is always `admission`: every
 source of it is raised before dispatch.
+
+**Revalidation retries.** `connections revalidate` sends its validation (the
+adapter's identity probe, a read) again when the attempt failed transiently,
+inside the same dispatched revalidation and within its deadline. A transient
+failure is the adapter answering `unavailable` (a provider connection refused,
+reset or closed, such as a pooled keep-alive connection the provider closed
+while it was idle; a name that does not resolve; the catalog provider's
+identity or scope probe also on an HTTP 429 or 5xx), a provider timeout, rate
+limit, internal error or marked capacity answer. The owner sends at most three
+attempts, waiting 200 ms before the second and 1 s before the third, and only
+while the adapter process still runs, the owner is not stopping, and the wait,
+then an attempt as long as the last one took, then a 500 ms margin, all end
+before the deadline. A credential the provider refuses (HTTP 401), a
+permission refusal (403), a credential below the profile's scopes, an identity
+mismatch and a protocol violation are never sent again. When every attempt
+failed, the failure keeps its code, stage and next action, and additionally
+carries `cause`, the class of the last attempt
+(`connectors.cli.FailureCause`), and `attempts`, the number of validations the
+owner sent, when it sent any. `cause` is `adapter_exited` when the adapter
+process was no longer running after the failed attempt, and `owner_stopping` when the owner began to
+stop during the revalidation. No other command and no other failure carries
+either field; a revalidation whose reply never arrived stays `outcome_unknown`
+and carries neither.
 
 A guarded write's failure carries its `mutation` record, and its stage follows
 who refused and whether the write was attempted. A refusal the host made

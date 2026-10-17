@@ -1,12 +1,13 @@
 //! Actual CLI/owner/private child, disposable HTTPS, signing clock and qualified
 //! keyring. Synthetic clock/provider responses do not prove sandbox acceptance.
 use super::*;
-use base64::{Engine, engine::general_purpose::STANDARD};
 use connectors_host::local::owner::{approval_issuance, mutation};
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 #[path = "background_recovery.rs"]
 mod background_recovery;
+#[path = "custody_journey.rs"]
+mod custody_journey;
 #[path = "owner_replay.rs"]
 mod owner_replay;
 
@@ -290,67 +291,51 @@ fn revoked_restoration_control(cli: &Cli, provider: &Provider, mode: u8) {
     assert!(!cli.paths.state.join("owner.sock").exists());
 }
 
+/// Two synthetic Roughtime sources at quorum two, sharing one request count and
+/// one answering switch, so one switch silences the whole clock.
 struct Clock {
-    address: String,
+    sources: Vec<clock_fixture::Server>,
     count: Arc<AtomicUsize>,
-    stopped: Arc<AtomicBool>,
     respond: Arc<AtomicBool>,
-    thread: Option<std::thread::JoinHandle<()>>,
 }
 impl Clock {
     fn new() -> Self {
-        let socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
-        socket
-            .set_read_timeout(Some(Duration::from_millis(100)))
-            .unwrap();
-        let address = socket.local_addr().unwrap().to_string();
         let count = Arc::new(AtomicUsize::new(0));
-        let stopped = Arc::new(AtomicBool::new(false));
         let respond = Arc::new(AtomicBool::new(true));
-        let replies = respond.clone();
-        let stop = stopped.clone();
-        let calls = count.clone();
-        let thread = std::thread::spawn(move || {
-            let mut buffer = [0; 4096];
-            let started = Instant::now();
-            while !stop.load(Ordering::SeqCst) {
-                match socket.recv_from(&mut buffer) {
-                    Ok((size, peer)) => {
-                        let sequence = calls.fetch_add(1, Ordering::SeqCst) as u64;
-                        if !replies.load(Ordering::SeqCst) {
-                            continue;
-                        }
+        let started = Instant::now();
+        let sources = [7u8, 8]
+            .into_iter()
+            .map(|seed| {
+                clock_fixture::Server::shared(
+                    count.clone(),
+                    respond.clone(),
+                    Box::new(move |sequence, request| {
                         // Synthetic time advances across exchanges as well as
                         // within an acquired sample. Repeating the fixed epoch
                         // can legitimately fail the ledger's rollback guard.
-                        let mut fixture = clock_fixture::Fixture::default();
-                        fixture.midpoint += started.elapsed().as_secs() + sequence;
-                        socket
-                            .send_to(&fixture.reply(&buffer[..size]), peer)
-                            .unwrap();
-                    }
-                    Err(e)
-                        if matches!(
-                            e.kind(),
-                            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
-                        ) => {}
-                    Err(e) => panic!("fixture clock: {e}"),
-                }
-            }
-        });
+                        let mut fixture = clock_fixture::Fixture {
+                            seed,
+                            ..Default::default()
+                        };
+                        fixture.midpoint += started.elapsed().as_secs() + sequence as u64;
+                        Some(fixture.reply(request))
+                    }),
+                )
+            })
+            .collect();
         Self {
-            address,
+            sources,
             count,
-            stopped,
             respond,
-            thread: Some(thread),
         }
     }
-}
-impl Drop for Clock {
-    fn drop(&mut self) {
-        self.stopped.store(true, Ordering::SeqCst);
-        self.thread.take().unwrap().join().unwrap();
+    /// The `[approval_clock]` table naming both sources.
+    fn table(&self) -> String {
+        clock_fixture::quorum_toml(
+            2,
+            100,
+            &[(&self.sources[0].address, 7), (&self.sources[1].address, 8)],
+        )
     }
 }
 
@@ -516,7 +501,10 @@ fn journey_case(mode: u8) {
             "operations=['project.get','issues.list']",
             "operations=['project.get','merge_request.merge']",
         );
-    private(&cli.paths.config, format!("{config}\n[approval_clock]\nformat='roughtime-clock/1'\naddress='{}'\npublic_key='{}'\nmax_rate_error_ppm=100\n", clock.address, STANDARD.encode(clock_fixture::root_key())).as_bytes());
+    private(
+        &cli.paths.config,
+        format!("{config}\n{}", clock.table()).as_bytes(),
+    );
     let credential = provider.root.path().join("private/credential.json");
     private(&credential, &token(true).0);
     let connected = success(cli.run(&[

@@ -49,6 +49,8 @@ fn kubernetes() -> Kubernetes {
         helm_release_reads: HelmReleaseReads::Off,
         pod_logs: false,
         pod_exec: true,
+        node_reads: false,
+        custom_resources: Vec::new(),
         kubeconfig_contexts: false,
     };
     let effective = json!({"format":"connectors-kubernetes-local/1","instance":"recorded",
