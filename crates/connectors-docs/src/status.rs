@@ -299,8 +299,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Zendesk Support",
-        "Tickets, users and organizations changed since a start time, one of each by id, and a ticket's comments, with OAuth client credentials or an API token.",
-        "adapters/catalog/tests/zendesk.rs::shipped_zendesk_selections_are_exactly_the_seven_reads",
+        "Tickets, users and organizations changed since a start time, one of each by id, and a ticket's comments, with OAuth client credentials or an API token; a ticket update, a private note and a draft reply behind an approval, refused as a conflict when the ticket changed since it was read.",
+        "adapters/catalog/tests/zendesk.rs::shipped_zendesk_selections_are_the_seven_reads_and_three_writes",
         "/docs/reference/adapters/catalog",
     ),
     shipped(
