@@ -5,8 +5,7 @@ source:
 base_url: https://{domain}.atlassian.net/rest/api/3
 config: {domain: {type: string}}
 auth:
-  atlassian.basic: {use: atlassian, default: true, identity: {path: myself}}
-  atlassian.bearer: {use: atlassian, identity: {path: myself}}
+  atlassian.basic: {use: atlassian, identity: {path: myself}}
 paging:
   token: {request: nextPageToken, next: /nextPageToken, limit: maxResults, last: /isLast}
   offset: {request: startAt, limit: maxResults, total: /total}

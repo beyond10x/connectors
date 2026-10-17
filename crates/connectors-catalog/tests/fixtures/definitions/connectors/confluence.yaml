@@ -7,10 +7,8 @@ config: {domain: {type: string}}
 auth:
   atlassian.basic:
     use: atlassian
-    default: true
     identity: {path: rest/api/user/current}
     access: {path: api/v2/pages, query: {limit: "1"}}
-  atlassian.bearer: {use: atlassian, identity: {path: rest/api/user/current}}
 paging: {limit: {limit: limit, max: 250}}
 operations:
   pages.changed:

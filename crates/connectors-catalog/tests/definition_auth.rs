@@ -1,6 +1,7 @@
-//! Auth profiles in a `connectors-definition/1` file: several per provider, one
-//! default, shared through `auth/<name>.yaml` and extended per provider. Each
-//! lowered profile equals the `auth` block the provider's guide documents.
+//! Auth profiles in a `connectors-definition/1` file: several per connector, one
+//! default, shared through `auth/<name>.yaml` and extended per connector. They
+//! lower into the connector declaration, where each profile equals the `auth`
+//! block the connector's guide documents.
 #![cfg(unix)]
 use connectors_catalog::definition::{self, Refusal, Request};
 use serde_json::Value;
@@ -32,8 +33,17 @@ impl Lowering {
     fn json(path: &Path) -> Value {
         serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
     }
-    fn auth(&self) -> Value {
-        Self::json(&self.lowered().auth)
+    fn declaration(&self) -> Value {
+        Self::json(&self.lowered().connector)
+    }
+    fn profile(&self, id: &str) -> Value {
+        self.declaration()["profiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|profile| profile["profile"] == id)
+            .unwrap_or_else(|| panic!("the declaration has no profile `{id}`"))
+            .clone()
     }
     fn selection(&self) -> Value {
         Self::json(&self.lowered().operations)
@@ -175,11 +185,21 @@ fn jira_takes_both_shared_atlassian_profiles_and_records_the_default() {
         Lowering::json(&lowering.lowered().bundle)["auth_profile"],
         "atlassian.basic"
     );
-    let auth = lowering.auth();
-    assert_eq!(auth["format"], "connectors-catalog-auth/1");
-    assert_eq!(auth["default"], "atlassian.basic");
+    let declaration = lowering.declaration();
+    assert_eq!(declaration["format"], "connectors-catalog-connector/1");
+    assert_eq!(declaration["connector_id"], "jira");
+    assert_eq!(declaration["provider_id"], "atlassian");
+    assert_eq!(declaration["catalog_provider"], "jira");
+    assert_eq!(declaration.get("default_endpoint"), None);
+    let ids: Vec<&str> = declaration["profiles"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|profile| profile["profile"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["atlassian.basic", "atlassian.bearer"]);
     assert_eq!(
-        auth["profiles"]["atlassian.basic"],
+        lowering.profile("atlassian.basic"),
         documented(
             "docs/catalog-jira.md",
             "atlassian.basic",
@@ -187,7 +207,7 @@ fn jira_takes_both_shared_atlassian_profiles_and_records_the_default() {
         )
     );
     assert_eq!(
-        auth["profiles"]["atlassian.bearer"],
+        lowering.profile("atlassian.bearer"),
         documented(
             "docs/catalog-jira.md",
             "atlassian.bearer",
@@ -201,7 +221,7 @@ fn confluence_extends_the_shared_basic_profile_and_lowers_to_the_shipped_bundle_
     let root = root();
     let lowering = lower("confluence-v1", CONFLUENCE_V1, root.path());
     assert_eq!(
-        lowering.auth()["profiles"]["atlassian.basic"],
+        lowering.profile("atlassian.basic"),
         documented(
             "docs/catalog-confluence.md",
             "atlassian.basic",
@@ -237,12 +257,58 @@ fn gitlab_sends_its_token_in_a_named_header_and_probes_its_scopes() {
     let root = root();
     let lowering = lower("gitlab", GITLAB, root.path());
     assert_eq!(
-        lowering.auth()["profiles"]["gitlab.pat"],
+        lowering.profile("gitlab.pat"),
         documented(
             "docs/local-catalog-provider.md",
             "gitlab.pat",
             "PRIVATE-TOKEN"
         )
+    );
+}
+
+#[test]
+fn a_defaulted_host_is_the_default_endpoint_and_the_path_under_a_variable_host_is_api_path() {
+    let root = root();
+    let declaration = lower("gitlab", GITLAB, root.path()).declaration();
+    assert_eq!(declaration["default_endpoint"], "https://gitlab.com");
+    assert_eq!(declaration.get("api_path"), None);
+    let text = GITLAB.replace(
+        "base_url: https://{hostname}\n",
+        "base_url: https://{hostname}/api/v4\n",
+    );
+    let declaration = lower("gitlab", &text, root.path()).declaration();
+    assert_eq!(declaration["default_endpoint"], "https://gitlab.com");
+    assert_eq!(declaration["api_path"], "/api/v4");
+    let text = text.replace("{type: string, default: gitlab.com}", "{type: string}");
+    let declaration = lower("gitlab", &text, root.path()).declaration();
+    assert_eq!(declaration.get("default_endpoint"), None);
+    assert_eq!(declaration["api_path"], "/api/v4");
+}
+
+#[test]
+fn a_token_url_on_the_base_origin_is_written_as_its_path() {
+    let root = root();
+    let text = GITLAB.replace(
+        "  gitlab.pat: {scheme: header, header: PRIVATE-TOKEN,",
+        "  gitlab.oauth: {scheme: oauth2_client_credentials, token_url: \"https://{hostname}/oauth/token\", scopes: {requested: [api]}, identity: {path: user, kind: gitlab.user, subject: /id}, label: OAuth client secret}\n  gitlab.pat: {default: true, scheme: header, header: PRIVATE-TOKEN,",
+    );
+    let lowering = lower("gitlab", &text, root.path());
+    let oauth = lowering.profile("gitlab.oauth");
+    assert_eq!(oauth["token_url"], "/oauth/token");
+    assert_eq!(oauth["scheme"], "oauth2_client_credentials");
+    assert_eq!(oauth["bearer"], true);
+}
+
+#[test]
+fn profiles_of_two_providers_are_refused() {
+    let root = root();
+    let text = GITLAB.replace(
+        "  gitlab.pat: {scheme: header,",
+        "  code.pat: {default: true, scheme: header, header: PRIVATE-TOKEN, label: Code token, identity: {path: user, kind: code.user}}\n  gitlab.pat: {scheme: header,",
+    );
+    assert_eq!(
+        lower("gitlab", &text, root.path()).refusal().name(),
+        "provider_id"
     );
 }
 

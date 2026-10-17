@@ -1,7 +1,9 @@
 //! One `connectors-definition/1` connector definition, read and lowered into
 //! what the catalog provider already runs: a bundle with its index, compiled by
-//! [`crate::pipeline`] from the vendored source the definition pins, and a
-//! `connectors-catalog-operations/1` selection of the operations it exposes.
+//! [`crate::pipeline`] from the vendored source the definition pins, a
+//! `connectors-catalog-operations/1` selection of the operations it exposes, and
+//! the `connectors-catalog-connector/1` declaration of the connector and its
+//! auth profiles, byte for byte as the catalog commits it.
 //!
 //! The types mirror the schema (`spec/domains/definition.yaml` in the
 //! definitions repository) field for field, and every struct refuses a field
@@ -113,8 +115,9 @@ pub struct ConfigField {
 
 /// The schema identifier of a shared auth file, `auth/<name>.yaml`.
 pub const AUTH_SCHEMA: &str = "urn:beyond10x:connectors-auth:1";
-/// The file the lowering writes every auth profile into.
-pub const AUTH_FORMAT: &str = "connectors-catalog-auth/1";
+/// The connector declaration the lowering writes: the catalog's
+/// `providers/<name>/connector.json`.
+pub const CONNECTOR_FORMAT: &str = "connectors-catalog-connector/1";
 
 /// `connectors_definitions.definition.AuthScheme`: `basic` sends
 /// `Authorization: Basic`, `bearer` `Authorization: Bearer`, `header` the token
@@ -635,6 +638,10 @@ pub struct Operation {
 #[serde(deny_unknown_fields)]
 pub struct ProviderDefinition {
     pub schema: SchemaId,
+    /// The connector id, when it is not the file stem: `calendar` for
+    /// `google-calendar.yaml`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     /// The catalog provider, the bundle's name, when it is not the file stem:
     /// a second selection over one bundle.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -735,6 +742,8 @@ pub enum Refusal {
     AuthMisplaced { key: String, field: String },
     /// A `{variable}` in `base_url` or an OAuth URL that `config` does not declare.
     UndeclaredVariable(String),
+    /// Profile ids that do not all start with one provider id and a `.`.
+    ProviderId(String),
     /// A source that names other than one document, or a projection where
     /// none is taken, or none where one is; or a document of another kind.
     SourceKind(String),
@@ -820,6 +829,7 @@ impl Refusal {
             Self::AuthIncomplete { .. } => "auth_incomplete",
             Self::AuthMisplaced { .. } => "auth_misplaced",
             Self::UndeclaredVariable(_) => "undeclared_variable",
+            Self::ProviderId(_) => "provider_id",
             Self::SourceKind(_) => "source_kind",
             Self::SourceOutsideRoot(_) => "source_outside_root",
             Self::SourceNotGzip(_) => "source_not_gzip",
@@ -858,6 +868,7 @@ impl std::fmt::Display for Refusal {
             | Self::SourceNotGzip(detail)
             | Self::SourceTooLarge(detail)
             | Self::AuthLibrary(detail)
+            | Self::ProviderId(detail)
             | Self::Pipeline(detail)
             | Self::Write(detail) => write!(f, "{name}: {detail}"),
             Self::WrongSchema(schema) => write!(f, "{name}: `{schema}`, expected `{SCHEMA}`"),
@@ -1027,8 +1038,8 @@ pub struct Lowered {
     pub bundle: PathBuf,
     /// `<id>.operations.json`.
     pub operations: PathBuf,
-    /// `<id>.auth.json`: every profile as the provider's `auth` block.
-    pub auth: PathBuf,
+    /// `<id>.connector.json`: the connector declaration.
+    pub connector: PathBuf,
 }
 
 /// One row of the selection, in the shape the catalog provider's `Selection`
@@ -1395,8 +1406,88 @@ fn resolve_auth(
     Ok((default, resolved))
 }
 
-/// One resolved profile as the catalog provider's `auth` block.
-fn auth_block(id: &str, profile: &Auth) -> Result<Value, Refusal> {
+/// A value of a connector declaration, written as the committed declarations
+/// write it: an object on one line, a list of more than one string one string
+/// per line.
+enum Node {
+    Text(String),
+    Flag(bool),
+    Inline(Fields),
+    List(Vec<String>),
+}
+
+type Fields = Vec<(String, Node)>;
+
+fn text(value: &str) -> Node {
+    Node::Text(value.to_owned())
+}
+
+fn quoted(value: &str) -> String {
+    Value::from(value).to_string()
+}
+
+impl Node {
+    fn inline(&self) -> String {
+        match self {
+            Self::Text(value) => quoted(value),
+            Self::Flag(value) => value.to_string(),
+            Self::Inline(fields) => {
+                let pairs: Vec<String> = fields
+                    .iter()
+                    .map(|(key, node)| format!("{}: {}", quoted(key), node.inline()))
+                    .collect();
+                format!("{{{}}}", pairs.join(", "))
+            }
+            Self::List(items) => {
+                let items: Vec<String> = items.iter().map(|item| quoted(item)).collect();
+                format!("[{}]", items.join(", "))
+            }
+        }
+    }
+
+    /// The value as it stands in an object indented by `indent`.
+    fn written(&self, indent: usize) -> String {
+        match self {
+            Self::List(items) if items.len() > 1 => {
+                let pad = " ".repeat(indent + 2);
+                let lines: Vec<String> = items
+                    .iter()
+                    .map(|item| format!("{pad}{}", quoted(item)))
+                    .collect();
+                format!("[\n{}\n{}]", lines.join(",\n"), " ".repeat(indent))
+            }
+            _ => self.inline(),
+        }
+    }
+}
+
+/// `fields` as an object whose closing brace is indented by `indent`.
+fn object(fields: &Fields, indent: usize) -> String {
+    let pad = " ".repeat(indent + 2);
+    let lines: Vec<String> = fields
+        .iter()
+        .map(|(key, node)| format!("{pad}{}: {}", quoted(key), node.written(indent + 2)))
+        .collect();
+    format!("{{\n{}\n{}}}", lines.join(",\n"), " ".repeat(indent))
+}
+
+fn field(key: &str, node: Node) -> (String, Node) {
+    (key.to_owned(), node)
+}
+
+/// `url` as its path when it lies on `base_url`'s origin, which the catalog
+/// provider resolves against the instance endpoint; otherwise as written.
+fn on_origin(url: &str, base_url: &str) -> String {
+    let own = origin(url);
+    url.strip_prefix(own)
+        .filter(|path| own == origin(base_url) && path.starts_with('/'))
+        .unwrap_or(url)
+        .to_owned()
+}
+
+/// One resolved profile as a declaration's profile block, its fields in the
+/// order of the catalog provider's `AuthConfig`, the identity's `source` first.
+fn profile_block(id: &str, profile: &Auth, base_url: &str) -> Result<Fields, Refusal> {
     let missing = |field: &str| Refusal::AuthIncomplete {
         key: id.to_owned(),
         field: field.to_owned(),
@@ -1412,10 +1503,15 @@ fn auth_block(id: &str, profile: &Auth) -> Result<Value, Refusal> {
         .as_ref()
         .ok_or_else(|| missing("identity"))?;
     let source = identity.source.unwrap_or(IdentitySource::Api);
-    let mut probe = serde_json::Map::new();
+    let mut probe = Fields::new();
+    match source {
+        IdentitySource::Api => {}
+        IdentitySource::IdToken => probe.push(field("source", text("id_token"))),
+        IdentitySource::Configuration => probe.push(field("source", text("configuration"))),
+    }
     match (&identity.path, source) {
         (Some(path), IdentitySource::Api | IdentitySource::Configuration) => {
-            probe.insert("path".to_owned(), Value::from(path.as_str()));
+            probe.push(field("path", text(path)));
         }
         (None, IdentitySource::Api | IdentitySource::Configuration) => {
             return Err(missing("identity.path"));
@@ -1423,140 +1519,156 @@ fn auth_block(id: &str, profile: &Auth) -> Result<Value, Refusal> {
         (Some(_), IdentitySource::IdToken) => return Err(misplaced("identity.path")),
         (None, IdentitySource::IdToken) => {}
     }
-    probe.insert(
-        "kind".to_owned(),
-        Value::from(
-            identity
-                .kind
-                .as_ref()
-                .ok_or_else(|| missing("identity.kind"))?
-                .as_str(),
-        ),
-    );
+    let kind = identity
+        .kind
+        .as_ref()
+        .ok_or_else(|| missing("identity.kind"))?;
+    probe.push(field("kind", text(kind)));
     if let Some(subject) = &identity.subject {
-        probe.insert("subject_pointer".to_owned(), Value::from(subject.as_str()));
+        probe.push(field("subject_pointer", text(subject)));
     }
-    match source {
-        IdentitySource::Api => {}
-        IdentitySource::IdToken => {
-            probe.insert("source".to_owned(), Value::from("id_token"));
-        }
-        IdentitySource::Configuration => {
-            probe.insert("source".to_owned(), Value::from("configuration"));
-        }
+
+    let mut block = vec![field("profile", text(id))];
+    let word = match scheme {
+        AuthScheme::Basic => Some("basic"),
+        AuthScheme::OAuth2Refresh => Some("oauth2_refresh"),
+        AuthScheme::OAuth2ClientCredentials => Some("oauth2_client_credentials"),
+        AuthScheme::Bearer | AuthScheme::Header => None,
+    };
+    if let Some(word) = word {
+        block.push(field("scheme", text(word)));
     }
-    let mut block = serde_json::json!({
-        "profile": id,
-        "label": label,
-        "identity": probe,
-    });
-    let header = profile.header.clone();
-    let authorization = || header.clone().unwrap_or_else(|| "Authorization".to_owned());
-    match scheme {
-        AuthScheme::Basic => {
-            block["scheme"] = Value::from("basic");
-            block["header"] = Value::from(authorization());
-            block["bearer"] = Value::Bool(false);
-            block["account_label"] = Value::from(
-                profile
-                    .account_label
-                    .as_ref()
-                    .ok_or_else(|| missing("account_label"))?
-                    .as_str(),
-            );
-        }
-        AuthScheme::Bearer => {
-            block["header"] = Value::from(authorization());
-            block["bearer"] = Value::Bool(true);
-        }
-        AuthScheme::Header => {
-            block["header"] = Value::from(header.clone().ok_or_else(|| missing("header"))?);
-            block["bearer"] = Value::Bool(false);
-            if let Some(prefix) = &profile.prefix {
-                block["prefix"] = Value::from(prefix.as_str());
-            }
-        }
-        AuthScheme::OAuth2Refresh | AuthScheme::OAuth2ClientCredentials => {
-            block["scheme"] = Value::from(if scheme == AuthScheme::OAuth2Refresh {
-                "oauth2_refresh"
-            } else {
-                "oauth2_client_credentials"
-            });
-            block["header"] = Value::from(authorization());
-            block["bearer"] = Value::Bool(true);
-            block["token_url"] = Value::from(
-                profile
-                    .token_url
-                    .as_ref()
-                    .ok_or_else(|| missing("token_url"))?
-                    .as_str(),
-            );
-            match (&profile.authorize_url, scheme) {
-                (Some(url), AuthScheme::OAuth2Refresh) => {
-                    block["authorize_url"] = Value::from(url.as_str());
-                }
-                (None, AuthScheme::OAuth2Refresh) => return Err(missing("authorize_url")),
-                (Some(_), _) => return Err(misplaced("authorize_url")),
-                (None, _) => {}
-            }
-        }
+    let header = match (&profile.header, scheme) {
+        (Some(header), _) => header.clone(),
+        (None, AuthScheme::Header) => return Err(missing("header")),
+        (None, _) => "Authorization".to_owned(),
+    };
+    block.push(field("header", Node::Text(header)));
+    block.push(field(
+        "bearer",
+        Node::Flag(!matches!(scheme, AuthScheme::Basic | AuthScheme::Header)),
+    ));
+    match (&profile.prefix, scheme) {
+        (Some(prefix), AuthScheme::Header) => block.push(field("prefix", text(prefix))),
+        (Some(_), _) => return Err(misplaced("prefix")),
+        (None, _) => {}
     }
-    if profile.prefix.is_some() && scheme != AuthScheme::Header {
-        return Err(misplaced("prefix"));
+    match (&profile.account_label, scheme) {
+        (Some(account), AuthScheme::Basic) => block.push(field("account_label", text(account))),
+        (None, AuthScheme::Basic) => return Err(missing("account_label")),
+        (Some(_), _) => return Err(misplaced("account_label")),
+        (None, _) => {}
     }
-    if profile.account_label.is_some() && scheme != AuthScheme::Basic {
-        return Err(misplaced("account_label"));
-    }
-    if !scheme.is_oauth() {
-        for (field, given) in [
-            ("token_url", &profile.token_url),
-            ("authorize_url", &profile.authorize_url),
-        ] {
-            if given.is_some() {
-                return Err(misplaced(field));
-            }
-        }
-    }
-    if let Some(scopes) = &profile.scopes {
+    block.push(field("label", text(label)));
+    block.push(field("identity", Node::Inline(probe)));
+    let scopes = profile.scopes.as_ref();
+    if let Some(scopes) = scopes {
         match (&scopes.path, &scopes.pointer) {
-            (Some(path), Some(pointer)) => {
-                block["scopes"] = serde_json::json!({"path": path, "pointer": pointer});
-            }
+            (Some(path), Some(pointer)) => block.push(field(
+                "scopes",
+                Node::Inline(vec![
+                    field("path", text(path)),
+                    field("pointer", text(pointer)),
+                ]),
+            )),
             (None, None) => {}
             (Some(_), None) => return Err(missing("scopes.pointer")),
             (None, Some(_)) => return Err(missing("scopes.path")),
         }
-        if let Some(minimum) = &scopes.minimum {
-            block["minimum_scopes"] = serde_json::json!(minimum);
-        }
-        if let Some(requested) = &scopes.requested {
-            if !scheme.is_oauth() {
-                return Err(misplaced("scopes.requested"));
-            }
-            block["requested_scopes"] = serde_json::json!(requested);
-        }
     }
     if let Some(access) = &profile.access {
-        block["access"] = serde_json::json!({"path": access.path});
+        let mut read = vec![field("path", text(&access.path))];
         if let Some(query) = &access.query {
-            block["access"]["query"] = serde_json::json!(query);
+            read.push(field(
+                "query",
+                Node::Inline(
+                    query
+                        .iter()
+                        .map(|(key, value)| field(key, text(value)))
+                        .collect(),
+                ),
+            ));
         }
+        block.push(field("access", Node::Inline(read)));
+    }
+    if let Some(minimum) = scopes.and_then(|scopes| scopes.minimum.as_ref()) {
+        block.push(field("minimum_scopes", Node::List(minimum.clone())));
+    }
+    if scheme.is_oauth() {
+        let token_url = profile
+            .token_url
+            .as_ref()
+            .ok_or_else(|| missing("token_url"))?;
+        block.push(field(
+            "token_url",
+            Node::Text(on_origin(token_url, base_url)),
+        ));
+        match (&profile.authorize_url, scheme) {
+            (Some(url), AuthScheme::OAuth2Refresh) => block.push(field("authorize_url", text(url))),
+            (None, AuthScheme::OAuth2Refresh) => return Err(missing("authorize_url")),
+            (Some(_), _) => return Err(misplaced("authorize_url")),
+            (None, _) => {}
+        }
+    } else {
+        for (name, given) in [
+            ("token_url", &profile.token_url),
+            ("authorize_url", &profile.authorize_url),
+        ] {
+            if given.is_some() {
+                return Err(misplaced(name));
+            }
+        }
+    }
+    if let Some(requested) = scopes.and_then(|scopes| scopes.requested.as_ref()) {
+        if !scheme.is_oauth() {
+            return Err(misplaced("scopes.requested"));
+        }
+        block.push(field("requested_scopes", Node::List(requested.clone())));
     }
     Ok(block)
 }
 
-/// The `connectors-catalog-auth/1` value of a definition's profiles, `use`
-/// resolved against `root`, for the catalog provider `provider`.
-fn auth_value(
+/// The declaration's `default_endpoint` and `api_path`. When the host of
+/// `base_url` is one variable, users know the host and not the API under it, so
+/// the endpoint is the origin and the path under it is `api_path`. The endpoint
+/// is a default only when `config` defaults every variable in it.
+fn endpoint(definition: &ProviderDefinition) -> Result<(Option<String>, Option<String>), Refusal> {
+    let base = definition.base_url.as_str();
+    let (scheme, rest) = base
+        .split_once("://")
+        .ok_or_else(|| Refusal::Malformed(format!("`{base}` is not an absolute URL")))?;
+    let (authority, path) = rest.find('/').map_or((rest, ""), |at| rest.split_at(at));
+    let one_variable =
+        authority.starts_with('{') && authority.ends_with('}') && variables(authority)?.len() == 1;
+    let api_path = (one_variable && !path.is_empty()).then(|| path.to_owned());
+    let mut resolved = match api_path {
+        Some(_) => format!("{scheme}://{authority}"),
+        None => base.to_owned(),
+    };
+    for variable in variables(&resolved.clone())? {
+        let Some(default) = definition
+            .config
+            .as_ref()
+            .and_then(|config| config.get(variable))
+            .and_then(|field| field.default.as_ref())
+        else {
+            return Ok((None, api_path));
+        };
+        resolved = resolved.replace(&format!("{{{variable}}}"), default);
+    }
+    Ok((Some(resolved), api_path))
+}
+
+/// The connector declaration a definition lowers to, `use` resolved against
+/// `root`, and the profile its bundle records. The provider id is the part of
+/// the profile ids before their first `.`, which every profile shares.
+fn declaration(
     definition: &ProviderDefinition,
+    name: &str,
     provider: &str,
     root: &Path,
-) -> Result<Value, Refusal> {
+) -> Result<(String, String), Refusal> {
     let (default_profile, profiles) = resolve_auth(definition, root)?;
-    let mut blocks = serde_json::Map::new();
-    for (id, profile) in &profiles {
-        blocks.insert(id.clone(), auth_block(id, profile)?);
-    }
     let mut urls = vec![definition.base_url.as_str()];
     for profile in profiles.values() {
         urls.extend(profile.token_url.as_deref());
@@ -1573,24 +1685,70 @@ fn auth_value(
             }
         }
     }
-    Ok(serde_json::json!({
-        "format": AUTH_FORMAT,
-        "provider": provider,
-        "default": default_profile,
-        "profiles": blocks,
-    }))
+    let prefixes: std::collections::BTreeSet<&str> = profiles
+        .keys()
+        .map(|id| id.split_once('.').map_or("", |(prefix, _)| prefix))
+        .collect();
+    let provider_id = match prefixes.iter().collect::<Vec<_>>()[..] {
+        [only] if !only.is_empty() => *only,
+        _ => {
+            let ids: Vec<&str> = profiles.keys().map(String::as_str).collect();
+            return Err(Refusal::ProviderId(format!(
+                "profiles {} do not share one `<provider>.` prefix",
+                ids.join(", ")
+            )));
+        }
+    };
+    let (default_endpoint, api_path) = endpoint(definition)?;
+    let selection = match &definition.catalog {
+        None => "operations.json".to_owned(),
+        Some(catalog) => {
+            let suffix = name.strip_prefix(&format!("{catalog}-")).unwrap_or(name);
+            format!("{suffix}-operations.json")
+        }
+    };
+    let mut head = vec![
+        field("format", text(CONNECTOR_FORMAT)),
+        field(
+            "connector_id",
+            text(definition.id.as_deref().unwrap_or(name)),
+        ),
+        field("provider_id", text(provider_id)),
+        field("adapter_id", text("catalog")),
+        field("catalog_provider", text(provider)),
+    ];
+    if let Some(endpoint) = default_endpoint {
+        head.push(field("default_endpoint", Node::Text(endpoint)));
+    }
+    if let Some(path) = api_path {
+        head.push(field("api_path", Node::Text(path)));
+    }
+    head.push(field("selection", Node::Text(selection)));
+    let mut blocks = Vec::new();
+    for (id, profile) in &profiles {
+        blocks.push(format!(
+            "    {}",
+            object(&profile_block(id, profile, &definition.base_url)?, 4)
+        ));
+    }
+    let mut lines: Vec<String> = head
+        .iter()
+        .map(|(key, node)| format!("  {}: {}", quoted(key), node.written(2)))
+        .collect();
+    lines.push(format!("  \"profiles\": [\n{}\n  ]", blocks.join(",\n")));
+    Ok((format!("{{\n{}\n}}\n", lines.join(",\n")), default_profile))
 }
 
-/// The `connectors-catalog-auth/1` value the definition at `file` lowers its
-/// profiles to, `use` resolved against the definitions `root`. Reads no source.
-pub fn auth(file: &Path, root: &Path) -> Result<Value, Refusal> {
+/// The connector declaration the definition at `file` lowers to, `use`
+/// resolved against the definitions `root`. Reads no source.
+pub fn connector(file: &Path, root: &Path) -> Result<String, Refusal> {
     let shown = file.display();
     let bytes =
         std::fs::read(file).map_err(|error| Refusal::Unreadable(format!("{shown}: {error}")))?;
     let definition = parse(&bytes)?;
     let name = stem(file)?;
     let provider = definition.catalog.as_deref().unwrap_or(name);
-    auth_value(&definition, provider, root)
+    Ok(declaration(&definition, name, provider, root)?.0)
 }
 
 fn stem(file: &Path) -> Result<&str, Refusal> {
@@ -2166,8 +2324,7 @@ pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
     let name = stem(request.definition)?;
     let provider = definition.catalog.as_deref().unwrap_or(name);
 
-    let auth = auth_value(&definition, provider, request.root)?;
-    let auth_profile = auth["default"].as_str().unwrap_or_default().to_owned();
+    let (declared, auth_profile) = declaration(&definition, name, provider, request.root)?;
 
     let (kind, document_path) = definition.source.document()?;
     let source_path = under_root(request.root, document_path)?;
@@ -2269,16 +2426,13 @@ pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
         .map_err(|error| Refusal::Write(error.to_string()))?;
     let operations_path = request.out.join(format!("{name}.operations.json"));
     std::fs::write(&operations_path, selection).map_err(write)?;
-    let mut auth =
-        serde_json::to_vec_pretty(&auth).map_err(|error| Refusal::Write(error.to_string()))?;
-    auth.push(b'\n');
-    let auth_path = request.out.join(format!("{name}.auth.json"));
-    std::fs::write(&auth_path, auth).map_err(write)?;
+    let connector_path = request.out.join(format!("{name}.connector.json"));
+    std::fs::write(&connector_path, declared).map_err(write)?;
     Ok(Lowered {
         provider: provider.to_owned(),
         bundle: request.out.join(&entry.file_name),
         entry,
         operations: operations_path,
-        auth: auth_path,
+        connector: connector_path,
     })
 }
