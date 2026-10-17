@@ -800,6 +800,12 @@ fn the_lowered_jira_definition_serves_issue_get_against_the_fixture() {
         scratch: &scratch,
     })
     .expect("the Jira definition lowers");
+    let auth: Value = serde_json::from_slice(&fs::read(&lowered.auth).unwrap()).unwrap();
+    assert_eq!(
+        auth["profiles"][PROFILE],
+        documented_auth(),
+        "the lowered profile is the one the guide documents and this fixture runs"
+    );
     let selections: Vec<Selection> = serde_json::from_value(
         serde_json::from_slice::<Value>(&fs::read(&lowered.operations).unwrap()).unwrap()
             ["operations"]
