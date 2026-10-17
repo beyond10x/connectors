@@ -156,6 +156,13 @@ impl runtime::Adapter for Fixture {
         if knob("unavailable") == Some(1) {
             return Err(runtime::Failure::Unavailable);
         }
+        // `/work/unavailable_after_ms`, when a test writes it, holds each
+        // validation that long and then fails it transiently, as a provider
+        // whose gateway times out does.
+        if let Some(after) = knob("unavailable_after_ms") {
+            std::thread::sleep(std::time::Duration::from_millis(after));
+            return Err(runtime::Failure::Unavailable);
+        }
         // A live provider's identity probe takes time: `/work/probe_ms`, when
         // a test writes it, holds each validation that long.
         if let Some(probe) = knob("probe_ms") {
@@ -183,6 +190,11 @@ impl runtime::Adapter for Fixture {
         _: Value,
     ) -> runtime::Result<Value> {
         record("invocations", &document.0);
+        // `/work/invoke_ms`, when a test writes it, is how long the provider
+        // takes to answer a read.
+        if let Some(took) = knob("invoke_ms") {
+            std::thread::sleep(std::time::Duration::from_millis(took));
+        }
         Ok(json!({"credential": digest(&document.0)}))
     }
 }

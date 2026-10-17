@@ -8,6 +8,8 @@ pub struct Revalidation {
     id: String,
     version: custody::Version,
     captured: u64,
+    /// The connection's semantic revision this capture was admitted at.
+    revision: String,
     /// The configured binding a configuration upgrade publishes the
     /// connection under; None when the connection already has it.
     upgrade: Option<Binding>,
@@ -15,6 +17,12 @@ pub struct Revalidation {
 impl Revalidation {
     pub fn version(&self) -> custody::Version {
         self.version
+    }
+    /// The connection's semantic revision this capture was admitted at: the
+    /// expected one of an explicit revalidation, the current one of a read's
+    /// recollection.
+    pub fn revision(&self) -> &str {
+        &self.revision
     }
     /// Whether this revalidation publishes the connection under a newer
     /// configuration revision of its instance.
@@ -341,7 +349,7 @@ impl Registry {
             tx.execute("INSERT INTO registry_uses (use_id,connection_ref,generation_id,version_id,publication_fence,expires_at_ms) VALUES (?1,?2,?3,?4,?5,?6)",
                 params![id,reference,row.generation,version,row.fence,timestamp(expires)?]).map_err(db)?;
             Ok(Revalidation {id, version:custody_version(authority,&row.scope_id,version)?, captured:now,
-                upgrade: upgrade.then(|| binding.clone())})
+                revision: revision.to_owned(), upgrade: upgrade.then(|| binding.clone())})
         })
     }
 
