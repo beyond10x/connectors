@@ -131,6 +131,10 @@ fn select(id: &str, operation_id: &str, effect: Effect) -> Selection {
         body_required: Vec::new(),
         body_nonempty: Vec::new(),
         body_fixed: BTreeMap::new(),
+        body_enums: BTreeMap::new(),
+        body_any_of: Vec::new(),
+        body_prefixes: BTreeMap::new(),
+        conflict_status: None,
         custody: None,
         query_fixed: BTreeMap::new(),
         query_folds: BTreeMap::new(),
@@ -147,6 +151,7 @@ fn mr_guard(values: &[(&str, &str)], preflight: Vec<Check>, postflight: Vec<Chec
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
             checks: preflight,
+            mismatch: None,
         },
         further_preflights: vec![],
         postflight: Postflight {
@@ -172,6 +177,7 @@ fn selections() -> Vec<Selection> {
                         ("branch".to_string(), "body.source_branch".to_string()),
                     ]),
                     checks: vec![input_check("/commit/id", "sha")],
+                    mismatch: None,
                 },
                 further_preflights: vec![],
                 postflight: Postflight {
