@@ -151,6 +151,11 @@ impl runtime::Adapter for Fixture {
         if document.0 == b"refused" || knob("refuse") == Some(1) {
             return Err(runtime::Failure::InvalidCredential);
         }
+        // `/work/unavailable`, when a test writes 1 there, fails every
+        // validation transiently, as a provider outage does.
+        if knob("unavailable") == Some(1) {
+            return Err(runtime::Failure::Unavailable);
+        }
         // A live provider's identity probe takes time: `/work/probe_ms`, when
         // a test writes it, holds each validation that long.
         if let Some(probe) = knob("probe_ms") {
