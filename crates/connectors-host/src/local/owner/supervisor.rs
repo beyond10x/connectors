@@ -967,12 +967,14 @@ fn worker(
                         )
                     };
                     // Evidence still current that would lapse before this read
-                    // could use it: under half its lifetime and under the
-                    // read's own remaining deadline left. The use, and so the
-                    // provider deadline, never outlasts the evidence.
+                    // could use it: under half its own lifetime (not the
+                    // profile's bound, which the provider's probe may undercut)
+                    // and under the read's own remaining deadline left. The
+                    // use, and so the provider deadline, never outlasts the
+                    // evidence; fresh evidence admits its read at once.
                     let lapses_early = |captured: &registry::ReadUse| {
                         let now = connectors_sdk::now_ms();
-                        let window = (binding.profile.evidence_lifetime_ms / 2)
+                        let window = (captured.evidence_lifetime_ms() / 2)
                             .min(job.deadline.saturating_sub(now));
                         captured.expires_at_ms() < now.saturating_add(window)
                     };
