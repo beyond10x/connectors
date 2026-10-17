@@ -313,8 +313,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Runpod pods",
-        "pod.create, pods.list and pod.terminate with the API key in custody; a create without a definite answer is unknown and never sent again; verified against a local fixture only (since 0.36.0).",
-        "adapters/catalog/tests/runpod.rs::shipped_runpod_selections_are_exactly_create_list_and_terminate",
+        "pod.create, pods.list and pod.terminate with the API key in custody; a create without a definite answer is unknown and never sent again, and one refused for lack of capacity is refused as capacity; verified against a local fixture only (since 0.36.0).",
+        "adapters/catalog/tests/runpod.rs::shipped_runpod_selections_are_exactly_create_list_terminate_and_pod_billing",
         "/docs/reference/adapters/catalog",
     ),
     shipped(

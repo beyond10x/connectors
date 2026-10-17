@@ -228,7 +228,7 @@
     },
     {
       "area": "Catalog provider",
-      "detail": "pod.create, pods.list and pod.terminate with the API key in custody; a create without a definite answer is unknown and never sent again; verified against a local fixture only (since 0.36.0).",
+      "detail": "pod.create, pods.list and pod.terminate with the API key in custody; a create without a definite answer is unknown and never sent again, and one refused for lack of capacity is refused as capacity; verified against a local fixture only (since 0.36.0).",
       "href": "/docs/reference/adapters/catalog",
       "label": "Runpod pods",
       "status": "shipped"

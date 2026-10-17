@@ -116,6 +116,7 @@ fn setup(root: &Path, socket: Option<&Path>, clock_addresses: [&str; 2]) -> Targ
         permissions: crate::local::config::Permissions {
             profiles: BTreeSet::from(["token".into()]),
             operations: BTreeSet::from(["item.write".into(), "item.read".into()]),
+            custody: Default::default(),
         },
     };
     config.adapters.insert("fixture".into(), adapter.clone());
@@ -160,12 +161,14 @@ fn setup(root: &Path, socket: Option<&Path>, clock_addresses: [&str; 2]) -> Targ
         requirements: vec![
             runtime::Requirement {
                 operation: "item.write".into(),
+                custody: false,
                 profile: "token".into(),
                 scopes: BTreeSet::from(["write".into()]),
                 effect: runtime::Effect::Write,
             },
             runtime::Requirement {
                 operation: "item.read".into(),
+                custody: false,
                 profile: "token".into(),
                 scopes: BTreeSet::new(),
                 effect: runtime::Effect::Read,

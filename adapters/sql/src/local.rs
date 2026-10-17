@@ -161,6 +161,7 @@ impl Local {
                 .iter()
                 .map(|o| Requirement {
                     operation: o.id.clone(),
+                    custody: false,
                     profile: config.engine.profile_id().into(),
                     scopes: BTreeSet::new(),
                     // Every operation reads inside a read-only transaction

@@ -316,6 +316,35 @@ pub(crate) mod tests {
         assert_eq!(reopened.build_version("absent").unwrap(), None);
     }
 
+    /// A bootstrap whose write declares custody of a credential it creates
+    /// (`Requirement::custody`) is remembered like any other and reads back
+    /// with the declaration: the record's model carries the member, so the
+    /// first launch of such an adapter is not refused `metadata_unavailable`.
+    #[test]
+    fn a_bootstrap_whose_write_declares_custody_is_remembered_and_read_back() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("state");
+        crate::local::filesystem::directory(&path, true, true).unwrap();
+        drop(Metadata::initialize(&path).unwrap());
+        let mut bootstrap = fixture_bootstrap();
+        bootstrap.requirements[0].effect = crate::local::runtime::Effect::Write;
+        bootstrap.requirements[0].custody = true;
+        bootstrap.validate().unwrap();
+        let state = State::new(&path);
+        state.remember("selection", &bootstrap).unwrap();
+        drop(state);
+
+        let cached = State::new(&path)
+            .cached("fixture", "selection")
+            .unwrap()
+            .unwrap();
+        assert!(cached.requirements[0].custody);
+        assert_eq!(
+            serde_json::to_value(cached).unwrap(),
+            serde_json::to_value(&bootstrap).unwrap()
+        );
+    }
+
     /// A store whose runtime record was written without a build version
     /// still opens: the record reads back with none, its cached bootstrap is
     /// unchanged, and the next bootstrap written records this build.

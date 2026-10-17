@@ -296,6 +296,24 @@ pub struct Permissions {
     pub profiles: BTreeSet<String>,
     #[serde(default)]
     pub operations: BTreeSet<String>,
+    /// Per write operation of this adapter whose answer carries a credential
+    /// it created, the adapter alias and profile that credential is held under
+    /// (`connectors.mutations.CredentialCustody`; `docs/local-mutation-ledger.md`,
+    /// "Created credentials"). Omitted when empty, so a configuration without
+    /// it keeps its bytes.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub custody: BTreeMap<String, CustodyTarget>,
+}
+
+/// Where a created credential is held: another configured adapter alias, and
+/// one of the profiles its permissions grant. The configuration is refused
+/// when it loads unless the target is not the writer, exists, grants the
+/// profile and declares no custody target of its own.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct CustodyTarget {
+    pub adapter: String,
+    pub profile: String,
 }
 impl Adapter {
     pub fn private_protocol(&self) -> super::runtime::PrivateProtocol {
@@ -544,6 +562,22 @@ impl Config {
                 return Err(Failure::InvalidConfiguration.into());
             }
             entry.executable.validate()?;
+        }
+        for (alias, entry) in &self.adapters {
+            for (operation, target) in &entry.permissions.custody {
+                let held = self.adapters.get(&target.adapter);
+                if self.format == "connectors-local/1"
+                    || !entry.permissions.operations.contains(operation)
+                    || &target.adapter == alias
+                    || !selector(&target.profile)
+                    || held.is_none_or(|held| {
+                        !held.permissions.profiles.contains(&target.profile)
+                            || !held.permissions.custody.is_empty()
+                    })
+                {
+                    return Err(Failure::InvalidConfiguration.into());
+                }
+            }
         }
         for (name, consumer) in &self.consumers {
             if !selector(name)
@@ -956,6 +990,106 @@ mod custody_tests {
         for custody in [mounted, platform] {
             let text = toml::to_string(&custody).unwrap();
             assert_eq!(toml::from_str::<Custody>(&text).unwrap(), custody, "{text}");
+        }
+    }
+}
+
+// The fixtures configure Unix absolute executable paths.
+#[cfg(all(test, unix))]
+mod custody_target_tests {
+    //! `[adapters.<alias>.permissions.custody]` names, per write operation of
+    //! that alias, another configured alias and one of its granted profiles a
+    //! created credential is held under (`docs/local-mutation-ledger.md`,
+    //! "Created credentials"). Everything else refuses the file when it loads.
+    use super::*;
+
+    fn entry(alias: &str, instance: &str, permissions: &str) -> String {
+        format!(
+            "[adapters.{alias}]\ninstance_id='{instance}'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.{alias}.executable]\npath='/not-installed/adapter'\nsha256='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\nargs=[]\n[adapters.{alias}.permissions]\n{permissions}"
+        )
+    }
+    const WRITER: &str = "profiles=['fixture.management']\noperations=['key.get','key.create']\n[adapters.minter.permissions.custody]\n'key.create'={adapter='minted',profile='fixture.key'}\n";
+    const TARGET: &str = "profiles=['fixture.key']\noperations=['key.get']\n";
+
+    fn read(format: &str, writer: &str, target: &str) -> std::result::Result<Config, Refusal> {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(
+            Some(&root.path().join("config/config.toml")),
+            Some(&root.path().join("state")),
+        )
+        .unwrap();
+        Config::initialize(&paths).unwrap();
+        std::fs::write(
+            &paths.config,
+            format!(
+                "format='{format}'\nowner_uid={}\n{}{}",
+                fs::uid(),
+                entry("minter", "fixture-minter", writer),
+                entry("minted", "fixture-minted", target),
+            ),
+        )
+        .unwrap();
+        Config::read(&paths.config)
+    }
+
+    #[test]
+    fn a_custody_target_is_another_alias_and_one_of_its_granted_profiles() {
+        let config = read("connectors-local/2", WRITER, TARGET).unwrap();
+        assert_eq!(
+            config.adapters["minter"].permissions.custody["key.create"],
+            CustodyTarget {
+                adapter: "minted".into(),
+                profile: "fixture.key".into(),
+            }
+        );
+        assert!(config.adapters["minted"].permissions.custody.is_empty());
+        // Absent, the table serialises as it did before it existed.
+        let text = toml::to_string(&config.adapters["minted"].permissions).unwrap();
+        assert!(!text.contains("custody"), "{text}");
+        let invalid = Some(Refusal::Failure(Failure::InvalidConfiguration));
+        for (writer, target) in [
+            // The writer itself.
+            (
+                WRITER.replace("adapter='minted'", "adapter='minter'"),
+                TARGET.to_owned(),
+            ),
+            // No such alias.
+            (
+                WRITER.replace("adapter='minted'", "adapter='absent'"),
+                TARGET.to_owned(),
+            ),
+            // A profile the target is not granted, and one that is no id.
+            (
+                WRITER.replace("profile='fixture.key'", "profile='fixture.other'"),
+                TARGET.to_owned(),
+            ),
+            (
+                WRITER.replace("profile='fixture.key'", "profile='not an id'"),
+                TARGET.to_owned(),
+            ),
+            // An operation the writer is not granted.
+            (
+                WRITER.replace("'key.create'={", "'key.delete'={"),
+                TARGET.to_owned(),
+            ),
+            // An unknown member of the target table.
+            (
+                WRITER.replace("profile='fixture.key'}", "profile='fixture.key',extra=1}"),
+                TARGET.to_owned(),
+            ),
+            // A target that holds custody of its own.
+            (
+                WRITER.to_owned(),
+                format!(
+                    "{TARGET}[adapters.minted.permissions.custody]\n'key.get'={{adapter='minter',profile='fixture.management'}}\n"
+                ),
+            ),
+        ] {
+            assert_eq!(
+                read("connectors-local/2", &writer, &target).err(),
+                invalid,
+                "{writer}{target}"
+            );
         }
     }
 }
