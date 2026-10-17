@@ -872,8 +872,14 @@ only `connections revalidate` re-pins it. A credential the provider refuses in
 the recollection is cut off as an explicit revalidation cuts it off, and the
 read answers as for a stored credential the provider refuses on a read:
 `code = service_failure`, `service_code = unauthorized` with
-`next_action = repair_connection`; the business read is not dispatched. Any
-other failure of the recollection is the read's own answer, before dispatch.
+`next_action = repair_connection`; the business read is not dispatched. A
+recollection run only because the evidence would lapse early, while it is
+still current, keeps the read admitted on that evidence: when it fails with
+anything but such a credential refusal (the provider or custody briefly
+unavailable, a timeout), the read is served on the evidence it was admitted
+on, for as long as that evidence stays current, because a transient failure
+preserves the still-valid baseline. Any other failure of the recollection of
+expired evidence is the read's own answer, before dispatch.
 Only a read still refused for expired evidence after its one recollection
 answers `code = not_granted` at `stage = admission` with
 `next_action = revalidate_connection`. A consumer launch

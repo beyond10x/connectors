@@ -88,8 +88,7 @@ fn adversary_two_revalidations_with_a_slow_probe_both_answer_ready_within_the_bo
 /// recollection, the read is refused although the evidence it was captured on
 /// still allows it; before this change the same read was served.
 #[test]
-fn adversary_a_read_on_current_evidence_is_served_when_its_early_recollection_fails_transiently()
-{
+fn adversary_a_read_on_current_evidence_is_served_when_its_early_recollection_fails_transiently() {
     const LIFETIME_MS: u64 = 20_000;
     let (container, connection, revision) = connected();
     container.set_knob("evidence_ms", LIFETIME_MS);

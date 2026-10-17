@@ -152,8 +152,8 @@ the exact retained generation/version and private publication fence for at most
 through qualified custody. The existing bounded transient-use records retain the
 version during validation; they create no new generation or custody owner. The
 capture is consumed once before the declared native identity/grant read. The
-original deadline, which starts after admission, includes queueing, startup,
-custody and provider work.
+original deadline (below: when it starts) includes queueing, startup, custody and
+provider work.
 
 Successful same-identity evidence replaces the one baseline under the unchanged
 generation and current binding/fence. Publication advances the private fence,
@@ -177,9 +177,22 @@ upgrade: those stay with explicit `connections revalidate`.
 A running owner of the CLI's own build admits `connections revalidate` from its
 held metadata handle; only without one does the CLI admit it directly, which
 verifies the whole store, before it starts an owner, as for `operations invoke`.
-The command's 30-second deadline starts once it is admitted, so the store's size
-never consumes it. Two revalidations of one connection queue on the instance's
-worker and each runs its own identity probe; each deadline covers its queueing.
+The command's 30-second deadline is set by the CLI as it sends the request to the
+owner: after its own direct admission when it admitted the revalidation itself,
+and before the owner's admission from its held handle otherwise, so that
+admission counts against the deadline. Either way the store's size never
+consumes it: the direct admission precedes it, and the owner's admission from
+its held handle does not verify the whole store.
+
+A revalidation that arrives while one of the same connection, at the same
+expected semantic revision, is queued or running on the owner joins it instead
+of queueing behind it: it runs no identity probe of its own, and answers the
+in-flight revalidation's own answer (its connection summary, or its refusal)
+as soon as that one answers. A joined revalidation's own deadline still bounds
+its wait; at that deadline it is `outcome_unknown`, as an unanswered
+revalidation is, and an in-flight revalidation whose own wait ended
+`outcome_unknown` answers its joiners the same. A revalidation at another
+expected revision, or of another connection, never joins.
 
 ## Stopping an owner
 
