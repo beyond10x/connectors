@@ -37,15 +37,17 @@ scope:
   path: docs/catalog-github.md
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 18
+revision: 19
 ---
 ## Outcome
 
 The assistant repository reads, through the Connectors CLI like the gitlab, jira and slack catalog providers, what waits on the authenticated GitHub user: review requests, assigned issues and pull requests, and notifications. Read only: no write, no mark-as-read.
 
+The same provider serves a second consumer that reads public repository metadata: organization repositories, one repository, its releases, its README and single files as text. One read-only provider serves both, so auth and paging are built once.
+
 ## Source
 
-GitHub's published REST OpenAPI description (github/rest-api-description, MIT licensed), the api.github.com description pinned by SHA-256 under `adapters/github/upstream/` with its licence, redacted by `connectors-build redact` if its examples carry credentials or personal data. Provider id `github`. Auth: a token (fine-grained or classic) held in custody; identity `GET /user`, subject `/id`.
+GitHub's published REST OpenAPI description (github/rest-api-description, MIT licensed), the api.github.com description pinned by SHA-256 under `adapters/github/upstream/` with its licence, redacted by `connectors-build redact` if its examples carry credentials or personal data. Provider id `github`. Auth: a bearer token (fine-grained or classic, minimal public-read scope for the repository reads) held in custody, identity `GET /user`, subject `/id`; and an anonymous profile for public reads (`repos.list`, `repo.get`, releases, `readme.raw`, `file.raw`) with no credential. A run of the second consumer makes about 110 calls, so the anonymous limit (60 per hour) is never the only path; the token profile is the default.
 
 ## Operations (each `effect: read`)
 
@@ -55,6 +57,12 @@ GitHub's published REST OpenAPI description (github/rest-api-description, MIT li
 | `issues.assigned` | `issues/list` | `GET /issues?filter=assigned&state=open` (issues and pull requests) | `per_page`, `page`, `Link` | `since` |
 | `notifications.list` | `activity/list-notifications-for-authenticated-user` | `GET /notifications` | `per_page`, `page`, `Link` | `since` |
 | `user.me` | `users/get-authenticated` | `GET /user` | single | none |
+| `repos.list` | `repos/list-for-org` | `GET /orgs/{org}/repos` (`type`, `sort`, `direction`) | `per_page`, `page`; short page ends | none |
+| `repo.get` | `repos/get` | `GET /repos/{owner}/{repo}` (description, topics, homepage, stars, pushed_at, archived, visibility) | single | none |
+| `releases.list` | `repos/list-releases` | `GET /repos/{owner}/{repo}/releases` (tag, name, published_at, body) | `per_page`, `page`; short page ends | none |
+| `release.latest` | `repos/get-latest-release` | `GET /repos/{owner}/{repo}/releases/latest` | single | none |
+| `readme.raw` | `repos/get-readme` | `GET /repos/{owner}/{repo}/readme`, answered as text | single | none |
+| `file.raw` | `repos/get-content` | `GET /repos/{owner}/{repo}/contents/{path}` (`ref`), answered as text | single | none |
 
 The exact query shape of `review_requests.list` is fixed in the operation (not caller-chosen); `since` is the only caller input besides paging.
 
@@ -63,7 +71,8 @@ The exact query shape of `review_requests.list` is fixed in the operation (not c
 Modelled first in `adapters/catalog/spec/ess/domains/selection.yaml` and `contracts/catalog/v1alpha1/semantics.md`, then implemented in `adapters/catalog/src/lib.rs`; new fields serialize only when set, so other bundles keep their bytes:
 
 1. A fixed query value per selection (`q` for `review_requests.list`), which the caller cannot send, and a caller input folded into it (`since` appended as `updated:>=<since>`).
-2. A header-keyed rate-limit rule: a 403 with `x-ratelimit-remaining: 0` is `rate_limited`, with the reset time from `x-ratelimit-reset`. A 429 already maps to `rate_limited`.
+. Text answers: `readme.raw` and `file.raw` return the file as text. Either a per-selection media type (`application/vnd.github.raw+json`) or decoding the JSON answer's base64 `content`; the choice is made in the specification, with a size bound and a refusal for a binary or oversized file.
+4. An anonymous auth profile (no credential, no identity probe) beside the token profile, if the catalog has none.
 
 Paging stays caller-driven (`page`, `per_page`); the end condition (a short page) is stated per operation, as for Zendesk and GitLab; the `Link` header is not read.
 
