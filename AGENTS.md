@@ -84,6 +84,14 @@ in `.local/tmp` older than the running task is deletable without asking (measure
 Keep unrelated worktrees' build outputs separate. Do not refresh vendor inputs during normal
 builds or edit generated output around a refusal.
 
+On the operator's shared build host, this repository's own Cargo builds use a compile cache of
+their own, so a new worktree does not recompile every dependency: `RUSTC_WRAPPER=sccache`,
+`SCCACHE_DIR=~/.cache/sccache/connectors`, `SCCACHE_SERVER_PORT=4301` and
+`SCCACHE_CACHE_SIZE=2G`. The server on port 4301 serves this repository only; never the default
+port 4226, never a wrapper set globally. Set them in the build's environment, not in a committed
+Cargo configuration, and keep the caller's `TMPDIR` short (the server binds its startup socket
+there).
+
 For documentation-only changes, check links, factual support claims and AEP
 consistency; do not rerun unrelated live-provider tests. Report actual commands,
 results and material limitations. Relay AEP validation output as its skill requires.
