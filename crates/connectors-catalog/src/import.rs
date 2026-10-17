@@ -396,6 +396,33 @@ struct DocumentedAccess {
     query: BTreeMap<String, String>,
 }
 
+/// A connector declaration, `adapters/catalog/providers/<catalog>/connector.json`.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Declared {
+    format: String,
+    connector_id: String,
+    #[allow(dead_code)]
+    provider_id: String,
+    #[allow(dead_code)]
+    adapter_id: String,
+    catalog_provider: String,
+    #[serde(default)]
+    default_endpoint: Option<String>,
+    #[serde(default)]
+    api_path: Option<String>,
+    selection: String,
+    profiles: Vec<DocumentedAuth>,
+}
+
+/// The scheme and authority of `url`, or all of it when it has no path.
+fn origin(url: &str) -> &str {
+    let after_scheme = url.find("://").map_or(0, |at| at + 3);
+    url[after_scheme..]
+        .find('/')
+        .map_or(url, |at| &url[..after_scheme + at])
+}
+
 /// A URL of a guide with its placeholders as definition variables.
 fn templated(url: &str) -> String {
     let Some(rest) = url.strip_prefix("https://") else {
@@ -538,17 +565,33 @@ fn shipped_selections(connectors: &Path) -> Result<Vec<SelectionFile>, Failure> 
     Ok(files)
 }
 
-/// Every documented configuration, keyed by the selection it names, in guide
-/// order.
+/// Every documented configuration, keyed by the selection it names: the guides'
+/// blocks in guide order, then the hand-written configurations the catalog tests
+/// hold (`adapters/catalog/tests/hand_written/*.json`), one per file.
 fn documented(connectors: &Path) -> Result<Vec<(String, DocumentedConfiguration)>, Failure> {
-    let mut found = Vec::new();
+    let mut sources = Vec::new();
     for entry in sorted_entries(&connectors.join("docs"))? {
         let path = entry.path();
         if path.extension().is_none_or(|extension| extension != "md") {
             continue;
         }
         let text = String::from_utf8_lossy(&read(&path)?).into_owned();
-        for block in fenced_blocks(&text) {
+        sources.push((path, fenced_blocks(&text)));
+    }
+    let hand_written = connectors.join("adapters/catalog/tests/hand_written");
+    if hand_written.is_dir() {
+        for entry in sorted_entries(&hand_written)? {
+            let path = entry.path();
+            if path.extension().is_none_or(|extension| extension != "json") {
+                continue;
+            }
+            let text = String::from_utf8_lossy(&read(&path)?).into_owned();
+            sources.push((path, vec![text]));
+        }
+    }
+    let mut found = Vec::new();
+    for (path, blocks) in sources {
+        for block in blocks {
             let Ok(probe) = serde_json::from_str::<Value>(&block) else {
                 continue;
             };
@@ -583,6 +626,95 @@ struct Configured {
     base: BTreeMap<String, String>,
     /// Definition name → the profile the bundle records.
     default: BTreeMap<String, String>,
+    /// Definition name → its connector id, where the declaration names one
+    /// other than the definition name.
+    id: BTreeMap<String, String>,
+    /// Definition name → the config variable the declaration's default
+    /// endpoint defaults, and its value.
+    defaults: BTreeMap<String, (String, String)>,
+}
+
+/// Take a definition's connector id, base URL and profiles from its declaration.
+/// A declaration with `api_path` has a host the user names: the base URL is that
+/// host as one variable and the path, and the default endpoint's host is the
+/// variable's default. Without `api_path` a default endpoint is the base URL;
+/// without either, the guides' `api_base` stays. A `token_url` path is on the
+/// base URL's origin.
+fn declare(configured: &mut Configured, name: &str, declared: Declared) -> Result<(), Failure> {
+    let guide = configured.base.get(name).cloned();
+    let base = match (&declared.api_path, &declared.default_endpoint) {
+        (Some(path), endpoint) => {
+            let documented = guide.as_deref().and_then(|base| {
+                let rest = base.strip_prefix("https://{")?;
+                let (variable, tail) = rest.split_once('}')?;
+                (tail == path && !variable.contains(['{', '/'])).then(|| variable.to_owned())
+            });
+            let variable = documented.unwrap_or_else(|| "hostname".to_owned());
+            if let Some(endpoint) = endpoint {
+                let host = endpoint
+                    .strip_prefix("https://")
+                    .filter(|host| !host.is_empty() && !host.contains('/'))
+                    .ok_or_else(|| {
+                        Failure::Malformed(format!(
+                            "the `{name}` declaration's default endpoint `{endpoint}` is not an https origin"
+                        ))
+                    })?;
+                configured
+                    .defaults
+                    .insert(name.to_owned(), (variable.clone(), host.to_owned()));
+            }
+            format!("https://{{{variable}}}{path}")
+        }
+        (None, Some(endpoint)) => endpoint.clone(),
+        (None, None) => guide.ok_or_else(|| {
+            Failure::NotFound(format!("no guide documents a configuration of `{name}`"))
+        })?,
+    };
+    let mut profiles = IndexMap::new();
+    for block in &declared.profiles {
+        let mut profile = documented_profile(block)?;
+        if let Some(path) = profile
+            .token_url
+            .as_deref()
+            .filter(|url| url.starts_with('/'))
+        {
+            profile.token_url = Some(format!("{}{path}", origin(&base)));
+        }
+        profiles.insert(block.profile.clone(), profile);
+    }
+    if declared.connector_id != name {
+        configured.id.insert(name.to_owned(), declared.connector_id);
+    }
+    configured.base.insert(name.to_owned(), base);
+    configured.profiles.insert(name.to_owned(), profiles);
+    Ok(())
+}
+
+/// The declaration beside `selection`, when one names it.
+fn declared(connectors: &Path, selection: &SelectionFile) -> Result<Option<Declared>, Failure> {
+    let path = connectors
+        .join("adapters/catalog/providers")
+        .join(&selection.catalog)
+        .join("connector.json");
+    let bytes = match std::fs::read(&path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(Failure::Unreadable(format!("{}: {error}", path.display()))),
+    };
+    let declared: Declared = serde_json::from_slice(&bytes)
+        .map_err(|error| Failure::Malformed(format!("{}: {error}", path.display())))?;
+    if declared.format != definition::CONNECTOR_FORMAT
+        || declared.catalog_provider != selection.catalog
+    {
+        return Err(Failure::Malformed(format!(
+            "{}: not a `{}` declaration of `{}`",
+            path.display(),
+            definition::CONNECTOR_FORMAT,
+            selection.catalog
+        )));
+    }
+    let file = selection.relative.rsplit('/').next().unwrap_or_default();
+    Ok((declared.selection == file).then_some(declared))
 }
 
 fn configured(connectors: &Path) -> Result<Configured, Failure> {
@@ -593,6 +725,8 @@ fn configured(connectors: &Path) -> Result<Configured, Failure> {
         profiles: BTreeMap::new(),
         base: BTreeMap::new(),
         default: BTreeMap::new(),
+        id: BTreeMap::new(),
+        defaults: BTreeMap::new(),
     };
     for selection in &selections {
         let mut profiles = IndexMap::new();
@@ -607,6 +741,13 @@ fn configured(connectors: &Path) -> Result<Configured, Failure> {
             if !profiles.contains_key(&block.auth.profile) {
                 profiles.insert(block.auth.profile.clone(), documented_profile(&block.auth)?);
             }
+        }
+        if let Some(declared) = declared(connectors, selection)? {
+            declare(&mut configured, &selection.name, declared)?;
+            profiles = configured
+                .profiles
+                .remove(&selection.name)
+                .unwrap_or_default();
         }
         let bundle = crate::bundle::load(&bundles, &selection.catalog).map_err(|error| {
             Failure::Unreadable(format!("bundle `{}`: {error}", selection.catalog))
@@ -1766,6 +1907,11 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
             rest = &rest[open + close + 1..];
         }
     }
+    if let Some((variable, value)) = configured.defaults.get(&name)
+        && let Some(field) = config.get_mut(variable)
+    {
+        field.default = Some(value.clone());
+    }
 
     // The operations.
     let context = Context {
@@ -1849,6 +1995,7 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
     let source_path = format!("{vendored_dir}/{source_file}");
     let definition = ProviderDefinition {
         schema: SchemaId::V1,
+        id: configured.id.get(&name).cloned(),
         catalog: (catalog != name).then(|| catalog.to_owned()),
         source: Source {
             openapi: (kind_word == "openapi").then(|| source_path.clone()),

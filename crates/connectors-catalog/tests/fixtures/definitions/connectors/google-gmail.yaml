@@ -1,4 +1,5 @@
 schema: urn:beyond10x:connectors-definition:1
+id: gmail
 source:
   discovery: upstream/google-gmail/gmail-api.json.gz
   sha256: 7591d33ec87e4ef83551f71630213a89ac349becebe9bd9b3e4ce3851dede0fe
@@ -8,8 +9,8 @@ auth:
   google.oauth:
     use: google
     scopes:
-      minimum: ["https://www.googleapis.com/auth/gmail.readonly"]
-      requested: [openid, "https://www.googleapis.com/auth/gmail.readonly"]
+      minimum: ["https://www.googleapis.com/auth/gmail.compose", "https://www.googleapis.com/auth/gmail.readonly"]
+      requested: [openid, "https://www.googleapis.com/auth/gmail.compose", "https://www.googleapis.com/auth/gmail.readonly"]
 paging: {maxResults: {limit: maxResults, max: 500}}
 defaults: {rate_limit_reasons: [rateLimitExceeded, userRateLimitExceeded, dailyLimitExceeded]}
 operations:
