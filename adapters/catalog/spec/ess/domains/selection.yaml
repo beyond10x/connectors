@@ -2,7 +2,7 @@ domain: connectors_catalog.selection
 summary: The members of a selection in a `connectors-catalog-operations/1` file that bound its query parameters, those of a selected write that close, type, require and fix its JSON body, which the engine holds before it sends the request, and the success envelope a read's answer is held to after it.
 
 # Normative owner: docs/local-catalog-provider.md, "Configure the provider" (`bounds`, `body_keys`,
-# `body_types`, `body_required`, `body_nonempty`, `body_fixed`, `envelope`). The engine reads these as members of a
+# `body_types`, `body_required`, `body_nonempty`, `body_fixed`, `envelope`, `refusal_texts`). The engine reads these as members of a
 # selection; each is omitted when empty, so a selection without it keeps its serialised form.
 #
 # The bundle records no request body schema, so every name here is declared by the selection
@@ -122,6 +122,70 @@ types:
       - ok.count >= 1
       - error.count >= 1
       - any: [{not: defined(refusals)}, {refusals.count: {lte: 16}}]
+
+  # The member of a selected write whose answer carries a credential the write created, shown
+  # once (`connectors.mutations.CredentialCustody` in the shared model). `secret` is the RFC 6901
+  # pointer of that credential in the write's 2xx JSON answer, a non-empty string; `returns`
+  # names the public members of the answer the caller receives, each output name keyed to its
+  # pointer, such as a key's hash. Nothing else of the answer is returned: the engine reads the
+  # secret into protected memory, builds the result from `returns` alone, and an answer whose
+  # secret or a returned member is absent, not a string, or a returned value that carries the
+  # secret's bytes, is an applied write the engine cannot read (`upstream_protocol`, the effect
+  # still applied). The output schema declares the returned names and the owner's `custody` and
+  # `connection` members, and nothing of the provider's answer schema. What the engine refuses
+  # when the selection loads beyond these invariants (custody on a read, beside a guard's
+  # postflight, a pointer without a leading `/`, a returned name `custody` or `connection`, more
+  # than eight returned members) is stated in the owner and pinned by the engine's tests.
+  - name: connectors_catalog.selection.Custody
+    kind: struct
+    fields:
+      - {name: secret, type: String}
+      - {name: returns, type: "Map<String, String>"}
+    invariants:
+      - secret.count >= 1
+      - returns.count >= 1
+
+  # The member of a write selection that declares its created credential.
+  - name: connectors_catalog.selection.CustodyWrite
+    kind: struct
+    fields:
+      - {name: custody, type: "Optional<connectors_catalog.selection.Custody>"}
+
+  # The code a refusal text answers with: `capacity` for a request the provider refused because
+  # it has no room to serve it now, such as a create it cannot place, which the same request may
+  # find elsewhere or later.
+  - name: connectors_catalog.selection.TextRefusalCode
+    kind: enum
+    variants: [capacity]
+
+  # One refusal a provider names only in the text of its refusal: a write the engine already
+  # refuses as a definite 4xx answer (400, 401, 403, 404, 405, 409, 410, 412, 415, 422) whose JSON
+  # body carries, at one of the RFC 6901 `pointers`, a string containing one of `contains`,
+  # compared without regard to case, is refused with `code` instead of the code its status gives.
+  # It is for a provider that documents no distinct status for the refusal and whose own clients
+  # recognise it by text. A 5xx, a 429, a lost connection or a 2xx is never reclassified by it:
+  # those keep the classification their status gives, so an answer that leaves the effect
+  # possible stays unknown whatever text it carries.
+  - name: connectors_catalog.selection.TextRefusal
+    kind: struct
+    fields:
+      - {name: pointers, type: "List<String>"}
+      - {name: contains, type: "List<String>"}
+      - {name: code, type: connectors_catalog.selection.TextRefusalCode}
+    invariants:
+      - pointers.count >= 1
+      - contains.count >= 1
+
+  # The member of a write selection that declares its refusal texts, the first match deciding.
+  # What the engine refuses when the selection loads beyond these invariants (refusal texts on a
+  # read, a pointer without a leading `/`, an empty or repeated text within one refusal) is
+  # stated in the owner and pinned by the engine's tests.
+  - name: connectors_catalog.selection.WriteRefusalTexts
+    kind: struct
+    fields:
+      - {name: refusal_texts, type: "Optional<List<connectors_catalog.selection.TextRefusal>>"}
+    invariants:
+      - any: [{not: defined(refusal_texts)}, {refusal_texts.count: {lte: 16}}]
 
   # The member of a read selection that declares its success envelope.
   - name: connectors_catalog.selection.ReadEnvelope

@@ -20,9 +20,9 @@
 //!
 //! [`index`] renders `website/docs/connectors/index.md`. A row per catalog connector comes from
 //! its declaration (`adapters/catalog/providers/<p>/connector.json` and the selection it names);
-//! the connectors without one (Slack, the connectors served by their own executables, MCP) have
-//! a row in [`HAND`]. Each row links the page whose front matter `connectors` names it, and
-//! generation fails when a row has no page, a page no row, or a catalog provider directory
+//! the connectors without one (Slack, OpenRouter, the connectors served by their own executables,
+//! MCP) have a row in [`HAND`]. Each row links the page whose front matter `connectors` names it,
+//! and generation fails when a row has no page, a page no row, or a catalog provider directory
 //! neither a declaration nor a hand row.
 
 use std::{
@@ -354,8 +354,8 @@ pub struct Hand {
 const PINNED: &str = "pinned";
 
 /// The connectors with no catalog declaration. Slack is served by the catalog provider from two
-/// selections; the others by an executable of their own, each pinned by its instance; MCP has no
-/// runtime.
+/// selections and OpenRouter from one, each through pinned instances; the others by an executable
+/// of their own, each pinned by its instance; MCP has no runtime.
 pub const HAND: &[Hand] = &[
     Hand {
         connector: "slack",
@@ -365,6 +365,16 @@ pub const HAND: &[Hand] = &[
         reads: &[],
         writes: &[],
         profiles: &["slack.bot", "slack.user"],
+        configured: PINNED,
+    },
+    Hand {
+        connector: "openrouter",
+        provider: "OpenRouter",
+        catalog: Some("openrouter"),
+        selections: &["operations.json"],
+        reads: &[],
+        writes: &[],
+        profiles: &["openrouter.api-key"],
         configured: PINNED,
     },
     Hand {
@@ -725,7 +735,7 @@ pub fn index(root: &Path) -> Result<String> {
             "Every connector has one onboarding page with the same eight steps, from what it reads and writes to its limits."
         ),
         yaml_string(
-            "adapters/catalog/providers/*/connector.json and their selections; Slack, the connectors served by their own executables and MCP by hand in crates/connectors-docs/src/onboarding.rs"
+            "adapters/catalog/providers/*/connector.json and their selections; Slack, OpenRouter, the connectors served by their own executables and MCP by hand in crates/connectors-docs/src/onboarding.rs"
         ),
     ))
 }

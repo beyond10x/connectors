@@ -1,8 +1,8 @@
 ---
 title: Runpod
 sidebar_position: 13
-description: List Runpod pods, and create and terminate pods under approval.
-lede: One Runpod instance per account lists pods and creates or terminates them under approval, each write sent exactly once.
+description: List Runpod pods and their billing, and create and terminate pods under approval.
+lede: One Runpod instance per account lists pods, reads their billing and creates or terminates them under approval, each write sent exactly once.
 source: docs/catalog-runpod.md, adapters/catalog/providers/runpod/connector.json, adapters/catalog/providers/runpod/operations.json, adapters/catalog/tests/runpod.rs
 connectors: "runpod"
 ---
@@ -23,7 +23,7 @@ out here. A command that needs a Runpod account is shown without output.
 
 | Reads | Writes |
 |---|---|
-| `pods.list` | `pod.create` and `pod.terminate`, both unguarded: neither reads the pod first |
+| `pods.list`, `billing.pods` | `pod.create` and `pod.terminate`, both unguarded: neither reads the pod first |
 
 ## Prerequisites at the provider
 
@@ -114,8 +114,10 @@ connectors operations invoke --connector runpod --instance gpu --connection "$co
   --idempotency-key worker-a
 ```
 
-A create answered `5xx`, or lost after it was sent, is `unknown`: the pod may exist and be billed.
-List by the same `name` before creating again. Terminate the same way with `pod.terminate` and
+A create Runpod refuses because it has no machine to place the pod on is `refused` with code
+`capacity`: no pod was created, and the same workload may be placed on another GPU type, data
+center or cloud type, or later. A create answered `5xx`, or lost after it was sent, is `unknown`:
+the pod may exist and be billed. List by the same `name` before creating again. Terminate the same way with `pod.terminate` and
 `{"podId": "<id from the create answer>"}`.
 
 ## Reconnect when the connection is Stale
@@ -139,4 +141,5 @@ the first account's pods answer `pod.terminate` with `404` while they keep runni
   Runpod account has been called and no pod created.
 - `pod.terminate` answered `404` terminated nothing under the current key; it does not prove the
   pod is gone.
-- Stop, start, reset, update, templates, volumes and billing are not offered.
+- Stop, start, reset, update, templates, volumes and every billing read but `billing.pods` are not
+  offered.

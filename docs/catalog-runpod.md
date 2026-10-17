@@ -1,11 +1,11 @@
 # Runpod pods through the catalog provider
 
-The catalog provider creates, lists and terminates Runpod pods from the pinned
+The catalog provider creates, lists, bills and terminates Runpod pods from the pinned
 Runpod REST API OpenAPI document, with the Runpod API key held in the Connectors
-keyring. A caller that starts GPU pods on demand invokes these three operations
+keyring. A caller that starts GPU pods on demand invokes these four operations
 instead of carrying its own HTTP client for the Runpod REST API and holding the
 account key itself. Nothing here is Runpod-specific code: the pinned document is
-compiled into a bundle, a reviewed selection set exposes one read and two
+compiled into a bundle, a reviewed selection set exposes two reads and two
 writes, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Connection, approval and invocation work as described there; this page
@@ -47,7 +47,7 @@ them is selected.
 ## The shipped selection set
 
 [`adapters/catalog/providers/runpod/operations.json`](../adapters/catalog/providers/runpod/operations.json)
-exposes these three operations and nothing else. `adapters/catalog/tests/runpod.rs`
+exposes these four operations and nothing else. `adapters/catalog/tests/runpod.rs`
 pins this exact id list with each id's `operationId`, method and path in the
 pinned document, so a renamed, dropped or added id, or a source operation that
 moved, fails the gate.
@@ -56,6 +56,7 @@ moved, fails the gate.
 |---|---|---|---|
 | `pod.create` | `CreatePod` | `POST /v1/pods` with a JSON `body` | write, unguarded |
 | `pods.list` | `ListPods` | `GET /v1/pods` | read |
+| `billing.pods` | `PodBilling` | `GET /v1/billing/pods`, filtered by `bucketSize`, `startTime`, `endTime`, `podId`, `gpuTypeId` and `grouping` | read |
 | `pod.terminate` | `DeletePod` | `DELETE /v1/pods/{podId}` | write, unguarded |
 
 `pods.list` takes every query filter the pinned document declares, by name:
@@ -116,7 +117,8 @@ Each write sends exactly one request and is never sent again by the provider.
 | write | answer | classification | what the caller concludes |
 |---|---|---|---|
 | `pod.create` | `201` or `200` | `applied` | the pod exists; `result.body` is Runpod's pod, with its `id` |
-| `pod.create` | a documented definite refusal (`400`, `401`, `403`, `404`, `409`, `422`, …) | `refused` | no pod was created; fix the input or the key |
+| `pod.create` | a definite refusal (`400`, `401`, `403`, `404`, `409`, `422`, …) whose `message` or `detail` names a lack of capacity (below) | `refused`, code `capacity` | no pod was created, because Runpod had no machine to place it on; the same workload may be placed elsewhere (another GPU type, data center or cloud type) or later |
+| `pod.create` | any other definite refusal (`400`, `401`, `403`, `404`, `409`, `422`, …) | `refused` | no pod was created; fix the input or the key |
 | `pod.create` | a `5xx`, a timeout, or a connection lost after the request was sent | `unknown` | the pod may exist and may be billed. Do not create again blindly: list by the same `name` with `pods.list`, and create only if none is there |
 | `pod.terminate` | `204` (documented) or `200` | `applied` | the pod is terminated |
 | `pod.terminate` | `404` | `refused`, code `not_found` | Runpod has no pod with that id under the connection's current key: under that key it was already terminated or never existed, and this call terminated nothing. It does not prove the pod is gone: if the connection now holds a key from another Runpod account (see [Authentication](#authentication)), the first account's pods answer `404` while they are still running and billed |
@@ -124,6 +126,24 @@ Each write sends exactly one request and is never sent again by the provider.
 
 Give every pod a unique `name` so that an `unknown` create can be resolved by
 one `pods.list` read.
+
+Runpod documents no distinct answer for a create it cannot place: the pinned
+document lists only `201` and `400` for `createPod`
+(<https://rest.runpod.io/v1/openapi.json>). Runpod's own clients recognise a
+stock-out by the text of the refusal, and the selection declares the same
+texts (`refusal_texts` in `adapters/catalog/providers/runpod/operations.json`):
+
+- runpodctl at `e12397351fa1`, `cmd/pods/createPods.go:124-135`: "no longer
+  any instances available", on a `400` or `409`;
+- runpod-python, `runpod/apps/api.py:148-157`: "resources to deploy your pod",
+  "insufficient capacity", "no available machine" and "out of stock".
+
+A `pod.create` refusal whose v1 error `message` or v2 (RFC 9457) problem
+`detail` contains one of these texts, compared without regard to case, is
+`refused` with code `capacity`. A `5xx` stays `unknown` even when it carries
+one of these texts, since the pod may exist. No stock-out answer from Runpod
+itself has been observed yet: the tests' answers are built from these
+clients' texts, not captured.
 
 ## Authentication
 
@@ -158,7 +178,7 @@ enabled = true
 [connectors.runpod.instances.gpu]
 ```
 
-The bundle, the three operations, the profile and the provider executable are
+The bundle, the four operations, the profile and the provider executable are
 derived from the shipped connector, and the instance serves the two writes
 (its provider runs over `connectors-private/2`). The instance id, and so the
 connection's subject, is `runpod.gpu`:
@@ -189,6 +209,14 @@ List the running pods with one name:
 connectors operations invoke --connector runpod --instance gpu --connection "$connection" \
   --operation pods.list --schema "$schema" --revision "$revision" \
   --input-json '{"name":"worker-a","desiredStatus":"RUNNING"}' --output json
+```
+
+Read one pod's daily billing records (`billing.pods` is a read, so it needs no approval):
+
+```sh
+connectors operations invoke --connector runpod --instance gpu --connection "$connection" \
+  --operation billing.pods --schema "$schema" --revision "$revision" \
+  --input-json '{"bucketSize":"day","podId":"<pod id>"}' --output json
 ```
 
 Create a pod (`create.json`, approved as above):
@@ -231,7 +259,7 @@ connectors operations invoke --connector runpod --instance gpu --connection "$co
 - No guard: neither write reads the pod first. A pod's state is not pinned
   before terminate.
 - `pod.show` (`GetPod`), stop, start, reset, update and every endpoint,
-  template, network volume, registry-auth and billing operation are not
+  template, network volume, registry-auth and billing operation but `billing.pods` are not
   selected.
 - The identity is the configured connection, not a Runpod account (see
   [Authentication](#authentication)).

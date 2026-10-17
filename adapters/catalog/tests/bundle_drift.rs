@@ -23,7 +23,9 @@ use std::path::Path;
 /// `filter`; no shipped read is among them. Confluence v1's source is the
 /// document this repository authors from Atlassian's v1 reference pages, not a
 /// pinned upstream; it describes only the shipped reads and has no gap.
-const SOURCES: [(&str, &str, Option<&str>, &str, usize); 13] = [
+/// OpenRouter's 2 are one write whose own `servers` override the document's and
+/// `listInterns`'s `status` array (`explode: false`); no shipped read is among them.
+const SOURCES: [(&str, &str, Option<&str>, &str, usize); 14] = [
     (
         "confluence",
         "../atlassian/upstream/confluence/confluence-v2.json",
@@ -86,6 +88,13 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 13] = [
         None,
         "atlassian.basic",
         0,
+    ),
+    (
+        "openrouter",
+        "../openrouter/upstream/openrouter-openapi.json",
+        None,
+        "openrouter.api-key",
+        2,
     ),
     (
         "opsgenie",
