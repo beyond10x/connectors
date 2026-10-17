@@ -88,6 +88,13 @@
     },
     {
       "area": "Local runtime",
+      "detail": "A connection connected or revalidated once keeps serving reads across any number of evidence lifetimes: a read on lapsed evidence recollects it once from custody, with no re-entry, before it is served.",
+      "href": "/docs/concepts/local-runtime",
+      "label": "Unattended reads",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
       "detail": "An owner configuration can explicitly select read-only mounted-secret custody (mounted_secret, Linux): connect, list and a credentialed invoke run under an empty environment in a container, reading a Kubernetes-style Secret volume and writing nothing; rotation needs a revalidation.",
       "href": "/docs/guides/set-up-the-local-cli",
       "label": "Mounted-secret custody",

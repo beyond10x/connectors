@@ -23,12 +23,26 @@ pub(super) fn execute(
     // never starts it, opens a secret session, or resolves credential material.
     match call.callable {
         "connections-revalidate" => {
-            let deadline = connectors_sdk::now_ms() + 30_000;
             let reference = text("connection")?;
             let revision = text("expected_revision")?;
-            owner::admit_revalidation(paths, alias, reference, revision).map_err(owner_failure)?;
-            owner::Client::connect(paths, true)
-                .map_err(owner_failure)?
+            // A running owner of this build admits the revalidation itself,
+            // from its held metadata handle, before it queues it. Without one
+            // the CLI admits it directly, which verifies the whole store (its
+            // cost grows with the store), and only then starts an owner. The
+            // 30-second bound is set here, after that direct admission; with a
+            // running owner it is set before the owner's own admission from
+            // its held handle, which counts against it but does not verify
+            // the whole store (contracts/cli/v1alpha1/owner.md).
+            let client = match owner::Client::connect(paths, false) {
+                Ok(client) if client.is_same_build() => client,
+                _ => {
+                    owner::admit_revalidation(paths, alias, reference, revision)
+                        .map_err(owner_failure)?;
+                    owner::Client::connect(paths, true).map_err(owner_failure)?
+                }
+            };
+            let deadline = connectors_sdk::now_ms() + 30_000;
+            client
                 .revalidate(alias, reference, revision, deadline)
                 .map_err(|error| {
                     // The class of a transient failure the owner retried, and

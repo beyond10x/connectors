@@ -312,6 +312,66 @@ pub(super) struct Pool {
     /// custody target's worker. Weak, so a worker never keeps its pool alive;
     /// empty for a pool not built by [`Pool::shared`].
     this: Weak<Pool>,
+    /// The revalidations queued or running, by instance, connection and
+    /// expected revision: a revalidation of the same key joins the one in
+    /// flight instead of queueing behind it (contracts/cli/v1alpha1/owner.md).
+    revalidations: Mutex<BTreeMap<JoinKey, Arc<Joined>>>,
+}
+/// A revalidation's instance, connection and expected semantic revision.
+type JoinKey = (String, String, String);
+/// The answer of one revalidation in flight, which every revalidation that
+/// joined it answers too.
+#[derive(Default)]
+struct Joined {
+    answer: Mutex<Option<Result<Value>>>,
+    wake: Condvar,
+}
+impl Joined {
+    fn publish(&self, answer: Result<Value>) {
+        if let Ok(mut slot) = self.answer.lock() {
+            *slot = Some(answer);
+        }
+        self.wake.notify_all();
+    }
+    /// The joined revalidation's answer, or `outcome_unknown` once this
+    /// joiner's own deadline passes first, as for an unanswered revalidation.
+    fn wait(&self, deadline: u64) -> Result<Value> {
+        let mut slot = self.answer.lock().map_err(|_| Code::Unavailable)?;
+        loop {
+            if let Some(answer) = slot.as_ref() {
+                return answer.clone();
+            }
+            let left = until(deadline)
+                .map_err(|_| Error::from(Code::OutcomeUnknown))?
+                .saturating_duration_since(Instant::now());
+            slot = self
+                .wake
+                .wait_timeout(slot, left)
+                .map_err(|_| Code::Unavailable)?
+                .0;
+        }
+    }
+}
+/// The revalidation others join, while it is in flight. Dropped, it leaves
+/// the flight, so a revalidation arriving later runs its own, and answers its
+/// joiners: its own answer, or `outcome_unknown` if it never had one.
+struct Leading<'a> {
+    pool: &'a Pool,
+    key: JoinKey,
+    joined: Arc<Joined>,
+    answer: Option<Result<Value>>,
+}
+impl Drop for Leading<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut flight) = self.pool.revalidations.lock() {
+            flight.remove(&self.key);
+        }
+        let answer = self
+            .answer
+            .take()
+            .unwrap_or_else(|| Err(Code::OutcomeUnknown.into()));
+        self.joined.publish(answer);
+    }
 }
 impl Pool {
     /// A pool whose workers hold no handle to it: its custody step finds none.
@@ -333,6 +393,7 @@ impl Pool {
             shutdown_lock: Mutex::new(()),
             settled: Arc::new(AtomicU64::new(0)),
             this,
+            revalidations: Mutex::new(BTreeMap::new()),
         }
     }
     fn send(
@@ -420,7 +481,49 @@ impl Pool {
             })?;
         Ok((receiver, dispatch))
     }
+    /// Runs a job on its instance's worker. A revalidation that finds one of
+    /// the same connection at the same expected revision queued or running
+    /// joins it: it sends no job, runs no identity probe and answers that
+    /// revalidation's own answer (contracts/cli/v1alpha1/owner.md).
     pub fn run(&self, alias: &str, adapter: &Adapter, task: Task, deadline: u64) -> Result<Output> {
+        let Task::Revalidate {
+            connection,
+            revision,
+            ..
+        } = &task
+        else {
+            return self.run_job(alias, adapter, task, deadline);
+        };
+        let key = (
+            adapter.instance_id.clone(),
+            connection.clone(),
+            revision.clone(),
+        );
+        let mut leading = {
+            let mut flight = self.revalidations.lock().map_err(|_| Code::Unavailable)?;
+            if let Some(joined) = flight.get(&key) {
+                let joined = joined.clone();
+                drop(flight);
+                return joined.wait(deadline).map(Output::Value);
+            }
+            let joined = Arc::new(Joined::default());
+            flight.insert(key.clone(), joined.clone());
+            Leading {
+                pool: self,
+                key,
+                joined,
+                answer: None,
+            }
+        };
+        let answer = self.run_job(alias, adapter, task, deadline);
+        leading.answer = Some(match &answer {
+            Ok(Output::Value(value)) => Ok(value.clone()),
+            Ok(_) => Err(Code::Unavailable.into()),
+            Err(error) => Err(error.clone()),
+        });
+        answer
+    }
+    fn run_job(&self, alias: &str, adapter: &Adapter, task: Task, deadline: u64) -> Result<Output> {
         // The worker may still commit a revalidation after this wait ends.
         let committing = matches!(task, Task::Revalidate { .. });
         let (receiver, dispatch) = self.send(alias, adapter, task, deadline)?;
@@ -886,174 +989,27 @@ fn worker(
                         connectors_sdk::now_ms(),
                         job.deadline,
                     )?;
-                    let version = captured.version();
-                    let selection = config.selection();
-                    let read = custody::Store::open_for(version.scope(), &selection, &paths.state)
-                        .and_then(|store| store.read(version));
-                    let check = || -> Result<()> {
-                        let (latest_config, latest) = selected(&paths, &job.alias)?;
-                        if latest.selection() != current.selection()
-                            || latest_config.selection() != config.selection()
-                        {
-                            return Err(Code::LifecycleConflict.into());
-                        }
-                        if !latest.permissions.profiles.contains(&profile) {
-                            return Err(Code::Forbidden.into());
-                        }
-                        if stopped.load(Ordering::SeqCst) {
-                            return Err(Error {
-                                cause: Some(Cause::OwnerStopping),
-                                ..Error::from(Code::Unavailable)
-                            });
-                        }
-                        Ok(())
-                    };
-                    let material = match read {
-                        Ok(value) => value,
-                        // The mounted item's bytes are no longer the pinned
-                        // ones: re-read it, validate the new bytes with the
-                        // provider and publish them as a new version, without
-                        // re-entry. The old bytes' version is retired.
-                        #[cfg(target_os = "linux")]
-                        Err(custody::Failure::Missing) if selection.read_only() => {
-                            registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
-                            let acquired = registry.begin_repair(
-                                &binding,
-                                &connection,
-                                &revision,
-                                connectors_sdk::now_ms(),
-                            )?;
-                            let claim = registry.consume(acquired, connectors_sdk::now_ms())?;
-                            let sent = std::cell::Cell::new(0u32);
-                            let published = super::publish_mounted(
-                                &paths,
-                                &selection,
-                                &registry,
-                                &claim,
-                                &job.alias,
-                                &profile,
-                                |secret| {
-                                    control
-                                        .lock()
-                                        .map_err(|_| Code::Unavailable)?
-                                        .check(job.epoch)
-                                        .and_then(|_| check())?;
-                                    let (result, attempts, cause) = revalidate_with_retries(
-                                        job.deadline,
-                                        || {
-                                            let result =
-                                                active.validate(&profile, &secret, job.deadline);
-                                            (result, active.running().unwrap_or(false))
-                                        },
-                                        || stopped.load(Ordering::SeqCst),
-                                        std::thread::sleep,
-                                    );
-                                    sent.set(attempts);
-                                    result
-                                        .map(runtime::Baseline::into_registry)
-                                        .map_err(|failure| retried(failure, attempts, cause))
-                                },
-                                || {
-                                    control
-                                        .lock()
-                                        .map_err(|_| Code::Unavailable)?
-                                        .check(job.epoch)
-                                        .and_then(|_| check())
-                                },
-                            );
-                            if let Err(error) = published {
-                                let mut error = error;
-                                if sent.get() > 0 && error.attempts.is_none() {
-                                    error.attempts = Some(sent.get());
-                                }
-                                if error.code != Code::OutcomeUnknown {
-                                    registry.fail(&claim, connectors_sdk::now_ms())?;
-                                }
-                                return Err(error);
-                            }
-                            let observed = registry.describe(
-                                &current.instance_id,
-                                &current.adapter_id,
-                                &current.configuration_revision,
-                                &connection,
-                                connectors_sdk::now_ms(),
-                                true,
-                            )?;
-                            return Ok(Output::Value(
-                                json!({"connection":connection_value(&job.alias,observed)}),
-                            ));
-                        }
-                        Err(error) => {
-                            if super::read_invalidates(&selection, error) {
-                                registry
-                                    .missing_revalidation(captured, connectors_sdk::now_ms())?;
-                            } else {
-                                registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
-                            }
-                            return Err(Code::CustodyUnavailable.into());
-                        }
-                    };
-                    let guard = control.lock().map_err(|_| Code::Unavailable)?;
-                    if let Err(error) = guard.check(job.epoch).and_then(|_| check()) {
-                        registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
-                        return Err(error);
-                    }
-                    let upgrade = captured.upgrades();
-                    let dispatched =
-                        registry.dispatch_revalidation(captured, connectors_sdk::now_ms())?;
-                    drop(guard);
-                    let (result, attempts, cause) = revalidate_with_retries(
-                        job.deadline,
-                        || {
-                            let result = active.validate(&profile, &material, job.deadline);
-                            (result, active.running().unwrap_or(false))
+                    revalidate(
+                        &Scope {
+                            paths: &paths,
+                            alias: &job.alias,
+                            config: &config,
+                            current: &current,
+                            control: &control,
+                            stopped: &stopped,
+                            epoch: job.epoch,
+                            deadline: job.deadline,
+                            profile: &profile,
                         },
-                        || stopped.load(Ordering::SeqCst),
-                        std::thread::sleep,
-                    );
-                    let guard = control.lock().map_err(|_| Code::Unavailable)?;
-                    if let Err(error) = guard.check(job.epoch).and_then(|_| check()) {
-                        registry.finish_revalidation(
-                            dispatched,
-                            Err(None),
-                            connectors_sdk::now_ms(),
-                        )?;
-                        let mut error = error;
-                        if attempts > 0 {
-                            error.attempts = Some(attempts);
-                        }
-                        return Err(error);
-                    }
-                    match result {
-                        Ok(baseline) => registry.finish_revalidation(
-                            dispatched,
-                            Ok(baseline.into_registry()),
-                            connectors_sdk::now_ms(),
-                        )?,
-                        Err(error) => {
-                            let reason = match error {
-                                runtime::Failure::InvalidCredential
-                                | runtime::Failure::IdentityMismatch => {
-                                    Some(registry::InvalidCredential::Invalid)
-                                }
-                                runtime::Failure::InsufficientScope => {
-                                    Some(registry::InvalidCredential::Insufficient)
-                                }
-                                _ => None,
-                            };
-                            registry.finish_revalidation(
-                                dispatched,
-                                Err(reason),
-                                connectors_sdk::now_ms(),
-                            )?;
-                            // Repair refuses the changed binding of an upgrade, so a
-                            // credential the new provider refuses needs a new connection.
-                            let mut error = retried(error, attempts, cause);
-                            error.reconnect = upgrade && reason.is_some();
-                            return Err(error);
-                        }
-                    }
-                    drop(guard);
+                        active,
+                        &registry,
+                        &binding,
+                        captured,
+                        Admission::Explicit {
+                            connection: &connection,
+                            revision: &revision,
+                        },
+                    )?;
                     let observed = registry.describe(
                         &current.instance_id,
                         &current.adapter_id,
@@ -1104,13 +1060,101 @@ fn worker(
                     .map_err(|_| Code::InvalidInput)?;
                     let registry = registry::Registry::with_system_clock(&paths.state);
                     let binding = bootstrap.binding(&requirement.profile)?;
-                    let captured = registry.capture_read(
-                        &binding,
-                        &connection,
-                        &requirement.scopes,
-                        connectors_sdk::now_ms(),
-                        job.deadline,
-                    )?;
+                    let capture = || {
+                        registry.capture_read(
+                            &binding,
+                            &connection,
+                            &requirement.scopes,
+                            connectors_sdk::now_ms(),
+                            job.deadline,
+                        )
+                    };
+                    // Evidence still current that would lapse before this read
+                    // could use it: under half its own lifetime (not the
+                    // profile's bound, which the provider's probe may undercut)
+                    // and under the read's own remaining deadline left. The
+                    // use, and so the provider deadline, never outlasts the
+                    // evidence; fresh evidence admits its read at once.
+                    let lapses_early = |captured: &registry::ReadUse| {
+                        let now = connectors_sdk::now_ms();
+                        let window = (captured.evidence_lifetime_ms() / 2)
+                            .min(job.deadline.saturating_sub(now));
+                        captured.expires_at_ms() < now.saturating_add(window)
+                    };
+                    let captured = match capture() {
+                        Ok(captured) if !lapses_early(&captured) => captured,
+                        // Only the evidence lapsed, or is about to, for an
+                        // intact credential: recollect it once from the
+                        // retained custody version, as `connections
+                        // revalidate` would, within this read's deadline, then
+                        // capture the read against it. Still not current after
+                        // that is the read's refusal.
+                        //
+                        // A recollection run only because current evidence
+                        // would lapse early keeps the read use captured on it:
+                        // a failure that records no credential refusal leaves
+                        // that evidence current, and the read is served on it.
+                        result @ (Ok(_) | Err(registry::Failure::EvidenceExpired)) => {
+                            let early = result.ok();
+                            let recollected = (|| -> Result<()> {
+                                let now = connectors_sdk::now_ms();
+                                let expires = job.deadline.min(now.saturating_add(30_000));
+                                let recollection = registry.capture_recollection(
+                                    &binding,
+                                    &connection,
+                                    now,
+                                    expires,
+                                )?;
+                                revalidate(
+                                    &Scope {
+                                        paths: &paths,
+                                        alias: &job.alias,
+                                        config: &config,
+                                        current: &current,
+                                        control: &control,
+                                        stopped: &stopped,
+                                        epoch: job.epoch,
+                                        deadline: expires,
+                                        profile: &requirement.profile,
+                                    },
+                                    active,
+                                    &registry,
+                                    &binding,
+                                    recollection,
+                                    Admission::ReadRecollection,
+                                )
+                            })();
+                            match (recollected, early) {
+                                (Ok(()), early) => {
+                                    // The recollection's publication moved
+                                    // the fence past the early use.
+                                    if let Some(early) = early {
+                                        registry.cancel_read(early, connectors_sdk::now_ms())?;
+                                    }
+                                    capture()?
+                                }
+                                (Err(error), None) => return Err(error),
+                                (Err(error), Some(early)) => {
+                                    // A credential refusal cut the material
+                                    // off: the connection admits no read.
+                                    // Anything else left the evidence the
+                                    // read was captured on current.
+                                    let admitted = registry.admit_read(
+                                        &binding,
+                                        &connection,
+                                        &requirement.scopes,
+                                        connectors_sdk::now_ms(),
+                                    );
+                                    if admitted.is_err() {
+                                        registry.cancel_read(early, connectors_sdk::now_ms())?;
+                                        return Err(error);
+                                    }
+                                    early
+                                }
+                            }
+                        }
+                        other => other?,
+                    };
                     let version = captured.version();
                     let selection = config.selection();
                     let material =
@@ -1187,6 +1231,240 @@ fn worker(
         busy.store(false, Ordering::SeqCst);
         let _ = job.reply.send(result);
     }
+}
+
+/// What admitted a revalidation (`connectors.cli.LocalRevalidationCause`,
+/// ess/domains/cli.yaml).
+#[derive(Clone, Copy)]
+enum Admission<'a> {
+    /// `connections revalidate`: the only cause that re-pins changed mounted
+    /// material or follows a configuration upgrade.
+    Explicit {
+        connection: &'a str,
+        revision: &'a str,
+    },
+    /// The one recollection a read runs, first in its own job, when only its
+    /// connection's evidence lapsed (contracts/cli/v1alpha1/semantics.md).
+    ReadRecollection,
+}
+
+/// The job a revalidation runs in, on the instance's serialized worker.
+#[derive(Clone, Copy)]
+struct Scope<'a> {
+    paths: &'a Paths,
+    alias: &'a str,
+    config: &'a Config,
+    current: &'a Adapter,
+    control: &'a Mutex<lifecycle::Control>,
+    stopped: &'a AtomicBool,
+    epoch: u64,
+    /// The validation's deadline, at most the captured use's expiry.
+    deadline: u64,
+    profile: &'a str,
+}
+
+/// Validates the captured custody version's bytes with the provider and
+/// publishes the recollected baseline under the unchanged generation, or
+/// records the provider's refusal (`connections revalidate`, owner.md). Under
+/// the read-only binding, bytes no longer the pinned ones are re-pinned only
+/// for an explicit revalidation; a read's recollection refuses them as its
+/// read would.
+fn revalidate(
+    scope: &Scope<'_>,
+    active: &mut runtime::Child,
+    registry: &registry::Registry,
+    binding: &registry::Binding,
+    captured: registry::Revalidation,
+    admission: Admission<'_>,
+) -> Result<()> {
+    let explicit = matches!(admission, Admission::Explicit { .. });
+    // Only `connections revalidate` carries `cause` and `attempts`
+    // (contracts/cli/v1alpha1/semantics.md, "Revalidation retries"); a read's
+    // recollection answers the read's own failure without them.
+    let answer = |mut error: Error| -> Error {
+        if !explicit {
+            error.cause = None;
+            error.attempts = None;
+        }
+        error
+    };
+    revalidate_inner(scope, active, registry, binding, captured, admission).map_err(answer)
+}
+
+fn revalidate_inner(
+    scope: &Scope<'_>,
+    active: &mut runtime::Child,
+    registry: &registry::Registry,
+    binding: &registry::Binding,
+    captured: registry::Revalidation,
+    admission: Admission<'_>,
+) -> Result<()> {
+    let Scope {
+        paths,
+        alias,
+        config,
+        current,
+        control,
+        stopped,
+        epoch,
+        deadline,
+        profile,
+    } = *scope;
+    let version = captured.version();
+    let selection = config.selection();
+    let read = custody::Store::open_for(version.scope(), &selection, &paths.state)
+        .and_then(|store| store.read(version));
+    let check = || -> Result<()> {
+        let (latest_config, latest) = selected(paths, alias)?;
+        if latest.selection() != current.selection()
+            || latest_config.selection() != config.selection()
+        {
+            return Err(Code::LifecycleConflict.into());
+        }
+        if !latest.permissions.profiles.iter().any(|p| p == profile) {
+            return Err(Code::Forbidden.into());
+        }
+        if stopped.load(Ordering::SeqCst) {
+            return Err(Error {
+                cause: Some(Cause::OwnerStopping),
+                ..Error::from(Code::Unavailable)
+            });
+        }
+        Ok(())
+    };
+    let material = match read {
+        Ok(value) => value,
+        // The mounted item's bytes are no longer the pinned ones: re-read it,
+        // validate the new bytes with the provider and publish them as a new
+        // version, without re-entry. The old bytes' version is retired.
+        #[cfg(target_os = "linux")]
+        Err(custody::Failure::Missing) if selection.read_only() => {
+            registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+            let Admission::Explicit {
+                connection,
+                revision,
+            } = admission
+            else {
+                // A read never re-pins changed material.
+                return Err(super::read_error(&selection, custody::Failure::Missing));
+            };
+            let acquired =
+                registry.begin_repair(binding, connection, revision, connectors_sdk::now_ms())?;
+            let claim = registry.consume(acquired, connectors_sdk::now_ms())?;
+            let sent = std::cell::Cell::new(0u32);
+            let published = super::publish_mounted(
+                paths,
+                &selection,
+                registry,
+                &claim,
+                alias,
+                profile,
+                |secret| {
+                    control
+                        .lock()
+                        .map_err(|_| Code::Unavailable)?
+                        .check(epoch)
+                        .and_then(|_| check())?;
+                    let (result, attempts, cause) = revalidate_with_retries(
+                        deadline,
+                        || {
+                            let result = active.validate(profile, &secret, deadline);
+                            (result, active.running().unwrap_or(false))
+                        },
+                        || stopped.load(Ordering::SeqCst),
+                        std::thread::sleep,
+                    );
+                    sent.set(attempts);
+                    result
+                        .map(runtime::Baseline::into_registry)
+                        .map_err(|failure| retried(failure, attempts, cause))
+                },
+                || {
+                    control
+                        .lock()
+                        .map_err(|_| Code::Unavailable)?
+                        .check(epoch)
+                        .and_then(|_| check())
+                },
+            );
+            if let Err(error) = published {
+                let mut error = error;
+                if sent.get() > 0 && error.attempts.is_none() {
+                    error.attempts = Some(sent.get());
+                }
+                if error.code != Code::OutcomeUnknown {
+                    registry.fail(&claim, connectors_sdk::now_ms())?;
+                }
+                return Err(error);
+            }
+            return Ok(());
+        }
+        Err(error) => {
+            if super::read_invalidates(&selection, error) {
+                registry.missing_revalidation(captured, connectors_sdk::now_ms())?;
+            } else {
+                registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+            }
+            return Err(match admission {
+                Admission::Explicit { .. } => Code::CustodyUnavailable.into(),
+                Admission::ReadRecollection => super::read_error(&selection, error),
+            });
+        }
+    };
+    let guard = control.lock().map_err(|_| Code::Unavailable)?;
+    if let Err(error) = guard.check(epoch).and_then(|_| check()) {
+        registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+        return Err(error);
+    }
+    // Only an explicit revalidation follows a configuration upgrade; a read's
+    // recollection is captured against the connection's own binding.
+    let upgrade = captured.upgrades();
+    let dispatched = registry.dispatch_revalidation(captured, connectors_sdk::now_ms())?;
+    drop(guard);
+    let (result, attempts, cause) = revalidate_with_retries(
+        deadline,
+        || {
+            let result = active.validate(profile, &material, deadline);
+            (result, active.running().unwrap_or(false))
+        },
+        || stopped.load(Ordering::SeqCst),
+        std::thread::sleep,
+    );
+    let guard = control.lock().map_err(|_| Code::Unavailable)?;
+    if let Err(error) = guard.check(epoch).and_then(|_| check()) {
+        registry.finish_revalidation(dispatched, Err(None), connectors_sdk::now_ms())?;
+        let mut error = error;
+        if attempts > 0 {
+            error.attempts = Some(attempts);
+        }
+        return Err(error);
+    }
+    match result {
+        Ok(baseline) => registry.finish_revalidation(
+            dispatched,
+            Ok(baseline.into_registry()),
+            connectors_sdk::now_ms(),
+        )?,
+        Err(error) => {
+            let reason = match error {
+                runtime::Failure::InvalidCredential | runtime::Failure::IdentityMismatch => {
+                    Some(registry::InvalidCredential::Invalid)
+                }
+                runtime::Failure::InsufficientScope => {
+                    Some(registry::InvalidCredential::Insufficient)
+                }
+                _ => None,
+            };
+            registry.finish_revalidation(dispatched, Err(reason), connectors_sdk::now_ms())?;
+            // Repair refuses the changed binding of an upgrade, so a
+            // credential the new provider refuses needs a new connection.
+            let mut error = retried(error, attempts, cause);
+            error.reconnect = upgrade && reason.is_some();
+            return Err(error);
+        }
+    }
+    drop(guard);
+    Ok(())
 }
 
 /// The answer to a read: the provider result as the JSON value the adapter
@@ -1553,6 +1831,107 @@ mod revalidate_wait_tests {
             assert_eq!(code(&pool, Task::Ensure { resume: false }), other);
             pool.shutdown().unwrap();
         }
+    }
+
+    /// A pool whose one worker answers each job after `delay` with the number
+    /// of jobs it has taken up, counting them in the returned counter.
+    fn answering(delay: Duration) -> (Pool, Arc<AtomicUsize>) {
+        let pool = pool(true);
+        let jobs = Arc::new(AtomicUsize::new(0));
+        let taken = jobs.clone();
+        let (sender, receiver) = mpsc::sync_channel::<Work>(16);
+        let thread = std::thread::spawn(move || {
+            while let Ok(work) = receiver.recv() {
+                if let Work::Invoke(job) = work {
+                    let n = taken.fetch_add(1, Ordering::SeqCst) + 1;
+                    std::thread::sleep(delay);
+                    let _ = job.reply.send(Ok(Output::Value(json!(n))));
+                }
+            }
+        });
+        let mut workers = pool.workers.lock().unwrap();
+        let worker = workers.get_mut("instance").unwrap();
+        worker.sender = sender;
+        let _ = std::mem::replace(&mut worker.thread, thread);
+        drop(workers);
+        (pool, jobs)
+    }
+
+    fn task(revision: &str) -> Task {
+        Task::Revalidate {
+            connection: "connection".into(),
+            revision: revision.into(),
+            profile: "profile".into(),
+        }
+    }
+
+    /// story:connection-lease-holds-unattended, contracts/cli/v1alpha1/owner.md:
+    /// a revalidation arriving while one of the same connection and expected
+    /// revision is in flight joins it and answers its answer, sending no job of
+    /// its own; one at another revision, or arriving after the answer, runs its
+    /// own.
+    #[test]
+    fn a_revalidation_in_flight_is_joined_not_queued_behind() {
+        let (pool, jobs) = answering(Duration::from_millis(600));
+        let run = |revision: &str| {
+            pool.run(
+                "alias",
+                &adapter(),
+                task(revision),
+                connectors_sdk::now_ms() + 5_000,
+            )
+        };
+        let value = |output: Result<Output>| match output {
+            Ok(Output::Value(value)) => value,
+            _ => panic!("the stand-in worker answers a value"),
+        };
+        let started = Instant::now();
+        let [first, second, other] = std::thread::scope(|scope| {
+            let first = scope.spawn(|| value(run("revision")));
+            std::thread::sleep(Duration::from_millis(100));
+            let second = scope.spawn(|| value(run("revision")));
+            let other = scope.spawn(|| value(run("other")));
+            [first, second, other].map(|t| t.join().unwrap())
+        });
+        assert_eq!(first, second, "the joiner answers the joined answer");
+        assert_ne!(first, other, "another revision never joins");
+        assert_eq!(jobs.load(Ordering::SeqCst), 2);
+        // The joiner did not wait for a second probe behind the first.
+        assert!(started.elapsed() < Duration::from_millis(1_800));
+        assert!(pool.revalidations.lock().unwrap().is_empty());
+        let later = value(run("revision"));
+        assert_ne!(later, first, "a revalidation after the answer runs its own");
+        assert_eq!(jobs.load(Ordering::SeqCst), 3);
+        pool.shutdown().unwrap();
+    }
+
+    /// A joiner whose own deadline passes before the joined answer is
+    /// `outcome_unknown`, as an unanswered revalidation is.
+    #[test]
+    fn a_joiner_past_its_own_deadline_is_outcome_unknown() {
+        let (pool, _) = answering(Duration::from_millis(1_000));
+        std::thread::scope(|scope| {
+            let leader = scope.spawn(|| {
+                pool.run(
+                    "alias",
+                    &adapter(),
+                    task("revision"),
+                    connectors_sdk::now_ms() + 5_000,
+                )
+            });
+            std::thread::sleep(Duration::from_millis(100));
+            match pool.run(
+                "alias",
+                &adapter(),
+                task("revision"),
+                connectors_sdk::now_ms() + 200,
+            ) {
+                Err(error) => assert_eq!(error.code, Code::OutcomeUnknown),
+                Ok(_) => panic!("the joiner's deadline passes first"),
+            }
+            assert!(leader.join().unwrap().is_ok());
+        });
+        pool.shutdown().unwrap();
     }
 }
 
