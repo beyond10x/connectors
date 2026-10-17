@@ -248,7 +248,7 @@ fn an_auth_with_other_than_exactly_one_entry_is_refused() {
 fn an_unknown_field_is_refused() {
     for text in [
         jira_text().replace("operations:\n", "datasources: {}\noperations:\n"),
-        jira_text().replace("{op: getIssue}", "{op: getIssue, guard: {}}"),
+        jira_text().replace("{op: getIssue}", "{op: getIssue, retry: {}}"),
         jira_text().replace("{scheme: basic}", "{scheme: basic, token: x}"),
         jira_text().replace("{type: string}", "{type: string, secret: true}"),
         jira_text().replace("  sha256:", "  format: openapi\n  sha256:"),
@@ -443,6 +443,22 @@ fn every_refusal_has_a_distinct_name() {
             key: String::new(),
             style: String::new(),
             parameter: String::new(),
+        }
+        .name(),
+        Refusal::UnknownGuardRead {
+            key: String::new(),
+            read: String::new(),
+        }
+        .name(),
+        Refusal::GuardParameter {
+            key: String::new(),
+            parameter: String::new(),
+        }
+        .name(),
+        Refusal::BodyType {
+            key: String::new(),
+            field: String::new(),
+            spec: String::new(),
         }
         .name(),
         Refusal::Pipeline(String::new()).name(),
