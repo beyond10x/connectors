@@ -4,13 +4,15 @@ The current local binding lists schemas and runs bounded, parameterized
 read-only queries using a saved PostgreSQL password. It requires Linux x86_64 and
 the [qualified Secret Service binding](local-secret-service.md).
 
-The same adapter serves MySQL when its native file says `"engine": "mysql"`; see
+Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
+
+The same implementation, `connectors-sql`, serves the `mysql` connector when its native file says `"engine": "mysql"`; see
 [MySQL through the local CLI](local-mysql-cli.md). A file without `engine`
 selects PostgreSQL, so every existing configuration and connection keeps working
 unchanged.
 
 PostgreSQL is the third execution family in this repository. GitLab and
-Kubernetes reach their provider over HTTP; this adapter speaks the PostgreSQL
+Kubernetes reach their provider over HTTP; this implementation speaks the PostgreSQL
 wire protocol, so there is no HTTP capability, no bearer header and no identity
 probe endpoint. The differences that follow from that are in
 [What the connection is bound to](#what-the-connection-is-bound-to).
@@ -56,7 +58,7 @@ sha256sum target/release/connectors-sql
 
 Copy `configuration_revision` from that output verbatim. It is a digest of the
 effective document, which includes a `ca_digest` computed over the CA bytes in a
-form of the adapter's own choosing — it is **not** `sha256sum` of the PEM file,
+form of the SQL implementation's own choosing — it is **not** `sha256sum` of the PEM file,
 and no command reproduces it independently.
 
 The published `configuration_schema` has two branches, and the local one
@@ -64,10 +66,18 @@ describes the **effective** document the composition builds, not the file above:
 there the CA is reduced to `ca_digest`. Nothing validates your file against that
 branch, so do not write the file to match it.
 
-Add an adapter entry to the configuration created by setup:
+PostgreSQL is not a catalog connector, so the configuration pins its instance.
+Add the instance to the configuration created by setup: change its `format` line
+to `format = "connectors-local/5"`, which instances need, and add the instance
+`warehouse` of the connector `postgres`, selected as `--connector postgres
+--instance warehouse`:
 
 ```toml
-[adapters.warehouse]
+[connectors.postgres]
+enabled = true
+
+[connectors.postgres.instances.warehouse]
+alias = "warehouse"
 instance_id = "postgres-local"
 adapter_id = "sql"
 configuration_revision = "REPLACE_FROM_BOOTSTRAP"
@@ -76,11 +86,11 @@ private_protocol = "connectors-private/1"
 startup = "on-demand"
 restart = "never"
 
-[adapters.warehouse.permissions]
+[connectors.postgres.instances.warehouse.permissions]
 profiles = ["postgres.password"]
 operations = ["schema.list", "query.read", "database.list", "table.list", "table.describe", "index.list"]
 
-[adapters.warehouse.executable]
+[connectors.postgres.instances.warehouse.executable]
 path = "/absolute/path/connectors-sql"
 sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
 args = ["--local-config", "/absolute/path/postgres.json"]
@@ -92,9 +102,9 @@ is refused at `operations describe` as well as at invocation.
 ## Connect and read
 
 ```sh
-target/release/connectors --output json connections connect --adapter warehouse --profile postgres.password --credential-prompt
-target/release/connectors --output json operations describe --adapter warehouse --operation query.read
-target/release/connectors --output json operations invoke --adapter warehouse --connection CONNECTION --operation query.read --schema SCHEMA --revision REVISION --input-json '{"query":"SELECT id, opened_at FROM incidents WHERE severity = $1 ORDER BY opened_at DESC","parameters":["critical"],"limit":100}'
+target/release/connectors --output json connections connect --connector postgres --instance warehouse --profile postgres.password --credential-prompt
+target/release/connectors --output json operations describe --connector postgres --instance warehouse --operation query.read
+target/release/connectors --output json operations invoke --connector postgres --instance warehouse --connection CONNECTION --operation query.read --schema SCHEMA --revision REVISION --input-json '{"query":"SELECT id, opened_at FROM incidents WHERE severity = $1 ORDER BY opened_at DESC","parameters":["critical"],"limit":100}'
 ```
 
 For automation, `--credential-file /absolute/private/file.json` or
@@ -111,18 +121,18 @@ descriptor 3. See [Launch a consumer](local-consumer-launch.md).
 
 **The session is the credential check.** PostgreSQL accepts or rejects the
 password during the startup exchange, before any statement can run, so connect
-and repair open one session and close it without running a query. No validation
+and reconnect open one session and close it without running a query. No validation
 statement is invented, because the handshake already proves more than one would.
 A rejected password comes back as the server's own `28P01`.
 
 **The identity is the role and the database**, recorded as `reader@incidents`.
 The role name is the principal PostgreSQL authorises against and the database
-scopes it. The protected repair document accepts only a password; it cannot
+scopes it. The protected reconnect document accepts only a password; it cannot
 select another role. Changing `user`, `host`, `port` or `database` changes the
 configuration revision. A native file that no longer matches the configured
 revision is refused as `readiness_mismatch` at startup, before a session opens.
-Failed password repair on the original binding preserves its still-valid saved
-credential. These are the reachable SQL repair boundaries; a password alone
+A failed password reconnect on the original binding preserves its still-valid saved
+credential. These are the reachable SQL reconnect boundaries; a password alone
 cannot produce a different role identity.
 
 **A password grants no scopes and exposes no expiry.** The profile declares no
@@ -132,7 +142,7 @@ denial appears when the query runs. `credential_expires_at_ms` is absent, meanin
 not observed rather than unlimited; a rotated or expired password is reported
 when it is next used.
 
-## Query bounds, which the adapter enforces and the caller cannot widen
+## Query bounds, which the instance enforces and the caller cannot widen
 
 Every invocation opens its own session and its own **read-only transaction**,
 then sets `statement_timeout = '10s'`, `lock_timeout = '2s'` and
@@ -171,13 +181,13 @@ parameters, never written into the statement. Every answer is the `query.read` s
 `columns`, `rows` of text or `null`, `truncated` and `provenance` — with fixed columns:
 
 ```sh
-target/release/connectors --output json operations invoke --adapter warehouse --connection CONNECTION --operation database.list --schema SCHEMA --revision REVISION --input-json '{"limit":100}'
-target/release/connectors --output json operations invoke --adapter warehouse --connection CONNECTION --operation table.list --schema SCHEMA --revision REVISION --input-json '{"schema":"public","limit":200}'
-target/release/connectors --output json operations invoke --adapter warehouse --connection CONNECTION --operation table.describe --schema SCHEMA --revision REVISION --input-json '{"schema":"public","table":"incidents","limit":200}'
-target/release/connectors --output json operations invoke --adapter warehouse --connection CONNECTION --operation index.list --schema SCHEMA --revision REVISION --input-json '{"schema":"public","table":"incidents","limit":200}'
+target/release/connectors --output json operations invoke --connector postgres --instance warehouse --connection CONNECTION --operation database.list --schema SCHEMA --revision REVISION --input-json '{"limit":100}'
+target/release/connectors --output json operations invoke --connector postgres --instance warehouse --connection CONNECTION --operation table.list --schema SCHEMA --revision REVISION --input-json '{"schema":"public","limit":200}'
+target/release/connectors --output json operations invoke --connector postgres --instance warehouse --connection CONNECTION --operation table.describe --schema SCHEMA --revision REVISION --input-json '{"schema":"public","table":"incidents","limit":200}'
+target/release/connectors --output json operations invoke --connector postgres --instance warehouse --connection CONNECTION --operation index.list --schema SCHEMA --revision REVISION --input-json '{"schema":"public","table":"incidents","limit":200}'
 ```
 
-| operation | columns |
+| operation id | columns |
 |---|---|
 | `database.list` | `database_name`: the databases the role may connect to (`pg_database`, without templates) |
 | `table.list` | `table_name`, `table_kind` (`table` or `view`), `row_estimate` (`pg_class.reltuples`; `null` for a view or a table never analysed) |
@@ -209,14 +219,14 @@ column, or a column in a partial index's predicate. A whole-row reference such a
 `(t IS NOT NULL)` counts as every column, and so does an index on expressions alone, such as
 `((pub + 1))`: a role granted only some columns of a table does not see it.
 
-Add the operations you grant to `operations` in the adapter entry. These reads are checked
+Add the operations you grant to `operations` in the instance's `permissions`. These reads are checked
 against a scripted PostgreSQL wire fixture; their visibility rules were also run against a
 disposable PostgreSQL 17 server on 2026-10-09.
 
 ## Read profiles
 
 A read profile is a read you write once in the native file and callers then run by name,
-passing values for its parameters and nothing else: no statement text reaches the adapter
+passing values for its parameters and nothing else: no statement text reaches the instance
 from a caller. `profile.read` serves it, with typed output columns, numbers masked by
 default and a keyset cursor, so a workflow can page through it and join its rows on a call
 identifier without a model. The statement, its columns and its masking stay in your file;
@@ -272,12 +282,12 @@ the repository holds only the shape below. Add `read_profiles` to the native fil
 
 A file the model refuses fails `--print-local-bootstrap`. Profiles are part of the
 configuration revision, so re-copy `configuration_revision` after changing one, and add
-`"profile.read"` to `operations` in the adapter entry. `operations describe` then shows each
+`"profile.read"` to `operations` in the instance's `permissions`. `operations describe` then shows each
 profile's own parameters and typed columns:
 
 ```sh
-target/release/connectors --output json operations describe --adapter warehouse --operation profile.read
-target/release/connectors --output json operations invoke --adapter warehouse --connection CONNECTION --operation profile.read --schema SCHEMA --revision REVISION --input-json '{"profile":"calls-by-number","parameters":{"number":"+99900000101","from":"2026-01-02T00:00:00Z","to":"2026-01-03T00:00:00Z"},"limit":100}'
+target/release/connectors --output json operations describe --connector postgres --instance warehouse --operation profile.read
+target/release/connectors --output json operations invoke --connector postgres --instance warehouse --connection CONNECTION --operation profile.read --schema SCHEMA --revision REVISION --input-json '{"profile":"calls-by-number","parameters":{"number":"+99900000101","from":"2026-01-02T00:00:00Z","to":"2026-01-03T00:00:00Z"},"limit":100}'
 ```
 
 An answer names the profile, its `call_identifier` and `ordering` columns and each column's
@@ -295,7 +305,7 @@ snapshot. The full rules are in the
 
 ## Limitations
 
-MySQL is served by the same adapter; see [the MySQL guide](local-mysql-cli.md). No write,
+MySQL is served by the same implementation as the `mysql` connector; see [the MySQL guide](local-mysql-cli.md). No write,
 DDL, transaction control, cursor, stored procedure or connection pooling is
 exposed. `schema.list`, `query.read`, the four catalogue reads and `profile.read` are the
 whole surface. Read profiles are checked against scripted wire fixtures only; no live

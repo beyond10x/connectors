@@ -1,24 +1,31 @@
 # Connect a Google API with OAuth
 
-A catalog configuration whose profile uses `"scheme": "oauth2_refresh"` (see the
-[catalog provider guide](local-catalog-provider.md)) stores
-`{"client_id","client_secret","refresh_token"}` for a connection. Google issues
+The Google connectors (`gmail`, `drive`, `calendar`, `slides`) declare the auth
+profile `google.oauth`, whose scheme is `"oauth2_refresh"` (see the
+[catalog provider guide](local-catalog-provider.md)). A connection of one of
+their instances stores
+`{"client_id","client_secret","refresh_token"}`. Google issues
 that refresh token only after a person consents in a browser. `connections
-connect` and `connections repair` do that for you when you hand them the OAuth
+connect` and `connections reconnect` do that for you when you hand them the OAuth
 client file Google's console downloads. The stored material is an
 OAuth-acquired non-rotating static entry
 (`architecture-decision-record:oauth-material-as-static-entry`): Google does not
 rotate refresh tokens for installed apps, so the entry never changes after
 consent, and the provider process turns it into short-lived access tokens that
-are never written down.
+are never written down. Connector, instance and connection are defined in
+[the README](../README.md#vocabulary).
 
 ## Create the Google OAuth client
 
 1. In the Google Cloud console, select or create a project and enable each API
-   the configuration reads.
-2. Configure the OAuth consent screen. Add the scopes the configuration lists
-   in `requested_scopes`. While the app's publishing status is *Testing*, add
-   every Google account that will connect as a test user.
+   whose connector you configure.
+2. Configure the OAuth consent screen. Add the scopes each connector requests;
+   its guide lists them ([Gmail](catalog-google-gmail.md#authentication),
+   [Drive](catalog-google-drive.md#authentication),
+   [Calendar](catalog-google-calendar.md#authentication),
+   [Slides](catalog-google-slides.md#authentication)). While the app's
+   publishing status is *Testing*, add every Google account that will connect
+   as a test user.
 3. Under *Credentials*, create an *OAuth client ID* of application type
    *Desktop app*, and download its JSON. The file has one `installed` object
    with `client_id`, `client_secret`, `auth_uri`, `token_uri` and
@@ -30,18 +37,18 @@ are never written down.
    chmod 600 ~/Downloads/client_secret_*.json
    ```
 
-5. Write the configuration's endpoints exactly as the file states them:
-   `authorize_url` equal to its `auth_uri` (currently
-   `https://accounts.google.com/o/oauth2/auth`) and `token_url` equal to its
-   `token_uri` (`https://oauth2.googleapis.com/token`), byte for byte. A file
-   whose endpoints differ is refused with `protected_entry_unavailable` before
-   any browser step.
+5. The profile's endpoints must equal the file's byte for byte:
+   `authorize_url` its `auth_uri` (currently
+   `https://accounts.google.com/o/oauth2/auth`) and `token_url` its
+   `token_uri` (`https://oauth2.googleapis.com/token`). The Google connectors
+   declare exactly these. A file whose endpoints differ is refused with
+   `protected_entry_unavailable` before any browser step.
 
 ## Connect with OAuth
 
 ```sh
-connectors connections connect --adapter drive --profile google.drive \
-  --credential-file ~/Downloads/client_secret_1234.json
+connectors connections connect --connector drive --instance private \
+  --profile google.oauth --credential-file ~/Downloads/client_secret_1234.json
 ```
 
 The CLI starts the owner's capture, which gives it the profile's
@@ -54,13 +61,13 @@ The CLI starts the owner's capture, which gives it the profile's
    the address and hand it to a person;
 3. after you consent, reads the redirect, checks its `state`, and exchanges the
    code together with its PKCE S256 verifier at `token_url`. This exchange uses
-   the platform trust roots only: the configuration's `token_ca_file` applies
+   the platform trust roots only: a configuration's `token_ca_file` applies
    to the provider's own refresh and validation requests, not to it;
 4. submits `{client_id, client_secret, refresh_token}` as the connection's
    entry. The owner validates it with a refresh of its own, checks the identity
    and `minimum_scopes`, and stores it in custody.
 
-The scopes requested are `requested_scopes` plus `openid`, with
+The scopes requested are the profile's `requested_scopes` plus `openid`, with
 `access_type=offline` and `prompt=consent`, so Google returns a refresh token on
 every consent. The client file itself is read and not kept.
 
@@ -94,30 +101,42 @@ A file that is not Google's installed-client JSON, such as an entry already
 holding `{client_id, client_secret, refresh_token}`, is submitted unchanged, as
 for every other profile.
 
-## Repair
+## Reconnect
 
 When Google stops honouring the refresh token (it was revoked, the account's
 password changed, or it expired), an invoke fails with `service_failure`,
-`service_code: unauthorized` and `next_action: repair_connection`. Repair the
-connection with the same client file:
+`service_code: unauthorized` and `next_action: repair_connection`, and the
+connection moves to the `stale` state, which `connections list` and
+`connections describe` show. A `stale` connection admits no read, write or
+revalidation. Reconnect it with the same client file, naming the connection and
+its current revision:
 
 ```sh
-connectors connections repair --adapter drive --connection <connection> \
-  --expected-revision <revision> --credential-file ~/Downloads/client_secret_1234.json
+connectors connections reconnect --connector drive --instance private \
+  --connection <connection> --expected-revision <revision> \
+  --credential-file ~/Downloads/client_secret_1234.json
 ```
 
-Repair runs the same consent and replaces the entry. Consent with the same
-Google account: another account's identity is refused as `identity_mismatch`
-and the connection keeps its previous entry.
+Reconnect runs the same consent and replaces the entry on the same connection,
+which returns to ready. Consent with the same Google account: another account's
+identity is refused as `identity_mismatch` and the connection keeps its
+previous entry.
 
 ## Testing-mode expiry
 
 Google expires the refresh tokens of an app whose publishing status is
-*Testing* seven days after consent. Every connection made for such an app needs
-a repair once a week; publishing the app lifts the limit, subject to Google's
-verification for sensitive scopes. Each connection is its own consent, so a
-configuration per Google API means one consent, and one weekly repair, per
-configuration.
+*Testing* seven days after consent
+(<https://developers.google.com/identity/protocols/oauth2>).
+Every connection made for such an app needs a reconnect once a week.
+
+An app used only by its developer can be set to *In production* without
+verification: Google exempts an app for personal use (fewer than 100 users)
+from verification (<https://support.google.com/cloud/answer/13464323>),
+and an app *In production* is not subject to the seven-day expiry. Set the
+publishing status on the OAuth consent screen.
+
+Each instance is its own consent: `gmail.private` and `drive.private` are two
+consents, and in *Testing* two weekly reconnects.
 
 ## Verification
 

@@ -12,18 +12,21 @@
 //! pages until `nextPageToken` is absent; the history walk starts from the
 //! profile's `historyId` and ends on the page without `nextPageToken`, whose
 //! `historyId` is the next baseline; an out-of-date `startHistoryId`'s `404`
-//! reaches the caller as `not_found`. The profile is the guide's own, pointed at
+//! reaches the caller as `not_found`. The profile is the read configuration the
+//! guide showed before connectors were declared (`hand_written`), pointed at
 //! the fixture token route. The fixture secrets are fictional and only ever
 //! compared, never printed. No live credential and no network.
 //!
 //! The two draft writes run through the same child over private protocol two,
-//! on the guide's write instance with the compose scope granted: the host's
+//! on the guide's former write configuration with the compose scope granted: the host's
 //! prepare and commit, the send's preflight read of the draft, and the exact
 //! POST body. A draft whose message changed since the approval sends nothing.
 //! The approval binding is exercised with the host's own approval signer and
 //! verifier against a subject built from the child's descriptor; the signing
 //! key is the public RFC 8032 section 7.1 test vector, never a deployment key.
 #![cfg(unix)]
+mod hand_written;
+
 use connectors_catalog::{bundle, discovery};
 use connectors_catalog_provider::{Check, Effect, Engine, Expectation, Selection};
 use connectors_host::local::{
@@ -681,10 +684,12 @@ fn guide_documents_user_id_formats_and_history_deltas() {
 /// The guide's rows, sections and write route for the two draft writes: each
 /// write cited with its Discovery id and POST route, the compose scope, the
 /// input the send's guard compares, `users.messages.send` named as not
-/// selected, and a separate write instance connected afresh. Repair cannot
-/// add a scope, and the guide must not say it does.
+/// selected, and one instance whose consent requests both scopes. A reconnect
+/// cannot add a scope, so an installation holding a read and a write entry
+/// connects the one instance afresh, and the guide must not route the write
+/// scope through a reconnect or a second instance.
 #[test]
-fn guide_cites_the_draft_writes_the_compose_scope_and_the_write_instance() {
+fn guide_cites_the_draft_writes_the_compose_scope_and_the_one_instance() {
     let guide = guide();
     let rows: Vec<&str> = guide.lines().filter(|l| l.starts_with('|')).collect();
     for (id, operation_id, path) in WRITES {
@@ -710,39 +715,37 @@ fn guide_cites_the_draft_writes_the_compose_scope_and_the_write_instance() {
         "`users.drafts.get`".into(),
         "cannot be recalled".into(),
         "A changed draft sends nothing".into(),
-        "Writes use a separate instance".into(),
-        format!("`{WRITE_INSTANCE}`"),
-        "`connections connect` that instance with the Google client file".into(),
-        "`connections repair` cannot add a scope".into(),
+        format!("`{GMAIL_SCOPE}`"),
+        "They run on the same instance as the reads".into(),
+        "One instance per Google account reads and writes".into(),
+        "[connectors.gmail.instances.private]".into(),
+        "`connectors setup migrate` keeps each as it is".into(),
+        "does not merge them".into(),
         "`approval_issuance.rs`".into(),
     ] {
         assert!(flat.contains(&term), "the guide does not state {term}");
     }
-    assert!(
-        !flat.contains("with `connections repair`"),
-        "the guide routes the write scope through `connections repair`"
-    );
+    for stale in [
+        "Writes use a separate instance",
+        "connections repair",
+        format!("`{WRITE_INSTANCE}`").as_str(),
+    ] {
+        assert!(!flat.contains(stale), "the guide still says {stale}");
+    }
 }
 
-/// The JSON block of the guide that contains `marker`.
-fn guide_block(marker: &str) -> Value {
-    let guide = guide();
-    let example = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| body.contains(marker))
-        .unwrap_or_else(|| panic!("the guide has no JSON block with {marker}"));
-    serde_json::from_str::<Value>(example).unwrap()
-}
-/// The guide's configuration example for this provider.
+/// The read configuration the guide showed before connectors were declared,
+/// with the read-only scope (`hand_written`).
 fn documented_config() -> Value {
-    guide_block(&format!("\"provider\": \"{PROVIDER}\""))
+    serde_json::from_str(&hand_written::blocks("catalog-google-gmail.md")[0]).unwrap()
 }
-/// The guide's write instance: its read configuration with the write values
-/// the guide lists applied.
+/// The write configuration the guide showed: its read configuration with the
+/// write values it listed applied (`hand_written`).
 fn documented_write_config() -> Value {
-    let values = guide_block(&format!("\"instance\": \"{WRITE_INSTANCE}\""));
+    let values: Value = serde_json::from_str(&hand_written::file(
+        "catalog-google-gmail.write-values.json",
+    ))
+    .unwrap();
     let mut config = documented_config();
     config["instance"] = values["instance"].clone();
     config["auth"]["minimum_scopes"] = values["auth"]["minimum_scopes"].clone();
@@ -750,9 +753,9 @@ fn documented_write_config() -> Value {
     config
 }
 
-/// The write instance asks for the compose scope and nothing that reads the
-/// mailbox, and keeps the read block's `authorize_url`, which must be the
-/// client file's `auth_uri` for `connections connect` to accept the file.
+/// The hand-written write instance asks for the compose scope and nothing that
+/// reads the mailbox, and keeps the read block's `authorize_url`, which must be
+/// the client file's `auth_uri` for `connections connect` to accept the file.
 #[test]
 fn guide_documents_the_write_instance() {
     let config = documented_write_config();

@@ -144,7 +144,7 @@ fn completion_offers_service_commands_at_the_root() {
     let root = complete(&["connectors", ""]);
     for word in SERVICE_COMMANDS
         .iter()
-        .chain(&["adapters", "operations", "help"])
+        .chain(&["instances", "adapters", "operations", "help"])
     {
         assert!(
             root.contains(*word),
@@ -159,7 +159,10 @@ fn completion_offers_service_commands_at_the_root() {
         );
     }
     let help = complete(&["connectors", "help", ""]);
-    for word in SERVICE_COMMANDS.iter().chain(&["adapters", "operations"]) {
+    for word in SERVICE_COMMANDS
+        .iter()
+        .chain(&["instances", "adapters", "operations"])
+    {
         assert!(
             help.contains(*word),
             "help completion offers {word}: {help:?}"
@@ -235,9 +238,9 @@ fn generated_completion_is_unchanged() {
     let operations = complete(&["connectors", "operations", "describe", "--"]);
     assert!(operations.contains("--state-dir"), "{operations:?}");
     assert!(!operations.contains("--endpoint"), "{operations:?}");
-    let adapters = complete(&["connectors", "adapters", ""]);
+    let instances = complete(&["connectors", "instances", ""]);
     assert!(
-        adapters.contains("describe") && !adapters.contains("invoke"),
-        "{adapters:?}"
+        instances.contains("describe") && !instances.contains("invoke"),
+        "{instances:?}"
     );
 }

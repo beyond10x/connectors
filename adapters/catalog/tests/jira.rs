@@ -538,17 +538,14 @@ impl Drop for Provider {
         self.thread.take().unwrap().join().unwrap();
     }
 }
-/// The `auth` profile of the configuration example in the Jira guide, so the
-/// fixture runs the profile the guide tells a reader to write.
+/// The `auth` profile the `jira` connector declares
+/// (`providers/jira/connector.json`), so the fixture runs the profile the
+/// guide's instance uses.
 fn documented_auth() -> Value {
-    let guide = fs::read_to_string(root().join("../../docs/catalog-jira.md")).unwrap();
-    let example = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| body.contains("\"provider\": \"jira\""))
-        .expect("the documented Jira configuration");
-    let auth = serde_json::from_str::<Value>(example).unwrap()["auth"].clone();
+    let declaration: Value =
+        serde_json::from_slice(&fs::read(root().join("providers/jira/connector.json")).unwrap())
+            .unwrap();
+    let auth = declaration["profiles"][0].clone();
     assert_eq!(auth["profile"], PROFILE);
     assert_eq!(auth["scheme"], "basic");
     assert_eq!(auth["identity"]["kind"], "atlassian.account");

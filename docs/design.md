@@ -1,15 +1,17 @@
-# Connectors v2: independent adapter services built from contracts
+# Connectors v2: independent services built from contracts
 
-- **Status:** local three-adapter implementation and wire contract verified; GitLab specification generation implemented, with review remediation and proposed contract documents recorded in sections 27–30. No release or rollout is configured.
+- **Status:** local implementation of three internal adapters and wire contract verified; GitLab specification generation implemented, with review remediation and proposed contract documents recorded in sections 27–30. No release or rollout is configured.
 - **Recorded:** 2026-09-08.
 - **Working name:** `connectors_v2`; this is a local design repository, not a published project.
 - **Scope of this deliverable:** preserve the design decisions, their evidence, and the locally implemented slices and remaining boundaries.
 
-Navigation: [intent and evidence](#1-purpose-and-how-to-read-this-document), [repository layout](#4-monorepo-layout-and-dependencies), [contracts and operations](#5-shared-contract-ownership-and-evolution), [sessions](#8-bidirectional-sessions), [data and discovery](#9-datasources-and-execution-profiles), [configuration](#11-configuration-and-caching), [auth](#12-authentication-and-secret-store-independence), [resources and SaaS](#13-resource-management-and-saas-ownership), [media and SIP](#14-sip-rtvbp-webrtc-and-mediasession), [webhooks](#15-webhooks-and-durable-events), [federation](#16-federation), [local distribution](#17-local-execution-service-distribution-and-composition), [ESS adapter kind](#18-the-connectors-owned-ess-adapter-specification-kind), [provider scope](#19-provider-scope-and-extraction-priorities), [conformance](#21-conformance-and-validation-strategy), [implementation order](#22-implementation-order-and-completion-criteria), [migration](#23-specification-extraction-and-migration-records), [open decisions](#24-open-decisions-and-recommended-defaults), [workspace handoff](#25-local-workspace-and-implementation-handoff), [sources](#26-evidence-map-and-references).
+The words a user of the CLI, the configuration or the library meets (provider, connector, auth profile, instance, connection and operation) are defined once in [the README's vocabulary](../README.md#vocabulary), with their reasoning in [the connector vocabulary design](design/connector-vocabulary.md). In this document, "adapter" is the internal name of an implementation and of the process that serves an instance.
+
+Navigation: [intent and evidence](#1-purpose-and-how-to-read-this-document), [repository layout](#4-monorepo-layout-and-dependencies), [contracts and operations](#5-shared-contract-ownership-and-evolution), [sessions](#8-bidirectional-sessions), [data and discovery](#9-datasources-and-execution-profiles), [configuration](#11-configuration-and-caching), [auth](#12-authentication-and-secret-store-independence), [resources and SaaS](#13-resource-management-and-saas-ownership), [media and SIP](#14-sip-rtvbp-webrtc-and-mediasession), [webhooks](#15-webhooks-and-durable-events), [federation](#16-federation), [local distribution](#17-local-execution-service-distribution-and-composition), [internal adapter kind](#18-the-connectors-owned-ess-specification-kind-for-internal-adapters), [provider scope](#19-provider-scope-and-extraction-priorities), [conformance](#21-conformance-and-validation-strategy), [implementation order](#22-implementation-order-and-completion-criteria), [migration](#23-specification-extraction-and-migration-records), [open decisions](#24-open-decisions-and-recommended-defaults), [workspace handoff](#25-local-workspace-and-implementation-handoff), [sources](#26-evidence-map-and-references).
 
 ## 1. Purpose and how to read this document
 
-The operator considers the existing `../connectors` implementation heavily over-engineered. The request began as a specification-first clean-room rewrite and developed into a more specific architecture: independently deployable adapter services, a small set of shared semantic contracts, a generic client, and an optional host that can supervise local adapters or federate remote ones.
+The operator considers the existing `../connectors` implementation heavily over-engineered. The request began as a specification-first clean-room rewrite and developed into a more specific architecture: independently deployable internal adapter services, a small set of shared semantic contracts, a generic client, and an optional host that can supervise local adapters or federate remote ones.
 
 This document is self-contained. Reading the old code is useful for extraction, but should not be necessary to understand the intended system. Existing code is evidence of behavior, not automatically the authority for the replacement. A desired behavior may deliberately differ from observed behavior; record that decision before turning either into a compatibility test.
 
@@ -28,17 +30,17 @@ Contract and CLI names below are proposed names unless explicitly identified as 
 1. Extract specifications before rewriting; preserve useful semantics and remove unnecessary implementation constraints.
 2. Core defines abstract operations, events, and bidirectional sessions. Higher-level contracts include media sessions, authentication, datasources, execution, and discovery.
 3. SIP/RTP, WebRTC, and RTVBP should expose the same supported media semantics through independent implementations or bindings. Their protocol code must not depend on one another.
-4. Adapters should be slim in responsibility. They own provider/protocol behavior and transient protocol state; the host supplies persistence, credential custody, instrumentation wiring, and other infrastructure through contracts.
+4. Internal adapters should be slim in responsibility. They own provider/protocol behavior and transient protocol state; the host supplies persistence, credential custody, instrumentation wiring, and other infrastructure through contracts.
 5. SaaS configuration and tenant ownership must be modeled explicitly. A live session contract cannot describe all manageable external resources.
-6. Resource-management contracts tell the cloud what an adapter can manage. External resources, their SaaS assignments, and runtime sessions are different things.
+6. Resource-management contracts tell the cloud what an internal adapter can manage. External resources, their SaaS assignments, and runtime sessions are different things.
 7. Authentication must be decoupled from provider operations and from the secret-store implementation.
-8. Focus on Jira, Confluence, Kubernetes including endpoint discovery, Loki, Prometheus, GitLab, SIP, and SQL. Slack supplied detailed auth/configuration/webhook examples and remains an adapter candidate. RTVBP is part of proving the media boundary; WebRTC is an interoperability target.
-9. Adapters may run on another host or service. A client discovers or is statically configured with endpoints, then asks which contracts they support.
+8. Focus on Jira, Confluence, Kubernetes including endpoint discovery, Loki, Prometheus, GitLab, SIP, and SQL. Slack supplied detailed auth/configuration/webhook examples and remains an internal adapter candidate. RTVBP is part of proving the media boundary; WebRTC is an interoperability target.
+9. Internal adapters may run on another host or service. A client discovers or is statically configured with endpoints, then asks which contracts they support.
 10. A client can run a serving mode that exposes federated access to downstream services through the same outward contracts.
-11. Local adapters may be downloaded and built with Cargo, then run locally. They need not be linked into the client or host.
-12. The current catalog becomes an optional ordinary provider/service. It is not a mandatory compiler or runtime dependency of every adapter.
-13. An adapter is described by a **custom ESS specification kind owned by Connectors**. Its schema, semantic rules, compiler, and provider generation belong in Connectors, not in ESS's built-in domain vocabulary.
-14. Use a single repository for shared machinery and adapters, with independent adapter service artifacts.
+11. Local internal adapters may be downloaded and built with Cargo, then run locally. They need not be linked into the client or host.
+12. The current catalog becomes an optional ordinary provider/service. It is not a mandatory compiler or runtime dependency of every internal adapter.
+13. An internal adapter is described by a **custom ESS specification kind owned by Connectors**. Its schema, semantic rules, compiler, and provider generation belong in Connectors, not in ESS's built-in domain vocabulary.
+14. Use a single repository for shared machinery and internal adapters, with independent adapter service artifacts.
 15. Current authorization is a local design handoff, with the operator subsequently invoking managed-worktree and AEP planning workflows. No implementation, remote creation, publication, deployment, consumer repin, or old-repository modification was requested by this task.
 16. The operator explicitly deferred Atlas integration. Keep this repository standalone: no Atlas catalog registration, roadmap/lineage changes, documentation delivery wiring, or consumer dependency integration. Reading verified Atlas authority and using its existing commit wrapper are tooling use only.
 
@@ -114,12 +116,12 @@ The newer cached branch includes Operation v0alpha2/v0alpha3 and Connection v0al
 
 ## 3. System shape and vocabulary
 
-Connectors v2 consists of a shared contract kernel, higher-level contract families, an adapter SDK, a client, a host, a Connectors-owned specification compiler, and independent adapter services.
+Connectors v2 consists of a shared contract kernel, higher-level contract families, an SDK for internal adapters, a client, a host, a Connectors-owned specification compiler, and independent adapter services.
 
 ```mermaid
 flowchart LR
     client[Connectors client] --> host[Optional federation host]
-    client --> direct[Direct adapter service]
+    client --> direct[Direct internal adapter service]
     host --> atlassian[Atlassian service]
     host --> kube[Kubernetes service]
     host --> sql[SQL service]
@@ -135,18 +137,19 @@ flowchart LR
 |---|---|
 | Contract | Versioned types plus interaction/lifecycle rules and executable conformance examples |
 | Profile | A named supported subset or specialization with explicit guarantees, such as duplex audio or relational reads |
-| Adapter | Provider/protocol implementation of one or more contracts |
+| Adapter | Internal provider/protocol implementation of one or more contracts |
 | Binding | A mapping that carries a contract across a transport/protocol boundary; it can proxy or serve a capability |
-| Adapter service | A running, independently addressable instance of an adapter and its infrastructure bindings |
+| Adapter service | The running, independently addressable process of an internal adapter that serves an instance, with its infrastructure bindings |
 | Host | A runtime that binds infrastructure, serves local capabilities, supervises local processes, and/or federates downstream services |
 | Client | A consumer of service contracts; provider-independent at its transport/discovery layer |
-| Connection | A stable binding to authorized external access; lifetime is not the lifetime of an HTTP connection or socket |
 | Resource | A manageable or observable provider object, such as a number, repository, database endpoint, or cluster |
 | Assignment | SaaS-owned association of a resource/connection with a tenant, principal, application, and policy |
 | Session | Shared interaction lifetime permitting bidirectional requests and events, optionally with data streams |
 | Catalog service | Optional discovery/distribution provider; direct services are usable without it |
-| Adapter specification | Instance of the custom Connectors-owned ESS specification kind |
+| Adapter specification | A document of the custom Connectors-owned ESS specification kind that describes an internal adapter |
 | Realization | Binding of a semantic specification to concrete implementation artifacts and entrypoints |
+
+A connection has the vocabulary's meaning; its lifetime is not the lifetime of an HTTP connection or socket.
 
 “Provider” and “integration” describe useful concepts but are not reasons to require the old catalog → integration → connection class hierarchy in every service. Retain distinctions that affect configuration, identity, or behavior. Public names need an explicit migration decision before changing existing clients.
 
@@ -155,7 +158,7 @@ flowchart LR
 - `connectors-core` is a library of generic contracts/primitives, not a central server process.
 - Core and shared contracts do not import provider implementations, database clients, SIP stacks, or deployment machinery.
 - A provider library depends on SDK contracts, not on sibling providers or a universal driver enum.
-- A host does not import every concrete adapter. It can operate through service contracts and launch separate executables.
+- A host does not import every concrete internal adapter. It can operate through service contracts and launch separate executables.
 - Common orchestration and infrastructure are reusable. Provider-specific verification, mapping, parsing, and protocol state stay with the provider.
 - Root `ess/` contains shared semantics only. Typed provider vocabulary, native target tuples and operation preparation belong under each [adapter's spec/ess root](../adapters/README.md); native textual contracts live with the same adapter. The Rust gate checks the ESS boundary and compiles each root independently. Shared protocols are not a closed provider catalog.
 - The same outward contract works locally, remotely, or through federation, subject to explicitly advertised transport/profile support.
@@ -166,7 +169,7 @@ flowchart LR
 
 ## 4. Monorepo layout and dependencies
 
-Use one Cargo workspace and lockfile by default. Build each adapter as its own executable/container. Root workspace membership does not mean linking every provider into each binary. Introduce an additional workspace only for a demonstrated dependency incompatibility, not as the normal modularity mechanism. Make canonical generation independent of incidental JSON-map feature choices.
+Use one Cargo workspace and lockfile by default. Build each internal adapter as its own executable/container. Root workspace membership does not mean linking every provider into each binary. Introduce an additional workspace only for a demonstrated dependency incompatibility, not as the normal modularity mechanism. Make canonical generation independent of incidental JSON-map feature choices.
 
 ```text
 connectors/
@@ -186,7 +189,7 @@ connectors/
 │   ├── media/
 │   └── catalog/
 ├── spec-kinds/
-│   └── adapter/v1/
+│   └── adapter/v1/                    # Kind of the internal adapter specifications
 │       ├── schema.json                # Custom Connectors specification kind
 │       ├── semantics.md
 │       └── examples/
@@ -225,7 +228,7 @@ connectors/
     └── operating-services/
 ```
 
-This is a target layout, not a request to scaffold every empty crate immediately. The current deliverable creates the design, local repository guidance, and its AEP handoff record. Add WebRTC as an adapter when the media contract and an implementation justify it; it remains a stated interoperability target.
+This is a target layout, not a request to scaffold every empty crate immediately. The current deliverable creates the design, local repository guidance, and its AEP handoff record. Add WebRTC as an internal adapter when the media contract and an implementation justify it; it remains a stated interoperability target.
 
 ### 4.1 Package responsibilities
 
@@ -236,24 +239,24 @@ This is a target layout, not a request to scaffold every empty crate immediately
 | `connectors-sdk` | Reusable service surface, registration, bounded runtime helpers, config handling, common auth mechanics, instrumentation, host dependency interfaces | Product tenant ownership or per-provider implementation branches |
 | `connectors-client` | Bootstrap, contract negotiation, calls, event/session clients, transport bindings | Provider credential custody, implementation selection inferred from names |
 | `connectors-host` | Infrastructure bindings, local supervision, federation, policy integration, lifecycle/recovery | An intrinsic list of every provider or a customer-specific domain model |
-| `connectors-spec` | Parser/validator for adapter kind, upstream import orchestration, semantic mapping, ESS lowering, generation | Runtime provider invocation or a new general ESS compiler |
-| `connectors-conformance` | Contract scenarios, provider test doubles, transport adapters for black-box testing | Assertions that merely preserve old file layout or trait structure |
+| `connectors-spec` | Parser/validator for the internal adapter kind, upstream import orchestration, semantic mapping, ESS lowering, generation | Runtime provider invocation or a new general ESS compiler |
+| `connectors-conformance` | Contract scenarios, provider test doubles, internal transport adapters for black-box testing | Assertions that merely preserve old file layout or trait structure |
 | CLI | User-facing client/serve/lifecycle entrypoints | Reimplementation of service semantics |
 
 Start common OAuth helpers, config validation, caches, and storage backends as modules. Extract a new crate when dependency or release boundaries require it. Concrete state/secret bindings can initially be host modules. Product-specific ownership and provisioning workflows are composition extensions that use host ports, not branches baked into the generic host.
 
 ```text
-adapter library   -> SDK -> contracts -> core
-client            -> contracts
-host              -> client + SDK
-CLI               -> client + host
-adapter executable -> its own adapter library + host wiring
-spec compiler     -> adapter-kind definition + ESS libraries/tools
+internal adapter library    -> SDK -> contracts -> core
+client                      -> contracts
+host                        -> client + SDK
+CLI                         -> client + host
+internal adapter executable -> its own adapter library + host wiring
+spec compiler               -> internal adapter-kind definition + ESS libraries/tools
 ```
 
-There is no dependency from runtime crates to `connectors-spec`. There is no host-to-concrete-adapter dependency. Thin adapter entrypoints can use shared host wiring without making their libraries depend on customer state or peer providers. A separately authored composition executable may link selected parent/child libraries and inject their narrow ports into the generic host; [mediated composition ownership](../contracts/discovery/composition.md) defines this one-process case without a concrete loader in the host.
+There is no dependency from runtime crates to `connectors-spec`. There is no dependency from the host to a concrete internal adapter. Thin adapter entrypoints can use shared host wiring without making their libraries depend on customer state or peer providers. A separately authored composition executable may link selected parent/child libraries and inject their narrow ports into the generic host; [mediated composition ownership](../contracts/discovery/composition.md) defines this one-process case without a concrete loader in the host.
 
-### 4.2 Adapter layout
+### 4.2 Internal adapter layout
 
 `adapters/<owner>/` is the ownership and extraction boundary. Native contract prose,
 authored ESS, adopted upstream sources/pins/licenses, generated artifacts, fixtures,
@@ -261,7 +264,7 @@ design notes and implementation move together. Root `contracts/` and `ess/` own
 shared protocols and generic facts only. A provider update changes its own binding;
 it changes a shared package only when it changes a shared guarantee or codec.
 
-An extracted adapter consumes an exact reviewed shared-contract/SDK release or
+An extracted internal adapter consumes an exact reviewed shared-contract/SDK release or
 immutable commit and digest, with matching schemas/conformance inputs. Those shared
 artifacts may continue to be released from this repository; moving Loki does not
 require moving the shared contracts into Loki's repository. There is no published
@@ -270,20 +273,20 @@ dependencies and proving an independent build remain packaging prerequisites.
 
 Specification-only directories need no placeholder crate or fake runtime
 declaration. Current Cargo membership explicitly selects the three implemented
-adapters. Parent/child pairings belong to composition; children consume shared
+internal adapters. Parent/child pairings belong to composition; children consume shared
 capabilities without importing parent bindings. See [ownership and gate](../adapters/README.md).
 
 ```text
 adapters/atlassian/
 ├── Cargo.toml                        # Library and standalone binary
-├── design.md                         # Adapter-owned design and evidence notes
+├── design.md                         # Design and evidence notes of the internal adapter
 ├── contracts/                        # Versioned native profiles and fixtures
 │   └── documents/v1alpha1/
 │       ├── semantics.md
 │       └── cql.md
 ├── spec/
 │   ├── ess/                          # Authored native semantic models
-│   ├── adapter.yaml                  # Instance of custom adapter kind
+│   ├── adapter.yaml                  # Document of the internal adapter kind
 │   ├── configuration.yaml
 │   ├── authentication.yaml
 │   └── bindings/
@@ -312,7 +315,7 @@ adapters/atlassian/
     └── fixtures/
 ```
 
-The authored adapter kind owns config and mapping semantics. Provider code implements remaining obligations. Generated upstream DTOs and bindings reuse shared contract types instead of creating independent copies of them. Generation must expose unresolved obligations by name.
+The authored internal adapter kind owns config and mapping semantics. Provider code implements remaining obligations. Generated upstream DTOs and bindings reuse shared contract types instead of creating independent copies of them. Generation must expose unresolved obligations by name.
 
 Commit the generated Rust required for an ordinary Cargo source build. CI regenerates in a temporary directory and checks for drift. Do not perform networked source refresh or require an unpinned ESS invocation from `build.rs`. Only the generator edits generated files. Source pin updates and generated behavior changes are reviewed together.
 
@@ -331,11 +334,11 @@ A Rust trait alone is not a distributed contract. Each shared contract release c
 
 `contracts/` is the shared semantic source and fixture home; native profiles live in `adapters/<owner>/contracts/` beside their authored `spec/ess/`. `connectors-contracts` binds the shared contracts in Rust. Generated schemas and DTOs do not become an independent authority. ESS may express some semantic rules; independent tests carry the obligations it cannot yet express. A syntax-valid schema does not prove behavioral completeness.
 
-Separate versions for the adapter specification kind, shared contract, provider API source, adapter implementation, configuration schema, and realization/build inputs. Installing a new adapter must not require a new core driver enum. A new contract family is introduced explicitly, not as an untyped extension bag hidden inside an old version.
+Separate versions for the internal adapter specification kind, shared contract, provider API source, adapter implementation, configuration schema, and realization/build inputs. Installing a new adapter must not require a new core driver enum. A new contract family is introduced explicitly, not as an untyped extension bag hidden inside an old version.
 
 Compatible implementation upgrades can preserve service/resource identities. Advertised capabilities must match installed handlers and the selected realization. A descriptor generated from a spec with an unresolved implementation stub cannot advertise that stub as a working capability.
 
-Contract negotiation selects an explicit mutually supported version and profile. No silent protocol fallback, hidden field dropping, weakening of guarantees, or automatic request resend. A version adapter is a tested binding with declared information loss and refusal cases.
+Contract negotiation selects an explicit mutually supported version and profile. No silent protocol fallback, hidden field dropping, weakening of guarantees, or automatic request resend. A version adapter is an internal, tested binding with declared information loss and refusal cases.
 
 ## 6. Service bootstrap and discovery
 
@@ -343,7 +346,7 @@ Contract negotiation selects an explicit mutually supported version and profile.
 
 | Discovery | Question | Typical result |
 |---|---|---|
-| Service discovery | Where can I contact adapter services? | Configured endpoint or directory entry |
+| Service discovery | Where can I contact the services of internal adapters? | Configured endpoint or directory entry |
 | Contract discovery | What does this service implement and offer to this caller? | Versioned descriptor and capability/readiness information |
 | Resource discovery | What hosts, endpoints, services, or data resources does it observe? | Attributed resource observations with scope and freshness |
 
@@ -351,7 +354,7 @@ A configured HTTP endpoint must be usable without a catalog. Standardize one min
 
 ### 6.2 Descriptor semantics
 
-An adapter's specification produces the static part of its descriptor. Runtime composition supplies instance identity, enabled implementations, dependency readiness, and caller-visible scope. A descriptor conceptually contains:
+An internal adapter's specification produces the static part of its descriptor. Runtime composition supplies instance identity, enabled implementations, dependency readiness, and caller-visible scope. A descriptor conceptually contains:
 
 ```yaml
 # Illustrative, not a released schema.
@@ -403,7 +406,7 @@ Cancellation requests stopping work. A cancellation acknowledgement must state w
 
 Errors should have safe stable classifications such as invalid input, unsupported contract/profile, authentication required, not admitted, dependency unavailable, capacity, stale description, rate limited, and outcome unknown. Exact names and public disclosure detail are open. Preserve internal diagnostic distinctions without exposing secrets or sensitive policy facts in public error text.
 
-Tenant authority is structural in admitted context. SaaS authentication and authorization to use a Slack/GitLab/Jira credential are different from the provider's own credential validity and scopes. Both must hold. Adapters can perform provider-specific scope and resource checks; the host must not reinterpret provider credentials as blanket application authority.
+Tenant authority is structural in admitted context. SaaS authentication and authorization to use a Slack/GitLab/Jira credential are different from the provider's own credential validity and scopes. Both must hold. Internal adapters can perform provider-specific scope and resource checks; the host must not reinterpret provider credentials as blanket application authority.
 
 For the Beyond10x service binding, preserve the organization rule that verified authentication supplies tenant, optional realm, current authority, and executor before application decoding. No independent caller-set header, query, or body can choose those coordinates. An absent realm is different from a realm named `default`; do not normalize between them in credentials, namespaces, cache/idempotency keys, logs, or dispatch. Ordinary project/workspace/resource selectors remain typed domain inputs. These are host/binding concerns, not provider names or a tenant database embedded in the core library.
 
@@ -474,7 +477,7 @@ List and detail projections can differ intentionally. Declare that difference in
 
 ### 9.2 Provider profiles
 
-- **Jira/Confluence:** record and document reads with scoped sites/projects/spaces. Preserve provider paging and query semantics; do not silently equate a Jira issue with a Confluence document. Auth and some infrastructure can be shared in the Atlassian adapter.
+- **Jira/Confluence:** record and document reads with scoped sites/projects/spaces. Preserve provider paging and query semantics; do not silently equate a Jira issue with a Confluence document. Auth and some infrastructure can be shared in the internal Atlassian adapter.
 - **GitLab:** repositories, projects, issues, merge requests, files, branches, and bounded incremental reads as selected by the specification. CI jobs/pipelines are provider resources; launching one is not automatically equivalent to a generic host process.
 - **Loki:** log labels, timestamps, streams, ordering, native query, result/time/byte limits, and truncation. Preserve the exact query language/profile instead of calling it SQL.
 - **Prometheus:** instant/range time-series semantics, timestamps, step/resolution, label sets, native query, and partial/error behavior. A series is not a log record.
@@ -486,7 +489,7 @@ For all providers, contract selection and operation inventory are still extracti
 
 An execution profile may expose start, status, cancel/terminate, exit outcome, and bounded stdout/stderr or equivalent event streams. Define attachment, input handling, resize/signals where supported, retention, restart continuity, and admission of command/target/environment.
 
-Kubernetes process execution must target an admitted workload/container. It does not confer arbitrary cluster administration or a generic shell on the connector's own host. A GitLab job profile can share common lifecycle primitives while retaining provider-specific triggers and resource semantics. An adapter advertises only the profile it can honestly implement.
+Kubernetes process execution must target an admitted workload/container. It does not confer arbitrary cluster administration or a generic shell on the connector's own host. A GitLab job profile can share common lifecycle primitives while retaining provider-specific triggers and resource semantics. An internal adapter advertises only the profile it can honestly implement.
 
 ## 10. Host, resource, and endpoint discovery
 
@@ -499,13 +502,13 @@ The host controls materialization:
 ```text
 Kubernetes observation
     → authorized selection/configuration
-    → compatible SQL/Loki/Prometheus adapter placement
+    → compatible placement of an internal SQL/Loki/Prometheus adapter
     → explicit credential and route binding
     → readiness validation
     → callable datasource
 ```
 
-An endpoint inside a cluster may be unreachable from a laptop. Use an adapter placed in the reachable network or a separately admitted tunnel/mediated-route capability. Federation of discovery results does not make private addresses reachable. An observation never causes an automatic credential probe, arbitrary outbound dial, or downloaded-code execution.
+An endpoint inside a cluster may be unreachable from a laptop. Use an internal adapter placed in the reachable network or a separately admitted tunnel/mediated-route capability. Federation of discovery results does not make private addresses reachable. An observation never causes an automatic credential probe, arbitrary outbound dial, or downloaded-code execution.
 
 Define withdrawal, re-observation, stable identity across changes, and stale-binding behavior. A moved service or changed provider object must not silently redirect an existing authorized connection to an unrelated target. Bound resources and long-lived sessions retain their admitted identity/revision according to explicit update/revocation policy.
 
@@ -513,11 +516,11 @@ Before modeling these relationships in ESS, establish cardinality and ownership 
 
 ## 11. Configuration and caching
 
-An adapter specification publishes a typed configuration schema, constraints, defaults, secret-reference requirements, and update semantics. The adapter implements provider-specific validation. A host can generate basic forms and use a versioned configuration-management contract without importing the adapter implementation.
+An internal adapter specification publishes a typed configuration schema, constraints, defaults, secret-reference requirements, and update semantics. The adapter implements provider-specific validation. A host can generate basic forms and use a versioned configuration-management contract without importing the adapter implementation.
 
 Example scopes:
 
-| Adapter | Configuration examples |
+| Internal adapter | Configuration examples |
 |---|---|
 | Atlassian | Allowed sites/projects/spaces, auth profiles, selected operations, query/read limits, cache policy |
 | GitLab | Instances, project/group scope, auth identity, enabled reads/writes, pagination limits |
@@ -553,7 +556,7 @@ Caching has both a common mechanism and provider-specific meaning:
 | Persist sensitive material | Injected secret-store binding |
 | Authenticate a permitted provider request | Connection-bound authentication capability at the execution boundary |
 
-The runtime adapter declares the capability it needs. It does not construct storage paths, open a Vault client, own the OAuth callback service, or duplicate generic token-refresh coordination.
+The internal runtime adapter declares the capability it needs. It does not construct storage paths, open a Vault client, own the OAuth callback service, or duplicate generic token-refresh coordination.
 
 Keep inbound SaaS caller identity, permission to use a connection, provider credential validity, and provider-granted scopes separate. A user's login is not a provider token. A valid provider token is not an application grant. Remote federation authentication is another explicit boundary, not a reason to forward vendor credentials between all hosts.
 
@@ -604,13 +607,13 @@ Do not require all backends to implement the existing prepared multi-key transac
 
 ### 12.4 Authenticated runtime capabilities
 
-For HTTP-based providers, a runtime adapter can receive:
+For HTTP-based providers, an internal runtime adapter can receive:
 
 ```text
 AuthenticatedHttp.execute(admitted_request) -> ProviderResponse
 ```
 
-It is bound to the selected connection, external identity/profile, allowed destination, and execution limits. The provider adapter constructs and interprets the business request. The authentication capability obtains usable credentials and places them immediately before permitted dispatch.
+It is bound to the selected connection, external identity/profile, allowed destination, and execution limits. The internal provider adapter constructs and interprets the business request. The authentication capability obtains usable credentials and places them immediately before permitted dispatch.
 
 Destination and redirect checks prevent a request from forwarding credentials to an arbitrary target. The connector's request builder cannot override the selected credential or turn an opaque auth handle into universal network access. Required SaaS admission happens before this interface.
 
@@ -638,7 +641,7 @@ Separate three layers:
 |---|---|---|
 | External resource | Carrier number/trunk with provider-side identity | External system; accessed through its management implementation |
 | SaaS assignment | Number belongs to tenant A and reaches assistant B | Product/control plane using host persistence and admission |
-| Runtime session | One call arriving through that number | Protocol adapter plus session host/application |
+| Runtime session | One call arriving through that number | Internal protocol adapter plus session host/application |
 
 A resource can be shared or referenced by multiple authorized bindings. Its external account/ownership and SaaS tenancy are not automatically the same. Before an ESS model encodes relations, settle cardinality, uniqueness, reassignment, deletion, and orphan/recovery behavior.
 
@@ -680,7 +683,7 @@ SIP/RTP endpoint <-> MediaSession <-> bridge <-> MediaSession <-> RTVBP endpoint
 
 ### 14.3 Incoming calls in cloud/SaaS
 
-An adapter listens on configured SIP ingress, interprets the protocol, and submits an offer toward the host. It does not open an application session under a tenant inferred from an untrusted caller header.
+An internal adapter listens on configured SIP ingress, interprets the protocol, and submits an offer toward the host. It does not open an application session under a tenant inferred from an untrusted caller header.
 
 Conceptual receiver port:
 
@@ -698,7 +701,7 @@ The host resolves receiver-owned routing using trusted ingress plus the destinat
 ```mermaid
 sequenceDiagram
     participant Carrier
-    participant SIP as SIP adapter
+    participant SIP as internal SIP adapter
     participant Host as Session host
     participant Store as Assignment store
     participant App as Tenant application
@@ -740,7 +743,7 @@ InboundBinding:
 
 Provisioning records the request durably, calls the management operation, records the provider reference/outcome, creates the tenant assignment, configures external delivery where necessary, and activates the binding only when prerequisites are ready. Recovery must distinguish unknown external allocation from a definitely failed request; blindly repeating allocation may create another billable resource.
 
-The SIP adapter owns dialog/media state and emits instrumentation. The host/product owns persistent assignments, operational history, credential custody, routing/admission, and telemetry retention. Slim means narrow responsibility, not an incorrect stateless SIP implementation.
+The internal SIP adapter owns dialog/media state and emits instrumentation. The host/product owns persistent assignments, operational history, credential custody, routing/admission, and telemetry retention. Slim means narrow responsibility, not an incorrect stateless SIP implementation.
 
 ## 15. Webhooks and durable events
 
@@ -775,7 +778,7 @@ A common event envelope includes event reference/type/schema version, source con
 
 Define deduplication scope/window, ordering scope, cursor expiry, replay authorization, retention, backpressure, and consumer acknowledgement. A durable subscription may provide at-least-once delivery within retention. Without a reliable upstream event identity, expose possible duplicates; do not claim exactly-once processing.
 
-A Slack webhook adapter and Socket Mode adapter can publish the same typed event contract if their normalization and attribution agree. The existing Socket Mode persist-before-ack behavior is a useful reference. Do not generalize the old local event store's 10,000-event/64 MiB limits to all new deployments without a configuration/profile decision.
+An internal Slack webhook adapter and a Socket Mode adapter can publish the same typed event contract if their normalization and attribution agree. The existing Socket Mode persist-before-ack behavior is a useful reference. Do not generalize the old local event store's 10,000-event/64 MiB limits to all new deployments without a configuration/profile decision.
 
 Event receipt is not approval for a subsequent mutation. A product may define an explicitly admitted event-to-action policy; it must not accidentally turn every event reference into universal approval. Preserve the distinction between the old local `event:` claim mechanism and hosted exact-input approval records.
 
@@ -787,14 +790,14 @@ Outbound webhooks bind a subscription to HTTP delivery with declared authenticat
 
 ## 16. Federation
 
-The host exposes the same outward service/bootstrap and capability contracts as an adapter. It connects to configured or discovered-and-admitted downstream services, imports their descriptions under source-qualified identities, and forwards requests through supported bindings. An application can talk to a provider directly or through the host.
+The host exposes the same outward service/bootstrap and capability contracts as an internal adapter. It connects to configured or discovered-and-admitted downstream services, imports their descriptions under source-qualified identities, and forwards requests through supported bindings. An application can talk to a provider directly or through the host.
 
 Federation is an explicitly implemented capability, not a property obtained by concatenating JSON descriptors. Its contract includes:
 
 1. **Identity and namespace:** preserve origin instance and resource/operation ownership across hops. Aliases are presentation; they cannot collide or repoint existing handles silently.
-2. **Version/profile compatibility:** advertise the intersection the gateway can actually serve. Explicitly declared adapters can translate versions; information loss and refusal cases are tested.
+2. **Version/profile compatibility:** advertise the intersection the gateway can actually serve. Explicitly declared internal adapters can translate versions; information loss and refusal cases are tested.
 3. **Authentication/delegation:** authenticate the client, bind the selected downstream connection, and use an explicit trusted delegation or service-authentication arrangement. A downstream receiver validates the authority it consumes. Never substitute a broad gateway identity for every caller without the corresponding receiver-owned narrowing policy.
-4. **Admission:** effective access is bounded by both gateway and downstream policy. A leaf adapter continues enforcing provider-specific resource/configuration restrictions even if reached directly.
+4. **Admission:** effective access is bounded by both gateway and downstream policy. A leaf's internal adapter continues enforcing provider-specific resource/configuration restrictions even if reached directly.
 5. **Origins and freshness:** preserve provenance, completeness, cursor ownership, cache status, and source revision. A stale directory entry is not proof that a capability is currently available.
 6. **Partial failure:** unavailable sources appear explicitly. An empty merged list must not falsely mean “no matching resources” when one source failed. Aggregate pagination/order/continuation rules need a separate contract if the host combines result sets.
 7. **Cancellation/retry:** preserve operation identity and deadlines. Lost responses remain uncertain; a gateway must not automatically replay a mutation because it can select another route.
@@ -805,9 +808,9 @@ Start the proof with one federation hop and explicit downstream configuration. T
 
 ### 16.1 Credential locality
 
-The executing adapter service owns provider credential custody through its configured auth/store bindings. Federation does not centralize all vendor secrets. Gateway credentials authenticate its permitted relationship with downstream services; those are distinct from vendor credentials.
+The executing internal adapter service owns provider credential custody through its configured auth/store bindings. Federation does not centralize all vendor secrets. Gateway credentials authenticate its permitted relationship with downstream services; those are distinct from vendor credentials.
 
-When provider OAuth must be completed remotely, route the control flow to the owning adapter/coordinator through an admitted management contract. Do not expose its private callback capabilities or provider registration secrets as ordinary operation discovery data.
+When provider OAuth must be completed remotely, route the control flow to the owning internal adapter/coordinator through an admitted management contract. Do not expose its private callback capabilities or provider registration secrets as ordinary operation discovery data.
 
 ### 16.2 Session and data reachability
 
@@ -819,7 +822,7 @@ A relayed session needs a defined owner and termination policy when one hop fail
 
 ### 17.1 One protocol boundary across placements
 
-A local configuration can identify either a remote service endpoint or an adapter artifact to launch. The host supplies local infrastructure bindings and starts the service as a separate executable. Clients perform the same bootstrap and contract checks as for a remote service.
+A local configuration can identify either a remote service endpoint or an internal adapter artifact to launch. The host supplies local infrastructure bindings and starts the service as a separate executable. Clients perform the same bootstrap and contract checks as for a remote service.
 
 Separate executable processes are the initial recommendation. No Rust dynamic-library ABI or arbitrary in-process plugin loader is required. Logical adapter independence does not require a network hop for every internal host dependency; use ordinary injected ports inside a service.
 
@@ -836,7 +839,7 @@ The launcher caches artifacts by the actual source/build inputs, not a moving br
 
 ### 17.2 Host lifecycle
 
-The host handles configuration validation, dependency binding, startup, readiness, graceful shutdown, restart policy, and process accounting. Adapter libraries receive scoped capabilities. Adapters handle provider protocol cleanup and expose reliable readiness/termination information.
+The host handles configuration validation, dependency binding, startup, readiness, graceful shutdown, restart policy, and process accounting. Internal adapter libraries receive scoped capabilities. Adapters handle provider protocol cleanup and expose reliable readiness/termination information.
 
 Startup must refuse missing required bindings without silently falling back to an insecure or semantically different implementation. Restart does not prove continuation of sessions or delivery positions. Stop/drain semantics account for active sessions before an old artifact/configuration is retired.
 
@@ -844,7 +847,7 @@ The selected OS/architecture support matrix is open. The old system deliberately
 
 ### 17.3 CLI target
 
-The proposed CLI supports client operations, connection/config management, service discovery, local adapter lifecycle, and a serving/federating mode. `connectors serve` in the conversation names that future mode; the installed 0.7.0 CLI currently requires a subgroup such as `serve local`. Exact new command syntax is to be specified, not assumed from this document.
+The proposed CLI supports client operations, connection/config management, service discovery, local lifecycle of internal adapter processes, and a serving/federating mode. `connectors serve` in the conversation names that future mode; the installed 0.7.0 CLI currently requires a subgroup such as `serve local`. Exact new command syntax is to be specified, not assumed from this document.
 
 Principles:
 
@@ -858,23 +861,23 @@ Principles:
 
 Compositions select service artifacts/endpoints, contract requirements, routes, infrastructure bindings, and policy. Private tenant values and secret references are environment-owned; public examples contain no credentials. The same engineering composition could use remote Atlassian/GitLab, in-cluster Kubernetes/SQL, and a local catalog.
 
-Each adapter produces an independent artifact with its specification/contract compatibility, implementation revision, and build inputs. A new Jira implementation should not require releasing SIP or the client. A shared contract change requires testing affected providers/clients, not blindly bumping and regenerating every unrelated artifact.
+Each internal adapter produces an independent artifact with its specification/contract compatibility, implementation revision, and build inputs. A new Jira implementation should not require releasing SIP or the client. A shared contract change requires testing affected providers/clients, not blindly bumping and regenerating every unrelated artifact.
 
-## 18. The Connectors-owned ESS adapter specification kind
+## 18. The Connectors-owned ESS specification kind for internal adapters
 
 ### 18.1 Ownership correction
 
-This was an explicit operator clarification: **adapter specifications are a custom specification kind inside Connectors.** Do not add Jira, Slack, cache policy, MediaSession bindings, or provider-specific mapping semantics to ESS's intrinsic domain model merely to support this rewrite.
+This was an explicit operator clarification about the internal adapters: **adapter specifications are a custom specification kind inside Connectors.** Do not add Jira, Slack, cache policy, MediaSession bindings, or provider-specific mapping semantics to ESS's intrinsic domain model merely to support this rewrite.
 
 Connectors owns the kind's schema, parser, semantic validation, provider/source mappings, code-generation integration, and descriptor projection. ESS supplies its supported typed modeling, synthesis, conformance, realization, build, runtime, and deployment machinery.
 
 Initial implementation should be a Connectors frontend that lowers to supported ESS documents/IR and implementation bindings. This does not assume the installed ESS has a plugin API for arbitrary custom specification kinds. If such an extension mechanism is later used, prove its compatibility and keep the domain ownership unchanged.
 
-### 18.2 What an adapter specification declares
+### 18.2 What an internal adapter specification declares
 
 | Area | Declaration |
 |---|---|
-| Identity | Adapter identity, kind version, source provenance, referenced shared contract versions |
+| Identity | Internal adapter identity, kind version, source provenance, referenced shared contract versions |
 | Provided surface | Contracts, profiles, operations, events, resources, management and configuration capabilities |
 | Required dependencies | Typed credential/auth, state, cache, clock, telemetry, network or device capabilities to bind |
 | Configuration | Schema, defaults, constraints, management authority, activation/restart effects |
@@ -890,7 +893,7 @@ The custom kind, shared contracts, and provider code have different authority:
 
 ```text
 contracts/media defines MediaSession behavior
-spec-kinds/adapter defines how an adapter declares an implementation of a contract
+spec-kinds/adapter defines how an internal adapter declares an implementation of a contract
 adapters/sip/spec binds that contract to SIP implementation/configuration
 adapters/sip/src implements the remaining protocol behavior
 ```
@@ -900,20 +903,20 @@ adapters/sip/src implements the remaining protocol behavior
 ```mermaid
 flowchart TD
     upstream[Vendor specification or reviewed authored source] --> imported[Typed upstream interface and coverage]
-    imported --> compiler[Connectors adapter-spec compiler]
+    imported --> compiler[Connectors internal adapter-spec compiler]
     contracts[Shared semantic contracts] --> compiler
-    spec[Authored adapter specification and mappings] --> compiler
+    spec[Authored internal adapter specification and mappings] --> compiler
     compiler --> semantic[ESS semantic components and typed ports]
     compiler --> bindings[Provider bindings and descriptor projections]
     compiler --> obligations[Explicit implementation obligations]
     semantic --> synth[ESS supported synthesis]
-    synth --> implementation[Adapter implementation]
+    synth --> implementation[Internal adapter implementation]
     bindings --> implementation
     obligations --> code[Provider code or existing protocol libraries]
     code --> implementation
     implementation --> tests[Contract conformance]
     tests --> build[Realization plus build/runtime inputs and executor]
-    build --> artifact[Executable or OCI adapter service]
+    build --> artifact[Executable or OCI internal adapter service]
 ```
 
 The compiler produces an inspectable coverage report: generated, requires implementation, or refused/unresolved, each tied to its source and contract. A successful parser or generated server is not evidence that provider effects work. The descriptor's enabled capabilities must be backed by implementations and the selected realization.
@@ -941,7 +944,7 @@ The installed ESS 0.9.2 reports `validate`, `compile`, `import openapi`, `synthe
 
 The inspected source has typed OpenAPI interface import with explicit coverage/accounting. Its service-interface/import representation is distinct from native semantic `EssIr`. Do not assume an imported vendor API can be passed unchanged to native ESS synthesis.
 
-The inspected Rust HTTP emitter derives routes from the same HTTP contract projection and creates typed serving surfaces. It explicitly emits behavior obligations and basic sequential HTTP handling; an unmet implementation can respond with a named 501 refusal. It is not a completed production concurrent/streaming adapter runtime. Integrating generated ports with the selected SDK service realization remains implementation work.
+The inspected Rust HTTP emitter derives routes from the same HTTP contract projection and creates typed serving surfaces. It explicitly emits behavior obligations and basic sequential HTTP handling; an unmet implementation can respond with a named 501 refusal. It is not a completed production concurrent/streaming internal adapter runtime. Integrating generated ports with the selected SDK service realization remains implementation work.
 
 The old Connectors core specification did not validate with the installed tool:
 
@@ -967,7 +970,7 @@ The following table is a starting scope for extraction and staged implementation
 | SQL | One bounded read profile, then another database implementation | Native types/nulls, schema scope, credentials, cancellation, connection/session ownership, optional transactions/writes |
 | SIP | Inbound offer → admission → duplex media → termination | Outbound dial, supported signaling/media profiles, DTMF, ingress/routing policy, failure races |
 | RTVBP | Carry the agreed MediaSession profile over its binding | Backpressure, control responsiveness, loss, authenticated establishment, terminal propagation |
-| Catalog | Optional service advertising/querying reviewed definitions | Artifact provenance, distribution and source refresh; direct adapters operate without it |
+| Catalog | Optional service advertising/querying reviewed definitions | Artifact provenance, distribution and source refresh; direct internal adapters operate without it |
 | Slack | Reference auth flow and normalized event → admitted action | Bot/user/app credential separation, channel config, Socket Mode/webhook equivalence, durable acceptance |
 | WebRTC | Compatibility target for MediaSession | Its independent establishment/media realization; do not claim support before implemented |
 
@@ -977,19 +980,19 @@ SIP and SQL are explicitly in the desired scope. A scope proposal that drops the
 
 ## 20. Observability, persistence, and bounded execution
 
-Provider libraries emit structured logs, metrics, and typed lifecycle observations. The host configures collection/export, retention, and access. Use normal Rust instrumentation facilities and injected context rather than building a logging backend in every adapter.
+Provider libraries emit structured logs, metrics, and typed lifecycle observations. The host configures collection/export, retention, and access. Use normal Rust instrumentation facilities and injected context rather than building a logging backend in every internal adapter.
 
-Attach correlation across operation/session, adapter instance, admitted connection/resource binding, and relevant config/contract revision. Keep external request IDs where safe. Separate audit records of authority/effects from diagnostic logs and from provider event history. A provider event cannot substitute for an approval record, and a log line cannot substitute for durable operation state.
+Attach correlation across operation/session, instance and its internal adapter, admitted connection/resource binding, and relevant config/contract revision. Keep external request IDs where safe. Separate audit records of authority/effects from diagnostic logs and from provider event history. A provider event cannot substitute for an approval record, and a log line cannot substitute for durable operation state.
 
-Persistent product state lives behind host-owned ports. Examples include connection metadata, active credential references, assignments, config revisions, subscription cursors, approval redemption, and required execution audit. Transient protocol state remains in adapters, including SIP dialogs, SQL connections, WebSocket state, timers, and in-flight provider requests. The [§31 ownership inventory](#31-host-persistence-ownership-and-atomicity) assigns the narrow logical ports and required atomic groups; these are specification obligations, not implemented stores.
+Persistent product state lives behind host-owned ports. Examples include connection metadata, active credential references, assignments, config revisions, subscription cursors, approval redemption, and required execution audit. Transient protocol state remains in internal adapters, including SIP dialogs, SQL connections, WebSocket state, timers, and in-flight provider requests. The [§31 ownership inventory](#31-host-persistence-ownership-and-atomicity) assigns the narrow logical ports and required atomic groups; these are specification obligations, not implemented stores.
 
 Do not automatically recreate the old generic keyed-byte-cell store for every domain. Choose narrow operations with the atomicity the consumer needs, then implement backend conformance. For example, immutable secret writes, compare-and-swap active references, atomic approval spending, and cursor checkpoints have different requirements. Do not promise cross-key or cross-service transactions that a chosen backend cannot deliver.
 
 Bound resources at the appropriate layers: frames, request/input/result bytes, concurrent requests and sessions, buffered events/media, query work and duration, connection establishment, retained state, and retry attempts. Define exact defaults as part of the first profiles. Report capacity rather than silently truncating protocol objects. A truncated datasource result is valid only when the contract explicitly reports truncation/completeness and continuation behavior.
 
-For hosted adapters, health/readiness has layers: process alive, infrastructure ready, provider access valid, selected resource callable, and active session healthy. Readiness checks must not have undeclared external effects or widen credentials. Credentials should not be resolved merely to list static implementation metadata.
+For hosted internal adapters, health/readiness has layers: process alive, infrastructure ready, provider access valid, selected resource callable, and active session healthy. Readiness checks must not have undeclared external effects or widen credentials. Credentials should not be resolved merely to list static implementation metadata.
 
-In-process capabilities constrain well-behaved trusted code; they are not a sandbox against malicious Rust code. A separate process is also not automatically a restricted sandbox. If untrusted third-party adapters become a supported product feature, define the containment and distribution trust model explicitly. Initial built/reviewed adapters and configured artifact sources are the bounded starting assumption.
+In-process capabilities constrain well-behaved trusted code; they are not a sandbox against malicious Rust code. A separate process is also not automatically a restricted sandbox. If untrusted third-party adapters become a supported product feature (today every adapter is internal), define the containment and distribution trust model explicitly. Initial built/reviewed adapters and configured artifact sources are the bounded starting assumption.
 
 ## 21. Conformance and validation strategy
 
@@ -1033,7 +1036,7 @@ Original-byte decoder cases matter: duplicate JSON keys, unknown fields, oversiz
 ### 21.3 Tests that demonstrate decoupling
 
 - Build the CLI/client without SIP/RTP/RTVBP/SQL driver dependencies.
-- Build each adapter without sibling provider implementations.
+- Build each internal adapter without sibling provider implementations.
 - Run Slack/Atlassian business-operation tests with fake authenticated transport and no OAuth server or real secret backend.
 - Run auth coordinator tests with fake provider exchange, clock, and metadata/custody ports.
 - Swap the credential store without modifying provider code.
@@ -1059,7 +1062,7 @@ Define minimal service bootstrap, operation, session, error, identity/admission 
 
 **Exit:** the same tests pass in-process where supported, directly over the chosen wire binding, and through a one-hop fake federator. No provider-specific dependency is required.
 
-### Stage 2: implement the adapter specification frontend
+### Stage 2: implement the internal adapter specification frontend
 
 Define the custom kind in Connectors. Use one supported OpenAPI input, one shared contract profile, one explicit mapping, and one deliberately unsupported/unmapped case. Lower to a pinned ESS input and generate bindings, configuration schema, descriptor, and named implementation obligations.
 
@@ -1083,11 +1086,11 @@ Specify the first MediaSession and telephony-control profiles; implement SIP and
 
 **Exit:** the media bridge and application remain unchanged when endpoints are substituted. SIP contains no customer database or RTVBP protocol dependency. Include both inbound architecture and selected outbound compatibility; do not claim an outbound-only proof validates inbound routing.
 
-### Stage 6: complete selected adapters and packaging
+### Stage 6: complete selected internal adapters and packaging
 
 Extend Jira/Confluence, GitLab, Loki/Prometheus, SQL implementations, event intake, and catalog service according to the behavior matrix. Add process/job profiles only when their semantics have been settled. Produce local and OCI artifacts with checked runtime descriptors and exact build provenance.
 
-**Exit:** independent adapter builds/releases, observable readiness, source-build installation, shutdown/restart, and configured federation all pass their profiles. Additional adapters can be added without core/host provider branches.
+**Exit:** independent internal adapter builds/releases, observable readiness, source-build installation, shutdown/restart, and configured federation all pass their profiles. Additional adapters can be added without core/host provider branches.
 
 ### Stage 7: migrate selected consumers
 
@@ -1165,7 +1168,7 @@ These details need a recorded decision when their first implementation slice beg
 | Media data placement | Direct media when authorized and reachable, with explicit relay composition where needed | NAT/reachability, credentials, loss, bounded buffers, and terminal propagation |
 | Event durability and subscription storage | One selected durable acceptance/checkpoint model | Crash after persistence/before ack and replay/retention-gap scenarios |
 | Artifact discovery/distribution | Configured reviewed sources and immutable artifact/source identities | A descriptor cannot cause an unapproved build or execution; source provenance survives packaging |
-| Package/release versioning | One workspace/lockfile initially; independent adapter artifacts and capability versions | Consumers can select one adapter without rebuilding/releasing unrelated runtime services |
+| Package/release versioning | One workspace/lockfile initially; independent internal adapter artifacts and capability versions | Consumers can select one adapter without rebuilding/releasing unrelated runtime services |
 | Supported platforms | Declare an initial platform set; Linux is the first cloud/container target | Local credential custody and process supervision are implemented on every claimed target |
 
 Exact numeric limits, lease durations, retry windows, cache defaults, supported provider operations, codec sets, and secret retention periods are intentionally not invented here. They must be selected, encoded, and tested for each first profile. The lack of a number in this handoff does not permit an unbounded implementation.
@@ -1225,22 +1228,22 @@ The old untracked `docs/design/21-clean-room-rewrite.md` is recorded only to exp
 - [Rust HTTP emitter](../../ess/crates/generate/ess-synth/src/rust/http.rs): generated serving surface and explicit implementation obligations; inspect the pinned revision before relying on a later tool release.
 - [Component delivery](../../ess/website/docs/concepts/component-delivery.md): independent component and deployment concerns.
 
-The custom Connectors adapter kind described here is a proposal to implement in this repository. These references do not claim that ESS currently supplies that domain model or a ready-made adapter-kind plugin API.
+The custom Connectors kind for internal adapters described here is a proposal to implement in this repository. These references do not claim that ESS currently supplies that domain model or a ready-made adapter-kind plugin API.
 
 ### 26.3 Provider-specific auth example
 
-Slack was used to make authentication separation concrete. Its official [token documentation](https://docs.slack.dev/authentication/tokens/) distinguishes token roles; [OAuth installation documentation](https://docs.slack.dev/authentication/installing-with-oauth/) describes application installation; [token rotation documentation](https://docs.slack.dev/authentication/using-token-rotation) describes refresh behavior. The [FAQ](https://docs.slack.dev/faq/) supplies supplementary platform context. These are source references for the example, not a substitute for pinning exact provider facts during adapter authoring.
+Slack was used to make authentication separation concrete. Its official [token documentation](https://docs.slack.dev/authentication/tokens/) distinguishes token roles; [OAuth installation documentation](https://docs.slack.dev/authentication/installing-with-oauth/) describes application installation; [token rotation documentation](https://docs.slack.dev/authentication/using-token-rotation) describes refresh behavior. The [FAQ](https://docs.slack.dev/faq/) supplies supplementary platform context. These are source references for the example, not a substitute for pinning exact provider facts during internal adapter authoring.
 
-Recheck current official specifications/documentation before implementing any provider endpoint, parameter, authorization exchange, webhook verification rule, or rate behavior. Store the fetched provenance with the adapter. No vendor API path or protocol implementation should be invented from an architectural sketch.
+Recheck current official specifications/documentation before implementing any provider endpoint, parameter, authorization exchange, webhook verification rule, or rate behavior. Store the fetched provenance with the internal adapter. No vendor API path or protocol implementation should be invented from an architectural sketch.
 
 ## 27. First executable slice, 2026-09-08
 
-After this design handoff, the operator authorized the goal **three adapters implemented
-end to end**, selecting **Kubernetes including discovery, GitLab, and SQL**. The
+After this design handoff, the operator authorized the goal of three internal adapters
+**implemented end to end**, selecting **Kubernetes including discovery, GitLab, and SQL**. The
 earlier design-only boundary describes the original handoff; the wider architecture
 above remains the direction, with only the explicitly selected profile implemented.
 
-The normative first-slice behavior is [configured adapter services v1alpha1](../contracts/service/v1alpha1/semantics.md).
+The normative first-slice behavior of these internal adapters is [configured adapter services v1alpha1](../contracts/service/v1alpha1/semantics.md).
 It provides eight read/discovery operations through independent Rust services,
 a generic HTTP client, and one-hop federation. Kubernetes endpoint observations
 feed an explicit host-owned SQL configuration step. The SDK defines abstract
@@ -1248,7 +1251,7 @@ credential and HTTP capabilities; concrete stores, admission, network transport,
 logging and serving belong to the host. Provider libraries can exclude host wiring
 by disabling their `service` feature. There is no provider registry in core.
 
-Connectors owns [the adapter spec kind](../spec-kinds/adapter/v1/semantics.md),
+Connectors owns [the internal adapter spec kind](../spec-kinds/adapter/v1/semantics.md),
 its JSON Schema, deterministic descriptor compiler, and handwritten implementation
 obligations. [ESS declarations](../ess/system.yaml) give authored entities a typed
 home. Automatic OpenAPI-to-ESS executable realization, OCI synthesis, OAuth
@@ -1257,7 +1260,7 @@ providers remain future work; the current descriptors do not advertise them.
 
 Start with [the README](../README.md), then [the live acceptance recipe](live-e2e.md)
 and [verification evidence](verification.md). The governing implementation record
-is [story:three-adapters-e2e](../.engineering/planning/story/three-adapters-e2e.md).
+is [the story of the three internal adapters](../.engineering/planning/story/three-adapters-e2e.md).
 This extension keeps the work local and does not register or integrate it into Atlas.
 
 ## 28. GitLab specification-to-service slice, 2026-09-08
@@ -1267,11 +1270,11 @@ The subsequent authorized implementation is
 The operator requested a local snapshot first; commit `75f1c72` preserves the
 complete earlier implementation and unfinished generator.
 
-GitLab now uses the Connectors-owned `connectors.adapter/v2` profile. The frontend
+At the time, GitLab's internal adapter used the Connectors-owned `connectors.adapter/v2` profile. The frontend
 validates pinned upstream mappings, retains source coverage and ESS import refusals,
 lowers its selected local request types into the pinned ESS 0.20.0, and generates request
 construction, dispatch and descriptors. ESS-generated types are consumed by the
-running adapter. Handwritten bindings own admission, pagination, response checks
+running internal adapter. Handwritten bindings own admission, pagination, response checks
 and provenance. Kubernetes/SQL remain on the strict v1 profile.
 
 This extends section 27's first slice with bounded generation and local OCI
@@ -1300,7 +1303,7 @@ wire fixtures; and a Rust gate checks the workspace and minimum toolchain.
 The response retains dispositions for all findings and distinguishes current
 fixture evidence from the previous live/container proof.
 
-## 30. Contract and adapter design documents, 2026-09-08
+## 30. Contract and internal adapter design documents, 2026-09-08
 
 The operator asked which contracts a rebuild of Jira, Confluence, Kubernetes, Docker,
 federated Grafana (Loki, Prometheus, Alertmanager) and media sessions (SIP via sipx,
@@ -1312,13 +1315,13 @@ document counts from its 17 proposed rows because catalog appears twice. One des
 document per adapter now lives beside its [owned contracts](../adapters/README.md);
 monitoring and media comparisons live under docs/compositions. The original
 2026-09-08 inventory predates that ownership correction. The documents state each
-adapter's required contracts and cite the old surface. Nothing in
+internal adapter's required contracts and cite the old surface. Nothing in
 these documents is implemented; descriptors advertise none of it. Docker has no
 predecessor in the old repository and is designed from the Kubernetes shape.
 
 ## 31. Host persistence ownership and atomicity
 
-This inventory consolidates the selected contracts' obligations for E28. Each row names one **logical port owner**, not a Rust trait, universal keyed-byte API, database choice or advertised implementation. A port can have multiple replicas only when they share its one authoritative state and required serialization. Separate rows distinguish state ownership even where an atomic group requires one underlying host metadata authority. Adapters own provider protocol interpretation and transient connections, not these product ledgers.
+This inventory consolidates the selected contracts' obligations for E28. Each row names one **logical port owner**, not a Rust trait, universal keyed-byte API, database choice or advertised implementation. A port can have multiple replicas only when they share its one authoritative state and required serialization. Separate rows distinguish state ownership even where an atomic group requires one underlying host metadata authority. Internal adapters own provider protocol interpretation and transient connections, not these product ledgers.
 
 | Port owner | Sole owned state and narrow decisions | Required failure/retention handoff | Normative contract |
 |---|---|---|---|
@@ -1338,7 +1341,7 @@ This inventory consolidates the selected contracts' obligations for E28. Each ro
 | SessionRedemptionPort | Serving endpoint's one-use establishment authority and redemption decision | Redeem before data; distinct from approval, transport nonce and renewable data lease. A supporting authority binding must prevent reuse across its selected ingress/replica/restart scope. Loss of continuity cannot recreate an accepted establishment token; exact ledger/format remains an advertisement prerequisite | [sessions §4](../contracts/sessions/v1alpha1/semantics.md), [auth capability](../contracts/auth/capability/v1alpha1/semantics.md) |
 | SessionSupervisorPort | One live owner's serialized state, first terminal fact, lease/revoke/drain decisions and task/resource accounting | Enforce the existing 2 s data cutoff and 5 s teardown, independently at controlled endpoints. Restart/continuity loss is lost, never reattach or reconstructed live leases. Durable terminal records, if selected, do not restore live sockets/devices or permit token reuse | [sessions §4.1](../contracts/sessions/v1alpha1/semantics.md#41-traffic-cutoff-and-teardown-f06) |
 | ReadCursorCachePort | Optional bounded read cache/context/key/expiry; no second discovery view or mutation-result authority | Default ephemeral cursor-key loss invalidates continuations. Discovery cursors refer to DiscoveryPublicationPort's immutable view and cannot retain it past its limits. Cache absence proves no provider absence. Durable subscription checkpoints are a different deferred port | [records](../contracts/datasources/records/v1alpha1/semantics.md), [resources §4.4](../contracts/discovery/resources/v1alpha1/semantics.md#44-publication-retention-and-public-paging) |
-| DeploymentConfigurationPort | Authoritative admitted instance/operation/profile/route/configuration/projection meaning and selected issuer/trust policy inputs | Deployment files/artifacts may supply immutable configuration; no live configuration database is implied. Effective connection facts belong to ConnectionAuthorityPort. A configuration backup cannot reset another port's uniqueness or revive old identities, target bindings, grants or private history | [§18](#18-the-connectors-owned-ess-adapter-specification-kind), [delegation §§2,5](../contracts/service/delegation.md) |
+| DeploymentConfigurationPort | Authoritative admitted instance/operation/profile/route/configuration/projection meaning and selected issuer/trust policy inputs | Deployment files/artifacts may supply immutable configuration; no live configuration database is implied. Effective connection facts belong to ConnectionAuthorityPort. A configuration backup cannot reset another port's uniqueness or revive old identities, target bindings, grants or private history | [§18](#18-the-connectors-owned-ess-specification-kind-for-internal-adapters), [delegation §§2,5](../contracts/service/delegation.md) |
 | EventClaimSpendPort — unselected | Conceptual one-shot event-derived claim, separate from event receipt and mutation attempt | Exact claim ingress/proof remains unbound. An event or its persisted receipt is not approval. This named future owner cannot advertise spending until its dedicated proof/issuer/ingress contract is settled | [operations §4](../contracts/operations/v1alpha1/semantics.md), [delegation §8](../contracts/service/delegation.md#8-ess-and-verification-boundary) |
 
 ### 31.1 Atomic groups and ordered handoffs
@@ -1353,17 +1356,17 @@ This inventory consolidates the selected contracts' obligations for E28. Each ro
 
 ### 31.2 Revisions, retention and modeled scope
 
-Shared immutable artifact provenance is modeled in `ess/domains/artifact_provenance.yaml` under the [artifact declaration rules](../contracts/catalog/v1alpha1/semantics.md#9-ess-declarations-and-optional-catalog-state). Sources and generated Bundles are independently retained declarations; consumers reference them without deletion ownership. Index replacement does not mutate a Bundle or confer execution authority. This additive model preserves existing adapter/operation identities and current strict reader syntax; optional distribution publication remains separately selected work.
+Shared immutable artifact provenance is modeled in `ess/domains/artifact_provenance.yaml` under the [artifact declaration rules](../contracts/catalog/v1alpha1/semantics.md#9-ess-declarations-and-optional-catalog-state). Sources and generated Bundles are independently retained declarations; consumers reference them without deletion ownership. Index replacement does not mutate a Bundle or confer execution authority. This additive model preserves existing internal adapter/operation identities and current strict reader syntax; optional distribution publication remains separately selected work.
 
 Public connection revision and F02/F03 semantic binding revision identify effect-relevant configuration/management meaning. They change for admitted semantic changes, not for same-identity material refresh, evidence recollection or safe same-target route revalidation alone. The **private auth publication fence** instead advances on auth binding publication/revocation/replace and serializes pending admissions; acquisition/refresh's existing expected_binding_revision carrier names this private fence. Credential generation, discovery generation and private route evidence revision are further distinct coordinates. Refresh may invalidate current dispatch/permission evidence while leaving a request's semantic fingerprint unchanged; current admission still governs replay disclosure. A changed destination/identity/operation meaning cannot be hidden by keeping a semantic revision constant. New fixed target/parent/access-mode/owner bindings require the new connection rules already selected by auth.connection.
 
 Do not unify retention windows: custody follows valid-use plus its declared retention, key known results use the fixed 86,400 s settlement window while Pending/Quarantined remain live, approval tombstones have no automatic expiry, delegation receipts retire only after trustworthy expiry, discovery history/cursors have their own 600 s/300 s bounds, and session live authority follows its lease/cutoff rules. Audit compaction, metadata retention and secret GC cannot erase the evidence still needed by another owner's safety predicate. Custody scope/version, private material/generation/route locators and protected acquisition correlation never enter public responses, ordinary logs or metrics; diagnostic correlation uses separately admitted safe ids. Access-controlled internal port state is not a diagnostic export.
 
-The shared ESS root now declares twenty-seven entities. The eleven existing identities and lifecycles remain intact: AdapterSpecification, OperationDeclaration, ServiceConfiguration, CredentialGeneration, DispatchAdmission, RefreshAttempt, AttemptRecord, KeyReservation, DeliveryReceipt, ApprovalRedemption and Session. Nine additive records complete the selected model scope: Source, Bundle, AuthProfile, Connection, Acquisition, CustodyVersion, AuditRecord, DiscoveryCollection and ResourceObservation. Seven owner records of the local implementation followed: ReadUse, LocalClockFloor, LocalRuntimeRecord, ConnectionListCursor, ApprovalIssuer, ApprovalSigningKey and LocalApprovalPolicy ([local ER metadata](local-er-metadata.md) maps their tables). Their owning contracts select identities, references, deletion independence, retention and lifecycle causation; actual atomic storage and trusted predicates remain implementation obligations.
+The shared ESS root now declares twenty-seven entities. The eleven existing identities and lifecycles remain intact: AdapterSpecification (an internal adapter's specification), OperationDeclaration, ServiceConfiguration, CredentialGeneration, DispatchAdmission, RefreshAttempt, AttemptRecord, KeyReservation, DeliveryReceipt, ApprovalRedemption and Session. Nine additive records complete the selected model scope: Source, Bundle, AuthProfile, Connection, Acquisition, CustodyVersion, AuditRecord, DiscoveryCollection and ResourceObservation. Seven owner records of the local implementation followed: ReadUse, LocalClockFloor, LocalRuntimeRecord, ConnectionListCursor, ApprovalIssuer, ApprovalSigningKey and LocalApprovalPolicy ([local ER metadata](local-er-metadata.md) maps their tables). Their owning contracts select identities, references, deletion independence, retention and lifecycle causation; actual atomic storage and trusted predicates remain implementation obligations.
 
 Connection retains one optional bounded baseline EvidenceSnapshot for its active generation and an optional fixed MediatedRouteBinding. CredentialSet, ExternalIdentity, CompositionDeclaration, Curation and gateway idempotency.RouteBinding are values, with no independent entity lifecycle. A discovery collection owns its bounded observations; a child route retains historical coordinates without a live observation foreign key. Audit uses a private injective instance/ref identity and at most one final observation; attempt and selected-connection links reference independently retained records. Immutable Sources and Bundles are reusable, and no optional index owns their deletion. DispatchAdmission remains transient, Session models one live supervisor, and CredentialGeneration identifies immutable capture.
 
-This is the specification baseline for Kubernetes including discovery, GitLab and SQL. It is ready for implementation decomposition after the combined gate and independent review, not a claim of runtime conformance. SaaS assignments, event subscriptions, optional scoped monitoring bindings, optional distribution publication and other deferred capabilities remain outside this milestone. New entity-bearing work must use the same ESS-first process; no missing selected ownership/lifecycle decision is hidden as a storage detail. Public codecs, strict adapter readers, backends, clocks, cryptography and cross-record predicates still require their explicit implementation and conformance work.
+This is the specification baseline for Kubernetes including discovery, GitLab and SQL. It is ready for implementation decomposition after the combined gate and independent review, not a claim of runtime conformance. SaaS assignments, event subscriptions, optional scoped monitoring bindings, optional distribution publication and other deferred capabilities remain outside this milestone. New entity-bearing work must use the same ESS-first process; no missing selected ownership/lifecycle decision is hidden as a storage detail. Public codecs, strict internal adapter readers, backends, clocks, cryptography and cross-record predicates still require their explicit implementation and conformance work.
 
 Deferred obligations remain named, with no selected protocol: AssignmentProvisioningPort for product assignments/provisioning (§§12–14); EventCheckpointPort for durable intake/acknowledgement/delivery/subscription cursors (§15); ExecutionJobPort for process/job output/restart state (§10); DeploymentArtifactPort for pinned installed artifacts/build identity (§17); TelemetryRetentionPort for admitted logs/metrics export (§20). These do not substitute for selected execution audit, event claims or live session authority. Backend selection, storage migration and cross-service atomicity proofs remain prerequisites for the profiles that need them; they are not silently supplied by a local file or SQLite proposal.
 
@@ -1375,7 +1378,7 @@ Remote provider APIs remain integration targets. Credential custody and executio
 retain replaceable infrastructure bindings so later remote delivery can preserve
 the workflows; that future binding is not a prerequisite for this local milestone.
 
-The [five-day Claude/Codex usage analysis](recent-adapter-usage-20260909.md) records
+The [five-day Claude/Codex usage analysis](recent-adapter-usage-20260909.md), a record that keeps the legacy term, records
 recoverable tool calls, reviewed failures, specification gaps and twenty-two proposed
 acceptance scenarios. It covers local setup/repair, MySQL incident queries, GitLab
 CI/MRs and incremental collection, Jira JQL and mutations, Confluence CQL/documents,
@@ -1384,7 +1387,7 @@ derived metrics, Prometheus/Grafana queries, Kubernetes/Docker execution, and
 observed GitHub/AWS workflows. It distinguishes provider use from help, fixtures,
 quoted commands and incomplete executions; private session payloads are excluded.
 
-The existing three-adapter specification milestone remains its bounded baseline.
+The existing specification milestone of three internal adapters remains its bounded baseline.
 It does not establish parity with this broader observed usage. Specify the local
 configuration/management/custody journey first, then select the required native
 profiles and lifecycle behavior through the existing contract/ESS workflow before
@@ -1394,22 +1397,23 @@ storage backend, protected entry codec, write-admission binding or execution pro
 
 ## 33. Selected local CLI binding, 2026-09-09
 
-The operator subsequently selected a Linux local CLI with `setup`, `adapters`,
-`connections` and `operations` command groups. The [CLI contract](../contracts/cli/v1alpha1/semantics.md)
+The operator subsequently selected a Linux local CLI with `setup`, `adapters` (a deprecated name
+of today's `instances`), `connections` and `operations` command groups. The [CLI contract](../contracts/cli/v1alpha1/semantics.md)
 owns its exact command inventory, process results, protected entry and startup
 rules; [authored ESS values](../ess/domains/cli.yaml) give those inputs and
 observations their shared typed home. These choices resolve the corresponding
 open selections in §32 without changing that section's historical evidence.
 
-Non-secret configuration uses TOML with one entry per adapter. `startup` selects
+Non-secret configuration uses TOML. The legacy format has one `[adapters.<alias>]` entry per
+instance; `connectors-local/5` enables connectors by name and names their instances. `startup` selects
 `on-demand` by default or `automatic` at local host startup. Read-only listing and
-status start nothing. An admitted connect, repair or invocation can start the
-host and the selected adapter under the lifecycle contract. Explicit stop remains
+status start nothing. An admitted connect, reconnect or invocation can start the
+host and the selected instance's internal adapter under the lifecycle contract. Explicit stop remains
 suppressed until an admitted request explicitly resumes that entry.
 
 Credential custody selects the user's local OS keyring, with protected terminal,
 file or stdin entry and private non-secret metadata. Durable acknowledgement,
-Linux ownership checks, repair/revoke races and launch isolation remain explicit
+Linux ownership checks, reconnect/revoke races and launch isolation remain explicit
 runtime conformance obligations. Cloud identity, hosted secrets, federation and
 MCP are not prerequisites for this stage.
 

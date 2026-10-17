@@ -2,6 +2,8 @@
 //! selection descriptions' claims about what reaches guests, read against the
 //! pinned Discovery document and driven through the engine against a scripted
 //! provider. No network, no credential.
+mod hand_written;
+
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_core::{ErrorCode, Result};
@@ -402,32 +404,37 @@ async fn patch_warns_that_a_truncated_guest_list_replaces_every_guest() {
     );
 }
 
-/// Every Google configuration in the Calendar guide — the read instance and
-/// the write instance — names one authorization endpoint,
-/// `https://accounts.google.com/o/oauth2/auth`. Only the Calendar guide is
-/// checked in this tree: the Drive, Slides and catalog provider guides are
-/// moved to the same endpoint on the integration branch (34dab8a31), not on
-/// this unit's base.
+/// Every Google configuration of the Calendar guide names one authorization
+/// endpoint, `https://accounts.google.com/o/oauth2/auth`: the profile the
+/// `calendar` connector declares, which the guide's instance uses and names,
+/// and the read and the write configuration the guide showed before connectors
+/// were declared (`hand_written`).
 #[test]
 fn every_google_guide_names_one_authorize_url() {
+    const AUTHORIZE: &str = "https://accounts.google.com/o/oauth2/auth";
     let mut urls = Vec::new();
-    for line in doc("catalog-google-calendar.md").lines() {
-        if let Some((_, rest)) = line.split_once("\"authorize_url\": \"")
-            && rest.starts_with("https://accounts.google.com/")
-        {
-            urls.push(rest.split('"').next().unwrap().to_owned());
-        }
+    for body in hand_written::blocks("catalog-google-calendar.md") {
+        let config: Value = serde_json::from_str(&body).unwrap();
+        urls.push(config["auth"]["authorize_url"].as_str().unwrap().to_owned());
     }
     assert_eq!(
         urls.len(),
         2,
         "the read and the write configuration: {urls:?}"
     );
-    assert!(
-        urls.iter()
-            .all(|url| url == "https://accounts.google.com/o/oauth2/auth"),
-        "the Calendar guide names another authorize_url than \
-         https://accounts.google.com/o/oauth2/auth (only this guide is checked here; the \
-         other Google guides are fixed on the integration branch at 34dab8a31): {urls:#?}"
+    let declaration: Value = serde_json::from_slice(
+        &fs::read(root().join("providers/google-calendar/connector.json")).unwrap(),
+    )
+    .unwrap();
+    urls.push(
+        declaration["profiles"][0]["authorize_url"]
+            .as_str()
+            .unwrap()
+            .to_owned(),
     );
+    assert!(
+        urls.iter().all(|url| url == AUTHORIZE),
+        "a Calendar configuration names another authorize_url than {AUTHORIZE}: {urls:#?}"
+    );
+    assert!(doc("catalog-google-calendar.md").contains(&format!("`{AUTHORIZE}`")));
 }

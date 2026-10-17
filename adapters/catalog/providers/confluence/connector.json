@@ -1,0 +1,20 @@
+{
+  "format": "connectors-catalog-connector/1",
+  "connector_id": "confluence",
+  "provider_id": "atlassian",
+  "adapter_id": "catalog",
+  "catalog_provider": "confluence",
+  "selection": "operations.json",
+  "profiles": [
+    {
+      "profile": "atlassian.basic",
+      "scheme": "basic",
+      "header": "Authorization",
+      "bearer": false,
+      "account_label": "Account email",
+      "label": "API token",
+      "identity": {"path": "rest/api/user/current", "kind": "atlassian.account", "subject_pointer": "/accountId"},
+      "access": {"path": "api/v2/pages", "query": {"limit": "1"}}
+    }
+  ]
+}

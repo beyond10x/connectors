@@ -1,3 +1,4 @@
+> This dated record predates the [connector vocabulary](../README.md#vocabulary) and keeps the terms of its date.
 # Public documentation and executable contract examples
 
 Status: implemented locally on 2026-09-09; moved to its own site on the shared shell on

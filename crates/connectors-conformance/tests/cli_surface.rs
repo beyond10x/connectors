@@ -4,9 +4,13 @@
 use connectors_cli_contract::{
     AcquireError, Context, DynamicError, DynamicPhase, DynamicValidator, Handler, HandlerReply,
     Invocation, ProcessOutput, ProtectedSource, Sources,
+    wire::{ArgumentSource, Plan, Shape},
 };
 use serde_json::{Value, json};
-use std::{collections::BTreeSet, ffi::OsString};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ffi::OsString,
+};
 
 fn fixture(name: &str) -> Value {
     let data: Value = serde_json::from_str(include_str!(
@@ -86,7 +90,7 @@ fn refusal(output: &ProcessOutput, exit: i32) -> Value {
 }
 
 #[test]
-fn the_selected_inventory_has_thirty_grouped_commands_and_explicit_runtime_obligations() {
+fn the_selected_inventory_has_thirty_one_grouped_commands_and_explicit_runtime_obligations() {
     let plan = connectors_cli_contract::plan();
     let actual: BTreeSet<_> = plan
         .commands
@@ -98,14 +102,15 @@ fn the_selected_inventory_has_thirty_grouped_commands_and_explicit_runtime_oblig
         "setup check",
         "setup checkpoints-enable",
         "setup owner-stop",
-        "adapters list",
-        "adapters describe",
-        "adapters status",
-        "adapters stop",
+        "setup migrate",
+        "instances list",
+        "instances describe",
+        "instances status",
+        "instances stop",
         "connections list",
         "connections describe",
         "connections connect",
-        "connections repair",
+        "connections reconnect",
         "connections revalidate",
         "connections launch",
         "connections status",
@@ -312,18 +317,18 @@ fn every_local_action_dispatches_once_with_its_declared_result_type() {
         ),
         (&["setup", "init"], "SetupInitResult"),
         (&["setup", "check"], "SetupCheckResult"),
-        (&["adapters", "list", "--limit", "10"], "AdapterListResult"),
+        (&["instances", "list", "--limit", "10"], "AdapterListResult"),
         (
-            &["adapters", "describe", "--adapter", "forge"],
+            &["instances", "describe", "--adapter", "forge"],
             "AdapterDescribeResult",
         ),
         (
-            &["adapters", "status", "--adapter", "forge"],
+            &["instances", "status", "--adapter", "forge"],
             "AdapterStatusResult",
         ),
         (
             &[
-                "adapters",
+                "instances",
                 "stop",
                 "--adapter",
                 "forge",
@@ -366,7 +371,7 @@ fn every_local_action_dispatches_once_with_its_declared_result_type() {
         (
             &[
                 "connections",
-                "repair",
+                "reconnect",
                 "--adapter",
                 "forge",
                 "--connection",
@@ -375,7 +380,7 @@ fn every_local_action_dispatches_once_with_its_declared_result_type() {
                 "r1",
                 "--credential-stdin",
             ],
-            "ConnectionRepairResult",
+            "ConnectionReconnectResult",
         ),
         (
             &[
@@ -618,7 +623,7 @@ const INVOKE: &[&str] = &[
     "json",
 ];
 fn invocation_result(result: Value) -> Value {
-    json!({"adapter":"forge","operation":"read","revision":"r1","result":result})
+    json!({"adapter":"forge","connector":"fixture-forge","instance":"forge","operation":"read","revision":"r1","result":result})
 }
 
 #[test]
@@ -661,7 +666,7 @@ fn describe_and_invoke_answer_json_values_not_json_text() {
     let input_schema = json!({"type":"object","properties":{"selector":{"type":"string"}}});
     let output_schema = json!({"type":"object","properties":{"count":{"type":"integer"}}});
     let operation = json!({"id":"read","description":"Read","contract":"operations/v1alpha1","profile":"read","input_schema":input_schema,"output_schema":output_schema});
-    let described = json!({"adapter":"forge","revision":"r1","schema":"fixture-input","operation":operation,"source":"cached","stale":true});
+    let described = json!({"adapter":"forge","connector":"fixture-forge","instance":"forge","revision":"r1","schema":"fixture-input","operation":operation,"source":"cached","stale":true});
     let mut adapter = fixture("AdapterDescribeResult");
     adapter["descriptor"]["operations"] = json!([operation]);
     let cases: [(&[&str], Value); 2] = [
@@ -676,7 +681,7 @@ fn describe_and_invoke_answer_json_values_not_json_text() {
             ],
             described,
         ),
-        (&["adapters", "describe", "--adapter", "forge"], adapter),
+        (&["instances", "describe", "--adapter", "forge"], adapter),
     ];
     for (args, result) in cases {
         let mut handler = Recorder::new(result.clone());
@@ -839,7 +844,7 @@ fn a_configuration_refusal_may_name_the_format_and_entry_and_nothing_else() {
         "next_action":"check_configuration","configuration_format":"connectors-local/1",
         "instance_id":"forge-local"});
     let mut sources = InputSources::default();
-    let args = ["adapters", "list", "--output", "json"];
+    let args = ["instances", "list", "--output", "json"];
     let output = refusal(
         &run(
             &args,
@@ -866,4 +871,295 @@ fn a_configuration_refusal_may_name_the_format_and_entry_and_nothing_else() {
     );
     refusal(&refused, 1);
     assert!(!refused.stderr.contains("TOML"));
+}
+
+/// Whether every struct of the shape that carries `adapter` requires
+/// `connector` and `instance` beside it. A service descriptor's `adapter`
+/// (`configuration_schema` beside it) is the implementation it describes, not
+/// a selector.
+fn names_selection(shape: &Shape) -> bool {
+    match shape.required() {
+        Shape::Struct { fields } => {
+            (!fields.contains_key("adapter")
+                || fields.contains_key("configuration_schema")
+                || ["adapter", "connector", "instance"]
+                    .iter()
+                    .all(|name| fields.get(*name) == Some(&Shape::String)))
+                && fields.values().all(names_selection)
+        }
+        Shape::List { of } => names_selection(of),
+        Shape::Map { value } => names_selection(value),
+        _ => true,
+    }
+}
+
+/// story:cli-connector-instance-selectors: every command that takes
+/// `--adapter` takes `--connector` and `--instance`, each an optional field of
+/// its input, so the parser requires none of them and the handler decides
+/// which one selected. Every result type that names a selected alias requires
+/// its connector and instance beside it.
+#[test]
+fn every_adapter_command_also_selects_by_connector_and_instance() {
+    let plan = connectors_cli_contract::plan();
+    let optional = Shape::Optional {
+        of: Box::new(Shape::String),
+    };
+    let mut selecting = Vec::new();
+    for command in &plan.commands {
+        let longs: BTreeSet<&str> = command
+            .arguments
+            .iter()
+            .filter_map(|argument| match &argument.source {
+                ArgumentSource::Option { long } => Some(long.as_str()),
+                _ => None,
+            })
+            .collect();
+        if !longs.contains("adapter") {
+            continue;
+        }
+        selecting.push(command.path.join(" "));
+        assert!(
+            longs.contains("connector") && longs.contains("instance"),
+            "{:?}",
+            command.path
+        );
+        let callable = &plan.callables[&command.callable];
+        let Some(Shape::Struct { fields }) = callable.input.as_ref().map(|input| &input.shape)
+        else {
+            panic!("{:?}: no struct input", command.path);
+        };
+        for name in ["adapter", "connector", "instance"] {
+            assert_eq!(
+                fields.get(name),
+                Some(&optional),
+                "{:?} {name}",
+                command.path
+            );
+        }
+    }
+    assert_eq!(selecting.len(), 25, "{selecting:?}");
+    for (name, callable) in &plan.callables {
+        assert!(names_selection(&callable.result.shape), "{name}");
+    }
+    for selector in [
+        &["--connector", "fixture", "--instance", "main"][..],
+        &["--adapter", "forge"],
+        &[],
+    ] {
+        let mut handler = Recorder::new(fixture("ApprovalPolicyResult"));
+        let output = run(
+            &[
+                &["approvals", "policy-status", "--output", "json"][..],
+                selector,
+            ]
+            .concat(),
+            &mut InputSources::default(),
+            &mut handler,
+            None,
+        );
+        assert_eq!(output.exit_code, 0, "{selector:?}: {output:?}");
+        let (_, input, _) = handler.last.unwrap();
+        let expected: serde_json::Map<String, Value> = selector
+            .chunks(2)
+            .map(|pair| (pair[0].trim_start_matches("--").to_owned(), json!(pair[1])))
+            .collect();
+        assert_eq!(input, Value::Object(expected), "{selector:?}");
+    }
+}
+
+/// story:connections-reconnect-verb: `connections reconnect` replaces
+/// `connections repair` and the `instances` group replaces `adapters`. Each old
+/// path is a path alias of exactly its new one, so the same arguments reach
+/// the same callable with the same input and answer the same output.
+#[test]
+fn every_renamed_path_is_an_alias_of_its_new_name() {
+    let plan = connectors_cli_contract::plan();
+    let aliases: BTreeSet<(String, String)> = plan
+        .commands
+        .iter()
+        .flat_map(|command| {
+            command
+                .aliases
+                .iter()
+                .map(|alias| (alias.join(" "), command.path.join(" ")))
+        })
+        .collect();
+    let renamed = [
+        ("connections repair", "connections reconnect"),
+        ("adapters list", "instances list"),
+        ("adapters describe", "instances describe"),
+        ("adapters status", "instances status"),
+        ("adapters stop", "instances stop"),
+    ];
+    assert_eq!(
+        aliases,
+        renamed
+            .iter()
+            .map(|(old, new)| ((*old).to_owned(), (*new).to_owned()))
+            .collect()
+    );
+    let arguments: &[&str] = &[
+        "--connector",
+        "fixture",
+        "--instance",
+        "main",
+        "--connection",
+        "c1",
+        "--expected-revision",
+        "r1",
+        "--host-incarnation",
+        "h1",
+        "--child-incarnation",
+        "p1",
+        "--credential-stdin",
+    ];
+    for (old, new) in renamed {
+        let declaration = plan
+            .commands
+            .iter()
+            .find(|command| command.path.join(" ") == new)
+            .unwrap();
+        let longs: BTreeSet<String> = declaration
+            .arguments
+            .iter()
+            .flat_map(|argument| match &argument.source {
+                ArgumentSource::Option { long } => vec![format!("--{long}")],
+                ArgumentSource::Protected { stdin, .. } => vec![format!("--{stdin}")],
+                _ => Vec::new(),
+            })
+            .collect();
+        let args: Vec<&str> = arguments
+            .chunks(2)
+            .filter(|pair| pair.len() == 2 && longs.contains(pair[0]))
+            .flatten()
+            .copied()
+            .chain(
+                arguments
+                    .last()
+                    .copied()
+                    .filter(|flag| longs.contains(*flag)),
+            )
+            .collect();
+        let result = fixture(match declaration.callable.as_str() {
+            "connections-reconnect" => "ConnectionReconnectResult",
+            "adapters-list" => "AdapterListResult",
+            "adapters-describe" => "AdapterDescribeResult",
+            "adapters-status" => "AdapterStatusResult",
+            "adapters-stop" => "AdapterStopResult",
+            other => panic!("{other}"),
+        });
+        let answer = |path: &str| {
+            let mut handler = Recorder::new(result.clone());
+            let mut sources = InputSources {
+                value: r#"{"credential":"fictional-credential-sentinel"}"#.into(),
+                ..Default::default()
+            };
+            let output = run(
+                &[
+                    &["--output", "json"][..],
+                    &path.split(' ').collect::<Vec<_>>(),
+                    &args,
+                ]
+                .concat(),
+                &mut sources,
+                &mut handler,
+                None,
+            );
+            assert_eq!(output.exit_code, 0, "{path}: {output:?}");
+            assert_eq!(handler.calls, 1, "{path}");
+            (output, handler.last.unwrap(), sources.calls)
+        };
+        let (by_new, by_old) = (answer(new), answer(old));
+        assert_eq!(by_new.0, by_old.0, "{old} -> {new}");
+        assert_eq!(by_new.1.0, declaration.callable, "{new}");
+        assert_eq!(by_new.1, by_old.1, "{old} -> {new}");
+        assert_eq!(by_new.2, by_old.2, "{old} -> {new}");
+    }
+}
+
+/// What makes two declarations of `plan` reach one parser entry: the same path
+/// declared twice, as a path or an alias; a path that is also another's group;
+/// or a reserved word. The generated tree keys each leaf by its name
+/// (`apps/connectors-cli-contract/src/runtime.rs`, `command`), so the later of
+/// two would silently replace the earlier one.
+fn path_collisions(plan: &Plan) -> Vec<String> {
+    let mut collisions = Vec::new();
+    let mut seen = BTreeMap::<&[String], &str>::new();
+    for command in &plan.commands {
+        for path in std::iter::once(&command.path).chain(&command.aliases) {
+            let words = path.join(" ");
+            if path.is_empty() || ["help", "completions", "version"].contains(&path[0].as_str()) {
+                collisions.push(format!("`{words}` takes a reserved word"));
+            }
+            if let Some(earlier) = seen.insert(path, &command.callable) {
+                collisions.push(format!(
+                    "`{words}` names {earlier} and {}",
+                    command.callable
+                ));
+            }
+        }
+    }
+    for path in seen.keys() {
+        if seen
+            .keys()
+            .any(|other| other.len() > path.len() && other.starts_with(path))
+        {
+            collisions.push(format!("`{}` is a command and a group", path.join(" ")));
+        }
+    }
+    collisions
+}
+
+/// The leaf `path` names in `tree`, if any.
+fn leaf<'a>(tree: &'a clap::Command, path: &[String]) -> Option<&'a clap::Command> {
+    path.iter()
+        .try_fold(tree, |command, word| command.find_subcommand(word))
+}
+
+/// story:cli-text-without-adapter: an alias that collides with a command is
+/// refused, not silently overwritten. `ess generate cli` refuses such a
+/// binding; this refuses a plan that carries one anyway, and holds that every
+/// declared path reaches its own declaration in the generated tree.
+#[test]
+fn no_alias_or_path_replaces_another_command() {
+    let plan = connectors_cli_contract::plan();
+    assert_eq!(path_collisions(&plan), Vec::<String>::new());
+    let tree = connectors_cli_contract::command();
+    let mut reached = 0;
+    for command in &plan.commands {
+        for path in std::iter::once(&command.path).chain(&command.aliases) {
+            let about = leaf(&tree, path).and_then(|leaf| leaf.get_about());
+            assert_eq!(
+                about.map(ToString::to_string).as_deref(),
+                Some(command.about.as_str()),
+                "{path:?}"
+            );
+            reached += 1;
+        }
+    }
+    assert_eq!(reached, 36);
+    // What the check refuses, the generated tree would hide: an alias onto
+    // `connections list` replaces that command without a word.
+    let mut colliding = plan.clone();
+    let listed = colliding
+        .commands
+        .iter_mut()
+        .find(|command| command.path == ["instances", "list"])
+        .unwrap();
+    listed
+        .aliases
+        .push(vec!["connections".into(), "list".into()]);
+    let replaced = listed.about.clone();
+    let tree = connectors_cli_contract::runtime::command(&colliding);
+    let path = ["connections".to_owned(), "list".to_owned()];
+    assert_eq!(
+        leaf(&tree, &path)
+            .and_then(|leaf| leaf.get_about())
+            .map(ToString::to_string),
+        Some(replaced)
+    );
+    assert_eq!(
+        path_collisions(&colliding),
+        ["`connections list` names connections-list and adapters-list"]
+    );
 }

@@ -957,6 +957,9 @@ fn spawn(
     deadline: Instant,
 ) -> Result<(UnixStream, std::process::Child, Launched)> {
     let binary = std::env::current_exe().map_err(|_| Code::Unavailable)?;
+    // The owner runs from a sealed copy; it derives configured instances from
+    // the installation this CLI resolved, so both bind the same executable.
+    let installation = crate::local::config::installation_directory();
     let hash = hex::encode(Sha256::digest(
         std::fs::read(&binary).map_err(|_| Code::Unavailable)?,
     ));
@@ -998,8 +1001,12 @@ fn spawn(
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+    if let Some(directory) = &installation {
+        command.env(crate::local::config::INSTALLATION, directory);
+    }
     // A test build ties the owner to the process a harness names (owner.md);
-    // this one variable is all of the CLI's environment the owner receives.
+    // with the installation directory above, it is all of the CLI's environment the
+    // owner receives.
     #[cfg(debug_assertions)]
     if let Some(parent) = std::env::var_os(super::tether::PARENT) {
         command.env(super::tether::PARENT, parent);
@@ -1804,16 +1811,15 @@ fn action(
                 bootstrap.binding(&profile)?
             };
             let selection = config.selection();
-            if selection.read_only() {
-                // A read-only binding cannot hold what an OAuth-acquired,
-                // refresh-rotating profile writes, and one mounted item backs
-                // one connection: both refused before any provider exchange.
-                if bootstrap.profile(&profile)?.acquisition.is_some()
-                    || (connection.is_none()
-                        && registry.holds_profile(&binding, connectors_sdk::now_ms())?)
-                {
-                    return Err(Code::CustodyReadOnly.into());
-                }
+            // A read-only binding cannot hold what an OAuth-acquired,
+            // refresh-rotating profile writes: refused before any provider
+            // exchange. That one mounted item backs one connection needs no
+            // check of its own: a connect on an instance that holds a
+            // connection is refused by `begin`, naming the step that clears
+            // it (story:connect-refused-while-instance-holds-connection), and
+            // the publishing commit still refuses a second one.
+            if selection.read_only() && bootstrap.profile(&profile)?.acquisition.is_some() {
+                return Err(Code::CustodyReadOnly.into());
             }
             let now = connectors_sdk::now_ms();
             let acquired = match connection {
@@ -1823,7 +1829,7 @@ fn action(
                     expected_revision.as_deref().ok_or(Code::InvalidInput)?,
                     now,
                 )?,
-                None => registry.begin(&binding, now)?,
+                None => begin_connect(&registry, &binding, now)?,
             };
             let reference = acquired.reference().to_owned();
             let expiry = now + 300_000;
@@ -2042,6 +2048,25 @@ fn action(
         }
         _ => Err(Code::InvalidInput.into()),
     }
+}
+
+/// A connect's allocation. Refused beside another connect of the instance in
+/// flight (`Conflict`, `retry_status`), the refusal carries that connect's
+/// acquisition, which `connections status --acquisition` follows until it
+/// ends (story:connect-refused-while-instance-holds-connection). It is read
+/// after the refusal, so a connect that ended in between leaves it absent.
+fn begin_connect(
+    registry: &registry::Registry,
+    binding: &registry::Binding,
+    now: u64,
+) -> Result<registry::Acquisition> {
+    registry.begin(binding, now).map_err(|failure| {
+        let mut error = Error::from(failure);
+        if failure == registry::Failure::Conflict {
+            error.acquisition = registry.in_flight(&binding.instance_id, now).ok().flatten();
+        }
+        error
+    })
 }
 
 /// A consumer launch, in the owner, which alone reads the credential. Admission
@@ -2809,7 +2834,7 @@ mod idle_sweep_tests {
         let mut tether = tether::Tether::new(&directory, &state, &socket).unwrap();
         assert!(!tether.ended());
         // Queued before the socket is removed: retirement serves it and listens again.
-        let client = UnixStream::connect(state.join("owner.sock")).unwrap();
+        let client = UnixStream::connect(&socket).unwrap();
         let retirement = retire(&owner, &recovery, &mut listener, &socket, &mut tether);
         assert!(matches!(retirement, Retirement::Serve));
         assert!(state.join("owner.sock").exists(), "the owner listens again");
@@ -2922,5 +2947,37 @@ mod allocator_tests {
             "glibc's default created no arena for 8 threads"
         );
         assert_eq!(arenas_created(true), 0);
+    }
+}
+
+/// story:connect-refused-while-instance-holds-connection: a connect refused
+/// beside another connect of the instance in flight carries that connect's
+/// acquisition, so the `retry_status` it names can be followed with
+/// `connections status --acquisition`.
+#[cfg(all(test, unix))]
+mod connect_refusal_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    const NOW: u64 = 1_788_998_400_000;
+
+    #[test]
+    fn a_connect_beside_one_in_flight_names_its_acquisition() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        drop(Metadata::initialize(root.path()).unwrap());
+        let registry = registry::Registry::new(root.path());
+        let binding = crate::local::registry::fixture_binding("instance");
+        let first = begin_connect(&registry, &binding, NOW).unwrap();
+        let Err(refused) = begin_connect(&registry, &binding, NOW) else {
+            panic!("a connect beside one in flight was admitted");
+        };
+        assert_eq!(refused.code, Code::LifecycleConflict);
+        assert_eq!(refused.acquisition.as_deref(), Some(first.reference()));
+        let other = crate::local::registry::fixture_binding("other");
+        begin_connect(&registry, &other, NOW).unwrap();
+        let claim = registry.consume(first, NOW).unwrap();
+        registry.fail(&claim, NOW).unwrap();
+        begin_connect(&registry, &binding, NOW).unwrap();
     }
 }

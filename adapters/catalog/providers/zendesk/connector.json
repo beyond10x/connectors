@@ -1,0 +1,29 @@
+{
+  "format": "connectors-catalog-connector/1",
+  "connector_id": "zendesk",
+  "provider_id": "zendesk",
+  "adapter_id": "catalog",
+  "catalog_provider": "zendesk",
+  "selection": "operations.json",
+  "profiles": [
+    {
+      "profile": "zendesk.oauth",
+      "scheme": "oauth2_client_credentials",
+      "header": "Authorization",
+      "bearer": true,
+      "label": "OAuth client secret",
+      "identity": {"path": "api/v2/users/me", "kind": "zendesk.user", "subject_pointer": "/user/id"},
+      "token_url": "/oauth/tokens",
+      "requested_scopes": ["read"]
+    },
+    {
+      "profile": "zendesk.basic",
+      "scheme": "basic",
+      "header": "Authorization",
+      "bearer": false,
+      "account_label": "Account email followed by /token",
+      "label": "API token",
+      "identity": {"path": "api/v2/users/me", "kind": "zendesk.user", "subject_pointer": "/user/id"}
+    }
+  ]
+}

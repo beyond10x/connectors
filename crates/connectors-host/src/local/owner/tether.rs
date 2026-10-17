@@ -184,13 +184,33 @@ impl Parent {
 mod tests {
     use super::*;
 
+    /// Binds `owner.sock` in the opened state directory through its descriptor
+    /// on Linux, as the owner does, so a long temporary path does not push the
+    /// socket address past `SUN_LEN`; the tether still checks the socket by
+    /// its path.
+    fn bind(directory: &File) -> std::os::unix::net::UnixListener {
+        #[cfg(target_os = "linux")]
+        let socket = {
+            use std::os::fd::AsRawFd;
+            PathBuf::from(format!(
+                "/proc/self/fd/{}/owner.sock",
+                directory.as_raw_fd()
+            ))
+        };
+        #[cfg(not(target_os = "linux"))]
+        let socket = crate::local::runtime::artifact::path_of(directory)
+            .unwrap()
+            .join("owner.sock");
+        std::os::unix::net::UnixListener::bind(socket).unwrap()
+    }
+
     fn fixture() -> (tempfile::TempDir, PathBuf, File, PathBuf) {
         let root = tempfile::tempdir().unwrap();
         let state = root.path().join("state");
         std::fs::create_dir(&state).unwrap();
         let directory = File::open(&state).unwrap();
         let socket = state.join("owner.sock");
-        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let listener = bind(&directory);
         std::mem::forget(listener);
         (root, state, directory, socket)
     }
@@ -258,7 +278,7 @@ mod tests {
         std::fs::create_dir_all(&state).unwrap();
         let directory = File::open(&state).unwrap();
         let socket = state.join("owner.sock");
-        let _listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let _listener = bind(&directory);
         let tether = Tether::new(&directory, &state, &socket).unwrap();
         std::fs::rename(&parent, root.path().join("moved")).unwrap();
         std::fs::create_dir(&parent).unwrap();
@@ -276,7 +296,7 @@ mod tests {
         let (_root, state, directory, socket) = fixture();
         let tether = Tether::new(&directory, &state, &socket).unwrap();
         std::fs::remove_file(&socket).unwrap();
-        let _stand_in = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let _stand_in = bind(&directory);
         assert_eq!(tether.lost_now(), Some(Loss::Socket));
     }
 
@@ -287,13 +307,13 @@ mod tests {
         let (_root, state, directory, socket) = fixture();
         let mut tether = Tether::new(&directory, &state, &socket).unwrap();
         std::fs::remove_file(&socket).unwrap();
-        let _again = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let _again = bind(&directory);
         tether.rebound();
         assert_eq!(tether.lost_now(), None);
         std::fs::remove_file(&socket).unwrap();
         tether.rebound();
         assert_eq!(tether.lost_now(), Some(Loss::Socket));
-        let _stand_in = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let _stand_in = bind(&directory);
         assert_eq!(tether.lost_now(), Some(Loss::Socket));
     }
 

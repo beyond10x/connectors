@@ -1,0 +1,79 @@
+# Ledger expectations only: RecordConnectionCandidate stands for the host's
+# record of the candidate custody version a reconnect allocates on the
+# connection before its publication. On a Live connection that change is part
+# of the publication itself, so the command is refused there.
+type: ess-scenario/1
+domain: connectors.auth_bindings
+scenario: stale-connection-records-reconnect-candidate
+summary: 'A reconnect candidate recorded on a Stale connection keeps it Stale, a second one after a failed reconnect too, and the command is refused on a Live connection.'
+arrange:
+- instance: connection
+  entity: connectors.auth_bindings.Connection
+timeline:
+- at: '2026-10-16T13:00:00Z'
+  command: connectors.auth_bindings.AllocateConnection
+  input:
+    decision: allow
+    instance_id: gmail.private
+    profile_record_ref: catalog/google.oauth/r1
+    owner_scope: local
+    access_mode: credential
+    publication_fence: fence-1
+  outcome: allocated
+  events:
+  - event: connectors.auth_bindings.ConnectionAllocated
+  capture:
+    instance: connection
+    event: connectors.auth_bindings.ConnectionAllocated
+    field: connection_ref
+- at: '2026-10-16T13:00:01Z'
+  command: connectors.auth_bindings.RecordConnectionCandidate
+  input:
+    connection_ref:
+      $instance: connection
+    candidate_custody_version_ref: version-0
+  outcome: wrong-state
+  error:
+    name: connectors.auth_bindings.ConnectionStateConflict
+  no_events:
+  - connectors.auth_bindings.ConnectionCandidateRecorded
+- at: '2026-10-16T13:00:02Z'
+  command: connectors.auth_bindings.MarkConnectionStale
+  input:
+    connection_ref:
+      $instance: connection
+  outcome: marked-stale
+  events:
+  - event: connectors.auth_bindings.ConnectionMarkedStale
+- at: '2026-10-16T13:00:03Z'
+  command: connectors.auth_bindings.RecordConnectionCandidate
+  input:
+    connection_ref:
+      $instance: connection
+    candidate_custody_version_ref: version-1
+  outcome: candidate-recorded
+  events:
+  - event: connectors.auth_bindings.ConnectionCandidateRecorded
+    payload:
+      connection_ref:
+        $instance: connection
+      candidate_custody_version_ref: version-1
+- at: '2026-10-16T13:00:04Z'
+  command: connectors.auth_bindings.RecordConnectionCandidate
+  input:
+    connection_ref:
+      $instance: connection
+    candidate_custody_version_ref: version-2
+  outcome: candidate-recorded
+  events:
+  - event: connectors.auth_bindings.ConnectionCandidateRecorded
+    payload:
+      connection_ref:
+        $instance: connection
+      candidate_custody_version_ref: version-2
+assert:
+- view: connectors.auth_bindings.Connections
+  contains:
+    connection_ref:
+      $instance: connection
+    state: Stale

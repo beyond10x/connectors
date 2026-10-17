@@ -7,6 +7,8 @@
 //! drives the provider child against a disposable HTTPS fixture. Fixture
 //! secrets are fictional and only ever compared, never printed. No network.
 #![cfg(unix)]
+mod hand_written;
+
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,
@@ -390,15 +392,10 @@ fn id_token() -> String {
         URL_SAFE_NO_PAD.encode(b"fixture-signature")
     )
 }
+/// The read configuration the guide showed before connectors were declared
+/// (`hand_written`).
 fn documented_config() -> Value {
-    let guide = guide("catalog-google-gmail.md");
-    let example = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| body.contains(&format!("\"provider\": \"{PROVIDER}\"")))
-        .unwrap();
-    serde_json::from_str::<Value>(example).unwrap()
+    serde_json::from_str(&hand_written::blocks("catalog-google-gmail.md")[0]).unwrap()
 }
 
 struct Provider {

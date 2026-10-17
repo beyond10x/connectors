@@ -272,6 +272,30 @@ impl World {
         (reference, revision)
     }
 
+    /// Connections of the one instance, as it held them before
+    /// story:connect-refused-while-instance-holds-connection: each is
+    /// allocated before any is published, which neither the host nor the
+    /// model refuses. An instance from before that rule keeps them all.
+    fn connect_together(&mut self, subjects: &[&str], now: u64) {
+        let prepared = subjects
+            .iter()
+            .map(|subject| {
+                let acquisition = self.registry.begin_unchecked(&binding(), now).unwrap();
+                let claim = self.registry.consume(acquisition, now).unwrap();
+                self.registry
+                    .prepare(&claim, baseline(subject, now), 12, now)
+                    .unwrap()
+            })
+            .collect::<Vec<_>>();
+        for prepared in prepared {
+            let receipt = custody::WrittenVersion::fixture(prepared.version());
+            let stored = self.registry.acknowledge(prepared, receipt, now).unwrap();
+            let reference = self.registry.publish(stored, now).unwrap();
+            let revision = self.describe(&reference, now).revision;
+            self.connections.push((reference, revision));
+        }
+    }
+
     fn describe(&self, reference: &str, now: u64) -> registry::ObservedConnection {
         self.registry
             .describe(INSTANCE, ADAPTER, CONFIG, reference, now, true)
@@ -431,8 +455,7 @@ fn approval_subject(world: &World) -> approvals::Subject {
 /// `artifact_provenance`, which has none).
 fn populated() -> World {
     let mut world = World::new();
-    world.connect("one", NOW);
-    world.connect("two", NOW);
+    world.connect_together(&["one", "two"], NOW);
     // ReadUse (credential_evidence), cursor (cli), clock floors (clock).
     let (first, _) = world.connections[0].clone();
     world
@@ -758,8 +781,9 @@ fn mr4_a_settled_attempt_ignores_every_later_settlement() {
 #[test]
 fn mr5_revoke_changes_only_the_revoked_connection() {
     let mut world = World::new();
-    let (first, revision) = world.connect("one", NOW);
-    let (second, _) = world.connect("two", NOW);
+    world.connect_together(&["one", "two"], NOW);
+    let (first, revision) = world.connections[0].clone();
+    let (second, _) = world.connections[1].clone();
     for reference in [&first, &second] {
         world
             .registry

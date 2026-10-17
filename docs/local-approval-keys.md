@@ -6,29 +6,31 @@ publication state. Key management does not issue approval proofs or enable provi
 writes. [Local approval issuance](local-approvals.md) supplies caller/policy admission
 and qualified time; complete provider dispatch binding remains unfinished.
 
-After local setup and adapter configuration, initialize and inspect an issuer:
+Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
+
+After local setup and the configuration of an instance (here `forge`, an instance of the `gitlab` connector), initialize and inspect an issuer:
 
 ```sh
-connectors approvals key-init --adapter forge
-connectors approvals key-status --adapter forge --output json
+connectors approvals key-init --connector gitlab --instance forge
+connectors approvals key-status --connector gitlab --instance forge --output json
 ```
 
 The first initialization needs no expected revision. Status returns the issuer,
 audience, current revision and a bounded list of public key IDs, public keys and
 states. Before initialization, the optional issuer member is absent. Status starts
-no adapter and reads no signing seed. The configured adapter
+no process for the instance and reads no signing seed. The instance's
 executable need not be running for any key-management command.
 
 Use the exact UUIDs returned by status for subsequent management:
 
 ```sh
-connectors approvals key-rotate --adapter forge \
+connectors approvals key-rotate --connector gitlab --instance forge \
   --expected-revision "$revision" --expected-key "$active_key"
-connectors approvals key-recover --adapter forge \
+connectors approvals key-recover --connector gitlab --instance forge \
   --expected-revision "$revision" --candidate "$candidate_key"
-connectors approvals key-revoke --adapter forge \
+connectors approvals key-revoke --connector gitlab --instance forge \
   --expected-revision "$revision" --expected-key "$active_key"
-connectors approvals key-retire --adapter forge \
+connectors approvals key-retire --connector gitlab --instance forge \
   --expected-revision "$revision" --key "$retired_key"
 ```
 
