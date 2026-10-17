@@ -3,7 +3,7 @@ use connectors_sdk::Secret;
 use std::{
     collections::BTreeMap,
     sync::{
-        Arc, Condvar, Mutex,
+        Arc, Condvar, Mutex, Weak,
         atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering},
         mpsc,
     },
@@ -307,9 +307,23 @@ pub(super) struct Pool {
     shutdown_lock: Mutex<()>,
     /// Attempts recovery has settled; the owner's idle clock counts only these.
     settled: Arc<AtomicU64>,
+    /// This pool, as the handle a worker's job reaches another instance's
+    /// worker through: a write that created a credential holds it on its
+    /// custody target's worker. Weak, so a worker never keeps its pool alive;
+    /// empty for a pool not built by [`Pool::shared`].
+    this: Weak<Pool>,
 }
 impl Pool {
+    /// A pool whose workers hold no handle to it: its custody step finds none.
+    #[cfg(test)]
     pub fn new(paths: Arc<Paths>, incarnation: String) -> Self {
+        Self::with_handle(paths, incarnation, Weak::new())
+    }
+    /// [`Pool::new`], shared, its workers holding a handle to it.
+    pub fn shared(paths: Arc<Paths>, incarnation: String) -> Arc<Self> {
+        Arc::new_cyclic(|this| Self::with_handle(paths, incarnation, this.clone()))
+    }
+    fn with_handle(paths: Arc<Paths>, incarnation: String, this: Weak<Pool>) -> Self {
         Self {
             workers: Mutex::new(BTreeMap::new()),
             paths,
@@ -318,6 +332,7 @@ impl Pool {
             stopped: Arc::new(AtomicBool::new(false)),
             shutdown_lock: Mutex::new(()),
             settled: Arc::new(AtomicU64::new(0)),
+            this,
         }
     }
     fn send(
@@ -350,11 +365,12 @@ impl Pool {
             };
             let recovery_pending = Arc::new(AtomicBool::new(false));
             let instance = adapter.instance_id.clone();
+            let pool = self.this.clone();
             let thread = std::thread::Builder::new()
                 .name("connectors-adapter-owner".into())
                 .spawn(move || {
                     worker(
-                        paths, launches, shared, stopped, activity, instance, receiver,
+                        paths, launches, shared, stopped, activity, instance, receiver, pool,
                     )
                 })
                 .map_err(|_| Code::Unavailable)?;
@@ -609,6 +625,8 @@ impl Pool {
         result
     }
 }
+// One argument per piece of state the worker thread shares with its pool.
+#[allow(clippy::too_many_arguments)]
 fn worker(
     paths: Arc<Paths>,
     launches: Arc<Launches>,
@@ -617,6 +635,7 @@ fn worker(
     activity: Activity,
     instance: String,
     receiver: mpsc::Receiver<Work>,
+    pool: Weak<Pool>,
 ) {
     let Activity {
         busy,
@@ -840,6 +859,7 @@ fn worker(
                             lifecycle: &control,
                             epoch: job.epoch,
                             stopped: &stopped,
+                            pool: &pool,
                         },
                     )
                     .map(Output::Write)

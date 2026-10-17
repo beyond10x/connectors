@@ -249,6 +249,13 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Catalog provider",
+        "GitLab raw file text and languages",
+        "file.raw answers a repository file's exact UTF-8 text at a ref, refusing a file that is not UTF-8 as upstream_protocol and one over the 4 MiB provider response bound as capacity; project.languages answers each language with its percentage; verified against fixtures, not a live GitLab.",
+        "adapters/catalog/tests/gitlab_raw_file_languages.rs::file_raw_returns_the_exact_text_at_the_named_ref",
+        "/docs/reference/adapters/gitlab",
+    ),
+    shipped(
+        "Catalog provider",
         "GitLab merge-request feed",
         "GitLab binds datasource.feed/v1alpha1 as profile gitlab-merge-requests/1, checked against recorded GitLab answers (since 0.32.0).",
         "adapters/catalog/tests/gitlab_feed.rs::the_shipped_gitlab_selection_declares_the_feed_family_under_its_profile",
@@ -314,7 +321,7 @@ pub const CAPABILITIES: &[Capability] = &[
         "Catalog provider",
         "Runpod pods",
         "pod.create, pods.list and pod.terminate with the API key in custody; a create without a definite answer is unknown and never sent again; verified against a local fixture only (since 0.36.0).",
-        "adapters/catalog/tests/runpod.rs::shipped_runpod_selections_are_exactly_create_list_and_terminate",
+        "adapters/catalog/tests/runpod.rs::shipped_runpod_selections_are_exactly_create_list_terminate_and_pod_billing",
         "/docs/reference/adapters/catalog",
     ),
     shipped(

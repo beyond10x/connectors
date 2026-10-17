@@ -244,6 +244,7 @@ fn bootstrap(instance: &str, adapter: &str, declared: &[Declared]) -> runtime::B
             .iter()
             .map(|(id, _, _)| runtime::Requirement {
                 operation: (*id).into(),
+                custody: false,
                 profile: "token".into(),
                 scopes: BTreeSet::new(),
                 effect: runtime::Effect::Read,
