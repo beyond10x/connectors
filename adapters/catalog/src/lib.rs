@@ -663,6 +663,91 @@ pub struct Selection {
     /// bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custody: Option<Custody>,
+    /// Query parameters of a read fixed to one value each
+    /// (`connectors_catalog.selection.FixedQuery`): sent on every request,
+    /// never declared, and refused from caller input. Omitted when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub query_fixed: BTreeMap<String, String>,
+    /// Caller inputs folded into a fixed query value, keyed by the input's
+    /// declared name ([`QueryFold`]). Omitted when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub query_folds: BTreeMap<String, QueryFold>,
+    /// A read whose JSON answer carries a file as base64, answered as its
+    /// text ([`EmbeddedText`]). Omitted when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub embedded_text: Option<EmbeddedText>,
+    /// The headers by which the provider says its rate limit is spent
+    /// ([`RateLimitHeaders`]). Omitted when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate_limit_headers: Option<RateLimitHeaders>,
+}
+
+/// The form a folded caller value takes (`connectors_catalog.selection.FoldFormat`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FoldFormat {
+    /// An ISO 8601 date `YYYY-MM-DD`, or a date-time `YYYY-MM-DDTHH:MM:SS`
+    /// followed by `Z` or `+HH:MM`/`-HH:MM`.
+    Timestamp,
+}
+
+/// The input schema pattern of a `timestamp` fold; [`timestamp`] checks the same.
+const TIMESTAMP_PATTERN: &str =
+    "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2}))?$";
+
+/// Whether a text is a `timestamp`: exactly the shape [`TIMESTAMP_PATTERN`] states.
+fn timestamp(text: &str) -> bool {
+    let shape = |text: &str, form: &str| {
+        text.len() == form.len()
+            && text
+                .bytes()
+                .zip(form.bytes())
+                .all(|(byte, slot)| match slot {
+                    b'9' => byte.is_ascii_digit(),
+                    b'S' => byte == b'+' || byte == b'-',
+                    other => byte == other,
+                })
+    };
+    shape(text, "9999-99-99")
+        || shape(text, "9999-99-99T99:99:99Z")
+        || shape(text, "9999-99-99T99:99:99S99:99")
+}
+
+/// One caller input folded into a fixed query value
+/// (`connectors_catalog.selection.QueryFold`): when sent, one space, `prefix`
+/// and the value are appended to the fixed value of `into`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QueryFold {
+    pub into: String,
+    pub prefix: String,
+    pub format: FoldFormat,
+}
+/// The most query values one selection fixes.
+pub const QUERY_FIXED: usize = 8;
+
+/// A file a read's 2xx JSON answer carries as base64
+/// (`connectors_catalog.selection.EmbeddedText`), answered as its text. Each
+/// member but `max_bytes` is an RFC 6901 pointer into the answer.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EmbeddedText {
+    pub content: String,
+    pub encoding: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<String>,
+    pub max_bytes: u64,
+}
+
+/// The headers by which a provider says its rate limit is spent
+/// (`connectors_catalog.selection.RateLimitHeaders`): a `403` or `429` whose
+/// `remaining` header is exactly `0` is `rate_limited`, waiting until the Unix
+/// time `reset` names unless `Retry-After` says otherwise.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RateLimitHeaders {
+    pub remaining: String,
+    pub reset: String,
 }
 
 /// The member of a write selection whose 2xx JSON answer carries a credential
@@ -923,6 +1008,8 @@ pub struct Prepared {
     instance: String,
     source_revision: String,
     rate_limit_reasons: Vec<String>,
+    /// The selection's rate-limit headers, read from a definite refusal.
+    rate_limit_headers: Option<RateLimitHeaders>,
     /// The selection's refusal texts, read from a definite refusal's body.
     refusal_texts: Vec<TextRefusal>,
     /// The created credential the answer carries, when the selection declares it.
@@ -1194,6 +1281,14 @@ impl Engine {
                     selection.id
                 )));
             }
+            check_rate_limit_headers(selection)?;
+            check_embedded_text(selection)?;
+            check_fixed_query(selection, find(&selection.operation_id)?, &operation)?;
+            // A fixed parameter leaves the operation as a withheld one does:
+            // undeclared and never bound from input. The engine adds its value.
+            operation
+                .parameters
+                .retain(|p| !selection.query_fixed.contains_key(&p.name));
             let template =
                 Template::from_operation(&operation).map_err(|refusal| refuse(refusal.reason()))?;
             if let Some(guard) = &selection.guard {
@@ -1450,6 +1545,15 @@ impl Engine {
             if selection.binary.is_some() {
                 declaration.output_schema["properties"]["body"] = binary_body_schema();
             }
+            if selection.embedded_text.is_some() {
+                declaration.output_schema["properties"]["body"] = json!({"type": "string"});
+            }
+            // A folded input is declared under its own name, optional, in the
+            // fold's format; it is no parameter of the operation.
+            for name in selection.query_folds.keys() {
+                declaration.input_schema["properties"][name.as_str()] =
+                    json!({"type": "string", "pattern": TIMESTAMP_PATTERN});
+            }
             let text = expects_text(selection, &operation);
             if text && selection.envelope.is_some() {
                 return Err(refuse(format!(
@@ -1662,11 +1766,15 @@ impl Engine {
         connectors_sdk::validate(&exposed.declaration.input_schema, &input)?;
         let values = Self::parameter_values(&exposed.operation, &input)?;
         check_bounds(&exposed.selection, &values)?;
-        let (segments, query) = self.resolve(&exposed.template, values)?;
+        let (segments, mut query) = self.resolve(&exposed.template, values)?;
+        query.extend(fixed_query(&exposed.selection, &input)?);
         let borrowed: Vec<&str> = segments.iter().map(String::as_str).collect();
         let query: Vec<(&str, String)> =
             query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
         let response = http.get(&borrowed, &query).await?;
+        if let Some(error) = spent(&response, exposed.selection.rate_limit_headers.as_ref()) {
+            return Err(error);
+        }
         if let Some(binary) = &exposed.selection.binary {
             let (status, body) =
                 read_binary(response, None, binary, hosts, &exposed.selection).await?;
@@ -1691,6 +1799,10 @@ impl Engine {
         {
             return Err(refusal);
         }
+        let body = match &exposed.selection.embedded_text {
+            Some(embedded) => embedded_text(embedded, &body)?,
+            None => body,
+        };
         Ok(json!({
             "status": response.status,
             "body": body,
@@ -1993,6 +2105,7 @@ impl Engine {
             instance: instance.to_owned(),
             source_revision: self.source_revision.clone(),
             rate_limit_reasons: exposed.selection.rate_limit_reasons.clone(),
+            rate_limit_headers: exposed.selection.rate_limit_headers.clone(),
             refusal_texts: exposed.selection.refusal_texts.clone(),
             custody: exposed.selection.custody.clone(),
         })
@@ -2112,6 +2225,13 @@ impl Prepared {
             Ok(response) => response,
             Err(_) => return WriteOutcome::Unknown(Error::unavailable()),
         };
+        // A spent rate limit is a definite refusal only as a `403`: a `429`
+        // stays the unconfirmed outcome below, as it is without the headers.
+        if response.status == 403
+            && let Some(error) = spent(&response, self.rate_limit_headers.as_ref())
+        {
+            return WriteOutcome::Refused(error);
+        }
         if matches!(
             response.status,
             400 | 401 | 403 | 404 | 405 | 409 | 410 | 412 | 415 | 422
@@ -2957,6 +3077,245 @@ fn hold(custody: &Custody, result: &mut Value) -> Result<Held> {
         value: Value::Object(returned),
         secret: Some(secret),
     })
+}
+
+/// Whether a header name is an HTTP token (RFC 9110 §5.6.2).
+fn header_token(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b))
+}
+
+/// A selection's rate-limit headers: two distinct HTTP tokens.
+fn check_rate_limit_headers(selection: &Selection) -> Result<()> {
+    let Some(headers) = &selection.rate_limit_headers else {
+        return Ok(());
+    };
+    if !header_token(&headers.remaining)
+        || !header_token(&headers.reset)
+        || headers.remaining.eq_ignore_ascii_case(&headers.reset)
+    {
+        return Err(refuse(format!(
+            "selection `{}` declares rate-limit headers that are not two distinct header names",
+            selection.id
+        )));
+    }
+    Ok(())
+}
+
+/// The one value of a header without surrounding blanks, by name in any
+/// ASCII case; none when it is absent.
+fn trimmed_header<'a>(response: &'a HttpResponse, name: &str) -> Option<&'a str> {
+    header(response, name).map(|value| value.trim_matches([' ', '\t']))
+}
+
+/// A `403` or `429` whose declared `remaining` header is exactly `0`, as the
+/// `rate_limited` refusal it is: its wait from `Retry-After` when the answer
+/// carries one, else the seconds until the Unix time `reset` names.
+fn spent(response: &HttpResponse, headers: Option<&RateLimitHeaders>) -> Option<Error> {
+    let headers = headers?;
+    if !matches!(response.status, 403 | 429) || trimmed_header(response, &headers.remaining)? != "0"
+    {
+        return None;
+    }
+    let reset = || {
+        let reset = trimmed_header(response, &headers.reset)?;
+        if reset.is_empty() || !reset.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        let reset = reset.parse::<u64>().ok()?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()?
+            .as_secs();
+        let wait = reset.checked_sub(now).filter(|wait| *wait > 0)?;
+        u32::try_from(wait).ok().map(u64::from)
+    };
+    let mut error = Error::new(ErrorCode::RateLimited, "provider refused the request")
+        .answered()
+        .with_upstream_reason(connectors_core::reason::from_body(&response.body));
+    error.retry_after_seconds = match header(response, "retry-after") {
+        Some(_) => retry_after_header(response),
+        None => reset(),
+    };
+    Some(error)
+}
+
+/// An embedded text belongs to a read that answers JSON and reads it no other
+/// way: no `response`, `envelope`, `binary` or `download` beside it, pointers
+/// with a leading `/`, and a `max_bytes` within [`BINARY_LIMIT`].
+fn check_embedded_text(selection: &Selection) -> Result<()> {
+    let Some(embedded) = &selection.embedded_text else {
+        return Ok(());
+    };
+    let pointers = [
+        Some(&embedded.content),
+        Some(&embedded.encoding),
+        embedded.size.as_ref(),
+    ];
+    if selection.effect != Effect::Read
+        || selection.response.is_some()
+        || selection.envelope.is_some()
+        || selection.binary.is_some()
+        || selection.download.is_some()
+        || pointers
+            .into_iter()
+            .flatten()
+            .any(|pointer| !pointer.starts_with('/'))
+        || !(1..=BINARY_LIMIT).contains(&embedded.max_bytes)
+    {
+        return Err(refuse(format!(
+            "selection `{}` declares embedded text other than on a JSON read with pointers and a max_bytes from 1 to {BINARY_LIMIT}",
+            selection.id
+        )));
+    }
+    Ok(())
+}
+
+/// The text of the file a 2xx JSON answer carries as base64.
+fn embedded_text(embedded: &EmbeddedText, body: &Value) -> Result<Value> {
+    let unreadable = |message: &str| Error::new(ErrorCode::UpstreamProtocol, message);
+    let too_long = |length: u64| {
+        Error::new(
+            ErrorCode::Capacity,
+            format!(
+                "file of {length} bytes exceeds the read's bound of {} bytes",
+                embedded.max_bytes
+            ),
+        )
+    };
+    if !body.is_object() {
+        return Err(unreadable("provider answered with no embedded file"));
+    }
+    if let Some(size) = embedded
+        .size
+        .as_deref()
+        .and_then(|pointer| body.pointer(pointer))
+        .and_then(Value::as_u64)
+        && size > embedded.max_bytes
+    {
+        return Err(too_long(size));
+    }
+    if body.pointer(&embedded.encoding).and_then(Value::as_str) != Some("base64") {
+        return Err(unreadable(
+            "provider answered with a file not encoded as base64",
+        ));
+    }
+    let content: Vec<u8> = body
+        .pointer(&embedded.content)
+        .and_then(Value::as_str)
+        .ok_or_else(|| unreadable("provider answered with no embedded file content"))?
+        .bytes()
+        .filter(|b| !b.is_ascii_whitespace())
+        .collect();
+    // Bounded before decoding: base64 carries three bytes in every four.
+    if (content.len() as u64) / 4 * 3 > embedded.max_bytes + 2 {
+        return Err(too_long((content.len() as u64) / 4 * 3));
+    }
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&content)
+        .map_err(|_| unreadable("provider answered with file content that is not base64"))?;
+    if bytes.len() as u64 > embedded.max_bytes {
+        return Err(too_long(bytes.len() as u64));
+    }
+    if bytes.contains(&0) {
+        return Err(Error::new(ErrorCode::Unsupported, "the file is not text"));
+    }
+    String::from_utf8(bytes)
+        .map(Value::String)
+        .map_err(|_| Error::new(ErrorCode::Unsupported, "the file is not text"))
+}
+
+/// A selection's fixed query values and folds, against `source`, its
+/// operation as the bundle declares it, and `operation`, what remains of it
+/// after the selection's credential and withheld parameters left.
+fn check_fixed_query(
+    selection: &Selection,
+    source: &Operation,
+    operation: &Operation,
+) -> Result<()> {
+    if selection.query_fixed.is_empty() && selection.query_folds.is_empty() {
+        return Ok(());
+    }
+    let refused = |reason: String| Err(refuse(format!("selection `{}` {reason}", selection.id)));
+    if selection.effect != Effect::Read || selection.query_fixed.len() > QUERY_FIXED {
+        return refused(format!(
+            "fixes query values other than up to {QUERY_FIXED} on a read"
+        ));
+    }
+    for (name, value) in &selection.query_fixed {
+        let reason = if value.is_empty() {
+            Some("to the empty value")
+        } else if !operation
+            .parameters
+            .iter()
+            .any(|p| &p.name == name && p.location == Location::Query)
+        {
+            Some("which is not a query parameter of its operation")
+        } else if selection.bounds.contains_key(name) {
+            Some("which it also bounds")
+        } else if selection.required.contains(name)
+            || selection.withhold.contains(name)
+            || selection.credential.contains(name)
+        {
+            Some("which it also marks required, withholds or passes as the credential")
+        } else {
+            None
+        };
+        if let Some(reason) = reason {
+            return refused(format!("fixes `{name}` {reason}"));
+        }
+    }
+    let mut joined = BTreeSet::new();
+    for (name, fold) in &selection.query_folds {
+        let reason = if !connectors_core::valid_id(name)
+            || source.parameters.iter().any(|p| &p.name == name)
+        {
+            Some("under a name that is not an id or is a parameter of its operation")
+        } else if !selection.query_fixed.contains_key(&fold.into) {
+            Some("into a value it does not fix")
+        } else if !joined.insert(&fold.into) {
+            Some("into a value another fold joins")
+        } else if fold.prefix.is_empty() || fold.prefix.chars().any(char::is_whitespace) {
+            Some("with an empty prefix or one holding whitespace")
+        } else {
+            None
+        };
+        if let Some(reason) = reason {
+            return refused(format!("folds `{name}` {reason}"));
+        }
+    }
+    Ok(())
+}
+
+/// The fixed query pairs of a read, each with its folded caller value
+/// appended when the caller sent one.
+fn fixed_query(selection: &Selection, input: &Value) -> Result<Vec<(String, String)>> {
+    let mut pairs = Vec::with_capacity(selection.query_fixed.len());
+    for (name, fixed) in &selection.query_fixed {
+        let mut value = fixed.clone();
+        for (input_name, fold) in &selection.query_folds {
+            if &fold.into != name {
+                continue;
+            }
+            let Some(supplied) = input.get(input_name) else {
+                continue;
+            };
+            let text = supplied
+                .as_str()
+                .filter(|text| match fold.format {
+                    FoldFormat::Timestamp => timestamp(text),
+                })
+                .ok_or_else(|| refuse(format!("parameter `{input_name}` is not a timestamp")))?;
+            value.push(' ');
+            value.push_str(&fold.prefix);
+            value.push_str(text);
+        }
+        pairs.push((name.clone(), value));
+    }
+    Ok(pairs)
 }
 
 /// What a selection's binary members must be, whatever it reads: `binary`
