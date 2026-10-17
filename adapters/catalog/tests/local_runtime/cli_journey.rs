@@ -1348,3 +1348,56 @@ fn adversary_u23_a_read_result_the_child_admitted_reaches_the_cli_through_the_ow
     let answer: Value = serde_json::from_slice(&deep.stdout).unwrap();
     assert_eq!(adversary_u23_depth(&answer["result"]["result"]), 64);
 }
+
+/// Serves the GitLab fixture, a disposable Secret Service and a configured,
+/// connected CLI state for the guide's `file.raw` and `project.languages`
+/// commands (`docs/local-catalog-provider.md`, "Raw file text and languages"),
+/// printing the configuration, state directory, connection and this process's
+/// id, until `FIXTURE_STOP` (named in its output) exists or
+/// `GITLAB_FIXTURE_SECONDS` (default 300) pass. `CONNECTORS_TEST_CLI=<debug
+/// connectors> cargo test -p connectors-catalog-provider --test local_runtime --
+/// --ignored --nocapture serve_the_raw_file_fixture`.
+#[test]
+#[ignore = "serves the fixture for the guide's commands"]
+fn serve_the_raw_file_fixture() {
+    let provider = Provider::new();
+    let custody = Custody::new(provider.root.path());
+    let cli = Cli::new(provider.root.path());
+    configure(&cli, &provider, &custody);
+    let configuration = fs::read_to_string(&cli.paths.config).unwrap().replace(
+        "operations=['project.get','issues.list']",
+        "operations=['file.raw','project.languages']",
+    );
+    private(&cli.paths.config, configuration.as_bytes());
+    let credential = provider.root.path().join("private/credential.json");
+    private(&credential, &token(true).0);
+    let connected = success(cli.run(&[
+        "connections",
+        "connect",
+        "--adapter",
+        "gitlab",
+        "--profile",
+        "gitlab.pat",
+        "--credential-file",
+        credential.to_str().unwrap(),
+    ]));
+    let stop = provider.root.path().join("stop");
+    println!("FIXTURE_CONFIG={}", cli.paths.config.display());
+    println!("FIXTURE_STATE={}", cli.paths.state.display());
+    println!(
+        "FIXTURE_CONNECTION={}",
+        connected["connection"]["summary"]["connection"]
+            .as_str()
+            .unwrap()
+    );
+    println!("FIXTURE_PID={}", std::process::id());
+    println!("FIXTURE_STOP={}", stop.display());
+    let seconds: u64 = std::env::var("GITLAB_FIXTURE_SECONDS")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(300);
+    let until = Instant::now() + Duration::from_secs(seconds);
+    while !stop.exists() && Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}

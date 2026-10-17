@@ -2,9 +2,15 @@
 format: aep.planning-md/3
 id: story:runpod-billing-pods-read
 kind: story
-status: draft
+status: implemented
 title: The Runpod catalog reads pod billing (billing.pods)
-revision: 1
+relations:
+- serves: vision:independent-contract-adapters
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-17T02:29:04Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-17T02:29:05Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-17T02:29:06Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 The Runpod catalog provider offers the read `billing.pods` (`PodBilling`, `GET /billing/pods`,
