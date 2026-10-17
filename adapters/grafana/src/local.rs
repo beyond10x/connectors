@@ -193,6 +193,7 @@ impl Local {
                     };
                     Requirement {
                         operation: o.id.clone(),
+                        custody: false,
                         profile: profile.into(),
                         scopes: BTreeSet::new(),
                         effect,

@@ -111,6 +111,7 @@ fn bootstrap() -> runtime::Bootstrap {
             .iter()
             .map(|id| runtime::Requirement {
                 operation: (*id).into(),
+                custody: false,
                 profile: "token".into(),
                 scopes: BTreeSet::new(),
                 effect: if matches!(*id, GRANTED_READ | UNGRANTED_READ) {

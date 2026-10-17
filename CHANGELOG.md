@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.53.0 — 2026-10-17
+
+### Added
+
+- OpenRouter management through the catalog provider (`openrouter`, profile
+  `openrouter.api-key`, pinned OpenRouter OpenAPI document): the reads `key.get`,
+  `workspaces.list` and `keys.list`, and the required-approval write `key.create`
+  (docs/catalog-openrouter.md).
+- A write that creates a credential holds it in custody. `key.create` sends the create once;
+  the key OpenRouter returns once goes straight into the protected store as a new connection
+  of the alias and profile `[adapters.<alias>.permissions.custody]` names for the operation,
+  and the caller receives only that connection's reference and the key's hash, never the key.
+  A create with no custody target, or a declaration and target that disagree, is refused
+  before anything is sent; a timeout or crash after dispatch is an unknown outcome that is
+  never re-sent (docs/local-mutation-ledger.md, "Created credentials").
+- Runpod: the read `billing.pods` (`PodBilling`, `GET /v1/billing/pods`) beside `pods.list`.
+- GitLab catalog reads `file.raw` and `project.languages`: a repository file's exact UTF-8 text at a ref (a file that is not UTF-8 is refused `upstream_protocol`, one over the 4 MiB provider response bound `capacity`, on its raw bytes) and a project's languages with their percentages; verified against fixtures only.
+
+### Fixed
+
+- An owner no longer outlives its state directory. A Unix owner exits, as a shutdown request
+  stops it, once its socket is no longer in its state directory or the state directory's path no
+  longer names the directory it opened (removed or replaced); it checks at least every 250 ms and
+  lets connected clients finish for at most 5 seconds. Such an owner was unreachable and, with its
+  directory deleted, never became idle, so it ran until killed. A Windows owner holds its state
+  directory open, so that directory cannot be removed beneath it; it has no such check. Idle
+  retirement after 10 minutes is unchanged.
+- Journey tests stop the owners they start (#175). A CLI built with debug assertions passes
+  `CONNECTORS_TEST_OWNER_PARENT` to the owner it starts on Unix, and that owner exits once the named
+  process has ended; a release build reads no such variable. The catalog journey harness names its
+  own test process, so its owners end with it however it ends, and on drop, pass or panic, it stops
+  every owner of its state directory: an owner that has not exited within 5 seconds of the
+  harness's shutdown request is killed through its pidfd (Linux) and waited for.
+
+### Limitations
+
+- A custody store that answers `outcome_unknown` while holding a created key is reported as
+  custody `failed`, though the connection may have been published; check `connections list` on
+  the custody alias before creating again.
+- The HTTP client's buffers that held OpenRouter's answer are not wiped after the key moves into
+  custody.
+- An owner crash between OpenRouter's applied answer and the settle recovers the attempt as
+  `unknown`, with the key's hash recorded nowhere; nothing is re-sent, and the created key is
+  visible (by hash and label) in `keys.list`.
+- The ignored CLI journeys, custody included, run in no CI job.
+
 ## 0.52.1 — 2026-10-16
 
 ### Fixed

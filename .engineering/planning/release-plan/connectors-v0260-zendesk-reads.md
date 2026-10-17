@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0260-zendesk-reads
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.26.0: Zendesk Support reads through the catalog provider'
 relations:
 - delivers: story:catalog-zendesk-reads
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 5
 transitions:
 - {from: "draft", to: "active", at: "2026-10-05T03:10:40Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-16T11:17:57Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":2}}}
 ---
 ## Outcome and authorization
 
@@ -81,3 +82,11 @@ ESS 0.45.0, AEP 0.65.0, Rust 1.98.1 default with rustfmt and Clippy, MSRV +1.88.
 
 The candidate tree changes when the operator commits it; the gate and website results
 apply to that tree only if the committed bytes equal these.
+
+## Release
+
+- Released 2026-10-05: https://github.com/beyond10x/connectors/releases/tag/v0.26.0, published
+  by b10x-bot[bot] at 2026-10-05T04:21:22Z. Tag `v0.26.0` (annotated) peels to 3ffaca81a.
+  The page predates the binary archives (no assets beyond GitHub's source archives).
+- story:catalog-zendesk-reads stays draft: its acceptance still needs a run against a live
+  Zendesk account, which this release did not have (see "Unfinished work and missing evidence").

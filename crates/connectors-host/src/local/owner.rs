@@ -5,6 +5,8 @@ mod lifecycle;
 mod maintenance;
 pub mod mutation;
 mod supervisor;
+#[cfg(unix)]
+mod tether;
 mod transport;
 use super::{
     config::{Adapter, Config, Paths},
@@ -828,6 +830,7 @@ mod cached_tests {
                 permissions: super::super::config::Permissions {
                     profiles: BTreeSet::new(),
                     operations: BTreeSet::new(),
+                    custody: Default::default(),
                 },
             },
         );

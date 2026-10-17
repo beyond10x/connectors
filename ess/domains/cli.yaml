@@ -307,6 +307,9 @@ types:
       - {name: profile, type: String}
       - {name: scopes, type: "List<String>"}
       - {name: effect, type: connectors.cli.PrivateOperationEffect}
+      # Present and true only for a write whose answer carries a credential it
+      # created (connectors.mutations.CredentialCustody); absent otherwise.
+      - {name: custody, type: "Optional<Boolean>"}
   - name: connectors.cli.PrivateAdapterBootstrap
     kind: struct
     fields:
@@ -648,6 +651,14 @@ types:
       # by tests.
       - {name: store_version, type: "Optional<String>"}
       - {name: binary_version, type: "Optional<String>"}
+      # ESS-LIMIT: custody and created appear together, only on `custody_unavailable` after
+      # a write that created a credential and applied (connectors.mutations.CredentialCustody):
+      # custody is `failed` and created holds the public members the selection returns, such
+      # as a key's hash, so the operator can revoke the credential at the provider. Never the
+      # credential. As for instance_id above, the presence rule is enforced by the host and
+      # pinned by tests.
+      - {name: custody, type: "Optional<connectors.mutations.CustodyOutcome>"}
+      - {name: created, type: "Optional<Map<String, String>>"}
       # ESS-LIMIT: clock_refusal and clock_sources appear together, only on an approval
       # clock's `unavailable` (`stage = observation`) when the quorum formed no answer
       # (contracts/service/clock.md, "Refusals"): clock_refusal is the combined

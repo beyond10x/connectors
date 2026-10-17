@@ -9,8 +9,9 @@
 //! redacted digest. The gate re-reads every record that names a rule and refuses a file
 //! whose digest drifted or which the rule would still change.
 //!
-//! Rule `upstream-redaction/2`, applied to the whole file (`/1` was the first two
-//! items alone):
+//! Rule `upstream-redaction/3` is `/2` plus the two items marked below; `/2` stays
+//! readable so a record that names it is still checked by the `/2` rule. Applied to the
+//! whole file (`/1` was the first two items alone):
 //!
 //! - every credential value becomes `example-redacted-token`: the value of a key,
 //!   quoted or not, whose name ends in `token`, `secret`, `password`, `passwd`,
@@ -23,7 +24,11 @@
 //! - every phone number written as `+` and 8 to 15 digits, or as
 //!   `+<country> <3>-<3>-<4>`, becomes `+15555550100` or `+1 555-555-0100`, unless it
 //!   is a North American number in the unassigned area code 555 or the fictional
-//!   exchange 555-01XX.
+//!   exchange 555-01XX;
+//! - (`/3`) the quoted value of a JSON key named exactly `key` or `key_hash`, when it
+//!   is one scalar without whitespace, and every `sk-or-v<N>-…` OpenRouter key, in full
+//!   or in its abbreviated `sk-or-v1-abc...123` form, wherever it stands, become
+//!   `example-redacted-token`.
 use super::Result;
 use regex::{Captures, Regex};
 use serde::Deserialize;
@@ -34,7 +39,9 @@ use std::{
 };
 
 /// The rule's name as a manifest records it.
-pub const RULE: &str = "upstream-redaction/2";
+pub const RULE: &str = "upstream-redaction/3";
+/// The previous rule, still accepted for records pinned under it.
+pub const RULE_V2: &str = "upstream-redaction/2";
 pub const CREDENTIAL: &str = "example-redacted-token";
 pub const EMAIL: &str = "user@example.com";
 pub const PHONE: &str = "+15555550100";
@@ -55,6 +62,11 @@ static CREDENTIAL_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     )
     .expect("credential pattern")
 });
+static KEY_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"("(?:key|key_hash)"[ \t]*:[ \t]*")([^"\s]+)(")"#).expect("key pattern")
+});
+static OPENROUTER_KEY_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"sk-or-v[0-9]+-[A-Za-z0-9._-]+").expect("openrouter key pattern"));
 static JWT_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]+)?")
         .expect("token pattern")
@@ -140,10 +152,33 @@ fn fictional_phone(digits: &str) -> bool {
     }
 }
 
-/// Apply the rule to a whole document.
+/// Apply the current rule to a whole document.
 pub fn redact(text: &str) -> (String, Counts) {
+    redact_under(text, RULE)
+}
+
+/// Apply the named rule (`/2` or `/3`) to a whole document.
+pub fn redact_under(text: &str, rule: &str) -> (String, Counts) {
     let mut counts = Counts::default();
-    let text = redact_credentials(text, &mut counts);
+    let mut text = redact_credentials(text, &mut counts);
+    if rule == RULE {
+        text = KEY_PATTERN
+            .replace_all(&text, |captures: &Captures| {
+                if &captures[2] == CREDENTIAL {
+                    captures[0].to_owned()
+                } else {
+                    counts.credentials += 1;
+                    format!("{}{CREDENTIAL}{}", &captures[1], &captures[3])
+                }
+            })
+            .into_owned();
+        text = OPENROUTER_KEY_PATTERN
+            .replace_all(&text, |_: &Captures| {
+                counts.credentials += 1;
+                CREDENTIAL.to_owned()
+            })
+            .into_owned();
+    }
     let text = EMAIL_PATTERN.replace_all(&text, |captures: &Captures| {
         if reserved_domain(&captures[1]) {
             captures[0].to_owned()
@@ -253,7 +288,7 @@ pub fn run(root: &Path) -> Result<usize> {
                 continue;
             };
             let label = format!("{}: {}", manifest.display(), record.file);
-            if rule != RULE {
+            if rule != RULE && rule != RULE_V2 {
                 return Err(format!("{label}: names redaction `{rule}`, not `{RULE}`").into());
             }
             if record.upstream_sha256.is_none() {
@@ -269,7 +304,7 @@ pub fn run(root: &Path) -> Result<usize> {
                 return Err(format!("{label}: differs from its recorded digest or length").into());
             }
             let text = std::str::from_utf8(&bytes).map_err(|_| format!("{label}: is not UTF-8"))?;
-            let (_, counts) = redact(text);
+            let (_, counts) = redact_under(text, rule);
             if counts != Counts::default() {
                 return Err(format!(
                     "{label}: {RULE} would still replace {} credential(s), {} email \
@@ -374,6 +409,19 @@ mod tests {
                 phones: 0
             }
         );
+    }
+
+    #[test]
+    fn openrouter_keys_are_replaced_under_the_current_rule_only() {
+        let text = "{\"key\": \"sk-or-v1-0123abcd\", \"key_hash\": \"c564\", \"label\": \"sk-or-v1-0e6...1c96\", \"keyboard\": \"x\"}\n";
+        let (out, counts) = redact(text);
+        assert_eq!(
+            out,
+            "{\"key\": \"example-redacted-token\", \"key_hash\": \"example-redacted-token\", \"label\": \"example-redacted-token\", \"keyboard\": \"x\"}\n"
+        );
+        assert_eq!(counts.credentials, 3);
+        assert_eq!(redact_under(text, RULE_V2).1, Counts::default());
+        assert_eq!(redact(&out).1, Counts::default());
     }
 
     #[test]

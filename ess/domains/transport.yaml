@@ -52,3 +52,24 @@ types:
     # after which the host has closed the stream and delivers nothing more; deadline is
     # timeout_ms passed (Timeout). Ping and pong are answered below the port and
     # fragments are reassembled there; only whole binary messages reach the adapter.
+
+  # How a read answers a 2xx body that is not JSON and that it returns as text: a source
+  # that declares only `text/` media types, or one whose reviewed selection reads a body of
+  # any other declared type, such as `application/octet-stream`, as text. Decided in this
+  # order, on the raw bytes as the provider sent them, before any decoding:
+  # capacity: more than 4194304 bytes, the provider response bound
+  # (connectors_core::RESPONSE_LIMIT); refused `capacity` by name, never truncated and
+  # nothing decoded. The transport refuses such a body while reading it, and an adapter
+  # holds a port's answer to the same bound.
+  # upstream_protocol: bytes that are not well-formed UTF-8; refused `upstream_protocol` by
+  # name, never decoded lossily, with replacement characters, or re-encoded as base64. A
+  # caller that needs such bytes selects a binary read, which answers them base64-encoded
+  # under its own smaller bound.
+  # text: the result's `body` is one JSON string holding exactly the decoded bytes: no
+  # normalisation of line endings, of a byte-order mark or of NUL, and an empty body is the
+  # empty string. The served result still holds the result bound (4 MiB less 1 KiB) on the
+  # whole serialised result, string escapes and envelope included, and refuses a larger
+  # result `capacity`; a text near the provider bound can therefore be refused there.
+  - name: connectors.transport.TextBodyOutcome
+    kind: enum
+    variants: [text, capacity, upstream_protocol]
