@@ -2,11 +2,12 @@
 format: aep.planning-md/3
 id: story:docs-catalog-guides-vocabulary
 kind: story
-status: draft
+status: implemented
 title: The catalog guides configure a connector and a named instance, with no native JSON or pins
 relations:
 - decomposes: epic:connector-vocabulary
 - depends_on: story:docs-vocabulary-readme-website
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: docs/catalog-confluence.md
@@ -20,7 +21,11 @@ scope:
   path: docs/catalog-runpod.md
 - confidence: inferred
   path: docs/catalog-zendesk.md
-revision: 8
+revision: 11
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-16T19:08:19Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "proposed", to: "active", at: "2026-10-16T19:08:20Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:41Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Context
 

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:connect-refused-while-instance-holds-connection
 kind: story
-status: active
+status: implemented
 title: Connect is refused while an instance holds a Live or Stale connection, and --connection becomes optional
 relations:
 - decomposes: epic:connector-vocabulary
@@ -36,10 +36,11 @@ scope:
   path: crates/connectors-host/src/local/registry/tests.rs
 - confidence: inferred
   path: ess/domains/cli.yaml
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-16T16:49:14Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-16T16:49:15Z", actor: "human:timo", revision: 5}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:39Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Context
 

@@ -2,12 +2,17 @@
 format: aep.planning-md/3
 id: story:stale-connection-reconnect-candidate
 kind: story
-status: draft
+status: implemented
 title: A reconnect candidate on a Stale connection is a modelled Stale-to-Stale change
 relations:
 - decomposes: epic:connector-vocabulary
 - depends_on: story:connection-stale-state
-revision: 1
+- serves: vision:independent-contract-adapters
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-16T18:18:38Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-16T18:18:38Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:45Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Context
 

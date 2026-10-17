@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:connections-reconnect-verb
 kind: story
-status: active
+status: implemented
 title: connections reconnect replaces connections repair, and instances replaces the adapters command group
 relations:
 - decomposes: epic:connector-vocabulary
@@ -25,10 +25,11 @@ scope:
   path: crates/connectors-conformance/tests/cli_surface.rs
 - confidence: inferred
   path: ess/domains/cli.yaml
-revision: 7
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-16T15:02:09Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-10-16T15:02:09Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:40Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Context
 

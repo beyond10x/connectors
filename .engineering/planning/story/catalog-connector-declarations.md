@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-connector-declarations
 kind: story
-status: active
+status: implemented
 title: Each catalog connector ships its declaration, so an instance needs no native JSON file
 relations:
 - decomposes: epic:connector-vocabulary
@@ -20,10 +20,11 @@ scope:
   path: adapters/catalog/tests
 - confidence: inferred
   path: crates/connectors-catalog/src/bundle.rs
-revision: 10
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-16T12:54:48Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-10-16T12:54:48Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:38Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Context
 

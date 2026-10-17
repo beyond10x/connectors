@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:connection-stale-state
 kind: story
-status: active
+status: implemented
 title: A connection whose credential the provider refused is listed Stale until a reconnect returns it to Live
 relations:
 - decomposes: epic:connector-vocabulary
@@ -23,10 +23,11 @@ scope:
   path: crates/connectors-host/src/local/registry/lifecycle.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/registry/observation.rs
-revision: 9
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-16T15:38:10Z", actor: "human:timo", revision: 8}
 - {from: "proposed", to: "active", at: "2026-10-16T15:38:11Z", actor: "human:timo", revision: 9}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:39Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Context
 

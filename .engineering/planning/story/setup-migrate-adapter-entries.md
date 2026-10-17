@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:setup-migrate-adapter-entries
 kind: story
-status: active
+status: implemented
 title: connectors setup migrate rewrites adapter entries as connector instances without re-consent
 relations:
 - decomposes: epic:connector-vocabulary
@@ -29,10 +29,11 @@ scope:
   path: crates/connectors-host/src/local/config.rs
 - confidence: inferred
   path: ess/domains/cli.yaml
-revision: 11
+revision: 12
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-16T15:49:27Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":3}}}
 - {from: "proposed", to: "active", at: "2026-10-16T15:49:28Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"review_outcome":3}}}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:45Z", actor: "human:timo", revision: 12, decided_on: {"recorded":{"test_result":1,"review_outcome":3}}}
 ---
 ## Context
 

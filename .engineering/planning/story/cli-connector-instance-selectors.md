@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:cli-connector-instance-selectors
 kind: story
-status: active
+status: implemented
 title: Every command selects its target with --connector and --instance; --adapter still works, deprecated
 relations:
 - decomposes: epic:connector-vocabulary
@@ -29,10 +29,11 @@ scope:
   path: crates/connectors-host/src/local/config.rs
 - confidence: inferred
   path: ess/domains/cli.yaml
-revision: 13
+revision: 14
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-16T14:07:00Z", actor: "human:timo", revision: 12, decided_on: {"recorded":{"review_outcome":2}}}
 - {from: "proposed", to: "active", at: "2026-10-16T14:07:00Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"review_outcome":2}}}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:38Z", actor: "human:timo", revision: 14, decided_on: {"recorded":{"test_result":1,"review_outcome":2}}}
 ---
 ## Context
 

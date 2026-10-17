@@ -2,15 +2,20 @@
 format: aep.planning-md/3
 id: story:docs-google-publishing-advice
 kind: story
-status: draft
+status: implemented
 title: The Google OAuth guide says a personal-use app can be published without verification
 relations:
 - decomposes: epic:connector-vocabulary
 - depends_on: story:docs-vocabulary-readme-website
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: docs/catalog-google-oauth.md
-revision: 2
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-16T19:08:22Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "proposed", to: "active", at: "2026-10-16T19:08:23Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:42Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Context
 

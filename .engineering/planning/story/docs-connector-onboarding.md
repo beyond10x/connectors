@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:docs-connector-onboarding
 kind: story
-status: draft
+status: implemented
 title: 'The site onboards every running connector: enable, add an instance, connect, read, approved write, reconnect'
 relations:
 - decomposes: epic:connector-vocabulary
@@ -11,7 +11,12 @@ relations:
 - depends_on: story:connections-reconnect-verb
 - depends_on: story:connection-stale-state
 - depends_on: story:connect-refused-while-instance-holds-connection
-revision: 1
+- serves: vision:independent-contract-adapters
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-16T22:00:09Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-16T22:00:10Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:42Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Context
 

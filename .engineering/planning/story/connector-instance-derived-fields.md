@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:connector-instance-derived-fields
 kind: story
-status: active
+status: implemented
 title: A Gmail instance configured by name alone connects once and runs reads and guarded writes
 relations:
 - decomposes: epic:connector-vocabulary
@@ -23,10 +23,11 @@ scope:
   path: crates/connectors-host/src/local/config.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/runtime.rs
-revision: 9
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-16T14:07:01Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-10-16T14:07:01Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:41Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Context
 
