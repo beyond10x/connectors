@@ -57,15 +57,21 @@ legacy `[adapters.<alias>]` table appear only where the text says so.
 the internal term without one of `adapters/`, `adapter_id`, `` `adapter` ``,
 `deprecated`, `legacy` or `internal`; on a term's table row outside the README; and
 on a README without the `## Vocabulary` table or an AGENTS.md without the link.
-`--no-pins` also refuses `configuration_revision`, `sha256` and `bundle_directory`,
-and `--one-instance` a second `[connectors.<c>.instances.<i>]` table:
+Given the README, it also fails when a connector of the README's support table (the
+table headed `| Connector |`) has no onboarding page under `website/docs/connectors/`
+or does not link it on the site, when a page there lacks the eight onboarding sections
+in order, and when a page has no row unless it is marked `:::caution[Planned]` (MCP)
+(`crates/connectors-docs/src/onboarding.rs`). `--no-pins` also refuses
+`configuration_revision`, `sha256` and `bundle_directory`, and `--one-instance` a second
+`[connectors.<c>.instances.<i>]` table:
 
 ```sh
 cargo run --locked -p connectors-docs -- vocabulary README.md AGENTS.md \
   website/product.json website/data/terminal.json website/docs/index.md \
   website/docs/getting-started.md website/docs/guides/*.md \
   website/docs/concepts/catalog-provider.md website/docs/concepts/contracts.md \
-  website/docs/concepts/governed-invocation.md website/docs/concepts/local-runtime.md
+  website/docs/concepts/governed-invocation.md website/docs/concepts/local-runtime.md \
+  website/docs/connectors/*.md
 ```
 
 `crates/connectors-docs/src/vocabulary.rs::the_readme_agents_and_site_speak_the_vocabulary`
@@ -75,6 +81,13 @@ and `website/docs/reference/adapters/*/index.md`, are not in it. CLI help and me
 are held to the same deprecated-only rule by
 `apps/connectors/tests/vocabulary_text.rs::help_says_adapter_only_on_a_deprecated_line` (deprecated
 names only).
+
+`crates/connectors-docs/src/onboarding.rs::every_support_table_connector_has_an_onboarding_page`
+holds the onboarding rule. A connector added to the README's support table, or a catalog
+connector declared under `adapters/catalog/providers/`, needs its page under
+`website/docs/connectors/` with front matter `connectors` naming it, and its row links that
+page on the site; `generate` writes the index from the declarations and the hand-written
+rows in `onboarding.rs`.
 
 ## Plan and implement
 
