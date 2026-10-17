@@ -192,3 +192,106 @@ types:
     kind: struct
     fields:
       - {name: envelope, type: "Optional<connectors_catalog.selection.Envelope>"}
+
+  # The form a folded caller value must take before it joins a fixed query value. `timestamp`
+  # is an ISO 8601 calendar date `YYYY-MM-DD`, or a date-time `YYYY-MM-DDTHH:MM:SS` followed by
+  # `Z` or an offset `+HH:MM` / `-HH:MM`: digits, `-`, `:`, `T`, `Z` and `+` only, so a folded
+  # value can never add a word, a qualifier or a quote to the value it joins.
+  - name: connectors_catalog.selection.FoldFormat
+    kind: enum
+    variants: [timestamp]
+
+  # One caller input folded into a fixed query value. The input is declared under the fold's
+  # own key, an optional string of the fold's `format`, and is not a parameter of the operation.
+  # When the caller sends it, the engine appends one space, `prefix` and the value to the fixed
+  # value of the query parameter `into`; when the caller omits it, the fixed value is sent
+  # alone. Such as GitHub's search `q`, fixed to `is:pr is:open review-requested:@me`, with
+  # `since` folded as `updated:>=<since>`.
+  - name: connectors_catalog.selection.QueryFold
+    kind: struct
+    fields:
+      - {name: into, type: String}
+      - {name: prefix, type: String}
+      - {name: format, type: connectors_catalog.selection.FoldFormat}
+    invariants:
+      - into.count >= 1
+      - prefix.count >= 1
+      - {not: {prefix: {contains: " "}}}
+
+  # The members of a read selection that fix query values. `query_fixed` fixes a query parameter
+  # the source declares to one string: the engine sends exactly that value under that name on
+  # every request, the parameter is not declared in the caller's input schema, and an input
+  # carrying it is refused as `invalid_input` before any request, so a caller cannot widen what
+  # the read reaches. `query_folds` keys each folded caller input by its declared name, and
+  # every fold joins a fixed value (`into` names a key of `query_fixed`). What the engine refuses
+  # when the selection loads beyond these invariants (a fixed or folded value on a write, a fixed
+  # name that is not a query parameter of the operation or that the selection also bounds,
+  # requires, withholds or names as a credential, an empty fixed value, a fold key that is a
+  # parameter of the operation or not an id, a fold whose `into` the selection does not fix, two
+  # folds into one value, more than eight fixed values) is stated in the owner and pinned by the
+  # engine's tests; ESS 0.59 has no set-membership constraint between two members.
+  - name: connectors_catalog.selection.FixedQuery
+    kind: struct
+    fields:
+      - {name: query_fixed, type: "Optional<Map<String, String>>"}
+      - {name: query_folds, type: "Optional<Map<String, connectors_catalog.selection.QueryFold>>"}
+    invariants:
+      - any: [{not: defined(query_folds)}, defined(query_fixed)]
+
+  # A read whose 2xx JSON answer carries a file as base64 text, such as GitHub's contents and
+  # README reads (`content`, `encoding: base64`, `size`). The engine answers with the file's
+  # text in place of the provider's JSON. Each member but `max_bytes` is an RFC 6901 pointer into
+  # the answer: `content` the base64 string (ASCII whitespace inside it is ignored, as GitHub
+  # wraps it), `encoding` a string that must be exactly `base64`, and `size`, when declared, the
+  # file's length as a JSON integer, read before anything is decoded. A file longer than
+  # `max_bytes`, by `size` or once decoded, is refused as `capacity` by name, never truncated. A
+  # file whose bytes are not UTF-8, or that holds a NUL byte, is not text and is refused as
+  # `unsupported`. An answer that is not a JSON object, whose `encoding` is absent or another
+  # value, or whose `content` is absent or not base64, is an answer the engine cannot read
+  # (`upstream_protocol`). What the engine refuses when the selection loads beyond these
+  # invariants (embedded text on a write, beside a `response`, an `envelope`, a `binary` or a
+  # `download`, a pointer without a leading `/`) is stated in the owner and pinned by the
+  # engine's tests.
+  - name: connectors_catalog.selection.EmbeddedText
+    kind: struct
+    fields:
+      - {name: content, type: String}
+      - {name: encoding, type: String}
+      - {name: size, type: "Optional<String>"}
+      - {name: max_bytes, type: Integer}
+    invariants:
+      - content.count >= 1
+      - encoding.count >= 1
+      - any: [{not: defined(size)}, {size.count: {gte: 1}}]
+      - max_bytes >= 1
+      - max_bytes <= 2097152
+
+  # The member of a read selection that declares its embedded text.
+  - name: connectors_catalog.selection.ReadEmbeddedText
+    kind: struct
+    fields:
+      - {name: embedded_text, type: "Optional<connectors_catalog.selection.EmbeddedText>"}
+
+  # The headers by which a provider says its rate limit is spent, such as GitHub's
+  # `x-ratelimit-remaining` and `x-ratelimit-reset`. A `403` or `429` answer whose `remaining`
+  # header is exactly `0` is `rate_limited`, for a read and for a write's definite refusal,
+  # whatever its body; its `reset` header, a Unix time in whole seconds, names the wait as
+  # `retry_after_seconds` (the seconds from now to that time, none for a time already past),
+  # unless the answer also carries `Retry-After`, which is read first. Every other `403` keeps the
+  # classification `rate_limit_reasons` or its status gives. What the engine refuses when the
+  # selection loads beyond these invariants (a header name that is not a token, or the same
+  # header twice without regard to case) is stated in the owner and pinned by the engine's tests.
+  - name: connectors_catalog.selection.RateLimitHeaders
+    kind: struct
+    fields:
+      - {name: remaining, type: String}
+      - {name: reset, type: String}
+    invariants:
+      - remaining.count >= 1
+      - reset.count >= 1
+
+  # The member of a selection that declares its rate-limit headers.
+  - name: connectors_catalog.selection.QuotaHeaders
+    kind: struct
+    fields:
+      - {name: rate_limit_headers, type: "Optional<connectors_catalog.selection.RateLimitHeaders>"}
