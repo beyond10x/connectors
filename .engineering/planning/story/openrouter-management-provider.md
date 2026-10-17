@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: story:openrouter-management-provider
 kind: story
-status: active
+status: implemented
 title: OpenRouter management keys read and created through the catalog provider, the created key held in custody
 relations:
 - serves: vision:independent-contract-adapters
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-16T06:55:07Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-16T06:55:07Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-17T02:29:03Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

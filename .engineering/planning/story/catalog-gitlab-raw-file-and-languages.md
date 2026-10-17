@@ -2,9 +2,15 @@
 format: aep.planning-md/3
 id: story:catalog-gitlab-raw-file-and-languages
 kind: story
-status: draft
+status: implemented
 title: 'GitLab catalog: read a repository file as text and a project''s languages'
-revision: 1
+relations:
+- serves: vision:independent-contract-adapters
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-17T02:29:07Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-17T02:29:08Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-17T02:29:09Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 A GitLab connection through the catalog provider reads a repository file's text as text, and a

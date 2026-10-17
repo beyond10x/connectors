@@ -2,9 +2,15 @@
 format: aep.planning-md/3
 id: story:journey-owners-are-stopped
 kind: story
-status: draft
+status: implemented
 title: Journey tests stop the owners they start, and an owner never outlives its directory
-revision: 1
+relations:
+- serves: vision:independent-contract-adapters
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-17T02:29:03Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-17T02:29:04Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-17T02:29:04Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Observed
 Every ignored CLI journey starts a `__connectors-owner` through the CLI
