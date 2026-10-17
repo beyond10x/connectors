@@ -515,9 +515,17 @@ impl ErAuthority {
 /// of both the bridge and its lifecycle lock to an autonomous retirement task.
 /// No shutdown runs in the caller's destructor: even a deadline-based shutdown
 /// can join once the worker has signalled completion, before its runtime drops.
-pub(super) fn release_handle(er: ErAuthority, lock: &mut Option<std::fs::File>) {
+///
+/// A verified handle returns to the pool; `checkpoint` says whether its use may
+/// persist the open checkpoint. A passive inspection may not: it only reads the
+/// store (`contracts/cli/v1alpha1/owner.md`), and the checkpoint is a commit.
+pub(super) fn release_handle(er: ErAuthority, lock: &mut Option<std::fs::File>, checkpoint: bool) {
     if er.reusable {
-        release(er);
+        if checkpoint {
+            release(er);
+        } else {
+            pool(er);
+        }
         return;
     }
     // The authority is destroyed before the lock. ManuallyDrop is deliberate:
@@ -555,6 +563,15 @@ pub(super) fn release(er: ErAuthority) {
     let _ = timed("er.write_checkpoint", || {
         er.facade.write_open_checkpoint(call_wait())
     });
+    pool(er);
+}
+
+/// Keeps a verified handle for the next open of the same store in this process
+/// without persisting its observation.
+fn pool(er: ErAuthority) {
+    if !er.reusable {
+        return;
+    }
     let evicted = {
         let Ok(mut idle) = IDLE.lock() else {
             return;
@@ -2032,7 +2049,7 @@ struct Provisioning {
 impl Drop for Provisioning {
     fn drop(&mut self) {
         if let Some(er) = self.er.take() {
-            release_handle(er, &mut self.lock);
+            release_handle(er, &mut self.lock, true);
         }
     }
 }
