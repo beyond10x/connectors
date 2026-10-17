@@ -114,6 +114,7 @@ fn bootstrap(alias: &str, adapter: &str) -> runtime::Bootstrap {
         }],
         requirements: vec![runtime::Requirement {
             operation: READ.into(),
+            custody: false,
             profile: PROFILE.into(),
             scopes: BTreeSet::new(),
             effect: runtime::Effect::Read,
