@@ -1033,16 +1033,28 @@ fn oauth_cache_evicted_on_invalid_credential() {
     project(&mut child, &entry()).unwrap();
     assert_eq!(provider.token_requests(), 1);
     provider.state.lock().unwrap().api_refuses = true;
+    let sent = provider.api_authorizations().len();
     assert!(matches!(
         project(&mut child, &entry()),
         Err(Failure::InvalidCredential)
     ));
-    assert_eq!(provider.token_requests(), 1);
+    // The refused cached token is dropped and the read is sent once more with
+    // a fresh exchange (story:ess-connector-vocabulary-model decision 16); the
+    // API refusing that token too is the stored credential's refusal, and that
+    // token is dropped as well.
+    assert_eq!(provider.token_requests(), 2);
+    assert_eq!(
+        provider.api_authorizations()[sent..],
+        [
+            Some(format!("Bearer {ACCESS_TOKEN}1")),
+            Some(format!("Bearer {ACCESS_TOKEN}2"))
+        ]
+    );
     provider.state.lock().unwrap().api_refuses = false;
     project(&mut child, &entry()).unwrap();
-    assert_eq!(provider.token_requests(), 2);
+    assert_eq!(provider.token_requests(), 3);
     let api = provider.api_authorizations();
-    assert!(api.last().unwrap().as_deref() == Some(&*format!("Bearer {ACCESS_TOKEN}2")));
+    assert!(api.last().unwrap().as_deref() == Some(&*format!("Bearer {ACCESS_TOKEN}3")));
     // A validation the token endpoint refuses evicts the cached token too, and
     // a validation that succeeds leaves its own fresh token cached.
     provider.set_token(TokenAnswer::Refuse(400, json!({"error": "invalid_grant"})));
@@ -1052,15 +1064,15 @@ fn oauth_cache_evicted_on_invalid_credential() {
     ));
     provider.set_token(grant(3600));
     project(&mut child, &entry()).unwrap();
-    assert_eq!(provider.token_requests(), 4);
+    assert_eq!(provider.token_requests(), 5);
     child
         .validate(OAUTH_PROFILE, &entry(), deadline())
         .unwrap_or_else(|failure| panic!("validation {failure:?}"));
-    assert_eq!(provider.token_requests(), 5);
+    assert_eq!(provider.token_requests(), 6);
     project(&mut child, &entry()).unwrap();
-    assert_eq!(provider.token_requests(), 5);
+    assert_eq!(provider.token_requests(), 6);
     let api = provider.api_authorizations();
-    assert!(api.last().unwrap().as_deref() == Some(&*format!("Bearer {ACCESS_TOKEN}4")));
+    assert!(api.last().unwrap().as_deref() == Some(&*format!("Bearer {ACCESS_TOKEN}5")));
     // A validation whose identity read the API refuses caches nothing.
     provider.state.lock().unwrap().api_refuses = true;
     assert!(matches!(
@@ -1069,7 +1081,7 @@ fn oauth_cache_evicted_on_invalid_credential() {
     ));
     provider.state.lock().unwrap().api_refuses = false;
     project(&mut child, &entry()).unwrap();
-    assert_eq!(provider.token_requests(), 7);
+    assert_eq!(provider.token_requests(), 8);
 }
 
 #[test]
