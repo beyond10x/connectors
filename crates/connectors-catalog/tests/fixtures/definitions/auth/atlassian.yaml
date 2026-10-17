@@ -5,7 +5,3 @@ profiles:
     label: API token
     account_label: Account email
     identity: {kind: atlassian.account, subject: /accountId}
-  atlassian.bearer:
-    scheme: bearer
-    label: Atlassian access token
-    identity: {kind: atlassian.account, subject: /accountId}

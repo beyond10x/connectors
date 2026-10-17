@@ -1,4 +1,5 @@
 schema: urn:beyond10x:connectors-definition:1
+id: calendar
 source:
   discovery: upstream/google-calendar/calendar-api.json.gz
   sha256: ae11869097c421ddd12e16b6cd4710ed7500379bbf669957b7014efb5b3a2698
@@ -8,8 +9,8 @@ auth:
   google.oauth:
     use: google
     scopes:
-      minimum: ["https://www.googleapis.com/auth/calendar.readonly"]
-      requested: [openid, "https://www.googleapis.com/auth/calendar.readonly"]
+      minimum: ["https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.readonly"]
+      requested: [openid, "https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.readonly"]
 defaults: {rate_limit_reasons: [rateLimitExceeded, userRateLimitExceeded, dailyLimitExceeded]}
 operations:
   calendarList.list:

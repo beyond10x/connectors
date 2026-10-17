@@ -123,8 +123,9 @@ enum Action {
         amendments: Option<PathBuf>,
     },
     /// Lower one `connectors-definition/1` file into a provider bundle, its index
-    /// entry and its `connectors-catalog-operations/1` selection in `--out`;
-    /// or, with `import`, write a definition from a shipped selection.
+    /// entry, its `connectors-catalog-operations/1` selection and its
+    /// `connectors-catalog-connector/1` declaration in `--out`; or, with
+    /// `import`, write a definition from a shipped selection.
     /// Deterministic; never touches the network.
     #[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
     Definition {
@@ -137,7 +138,8 @@ enum Action {
         /// The definitions checkout the definition's source paths are under.
         #[arg(long = "root", required = true)]
         definitions: Option<PathBuf>,
-        /// The bundle directory to write the bundle, index and selection into.
+        /// The bundle directory to write the bundle, index, selection and
+        /// declaration into.
         #[arg(long, required = true)]
         out: Option<PathBuf>,
     },

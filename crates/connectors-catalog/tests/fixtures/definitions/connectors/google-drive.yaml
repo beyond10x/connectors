@@ -1,4 +1,5 @@
 schema: urn:beyond10x:connectors-definition:1
+id: drive
 source:
   discovery: upstream/google-drive/drive-api.json.gz
   sha256: 50a01d9b5134f16b4782098bcc6694aa4edf810993432022aba49237b5c83048
@@ -8,8 +9,8 @@ auth:
   google.oauth:
     use: google
     scopes:
-      minimum: ["https://www.googleapis.com/auth/drive.readonly"]
-      requested: [openid, "https://www.googleapis.com/auth/drive.readonly"]
+      minimum: ["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive.readonly"]
+      requested: [openid, "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive.readonly"]
 paging: {pageSize: {limit: pageSize, max: 1000}}
 defaults: {rate_limit_reasons: [rateLimitExceeded, userRateLimitExceeded, dailyLimitExceeded]}
 operations:

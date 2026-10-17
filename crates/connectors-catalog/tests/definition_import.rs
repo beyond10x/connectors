@@ -1,8 +1,8 @@
 //! Every selection the catalog ships, imported into a definition and lowered
-//! back: the bundle comes out byte for byte the committed one, and the
-//! selection equal to the shipped file as a JSON value, every field of it.
-//! The committed definitions (`tests/fixtures/definitions/`, the copy of the
-//! definitions repository's files) lower to the same two files; their vendored
+//! back: the bundle and the connector declaration come out byte for byte the
+//! committed ones, and the selection equal to the shipped file as a JSON value,
+//! every field of it. The committed definitions (`tests/fixtures/definitions/`,
+//! the copy of the definitions repository's files) lower to the same files; their vendored
 //! sources and provenance READMEs are the importer's output byte for byte. A
 //! committed definition may say more than the importer can read from the shipped
 //! files (paging walks, filters, references), so it is not compared with the
@@ -214,7 +214,34 @@ fn assert_lowers_to_the_shipped_files(temp: &Path, name: &str, file: &Path, root
     );
     assert_eq!(written.get("feed"), expected.get("feed"), "`{name}` feed");
     assert_eq!(written, expected, "`{name}`: the whole selection");
+
+    let declaration = repository()
+        .join("adapters/catalog/providers")
+        .join(entry.catalog)
+        .join("connector.json");
+    let declared =
+        entry.selection == format!("{}/operations.json", entry.catalog) && declaration.exists();
+    assert_eq!(
+        declared,
+        !UNDECLARED.contains(&name),
+        "`{name}`: a committed declaration where, and only where, one is expected"
+    );
+    if declared {
+        assert_eq!(
+            lowered.connector,
+            out.join(format!("{name}.connector.json"))
+        );
+        let written = std::fs::read_to_string(&lowered.connector).unwrap();
+        assert!(
+            written == std::fs::read_to_string(&declaration).unwrap(),
+            "`{name}`: the lowered connector.json differs from the committed one:\n{written}"
+        );
+    }
 }
+
+/// The selections with no committed connector declaration: Slack's two run as
+/// two instances of one catalog directory, which ships none.
+const UNDECLARED: [&str; 3] = ["openrouter", "slack", "slack-user"];
 
 fn round_trip(name: &str) {
     let temp = tempfile::tempdir().unwrap();

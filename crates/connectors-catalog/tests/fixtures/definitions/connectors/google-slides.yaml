@@ -1,4 +1,5 @@
 schema: urn:beyond10x:connectors-definition:1
+id: slides
 source:
   discovery: upstream/google-slides/slides-api.json.gz
   sha256: 49fa379e29948696029ec8c4b334939f0bd6e74d9ef27650f523682283c1d3f1
@@ -8,8 +9,8 @@ auth:
   google.oauth:
     use: google
     scopes:
-      minimum: ["https://www.googleapis.com/auth/presentations.readonly"]
-      requested: [openid, "https://www.googleapis.com/auth/presentations.readonly"]
+      minimum: ["https://www.googleapis.com/auth/presentations"]
+      requested: [openid, "https://www.googleapis.com/auth/presentations", "https://www.googleapis.com/auth/presentations.readonly"]
 defaults: {rate_limit_reasons: [rateLimitExceeded, userRateLimitExceeded, dailyLimitExceeded]}
 operations:
   presentations.get:

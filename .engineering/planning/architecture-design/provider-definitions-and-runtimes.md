@@ -7,7 +7,7 @@ title: Connector definitions repository, lowerers, install, runtime roles and th
 relations:
 - designs: architecture-decision-record:provider-definitions-and-runtimes
 - informed_by: architecture-decision-record:declarative-http-provider-runtime
-revision: 8
+revision: 9
 ---
 ## 1. Purpose
 
@@ -269,30 +269,53 @@ defaults, which the bundle has no field for. Schema v2 adds them section by sect
 
 ## 14. Catalog coverage and what is not lowered
 
-State on 2026-10-17, branch `impl/definition-lowerer` with `origin/main` 0.53.1 merged in.
+State on 2026-10-17, branch `impl/definition-lowerer` with `origin/main` 0.53.1 merged in, checked
+against the twelve `connector.json` files of `design/connector-vocabulary` at `3e9170466`.
 
 Every selection the catalog ships, 15 files under `adapters/catalog/providers/`, has a definition in
 `beyond10x/connectors-definitions` (`connectors/<name>.yaml`; Slack's user selection is
 `slack-user.yaml` with `catalog: slack`). `connectors-build definition import` wrote them from the
-shipped files; authored additions were made by hand afterwards. Held by
+shipped files, reading auth from `connector.json` where the catalog directory has one and from the
+guides otherwise; authored additions were made by hand afterwards. Held by
 `crates/connectors-catalog/tests/definition_import.rs`: for each of the 15, the import lowers to a
-bundle byte-identical to `adapters/catalog/generated/bundles/<catalog>.bundle.json` and a selection
-equal to the shipped file as a JSON value on every field (feed included), and the committed
-definition itself lowers to the same two files. `task check` in the definitions repository
-validates every definition and shared auth file.
+bundle byte-identical to `adapters/catalog/generated/bundles/<catalog>.bundle.json`, a selection
+equal to the shipped file as a JSON value on every field (feed included) and, where the catalog
+directory has one, a `connector.json` byte-identical to the committed declaration; the committed
+definition itself lowers to the same files. `task check` in the definitions repository validates
+every definition and shared auth file.
 
 | Connector | Lines | Connector | Lines | Connector | Lines |
 |---|---|---|---|---|---|
-| confluence | 27 | google-gmail | 51 | opsgenie | 49 |
-| confluence-v1 | 34 | google-slides | 34 | runpod | 50 |
+| confluence | 25 | google-gmail | 52 | opsgenie | 49 |
+| confluence-v1 | 34 | google-slides | 35 | runpod | 50 |
 | gitlab | 356 | hubspot | 17 | slack | 123 |
-| google-calendar | 40 | jira | 76 | slack-user | 60 |
-| google-drive | 49 | openrouter | 32 | zendesk | 40 |
+| google-calendar | 41 | jira | 75 | slack-user | 60 |
+| google-drive | 50 | openrouter | 32 | zendesk | 40 |
 
 GitLab and Slack are long because the shipped selections carry a curated description per operation
 and per-operation guards; a definition writes a description only where it differs from the source's
 `summary`.
 
+### The connector declaration
+
+The lowerer writes `<name>.connector.json` (`connectors-catalog-connector/1`). Every field is
+derived except one:
+
+| Field | From |
+|---|---|
+| `connector_id` | the file stem, or `id:` where they differ (`id: calendar` in `google-calendar.yaml`) |
+| `provider_id` | the profile ids up to their first `.`; profiles of two providers are refused (`provider_id`) |
+| `catalog_provider`, `selection` | the file stem or `catalog:`; `operations.json`, or `<suffix>-operations.json` for a second selection |
+| `default_endpoint` | `base_url` with every variable defaulted by `config`; absent when one has no default |
+| `api_path` | the path of `base_url` when its host is one variable (`https://{hostname}/api/v4`) |
+| `profiles` | the profiles in file order, `use` resolved; a `token_url` on `base_url`'s origin is written as its path |
+
+The bytes follow the committed declarations: two-space indent, an object on one line, a list of more
+than one string one string per line, profile fields in the order of the catalog provider's
+`AuthConfig`, and in `identity` `source` first. `opsgenie/connector.json` writes `source` last;
+the lowerer's order changes that one line, and since the provider digests the parsed profile, not
+the file, no configuration revision changes.
+
 ## Declared but not lowered
 
 | What | Why |
@@ -300,40 +323,13 @@ and per-operation guards; a definition writes a description only where it differ
 | Paging walk fields `next`, `total`, `last` | the engine pages feeds only (`adapters/catalog/src/feed.rs:92`); for ordinary operations the caller walks. `limit` and `max` lower to bounds |
 | Datasource `filters` (GitLab `mine_open`) | the feed declaration has no presets |
 | `references`, `views` (Jira, GitLab) | `contracts/references/v1alpha1` is proposed; no runtime serves it. The lowerer enforces its rules: patterns compile in Rust `regex` (linear time), URL templates share `base_url`'s origin, the resolve operation is a declared GET whose path parameters are all bound, every value it uses is bound by every match |
-| Auth profiles | lowered to `<name>.auth.json`, an interim file; `connector.json` replaces it after the rebase onto `connector-vocabulary` (D11) |
+| `default: true` on a profile | the declaration has no default profile: an instance of a connector with several names one. The bundle records the default as `auth_profile` |
 | More than one feed per connector | the selection file carries one `feed` (`feed_count`) |
 | OpenRouter's second documented label ("inference key") | the guide documents `openrouter.api-key` twice with two labels; the definition carries the first |
 
-## Not yet held
-
-- `connector.json` byte identity: waits for the rebase onto `connector-vocabulary` (DEC-20261017-26).
-
-## Declared but not lowered
+## Not in a definition
 
 | What | Why |
 |---|---|
-| Paging walk fields `next`, `total`, `last` | the engine pages feeds only (`adapters/catalog/src/feed.rs:92`); for ordinary operations the caller walks. `limit` and `max` lower to bounds |
-| Datasource `filters` (GitLab `mine_open`) | the feed declaration has no presets |
-| `references`, `views` (Jira, GitLab) | `contracts/references/v1alpha1` is proposed; no runtime serves it. The lowerer enforces its rules: patterns compile in Rust `regex` (linear time), URL templates share `base_url`'s origin, the resolve operation is a declared GET whose path parameters are all bound, every value it uses is bound by every match |
-| Auth profiles | lowered to `<name>.auth.json`, an interim file; `connector.json` replaces it after the rebase onto `connector-vocabulary` (D11) |
-| More than one feed per connector | the selection file carries one `feed` (`feed_count`) |
-
-## Not yet held
-
-- `connector.json` byte identity: waits for the rebase onto `connector-vocabulary` (DEC-20261017-26).
-- The `openrouter` selection on newer `main`: not in this base; covered at the rebase.
-
-## Declared but not lowered
-
-| What | Why |
-|---|---|
-| Paging walk fields `next`, `total`, `last` | the engine pages feeds only (`adapters/catalog/src/feed.rs:92`); for ordinary operations the caller walks. `limit` and `max` lower to bounds |
-| Datasource `filters` (GitLab `mine_open`) | the feed declaration has no presets |
-| `references`, `views` (Jira, GitLab) | `contracts/references/v1alpha1` is proposed; no runtime serves it. The lowerer enforces its rules: patterns compile in Rust `regex` (linear time), URL templates share `base_url`'s origin, the resolve operation is a declared GET whose path parameters are all bound, every value it uses is bound by every match |
-| Auth profiles | lowered to `<name>.auth.json`, an interim file; `connector.json` replaces it after the rebase onto `connector-vocabulary` (D11) |
-| More than one feed per connector | the selection file carries one `feed` (`feed_count`) |
-
-## Not yet held
-
-- `connector.json` byte identity: waits for the rebase onto `connector-vocabulary` (DEC-20261017-26).
-- The `openrouter` selection on newer `main`: not in this base; covered at the rebase.
+| `atlassian.bearer` for Jira and Confluence | the guides configure it against `https://api.atlassian.com/ex/jira/<cloud-id>/…`, another base than the site's; a declaration has one endpoint, and the committed declarations ship `atlassian.basic` only |
+| A declaration for `slack`, `slack-user`, `openrouter` | their catalog directories have none at `3e9170466` (Slack: `adapters/catalog/tests/connector_declarations.rs:185`); the lowerer still writes one, which `adapters/catalog/tests/definition_auth.rs` loads profile by profile |

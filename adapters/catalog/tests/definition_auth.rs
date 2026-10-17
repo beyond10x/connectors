@@ -1,8 +1,10 @@
-//! Every auth profile the committed connector definitions lower to
-//! (`crates/connectors-catalog/tests/fixtures/definitions/`) is a profile the
-//! catalog provider loads: a `connectors-catalog-local/2` configuration with
-//! that `auth` block, the definition's `base_url` as `api_base`, the committed
-//! bundle and the shipped selection prints its bootstrap. No network.
+//! Every auth profile the committed connector definitions
+//! (`crates/connectors-catalog/tests/fixtures/definitions/`) lower into their
+//! connector declarations is a profile the catalog provider loads: a
+//! `connectors-catalog-local/2` configuration with that profile as its `auth`
+//! block, the definition's `base_url` as `api_base`, the committed bundle and
+//! the shipped selection prints its bootstrap. This covers the definitions
+//! whose catalog directory ships no declaration. No network.
 #![cfg(unix)]
 use connectors_catalog::definition;
 use connectors_host::local::filesystem;
@@ -71,14 +73,28 @@ fn every_lowered_auth_profile_loads_in_the_catalog_provider() {
             Some(stem) => format!("{stem}-operations.json"),
             None => "operations.json".to_owned(),
         };
-        let auth = definition::auth(file, &root_dir)
-            .unwrap_or_else(|refusal| panic!("`{name}` lowers its auth: {refusal}"));
-        assert_eq!(auth["provider"], catalog);
-        for (id, block) in auth["profiles"].as_object().unwrap() {
+        let declaration: Value = serde_json::from_str(
+            &definition::connector(file, &root_dir)
+                .unwrap_or_else(|refusal| panic!("`{name}` lowers its declaration: {refusal}")),
+        )
+        .unwrap();
+        assert_eq!(declaration["catalog_provider"], catalog);
+        assert_eq!(declaration["selection"], selection.as_str());
+        let api_base = filled(&parsed.base_url, &parsed);
+        let origin = api_base
+            .match_indices('/')
+            .nth(2)
+            .map_or(api_base.as_str(), |(at, _)| &api_base[..at]);
+        for block in declaration["profiles"].as_array().unwrap() {
+            let id = block["profile"].as_str().unwrap();
             let mut block = block.clone();
             for url in ["token_url", "authorize_url"] {
                 if let Some(template) = block[url].as_str() {
-                    block[url] = json!(filled(template, &parsed));
+                    let template = match template.starts_with('/') {
+                        true => format!("{origin}{template}"),
+                        false => template.to_owned(),
+                    };
+                    block[url] = json!(filled(&template, &parsed));
                 }
             }
             let config = json!({
@@ -86,7 +102,7 @@ fn every_lowered_auth_profile_loads_in_the_catalog_provider() {
                 "instance": "definition-check",
                 "provider": catalog,
                 "bundle_directory": root_path("generated/bundles"),
-                "api_base": filled(&parsed.base_url, &parsed),
+                "api_base": api_base,
                 "auth": block,
                 "operations_file": root_path(&format!("providers/{catalog}/{selection}")),
             });
@@ -99,5 +115,5 @@ fn every_lowered_auth_profile_loads_in_the_catalog_provider() {
             loaded += 1;
         }
     }
-    assert_eq!(loaded, 19, "every profile of every definition is loaded");
+    assert_eq!(loaded, 17, "every profile of every definition is loaded");
 }

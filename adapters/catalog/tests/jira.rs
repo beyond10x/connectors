@@ -797,9 +797,16 @@ fn the_lowered_jira_definition_serves_issue_get_against_the_fixture() {
         scratch: &scratch,
     })
     .expect("the Jira definition lowers");
-    let auth: Value = serde_json::from_slice(&fs::read(&lowered.auth).unwrap()).unwrap();
+    let declaration: Value =
+        serde_json::from_slice(&fs::read(&lowered.connector).unwrap()).unwrap();
+    let profile = declaration["profiles"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|profile| profile["profile"] == PROFILE)
+        .expect("the declaration has the fixture's profile");
     assert_eq!(
-        auth["profiles"][PROFILE],
+        *profile,
         documented_auth(),
         "the lowered profile is the one the guide documents and this fixture runs"
     );
