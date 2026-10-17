@@ -1,0 +1,27 @@
+schema: urn:beyond10x:connectors-definition:1
+source:
+  openapi: upstream/confluence/confluence-v2.json.gz
+  sha256: edb639bbc700ee451a996acd2568e51db4ceab954449427537df30f0ce20ca08
+base_url: https://{domain}.atlassian.net/wiki
+config: {domain: {type: string}}
+auth:
+  atlassian.basic:
+    use: atlassian
+    default: true
+    identity: {path: rest/api/user/current}
+    access: {path: api/v2/pages, query: {limit: "1"}}
+  atlassian.bearer: {use: atlassian, identity: {path: rest/api/user/current}}
+paging: {limit: {limit: limit, max: 250}}
+operations:
+  pages.changed:
+    op: getPages
+    description: List pages newest-modified first (space-id, sort -modified-date), one page per call; the walk ends on a page without _links.next or at the first page whose version.createdAt is older than the caller's cutoff
+  space.pages:
+    op: getPagesInSpace
+    description: List one space's pages, one page per call; the walk follows the cursor in _links.next and ends on a page without it
+  page.get:
+    op: getPageById
+    description: Read one page; ask for body-format storage to receive its body
+  page.comments:
+    op: getPageFooterComments
+    description: List one page's footer comments, one page per call; the walk follows the cursor in _links.next and ends on a page without it

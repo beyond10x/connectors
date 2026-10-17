@@ -1,0 +1,11 @@
+schema: urn:beyond10x:connectors-auth:1
+profiles:
+  atlassian.basic:
+    scheme: basic
+    label: API token
+    account_label: Account email
+    identity: {kind: atlassian.account, subject: /accountId}
+  atlassian.bearer:
+    scheme: bearer
+    label: Atlassian access token
+    identity: {kind: atlassian.account, subject: /accountId}

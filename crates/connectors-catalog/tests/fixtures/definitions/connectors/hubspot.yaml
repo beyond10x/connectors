@@ -1,0 +1,17 @@
+schema: urn:beyond10x:connectors-definition:1
+source:
+  openapi: upstream/hubspot/crm-objects-2026-09.json.gz
+  sha256: 1cb7ca32e7a9ff224838f8c1f02a99104e509d651fc2524dfd16f77fdc9be9f9
+base_url: https://api.hubapi.com
+auth:
+  hubspot.private-app:
+    scheme: bearer
+    label: Private app access token
+    identity: {path: account-info/2026-09/details, kind: hubspot.portal, subject: /portalId}
+operations:
+  objects.list:
+    op: get-/crm/objects/2026-09/{objectType}_/crm/objects/2026-03/{objectType}
+    description: List one object type's records (contacts, companies, deals, tickets or any other type the account has), one page per call; the walk sends paging.next.after as after and ends on a page without paging.next
+  object.get:
+    op: get-/crm/objects/2026-09/{objectType}/{objectId}_/crm/objects/2026-03/{objectType}/{objectId}
+    description: Read one record by objectType and objectId; properties and associations are comma-separated lists

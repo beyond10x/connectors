@@ -393,6 +393,14 @@ struct Provider {
 }
 impl Provider {
     fn new() -> Self {
+        Self::serving(
+            &root_path("generated/bundles"),
+            &root_path("providers/jira/operations.json"),
+        )
+    }
+    /// The fixture, with the provider configured on this bundle directory and
+    /// this selection file.
+    fn serving(bundle_directory: &Path, operations_file: &Path) -> Self {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
@@ -476,11 +484,11 @@ impl Provider {
                 "format": "connectors-catalog-local/2",
                 "instance": "fixture-jira",
                 "provider": "jira",
-                "bundle_directory": root_path("generated/bundles"),
+                "bundle_directory": bundle_directory,
                 "api_base": format!("https://localhost:{}/rest/api/3", address.port()),
                 "ca_file": ca,
                 "auth": documented_auth(),
-                "operations_file": root_path("providers/jira/operations.json"),
+                "operations_file": operations_file,
             }))
             .unwrap(),
         );
@@ -770,6 +778,66 @@ fn issue_get_reads_one_issue_by_key_with_its_fields_expansions_and_attachments()
     );
     // Attachment metadata, what `jira.issue.attachment.list` lists.
     assert_eq!(body["fields"]["attachment"][0]["filename"], "fixture.txt");
+}
+
+/// The Jira `connectors-definition/1` fixture, lowered by
+/// `connectors_catalog::definition`, is what the provider loads: its bundle
+/// directory and selection file in place of the committed ones, and `issue.get`
+/// served through the provider child against this fixture.
+#[test]
+fn the_lowered_jira_definition_serves_issue_get_against_the_fixture() {
+    use connectors_catalog::definition;
+    let lowering = tempfile::tempdir().unwrap();
+    let scratch = lowering.path().join("scratch");
+    fs::create_dir_all(&scratch).unwrap();
+    let out = lowering.path().join("out");
+    let lowered = definition::lower(&definition::Request {
+        definition: &root_path(
+            "../../crates/connectors-catalog/tests/fixtures/definition/providers/jira.yaml",
+        ),
+        root: &root_path("../.."),
+        out: &out,
+        scratch: &scratch,
+    })
+    .expect("the Jira definition lowers");
+    let auth: Value = serde_json::from_slice(&fs::read(&lowered.auth).unwrap()).unwrap();
+    assert_eq!(
+        auth["profiles"][PROFILE],
+        documented_auth(),
+        "the lowered profile is the one the guide documents and this fixture runs"
+    );
+    let selections: Vec<Selection> = serde_json::from_value(
+        serde_json::from_slice::<Value>(&fs::read(&lowered.operations).unwrap()).unwrap()
+            ["operations"]
+            .clone(),
+    )
+    .unwrap();
+    let engine = Engine::new(&bundle::load(&out, "jira").unwrap(), BASE, &selections).unwrap();
+    let mut declared: Vec<String> = engine
+        .declarations(&[Effect::Read])
+        .into_iter()
+        .map(|o| o.id)
+        .collect();
+    declared.sort();
+    assert_eq!(declared, ["issue.comments", "issue.get", "issues.search"]);
+
+    let provider = Provider::serving(&out, &lowered.operations);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let expected = "/rest/api/3/issue/FIX-1?fields=summary%2Cstatus%2Cdescription%2Cattachment\
+                    &expand=renderedFields%2Cnames";
+    let result = invoke(
+        &mut child,
+        "issue.get",
+        json!({"issueIdOrKey": "FIX-1", "fields": "summary,status,description,attachment",
+               "expand": "renderedFields,names"}),
+    );
+    let requests = provider.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].0, expected);
+    assert_eq!(requests[0].1.as_deref(), Some(HEADER));
+    assert_eq!(result["status"], 200);
+    assert_eq!(Some(&result["body"]), page(expected).as_ref());
+    assert_eq!(result["provenance"]["instance"], "fixture-jira");
 }
 
 /// Jira answers `404` for an issue that does not exist or that the account
