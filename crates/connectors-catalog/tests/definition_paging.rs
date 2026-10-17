@@ -178,11 +178,12 @@ fn jira_operations_take_the_named_or_the_one_matching_style_and_no_bound_without
     assert_eq!(
         ids,
         [
-            "issue.changelog",
-            "issue.comments",
             "issue.get",
+            "issue.comments",
+            "issue.changelog",
             "issues.search"
-        ]
+        ],
+        "the selection lists the operations in the definition's order"
     );
     for entry in &entries {
         assert!(

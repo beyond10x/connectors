@@ -16,6 +16,8 @@ hex.workspace = true
 toml = "1.1"
 flate2.workspace = true
 tempfile.workspace = true
+indexmap = { version = "2", features = ["serde"] }
+regex = "1"
 
 [dev-dependencies]
 openapiv3 = "2.2"

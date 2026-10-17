@@ -1,14 +1,19 @@
-//! One `connectors-definition/1` provider definition, read and lowered into what
-//! the catalog provider already runs: a bundle with its index, compiled by
+//! One `connectors-definition/1` connector definition, read and lowered into
+//! what the catalog provider already runs: a bundle with its index, compiled by
 //! [`crate::pipeline`] from the vendored source the definition pins, and a
 //! `connectors-catalog-operations/1` selection of the operations it exposes.
 //!
-//! The types mirror schema v1 (`spec/domains/definition.yaml` in the
+//! The types mirror the schema (`spec/domains/definition.yaml` in the
 //! definitions repository) field for field, and every struct refuses a field
 //! the schema does not name. A definition the lowering cannot honour is refused
 //! by name ([`Refusal`]) before anything is written to the output directory.
+//!
+//! The maps a file lists (operations, body keys, guard comparisons, auth
+//! profiles) keep the file's order: the selection lists its operations, a closed
+//! body its keys and a guard its checks in the order the definition writes them.
 
 use crate::{bundle, pipeline};
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -30,12 +35,61 @@ pub enum SchemaId {
 
 /// `connectors_definitions.definition.Source`: the vendored document, by its
 /// path under the definitions root, and the SHA-256 of its decompressed bytes.
+/// Exactly one of `openapi`, `swagger` (Swagger 2.0) and `discovery` (Google
+/// Discovery) names it. A Swagger or Discovery document is projected to
+/// OpenAPI as `connectors-build catalog --derived-from` projects it, and
+/// `projection` is the file name the projected document is recorded under.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Source {
-    pub openapi: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub openapi: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub swagger: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub discovery: Option<String>,
     pub sha256: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub projection: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub amendments: Option<String>,
+}
+
+/// Which kind of document a source names.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SourceKind {
+    OpenApi,
+    Swagger,
+    Discovery,
+}
+
+impl Source {
+    /// The one document this source names, and its kind.
+    pub fn document(&self) -> Result<(SourceKind, &str), Refusal> {
+        let named: Vec<(SourceKind, &str)> = [
+            (SourceKind::OpenApi, &self.openapi),
+            (SourceKind::Swagger, &self.swagger),
+            (SourceKind::Discovery, &self.discovery),
+        ]
+        .into_iter()
+        .filter_map(|(kind, path)| path.as_deref().map(|path| (kind, path)))
+        .collect();
+        let [(kind, path)] = named[..] else {
+            return Err(Refusal::SourceKind(format!(
+                "a source names exactly one of openapi, swagger and discovery; this one names {}",
+                named.len()
+            )));
+        };
+        match (kind, &self.projection) {
+            (SourceKind::OpenApi, Some(_)) => Err(Refusal::SourceKind(
+                "an openapi source is not projected and names no projection".to_owned(),
+            )),
+            (SourceKind::Swagger | SourceKind::Discovery, None) => Err(Refusal::SourceKind(
+                "a swagger or discovery source names the projection's file name".to_owned(),
+            )),
+            _ => Ok((kind, path)),
+        }
+    }
 }
 
 /// `connectors_definitions.definition.ConfigType`.
@@ -51,7 +105,9 @@ pub enum ConfigType {
 pub struct ConfigField {
     #[serde(rename = "type")]
     pub value_type: ConfigType,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub values: Option<Vec<String>>,
 }
 
@@ -62,13 +118,36 @@ pub const AUTH_FORMAT: &str = "connectors-catalog-auth/1";
 
 /// `connectors_definitions.definition.AuthScheme`: `basic` sends
 /// `Authorization: Basic`, `bearer` `Authorization: Bearer`, `header` the token
-/// in `header`, behind `prefix` when one is given.
+/// in `header`, behind `prefix` when one is given; the two OAuth schemes
+/// exchange the stored entry at `token_url` for a bearer access token.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum AuthScheme {
     Basic,
     Bearer,
     Header,
+    #[serde(rename = "oauth2_refresh")]
+    OAuth2Refresh,
+    #[serde(rename = "oauth2_client_credentials")]
+    OAuth2ClientCredentials,
+}
+
+impl AuthScheme {
+    fn is_oauth(self) -> bool {
+        matches!(self, Self::OAuth2Refresh | Self::OAuth2ClientCredentials)
+    }
+}
+
+/// `connectors_definitions.definition.IdentitySource`: where the subject of a
+/// credential comes from. `api` (the default) reads `path`; `id_token` the
+/// OAuth token response; `configuration` names the connection itself after a
+/// read of `path` proves the credential.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IdentitySource {
+    Api,
+    IdToken,
+    Configuration,
 }
 
 /// `connectors_definitions.definition.AuthIdentity`: the read that names who
@@ -76,19 +155,30 @@ pub enum AuthScheme {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AuthIdentity {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<IdentitySource>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub kind: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub subject: Option<String>,
 }
 
 /// `connectors_definitions.definition.AuthScopes`: the read that names the
-/// granted scopes, and those a connection must hold.
+/// granted scopes (`path` and `pointer`, both or neither), the scopes a
+/// connection must hold, and the scopes an OAuth consent requests.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AuthScopes {
-    pub path: String,
-    pub pointer: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pointer: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub minimum: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requested: Option<Vec<String>>,
 }
 
 /// `connectors_definitions.definition.AuthAccess`: a read whose `200` proves
@@ -97,26 +187,40 @@ pub struct AuthScopes {
 #[serde(deny_unknown_fields)]
 pub struct AuthAccess {
     pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub query: Option<BTreeMap<String, String>>,
 }
 
 /// `connectors_definitions.definition.Auth`: one profile. With `use`, the
 /// profile of the same id in `auth/<use>.yaml` is the base, and every field
 /// given here replaces its counterpart; `identity` field by field.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Auth {
-    #[serde(rename = "use")]
+    #[serde(rename = "use", skip_serializing_if = "Option::is_none")]
     pub library: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub scheme: Option<AuthScheme>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub header: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub prefix: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub account_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub identity: Option<AuthIdentity>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub scopes: Option<AuthScopes>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub access: Option<AuthAccess>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authorize_url: Option<String>,
 }
 
 /// `connectors_definitions.definition.AuthLibraryId`.
@@ -126,13 +230,13 @@ pub enum AuthLibraryId {
     V1,
 }
 
-/// `connectors_definitions.definition.AuthLibrary`: profiles several providers
+/// `connectors_definitions.definition.AuthLibrary`: profiles several connectors
 /// share, `auth/<name>.yaml`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AuthLibrary {
     pub schema: AuthLibraryId,
-    pub profiles: BTreeMap<String, Auth>,
+    pub profiles: IndexMap<String, Auth>,
 }
 
 /// `connectors_definitions.definition.Effect`.
@@ -147,19 +251,27 @@ pub enum Effect {
 /// operations pages. `request` is the query parameter that carries the position;
 /// `limit` the page-size parameter, capped at `max`. `next`, `total` and `last`
 /// say where a walk reads its next position and its end; the runtime owns the
-/// walk itself.
+/// walk itself. A style matches an operation that has its `request` query
+/// parameter, or, without `request`, its `limit` one, unless the operation
+/// withholds that parameter.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PagingStyle {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub request: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub total: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub last: Option<String>,
 }
 
-/// `connectors_definitions.definition.GuardBefore`: the read before a write.
+/// `connectors_definitions.definition.GuardBefore`: a read before a write.
 /// `read` is an operation key of the definition, else an `operationId` of the
 /// source; its path parameters take the input of the same name unless `with`
 /// binds them. `expect` maps a JSON pointer to an input reference (`sha`,
@@ -168,25 +280,173 @@ pub struct PagingStyle {
 #[serde(deny_unknown_fields)]
 pub struct GuardBefore {
     pub read: String,
-    pub with: Option<BTreeMap<String, String>>,
-    pub expect: serde_yaml_ng::Mapping,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub with: Option<IndexMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expect: Option<IndexMap<String, String>>,
+}
+
+/// `connectors_definitions.definition.GuardRead`: a read after the write, its
+/// parameters bound as a [`GuardBefore`]'s are.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GuardRead {
+    pub read: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub with: Option<IndexMap<String, String>>,
+}
+
+/// `connectors_definitions.definition.RefusalCode`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RefusalCode {
+    InvalidInput,
+    Forbidden,
+    NotFound,
+}
+
+/// `connectors_definitions.definition.GuardRefusal`, the engine's
+/// `connectors_catalog.guard.Refusal`, carried as written.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GuardRefusal {
+    pub pointer: String,
+    pub values: Vec<String>,
+    pub code: RefusalCode,
 }
 
 /// `connectors_definitions.definition.GuardAfter`: comparisons against the
-/// write's answer; `any` holds when at least one of its comparisons holds.
+/// write's answer, or with `read` against that read's; `any` holds when at
+/// least one of its comparisons holds; `absent: true` wants the read to answer
+/// 404; `refusals` classify a 2xx answer that did not apply the write.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GuardAfter {
-    pub expect: serde_yaml_ng::Mapping,
-    pub any: Option<serde_yaml_ng::Mapping>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expect: Option<IndexMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub any: Option<IndexMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub read: Option<GuardRead>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub absent: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refusals: Option<Vec<GuardRefusal>>,
 }
 
-/// `connectors_definitions.definition.Guard`.
+/// `connectors_definitions.definition.Guard`: `before`, then each of `also`,
+/// in order, before the write; `after` once it answered, no comparison when
+/// absent.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Guard {
     pub before: GuardBefore,
-    pub after: GuardAfter,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub also: Option<Vec<GuardBefore>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after: Option<GuardAfter>,
+}
+
+/// `connectors_definitions.definition.ResponseKind`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResponseKind {
+    Json,
+    Text,
+    Binary,
+}
+
+/// `connectors_definitions.definition.Binary`, the engine's
+/// `connectors_catalog.binary.Binary`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Binary {
+    pub max_bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hosts: Option<Vec<String>>,
+}
+
+/// `connectors_definitions.definition.Download`, the engine's
+/// `connectors_catalog.binary.Download`: a read of a provider-issued URL, which
+/// names no `op`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Download {
+    pub path_prefix: String,
+}
+
+/// `connectors_definitions.definition.EnvelopeCode`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EnvelopeCode {
+    InvalidInput,
+    Unauthorized,
+    Forbidden,
+    NotFound,
+    RateLimited,
+    Internal,
+}
+
+/// `connectors_definitions.definition.EnvelopeRefusal`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EnvelopeRefusal {
+    pub values: Vec<String>,
+    pub code: EnvelopeCode,
+}
+
+/// `connectors_definitions.definition.Envelope`, the engine's
+/// `connectors_catalog.selection.Envelope`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Envelope {
+    pub ok: String,
+    pub error: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refusals: Option<Vec<EnvelopeRefusal>>,
+    pub otherwise: EnvelopeCode,
+}
+
+/// `connectors_definitions.definition.Bound`, the engine's bound of one query
+/// parameter: a range or the allowed values.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Bound {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub minimum: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub maximum: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub values: Option<Vec<String>>,
+}
+
+/// `connectors_definitions.definition.Defaults`: the fields an operation
+/// carries to the engine as written, given once for every operation that
+/// does not set the field itself. `envelope` applies only to the reads that
+/// answer JSON (no `response` other than `json`, no `download`), the only
+/// operations the engine admits one on; every other field applies to every
+/// operation.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Defaults {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub withhold: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credential: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bounds: Option<IndexMap<String, Bound>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response: Option<ResponseKind>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub binary: Option<Binary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub download: Option<Download>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub envelope: Option<Envelope>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate_limit_reasons: Option<Vec<String>>,
 }
 
 /// `connectors_definitions.definition.DatasourceKind`.
@@ -214,11 +474,15 @@ pub struct FeedCursor {
 pub struct FeedContainers {
     pub list: String,
     pub lookup: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub query: Option<BTreeMap<String, String>>,
     pub cursor: FeedCursor,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub records: Option<String>,
     pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub kind_word: Option<String>,
 }
 
@@ -252,13 +516,16 @@ pub struct FeedBody {
 #[serde(deny_unknown_fields)]
 pub struct FeedItems {
     pub list: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub query: Option<BTreeMap<String, String>>,
     pub position: FeedPosition,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub records: Option<String>,
     pub id: String,
     pub revision: String,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub author: Option<FeedAuthor>,
     pub body: FeedBody,
 }
@@ -274,38 +541,132 @@ pub struct Datasource {
     pub capabilities: BTreeMap<String, String>,
     pub containers: FeedContainers,
     pub items: FeedItems,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub filters: Option<BTreeMap<String, BTreeMap<String, String>>>,
 }
 
-/// `connectors_definitions.definition.Operation`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// `connectors_definitions.definition.Operation`. `op` is absent only for a
+/// `download`. The fields from `required` to `rate_limit_reasons` reach the
+/// engine as written, and each takes its value from `defaults` when not set.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Operation {
-    pub op: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub op: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub effect: Option<Effect>,
-    pub description: Option<String>,
     /// A style from `paging`, for an operation more than one style matches.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub paging: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub withhold: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credential: Option<Vec<String>>,
+    /// Bounds beside those the paging style gives, each replacing the style's
+    /// bound of the same parameter.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bounds: Option<IndexMap<String, Bound>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response: Option<ResponseKind>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub binary: Option<Binary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub download: Option<Download>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub envelope: Option<Envelope>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate_limit_reasons: Option<Vec<String>>,
     /// The closed body of a write, by key: `string`, `integer`, `boolean` or
-    /// `any`, required with a trailing `!`; or `=<value>`, sent fixed.
-    pub body: Option<BTreeMap<String, String>>,
+    /// `any`; a `string` followed by `+` must not be empty, and a trailing `!`
+    /// requires the key; or `=<value>`, sent fixed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body: Option<IndexMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub guard: Option<Guard>,
+    /// Written only where it differs from the source operation's summary,
+    /// which is the description otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
-/// `connectors_definitions.definition.ProviderDefinition`. The maps are ordered
-/// by key, so a lowering is a function of the definition's content, not of the
-/// order its file happens to list them in.
+/// `connectors_definitions.definition.ConnectorDefinition`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProviderDefinition {
     pub schema: SchemaId,
+    /// The catalog provider, the bundle's name, when it is not the file stem:
+    /// a second selection over one bundle.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub catalog: Option<String>,
     pub source: Source,
     pub base_url: String,
-    pub config: Option<BTreeMap<String, ConfigField>>,
-    pub auth: BTreeMap<String, Auth>,
-    pub paging: Option<BTreeMap<String, PagingStyle>>,
-    pub operations: BTreeMap<String, Operation>,
-    pub datasources: Option<BTreeMap<String, Datasource>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<IndexMap<String, ConfigField>>,
+    pub auth: IndexMap<String, Auth>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub paging: Option<IndexMap<String, PagingStyle>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub defaults: Option<Defaults>,
+    pub operations: IndexMap<String, Operation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub datasources: Option<IndexMap<String, Datasource>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub references: Option<IndexMap<String, Reference>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub views: Option<IndexMap<String, View>>,
+}
+
+/// `connectors_definitions.references.Match`: exactly one of `url`, an RFC 6570
+/// URI template matched in reverse (`{+name}` may span `/`), or `pattern`, a
+/// regular expression whose named groups are the reference's values.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReferenceMatch {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<String>,
+}
+
+/// `connectors_definitions.references.Resolve`: the read operation, by key, and
+/// the template each of its parameters takes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReferenceResolve {
+    pub operation: String,
+    pub with: IndexMap<String, String>,
+}
+
+/// `connectors_definitions.references.Reference` (`references/v1alpha1`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Reference {
+    #[serde(rename = "match")]
+    pub matches: Vec<ReferenceMatch>,
+    pub resolve: ReferenceResolve,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub outputs: Option<IndexMap<String, String>>,
+}
+
+/// `connectors_definitions.references.ViewField`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ViewField {
+    pub label: String,
+    pub pointer: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub renderer: Option<String>,
+}
+
+/// `connectors_definitions.references.View`: a field selection of the item a
+/// reference kind resolves to.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct View {
+    pub of: String,
+    pub fields: Vec<ViewField>,
 }
 
 /// Why a definition was not lowered. Each case is distinct, and [`Refusal::name`]
@@ -316,7 +677,7 @@ pub enum Refusal {
     Unreadable(String),
     /// Not YAML, a missing field, or a value outside the schema's vocabulary.
     Malformed(String),
-    /// A field schema v1 does not name, anywhere in the definition.
+    /// A field the schema does not name, anywhere in the definition.
     UnknownField(String),
     /// A `schema` other than [`SCHEMA`].
     WrongSchema(String),
@@ -331,8 +692,13 @@ pub enum Refusal {
     AuthProfileMissing { key: String, library: String },
     /// A profile, after `use`, lacks a field its scheme needs.
     AuthIncomplete { key: String, field: String },
-    /// A `{variable}` in `base_url` that `config` does not declare.
+    /// A profile, after `use`, gives a field its scheme does not take.
+    AuthMisplaced { key: String, field: String },
+    /// A `{variable}` in `base_url` or an OAuth URL that `config` does not declare.
     UndeclaredVariable(String),
+    /// A source that names other than one document, or a projection where
+    /// none is taken, or none where one is; or a document of another kind.
+    SourceKind(String),
     /// A `source` path that is absolute or leaves the definitions root.
     SourceOutsideRoot(String),
     /// A vendored source that is not a gzip file named `<name>.gz`.
@@ -343,6 +709,8 @@ pub enum Refusal {
     SourceHashMismatch { expected: String, actual: String },
     /// An `op` the bundle inventory carries no operation for.
     UnknownOperation { key: String, op: String },
+    /// An operation with neither an `op` nor a `download`.
+    NoOperation { key: String },
     /// An operation whose method is not `get` and that declares no `effect`.
     EffectRequired {
         key: String,
@@ -351,8 +719,8 @@ pub enum Refusal {
     },
     /// An operation names a `paging` style the definition does not declare.
     UnknownPaging { key: String, style: String },
-    /// More than one style's `request` parameter is a query parameter of the
-    /// operation, and the operation names none of them.
+    /// More than one style matches the operation, and the operation names
+    /// none of them.
     AmbiguousPaging { key: String, styles: Vec<String> },
     /// An operation names a style whose `request` or `limit` parameter it lacks.
     PagingParameter {
@@ -366,7 +734,8 @@ pub enum Refusal {
     /// A guard binds, with `with`, a parameter its read does not have.
     GuardParameter { key: String, parameter: String },
     /// A body key whose spec is not `string`, `integer`, `boolean` or `any`
-    /// (each optionally ending in `!`), nor `=<value>`.
+    /// (a `string` optionally followed by `+`, each optionally ending in `!`),
+    /// nor `=<value>`.
     BodyType {
         key: String,
         field: String,
@@ -389,6 +758,10 @@ pub enum Refusal {
         filter: String,
         parameter: String,
     },
+    /// A reference kind breaks a `references/v1alpha1` rule; the detail names it.
+    Reference { reference: String, detail: String },
+    /// A view names a reference kind the definition does not declare.
+    ViewReference { view: String, of: String },
     /// The catalog pipeline refused the source; the message names its step.
     Pipeline(String),
     /// The output directory, the selection or the scratch copy cannot be written.
@@ -406,12 +779,15 @@ impl Refusal {
             Self::AuthLibrary(_) => "auth_library",
             Self::AuthProfileMissing { .. } => "auth_profile_missing",
             Self::AuthIncomplete { .. } => "auth_incomplete",
+            Self::AuthMisplaced { .. } => "auth_misplaced",
             Self::UndeclaredVariable(_) => "undeclared_variable",
+            Self::SourceKind(_) => "source_kind",
             Self::SourceOutsideRoot(_) => "source_outside_root",
             Self::SourceNotGzip(_) => "source_not_gzip",
             Self::SourceTooLarge(_) => "source_too_large",
             Self::SourceHashMismatch { .. } => "source_hash_mismatch",
             Self::UnknownOperation { .. } => "unknown_operation",
+            Self::NoOperation { .. } => "no_operation",
             Self::EffectRequired { .. } => "effect_required",
             Self::UnknownPaging { .. } => "unknown_paging",
             Self::AmbiguousPaging { .. } => "ambiguous_paging",
@@ -423,6 +799,8 @@ impl Refusal {
             Self::DatasourceOperation { .. } => "datasource_operation",
             Self::FeedCount(_) => "feed_count",
             Self::FilterParameter { .. } => "filter_parameter",
+            Self::Reference { .. } => "reference",
+            Self::ViewReference { .. } => "view_reference",
             Self::Pipeline(_) => "pipeline",
             Self::Write(_) => "write",
         }
@@ -436,6 +814,7 @@ impl std::fmt::Display for Refusal {
             Self::Unreadable(detail)
             | Self::Malformed(detail)
             | Self::UnknownField(detail)
+            | Self::SourceKind(detail)
             | Self::SourceOutsideRoot(detail)
             | Self::SourceNotGzip(detail)
             | Self::SourceTooLarge(detail)
@@ -454,9 +833,15 @@ impl std::fmt::Display for Refusal {
             Self::AuthIncomplete { key, field } => {
                 write!(f, "{name}: auth profile `{key}` has no `{field}`")
             }
+            Self::AuthMisplaced { key, field } => {
+                write!(
+                    f,
+                    "{name}: auth profile `{key}` gives `{field}`, which its scheme does not take"
+                )
+            }
             Self::UndeclaredVariable(variable) => write!(
                 f,
-                "{name}: base_url variable `{variable}` is not declared in config"
+                "{name}: URL variable `{variable}` is not declared in config"
             ),
             Self::SourceHashMismatch { expected, actual } => write!(
                 f,
@@ -465,6 +850,10 @@ impl std::fmt::Display for Refusal {
             Self::UnknownOperation { key, op } => write!(
                 f,
                 "{name}: operation `{key}` names op `{op}`, which the bundle inventory lacks"
+            ),
+            Self::NoOperation { key } => write!(
+                f,
+                "{name}: operation `{key}` names no op and declares no download"
             ),
             Self::EffectRequired { key, op, method } => write!(
                 f,
@@ -498,7 +887,7 @@ impl std::fmt::Display for Refusal {
             ),
             Self::BodyType { key, field, spec } => write!(
                 f,
-                "{name}: operation `{key}` body `{field}` is `{spec}`; expected string, integer, boolean or any, optionally with `!`, or `=<value>`"
+                "{name}: operation `{key}` body `{field}` is `{spec}`; expected string, integer, boolean or any, a string optionally with `+`, each optionally with `!`, or `=<value>`"
             ),
             Self::UnknownDatasourceOperation { datasource, key } => write!(
                 f,
@@ -523,6 +912,13 @@ impl std::fmt::Display for Refusal {
             } => write!(
                 f,
                 "{name}: datasource `{datasource}` filter `{filter}` sets `{parameter}`, which items.list does not take"
+            ),
+            Self::Reference { reference, detail } => {
+                write!(f, "{name}: reference `{reference}`: {detail}")
+            }
+            Self::ViewReference { view, of } => write!(
+                f,
+                "{name}: view `{view}` is of `{of}`, which references does not declare"
             ),
         }
     }
@@ -558,15 +954,23 @@ pub fn parse(bytes: &[u8]) -> Result<ProviderDefinition, Refusal> {
             "source.sha256 `{digest}` is not lowercase hexadecimal"
         )));
     }
+    if let Some(catalog) = &definition.catalog
+        && !connectors_core::valid_id(catalog)
+    {
+        return Err(Refusal::Malformed(format!(
+            "catalog `{catalog}` is not a provider id"
+        )));
+    }
     Ok(definition)
 }
 
 /// What to lower, from where, into where.
 #[derive(Clone, Copy, Debug)]
 pub struct Request<'a> {
-    /// `providers/<id>.yaml`; the file stem is the provider id.
+    /// `connectors/<id>.yaml`; the file stem names the selection and the auth
+    /// file, and the catalog provider unless `catalog` names another.
     pub definition: &'a Path,
-    /// The definitions checkout `source.openapi` and `source.amendments` are under.
+    /// The definitions checkout the source paths and `auth/` are under.
     pub root: &'a Path,
     /// The bundle directory the bundle, its index entry and the selection go to.
     pub out: &'a Path,
@@ -578,35 +982,66 @@ pub struct Request<'a> {
 /// What a completed lowering wrote.
 #[derive(Clone, Debug)]
 pub struct Lowered {
+    /// The catalog provider: the bundle's name and the selection's `provider`.
     pub provider: String,
     pub entry: bundle::Entry,
     pub bundle: PathBuf,
+    /// `<id>.operations.json`.
     pub operations: PathBuf,
-    /// `<provider>.auth.json`: every profile as the provider's `auth` block.
+    /// `<id>.auth.json`: every profile as the provider's `auth` block.
     pub auth: PathBuf,
 }
 
 /// One row of the selection, in the shape the catalog provider's `Selection`
 /// reads.
 #[derive(Clone, Debug, Serialize)]
-struct SelectionEntry {
-    id: String,
-    operation_id: String,
-    effect: Effect,
+pub struct SelectionEntry {
+    pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-    bounds: BTreeMap<String, Bound>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    body_keys: Vec<String>,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-    body_types: BTreeMap<String, String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    body_required: Vec<String>,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-    body_fixed: BTreeMap<String, Value>,
+    pub operation_id: Option<String>,
+    pub effect: Effect,
     #[serde(skip_serializing_if = "Option::is_none")]
-    guard: Option<Value>,
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response: Option<ResponseKind>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub binary: Option<Binary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub download: Option<Download>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub envelope: Option<Envelope>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub bounds: BTreeMap<String, Bound>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub required: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub withhold: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub credential: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub rate_limit_reasons: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub body_keys: Vec<String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub body_types: BTreeMap<String, String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub body_required: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub body_nonempty: Vec<String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub body_fixed: BTreeMap<String, Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guard: Option<Value>,
+}
+
+/// The `connectors-catalog-operations/1` file a definition lowers to.
+#[derive(Clone, Debug, Serialize)]
+pub struct OperationsFile {
+    pub format: &'static str,
+    pub provider: String,
+    pub operations: Vec<SelectionEntry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub feed: Option<Value>,
 }
 
 /// The closed body a definition declares, in the selection's `body_*` fields.
@@ -615,10 +1050,11 @@ struct Body {
     keys: Vec<String>,
     types: BTreeMap<String, String>,
     required: Vec<String>,
+    nonempty: Vec<String>,
     fixed: BTreeMap<String, Value>,
 }
 
-fn body(key: &str, declared: Option<&BTreeMap<String, String>>) -> Result<Body, Refusal> {
+fn body(key: &str, declared: Option<&IndexMap<String, String>>) -> Result<Body, Refusal> {
     let mut body = Body::default();
     for (field, spec) in declared.into_iter().flatten() {
         body.keys.push(field.clone());
@@ -633,22 +1069,31 @@ fn body(key: &str, declared: Option<&BTreeMap<String, String>>) -> Result<Body, 
             body.fixed.insert(field.clone(), fixed);
             continue;
         }
-        let (kind, required) = match spec.strip_suffix('!') {
-            Some(kind) => (kind, true),
+        let refused = || Refusal::BodyType {
+            key: key.to_owned(),
+            field: field.clone(),
+            spec: spec.clone(),
+        };
+        let (rest, required) = match spec.strip_suffix('!') {
+            Some(rest) => (rest, true),
             None => (spec.as_str(), false),
+        };
+        let (kind, nonempty) = match rest.strip_suffix('+') {
+            Some(kind) => (kind, true),
+            None => (rest, false),
         };
         match kind {
             "string" | "integer" | "boolean" => {
                 body.types.insert(field.clone(), kind.to_owned());
             }
             "any" => {}
-            _ => {
-                return Err(Refusal::BodyType {
-                    key: key.to_owned(),
-                    field: field.clone(),
-                    spec: spec.clone(),
-                });
+            _ => return Err(refused()),
+        }
+        if nonempty {
+            if kind != "string" {
+                return Err(refused());
             }
+            body.nonempty.push(field.clone());
         }
         if required {
             body.required.push(field.clone());
@@ -659,40 +1104,41 @@ fn body(key: &str, declared: Option<&BTreeMap<String, String>>) -> Result<Body, 
 
 /// One `expect` entry as the engine's check: `=true`/`=false` a boolean, any
 /// other `=…` a literal, else an input reference.
-fn checks(mapping: &serde_yaml_ng::Mapping) -> Result<Vec<Value>, Refusal> {
+fn checks(mapping: Option<&IndexMap<String, String>>) -> Vec<Value> {
     mapping
-        .iter()
+        .into_iter()
+        .flatten()
         .map(|(pointer, expected)| {
-            let (Some(pointer), Some(expected)) = (pointer.as_str(), expected.as_str()) else {
-                return Err(Refusal::Malformed(
-                    "a guard's expect maps a pointer string to a string".to_owned(),
-                ));
-            };
             let expect = match expected.strip_prefix('=') {
                 Some("true") => serde_json::json!({"boolean": true}),
                 Some("false") => serde_json::json!({"boolean": false}),
                 Some(literal) => serde_json::json!({"literal": literal}),
                 None => serde_json::json!({"input": expected}),
             };
-            Ok(serde_json::json!({"pointer": pointer, "expect": expect}))
+            serde_json::json!({"pointer": pointer, "expect": expect})
         })
         .collect()
 }
 
-/// A range bound, in the shape the catalog provider's `Bound` reads.
-#[derive(Clone, Debug, Serialize)]
-struct Bound {
-    minimum: u64,
-    maximum: u64,
+/// The query parameter names of a source operation.
+fn query_of(found: &crate::inventory::Operation) -> Vec<&str> {
+    found
+        .parameters
+        .iter()
+        .filter(|parameter| parameter.location == crate::inventory::Location::Query)
+        .map(|parameter| parameter.name.as_str())
+        .collect()
 }
 
-/// The paging style an operation uses, by name, given its query parameters: the
-/// one it names, else the one style whose `request` parameter it has, else none.
+/// The paging style an operation uses, by name, given its query parameters and
+/// what it withholds: the one it names, else the one style that matches it,
+/// else none.
 fn paging_style<'a>(
     key: &str,
     operation: &Operation,
-    styles: Option<&'a BTreeMap<String, PagingStyle>>,
+    styles: Option<&'a IndexMap<String, PagingStyle>>,
     query: &[&str],
+    withheld: &[String],
 ) -> Result<Option<(&'a str, &'a PagingStyle)>, Refusal> {
     let Some(styles) = styles else {
         return match &operation.paging {
@@ -724,10 +1170,10 @@ fn paging_style<'a>(
     let matching: Vec<(&String, &PagingStyle)> = styles
         .iter()
         .filter(|(_, style)| {
-            style
-                .request
-                .as_deref()
-                .is_some_and(|request| query.contains(&request))
+            let parameter = style.request.as_deref().or(style.limit.as_deref());
+            parameter.is_some_and(|parameter| {
+                query.contains(&parameter) && !withheld.iter().any(|w| w == parameter)
+            })
         })
         .collect();
     match matching[..] {
@@ -740,18 +1186,9 @@ fn paging_style<'a>(
     }
 }
 
-#[derive(Serialize)]
-struct OperationsFile<'a> {
-    format: &'a str,
-    provider: &'a str,
-    operations: Vec<SelectionEntry>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    feed: Option<Value>,
-}
-
 /// The `{name}` variables of a URL template, in order.
 fn variables(template: &str) -> Result<Vec<&str>, Refusal> {
-    let malformed = || Refusal::Malformed(format!("base_url `{template}` is not a URL template"));
+    let malformed = || Refusal::Malformed(format!("`{template}` is not a URL template"));
     let mut names = Vec::new();
     let mut rest = template;
     while let Some(open) = rest.find(['{', '}']) {
@@ -808,7 +1245,7 @@ fn gunzip(name: &str, bytes: &[u8]) -> Result<Vec<u8>, Refusal> {
 }
 
 /// The `summary` of the operation `operation_id` names in the source document.
-fn summary(document: &Value, operation_id: &str) -> Option<String> {
+pub fn summary(document: &Value, operation_id: &str) -> Option<String> {
     document
         .get("paths")?
         .as_object()?
@@ -829,29 +1266,30 @@ fn summary(document: &Value, operation_id: &str) -> Option<String> {
 
 /// `base` with every field `over` gives replacing its counterpart, `identity`
 /// field by field.
-fn merged(base: &Auth, over: &Auth) -> Auth {
+pub fn merged(base: &Auth, over: &Auth) -> Auth {
     let identity = match (&base.identity, &over.identity) {
         (Some(base), Some(over)) => Some(AuthIdentity {
+            source: over.source.or(base.source),
             path: over.path.clone().or_else(|| base.path.clone()),
             kind: over.kind.clone().or_else(|| base.kind.clone()),
             subject: over.subject.clone().or_else(|| base.subject.clone()),
         }),
         (base, over) => over.clone().or_else(|| base.clone()),
     };
+    let pick = |over: &Option<String>, base: &Option<String>| over.clone().or_else(|| base.clone());
     Auth {
         library: None,
         default: over.default.or(base.default),
         scheme: over.scheme.or(base.scheme),
-        header: over.header.clone().or_else(|| base.header.clone()),
-        prefix: over.prefix.clone().or_else(|| base.prefix.clone()),
-        label: over.label.clone().or_else(|| base.label.clone()),
-        account_label: over
-            .account_label
-            .clone()
-            .or_else(|| base.account_label.clone()),
+        header: pick(&over.header, &base.header),
+        prefix: pick(&over.prefix, &base.prefix),
+        label: pick(&over.label, &base.label),
+        account_label: pick(&over.account_label, &base.account_label),
         identity,
         scopes: over.scopes.clone().or_else(|| base.scopes.clone()),
         access: over.access.clone().or_else(|| base.access.clone()),
+        token_url: pick(&over.token_url, &base.token_url),
+        authorize_url: pick(&over.authorize_url, &base.authorize_url),
     }
 }
 
@@ -860,8 +1298,8 @@ fn merged(base: &Auth, over: &Auth) -> Auth {
 fn resolve_auth(
     definition: &ProviderDefinition,
     root: &Path,
-) -> Result<(String, BTreeMap<String, Auth>), Refusal> {
-    let mut resolved = BTreeMap::new();
+) -> Result<(String, IndexMap<String, Auth>), Refusal> {
+    let mut resolved = IndexMap::new();
     for (id, entry) in &definition.auth {
         let profile = match &entry.library {
             None => entry.clone(),
@@ -892,7 +1330,7 @@ fn resolve_auth(
                     })?;
                 if base.library.is_some() || base.default.is_some() {
                     return Err(Refusal::AuthLibrary(format!(
-                        "auth/{library}.yaml profile `{id}` carries `use` or `default`, which only a provider's profile may"
+                        "auth/{library}.yaml profile `{id}` carries `use` or `default`, which only a connector's profile may"
                     )));
                 }
                 merged(base, entry)
@@ -920,28 +1358,61 @@ fn auth_block(id: &str, profile: &Auth) -> Result<Value, Refusal> {
         key: id.to_owned(),
         field: field.to_owned(),
     };
+    let misplaced = |field: &str| Refusal::AuthMisplaced {
+        key: id.to_owned(),
+        field: field.to_owned(),
+    };
     let scheme = profile.scheme.ok_or_else(|| missing("scheme"))?;
     let label = profile.label.as_ref().ok_or_else(|| missing("label"))?;
     let identity = profile
         .identity
         .as_ref()
         .ok_or_else(|| missing("identity"))?;
+    let source = identity.source.unwrap_or(IdentitySource::Api);
+    let mut probe = serde_json::Map::new();
+    match (&identity.path, source) {
+        (Some(path), IdentitySource::Api | IdentitySource::Configuration) => {
+            probe.insert("path".to_owned(), Value::from(path.as_str()));
+        }
+        (None, IdentitySource::Api | IdentitySource::Configuration) => {
+            return Err(missing("identity.path"));
+        }
+        (Some(_), IdentitySource::IdToken) => return Err(misplaced("identity.path")),
+        (None, IdentitySource::IdToken) => {}
+    }
+    probe.insert(
+        "kind".to_owned(),
+        Value::from(
+            identity
+                .kind
+                .as_ref()
+                .ok_or_else(|| missing("identity.kind"))?
+                .as_str(),
+        ),
+    );
+    if let Some(subject) = &identity.subject {
+        probe.insert("subject_pointer".to_owned(), Value::from(subject.as_str()));
+    }
+    match source {
+        IdentitySource::Api => {}
+        IdentitySource::IdToken => {
+            probe.insert("source".to_owned(), Value::from("id_token"));
+        }
+        IdentitySource::Configuration => {
+            probe.insert("source".to_owned(), Value::from("configuration"));
+        }
+    }
     let mut block = serde_json::json!({
         "profile": id,
         "label": label,
-        "identity": {
-            "path": identity.path.as_ref().ok_or_else(|| missing("identity.path"))?,
-            "kind": identity.kind.as_ref().ok_or_else(|| missing("identity.kind"))?,
-        },
+        "identity": probe,
     });
-    if let Some(subject) = &identity.subject {
-        block["identity"]["subject_pointer"] = Value::from(subject.as_str());
-    }
     let header = profile.header.clone();
+    let authorization = || header.clone().unwrap_or_else(|| "Authorization".to_owned());
     match scheme {
         AuthScheme::Basic => {
             block["scheme"] = Value::from("basic");
-            block["header"] = Value::from(header.unwrap_or_else(|| "Authorization".to_owned()));
+            block["header"] = Value::from(authorization());
             block["bearer"] = Value::Bool(false);
             block["account_label"] = Value::from(
                 profile
@@ -952,21 +1423,74 @@ fn auth_block(id: &str, profile: &Auth) -> Result<Value, Refusal> {
             );
         }
         AuthScheme::Bearer => {
-            block["header"] = Value::from(header.unwrap_or_else(|| "Authorization".to_owned()));
+            block["header"] = Value::from(authorization());
             block["bearer"] = Value::Bool(true);
         }
         AuthScheme::Header => {
-            block["header"] = Value::from(header.ok_or_else(|| missing("header"))?);
+            block["header"] = Value::from(header.clone().ok_or_else(|| missing("header"))?);
             block["bearer"] = Value::Bool(false);
             if let Some(prefix) = &profile.prefix {
                 block["prefix"] = Value::from(prefix.as_str());
             }
         }
+        AuthScheme::OAuth2Refresh | AuthScheme::OAuth2ClientCredentials => {
+            block["scheme"] = Value::from(if scheme == AuthScheme::OAuth2Refresh {
+                "oauth2_refresh"
+            } else {
+                "oauth2_client_credentials"
+            });
+            block["header"] = Value::from(authorization());
+            block["bearer"] = Value::Bool(true);
+            block["token_url"] = Value::from(
+                profile
+                    .token_url
+                    .as_ref()
+                    .ok_or_else(|| missing("token_url"))?
+                    .as_str(),
+            );
+            match (&profile.authorize_url, scheme) {
+                (Some(url), AuthScheme::OAuth2Refresh) => {
+                    block["authorize_url"] = Value::from(url.as_str());
+                }
+                (None, AuthScheme::OAuth2Refresh) => return Err(missing("authorize_url")),
+                (Some(_), _) => return Err(misplaced("authorize_url")),
+                (None, _) => {}
+            }
+        }
+    }
+    if profile.prefix.is_some() && scheme != AuthScheme::Header {
+        return Err(misplaced("prefix"));
+    }
+    if profile.account_label.is_some() && scheme != AuthScheme::Basic {
+        return Err(misplaced("account_label"));
+    }
+    if !scheme.is_oauth() {
+        for (field, given) in [
+            ("token_url", &profile.token_url),
+            ("authorize_url", &profile.authorize_url),
+        ] {
+            if given.is_some() {
+                return Err(misplaced(field));
+            }
+        }
     }
     if let Some(scopes) = &profile.scopes {
-        block["scopes"] = serde_json::json!({"path": scopes.path, "pointer": scopes.pointer});
+        match (&scopes.path, &scopes.pointer) {
+            (Some(path), Some(pointer)) => {
+                block["scopes"] = serde_json::json!({"path": path, "pointer": pointer});
+            }
+            (None, None) => {}
+            (Some(_), None) => return Err(missing("scopes.pointer")),
+            (None, Some(_)) => return Err(missing("scopes.path")),
+        }
         if let Some(minimum) = &scopes.minimum {
             block["minimum_scopes"] = serde_json::json!(minimum);
+        }
+        if let Some(requested) = &scopes.requested {
+            if !scheme.is_oauth() {
+                return Err(misplaced("scopes.requested"));
+            }
+            block["requested_scopes"] = serde_json::json!(requested);
         }
     }
     if let Some(access) = &profile.access {
@@ -976,6 +1500,60 @@ fn auth_block(id: &str, profile: &Auth) -> Result<Value, Refusal> {
         }
     }
     Ok(block)
+}
+
+/// The `connectors-catalog-auth/1` value of a definition's profiles, `use`
+/// resolved against `root`, for the catalog provider `provider`.
+fn auth_value(
+    definition: &ProviderDefinition,
+    provider: &str,
+    root: &Path,
+) -> Result<Value, Refusal> {
+    let (default_profile, profiles) = resolve_auth(definition, root)?;
+    let mut blocks = serde_json::Map::new();
+    for (id, profile) in &profiles {
+        blocks.insert(id.clone(), auth_block(id, profile)?);
+    }
+    let mut urls = vec![definition.base_url.as_str()];
+    for profile in profiles.values() {
+        urls.extend(profile.token_url.as_deref());
+        urls.extend(profile.authorize_url.as_deref());
+    }
+    for url in urls {
+        for variable in variables(url)? {
+            if !definition
+                .config
+                .as_ref()
+                .is_some_and(|config| config.contains_key(variable))
+            {
+                return Err(Refusal::UndeclaredVariable(variable.to_owned()));
+            }
+        }
+    }
+    Ok(serde_json::json!({
+        "format": AUTH_FORMAT,
+        "provider": provider,
+        "default": default_profile,
+        "profiles": blocks,
+    }))
+}
+
+/// The `connectors-catalog-auth/1` value the definition at `file` lowers its
+/// profiles to, `use` resolved against the definitions `root`. Reads no source.
+pub fn auth(file: &Path, root: &Path) -> Result<Value, Refusal> {
+    let shown = file.display();
+    let bytes =
+        std::fs::read(file).map_err(|error| Refusal::Unreadable(format!("{shown}: {error}")))?;
+    let definition = parse(&bytes)?;
+    let name = stem(file)?;
+    let provider = definition.catalog.as_deref().unwrap_or(name);
+    auth_value(&definition, provider, root)
+}
+
+fn stem(file: &Path) -> Result<&str, Refusal> {
+    file.file_stem()
+        .and_then(|stem| stem.to_str())
+        .ok_or_else(|| Refusal::Unreadable(format!("{}: no file stem", file.display())))
 }
 
 /// The source operation an operation key names, with its query parameters.
@@ -990,18 +1568,13 @@ fn keyed<'a>(
         key: key.to_owned(),
     };
     let operation = definition.operations.get(key).ok_or_else(unknown)?;
+    let op = operation.op.as_deref().ok_or_else(unknown)?;
     let found = inventory
         .operations
         .iter()
-        .find(|candidate| candidate.operation_id.as_deref() == Some(operation.op.as_str()))
+        .find(|candidate| candidate.operation_id.as_deref() == Some(op))
         .ok_or_else(unknown)?;
-    let query = found
-        .parameters
-        .iter()
-        .filter(|parameter| parameter.location == crate::inventory::Location::Query)
-        .map(|parameter| parameter.name.as_str())
-        .collect();
-    Ok((operation, found, query))
+    Ok((operation, found, query_of(found)))
 }
 
 /// The one path parameter of a datasource operation.
@@ -1042,8 +1615,9 @@ fn page_size(
         key: key.to_owned(),
         detail: "the feed needs a paging style with limit and max".to_owned(),
     };
-    let (_, style) =
-        paging_style(key, operation, definition.paging.as_ref(), query)?.ok_or_else(lacking)?;
+    let withheld = carried(definition, operation).withhold;
+    let (_, style) = paging_style(key, operation, definition.paging.as_ref(), query, &withheld)?
+        .ok_or_else(lacking)?;
     match (&style.limit, style.max) {
         (Some(limit), Some(max)) => Ok((limit.clone(), max)),
         _ => Err(lacking()),
@@ -1142,6 +1716,387 @@ fn feed(
     })))
 }
 
+/// The fields an operation carries to the engine as written, each from the
+/// operation or else from `defaults` ([`Defaults`] says where each applies).
+#[derive(Clone, Debug, Default)]
+struct Carried {
+    required: Vec<String>,
+    withhold: Vec<String>,
+    credential: Vec<String>,
+    bounds: Option<IndexMap<String, Bound>>,
+    response: Option<ResponseKind>,
+    binary: Option<Binary>,
+    download: Option<Download>,
+    envelope: Option<Envelope>,
+    rate_limit_reasons: Vec<String>,
+}
+
+fn carried(definition: &ProviderDefinition, operation: &Operation) -> Carried {
+    let none = Defaults::default();
+    let defaults = definition.defaults.as_ref().unwrap_or(&none);
+    let list = |own: &Option<Vec<String>>, default: &Option<Vec<String>>| {
+        own.clone().or_else(|| default.clone()).unwrap_or_default()
+    };
+    let response = operation.response.or(defaults.response);
+    let download = operation
+        .download
+        .clone()
+        .or_else(|| defaults.download.clone());
+    let effect = operation.effect.unwrap_or(Effect::Read);
+    let answers_json = effect == Effect::Read
+        && matches!(response, None | Some(ResponseKind::Json))
+        && download.is_none();
+    Carried {
+        required: list(&operation.required, &defaults.required),
+        withhold: list(&operation.withhold, &defaults.withhold),
+        credential: list(&operation.credential, &defaults.credential),
+        bounds: operation.bounds.clone().or_else(|| defaults.bounds.clone()),
+        response,
+        binary: operation.binary.clone().or_else(|| defaults.binary.clone()),
+        download,
+        envelope: operation
+            .envelope
+            .clone()
+            .or_else(|| answers_json.then(|| defaults.envelope.clone()).flatten()),
+        rate_limit_reasons: list(&operation.rate_limit_reasons, &defaults.rate_limit_reasons),
+    }
+}
+
+/// A guard read's parameter values: each path parameter of the read takes the
+/// input of its own name, and `with` binds any parameter of the read.
+fn bound_values(
+    key: &str,
+    probe: &crate::inventory::Operation,
+    with: Option<&IndexMap<String, String>>,
+) -> Result<BTreeMap<String, String>, Refusal> {
+    let mut values: BTreeMap<String, String> = probe
+        .parameters
+        .iter()
+        .filter(|parameter| parameter.location == crate::inventory::Location::Path)
+        .map(|parameter| (parameter.name.clone(), parameter.name.clone()))
+        .collect();
+    for (parameter, input) in with.into_iter().flatten() {
+        if !probe.parameters.iter().any(|p| &p.name == parameter) {
+            return Err(Refusal::GuardParameter {
+                key: key.to_owned(),
+                parameter: parameter.clone(),
+            });
+        }
+        values.insert(parameter.clone(), input.clone());
+    }
+    Ok(values)
+}
+
+/// The engine's guard for one operation's `guard`.
+fn guard(
+    definition: &ProviderDefinition,
+    inventory: &crate::inventory::Inventory,
+    key: &str,
+    guard: &Guard,
+) -> Result<Value, Refusal> {
+    let probe = |read: &str| -> Result<(String, &crate::inventory::Operation), Refusal> {
+        let operation_id = definition
+            .operations
+            .get(read)
+            .and_then(|local| local.op.as_deref())
+            .unwrap_or(read);
+        let found = inventory
+            .operations
+            .iter()
+            .find(|candidate| candidate.operation_id.as_deref() == Some(operation_id))
+            .ok_or_else(|| Refusal::UnknownGuardRead {
+                key: key.to_owned(),
+                read: read.to_owned(),
+            })?;
+        Ok((operation_id.to_owned(), found))
+    };
+    let preflight = |before: &GuardBefore| -> Result<Value, Refusal> {
+        let (operation_id, found) = probe(&before.read)?;
+        Ok(serde_json::json!({
+            "operation_id": operation_id,
+            "values": bound_values(key, found, before.with.as_ref())?,
+            "checks": checks(before.expect.as_ref()),
+        }))
+    };
+    let mut value = serde_json::json!({"preflight": preflight(&guard.before)?});
+    if let Some(also) = &guard.also {
+        value["further_preflights"] =
+            Value::Array(also.iter().map(&preflight).collect::<Result<_, _>>()?);
+    }
+    let after = guard.after.as_ref();
+    let mut postflight = serde_json::json!({
+        "checks": checks(after.and_then(|after| after.expect.as_ref())),
+    });
+    if let Some(after) = after {
+        if let Some(read) = &after.read {
+            let (operation_id, found) = probe(&read.read)?;
+            postflight["read"] = serde_json::json!({
+                "operation_id": operation_id,
+                "values": bound_values(key, found, read.with.as_ref())?,
+            });
+        }
+        if after.any.is_some() {
+            postflight["any_of"] = Value::Array(checks(after.any.as_ref()));
+        }
+        if let Some(absent) = after.absent {
+            postflight["absent"] = Value::Bool(absent);
+        }
+        if let Some(refusals) = &after.refusals {
+            postflight["refusals"] = serde_json::json!(refusals);
+        }
+    }
+    value["postflight"] = postflight;
+    Ok(value)
+}
+
+/// The selection a definition lowers to, against the inventory of its bundle
+/// and the (projected) source document whose summaries are the default
+/// descriptions. Pure: it reads and writes nothing.
+pub fn select(
+    definition: &ProviderDefinition,
+    provider: &str,
+    inventory: &crate::inventory::Inventory,
+    document: &Value,
+) -> Result<OperationsFile, Refusal> {
+    let mut operations = Vec::new();
+    for (key, operation) in &definition.operations {
+        let carried = carried(definition, operation);
+        let found = match &operation.op {
+            Some(op) => Some(
+                inventory
+                    .operations
+                    .iter()
+                    .find(|candidate| candidate.operation_id.as_deref() == Some(op.as_str()))
+                    .ok_or_else(|| Refusal::UnknownOperation {
+                        key: key.clone(),
+                        op: op.clone(),
+                    })?,
+            ),
+            None if carried.download.is_some() => None,
+            None => return Err(Refusal::NoOperation { key: key.clone() }),
+        };
+        let effect = match (operation.effect, found) {
+            (Some(effect), _) => effect,
+            (None, None) => Effect::Read,
+            (None, Some(found)) if found.method == "get" => Effect::Read,
+            (None, Some(found)) => {
+                return Err(Refusal::EffectRequired {
+                    key: key.clone(),
+                    op: operation.op.clone().unwrap_or_default(),
+                    method: found.method.clone(),
+                });
+            }
+        };
+        let query = found.map(query_of).unwrap_or_default();
+        let mut bounds = BTreeMap::new();
+        if let Some((_, style)) = paging_style(
+            key,
+            operation,
+            definition.paging.as_ref(),
+            &query,
+            &carried.withhold,
+        )? && let (Some(limit), Some(max)) = (&style.limit, style.max)
+            && query.contains(&limit.as_str())
+        {
+            bounds.insert(
+                limit.clone(),
+                Bound {
+                    minimum: Some(1),
+                    maximum: Some(max),
+                    values: None,
+                },
+            );
+        }
+        for (parameter, bound) in carried.bounds.iter().flatten() {
+            bounds.insert(parameter.clone(), bound.clone());
+        }
+        let declared_body = body(key, operation.body.as_ref())?;
+        let guard = operation
+            .guard
+            .as_ref()
+            .map(|declared| guard(definition, inventory, key, declared))
+            .transpose()?;
+        operations.push(SelectionEntry {
+            id: key.clone(),
+            operation_id: operation.op.clone(),
+            effect,
+            description: operation
+                .description
+                .clone()
+                .or_else(|| operation.op.as_deref().and_then(|op| summary(document, op))),
+            response: carried.response,
+            binary: carried.binary,
+            download: carried.download,
+            envelope: carried.envelope,
+            bounds,
+            required: carried.required,
+            withhold: carried.withhold,
+            credential: carried.credential,
+            rate_limit_reasons: carried.rate_limit_reasons,
+            body_keys: declared_body.keys,
+            body_types: declared_body.types,
+            body_required: declared_body.required,
+            body_nonempty: declared_body.nonempty,
+            body_fixed: declared_body.fixed,
+            guard,
+        });
+    }
+    check_references(definition, inventory)?;
+    Ok(OperationsFile {
+        format: OPERATIONS_FORMAT,
+        provider: provider.to_owned(),
+        operations,
+        feed: feed(definition, inventory)?,
+    })
+}
+
+/// `scheme://host` of a URL or URL template: everything before the third `/`.
+fn origin(template: &str) -> &str {
+    let after_scheme = template.find("://").map_or(0, |at| at + 3);
+    template[after_scheme..]
+        .find('/')
+        .map_or(template, |at| &template[..after_scheme + at])
+}
+
+/// The rules of `references/v1alpha1` a definition can be held to before any
+/// runtime serves it. References and views are validated here and lowered into
+/// nothing: no runtime serves them yet.
+fn check_references(
+    definition: &ProviderDefinition,
+    inventory: &crate::inventory::Inventory,
+) -> Result<(), Refusal> {
+    let empty = IndexMap::new();
+    let references = definition.references.as_ref().unwrap_or(&empty);
+    let base = origin(&definition.base_url);
+    for (name, reference) in references {
+        let refuse = |detail: String| Refusal::Reference {
+            reference: name.clone(),
+            detail,
+        };
+        if reference.matches.is_empty() {
+            return Err(refuse("declares no match".to_owned()));
+        }
+        let mut bound: Vec<Vec<String>> = Vec::new();
+        for entry in &reference.matches {
+            let names: Vec<String> = match (&entry.url, &entry.pattern) {
+                (Some(url), None) => {
+                    if origin(url) != base {
+                        return Err(refuse(format!(
+                            "url `{url}` is not on base_url's origin `{base}`"
+                        )));
+                    }
+                    variables(url)?
+                        .into_iter()
+                        .map(|name| name.trim_start_matches('+').to_owned())
+                        .collect()
+                }
+                (None, Some(pattern)) => {
+                    let compiled = regex::Regex::new(pattern)
+                        .map_err(|error| refuse(format!("pattern `{pattern}`: {error}")))?;
+                    compiled
+                        .capture_names()
+                        .flatten()
+                        .map(str::to_owned)
+                        .collect()
+                }
+                _ => {
+                    return Err(refuse(
+                        "a match is exactly one of url or pattern".to_owned(),
+                    ));
+                }
+            };
+            if names.is_empty() {
+                return Err(refuse("a match binds no value".to_owned()));
+            }
+            bound.push(names);
+        }
+        let unbound = |variable: &str| {
+            bound
+                .iter()
+                .any(|names| !names.iter().any(|n| n == variable))
+        };
+        let operation = definition
+            .operations
+            .get(&reference.resolve.operation)
+            .ok_or_else(|| {
+                refuse(format!(
+                    "resolves through `{}`, which operations does not declare",
+                    reference.resolve.operation
+                ))
+            })?;
+        let found = inventory
+            .operations
+            .iter()
+            .find(|candidate| {
+                operation.op.is_some()
+                    && candidate.operation_id.as_deref() == operation.op.as_deref()
+            })
+            .ok_or_else(|| {
+                refuse(format!(
+                    "`{}` names no source operation",
+                    reference.resolve.operation
+                ))
+            })?;
+        if found.method != "get" {
+            return Err(refuse(format!(
+                "resolves through `{}`, which is {}, not a read",
+                reference.resolve.operation,
+                found.method.to_uppercase()
+            )));
+        }
+        for parameter in found
+            .parameters
+            .iter()
+            .filter(|parameter| parameter.location == crate::inventory::Location::Path)
+        {
+            if !reference.resolve.with.contains_key(&parameter.name) {
+                return Err(refuse(format!(
+                    "path parameter `{}` of `{}` is not bound by with",
+                    parameter.name, reference.resolve.operation
+                )));
+            }
+        }
+        for (parameter, value) in &reference.resolve.with {
+            if !found.parameters.iter().any(|p| &p.name == parameter) {
+                return Err(refuse(format!(
+                    "with binds `{parameter}`, which `{}` does not take",
+                    reference.resolve.operation
+                )));
+            }
+            for variable in variables(value)? {
+                if unbound(variable) {
+                    return Err(refuse(format!("`{variable}` is not bound by every match")));
+                }
+            }
+        }
+        for template in reference.outputs.iter().flat_map(IndexMap::values) {
+            for variable in variables(template)? {
+                if !variable.starts_with('/') && unbound(variable) {
+                    return Err(refuse(format!(
+                        "output uses `{variable}`, which not every match binds"
+                    )));
+                }
+            }
+        }
+    }
+    for (view, declared) in definition.views.iter().flatten() {
+        if !references.contains_key(&declared.of) {
+            return Err(Refusal::ViewReference {
+                view: view.clone(),
+                of: declared.of.clone(),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// A plain file name: one normal path component.
+fn plain_file_name(name: &str) -> bool {
+    !name.is_empty()
+        && Path::new(name).components().collect::<Vec<_>>().as_slice()
+            == [Component::Normal(name.as_ref())]
+}
+
 /// Lower one definition. Every check that can refuse runs before the output
 /// directory is touched: the bundle is compiled into a staging directory under
 /// `scratch`, the selection is resolved against it, and only then are the bundle
@@ -1151,39 +2106,25 @@ pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
     let bytes = std::fs::read(request.definition)
         .map_err(|error| Refusal::Unreadable(format!("{shown}: {error}")))?;
     let definition = parse(&bytes)?;
-    let provider = request
-        .definition
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .ok_or_else(|| Refusal::Unreadable(format!("{shown}: no file stem")))?;
+    let name = stem(request.definition)?;
+    let provider = definition.catalog.as_deref().unwrap_or(name);
 
-    let (default_profile, profiles) = resolve_auth(&definition, request.root)?;
-    let auth_profile = default_profile.as_str();
-    let mut blocks = serde_json::Map::new();
-    for (id, profile) in &profiles {
-        blocks.insert(id.clone(), auth_block(id, profile)?);
-    }
-    for variable in variables(&definition.base_url)? {
-        if !definition
-            .config
-            .as_ref()
-            .is_some_and(|config| config.contains_key(variable))
-        {
-            return Err(Refusal::UndeclaredVariable(variable.to_owned()));
-        }
-    }
+    let auth = auth_value(&definition, provider, request.root)?;
+    let auth_profile = auth["default"].as_str().unwrap_or_default().to_owned();
 
-    let openapi = &definition.source.openapi;
-    let source_path = under_root(request.root, openapi)?;
+    let (kind, document_path) = definition.source.document()?;
+    let source_path = under_root(request.root, document_path)?;
     let file_name = source_path
         .file_name()
         .and_then(|name| name.to_str())
         .and_then(|name| name.strip_suffix(".gz"))
         .filter(|name| !name.is_empty())
-        .ok_or_else(|| Refusal::SourceNotGzip(format!("{openapi} is not named `<name>.gz`")))?;
+        .ok_or_else(|| {
+            Refusal::SourceNotGzip(format!("{document_path} is not named `<name>.gz`"))
+        })?;
     let compressed = std::fs::read(&source_path)
-        .map_err(|error| Refusal::Unreadable(format!("{openapi}: {error}")))?;
-    let source = gunzip(openapi, &compressed)?;
+        .map_err(|error| Refusal::Unreadable(format!("{document_path}: {error}")))?;
+    let source = gunzip(document_path, &compressed)?;
     let actual = hex::encode(Sha256::digest(&source));
     if actual != definition.source.sha256 {
         return Err(Refusal::SourceHashMismatch {
@@ -1203,150 +2144,78 @@ pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
         .prefix("definition-")
         .tempdir_in(request.scratch)
         .map_err(write)?;
-    let source_file = staging.path().join(file_name);
-    std::fs::write(&source_file, &source).map_err(write)?;
     let bundles = staging.path().join("bundles");
-    pipeline::run(&pipeline::Request {
+    let base = pipeline::Request {
         provider,
-        source: &source_file,
+        source: Path::new(""),
         directory: &bundles,
-        auth_profile,
+        auth_profile: &auth_profile,
         replace: false,
         amendments: amendments.as_deref(),
-    })
-    .map_err(|failure| Refusal::Pipeline(failure.to_string()))?;
+    };
+    let openapi = match kind {
+        SourceKind::OpenApi => {
+            let source_file = staging.path().join(file_name);
+            std::fs::write(&source_file, &source).map_err(write)?;
+            pipeline::run(&pipeline::Request {
+                source: &source_file,
+                ..base
+            })
+            .map_err(|failure| Refusal::Pipeline(failure.to_string()))?;
+            source
+        }
+        SourceKind::Swagger | SourceKind::Discovery => {
+            let projection_name = definition.source.projection.as_deref().unwrap_or_default();
+            if !plain_file_name(projection_name) || projection_name == file_name {
+                return Err(Refusal::SourceKind(format!(
+                    "projection `{projection_name}` is not a plain file name beside the source"
+                )));
+            }
+            let projection = crate::derived::project(&source)
+                .map_err(|refusal| Refusal::Pipeline(refusal.to_string()))?;
+            let expected = match kind {
+                SourceKind::Swagger => crate::swagger::FORMAT,
+                _ => crate::discovery::FORMAT,
+            };
+            if projection.format() != expected {
+                return Err(Refusal::SourceKind(format!(
+                    "{document_path} is a {} document, not the {expected} the source names",
+                    projection.format()
+                )));
+            }
+            let original = staging.path().join(file_name);
+            std::fs::write(&original, &source).map_err(write)?;
+            let projected = staging.path().join(projection_name);
+            std::fs::write(&projected, projection.openapi()).map_err(write)?;
+            pipeline::run_derived(
+                &pipeline::Request {
+                    source: &projected,
+                    ..base
+                },
+                &original,
+            )
+            .map_err(|failure| Refusal::Pipeline(failure.to_string()))?;
+            projection.openapi().to_vec()
+        }
+    };
     let bundle =
         bundle::load(&bundles, provider).map_err(|error| Refusal::Pipeline(error.to_string()))?;
-    let document = crate::parse_document(&source)
+    let document = crate::parse_document(&openapi)
         .map_err(|refusal| Refusal::Pipeline(refusal.reason().to_owned()))?;
 
-    let mut operations = Vec::new();
-    for (key, operation) in &definition.operations {
-        let found = bundle
-            .inventory
-            .operations
-            .iter()
-            .find(|candidate| candidate.operation_id.as_deref() == Some(operation.op.as_str()))
-            .ok_or_else(|| Refusal::UnknownOperation {
-                key: key.clone(),
-                op: operation.op.clone(),
-            })?;
-        let effect = match operation.effect {
-            Some(effect) => effect,
-            None if found.method == "get" => Effect::Read,
-            None => {
-                return Err(Refusal::EffectRequired {
-                    key: key.clone(),
-                    op: operation.op.clone(),
-                    method: found.method.clone(),
-                });
-            }
-        };
-        let query: Vec<&str> = found
-            .parameters
-            .iter()
-            .filter(|parameter| parameter.location == crate::inventory::Location::Query)
-            .map(|parameter| parameter.name.as_str())
-            .collect();
-        let mut bounds = BTreeMap::new();
-        if let Some((_, style)) = paging_style(key, operation, definition.paging.as_ref(), &query)?
-            && let (Some(limit), Some(max)) = (&style.limit, style.max)
-            && query.contains(&limit.as_str())
-        {
-            bounds.insert(
-                limit.clone(),
-                Bound {
-                    minimum: 1,
-                    maximum: max,
-                },
-            );
-        }
-        let declared_body = body(key, operation.body.as_ref())?;
-        let guard = operation
-            .guard
-            .as_ref()
-            .map(|guard| {
-                let read = definition
-                    .operations
-                    .get(&guard.before.read)
-                    .map_or(guard.before.read.as_str(), |local| local.op.as_str());
-                let probe = bundle
-                    .inventory
-                    .operations
-                    .iter()
-                    .find(|candidate| candidate.operation_id.as_deref() == Some(read))
-                    .ok_or_else(|| Refusal::UnknownGuardRead {
-                        key: key.clone(),
-                        read: guard.before.read.clone(),
-                    })?;
-                let mut values: BTreeMap<String, String> = probe
-                    .parameters
-                    .iter()
-                    .filter(|parameter| parameter.location == crate::inventory::Location::Path)
-                    .map(|parameter| (parameter.name.clone(), parameter.name.clone()))
-                    .collect();
-                for (parameter, input) in guard.before.with.iter().flatten() {
-                    if !probe.parameters.iter().any(|p| &p.name == parameter) {
-                        return Err(Refusal::GuardParameter {
-                            key: key.clone(),
-                            parameter: parameter.clone(),
-                        });
-                    }
-                    values.insert(parameter.clone(), input.clone());
-                }
-                let mut postflight = serde_json::json!({"checks": checks(&guard.after.expect)?});
-                if let Some(any) = &guard.after.any {
-                    postflight["any_of"] = Value::Array(checks(any)?);
-                }
-                Ok(serde_json::json!({
-                    "preflight": {
-                        "operation_id": read,
-                        "values": values,
-                        "checks": checks(&guard.before.expect)?,
-                    },
-                    "postflight": postflight,
-                }))
-            })
-            .transpose()?;
-        operations.push(SelectionEntry {
-            id: key.clone(),
-            operation_id: operation.op.clone(),
-            effect,
-            description: operation
-                .description
-                .clone()
-                .or_else(|| summary(&document, &operation.op)),
-            bounds,
-            body_keys: declared_body.keys,
-            body_types: declared_body.types,
-            body_required: declared_body.required,
-            body_fixed: declared_body.fixed,
-            guard,
-        });
-    }
-    let feed = feed(&definition, &bundle.inventory)?;
-    let mut selection = serde_json::to_vec_pretty(&OperationsFile {
-        format: OPERATIONS_FORMAT,
-        provider,
-        operations,
-        feed,
-    })
-    .map_err(|error| Refusal::Write(error.to_string()))?;
+    let selection = select(&definition, provider, &bundle.inventory, &document)?;
+    let mut selection =
+        serde_json::to_vec_pretty(&selection).map_err(|error| Refusal::Write(error.to_string()))?;
     selection.push(b'\n');
 
     let entry = bundle::write(request.out, &bundle, true)
         .map_err(|error| Refusal::Write(error.to_string()))?;
-    let operations_path = request.out.join(format!("{provider}.operations.json"));
+    let operations_path = request.out.join(format!("{name}.operations.json"));
     std::fs::write(&operations_path, selection).map_err(write)?;
-    let mut auth = serde_json::to_vec_pretty(&serde_json::json!({
-        "format": AUTH_FORMAT,
-        "provider": provider,
-        "default": auth_profile,
-        "profiles": blocks,
-    }))
-    .map_err(|error| Refusal::Write(error.to_string()))?;
+    let mut auth =
+        serde_json::to_vec_pretty(&auth).map_err(|error| Refusal::Write(error.to_string()))?;
     auth.push(b'\n');
-    let auth_path = request.out.join(format!("{provider}.auth.json"));
+    let auth_path = request.out.join(format!("{name}.auth.json"));
     std::fs::write(&auth_path, auth).map_err(write)?;
     Ok(Lowered {
         provider: provider.to_owned(),

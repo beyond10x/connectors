@@ -1,0 +1,49 @@
+schema: urn:beyond10x:connectors-definition:1
+source:
+  discovery: upstream/google-drive/drive-api.json.gz
+  sha256: 50a01d9b5134f16b4782098bcc6694aa4edf810993432022aba49237b5c83048
+  projection: drive.openapi.json
+base_url: https://www.googleapis.com/drive/v3
+auth:
+  google.oauth:
+    use: google
+    scopes:
+      minimum: ["https://www.googleapis.com/auth/drive.readonly"]
+      requested: [openid, "https://www.googleapis.com/auth/drive.readonly"]
+paging: {pageSize: {limit: pageSize, max: 1000}}
+defaults: {rate_limit_reasons: [rateLimitExceeded, userRateLimitExceeded, dailyLimitExceeded]}
+operations:
+  about.get:
+    op: drive.about.get
+    required: [fields]
+    description: Read the signed-in user, storage quota and Drive capabilities; Drive requires fields for this method, such as user,storageQuota
+  files.list:
+    op: drive.files.list
+    description: List files matching the search query q, one page per call; the walk follows nextPageToken as pageToken and ends on a page without it; that end condition holds only if fields, when given, includes nextPageToken, so include it (for example nextPageToken,files(id,name))
+  files.get:
+    op: drive.files.get
+    description: Read one file's metadata by fileId; its content is not downloaded here (use files.export for Google Workspace documents)
+  files.export:
+    op: drive.files.export
+    response: text
+    description: Export one Google Workspace document to the text mimeType given, such as text/plain, returned as text; at most the engine's 4 MiB response limit
+  changes.getStartPageToken:
+    op: drive.changes.getStartPageToken
+    description: "Read the start page token: the baseline from which changes.list reports later changes"
+  changes.list:
+    op: drive.changes.list
+    description: List changes since pageToken, one page per call; the walk follows nextPageToken and ends on the page carrying newStartPageToken, the next baseline; that end condition holds only if fields, when given, includes nextPageToken and newStartPageToken, so include both (for example nextPageToken,newStartPageToken,changes)
+  files.create:
+    op: drive.files.create
+    effect: write
+    description: "Create a file from metadata only, such as a Google Workspace document, a folder (mimeType application/vnd.google-apps.folder) or a shortcut; no content is uploaded; without body.parents it goes directly into My Drive; a name is not unique in a folder, so an existing name makes a second file; among other effects, body.writersCanShare and body.copyRequiresWriterPermission set who may share or copy it, body.contentRestrictions locks it (readOnly, ownerRestricted), body.downloadRestrictions restricts downloading it and ignoreDefaultVisibility skips the domain default visibility; this list is not exhaustive: the approval binds the whole input by digest, so read the whole input before approving"
+  files.update:
+    op: drive.files.update
+    effect: write
+    required: [fields]
+    guard: {before: {read: files.get, with: {fields: fields}, expect: {/version: version}}}
+    description: "Change one file's metadata while its version is the pinned version; one update can also move the file (addParents, removeParents), trash it (body.trashed), remove the access it inherits (body.inheritedPermissionsDisabled), change who may share or copy it (body.writersCanShare, body.copyRequiresWriterPermission), lock or unlock it (body.contentRestrictions: readOnly, ownerRestricted) and restrict downloading it (body.downloadRestrictions); fields is required, selects both the preflight read and the answer and must include version; shared-drive files are not supported yet; the effects listed are not exhaustive: the approval binds the whole input by digest, so read the whole input before approving"
+  files.copy:
+    op: drive.files.copy
+    effect: write
+    description: "Copy one file; the body names the copy and its parents, and a copy without body.parents inherits any discoverable parent of the source file (the source's folder and its access, not My Drive as a create would); a name is not unique in a folder, so an existing name makes a second file; among other effects, copyComments copies the source's open comments, body.writersCanShare and body.copyRequiresWriterPermission set who may share or copy it, body.contentRestrictions locks it (readOnly, ownerRestricted), body.downloadRestrictions restricts downloading it and ignoreDefaultVisibility skips the domain default visibility; this list is not exhaustive: the approval binds the whole input by digest, so read the whole input before approving"

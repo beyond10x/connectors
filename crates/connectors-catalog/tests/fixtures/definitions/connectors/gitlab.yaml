@@ -1,0 +1,349 @@
+schema: urn:beyond10x:connectors-definition:1
+source:
+  openapi: upstream/gitlab/openapi_v3.yaml.gz
+  sha256: f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530
+  amendments: upstream/gitlab/openapi_v3.amendments.json
+base_url: https://{hostname}/api/v4
+config: {hostname: {type: string, default: gitlab.com}}
+auth:
+  gitlab.pat:
+    scheme: header
+    header: PRIVATE-TOKEN
+    label: GitLab personal access token
+    identity: {path: user, kind: gitlab.user, subject: /id}
+    scopes: {path: personal_access_tokens/self, pointer: /scopes, minimum: [api]}
+paging:
+  pages: {request: page, next: "header:x-next-page", limit: per_page, max: 100}
+operations:
+  project.get: {op: getApiV4ProjectsId, description: Read one project}
+  issues.list:
+    op: getApiV4ProjectsIdIssues
+    description: List a project's issues, one page per call
+  file.get:
+    op: getApiV4ProjectsIdRepositoryFilesFilePath
+    description: Read one repository file at a ref
+  branch.get:
+    op: getApiV4ProjectsIdRepositoryBranchesBranch
+    description: Read one branch and its head commit
+  merge_requests.list:
+    op: getApiV4ProjectsIdMergeRequests
+    description: List a project's merge requests, one page per call
+  merge_request.get:
+    op: getApiV4ProjectsIdMergeRequestsMergeRequestIid
+    description: Read one merge request
+  pipelines.list:
+    op: getApiV4ProjectsIdPipelines
+    description: List a project's pipelines, one page per call
+  pipeline.get: {op: getApiV4ProjectsIdPipelinesPipelineId, description: Read one pipeline}
+  pipeline.jobs:
+    op: getApiV4ProjectsIdPipelinesPipelineIdJobs
+    description: List one pipeline's jobs, one page per call
+  job.get: {op: getApiV4ProjectsIdJobsJobId, description: Read one job}
+  job.trace:
+    op: getApiV4ProjectsIdJobsJobIdTrace
+    response: text
+    description: Read one job's log as text; the pinned source declares JSON, the provider answers text/plain
+  projects.list:
+    op: getApiV4Projects
+    description: List projects, one page per call; last_activity_after filters by time
+  tags.list:
+    op: getApiV4ProjectsIdRepositoryTags
+    description: List a project's repository tags, one page per call
+  releases.list:
+    op: getApiV4ProjectsIdReleases
+    description: List a project's releases, one page per call
+  project.events:
+    op: getApiV4ProjectsIdEvents
+    description: List a project's events, one page per call; after and before filter by date
+  commits.list:
+    op: getApiV4ProjectsIdRepositoryCommits
+    withhold: [pagination, page_token]
+    description: List a ref's commits with their parent ids, one page per call; since and until filter by commit time
+  repository.compare:
+    op: getApiV4ProjectsIdRepositoryCompare
+    description: Compare two refs; a true compare_timeout means GitLab stopped early, not that no commits lie between them
+  deployments.list:
+    op: getApiV4ProjectsIdDeployments
+    description: List a project's deployments with their environment and job, one page per call; updated_after, updated_before, finished_after and finished_before filter by time
+  issue.create:
+    op: postApiV4ProjectsIdIssues
+    effect: write
+    description: "Open one issue in project id from body; GitLab requires body.title. Unguarded: nothing exists to compare before a create, so the same input approved and sent again opens a second issue. Among other effects, body.assignee_ids assigns users, body.confidential makes it confidential, body.discussion_locked locks its discussion, body.merge_request_to_resolve_discussions_of resolves a merge request's discussions and body.iid and body.created_at, available only to administrators and project owners, set its internal id and creation time; this list is not exhaustive: the approval binds the whole input by digest, so read the whole input before approving"
+  merge_request.create:
+    op: postApiV4ProjectsIdMergeRequests
+    effect: write
+    guard:
+      before: {read: branch.get, with: {branch: body.source_branch}, expect: {/commit/id: sha}}
+      after: {expect: {/sha: sha}}
+    description: Open a merge request whose source branch head is the pinned sha
+  merge_request.update:
+    op: putApiV4ProjectsIdMergeRequestsMergeRequestIid
+    effect: write
+    guard:
+      before: {read: merge_request.get, expect: {/sha: sha, /state: =opened}}
+      after: {expect: {/sha: sha}}
+    description: Change an open merge request whose head is the pinned sha
+  merge_request.merge:
+    op: putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge
+    effect: write
+    guard:
+      before:
+        read: merge_request.get
+        expect:
+          /sha: body.sha
+          /state: =opened
+          /detailed_merge_status: =mergeable
+          /head_pipeline/id: pipeline_id
+          /head_pipeline/status: =success
+      after: {expect: {/state: =merged, /sha: body.sha}}
+    description: Merge an open, mergeable merge request at the pinned head after the pinned pipeline succeeded
+  merge_request.note.create:
+    op: postApiV4ProjectsIdMergeRequestsNoteableIdNotes
+    effect: write
+    body: {body: string!, internal: boolean}
+    description: "Add one note to merge request noteable_id (its IID) in project id; body.body is the text, body.internal true makes it internal. Unguarded: nothing exists to compare before a create, so the same input approved and sent again adds a second note. GitLab runs quick actions in the text, such as /close, /approve or /assign_reviewer, so read the whole text before approving"
+  merge_request.discussion.get:
+    op: getApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId
+    description: Read one discussion of merge request noteable_id (its IID) by discussion_id, with its notes and its resolvable and resolved state
+  merge_request.discussion.reply:
+    op: postApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionIdNotes
+    effect: write
+    body: {body: string!}
+    description: "Add one reply, body.body, to discussion discussion_id of merge request noteable_id (its IID). Unguarded: the same input approved and sent again adds a second reply. GitLab runs quick actions in the text, so read the whole text before approving"
+  merge_request.discussion.resolve:
+    op: putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId
+    effect: write
+    body: {resolved: boolean}
+    guard:
+      before: {read: merge_request.discussion.get, expect: {/id: discussion_id, /resolvable: =true}}
+      after: {expect: {/id: discussion_id, /resolved: body.resolved}}
+    description: Resolve (body.resolved true) or unresolve (false) one resolvable discussion of merge request noteable_id (its IID); body.resolved is a JSON boolean. The discussion read before and GitLab's answer after must both be discussion_id, and the answer must carry the requested state
+  repository.tree:
+    op: getApiV4ProjectsIdRepositoryTree
+    withhold: [pagination, page_token]
+    description: List the files and directories under path at ref, recursive to descend, one page per call
+  commit.get:
+    op: getApiV4ProjectsIdRepositoryCommitsSha
+    description: Read one commit by sha, a commit id, branch or tag name; stats adds its line counts
+  commit.diff:
+    op: getApiV4ProjectsIdRepositoryCommitsShaDiff
+    description: List one commit's file diffs, one page per call; unidiff selects the unified format
+  branches.list:
+    op: getApiV4ProjectsIdRepositoryBranches
+    withhold: [page_token]
+    description: List a project's branches with their head commits, one page per call; search and regex filter by name
+  search.blobs:
+    op: getApiV4ProjectsIdDashSearch
+    withhold: [type, state, confidential, fields]
+    bounds: {scope: {values: [blobs]}}
+    description: Search a project's code for an expression, one page per call; scope is held to blobs, ref selects a branch or tag
+  merge_request.auto_merge:
+    op: putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge
+    effect: write
+    body: {auto_merge: =true, sha: any}
+    guard:
+      before: {read: merge_request.get, expect: {/sha: body.sha, /state: =opened}}
+      after:
+        expect: {/sha: body.sha}
+        any: {/merge_when_pipeline_succeeds: =true, /state: =merged}
+    description: Set an open merge request at the pinned head to merge when its pipeline succeeds (auto_merge, fixed to true), or merge it at once when the pipeline already has
+  merge_request.reopen:
+    op: putApiV4ProjectsIdMergeRequestsMergeRequestIid
+    effect: write
+    body: {state_event: =reopen}
+    guard:
+      before: {read: merge_request.get, expect: {/sha: sha, /state: =closed}}
+      after: {expect: {/sha: sha, /state: =opened}}
+    description: Reopen a closed merge request whose head is the pinned sha (state_event, fixed to reopen)
+  merge_request.diffs:
+    op: getApiV4ProjectsIdMergeRequestsMergeRequestIidDiffs
+    description: List one merge request's file diffs by its IID, one page per call; unidiff selects the unified format
+  merge_request.discussions:
+    op: getApiV4ProjectsIdMergeRequestsNoteableIdDiscussions
+    description: List the discussions of merge request noteable_id (its IID), each with its notes, id and resolvable and resolved state, one page per call
+  tag.get:
+    op: getApiV4ProjectsIdRepositoryTagsTagName
+    description: Read one repository tag by tag_name, with its commit, message and release
+  tag.create:
+    op: postApiV4ProjectsIdRepositoryTags
+    effect: write
+    body: {tag_name: string, ref: string, message: string}
+    guard:
+      before: {read: commit.get, with: {sha: body.ref}, expect: {/id: sha}}
+      after: {expect: {/name: body.tag_name, /commit/id: sha}}
+    description: Create tag body.tag_name at body.ref (a branch, tag or commit) while that ref is the pinned commit sha; body.message makes it annotated. The provider reads the commit body.ref names first and refuses before any write when it is not sha, and the answer must name the tag at sha; a ref moved between that read and the create leaves the effect unknown. GitLab refuses a tag that already exists
+  tag.delete:
+    op: deleteApiV4ProjectsIdRepositoryTagsTagName
+    effect: write
+    guard:
+      before: {read: tag.get, expect: {/name: tag_name, /commit/id: sha}}
+      after: {read: {read: tag.get}, absent: true}
+    description: "Delete tag tag_name while it points at the pinned commit sha. The provider reads the tag first and refuses before any write when it is absent or at another commit, and reads it again after GitLab's 204: only a 404 there proves it gone, so a tag still found or a read that fails leaves the effect unknown. GitLab has no conditional delete: a tag deleted and recreated at another commit between that first read and the delete is deleted and still reported applied"
+  release.get:
+    op: getApiV4ProjectsIdReleasesTagName
+    description: Read the release of tag tag_name, with its commit, description and assets; include_html_description adds the rendered description
+  release.links:
+    op: getApiV4ProjectsIdReleasesTagNameAssetsLinks
+    description: List the asset links of the release of tag tag_name, one page per call
+  release.create:
+    op: postApiV4ProjectsIdReleases
+    effect: write
+    body:
+      tag_name: string
+      name: string
+      description: string
+      released_at: string
+      milestones: any
+      milestone_ids: any
+      assets: any
+    guard:
+      before: {read: tag.get, with: {tag_name: body.tag_name}, expect: {/commit/id: sha}}
+      after: {expect: {/tag_name: body.tag_name, /commit/id: sha}}
+    description: "Create the release of the existing tag body.tag_name while it points at the pinned commit sha, with body.name, body.description (Markdown), body.released_at, body.milestones or body.milestone_ids and body.assets.links. The provider reads the tag first and refuses before any write when it is absent or at another commit, and the answer must name the release of that tag at sha. The body admits neither ref nor tag_message, so it never creates a tag: create one with tag.create first. GitLab refuses a second release of one tag (409)"
+  release.update:
+    op: putApiV4ProjectsIdReleasesTagName
+    effect: write
+    body:
+      name: string
+      description: string
+      released_at: string
+      milestones: any
+      milestone_ids: any
+    guard:
+      before: {read: release.get, expect: {/tag_name: tag_name, /commit/id: sha}}
+      after: {expect: {/tag_name: tag_name, /commit/id: sha}}
+    description: "Change the release of tag tag_name while its commit is the pinned sha: body.name, body.description (Markdown), body.released_at, body.milestones or body.milestone_ids, each replacing the stored value (an empty milestones list removes every milestone). The provider reads the release first and refuses before any write when it is absent or at another commit, and the answer must name the same tag and commit"
+  pipeline.retry:
+    op: postApiV4ProjectsIdPipelinesPipelineIdRetry
+    effect: write
+    guard:
+      before: {read: pipeline.get, expect: {/id: pipeline_id, /sha: sha}}
+      after: {expect: {/id: pipeline_id, /sha: sha}}
+    description: "Retry the failed and canceled jobs of pipeline pipeline_id while it runs for the pinned commit sha. The provider reads the pipeline first and refuses before any write when it is absent or for another commit, and GitLab's answer must name the same pipeline at sha. A pipeline with no failed or canceled job is answered unchanged: GitLab retries nothing and the answer's status says so"
+  pipeline.cancel:
+    op: postApiV4ProjectsIdPipelinesPipelineIdCancel
+    effect: write
+    guard:
+      before: {read: pipeline.get, expect: {/id: pipeline_id, /sha: sha}}
+      after: {expect: {/id: pipeline_id, /sha: sha}}
+    description: "Cancel every job of pipeline pipeline_id while it runs for the pinned commit sha. The provider reads the pipeline first and refuses before any write when it is absent or for another commit, and GitLab's answer must name the same pipeline at sha. A pipeline that already finished is answered unchanged, its status not canceled: read the answer's status before taking the pipeline as stopped"
+  pipeline.create:
+    op: postApiV4ProjectsIdPipeline
+    effect: write
+    body: {ref: string, variables: any, inputs: any}
+    guard:
+      before: {read: commit.get, with: {sha: body.ref}, expect: {/id: sha}}
+      after: {expect: {/ref: body.ref, /sha: sha}}
+    description: "Run a new pipeline for body.ref (a branch or tag) while that ref is the pinned commit sha, with body.variables (a list of key, value and variable_type) and body.inputs. The provider reads the commit body.ref names first and refuses before any write when it is not sha, and the answer must name a pipeline for body.ref at sha; a ref moved between that read and the create leaves the effect unknown. Not idempotent: the same input approved and sent again runs a second pipeline"
+  environments.list:
+    op: getApiV4ProjectsIdEnvironments
+    description: List a project's environments, one page per call; name selects one by name, search matches at least three characters, states filters by available, stopping or stopped
+  commit.create:
+    op: postApiV4ProjectsIdRepositoryCommits
+    effect: write
+    body:
+      branch: string
+      commit_message: string!
+      actions: any!
+      author_email: string
+      author_name: string
+      stats: boolean
+    guard:
+      before: {read: branch.get, with: {branch: body.branch}, expect: {/commit/id: sha}}
+      after: {expect: {/parent_ids/0: sha}}
+    description: "Commit body.actions (each an action create, update, move, delete or chmod on a file_path, with content, encoding, previous_path, execute_filemode or last_commit_id as the action takes) with body.commit_message onto the existing branch body.branch while its head is the pinned commit sha; body.author_email and body.author_name set the author, body.stats the answer's line counts. The provider reads the branch first and refuses before any write when it is absent or its head is not sha, and the new commit's first parent must be sha; a branch moved between that read and the commit leaves the effect unknown. The body admits neither start_branch, start_sha, start_project nor force, so it never creates a branch or rewrites history: create one with branch.create first. The same input approved and sent again is refused by the guard, since the branch head is then the new commit"
+  file.update:
+    op: putApiV4ProjectsIdRepositoryFilesFilePath
+    effect: write
+    body:
+      branch: string
+      content: string!
+      commit_message: string!
+      encoding: string
+      author_email: string
+      author_name: string
+      last_commit_id: string
+    guard:
+      before: {read: branch.get, with: {branch: body.branch}, expect: {/commit/id: sha}}
+      after:
+        expect: {/commit/parent_ids/0: sha}
+        read: {read: branch.get, with: {branch: body.branch}}
+    description: Replace the content of the existing file file_path with body.content (body.encoding text or base64) in one commit with body.commit_message onto branch body.branch while its head is the pinned commit sha; body.author_email and body.author_name set the author, body.last_commit_id makes GitLab refuse when the file changed since that commit. The provider reads the branch first and refuses before any write when it is absent or its head is not sha; GitLab answers only the file_path and branch, so the provider reads the branch body.branch again after the write, and its head's first parent must be sha, or the effect is unknown; the branch is read by name, never as a revision a same-named tag would win. The body admits no start_branch, so it never creates a branch. GitLab refuses content identical to the file's (400)
+  branch.create:
+    op: postApiV4ProjectsIdRepositoryBranches
+    effect: write
+    body: {branch: string, ref: string}
+    guard:
+      before: {read: commit.get, with: {sha: body.ref}, expect: {/id: sha}}
+      after: {expect: {/name: body.branch, /commit/id: sha}}
+    description: Create branch body.branch at body.ref (a branch, tag or commit) while that ref is the pinned commit sha. The provider reads the commit body.ref names first and refuses before any write when it is not sha, and the answer must name the branch at sha; a ref moved between that read and the create leaves the effect unknown. GitLab refuses a branch that already exists (400)
+  branch.delete:
+    op: deleteApiV4ProjectsIdRepositoryBranchesBranch
+    effect: write
+    guard:
+      before: {read: branch.get, expect: {/name: branch, /commit/id: sha}}
+      after: {read: {read: branch.get}, absent: true}
+    description: "Delete branch branch while its head is the pinned commit sha. The provider reads the branch first and refuses before any write when it is absent or at another commit, and reads it again after GitLab's 204: only a 404 there proves it gone, so a branch still found or a read that fails leaves the effect unknown. GitLab has no conditional delete: a branch moved to another commit between that first read and the delete is deleted and still reported applied. GitLab refuses the default and protected branches itself"
+  project.create:
+    op: postApiV4Projects
+    effect: write
+    body:
+      name: string
+      path: string
+      namespace_id: integer
+      description: string
+      visibility: string
+      default_branch: string
+      initialize_with_readme: boolean
+    guard:
+      before:
+        read: getApiV4NamespacesId
+        with: {id: namespace}
+        expect: {/id: body.namespace_id, /full_path: namespace}
+      after: {expect: {/path: body.path, /namespace/id: body.namespace_id}}
+    description: Create project body.path (body.name, else the path) in the namespace whose full path is namespace and whose id is body.namespace_id, with body.description, body.visibility (private, internal or public), body.default_branch and body.initialize_with_readme. The provider reads the namespace by its path first and refuses before any write unless it exists with that id, and the answer must name the project body.path in that namespace. GitLab refuses a path already taken in the namespace (400). The body admits no other project setting, import_url and templates included
+datasources:
+  merge_requests:
+    kind: feed
+    profile: gitlab-merge-requests/1
+    capabilities:
+      deletions: not-observed
+      kind: fixed-word
+      revision: update-time
+      visibility: all-private
+    containers:
+      list: projects.list
+      lookup: project.get
+      query: {membership: "true", order_by: id, sort: asc}
+      cursor: {parameter: id_after, last: /id}
+      id: /id
+      name: /name_with_namespace
+      kind_word: project
+    items:
+      list: merge_requests.list
+      query: {order_by: updated_at, scope: all, sort: asc, state: all}
+      position: {time: updated_after}
+      id: /iid
+      revision: /updated_at
+      created_at: /created_at
+      updated_at: /updated_at
+      author: {id: /author/id, display_name: /author/name}
+      body: {pointer: /description, representation: text/markdown}
+    filters:
+      mine_open: {state: opened, scope: assigned_to_me}
+references:
+  merge_request:
+    match:
+      - url: "https://{hostname}/{+project}/-/merge_requests/{merge_request_iid}"
+      - pattern: "(?P<project>[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)!(?P<merge_request_iid>[0-9]+)"
+    resolve: {operation: merge_request.get, with: {id: "{project}", merge_request_iid: "{merge_request_iid}"}}
+    outputs:
+      summary: "!{merge_request_iid} {/state}: {/title}"
+views:
+  merge_request.row:
+    of: merge_request
+    fields:
+      - {label: Title, pointer: /title}
+      - {label: State, pointer: /state}
+      - {label: Author, pointer: /author/name}
+      - {label: Pipeline, pointer: /head_pipeline/status}

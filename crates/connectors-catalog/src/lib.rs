@@ -10,6 +10,7 @@ pub mod coverage;
 pub mod definition;
 pub mod derived;
 pub mod discovery;
+pub mod import;
 pub mod inventory;
 pub mod pipeline;
 pub mod swagger;

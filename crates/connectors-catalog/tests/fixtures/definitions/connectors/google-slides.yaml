@@ -1,0 +1,34 @@
+schema: urn:beyond10x:connectors-definition:1
+source:
+  discovery: upstream/google-slides/slides-api.json.gz
+  sha256: 49fa379e29948696029ec8c4b334939f0bd6e74d9ef27650f523682283c1d3f1
+  projection: slides.openapi.json
+base_url: https://slides.googleapis.com
+auth:
+  google.oauth:
+    use: google
+    scopes:
+      minimum: ["https://www.googleapis.com/auth/presentations.readonly"]
+      requested: [openid, "https://www.googleapis.com/auth/presentations.readonly"]
+defaults: {rate_limit_reasons: [rateLimitExceeded, userRateLimitExceeded, dailyLimitExceeded]}
+operations:
+  presentations.get:
+    op: slides.presentations.get
+    description: "Read one presentation by presentationId: its slides, layouts, masters and their elements; narrow it with fields to stay under the engine's 4 MiB response limit"
+  presentations.pages.get:
+    op: slides.presentations.pages.get
+    description: Read one page of a presentation by presentationId and pageObjectId, with its page elements
+  presentations.pages.getThumbnail:
+    op: slides.presentations.pages.getThumbnail
+    description: "Read a page thumbnail's contentUrl, width and height; the image behind contentUrl is not fetched. contentUrl gives anyone holding it the requester's access to the image for about 30 minutes: treat it as a credential and do not log or share it"
+  presentations.create:
+    op: slides.presentations.create
+    effect: write
+    description: "Create a blank presentation from the body's title, and presentationId if one is given; Google ignores every other body field. Unguarded: nothing exists to compare before a create"
+  presentations.batchUpdate:
+    op: slides.presentations.batchUpdate
+    effect: write
+    guard:
+      before: {read: presentations.get, expect: {/revisionId: body.writeControl.requiredRevisionId}}
+      after: {expect: {/presentationId: presentationId}}
+    description: "Apply body.requests atomically to a presentation whose current revisionId equals the pinned body.writeControl.requiredRevisionId, which is required; Google checks that revision again when it applies them. A fields value must keep presentationId, otherwise an applied write is reported unknown. createImage, replaceImage and replaceAllShapesWithImage store their URL in the deck as Image.sourceUrl, readable by every viewer: never pass a getThumbnail contentUrl as an image URL. Comment requests (Developer Preview) can fail on a 200 that is reported applied: read commentUpdateState in the answer"
