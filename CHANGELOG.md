@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Changed
+
+- A Runpod `pod.create` refused for lack of capacity is now `refused` with code `capacity`, not
+  `invalid_input`: a 4xx whose `message` or `detail` contains one of the stock-out texts Runpod's own
+  clients recognise (case-insensitive; a 5xx stays `unknown`), declared through the new catalog
+  selection member `refusal_texts` (modelled as `connectors_catalog.selection.WriteRefusalTexts`).
+
 ### Fixed
 
 - An owner no longer outlives its state directory. A Unix owner exits, as a shutdown request
