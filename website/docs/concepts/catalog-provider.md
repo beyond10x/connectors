@@ -47,6 +47,7 @@ is sent once as approved; the same input approved and sent again creates a secon
 | Confluence Cloud | pinned REST v2 | changed pages, a space's pages, one page, comments | local fixtures |
 | HubSpot CRM | pinned CRM Objects `2026-09` | records of one object type, one record | local fixtures |
 | Zendesk Support | pinned Support API, redacted | tickets, users and organizations changed since a time, one of each, comments | a live account |
+| GitHub REST | pinned REST description `v2.1.0`, redacted | review requests, assigned issues and pull requests, notifications, the authenticated user; an organization's repositories, one repository, releases, the README and single files as text | local fixtures |
 | Google Drive, Slides, Calendar, Gmail | Discovery documents projected to OpenAPI | reads and guarded writes; no direct message send | local fixtures |
 | Runpod | pinned REST API v1 | create, list and terminate pods | a local fixture |
 | Slack | Swagger 2.0 projected to OpenAPI 3.1.0 | conversation list, history and replies, users, the workspace, files and their content; message posting, editing and deleting, and direct messages, under approval; message search with a user token | a local fixture |

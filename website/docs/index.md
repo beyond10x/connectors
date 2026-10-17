@@ -36,7 +36,7 @@ Three ideas carry the rest of this documentation:
 Every release is a source release for Linux x86_64. The [status page](./status.md) lists each
 capability with the test that holds it. In short:
 
-- The **catalog provider** serves GitLab, Jira Cloud, Confluence Cloud, HubSpot CRM, Zendesk
+- The **catalog provider** serves GitLab, Jira Cloud, Confluence Cloud, HubSpot CRM, GitHub, Zendesk
   Support, Google Drive, Slides, Calendar and Gmail, and Runpod from their pinned API documents,
   with no Rust per endpoint ([catalog provider](./concepts/catalog-provider.md)).
 - **Native adapters** run Kubernetes resource reads and discovery, PostgreSQL reads and Tavily web

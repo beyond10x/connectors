@@ -76,8 +76,9 @@ enum Action {
     /// Re-derive every recorded upstream source digest from its archived bytes, and
     /// check every redacted upstream source against its record and its rule.
     SourceHashes,
-    /// Write the `upstream-redaction/3` copy of a vendor document: example credentials,
-    /// real-looking email addresses and phone numbers replaced. Never touches the network.
+    /// Write the `upstream-redaction/4` copy of a vendor document: example credentials,
+    /// PEM private keys, real-looking email addresses and phone numbers replaced. Never
+    /// touches the network.
     Redact {
         #[arg(long)]
         input: PathBuf,

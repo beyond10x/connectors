@@ -379,3 +379,140 @@ fn every_shipped_refusal_text_is_a_value_of_the_catalog_selection_model() {
         );
     }
 }
+
+/// A named change to a shipped value, run against the model and the reader alike.
+type Variation<'a> = (&'a str, &'a dyn Fn(&mut Value));
+
+/// One selection member checked against the type of the catalog selection model that declares
+/// it: every shipped value is a value of the model, at least one shipped selection declares it,
+/// the model still states the named invariant clauses, and the engine's reader admits exactly
+/// what the compiled model admits for each variation of the first shipped value
+/// (story:catalog-github-reads).
+fn member_matches_model(
+    member: &str,
+    holder: &str,
+    inner: &str,
+    clauses: &[&str],
+    selection: Value,
+    variations: &[Variation],
+) {
+    let schema = compiled(holder);
+    let invariants = schema["$defs"][inner]["x-ess-invariants"].to_string();
+    for clause in clauses {
+        assert!(
+            invariants.contains(clause),
+            "the model no longer states `{clause}` of `{member}`: {invariants}"
+        );
+    }
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let declared: Vec<(String, Value)> = shipped()
+        .into_iter()
+        .filter_map(|(name, s)| Some((name, s.get(member)?.clone())))
+        .collect();
+    assert!(
+        !declared.is_empty(),
+        "no shipped selection declares `{member}`, so this check would not cover it"
+    );
+    for (name, value) in &declared {
+        assert_valid(&validator, name, &serde_json::json!({ member: value }));
+    }
+    let (_, first) = &declared[0];
+    for (name, change) in variations {
+        let mut value = first.clone();
+        change(&mut value);
+        let model = validator.is_valid(&serde_json::json!({ member: value }));
+        let mut written = selection.clone();
+        written[member] = value;
+        let reader = serde_json::from_value::<Selection>(written).is_ok();
+        assert_eq!(
+            reader, model,
+            "`{member}` {name}: reader admits {reader}, model admits {model}"
+        );
+    }
+}
+
+type Change<'a> = &'a dyn Fn(&mut Value);
+
+#[test]
+fn every_shipped_rate_limit_header_pair_is_a_value_of_the_catalog_selection_model() {
+    let variations: [(&str, Change); 4] = [
+        ("as shipped", &|_| {}),
+        ("unknown member", &|h| {
+            h["limit"] = "x-ratelimit-limit".into()
+        }),
+        ("no reset", &|h| {
+            h.as_object_mut().unwrap().remove("reset");
+        }),
+        ("a number for a name", &|h| h["remaining"] = 0.into()),
+    ];
+    member_matches_model(
+        "rate_limit_headers",
+        "connectors_catalog.selection.QuotaHeaders",
+        "connectors_catalog.selection.RateLimitHeaders",
+        &["remaining.count", "reset.count"],
+        serde_json::json!({"id": "user.me", "operation_id": "users/get-authenticated", "effect": "read"}),
+        &variations,
+    );
+}
+
+#[test]
+fn every_shipped_fixed_query_is_a_value_of_the_catalog_selection_model() {
+    let variations: [(&str, Change); 3] = [
+        ("as shipped", &|_| {}),
+        ("a number for a value", &|q| {
+            let key = q.as_object().unwrap().keys().next().unwrap().clone();
+            q[key] = 1.into();
+        }),
+        ("a list", &|q| *q = serde_json::json!(["q"])),
+    ];
+    member_matches_model(
+        "query_fixed",
+        "connectors_catalog.selection.FixedQuery",
+        "connectors_catalog.selection.FixedQuery",
+        &["defined(query_folds)"],
+        serde_json::json!({"id": "review_requests.list", "operation_id": "search/issues-and-pull-requests", "effect": "read"}),
+        &variations,
+    );
+    let fold_variations: [(&str, Change); 4] = [
+        ("as shipped", &|_| {}),
+        ("unknown format", &|f| f["since"]["format"] = "date".into()),
+        ("unknown member", &|f| f["since"]["suffix"] = "x".into()),
+        ("no prefix", &|f| {
+            f["since"].as_object_mut().unwrap().remove("prefix");
+        }),
+    ];
+    member_matches_model(
+        "query_folds",
+        "connectors_catalog.selection.FixedQuery",
+        "connectors_catalog.selection.QueryFold",
+        &["into.count", "prefix.count", "contains"],
+        serde_json::json!({"id": "review_requests.list", "operation_id": "search/issues-and-pull-requests", "effect": "read",
+            "query_fixed": {"q": "is:pr is:open review-requested:@me"}}),
+        &fold_variations,
+    );
+}
+
+#[test]
+fn every_shipped_embedded_text_is_a_value_of_the_catalog_selection_model() {
+    let variations: [(&str, Change); 4] = [
+        ("as shipped", &|_| {}),
+        ("unknown member", &|e| e["media_type"] = "text/plain".into()),
+        ("no content", &|e| {
+            e.as_object_mut().unwrap().remove("content");
+        }),
+        ("a string for max_bytes", &|e| e["max_bytes"] = "1".into()),
+    ];
+    member_matches_model(
+        "embedded_text",
+        "connectors_catalog.selection.ReadEmbeddedText",
+        "connectors_catalog.selection.EmbeddedText",
+        &[
+            "content.count",
+            "encoding.count",
+            "max_bytes >= 1",
+            "max_bytes <= 2097152",
+        ],
+        serde_json::json!({"id": "readme.raw", "operation_id": "repos/get-readme", "effect": "read"}),
+        &variations,
+    );
+}

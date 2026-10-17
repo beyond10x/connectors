@@ -305,6 +305,13 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Catalog provider",
+        "GitHub REST",
+        "Review requests, assigned issues and pull requests, notifications and the authenticated user, and an organization's repositories, one repository, its releases, its README and single files as text, with a bearer token; read only; exercised against local fixtures only.",
+        "adapters/catalog/tests/github.rs::shipped_github_selections_are_exactly_the_ten_reads",
+        "/docs/reference/adapters/catalog",
+    ),
+    shipped(
+        "Catalog provider",
         "Google Drive, Slides, Calendar and Gmail",
         "Reads and guarded writes from Discovery documents projected to OpenAPI, with a refresh token from browser consent; exercised against local fixtures only.",
         "adapters/catalog/tests/google_drive.rs::shipped_drive_selections_are_the_six_reads_and_three_writes",
