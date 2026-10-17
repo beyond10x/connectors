@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.53.1 — 2026-10-17
+
+### Changed
+
+- A Runpod `pod.create` refused for lack of capacity is now `refused` with code `capacity`, not
+  `invalid_input`: a 4xx whose `message` or `detail` contains one of the stock-out texts Runpod's own
+  clients recognise (case-insensitive; a 5xx stays `unknown`), declared through the new catalog
+  selection member `refusal_texts` (modelled as `connectors_catalog.selection.WriteRefusalTexts`).
+
+### Limitations
+
+- The stock-out texts are taken from Runpod's own clients and verified against a local fixture
+  only; no real stock-out answer has been recorded yet.
+
 ## 0.53.0 — 2026-10-17
 
 ### Added

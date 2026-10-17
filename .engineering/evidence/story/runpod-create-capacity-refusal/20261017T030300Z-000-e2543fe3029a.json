@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-17T03:03:00Z",
+  "actor": "human:timo",
+  "artifact": "story:runpod-create-capacity-refusal",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "package gates on 9c2c230ed (release 0.53.1, on the 0.53.0 head): fmt, clippy -D warnings and tests of connectors-host, connectors, connectors-catalog-provider, connectors-build and connectors-docs, 1680 passed, 0 failed; cli, docs, metadata-entities, ess-boundary, source-hashes and release-binaries checks current; ignored inventory 0 unknown; plan validate passed. No real stock-out answer recorded; fixture only.",
+    "reference": "9c2c230ed0dd410cf8c9599a63a8105e42112a78"
+  }
+}
