@@ -92,7 +92,7 @@ fn a_read_in_its_evidence_first_half_life_probes_nothing() {
 /// A read whose evidence lapsed recollects it once; when the provider refuses
 /// the credential in that recollection, the read is not dispatched, answers
 /// as a stored credential refused on a read (`repair_connection`), and the
-/// connection is cut off (`reauthorization_required`).
+/// connection is cut off: the provider refused its credential, so it is `stale`.
 #[test]
 fn a_read_whose_recollection_is_refused_answers_repair() {
     const LIFETIME_MS: u64 = 1_000;
@@ -130,7 +130,7 @@ fn a_read_whose_recollection_is_refused_answers_repair() {
         &connection,
     ]));
     assert_eq!(
-        status["connection"]["summary"]["state"], "reauthorization_required",
+        status["connection"]["summary"]["state"], "stale",
         "{status}"
     );
 }
