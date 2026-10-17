@@ -1033,16 +1033,28 @@ fn oauth_cache_evicted_on_invalid_credential() {
     project(&mut child, &entry()).unwrap();
     assert_eq!(provider.token_requests(), 1);
     provider.state.lock().unwrap().api_refuses = true;
+    let sent = provider.api_authorizations().len();
     assert!(matches!(
         project(&mut child, &entry()),
         Err(Failure::InvalidCredential)
     ));
-    assert_eq!(provider.token_requests(), 1);
+    // The refused cached token is dropped and the read is sent once more with
+    // a fresh exchange (story:ess-connector-vocabulary-model decision 16); the
+    // API refusing that token too is the stored credential's refusal, and that
+    // token is dropped as well.
+    assert_eq!(provider.token_requests(), 2);
+    assert_eq!(
+        provider.api_authorizations()[sent..],
+        [
+            Some(format!("Bearer {ACCESS_TOKEN}1")),
+            Some(format!("Bearer {ACCESS_TOKEN}2"))
+        ]
+    );
     provider.state.lock().unwrap().api_refuses = false;
     project(&mut child, &entry()).unwrap();
-    assert_eq!(provider.token_requests(), 2);
+    assert_eq!(provider.token_requests(), 3);
     let api = provider.api_authorizations();
-    assert!(api.last().unwrap().as_deref() == Some(&*format!("Bearer {ACCESS_TOKEN}2")));
+    assert!(api.last().unwrap().as_deref() == Some(&*format!("Bearer {ACCESS_TOKEN}3")));
     // A validation the token endpoint refuses evicts the cached token too, and
     // a validation that succeeds leaves its own fresh token cached.
     provider.set_token(TokenAnswer::Refuse(400, json!({"error": "invalid_grant"})));
@@ -1052,15 +1064,15 @@ fn oauth_cache_evicted_on_invalid_credential() {
     ));
     provider.set_token(grant(3600));
     project(&mut child, &entry()).unwrap();
-    assert_eq!(provider.token_requests(), 4);
+    assert_eq!(provider.token_requests(), 5);
     child
         .validate(OAUTH_PROFILE, &entry(), deadline())
         .unwrap_or_else(|failure| panic!("validation {failure:?}"));
-    assert_eq!(provider.token_requests(), 5);
+    assert_eq!(provider.token_requests(), 6);
     project(&mut child, &entry()).unwrap();
-    assert_eq!(provider.token_requests(), 5);
+    assert_eq!(provider.token_requests(), 6);
     let api = provider.api_authorizations();
-    assert!(api.last().unwrap().as_deref() == Some(&*format!("Bearer {ACCESS_TOKEN}4")));
+    assert!(api.last().unwrap().as_deref() == Some(&*format!("Bearer {ACCESS_TOKEN}5")));
     // A validation whose identity read the API refuses caches nothing.
     provider.state.lock().unwrap().api_refuses = true;
     assert!(matches!(
@@ -1069,7 +1081,7 @@ fn oauth_cache_evicted_on_invalid_credential() {
     ));
     provider.state.lock().unwrap().api_refuses = false;
     project(&mut child, &entry()).unwrap();
-    assert_eq!(provider.token_requests(), 7);
+    assert_eq!(provider.token_requests(), 8);
 }
 
 #[test]
@@ -1296,6 +1308,28 @@ impl OAuthCli {
         .map(str::to_owned)
         .to_vec()
     }
+    /// Reconnects the one connection with the same entry, at its current
+    /// revision, and checks it is `ready` again.
+    fn reconnect(&self) {
+        use super::cli_journey::success;
+        let listed =
+            success(self.cli.run(&["connections", "list", "--adapter", "drive"]))["connections"][0]
+                .clone();
+        let reconnected = success(self.cli.run(&[
+            "connections",
+            "reconnect",
+            "--adapter",
+            "drive",
+            "--connection",
+            listed["connection"].as_str().unwrap(),
+            "--expected-revision",
+            listed["revision"].as_str().unwrap(),
+            "--credential-file",
+            self.credential.to_str().unwrap(),
+        ]))["connection"]
+            .clone();
+        assert_eq!(reconnected["summary"]["state"], "ready", "{reconnected}");
+    }
     fn run(&self, args: &[String]) -> std::process::Output {
         self.cli
             .run(&args.iter().map(String::as_str).collect::<Vec<_>>())
@@ -1344,7 +1378,9 @@ fn invalid_grant() -> TokenAnswer {
 
 /// A stored connection whose refresh token the token host now refuses as
 /// `invalid_grant` is reported with `next_action = repair_connection` on the
-/// next invoke; so is a cached access token the API refuses.
+/// next invoke, and the connection, now Stale, admits no read until a
+/// reconnect; so is a cached access token the API refuses even after a fresh
+/// exchange.
 #[test]
 #[ignore = "requires built production CLI and qualified disposable Secret Service"]
 fn oauth_invalid_grant_reports_repair() {
@@ -1368,14 +1404,104 @@ fn oauth_invalid_grant_reports_repair() {
         "the refused exchange reached the API"
     );
 
-    // A cached access token the API refuses is the stored credential's too.
+    // The connection is now Stale, which is not ready: even with the token
+    // host answering again, the next invoke is refused before any provider
+    // request, naming the reconnect, until a reconnect publishes.
     provider.set_token(grant(3600));
+    let (exchanged, authorized) = (provider.token_requests(), provider.api_authorizations());
+    let stale = super::cli_journey::refused_data(journey.run(&invoke));
+    assert_eq!(
+        (&stale["code"], &stale["stage"], &stale["next_action"]),
+        (
+            &json!("not_granted"),
+            &json!("admission"),
+            &json!("repair_connection")
+        ),
+        "{stale}"
+    );
+    assert_eq!(provider.token_requests(), exchanged);
+    assert_eq!(provider.api_authorizations(), authorized);
+    journey.reconnect();
+
+    // A cached access token the API refuses is dropped and the read is sent
+    // once more with a fresh exchange; the API refusing that token too is the
+    // stored credential's.
     success(journey.run(&invoke));
     provider.state.lock().unwrap().api_refuses = true;
     let exchanged = provider.token_requests();
     let refused = OAuthCli::refused(journey.run(&invoke), "invoke with the cached token");
     assert_eq!(refused["next_action"], "repair_connection", "{refused}");
-    assert_eq!(provider.token_requests(), exchanged);
+    assert_eq!(provider.token_requests(), exchanged + 1);
+    journey.assert_no_material();
+}
+
+/// story:connection-stale-state: after the token endpoint refuses the stored
+/// refresh token with `invalid_grant` during an invoke, `connections list`
+/// and `connections describe` report the connection `stale`; a reconnect that
+/// publishes a new credential returns it to `ready`, as the same connection.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn oauth_invalid_grant_makes_the_connection_stale_until_a_reconnect() {
+    use super::cli_journey::success;
+    let journey = OAuthCli::new();
+    let provider = &journey.provider;
+    provider.set_token(grant(60));
+    let invoke = journey.connected();
+    success(journey.run(&invoke));
+    let list = || {
+        let listed = success(
+            journey
+                .cli
+                .run(&["connections", "list", "--adapter", "drive"]),
+        )["connections"]
+            .clone();
+        assert_eq!(listed.as_array().map(Vec::len), Some(1), "{listed}");
+        listed[0].clone()
+    };
+    let live = list();
+    assert_eq!(live["state"], "ready", "{live}");
+    let reference = live["connection"].as_str().unwrap().to_owned();
+    let revision = live["revision"].as_str().unwrap().to_owned();
+
+    provider.set_token(invalid_grant());
+    let refused = OAuthCli::refused(journey.run(&invoke), "invoke after revocation");
+    assert_eq!(refused["next_action"], "repair_connection", "{refused}");
+    let stale = list();
+    assert_eq!(stale["state"], "stale", "{stale}");
+    assert_eq!(stale["connection"], reference.as_str());
+    assert_eq!(stale["revision"], revision.as_str());
+    let described = success(journey.cli.run(&[
+        "connections",
+        "describe",
+        "--adapter",
+        "drive",
+        "--connection",
+        &reference,
+    ]))["connection"]
+        .clone();
+    assert_eq!(described["summary"]["state"], "stale", "{described}");
+    // The cached-metadata flag is another fact: the configuration is current.
+    assert_eq!(described["stale"], false, "{described}");
+
+    provider.set_token(grant(3600));
+    let reconnected = success(journey.cli.run(&[
+        "connections",
+        "reconnect",
+        "--adapter",
+        "drive",
+        "--connection",
+        &reference,
+        "--expected-revision",
+        &revision,
+        "--credential-file",
+        journey.credential.to_str().unwrap(),
+    ]))["connection"]
+        .clone();
+    assert_eq!(reconnected["summary"]["state"], "ready", "{reconnected}");
+    let live = list();
+    assert_eq!(live["state"], "ready", "{live}");
+    assert_eq!(live["connection"], reference.as_str());
+    success(journey.run(&invoke));
     journey.assert_no_material();
 }
 

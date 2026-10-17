@@ -191,8 +191,8 @@ fn start_owner(root: &tempfile::TempDir) -> OwnerProcess {
 fn routed_metadata_reads_answer_as_the_direct_read_does() {
     let root = configured();
     let reads: [&[&str]; 5] = [
-        &["adapters", "describe", "--adapter", "forge"],
-        &["adapters", "describe", "--adapter", "bare"],
+        &["instances", "describe", "--adapter", "forge"],
+        &["instances", "describe", "--adapter", "bare"],
         &["operations", "list", "--adapter", "forge"],
         &["operations", "list", "--adapter", "bare"],
         &[

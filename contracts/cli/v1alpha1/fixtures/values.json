@@ -5,7 +5,7 @@
       "id": "approval-policy-uninitialized",
       "type": "connectors.cli.ApprovalPolicyResult",
       "valid": true,
-      "value": {"adapter":"forge"}
+      "value": {"adapter":"forge","connector":"fixture-forge","instance":"forge"}
     },
     {
       "id": "approval-policy-file-input",
@@ -24,7 +24,7 @@
       "type": "connectors.cli.ApprovalPrepareResult",
       "valid": true,
       "value": {
-        "adapter":"forge",
+        "adapter":"forge","connector":"fixture-forge","instance":"forge",
         "preparation": {
           "subject": {
             "format":"connectors.approval-subject/v1",
@@ -46,7 +46,7 @@
       "id": "approval-issuance-safe-result",
       "type": "connectors.cli.ApprovalIssueResult",
       "valid": true,
-      "value":{"adapter":"forge","reference":"reference","subject_sha256":"digest","disposition":"published"}
+      "value":{"adapter":"forge","connector":"fixture-forge","instance":"forge","reference":"reference","subject_sha256":"digest","disposition":"published"}
     },
     {
       "id": "approval-preparation-requires-explicit-null-route",
@@ -93,7 +93,7 @@
       "type": "connectors.cli.ApprovalClockCheckResult",
       "valid": true,
       "value": {
-        "adapter": "forge",
+        "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
         "observation": {
           "configuration_sha256": "9075017ceec92b29c7ec5d5b4e98364d39dd767ed602dadd2aca6797e5496df9",
           "lower_unix_ms": 1789077509997,
@@ -121,10 +121,16 @@
       }
     },
     {
-      "id": "approval-clock-check-requires-adapter",
+      "id": "approval-clock-check-selects-by-instance",
+      "type": "connectors.cli.ApprovalClockCheckInput",
+      "valid": true,
+      "value": {"connector":"fixture-forge","instance":"forge"}
+    },
+    {
+      "id": "approval-clock-check-selector-is-text",
       "type": "connectors.cli.ApprovalClockCheckInput",
       "valid": false,
-      "value": {}
+      "value": {"connector":1,"instance":"forge"}
     },
     {
       "id": "approval-clock-check-rejects-unbound-observation",
@@ -142,7 +148,7 @@
       "id": "approval-keys-uninitialized",
       "type": "connectors.cli.ApprovalKeysResult",
       "valid": true,
-      "value": {"adapter": "forge"}
+      "value": {"adapter": "forge", "connector": "fixture-forge", "instance": "forge"}
     },
     {
       "id": "approval-keys-no-secret-output",
@@ -157,7 +163,7 @@
       "value": {
         "connection": {
           "summary": {
-            "adapter": "forge", "instance_id": "forge-local",
+            "adapter": "forge", "connector": "fixture-forge", "instance": "forge", "instance_id": "forge-local",
             "connection": "connection-1", "profile": "token",
             "revision": "revision-1", "state": "ready"
           },
@@ -436,7 +442,7 @@
       "value": {
         "adapters": [
           {
-            "adapter": "forge",
+            "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
             "instance_id": "forge-local",
             "adapter_id": "fixture-forge",
             "startup": "on-demand",
@@ -461,7 +467,7 @@
       "value": {
         "configuration": {
           "summary": {
-            "adapter": "forge",
+            "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
             "instance_id": "forge-local",
             "adapter_id": "fixture-forge",
             "startup": "on-demand",
@@ -510,7 +516,7 @@
       "valid": true,
       "value": {
         "observation": {
-          "adapter": "forge",
+          "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
           "configuration_revision": "cfg-1",
           "state": "ready",
           "host_incarnation": "host-1",
@@ -536,7 +542,7 @@
       "valid": true,
       "value": {
         "observation": {
-          "adapter": "forge",
+          "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
           "configuration_revision": "cfg-1",
           "state": "stopped",
           "host_incarnation": "host-1",
@@ -560,7 +566,7 @@
       "value": {
         "connections": [
           {
-            "adapter": "forge",
+            "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
             "instance_id": "forge-local",
             "connection": "forge-local/connection-1",
             "profile": "token",
@@ -590,7 +596,7 @@
       "value": {
         "connection": {
           "summary": {
-            "adapter": "forge",
+            "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
             "instance_id": "forge-local",
             "connection": "forge-local/connection-1",
             "profile": "token",
@@ -625,7 +631,7 @@
       "value": {
         "connection": {
           "summary": {
-            "adapter": "forge",
+            "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
             "instance_id": "forge-local",
             "connection": "forge-local/connection-1",
             "profile": "token",
@@ -645,8 +651,8 @@
       }
     },
     {
-      "id": "valid-ConnectionRepairInput-17",
-      "type": "connectors.cli.ConnectionRepairInput",
+      "id": "valid-ConnectionReconnectInput-17",
+      "type": "connectors.cli.ConnectionReconnectInput",
       "valid": true,
       "value": {
         "adapter": "forge",
@@ -656,13 +662,13 @@
       }
     },
     {
-      "id": "valid-ConnectionRepairResult-18",
-      "type": "connectors.cli.ConnectionRepairResult",
+      "id": "valid-ConnectionReconnectResult-18",
+      "type": "connectors.cli.ConnectionReconnectResult",
       "valid": true,
       "value": {
         "connection": {
           "summary": {
-            "adapter": "forge",
+            "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
             "instance_id": "forge-local",
             "connection": "forge-local/connection-1",
             "profile": "token",
@@ -696,7 +702,7 @@
       "value": {
         "connection": {
           "summary": {
-            "adapter": "forge",
+            "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
             "instance_id": "forge-local",
             "connection": "forge-local/connection-1",
             "profile": "token",
@@ -729,7 +735,7 @@
       "type": "connectors.cli.ConnectionRevokeResult",
       "valid": true,
       "value": {
-        "adapter": "forge",
+        "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
         "connection": "forge-local/connection-1",
         "revision": "connection-r2",
         "local_state": "revoked",
@@ -759,7 +765,7 @@
       "type": "connectors.cli.OperationListResult",
       "valid": true,
       "value": {
-        "adapter": "forge",
+        "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
         "revision": "descriptor-r1",
         "operations": [
           {
@@ -787,7 +793,7 @@
       "type": "connectors.cli.OperationDescribeResult",
       "valid": true,
       "value": {
-        "adapter": "forge",
+        "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
         "revision": "descriptor-r1",
         "schema": "forge-local/project.get/input/descriptor-r1",
         "operation": {
@@ -820,7 +826,7 @@
       "type": "connectors.cli.OperationInvokeResult",
       "valid": true,
       "value": {
-        "adapter": "forge",
+        "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
         "operation": "project.get",
         "revision": "descriptor-r1",
         "result": {"id": 7, "name": "fixture"}
@@ -889,8 +895,8 @@
       }
     },
     {
-      "id": "valid-ConnectionRepairRequest-34",
-      "type": "connectors.cli.ConnectionRepairRequest",
+      "id": "valid-ConnectionReconnectRequest-34",
+      "type": "connectors.cli.ConnectionReconnectRequest",
       "valid": true,
       "value": {
         "adapter": "forge",
@@ -1091,7 +1097,7 @@
       "type": "connectors.cli.AdapterObservation",
       "valid": true,
       "value": {
-        "adapter": "forge",
+        "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
         "configuration_revision": "cfg-1",
         "state": "failed",
         "host_incarnation": "host-1",
@@ -1201,7 +1207,7 @@
     },
     {
       "id": "repair-requires-revision",
-      "type": "connectors.cli.ConnectionRepairInput",
+      "type": "connectors.cli.ConnectionReconnectInput",
       "valid": false,
       "value": {
         "adapter": "forge",
@@ -1302,7 +1308,7 @@
       "value": {
         "connections": [
           {
-            "adapter": "forge",
+            "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
             "instance_id": "forge-local",
             "connection": "forge-local/connection-1",
             "profile": "token",
@@ -1478,7 +1484,7 @@
       "value": {
         "connections": [
           {
-            "adapter": "forge",
+            "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
             "instance_id": "forge-local",
             "connection": "forge-local/connection-1",
             "profile": "token",

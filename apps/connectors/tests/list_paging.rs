@@ -1,4 +1,4 @@
-//! `adapters list` and `operations list` page with a self-contained cursor.
+//! `instances list` and `operations list` page with a self-contained cursor.
 //! A list longer than `--limit` answers one page and a `next_cursor`; following
 //! it answers the rest and no cursor. A cursor whose selection changed, one
 //! older than 300 seconds and one that does not decode answer `stale_cursor`.
@@ -182,7 +182,7 @@ fn operation_ids(page: &Value) -> Vec<String> {
 #[test]
 fn adapters_list_pages_with_a_cursor_and_ends_without_one() {
     let root = initialized(&[("alpha", "cfg-1"), ("beta", "cfg-1"), ("gamma", "cfg-1")]);
-    let first = success(&command(&root, &["adapters", "list", "--limit", "2"]));
+    let first = success(&command(&root, &["instances", "list", "--limit", "2"]));
     assert_eq!(aliases(&first), ["alpha", "beta"]);
     let cursor = first["next_cursor"]
         .as_str()
@@ -190,11 +190,11 @@ fn adapters_list_pages_with_a_cursor_and_ends_without_one() {
         .to_owned();
     let rest = success(&command(
         &root,
-        &["adapters", "list", "--limit", "2", "--cursor", &cursor],
+        &["instances", "list", "--limit", "2", "--cursor", &cursor],
     ));
     assert_eq!(aliases(&rest), ["gamma"]);
     assert!(rest["next_cursor"].is_null(), "{rest}");
-    let whole = success(&command(&root, &["adapters", "list", "--limit", "3"]));
+    let whole = success(&command(&root, &["instances", "list", "--limit", "3"]));
     assert_eq!(aliases(&whole), ["alpha", "beta", "gamma"]);
     assert!(whole["next_cursor"].is_null(), "{whole}");
 }
@@ -202,13 +202,13 @@ fn adapters_list_pages_with_a_cursor_and_ends_without_one() {
 #[test]
 fn adapters_list_refuses_a_stale_expired_or_undecodable_cursor() {
     let root = initialized(&[("alpha", "cfg-1"), ("beta", "cfg-1"), ("gamma", "cfg-1")]);
-    let first = success(&command(&root, &["adapters", "list", "--limit", "2"]));
+    let first = success(&command(&root, &["instances", "list", "--limit", "2"]));
     let cursor = first["next_cursor"].as_str().unwrap().to_owned();
 
     let expired = refusal(&command(
         &root,
         &[
-            "adapters",
+            "instances",
             "list",
             "--limit",
             "2",
@@ -225,7 +225,7 @@ fn adapters_list_refuses_a_stale_expired_or_undecodable_cursor() {
     ] {
         let refused = refusal(&command(
             &root,
-            &["adapters", "list", "--limit", "2", "--cursor", garbage],
+            &["instances", "list", "--limit", "2", "--cursor", garbage],
         ));
         assert_eq!(refused["code"], "stale_cursor", "{garbage}: {refused}");
     }
@@ -233,7 +233,7 @@ fn adapters_list_refuses_a_stale_expired_or_undecodable_cursor() {
     // A cursor issued for another page limit selects another page.
     let other_limit = refusal(&command(
         &root,
-        &["adapters", "list", "--limit", "1", "--cursor", &cursor],
+        &["instances", "list", "--limit", "1", "--cursor", &cursor],
     ));
     assert_eq!(other_limit["code"], "stale_cursor", "{other_limit}");
 
@@ -243,7 +243,7 @@ fn adapters_list_refuses_a_stale_expired_or_undecodable_cursor() {
     fs::write(&config_path, config).unwrap();
     let changed = refusal(&command(
         &root,
-        &["adapters", "list", "--limit", "2", "--cursor", &cursor],
+        &["instances", "list", "--limit", "2", "--cursor", &cursor],
     ));
     assert_eq!(changed["code"], "stale_cursor", "{changed}");
     assert_eq!(changed["stage"], "observation", "{changed}");

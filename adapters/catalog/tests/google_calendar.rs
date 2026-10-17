@@ -22,6 +22,8 @@
 //! descriptor; the signing key is the public RFC 8032 section 7.1 test vector,
 //! never a deployment key.
 #![cfg(unix)]
+mod hand_written;
+
 use connectors_catalog::{bundle, discovery};
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{
@@ -477,14 +479,13 @@ fn guide_documents_time_windows_sync_tokens_and_the_full_sync_reset() {
     }
 }
 
-/// The guide's configuration example for this provider: the read-only one, or
-/// the write instance's, which also asks for the write scope.
+/// The configuration the guide showed before connectors were declared
+/// (`hand_written`): the read-only one, or the write instance's, which also
+/// asks for the write scope.
 fn documented(write: bool) -> Value {
-    let guide = guide();
-    let example = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
+    let blocks = hand_written::blocks("catalog-google-calendar.md");
+    let example = blocks
+        .iter()
         .find(|body| {
             body.contains(&format!("\"provider\": \"{PROVIDER}\""))
                 && body.contains(WRITE_SCOPE) == write
@@ -497,9 +498,10 @@ fn documented_config() -> Value {
 }
 
 /// Each write is cited with its request and its guard; the write scope, the
-/// pinned `etag` and the route to a write-capable connection are stated: a
-/// separate instance, connected afresh. Repair cannot add a scope, and the
-/// guide must not say it does.
+/// pinned `etag` and the route to a write-capable connection are stated: the
+/// one instance whose consent requests both scopes. A reconnect cannot add a
+/// scope, so an installation holding a read and a write entry connects it
+/// afresh, and the guide must not route the write scope otherwise.
 #[test]
 fn guide_cites_each_write_its_guard_and_the_write_scope() {
     let guide = guide();
@@ -521,24 +523,27 @@ fn guide_cites_each_write_its_guard_and_the_write_scope() {
     }
     assert!(guide.contains(&format!("`{WRITE_SCOPE}`")));
     let flat = guide.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(guide.contains(&format!("`{CALENDAR_SCOPE}`")));
     for phrase in [
-        "Writes use a separate instance",
-        "`google-calendar-write`",
-        "`connections connect` that instance with the Google client file",
-        "`connections repair` cannot add a scope",
+        "Writes run on the same instance as the reads",
+        "One instance per Google account reads and writes",
+        "[connectors.calendar.instances.private]",
+        "does not merge them",
         "approval binds the whole input by its digest",
         "`sendUpdates`",
     ] {
         assert!(flat.contains(phrase), "the guide does not say {phrase}");
     }
-    assert!(
-        !flat.contains("through `connections repair`")
-            && !flat.contains("with `connections repair`"),
-        "the guide routes the write scope through `connections repair`"
-    );
+    for stale in [
+        "Writes use a separate instance",
+        "`google-calendar-write`",
+        "connections repair",
+    ] {
+        assert!(!flat.contains(stale), "the guide still says {stale}");
+    }
 }
 
-/// The write configuration is a separate instance, `google-calendar-write`:
+/// The hand-written write configuration is a separate instance, `google-calendar-write`:
 /// the read one with its own instance id and the write scope added to both
 /// `minimum_scopes` and `requested_scopes`, and nothing else changed.
 #[test]

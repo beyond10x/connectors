@@ -8,8 +8,10 @@ projected into OpenAPI, the projection is compiled into a bundle, a reviewed
 selection set exposes three reads and two guarded writes, and the engine
 described in [the catalog provider guide](local-catalog-provider.md) binds and
 sends them.
-Configuration, connection, approval and invocation work as described there; this
-page covers what differs for Slides. Authentication is the `oauth2_refresh`
+Connection, approval and invocation work as described there; this page
+configures the `slides` connector and covers what differs for Slides.
+Connector, instance and connection are defined in
+[the README](../README.md#vocabulary). Authentication is the `oauth2_refresh`
 profile `google.oauth`, as for [Google Drive](catalog-google-drive.md); see
 [Authentication](#authentication).
 
@@ -104,12 +106,10 @@ lists the slide ids only, and each slide can then be read with
 | `presentations.create` | `slides.presentations.create` | `POST /v1/presentations` | none |
 | `presentations.batchUpdate` | `slides.presentations.batchUpdate` | `POST /v1/presentations/{presentationId}:batchUpdate` | preflight `presentations.get`: `revisionId` must equal the body's `writeControl.requiredRevisionId` |
 
-They run on a separate write instance with the write scope; see
-[Authentication](#authentication). Both are required-approval mutations, like
-every catalog write: select
-`private_protocol = "connectors-private/2"`, permit them in the adapter's
-operation permissions, name them in the approval policy, and invoke each with a
-proof issued for its exact input, as the
+They run on the same instance as the reads, whose consent requests the write
+scope; see [Authentication](#authentication). Both are required-approval
+mutations, like every catalog write: name them in the instance's approval
+policy, and invoke each with a proof issued for its exact input, as the
 [guarded merge guide](local-gitlab-merge.md) walks through for GitLab. The
 approval subject carries the digest of the whole input, `body` included, so a
 proof issued for one body is refused for any other. A write offered without an
@@ -163,80 +163,81 @@ approval is refused before the provider sends anything.
 ## Authentication
 
 Slides uses Google OAuth: the `oauth2_refresh` scheme under the profile
-`google.oauth`, as described in
-[the catalog provider guide](local-catalog-provider.md). The protected entry is
+`google.oauth`, declared by the `slides` connector
+([`adapters/catalog/providers/google-slides/connector.json`](../adapters/catalog/providers/google-slides/connector.json)).
+The protected entry is
 `{"client_id":"...","client_secret":"...","refresh_token":"..."}` for an
-installed-app OAuth client. The provider exchanges it at `token_url` for an
-access token and sends that as `Authorization: Bearer <access token>`. The
-identity comes from the token answer's `id_token` (`identity.source: id_token`).
-`minimum_scopes` asks for the Slides read-only scope, which the pinned document
-accepts for all three reads. `authorize_url` and `requested_scopes` are never
-called by the provider; they are handed to the host for obtaining the entry by
-consent.
+installed-app OAuth client. The provider exchanges it at
+`https://oauth2.googleapis.com/token` for an access token and sends that as
+`Authorization: Bearer <access token>`. The identity comes from the token
+answer's `id_token` (`identity.source: id_token`). The consent address,
+`https://accounts.google.com/o/oauth2/auth`, is handed to the host for
+obtaining the entry by consent; the provider never calls it.
 
 The read-only scope does not cover the writes. The pinned document accepts
 `https://www.googleapis.com/auth/presentations` for both, and
-not `presentations.readonly`. An instance that writes names
-`https://www.googleapis.com/auth/presentations` in both `minimum_scopes` and
-`requested_scopes`; it grants the reads too. With that configuration, a stored
-refresh token that was granted only the read-only scope fails validation as
+not `presentations.readonly`; it grants the reads too. One instance per Google
+account reads and writes. Its consent requests `openid`,
+`https://www.googleapis.com/auth/presentations` and
+`https://www.googleapis.com/auth/presentations.readonly`, and the connection's
+`minimum_scopes` name `https://www.googleapis.com/auth/presentations`, so a
+stored refresh token granted only the read-only scope fails validation as
 insufficient scope.
 
-Writes use a separate instance. Configure a second instance id, such as
-`google-slides-write`: a copy of the configuration below with these values
-changed, as its own adapter entry in the host configuration with the writes in
-its operation permissions and `private_protocol = "connectors-private/2"`:
+Add to the host configuration (`~/.config/connectors/config.toml`, format
+`connectors-local/5`):
 
-```json
-{
-  "instance": "google-slides-write",
-  "auth": {
-    "minimum_scopes": ["https://www.googleapis.com/auth/presentations"],
-    "requested_scopes": ["openid", "https://www.googleapis.com/auth/presentations"]
-  }
-}
+```toml
+[connectors.slides]
+enabled = true
+
+[connectors.slides.instances.private]
 ```
 
-Then `connections connect` that instance with the Google client file. An
-existing read-only connection cannot be widened in place:
-`connections repair` cannot add a scope, because the configuration revision and
-the profile, whose `minimum_scopes` the scope changes, are part of the
-connection binding. Changing the scopes of the read instance itself leaves its
-connection bound to the old configuration, and a new connection on that same
-instance is refused while the old one exists.
+The `slides` connector's default endpoint is `https://slides.googleapis.com`.
+The bundle, the five operations, the profile and the provider executable are
+derived from the shipped connector:
 
-```json
-{
-  "format": "connectors-catalog-local/2",
-  "instance": "google-slides",
-  "provider": "google-slides",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
-  "api_base": "https://slides.googleapis.com",
-  "auth": {
-    "profile": "google.oauth",
-    "scheme": "oauth2_refresh",
-    "header": "Authorization",
-    "bearer": true,
-    "label": "Google refresh token",
-    "identity": {"source": "id_token", "kind": "google.user"},
-    "minimum_scopes": ["https://www.googleapis.com/auth/presentations.readonly"],
-    "token_url": "https://oauth2.googleapis.com/token",
-    "authorize_url": "https://accounts.google.com/o/oauth2/auth",
-    "requested_scopes": ["openid", "https://www.googleapis.com/auth/presentations.readonly"]
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/google-slides/operations.json"
-}
+```console
+$ connectors instances list
+{"adapters":[{"adapter":"slides.private","adapter_id":"catalog","connector":"slides","instance":"private","instance_id":"slides.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
 ```
+
+Then connect it with the Google client file, as
+[the Google OAuth guide](catalog-google-oauth.md) describes:
+
+```sh
+connectors connections connect --connector slides --instance private \
+  --profile google.oauth --credential-file ~/Downloads/client_secret_1234.json
+```
+
+### Moving from read and write entries
+
+An installation configured before connectors were declared may hold two Slides
+entries, one with the read-only scope and one with the `presentations` scope.
+`connectors setup migrate` keeps each as it is, with its revision, and does not
+merge them: the one instance asks for both scopes, so its configuration differs
+and its connection needs a consent of its own. Add the instance above, connect
+it, move callers to `--connector slides --instance private`, then revoke the
+connections of the old pair with `connections revoke` and remove their entries.
 
 ## Limits
 
+- The configuration this page shows, one instance whose consent requests
+  both scopes, is checked by derivation only: its configuration revision
+  equals that of a hand-written configuration with the declared fields
+  (`adapters/catalog/tests/connector_declarations.rs`). The reads and
+  writes below ran against the fixture under the hand-written read and
+  write configurations that preceded it, one scope set each
+  (`adapters/catalog/tests/hand_written/`).
 - Verified against a local HTTPS fixture only
-  (`adapters/catalog/tests/google_slides.rs`): the guide's configuration with the
-  fixture as API and token host, one token exchange, the exact request of each
+  (`adapters/catalog/tests/google_slides.rs`): the hand-written read
+  configuration with the fixture as API and token host, one token exchange, the exact request of each
   read with the exchanged bearer, the returned body as JSON, and a `/` in every
   path parameter sent as one escaped segment. No live presentation has been
   read; live evidence belongs to `story:catalog-google-live-deck-read`.
-- The writes are verified against the same fixture through the host's
+- The writes are verified against the same fixture, under the hand-written
+  write configuration, through the host's
   prepare/commit exchange: the preflight read, a stale or missing pinned
   revision refused with no POST, and the exact POST body. The approval binding
   is verified with the host's approval signer and verifier against a subject

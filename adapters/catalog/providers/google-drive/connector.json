@@ -1,0 +1,30 @@
+{
+  "format": "connectors-catalog-connector/1",
+  "connector_id": "drive",
+  "provider_id": "google",
+  "adapter_id": "catalog",
+  "catalog_provider": "google-drive",
+  "default_endpoint": "https://www.googleapis.com/drive/v3",
+  "selection": "operations.json",
+  "profiles": [
+    {
+      "profile": "google.oauth",
+      "scheme": "oauth2_refresh",
+      "header": "Authorization",
+      "bearer": true,
+      "label": "Google refresh token",
+      "identity": {"source": "id_token", "kind": "google.user"},
+      "minimum_scopes": [
+        "https://www.googleapis.com/auth/drive.file",
+        "https://www.googleapis.com/auth/drive.readonly"
+      ],
+      "token_url": "https://oauth2.googleapis.com/token",
+      "authorize_url": "https://accounts.google.com/o/oauth2/auth",
+      "requested_scopes": [
+        "openid",
+        "https://www.googleapis.com/auth/drive.file",
+        "https://www.googleapis.com/auth/drive.readonly"
+      ]
+    }
+  ]
+}

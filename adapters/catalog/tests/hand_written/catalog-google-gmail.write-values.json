@@ -1,0 +1,7 @@
+{
+  "instance": "google-gmail-write",
+  "auth": {
+    "minimum_scopes": ["https://www.googleapis.com/auth/gmail.compose"],
+    "requested_scopes": ["openid", "https://www.googleapis.com/auth/gmail.compose"]
+  }
+}

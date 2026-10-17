@@ -161,10 +161,10 @@ fn every_adapter_command_answers_an_unknown_alias_at_admission() {
             "--key",
             UUID,
         ],
-        vec!["adapters", "describe"],
-        vec!["adapters", "status"],
+        vec!["instances", "describe"],
+        vec!["instances", "status"],
         vec![
-            "adapters",
+            "instances",
             "stop",
             "--expected-revision",
             "1",
@@ -185,7 +185,7 @@ fn every_adapter_command_answers_an_unknown_alias_at_admission() {
         ],
         vec![
             "connections",
-            "repair",
+            "reconnect",
             "--connection",
             "c",
             "--expected-revision",
@@ -239,7 +239,7 @@ fn every_adapter_command_answers_an_unknown_alias_at_admission() {
 fn an_unknown_flag_or_command_is_cli_parse() {
     let root = initialized();
     for args in [
-        &["adapters", "list", "--no-such-flag"][..],
+        &["instances", "list", "--no-such-flag"][..],
         &["no-such-command"][..],
     ] {
         let envelope = stderr_envelope(&command(&root, args), 2);
@@ -255,7 +255,10 @@ fn an_unknown_flag_or_command_is_cli_parse() {
 #[test]
 fn a_wrong_argument_type_is_cli_input() {
     let root = initialized();
-    let envelope = stderr_envelope(&command(&root, &["adapters", "list", "--limit", "many"]), 2);
+    let envelope = stderr_envelope(
+        &command(&root, &["instances", "list", "--limit", "many"]),
+        2,
+    );
     assert_eq!(
         envelope,
         json!({"ok":false,"error":{"code":"cli_input","data":{}}})
@@ -431,7 +434,12 @@ fn c05_business_input_sources() {
     let base = [
         "operations",
         "invoke",
-        "--adapter",
+        // An unmigrated entry is selected by its adapter id and alias
+        // (story:cli-connector-instance-selectors); `--adapter` would add a
+        // `deprecations` member to the exact envelope asserted below.
+        "--connector",
+        "catalog",
+        "--instance",
         "forge",
         "--connection",
         "conn-1",
@@ -651,7 +659,7 @@ fn a_configured_alias_is_bounded_at_128_bytes() {
                 "a".repeat(64)
             );
         fs::write(&config_path, config).unwrap();
-        let output = command(&root, &["adapters", "list"]);
+        let output = command(&root, &["instances", "list"]);
         seen.push((
             length,
             if output.status.success() {

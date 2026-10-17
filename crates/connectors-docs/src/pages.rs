@@ -1,7 +1,7 @@
 //! Checks every documentation page, generated or written by hand:
 //!
-//! - front matter with `title`, `sidebar_position` and `description`, and on concept and guide
-//!   pages also `lede` and `source`;
+//! - front matter with `title`, `sidebar_position` and `description`, and on concept, guide and
+//!   connector pages also `lede` and `source`;
 //! - no admonition whose title is not in brackets (`:::caution Planned`), which Docusaurus prints
 //!   as raw text;
 //! - passive Markdown: outside code, no `{`, no `import`/`export` line, no capitalised tag and no
@@ -50,7 +50,9 @@ fn visit(docs: &Path, dir: &Path, problems: &mut Vec<String>) -> Result<()> {
             .replace('\\', "/");
         let source = fs::read_to_string(&path)
             .map_err(|error| format!("reading {}: {error}", path.display()))?;
-        let hand = relative.starts_with("concepts/") || relative.starts_with("guides/");
+        let hand = relative.starts_with("concepts/")
+            || relative.starts_with("guides/")
+            || relative.starts_with("connectors/");
         problems.extend(
             page_problems(&source, hand, markdown)
                 .into_iter()

@@ -5,6 +5,8 @@ A container has no session bus and no keyring, so it uses the read-only
 credential as a file in a read-only volume, and the owner configuration selects that volume
 explicitly. This page shows the setup, with a Kubernetes CronJob as the example.
 
+Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
+
 ## What the configuration stage needs
 
 The run needs an absolute configuration path and state path, an owner-only configuration
@@ -39,16 +41,20 @@ When the configuration stage refuses, `invalid_configuration` names its rule in
 
 ```toml
 # /srv/connectors/config.toml, owned 10001:10001, mode 0600
-format = "connectors-local/4"
+format = "connectors-local/5"
 owner_uid = 10001
 
 [custody]
 binding = "mounted_secret"
 directory = "/run/connectors/custody"
 
-[adapters.tavily]
+[connectors.tavily]
+enabled = true
+
+[connectors.tavily.instances.tavily]
+alias = "tavily"
 # instance_id, adapter_id, configuration_revision, protocol, private_protocol,
-# executable and permissions as for any adapter entry.
+# executable and permissions as for any pinned instance (docs/local-tavily.md).
 ```
 
 The custody directory must have no symbolic link in its path: mount it under `/run`, not
@@ -82,8 +88,8 @@ spec:
               args:
                 - >-
                   connectors --config /srv/connectors/config.toml --state-dir /srv/connectors/state setup init &&
-                  connectors --config /srv/connectors/config.toml --state-dir /srv/connectors/state connections connect --adapter tavily --profile tavily.api-key &&
-                  connectors --config /srv/connectors/config.toml --state-dir /srv/connectors/state connections list --adapter tavily
+                  connectors --config /srv/connectors/config.toml --state-dir /srv/connectors/state connections connect --connector tavily --instance tavily --profile tavily.api-key &&
+                  connectors --config /srv/connectors/config.toml --state-dir /srv/connectors/state connections list --connector tavily --instance tavily
               securityContext:
                 readOnlyRootFilesystem: false
                 allowPrivilegeEscalation: false

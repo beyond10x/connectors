@@ -174,7 +174,7 @@ fn rebuilt(body: &Value) -> String {
 }
 
 fn first_adapters_cursor(root: &tempfile::TempDir, limit: &str) -> String {
-    let first = success(&command(root, &["adapters", "list", "--limit", limit]));
+    let first = success(&command(root, &["instances", "list", "--limit", limit]));
     first["next_cursor"]
         .as_str()
         .expect("a next_cursor")
@@ -184,7 +184,7 @@ fn first_adapters_cursor(root: &tempfile::TempDir, limit: &str) -> String {
 fn adapters_page(root: &tempfile::TempDir, limit: &str, cursor: &str) -> Output {
     command(
         root,
-        &["adapters", "list", "--limit", limit, "--cursor", cursor],
+        &["instances", "list", "--limit", limit, "--cursor", cursor],
     )
 }
 
@@ -200,7 +200,7 @@ fn walk_adapters(root: &tempfile::TempDir, limit: usize) -> Vec<String> {
     let mut all = Vec::new();
     let mut cursor: Option<String> = None;
     for _ in 0..200 {
-        let mut args = vec!["adapters", "list", "--limit", &limit_arg];
+        let mut args = vec!["instances", "list", "--limit", &limit_arg];
         if let Some(c) = &cursor {
             args.extend(["--cursor", c.as_str()]);
         }
@@ -246,7 +246,7 @@ fn every_entry_appears_exactly_once_around_the_limit() {
     // 64 configured entries is the documented maximum; --limit 500 is one page.
     let aliases = (0..64).map(|i| format!("a{i:02}")).collect::<Vec<_>>();
     let root = initialized(&aliases);
-    let page = success(&command(&root, &["adapters", "list", "--limit", "500"]));
+    let page = success(&command(&root, &["instances", "list", "--limit", "500"]));
     assert_eq!(names(&page, "adapters", "adapter"), aliases);
     assert!(page["next_cursor"].is_null(), "{page}");
     assert_eq!(walk_adapters(&root, 1), aliases);
@@ -256,7 +256,7 @@ fn every_entry_appears_exactly_once_around_the_limit() {
 fn a_limit_outside_one_to_five_hundred_is_invalid_input() {
     let root = initialized(&["alpha".to_owned()]);
     for limit in ["0", "501", "-1"] {
-        let out = command(&root, &["adapters", "list", "--limit", limit]);
+        let out = command(&root, &["instances", "list", "--limit", limit]);
         let refused = refusal(&out);
         assert_eq!(
             refused["code"], "invalid_input",
@@ -266,7 +266,7 @@ fn a_limit_outside_one_to_five_hundred_is_invalid_input() {
     // Beyond i64 the argument parser refuses; it must never fall back to the
     // default limit and answer a page.
     for limit in ["9223372036854775808", "18446744073709551616"] {
-        let out = command(&root, &["adapters", "list", "--limit", limit]);
+        let out = command(&root, &["instances", "list", "--limit", limit]);
         assert!(!out.status.success(), "--limit {limit} answered a page");
     }
 }
@@ -387,7 +387,7 @@ fn a_cursor_does_not_cross_between_the_two_lists() {
     assert_eq!(refused["code"], "stale_cursor", "{refused}");
     assert_stale(
         &adapters_page(&root, "1", &ops_cursor),
-        "operations cursor to adapters list",
+        "operations cursor to instances list",
     );
 }
 

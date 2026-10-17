@@ -1,8 +1,10 @@
-# Run adapter services
+# Run connector services
 
 These instructions describe the implemented first-slice runtime. Run commands from
 the repository root after [building the workspace](development.md). For a complete
 disposable environment, follow the [live acceptance recipe](live-e2e.md).
+
+Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
 
 Copy the matching file from `examples/`, choose a unique instance/listener, configure
 the permitted resources, and bind private credential files or environment references.
@@ -36,7 +38,7 @@ The first profile supports one federation hop. It never retries a provider reque
 
 ## Supported surfaces
 
-| Adapter | Operations | External binding |
+| Service | Operations | External binding |
 |---|---|---|
 | Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover`, optionally `helm_releases.history`/`.status`/`.values`/`.manifest` | Kubernetes API; namespace/kind restrictions; bearer token and CA; Helm release reads need their own `helm_release_reads` selection |
 | SQL | `schema.list`, `query.read`, `database.list`, `table.list`, `table.describe`, `index.list` | PostgreSQL or MySQL; explicit role or user and database; read-only transactions or sessions and deadlines |
@@ -71,5 +73,5 @@ a network partition or process loss. See the [service contract](../contracts/ser
 for the exact budgets and the [SQL regression harness](../adapters/sql/examples/live_deadlines.rs)
 for live timeout, caller-drop and TLS checks.
 
-No adapter in this slice advertises OAuth acquisition, writes, durable events, process
+No service in this slice advertises OAuth acquisition, writes, durable events, process
 execution, or media sessions. Those remain separate contracts in the full design.
