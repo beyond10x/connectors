@@ -145,7 +145,7 @@ fn adapters_describe_answers_operation_schemas_as_json_objects() {
     let (root, _) = configured();
     let result = success(&command(
         &root,
-        &["adapters", "describe", "--adapter", "forge"],
+        &["instances", "describe", "--adapter", "forge"],
     ));
     let operations = result["descriptor"]["operations"].as_array().unwrap();
     assert_eq!(operations.len(), 1);

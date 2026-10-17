@@ -6,6 +6,8 @@
 //! service-account token is sent as `Bearer`. These cases drive the guides and
 //! the implementation against that, plus the revision and parsing edges.
 #![cfg(unix)]
+mod hand_written;
+
 use base64::Engine as _;
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
@@ -46,12 +48,11 @@ fn private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).unwrap();
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
 }
+/// The whole configurations for `provider` a guide documents, those it showed
+/// before connectors were declared included (`hand_written`).
 fn documented(guide: &str, provider: &str) -> Vec<Value> {
-    let guide = fs::read_to_string(root().join("../../docs").join(guide)).unwrap();
-    guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
+    hand_written::documented_blocks(guide)
+        .iter()
         .filter_map(|body| serde_json::from_str::<Value>(body).ok())
         .filter(|config| config["provider"] == provider)
         .collect()

@@ -134,13 +134,15 @@ fn root_help_is_the_generated_help_plus_the_contract_service_block() {
         .and_then(|rest| rest.split("```").next())
         .filter(|block| block.starts_with("Explicit service commands"))
         .expect("semantics.md states the explicit service commands block");
-    // help.txt is the generated tree's long help; root `--help` is its short form.
-    let mut generated = connectors_cli_contract::command();
+    // help.txt is the generated tree's long help; root `--help` is the short form of that tree
+    // as `connectors::help` presents it.
     assert_eq!(
-        generated.render_long_help().to_string(),
+        connectors_cli_contract::command()
+            .render_long_help()
+            .to_string(),
         include_str!("../../connectors-cli-contract/help.txt")
     );
-    let short = generated.render_help().to_string();
+    let short = connectors::help::command().render_help().to_string();
     assert_eq!(
         parts(&cli(&["--help"])),
         (Some(0), format!("{short}\n{block}"), String::new())

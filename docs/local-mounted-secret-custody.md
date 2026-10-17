@@ -9,6 +9,8 @@ It is Linux only. Its code is `crates/connectors-custody/src/mounted.rs`; the ho
 [Custody semantics §5.2](../contracts/auth/custody/v1alpha1/semantics.md#52-the-read-only-mounted-secret-binding)
 owns its guarantees. [The container setup](local-container.md) shows how to run it.
 
+Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
+
 ## Selection
 
 The binding is never chosen automatically. Only a `connectors-local/4` owner configuration
@@ -45,8 +47,9 @@ listed under this binding.
 
 ## Items
 
-An item is named by public, owner-configured coordinates only: `<adapter alias>/<profile>`,
-such as `tavily/tavily.api-key`. Both are selectors (`[A-Za-z0-9._-]{1,128}`, never `.` or
+An item is named by public, owner-configured coordinates only: `<alias>/<profile>`, where
+`<alias>` is the instance's alias (the `alias` of a pinned instance, `<connector>.<instance>`
+for a derived one), such as `tavily/tavily.api-key`. Both are selectors (`[A-Za-z0-9._-]{1,128}`, never `.` or
 `..`). The item holds the credential document the profile's protected file source accepts,
 at most 64 KiB. One item backs one connection: a second `connections connect` for the same
 alias and profile is `custody_read_only` while the first is not revoked, also when two
@@ -114,8 +117,8 @@ provider and publishes it as a new version.
 
 | Command or path | Under `mounted_secret` |
 |---|---|
-| `connections connect --adapter A --profile P` | Takes no protected source flag; a source flag is `invalid_input` at `arguments`. The owner reads item `A/P`, the provider validates those bytes, and the version is published from that read, not from a write. |
-| `connections repair` | The same for the existing connection. |
+| `connections connect --connector C --instance I --profile P` | Takes no protected source flag; a source flag is `invalid_input` at `arguments`. The owner reads the item `<alias>/P` of instance `I`, the provider validates those bytes, and the version is published from that read, not from a write. |
+| `connections reconnect` | The same for the existing connection. |
 | `connections revalidate` | Re-reads the item; changed bytes are validated and published as a new version, unchanged bytes refresh the evidence as before. |
 | `connections revoke` | Metadata only, as on every binding. The mounted item is untouched; delete or rotate the Secret as well. |
 | An OAuth-acquired (refresh-rotating) profile | `custody_read_only` at `custody`, before any provider exchange. |

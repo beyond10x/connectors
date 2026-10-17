@@ -1,0 +1,15 @@
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "runpod",
+  "provider": "runpod",
+  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
+  "api_base": "https://rest.runpod.io/v1",
+  "auth": {
+    "profile": "runpod.api-key",
+    "header": "Authorization",
+    "bearer": true,
+    "label": "Runpod API key",
+    "identity": {"source": "configuration", "path": "pods", "kind": "runpod.connection"}
+  },
+  "operations_file": "/absolute/path/adapters/catalog/providers/runpod/operations.json"
+}

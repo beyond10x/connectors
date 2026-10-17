@@ -54,6 +54,34 @@ fn a_provider_reason_reaches_the_cli_failure_json_and_a_credential_echo_does_not
             &input,
         ]))
     };
+    // A read the provider refused as unauthorized makes the connection Stale
+    // (story:connection-stale-state), which admits no read until a reconnect.
+    let reconnect = || {
+        let status = success(cli.run(&[
+            "connections",
+            "status",
+            "--adapter",
+            "gitlab",
+            "--connection",
+            &reference,
+        ]))["connection"]["summary"]
+            .clone();
+        assert_eq!(status["state"], "stale", "{status}");
+        let reconnected = success(cli.run(&[
+            "connections",
+            "reconnect",
+            "--adapter",
+            "gitlab",
+            "--connection",
+            &reference,
+            "--expected-revision",
+            status["revision"].as_str().unwrap(),
+            "--credential-file",
+            credential.to_str().unwrap(),
+        ]))["connection"]["summary"]["state"]
+            .clone();
+        assert_eq!(reconnected, "ready");
+    };
 
     let refused = read("org/fixture-refused");
     assert_eq!(refused["code"], "forbidden", "{refused}");
@@ -63,10 +91,12 @@ fn a_provider_reason_reaches_the_cli_failure_json_and_a_credential_echo_does_not
     let echo = read("org/fixture-echo");
     assert_eq!(echo["service_code"], "unauthorized", "{echo}");
     assert!(echo.get("service_reason").is_none(), "{echo}");
+    reconnect();
 
     let leaky = read("org/fixture-leaky");
     assert_eq!(leaky["service_code"], "unauthorized", "{leaky}");
     assert!(leaky.get("service_reason").is_none(), "{leaky}");
+    reconnect();
 
     let scope = read("org/fixture-scope");
     assert_eq!(scope["code"], "service_failure", "{scope}");

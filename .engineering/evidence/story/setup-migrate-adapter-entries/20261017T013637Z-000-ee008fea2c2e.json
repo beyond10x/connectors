@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-17T01:36:37Z",
+  "actor": "human:timo",
+  "artifact": "story:setup-migrate-adapter-entries",
+  "kind": "story",
+  "revision": 11,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build -- gate (ess 0.59.0, aep 0.71.3): exit 0, 2459 tests passed, 0 failed",
+    "reference": "commit 510267d2c on wave/connector-vocabulary-1"
+  }
+}

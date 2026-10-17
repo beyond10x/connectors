@@ -153,7 +153,7 @@ fn a_revision_conflict_reaches_the_cli_as_revision_conflict() {
     let output = command(
         &root,
         &[
-            "adapters",
+            "instances",
             "stop",
             "--adapter",
             "forge",

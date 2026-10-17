@@ -30,6 +30,12 @@ jobs:
       - name: Lint the host and the CLI
         shell: bash
         run: cargo clippy --locked -p connectors-host -p connectors --all-targets -- -D warnings
+      # The CLI's help tests run the catalog provider built beside `connectors`
+      # (apps/connectors/tests/vocabulary_text.rs); a package-scoped test
+      # build does not build it.
+      - name: Build the catalog provider
+        shell: bash
+        run: cargo build --locked -p connectors-catalog-provider
       - name: Test the host and the CLI
         shell: bash
         env:

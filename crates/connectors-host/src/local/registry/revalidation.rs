@@ -1,4 +1,4 @@
-use super::lifecycle::{bump, custody_version, recollected_snapshot};
+use super::lifecycle::{bump, custody_version, mark_stale, recollected_snapshot};
 use super::*;
 
 /// Private one-use capture. It cannot be serialized, resumed, or converted into
@@ -183,8 +183,14 @@ pub(super) fn follow_instance(tx: &Transaction<'_>, instance: &str, revision: &s
 /// the upgrade's configured revision (`Connection.refused_configuration_revision`).
 /// It invalidates nothing under the connection's own revision; a read under
 /// that configured revision then names a new connection (`changed`).
+/// A Stale connection does not reach here: it is not ready, so `admitted`
+/// refuses its revalidation at capture and at finish. Should one, it records
+/// none, since its lifecycle has no change that keeps it Stale
+/// (`MarkConnectionStale` moves only Live).
 fn refuse_upgrade(tx: &Transaction<'_>, row: &ConnectionRow, upgrade: &Binding) -> Result<()> {
-    if row.kept.refused.as_deref() == Some(upgrade.configuration_revision.as_str()) {
+    if row.kept.stale
+        || row.kept.refused.as_deref() == Some(upgrade.configuration_revision.as_str())
+    {
         return Ok(());
     }
     tx.execute(
@@ -210,9 +216,13 @@ fn release(tx: &Transaction<'_>, id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Each positive invalidity a revalidation finds (`invalid`, `insufficient`,
+/// `missing`) is one a reconnect fixes, so the connection is Stale too
+/// (story:ess-connector-vocabulary-model decision 17).
 fn invalidate(tx: &Transaction<'_>, row: &ConnectionRow, reason: InvalidCredential) -> Result<()> {
     tx.execute("UPDATE registry_materials SET invalid_reason=COALESCE(invalid_reason,?2) WHERE version_id=?1",
         params![row.material, reason.value()]).map_err(db)?;
+    mark_stale(tx, row)?;
     tx.execute(
         "UPDATE registry_uses SET released=1 WHERE version_id=?1 AND dispatched=0",
         [&row.material],
