@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.54.0 — 2026-10-17
+
+### Added
+
+- Zendesk ticket writes through the catalog provider, each `effect: write` and run only under an
+  issued approval: `ticket.update` (group, tags, priority, type), `ticket.note` (a private
+  internal note) and `ticket.draft_reply` (a private note behind the fixed first line
+  `[Draft reply - not sent to the requester]`; nothing reaches the requester). Each is guarded by
+  a `ShowTicket` preflight on the caller's `updated_stamp` and sends `safe_update: true`; a changed
+  ticket is refused as `conflict` with nothing sent, and Zendesk's `409` is `conflict`, never
+  retried (docs/catalog-zendesk.md, "Writes" and "Use the writes from a local install").
+- The catalog engine admits nested closed write bodies (RFC 6901 pointers in `body_keys`, each
+  object above closed), `string_list` body types, fixed values, enums, any-of sets and required
+  prefixes, all held before anything is sent; a closed-body refusal names the key. The shared
+  error code `conflict` (`ErrorCode::Conflict`), a write's `conflict_status` and a guard
+  preflight's `mismatch: conflict` carry a lost update as `conflict`.
+- Connector vocabulary: providers declare their connectors (`connector.json`); a
+  `connectors-local/5` configuration enables connectors and names their instances, and an
+  instance that pins nothing is derived from the provider installed beside the CLI. `--connector`
+  and `--instance` select an instance; `instances` replaces the `adapters` group and
+  `connections reconnect` replaces `connections repair`. A connection whose stored credential the
+  provider refused is `stale` until a reconnect publishes a new one, and an instance holds one
+  published connection. `connectors setup migrate` moves a legacy configuration to instances,
+  keeping instance ids, revisions, executable selections and custody items.
+
+### Changed
+
+- A connection connected or revalidated once keeps serving reads unattended: a read on lapsed
+  validation evidence recollects it once from the credential in custody (no re-entry, no new
+  custody version) before it is served, and evidence with less than half its lifetime left is
+  recollected first. Only a read still refused after that recollection answers
+  `revalidate_connection`; a consumer launch recollects nothing. Concurrent revalidations of one
+  connection both answer within the 30-second revalidation bound.
+
+### Deprecated
+
+- The `[adapters.<alias>]` configuration, the `--adapter` flag, the `adapters` command group and
+  `connections repair` keep working and say once that they are deprecated.
+
+### Fixed
+
+- A passive command no longer writes the metadata store: returning an inspection's Entity Runtime
+  handle persisted its observation as an open checkpoint.
+- The build runner's signal test no longer leaves a core file in the checkout.
+
+### Limitations
+
+- The Zendesk writes are verified against fixtures with the basic profile `zendesk.basic` only;
+  the documented `zendesk.oauth` block requests `scope=read`, which does not cover a write.
+- The Zendesk guide's move steps still use the deprecated `[adapters.zendesk]` form.
+
 ## 0.53.1 — 2026-10-17
 
 ### Changed
