@@ -853,5 +853,5 @@ fn an_adapter_identity_mismatch_outside_an_upgrade_names_a_repair() {
         "{data}"
     );
     assert_eq!(mismatched.before.1, registry::State::Ready);
-    assert_eq!(mismatched.after.1, registry::State::ReauthorizationRequired);
+    assert_eq!(mismatched.after.1, registry::State::Stale);
 }

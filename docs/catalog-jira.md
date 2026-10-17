@@ -7,8 +7,9 @@ issue, from the pinned Jira Cloud platform REST v3 OpenAPI document. Nothing her
 Jira-specific code: the pinned document is compiled into a bundle, a reviewed
 selection set exposes eight reads and one guarded write, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
-Configuration, connection, approval and invocation work exactly as described
-there; this page covers what differs for Jira.
+Connection, approval and invocation work as described there; this page
+configures the `jira` connector and covers what differs for Jira. Connector,
+instance and connection are defined in [the README](../README.md#vocabulary).
 
 ## Source and bundle
 
@@ -115,7 +116,7 @@ the end of a walk are in it.
   not-found.
 
   ```sh
-  connectors operations invoke --adapter jira-cloud --connection "$connection" \
+  connectors operations invoke --connector jira --instance work --connection "$connection" \
     --operation issue.transitions --schema "$schema" --revision "$revision" \
     --input-json '{"issueIdOrKey":"FIX-1","expand":"transitions.fields"}'
   ```
@@ -149,24 +150,26 @@ accepted by name; one it does not declare is refused before any request.
 `attachment.content` selects `getAttachmentContent` as a binary read
 ([binary reads](local-catalog-provider.md#configure-the-provider)). It takes the
 attachment's `id`, as `issue.get` lists it under `fields.attachment`, and answers
-`{media_type, length, sha256, content_base64}`: the bytes in base64 with their
-media type, length and SHA-256. An attachment over 2 MiB is refused as
+the bytes in base64 (`content_base64`) with their media type (`media_type`),
+length (`length`) and SHA-256 digest. An attachment over 2 MiB is refused as
 `capacity`, never truncated.
 
 The pinned document gives two answers. With `redirect` set to `false`, Jira
 answers `200` with the content itself. Otherwise, the default, Jira answers `303`
 with a `Location` to a download URL. The selection follows that redirect only to
 `https://api.media.atlassian.com`, without the connection's credential, and only
-when the connection admits that host:
+when the connection admits that host. An instance of the `jira` connector admits
+no host besides its endpoint, so on it a call without `"redirect": false` is
+refused as `forbidden` when Jira redirects, with nothing sent to the media host;
+send `"redirect": false`. Only a pinned instance, whose native configuration
+([the catalog provider guide](local-catalog-provider.md)) can state
 
 ```json
 "hosts": [{"origin": "https://api.media.atlassian.com"}]
 ```
 
-Without that entry the configuration still loads, and a call without
-`"redirect": false` is refused as `forbidden` when Jira redirects, with nothing
-sent to the media host; send `"redirect": false` instead. A redirect to any other
-host is refused the same way. Adding `hosts` changes the configuration revision.
+follows the redirect. A redirect to any other host is refused the same way.
+Adding `hosts` changes the configuration revision.
 
 **The media host is inferred, not verified live.** The pinned document names no
 redirect host; `https://api.media.atlassian.com`, Atlassian's media download
@@ -237,8 +240,8 @@ in the pinned document's shapes, not against a live site.
 
 ## Authentication
 
-Jira Cloud API tokens use HTTP basic with the account email. Declare the basic
-profile `atlassian.basic`, which Confluence uses too: one Atlassian credential
+Jira Cloud API tokens use HTTP basic with the account email, under the profile
+`atlassian.basic`, which Confluence uses too: one Atlassian credential
 connects both, as one `atlassian.account` identity (see
 [the Confluence guide](catalog-confluence.md#authentication)). The identity read
 is `GET /rest/api/3/myself`, whose `accountId` names the credential's subject.
@@ -247,29 +250,41 @@ read and no `minimum_scopes`. The profile was `jira.basic` with identity kind
 `jira.user` in 0.16 and 0.17; a configuration naming it must be changed and its
 connection made again.
 
-```json
-{
-  "format": "connectors-catalog-local/2",
-  "instance": "jira-cloud",
-  "provider": "jira",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
-  "api_base": "https://your-domain.atlassian.net/rest/api/3",
-  "auth": {
-    "profile": "atlassian.basic",
-    "scheme": "basic",
-    "header": "Authorization",
-    "bearer": false,
-    "account_label": "Account email",
-    "label": "API token",
-    "identity": {"path": "myself", "kind": "atlassian.account", "subject_pointer": "/accountId"}
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/jira/operations.json"
-}
+The `jira` connector declares that profile
+([`adapters/catalog/providers/jira/connector.json`](../adapters/catalog/providers/jira/connector.json))
+and no default endpoint: an instance names its site's REST v3 root. Add to the
+host configuration (`~/.config/connectors/config.toml`, format
+`connectors-local/5`):
+
+```toml
+[connectors.jira]
+enabled = true
+
+[connectors.jira.instances.work]
+endpoint = "https://your-domain.atlassian.net/rest/api/3"
 ```
 
-`connections connect` takes the credential document
-`{"account": "<email>", "token": "<API token>"}`; every request then carries
-`Authorization: Basic base64(<email>:<API token>)`.
+The bundle, the nine operations, the profile and the provider executable are
+derived from the shipped connector:
+
+```console
+$ connectors instances list
+{"adapters":[{"adapter":"jira.work","adapter_id":"catalog","connector":"jira","instance":"work","instance_id":"jira.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+```
+
+Connect with the credential document `{"account": "<email>", "token": "<API token>"}`
+in an owner-only file; every request then carries
+`Authorization: Basic base64(<email>:<API token>)`:
+
+```sh
+connectors connections connect --connector jira --instance work \
+  --profile atlassian.basic --credential-file ~/private/atlassian.json
+```
+
+An installation configured before connectors were declared converts its
+entries with `connectors setup migrate`, which keeps each instance id and
+revision; the pinned form it writes is described in
+[the catalog provider guide](local-catalog-provider.md).
 
 ### Through the API gateway
 
@@ -283,28 +298,19 @@ for an OAuth token. The pinned paths (`/rest/api/3/…`) are checked against wha
 follows the prefix, and every request, the identity read `myself` included, goes
 to the full `api_base`: `GET /ex/jira/<cloud id>/rest/api/3/myself`.
 
+No connector declaration fixes `request_prefix`, so a gateway instance is not
+derived: it is a pinned instance, whose native configuration file is written as
+[the catalog provider guide](local-catalog-provider.md) describes, with the
+site form's fields and these values.
+
 A service-account API token uses the same `atlassian.basic` profile as on the
 site, with the service account's email as the account. Only `api_base` and
 `request_prefix` change:
 
 ```json
 {
-  "format": "connectors-catalog-local/2",
-  "instance": "jira-cloud",
-  "provider": "jira",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
   "api_base": "https://api.atlassian.com/ex/jira/your-cloud-id/rest/api/3",
-  "request_prefix": "/ex/jira/your-cloud-id",
-  "auth": {
-    "profile": "atlassian.basic",
-    "scheme": "basic",
-    "header": "Authorization",
-    "bearer": false,
-    "account_label": "Account email",
-    "label": "API token",
-    "identity": {"path": "myself", "kind": "atlassian.account", "subject_pointer": "/accountId"}
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/jira/operations.json"
+  "request_prefix": "/ex/jira/your-cloud-id"
 }
 ```
 
@@ -314,14 +320,11 @@ live on 2026-09-30: a service-account API token connected through the gateway
 and `issues.search` returned issues. A user's scoped API token takes the same
 form with the user's email.
 
-An OAuth 2.0 (3LO) access token is sent as a bearer token. **Not verified live.**
+An OAuth 2.0 (3LO) access token is sent as a bearer token, under a profile the
+`jira` connector does not declare. **Not verified live.**
 
 ```json
 {
-  "format": "connectors-catalog-local/2",
-  "instance": "jira-cloud",
-  "provider": "jira",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
   "api_base": "https://api.atlassian.com/ex/jira/your-cloud-id/rest/api/3",
   "request_prefix": "/ex/jira/your-cloud-id",
   "auth": {
@@ -330,8 +333,7 @@ An OAuth 2.0 (3LO) access token is sent as a bearer token. **Not verified live.*
     "bearer": true,
     "label": "Atlassian access token",
     "identity": {"path": "myself", "kind": "atlassian.account", "subject_pointer": "/accountId"}
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/jira/operations.json"
+  }
 }
 ```
 

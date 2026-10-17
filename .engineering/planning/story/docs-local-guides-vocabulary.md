@@ -2,11 +2,12 @@
 format: aep.planning-md/3
 id: story:docs-local-guides-vocabulary
 kind: story
-status: draft
+status: implemented
 title: The local runtime guides use connectors, instances and reconnect
 relations:
 - decomposes: epic:connector-vocabulary
 - depends_on: story:docs-vocabulary-readme-website
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: adapters/grafana/README.md
@@ -48,7 +49,11 @@ scope:
   path: docs/local-tavily.md
 - confidence: inferred
   path: docs/running-services.md
-revision: 10
+revision: 14
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-16T19:08:17Z", actor: "human:timo", revision: 12, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "proposed", to: "active", at: "2026-10-16T19:08:18Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:43Z", actor: "human:timo", revision: 14, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Context
 
@@ -109,3 +114,15 @@ file listed under Scope: the 17 files under `docs/` and `adapters/{loki,promethe
 - Not in scope: historical documents (`docs/waves/`, `docs/evidence/`, `docs/plans/`,
   `docs/cli-migration-v1-to-v2.md`) and internal design (`docs/design.md`), where "adapter" is the
   internal term.
+
+## Coordinator additions
+
+## Coordinator additions
+
+- 20 hand-written files still name `connections repair` or `adapters …` as the fix (45 lines;
+  reconnect adversary, 2026-10-16), among them `docs/local-tavily.md:97`, `docs/catalog-google-*.md`,
+  `adapters/{grafana,loki,prometheus}/README.md` and
+  `adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.{md,json}`. Tests in
+  `adapters/catalog/tests/google_*.rs` pin guide text and move with the guides.
+- The generated website reference pages are regenerated once on the wave branch by the
+  coordinator; do not hand-edit them.

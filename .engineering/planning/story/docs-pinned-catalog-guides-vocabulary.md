@@ -2,17 +2,22 @@
 format: aep.planning-md/3
 id: story:docs-pinned-catalog-guides-vocabulary
 kind: story
-status: draft
+status: implemented
 title: The Slack guide and the catalog provider reference use the vocabulary with the pinned instance form
 relations:
 - decomposes: epic:connector-vocabulary
 - depends_on: story:docs-vocabulary-readme-website
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: docs/catalog-slack.md
 - confidence: inferred
   path: docs/local-catalog-provider.md
-revision: 5
+revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-16T19:08:18Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "proposed", to: "active", at: "2026-10-16T19:08:19Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:43Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Context
 

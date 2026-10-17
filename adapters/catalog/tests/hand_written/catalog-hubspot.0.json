@@ -1,0 +1,15 @@
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "hubspot",
+  "provider": "hubspot",
+  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
+  "api_base": "https://api.hubapi.com",
+  "auth": {
+    "profile": "hubspot.private-app",
+    "header": "Authorization",
+    "bearer": true,
+    "label": "Private app access token",
+    "identity": {"path": "account-info/2026-09/details", "kind": "hubspot.portal", "subject_pointer": "/portalId"}
+  },
+  "operations_file": "/absolute/path/adapters/catalog/providers/hubspot/operations.json"
+}

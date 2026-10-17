@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:ess-connector-vocabulary-model
 kind: story
-status: active
+status: implemented
 title: The ESS model declares Provider, Connector and the instance's connector, and the Stale connection state
 relations:
 - decomposes: epic:connector-vocabulary
@@ -21,10 +21,11 @@ scope:
   path: ess/domains/declarations.yaml
 - confidence: inferred
   path: website/docs/reference/contracts/model
-revision: 12
+revision: 13
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-16T11:55:34Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-10-16T11:55:34Z", actor: "human:timo", revision: 12, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:44Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Context
 

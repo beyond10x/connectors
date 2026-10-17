@@ -298,6 +298,7 @@ impl Lab {
             S::Revoked => "revoked",
             S::Disabled => "disabled",
             S::ReauthorizationRequired => "reauthorization_required",
+            S::Stale => "stale",
             S::CustodyUnavailable => "custody_unavailable",
             S::ParentDegraded => "parent_degraded",
             S::Pending => "pending",

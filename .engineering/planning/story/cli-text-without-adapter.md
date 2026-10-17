@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:cli-text-without-adapter
 kind: story
-status: draft
+status: implemented
 title: CLI help and error messages use the connector vocabulary and never say adapter
 relations:
 - decomposes: epic:connector-vocabulary
@@ -12,6 +12,8 @@ relations:
 - depends_on: story:connection-stale-state
 - depends_on: story:catalog-connector-declarations
 - depends_on: story:connector-instance-derived-fields
+- depends_on: story:connect-refused-while-instance-holds-connection
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: adapters/catalog/src/main.rs
@@ -27,7 +29,11 @@ scope:
   path: crates/connectors-host/src/local
 - confidence: inferred
   path: website/docs/reference/cli.md
-revision: 6
+revision: 10
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-16T18:18:37Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":3}}}
+- {from: "proposed", to: "active", at: "2026-10-16T18:18:37Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":3}}}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:39Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":1,"review_outcome":3}}}
 ---
 ## Context
 
@@ -97,3 +103,19 @@ containing "adapter" (case-insensitive) outside the allowlist.
   story:connector-instance-derived-fields (`crates/connectors-host/src/local/config.rs`,
   `runtime.rs`), both by `depends_on`; story:docs-vocabulary-readme-website regenerates the website
   after this story.
+
+## Coordinator additions
+
+## Coordinator additions
+
+From the reconnect adversary (2026-10-16):
+
+- Under `--output human`, `--help` on a deprecated name prints the deprecation line
+  (`apps/connectors/src/local/select.rs:310-315`), although its doc comment says help is left as
+  is; `connectors --help` lists `adapters` beside `instances` and `connections --help` lists
+  `repair` and `reconnect` with one about, with no deprecation mark. This story fixes both.
+- The runtime silently overwrites a real command when an alias collides with it
+  (`runtime.rs:287-298`); add a guard.
+- The `adapters describe` descriptor keeps `adapter` (implementation) and `instance` (instance id),
+  documented as an exception in the CLI contract (commit eca9692bd); renaming those fields is in
+  scope here.

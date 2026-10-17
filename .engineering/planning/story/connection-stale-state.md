@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: story:connection-stale-state
 kind: story
-status: draft
+status: implemented
 title: A connection whose credential the provider refused is listed Stale until a reconnect returns it to Live
 relations:
 - decomposes: epic:connector-vocabulary
 - depends_on: story:connections-reconnect-verb
 - informed_by: story:guarded-write-credential-refusal-says-repair
 - depends_on: story:ess-connector-vocabulary-model
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: adapters/catalog/tests/local_runtime/oauth2_refresh.rs
@@ -22,7 +23,11 @@ scope:
   path: crates/connectors-host/src/local/registry/lifecycle.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/registry/observation.rs
-revision: 6
+revision: 10
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-16T15:38:10Z", actor: "human:timo", revision: 8}
+- {from: "proposed", to: "active", at: "2026-10-16T15:38:11Z", actor: "human:timo", revision: 9}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:39Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Context
 
@@ -83,3 +88,21 @@ after `connections reconnect` publishes a new credential it reports it as `Live`
   does once both land.
 - Not here: whether the validation-evidence `pending` condition stays user-visible (design open
   question 1).
+
+## Coordinator additions
+
+## Coordinator additions
+
+From the implementor report of story:ess-connector-vocabulary-model (commit c18d26dbab), 2026-10-16:
+
+- The status projection has no `Stale` variant: a Stale connection reports
+  `reauthorization_required` with next action `reconnect`. This story adds the variant to the
+  connection status enum in `ess/domains/connection_admission.yaml` (now in scope) and regenerates,
+  so `connections list` shows `Stale` as the acceptance says.
+- A revalidation refused under a newer configuration revision records only
+  `refused_configuration_revision` and does not make the connection Stale: the credential still
+  works under its own revision (answer to the open point on Decision 17).
+- `MarkConnectionStale` is accepted by the local metadata authority (`ess/components.yaml`); the
+  host call site is this story.
+- The host store model digest changed with the new definitions (`crates/connectors-host/src/local/er.rs:787-830`);
+  this story runs the host store tests.

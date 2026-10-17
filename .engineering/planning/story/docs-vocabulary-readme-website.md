@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:docs-vocabulary-readme-website
 kind: story
-status: draft
+status: implemented
 title: README introduces the connector vocabulary once; AGENTS.md and the website link to it
 relations:
 - decomposes: epic:connector-vocabulary
@@ -12,6 +12,7 @@ relations:
 - depends_on: story:connections-reconnect-verb
 - depends_on: story:connection-stale-state
 - depends_on: story:cli-text-without-adapter
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: AGENTS.md
@@ -33,7 +34,11 @@ scope:
   path: website/docs/reference
 - confidence: inferred
   path: website/product.json
-revision: 10
+revision: 13
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-16T19:07:44Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"review_outcome":2}}}
+- {from: "proposed", to: "active", at: "2026-10-16T19:07:44Z", actor: "human:timo", revision: 12, decided_on: {"recorded":{"review_outcome":2}}}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:44Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"test_result":1,"review_outcome":2}}}
 ---
 ## Context
 

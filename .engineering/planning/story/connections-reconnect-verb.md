@@ -2,11 +2,12 @@
 format: aep.planning-md/3
 id: story:connections-reconnect-verb
 kind: story
-status: draft
+status: implemented
 title: connections reconnect replaces connections repair, and instances replaces the adapters command group
 relations:
 - decomposes: epic:connector-vocabulary
 - depends_on: story:cli-connector-instance-selectors
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: apps/connectors-cli-contract
@@ -24,7 +25,11 @@ scope:
   path: crates/connectors-conformance/tests/cli_surface.rs
 - confidence: inferred
   path: ess/domains/cli.yaml
-revision: 4
+revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-16T15:02:09Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "proposed", to: "active", at: "2026-10-16T15:02:09Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:40Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Context
 
@@ -37,10 +42,12 @@ carry the old vocabulary: `connections repair` (`apps/connectors/spec/cli.yaml:1
 
 - `connections reconnect` replaces `connections repair`; types renamed `ConnectionReconnect*` in
   `ess/domains/cli.yaml`. `connections repair` stays as a path alias (ess-cli/1 command `aliases`)
-  and prints exactly one deprecation line on standard error.
+  and reports its deprecation as the selectors story does: one line on standard error under
+  `--output human`, one `deprecations` entry in the JSON result or error envelope under
+  `--output json`, with nothing extra on standard error.
 - The `adapters` group becomes `instances` (`instances list|describe|status|stop`): the user-facing
   thing these commands address is an instance; the process they observe stays internally an
-  adapter (ADR decision 6). `adapters …` stays as an alias with the same deprecation line. This
+  adapter (ADR decision 6). `adapters …` stays as an alias with the same deprecation report. This
   naming is this story's call, not the design's; it is reversible until the window closes.
 - The wire value `next_action: repair_connection` is kept in this story: it is machine-facing, like
   the JSON `adapter` field, and changes with the removal release (migration plan step 9). Human text
@@ -67,8 +74,9 @@ carry the old vocabulary: `connections repair` (`apps/connectors/spec/cli.yaml:1
 
 A conformance test runs each renamed path (`connections repair` -> `connections reconnect`,
 `adapters list|describe|status|stop` -> `instances list|describe|status|stop`) with the same
-arguments against one instance under its old and its new name, and finds identical JSON results,
-with exactly one deprecation line on standard error for the old name and none for the new one.
+arguments against one instance under its old and its new name with `--output json`, and finds JSON
+results that differ only by one `deprecations` entry for the old name and none for the new one,
+with standard error empty on success for both.
 
 ## Notes
 

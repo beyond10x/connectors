@@ -2,11 +2,12 @@
 format: aep.planning-md/3
 id: story:docs-google-one-instance-per-account
 kind: story
-status: draft
+status: implemented
 title: The four Google API guides configure one instance per account
 relations:
 - decomposes: epic:connector-vocabulary
 - depends_on: story:docs-vocabulary-readme-website
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: docs/catalog-google-calendar.md
@@ -16,7 +17,11 @@ scope:
   path: docs/catalog-google-gmail.md
 - confidence: inferred
   path: docs/catalog-google-slides.md
-revision: 8
+revision: 11
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-16T19:08:21Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "proposed", to: "active", at: "2026-10-16T19:08:22Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-17T01:36:42Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Context
 

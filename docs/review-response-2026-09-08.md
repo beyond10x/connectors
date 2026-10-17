@@ -1,3 +1,4 @@
+> This dated record predates the [connector vocabulary](../README.md#vocabulary) and keeps the terms of its date.
 # Full review response — 2026-09-08
 
 All 17 findings in `.local/review/2026-09-08-full-review.md` have a disposition

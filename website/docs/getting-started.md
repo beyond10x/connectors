@@ -1,12 +1,12 @@
 ---
 title: Getting started
 sidebar_position: 2
-description: Build Connectors from source, start one adapter service and watch it describe itself and refuse what it must.
+description: Build Connectors from source, start one connector as a standalone service and watch it describe itself and refuse what it must.
 ---
 
 # Getting started
 
-Build the workspace, start the Kubernetes adapter as a standalone service and ask it what it
+Build the workspace, start the Kubernetes connector as a standalone service and ask it what it
 offers. No Kubernetes cluster and no real credential are needed: the service answers its
 descriptor without contacting its provider, and the invocation that would need the provider is
 refused by name. Every command below was run in a checkout of the repository, starting at its
@@ -23,7 +23,7 @@ target/debug/connectors --version
 ```
 
 ```text
-connectors 0.37.0
+connectors 0.52.0
 ```
 
 Ordinary builds read checked-in generated Rust and need no ESS. Cargo downloads dependencies on
@@ -31,13 +31,13 @@ the first build. Package distribution is not configured.
 
 ## Or install a release binary
 
-The walkthrough below builds from source because it also needs the Kubernetes adapter. For the
+The walkthrough below builds from source because it also needs the Kubernetes service. For the
 `connectors` command alone, each release page carries `connectors-<version>-<target>.tar.gz` for
 `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin` and
 `aarch64-apple-darwin`, with a `SHA256SUMS` file; releases cut before the binaries workflow
 existed carry source archives only, and there is no Windows binary. Each archive holds two
 binaries, `connectors` and the catalog provider `connectors-catalog-provider` (archives of 0.50.0
-and earlier hold `connectors` alone); the Kubernetes adapter and the other adapters are built
+and earlier hold `connectors` alone); the Kubernetes service and the other connectors are built
 from source. Download the archive for your platform and `SHA256SUMS`, check the archive's line
 with `sha256sum -c -` (on macOS `shasum -a 256 -c -`), extract it and put both binaries on your
 `PATH`; the repository's
@@ -50,10 +50,10 @@ Gatekeeper's quarantine attribute and is refused until you remove it with
 binary also cannot read login keychain items an earlier build wrote, so credentials are stored
 again after an upgrade.
 
-## Start an adapter service
+## Start a service
 
 Work in a directory under the git-ignored `target/`, with a service credential that callers
-present to the adapter and a provider credential that the adapter would present to Kubernetes.
+present to the service and a provider credential that the service would present to Kubernetes.
 Credential files must be regular files owned by you with mode `0600`.
 
 ```sh
@@ -76,7 +76,7 @@ http:
   credential: {kind: file, path: kubernetes.secret}
   credential_header: authorization
   bearer: true
-adapter:
+adapter:  # the internal implementation's own settings
   namespaces: [engineering]
   resource_kinds: [pods, services]
   discover_hosts: false
@@ -93,19 +93,33 @@ Start the service in the background:
 ```sh
 ../debug/connectors describe --endpoint http://127.0.0.1:17102/ \
   --allow-plaintext --token-file service.secret \
-  | jq '{instance, adapter, revision, operations: [.operations[] | {id, contract, profile}]}'
+  | jq '{instance, revision, operations: [.operations[] | {id, contract, profile}]}'
 ```
 
 ```json
 {
   "instance": "kubernetes-local",
-  "adapter": "kubernetes",
-  "revision": "fc07f3a36a72f565032bdb211d2b4d2e8ee58bb1ee76b13984e19746a29df181",
+  "revision": "3efdc565dd468f2d87f49faadd36ab0430f8560641ed79dbfb831be0066ea8b9",
   "operations": [
     {
       "id": "resources.list",
       "contract": "datasource.records/v1alpha1",
       "profile": "kubernetes-list"
+    },
+    {
+      "id": "resources.get",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "kubernetes-get"
+    },
+    {
+      "id": "namespaces.list",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "kubernetes-configured-namespaces"
+    },
+    {
+      "id": "deployments.history",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "kubernetes-rollout-history"
     },
     {
       "id": "endpoints.discover",
@@ -165,7 +179,7 @@ your shell's job control.
 
 ## Next
 
-- Put a federation host in front of this service: [Federate adapter services](./guides/federate-adapter-services.md).
+- Put a federation host in front of this service, the internal process of the Kubernetes connector: [Federate services](./guides/federate-adapter-services.md).
 - Use the local CLI with saved connections: [Set up the local CLI](./guides/set-up-the-local-cli.md).
-- See what each adapter can do and which ones run: [Adapters](./reference/adapters/index.md) and the [status page](./status.md).
+- See what each connector can do and which ones run: [connector reference](./reference/adapters/index.md) and the [status page](./status.md).
 - Follow an illustrated request from a laptop to GitLab: [Follow a request](/docs/examples/follow-a-request).

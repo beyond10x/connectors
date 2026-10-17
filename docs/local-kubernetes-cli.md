@@ -6,6 +6,8 @@ and runs a command in a pod under approval, using a saved Kubernetes bearer toke
 Linux x86_64 and the [qualified Secret Service binding](local-secret-service.md).
 The separately installed older CLI is not upgraded by building this checkout.
 
+Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
+
 Use the optimized build for the local owner. Startup copies and verifies its
 executable within a bounded deadline; large unoptimized debug binaries can exceed
 that budget on a busy host. Such a refusal grants no provider dispatch.
@@ -44,7 +46,7 @@ available in this profile. `resource_kinds` accepts only `pods`, `services`,
 collection that `kubectl get events` reads). The optional `ca_file` names an owner-only PEM
 certificate file; supply the cluster CA there when it is not in the system store.
 
-`discover_hosts` is optional and defaults to false. While it is false the adapter
+`discover_hosts` is optional and defaults to false. While it is false the instance
 does not advertise `hosts.discover` at all, so the node projection cannot be requested; `node_reads` below admits the full Node objects separately.
 
 `helm_release_reads` is optional and defaults to `"off"`. It selects how much of
@@ -98,7 +100,7 @@ and `custom_resources`, but not
 `kubeconfig`, `pod_exec` or `exec_plugin`
 ([Authenticate through an exec credential plugin](#authenticate-through-an-exec-credential-plugin)).
 
-The block above is the file format. The adapter's published
+The block above is the file format. The Kubernetes implementation's published
 `configuration_schema` has two branches, and the local one describes the
 **effective** document the composition builds at bootstrap, not this file: there
 the CA is reduced to a `ca_digest` and `discover_hosts` is always present. Nothing
@@ -113,15 +115,22 @@ sha256sum target/release/connectors-kubernetes
 
 Copy `configuration_revision` from that output verbatim. It is a digest of the
 effective document, which includes a `ca_digest` computed over the CA bytes in a
-form of the adapter's own choosing — it is **not** `sha256sum` of the PEM file, and
+form of the Kubernetes implementation's own choosing — it is **not** `sha256sum` of the PEM file, and
 no command reproduces it independently. Read it from
 `--print-local-bootstrap`, never compute it.
 
-Add an adapter entry to the configuration created by setup. Use the bootstrap's
+Kubernetes is not a catalog connector, so nothing derives its instance: the
+configuration pins it. Add the instance to the configuration created by setup:
+change its `format` line to `format = "connectors-local/5"`, which instances need,
+and add the instance `cluster` of the connector `kubernetes`, with the bootstrap's
 exact `configuration_revision`, the executable's SHA-256 and absolute paths:
 
 ```toml
-[adapters.cluster]
+[connectors.kubernetes]
+enabled = true
+
+[connectors.kubernetes.instances.cluster]
+alias = "cluster"
 instance_id = "kubernetes-local"
 adapter_id = "kubernetes"
 configuration_revision = "REPLACE_FROM_BOOTSTRAP"
@@ -130,14 +139,24 @@ private_protocol = "connectors-private/1"
 startup = "on-demand"
 restart = "never"
 
-[adapters.cluster.permissions]
+[connectors.kubernetes.instances.cluster.permissions]
 profiles = ["kubernetes.token"]
 operations = ["resources.list", "endpoints.discover"]
 
-[adapters.cluster.executable]
+[connectors.kubernetes.instances.cluster.executable]
 path = "/absolute/path/connectors-kubernetes"
 sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
 args = ["--local-config", "/absolute/path/kubernetes.json"]
+```
+
+The table names the connector and the instance; `--connector kubernetes --instance
+cluster` selects it. `alias` is the instance's name for the deprecated `--adapter`
+selector and its mounted custody items. `setup check` lists the instance's executable
+as the prerequisite `artifact:cluster`, and `instances list` shows it:
+
+```console
+$ target/release/connectors --output json instances list
+{"ok":true,"result":{"adapters":[{"adapter":"cluster","adapter_id":"kubernetes","connector":"kubernetes","instance":"cluster","instance_id":"kubernetes-local","restart":"never","startup":"on-demand"}],"source":"configuration"}}
 ```
 
 Omitted permission sets deny access, and an operation left out of `operations` is
@@ -152,8 +171,8 @@ artifact/configuration requires exact stop before a subsequent admitted launch.
 Use the hidden native token prompt on your foreground controlling terminal:
 
 ```sh
-target/release/connectors --output json connections connect --adapter cluster --profile kubernetes.token --credential-prompt
-target/release/connectors --output json operations describe --adapter cluster --operation resources.list
+target/release/connectors --output json connections connect --connector kubernetes --instance cluster --profile kubernetes.token --credential-prompt
+target/release/connectors --output json operations describe --connector kubernetes --instance cluster --operation resources.list
 ```
 
 For automation, `--credential-file /absolute/private/file.json` or
@@ -167,26 +186,26 @@ Retain the connection reference returned by connect, then the descriptor revisio
 and schema identity returned by operation describe:
 
 ```sh
-target/release/connectors --output json operations invoke --adapter cluster --connection CONNECTION --operation resources.list --schema SCHEMA --revision REVISION --input-json '{"namespace":"default","kind":"pods","limit":50}'
+target/release/connectors --output json operations invoke --connector kubernetes --instance cluster --connection CONNECTION --operation resources.list --schema SCHEMA --revision REVISION --input-json '{"namespace":"default","kind":"pods","limit":50}'
 ```
 
 Business JSON also supports `--input-file` and `--input-stdin`. The owner validates
 the exact original document and current authority before provider dispatch.
 
-Each CLI invocation may exit independently; the owner and its exact adapter child
+Each CLI invocation may exit independently; the owner and the instance's exact child process
 remain available. If the owner exits, a later admitted invocation can start it and
 reuse the saved exact credential version. Lists, descriptions and status start
 nothing. The cache always reports `stale: true` and does not grant permission.
 
-`adapters status --adapter cluster` returns incarnation coordinates. Pass those
-exact values to `adapters stop` with `--expected-revision`, `--host-incarnation`
+`instances status --connector kubernetes --instance cluster` returns incarnation coordinates. Pass those
+exact values to `instances stop` with `--expected-revision`, `--host-incarnation`
 and `--child-incarnation`.
 
 ## What the connection is bound to
 
-Connect and repair validate the credential with one Kubernetes
+Connect and reconnect validate the credential with one Kubernetes
 [SelfSubjectReview](https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/self-subject-review-v1/)
-request, issued through a check-specific capability whose endpoint the adapter
+request, issued through a check-specific capability whose endpoint the Kubernetes implementation
 composition fixes. Business reads cannot issue it, and it is the only POST this
 binding performs.
 
@@ -201,7 +220,7 @@ The saved identity is the authenticated **username** the cluster reports, for
 example `system:serviceaccount:observability:reader`. RBAC binds to that name, so
 it is the authorization-relevant identity; the optional `uid` is
 authenticator-dependent and is not used, because a cluster that omits it would
-otherwise report an unchanged principal as a switch. A `connections repair`
+otherwise report an unchanged principal as a switch. A `connections reconnect`
 carrying a different username is refused as an identity mismatch and the existing
 valid credential is preserved.
 
@@ -217,7 +236,7 @@ appears when the read is dispatched, as a forbidden refusal rather than an empty
 result.
 
 This binding does not observe a credential expiry. A bound service-account token
-carries its own lifetime inside the credential, which this adapter does not decode,
+carries its own lifetime inside the credential, which this implementation does not decode,
 so `credential_expires_at_ms` is absent — meaning not observed, not unlimited. An
 expired token is reported when it is next used.
 
@@ -225,7 +244,7 @@ expired token is reported when it is next used.
 
 A cluster whose kubeconfig user authenticates through an `exec` credential plugin,
 such as `aws eks get-token` for EKS, is reached by naming that plugin in the native
-configuration. The adapter runs it only under these rules, from the
+configuration. The instance's process runs it only under these rules, from the
 [reads contract](../adapters/kubernetes/contracts/reads/v1alpha1/semantics.md#exec-plugin-credentials):
 
 - **Pinned.** `exec_plugin.path` is the plugin's absolute path and
@@ -234,10 +253,10 @@ configuration. The adapter runs it only under these rules, from the
   must not be writable by group or others, must carry no set-user-ID or
   set-group-ID bit and no file capabilities (`getcap` shows none), and must be
   owned by root or by you. `path` must name the file
-  itself, not a symbolic link: the adapter opens it once without following a
+  itself, not a symbolic link: the process opens it once without following a
   link, hashes it through that open file and runs that same open file, so a file
   swapped in at `path` after the check never runs. The plugin inherits no open
-  file of the adapter beyond its standard streams. Plugins run on Linux only.
+  file of the instance's process beyond its standard streams. Plugins run on Linux only.
 - **Arguments from the kubeconfig, as data.** `exec_plugin.user` names the
   kubeconfig `users` entry; its `exec.args` become the argument vector, and no shell
   runs. The entry's `exec.command` must be the pinned path, written exactly as in
@@ -249,7 +268,7 @@ configuration. The adapter runs it only under these rules, from the
   environment. It receives `HOME` only when `exec_plugin.home` is set (and runs in
   that directory, otherwise in `/`), `KUBERNETES_EXEC_INFO`, and each name in
   `exec_plugin.env`, valued from the kubeconfig's `exec.env` or, failing that, from
-  the adapter's own environment. A kubeconfig `exec.env`
+  the instance process's own environment. A kubeconfig `exec.env`
   name that is not in `exec_plugin.env` refuses. `exec_plugin.env` itself cannot
   name one of the variables the
   [reads contract](../adapters/kubernetes/contracts/reads/v1alpha1/semantics.md#exec-plugin-credentials)
@@ -260,7 +279,7 @@ configuration. The adapter runs it only under these rules, from the
   judge. File reads are not sandboxed: point
   `home` at the directory holding the plugin's profile files (for the AWS CLI, the
   one containing `.aws/config` and `.aws/credentials`).
-- **Bounded, and only when admitted.** It runs inside a connect, repair or
+- **Bounded, and only when admitted.** It runs inside a connect, reconnect or
   operation, never while loading the configuration, listing or describing.
   `exec_plugin.timeout_ms` (1 to 60000, default 10000) bounds one run; at the
   deadline its whole process group and the plugin itself are killed (`timeout`),
@@ -271,8 +290,8 @@ configuration. The adapter runs it only under these rules, from the
   with a bearer token; a non-zero exit is `unavailable`.
 - **Token in memory only.** The token is reused until its `expirationTimestamp`,
   then the plugin runs again; an `expirationTimestamp` already past (Go's zero
-  time `0001-01-01T00:00:00Z` included) serves only the use that ran it. It is never written to disk. The adapter process
-  holds it, so stopping the adapter forgets it.
+  time `0001-01-01T00:00:00Z` included) serves only the use that ran it. It is never written to disk. The instance's process
+  holds it, so stopping that process (`instances stop`) forgets it.
 
 `exec_plugin` requires `kubeconfig`. No default configuration sets it. With it set,
 the bootstrap offers the profile `kubernetes.exec_plugin` instead of
@@ -318,13 +337,13 @@ installer makes `/usr/local/bin/aws` a symbolic link, so name the file it
 resolves to (`readlink -f "$(command -v aws)"`); a directory link on the way,
 such as `current`, is followed. Upgrading the plugin changes its digest, so the
 configuration and its `configuration_revision` change with it. Grant
-`profiles = ["kubernetes.exec_plugin"]` in the adapter entry. The protected
+`profiles = ["kubernetes.exec_plugin"]` in the instance's table. The protected
 entry is not a secret: it is `{"user":"..."}`, the same kubeconfig user name,
 which confirms whom the plugin runs for:
 
 ```sh
 printf '{"user":"%s"}' 'arn:aws:eks:eu-central-1:111122223333:cluster/fixture' |
-  target/release/connectors --output json connections connect --adapter cluster --profile kubernetes.exec_plugin --credential-stdin
+  target/release/connectors --output json connections connect --connector kubernetes --instance cluster --profile kubernetes.exec_plugin --credential-stdin
 ```
 
 Connect runs the plugin once and validates its token with the SelfSubjectReview
@@ -336,7 +355,7 @@ to.
 Use `operations describe` for each operation's current schema and descriptor
 revision, then invoke with the saved connection as above. The request shapes are:
 
-| Operation | Example input |
+| Operation id | Example input |
 |---|---|
 | `resources.list` | `{"namespace":"default","kind":"pods","limit":50}` |
 | `resources.get` | `{"namespace":"default","kind":"deployments","name":"api"}` |
@@ -404,11 +423,11 @@ existed, and the page cannot say which.
 Events are read with `resources.list` and `"kind":"events"`, and ReplicaSets with
 `"kind":"replicasets"`, once those kinds are configured.
 
-Add each operation you use to `operations` in the adapter's permissions, as in the
+Add each operation you use to `operations` in the instance's `permissions`, as in the
 configuration above. The credential needs this RBAC in every configured namespace
 it reads:
 
-| Operation | RBAC rule (namespaced Role) |
+| Operation id | RBAC rule (namespaced Role) |
 |---|---|
 | `resources.get` | `get` on the requested kind (`pods`, `services`, `events`, `endpointslices` in `discovery.k8s.io`, or `deployments`, `replicasets` in `apps`) |
 | `namespaces.list` | `get` on `namespaces` in each configured namespace |
@@ -470,7 +489,7 @@ cluster chooses the pod's default container, so name it for a pod with several.
 and `max_bytes` (1–131,072, default 131,072) bound the read. There is no cursor,
 no follow and no previous container.
 
-The adapter makes one log GET with timestamps and returns the lines in the order
+The instance makes one log GET with timestamps and returns the lines in the order
 the cluster sent them, each with `timestamp_unix_ns` (null when a line carries no
 timestamp), its `stream` (namespace, pod, container), the line text and
 `line_truncated`. A line is clipped at 8 KiB. `complete` is true only when the
@@ -508,11 +527,11 @@ above.
 namespace, as the [mutation contract, §4.2](../adapters/kubernetes/contracts/mutations/v1alpha1/semantics.md#42-pod-exec-podsexec)
 states. It is a write: it is advertised only while `pod_exec` is true, only on the
 `connectors-private/2` write exchange, and the read exchange and the federated
-service never list it. The adapter entry needs `private_protocol =
+service never list it. The instance needs `private_protocol =
 "connectors-private/2"` and `pods.exec` in its `operations`, and the operation
 needs an approval policy and an issued approval like every write
 ([local approvals](local-approvals.md)). The host spends the approval and records
-the attempt before the adapter opens the stream.
+the attempt before the instance's process opens the stream.
 
 The input is closed: `namespace`, `pod`, `container` (required, no default
 container) and `command`, an argument vector of 1–64 elements, each 1–4,096
@@ -521,7 +540,7 @@ is added. `timeout_seconds` (1–60, default 30) bounds the run and
 `max_output_bytes` (1–1,048,576, default 65,536) bounds stdout and stderr each.
 There is no stdin and no terminal.
 
-The adapter sends one GET to the pod's `exec` subresource, upgraded to a WebSocket
+The instance sends one GET to the pod's `exec` subresource, upgraded to a WebSocket
 through the host's admitted connection to the configured API server (no redirect
 followed), and reads the cluster's status message. The result is `namespace`,
 `pod`, `container`, `exit_code`, `stdout`, `stderr`, `stdout_truncated` and
@@ -581,7 +600,7 @@ projection larger than `limit` comes back with `complete: false` and
 cannot be represented inside the 1024-byte bound the operation publishes for
 `path` — an empty recorded key, or keys that concatenate past that length. Such
 a node is dropped together with everything under it, because returning it would
-produce a result the adapter's own published schema rejects. Raising `limit`
+produce a result the Kubernetes implementation's own published schema rejects. Raising `limit`
 will not bring it back. A `complete: false` page is evidence about what you
 did receive and none at all about what you did not: a path that is missing from
 an incomplete page is not an unset value.
@@ -630,7 +649,7 @@ test target exercise read reuse after owner/keyring restart, authenticated RBAC
 denial, real continuation binding, and repair/revocation/stop behavior. They are
 ignored by default and fail when explicitly selected without their prerequisites.
 
-Build the optimized production CLI and adapter first. Set `CONNECTORS_TEST_CLI`
+Build the optimized production CLI and `connectors-kubernetes` first. Set `CONNECTORS_TEST_CLI`
 to the absolute CLI binary path, `CONNECTORS_K8S_SANDBOX` to the disposable HTTPS
 API root, and `CONNECTORS_K8S_CA`, `CONNECTORS_K8S_TOKEN`, and
 `CONNECTORS_K8S_KUBECONFIG` to protected files. The token file contains the raw
