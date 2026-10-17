@@ -969,7 +969,8 @@ action as a read's does: an upstream 403 (the catalog provider also 405 and
 write's preflight is `retry_explicitly`. A write whose selection declares a
 conflict status, answered with it (the target changed since it was read, nothing
 applied), is `refused` as `service_failure`, `service_code = conflict` and is
-never sent again. A write classified `applied` or
+never sent again. A preflight declaring `mismatch: conflict` whose check differs
+refuses the write unsent with the same `service_failure`, `service_code = conflict`. A write classified `applied` or
 `unknown` is never offered `retry_explicitly`: it may have taken effect.
 Every other write failure — the host's approval refusals included — reports
 `next_action = retry_status`. A write whose effect is unknown after its
