@@ -247,7 +247,7 @@ fn an_auth_with_other_than_exactly_one_entry_is_refused() {
 #[test]
 fn an_unknown_field_is_refused() {
     for text in [
-        jira_text().replace("operations:\n", "paging: {}\noperations:\n"),
+        jira_text().replace("operations:\n", "datasources: {}\noperations:\n"),
         jira_text().replace("{op: getIssue}", "{op: getIssue, guard: {}}"),
         jira_text().replace("{scheme: basic}", "{scheme: basic, token: x}"),
         jira_text().replace("{type: string}", "{type: string, secret: true}"),
@@ -427,6 +427,22 @@ fn every_refusal_has_a_distinct_name() {
             key: String::new(),
             op: String::new(),
             method: String::new(),
+        }
+        .name(),
+        Refusal::UnknownPaging {
+            key: String::new(),
+            style: String::new(),
+        }
+        .name(),
+        Refusal::AmbiguousPaging {
+            key: String::new(),
+            styles: Vec::new(),
+        }
+        .name(),
+        Refusal::PagingParameter {
+            key: String::new(),
+            style: String::new(),
+            parameter: String::new(),
         }
         .name(),
         Refusal::Pipeline(String::new()).name(),

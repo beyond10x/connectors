@@ -78,6 +78,22 @@ pub enum Effect {
     Write,
 }
 
+/// `connectors_definitions.definition.PagingStyle`: how one family of list
+/// operations pages. `request` is the query parameter that carries the position;
+/// `limit` the page-size parameter, capped at `max`. `next`, `total` and `last`
+/// say where a walk reads its next position and its end; the runtime owns the
+/// walk itself.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PagingStyle {
+    pub request: Option<String>,
+    pub next: Option<String>,
+    pub limit: Option<String>,
+    pub max: Option<u64>,
+    pub total: Option<String>,
+    pub last: Option<String>,
+}
+
 /// `connectors_definitions.definition.Operation`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -85,6 +101,8 @@ pub struct Operation {
     pub op: String,
     pub effect: Option<Effect>,
     pub description: Option<String>,
+    /// A style from `paging`, for an operation more than one style matches.
+    pub paging: Option<String>,
 }
 
 /// `connectors_definitions.definition.ProviderDefinition`. The maps are ordered
@@ -98,6 +116,7 @@ pub struct ProviderDefinition {
     pub base_url: String,
     pub config: Option<BTreeMap<String, ConfigField>>,
     pub auth: BTreeMap<String, Auth>,
+    pub paging: Option<BTreeMap<String, PagingStyle>>,
     pub operations: BTreeMap<String, Operation>,
 }
 
@@ -133,6 +152,17 @@ pub enum Refusal {
         op: String,
         method: String,
     },
+    /// An operation names a `paging` style the definition does not declare.
+    UnknownPaging { key: String, style: String },
+    /// More than one style's `request` parameter is a query parameter of the
+    /// operation, and the operation names none of them.
+    AmbiguousPaging { key: String, styles: Vec<String> },
+    /// An operation names a style whose `request` or `limit` parameter it lacks.
+    PagingParameter {
+        key: String,
+        style: String,
+        parameter: String,
+    },
     /// The catalog pipeline refused the source; the message names its step.
     Pipeline(String),
     /// The output directory, the selection or the scratch copy cannot be written.
@@ -154,6 +184,9 @@ impl Refusal {
             Self::SourceHashMismatch { .. } => "source_hash_mismatch",
             Self::UnknownOperation { .. } => "unknown_operation",
             Self::EffectRequired { .. } => "effect_required",
+            Self::UnknownPaging { .. } => "unknown_paging",
+            Self::AmbiguousPaging { .. } => "ambiguous_paging",
+            Self::PagingParameter { .. } => "paging_parameter",
             Self::Pipeline(_) => "pipeline",
             Self::Write(_) => "write",
         }
@@ -192,6 +225,23 @@ impl std::fmt::Display for Refusal {
                 f,
                 "{name}: operation `{key}` (`{op}`) is {} and declares no effect",
                 method.to_uppercase()
+            ),
+            Self::UnknownPaging { key, style } => write!(
+                f,
+                "{name}: operation `{key}` names paging style `{style}`, which paging does not declare"
+            ),
+            Self::AmbiguousPaging { key, styles } => write!(
+                f,
+                "{name}: operation `{key}` matches paging styles {}; name one",
+                styles.join(", ")
+            ),
+            Self::PagingParameter {
+                key,
+                style,
+                parameter,
+            } => write!(
+                f,
+                "{name}: operation `{key}` names paging style `{style}`, but has no query parameter `{parameter}`"
             ),
         }
     }
@@ -262,6 +312,69 @@ struct SelectionEntry {
     effect: Effect,
     #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    bounds: BTreeMap<String, Bound>,
+}
+
+/// A range bound, in the shape the catalog provider's `Bound` reads.
+#[derive(Clone, Debug, Serialize)]
+struct Bound {
+    minimum: u64,
+    maximum: u64,
+}
+
+/// The paging style an operation uses, by name, given its query parameters: the
+/// one it names, else the one style whose `request` parameter it has, else none.
+fn paging_style<'a>(
+    key: &str,
+    operation: &Operation,
+    styles: Option<&'a BTreeMap<String, PagingStyle>>,
+    query: &[&str],
+) -> Result<Option<(&'a str, &'a PagingStyle)>, Refusal> {
+    let Some(styles) = styles else {
+        return match &operation.paging {
+            Some(named) => Err(Refusal::UnknownPaging {
+                key: key.to_owned(),
+                style: named.clone(),
+            }),
+            None => Ok(None),
+        };
+    };
+    if let Some(named) = &operation.paging {
+        let (name, style) = styles
+            .get_key_value(named)
+            .ok_or_else(|| Refusal::UnknownPaging {
+                key: key.to_owned(),
+                style: named.clone(),
+            })?;
+        for parameter in [&style.request, &style.limit].into_iter().flatten() {
+            if !query.contains(&parameter.as_str()) {
+                return Err(Refusal::PagingParameter {
+                    key: key.to_owned(),
+                    style: name.clone(),
+                    parameter: parameter.clone(),
+                });
+            }
+        }
+        return Ok(Some((name.as_str(), style)));
+    }
+    let matching: Vec<(&String, &PagingStyle)> = styles
+        .iter()
+        .filter(|(_, style)| {
+            style
+                .request
+                .as_deref()
+                .is_some_and(|request| query.contains(&request))
+        })
+        .collect();
+    match matching[..] {
+        [] => Ok(None),
+        [(name, style)] => Ok(Some((name.as_str(), style))),
+        _ => Err(Refusal::AmbiguousPaging {
+            key: key.to_owned(),
+            styles: matching.iter().map(|(name, _)| (*name).clone()).collect(),
+        }),
+    }
 }
 
 #[derive(Serialize)]
@@ -446,6 +559,25 @@ pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
                 });
             }
         };
+        let query: Vec<&str> = found
+            .parameters
+            .iter()
+            .filter(|parameter| parameter.location == crate::inventory::Location::Query)
+            .map(|parameter| parameter.name.as_str())
+            .collect();
+        let mut bounds = BTreeMap::new();
+        if let Some((_, style)) = paging_style(key, operation, definition.paging.as_ref(), &query)?
+            && let (Some(limit), Some(max)) = (&style.limit, style.max)
+            && query.contains(&limit.as_str())
+        {
+            bounds.insert(
+                limit.clone(),
+                Bound {
+                    minimum: 1,
+                    maximum: max,
+                },
+            );
+        }
         operations.push(SelectionEntry {
             id: key.clone(),
             operation_id: operation.op.clone(),
@@ -454,6 +586,7 @@ pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
                 .description
                 .clone()
                 .or_else(|| summary(&document, &operation.op)),
+            bounds,
         });
     }
     let mut selection = serde_json::to_vec_pretty(&OperationsFile {
