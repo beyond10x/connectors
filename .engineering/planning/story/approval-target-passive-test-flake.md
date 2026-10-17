@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: story:approval-target-passive-test-flake
 kind: story
-status: draft
+status: archived
 title: approval_target passive test sees an extra store write under suite load
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 2
+transitions:
+- {from: "draft", to: "archived", at: "2026-10-17T05:07:36Z", actor: "human:timo", revision: 2}
 ---
 ## Observation
 

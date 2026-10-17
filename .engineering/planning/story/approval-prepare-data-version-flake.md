@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: story:approval-prepare-data-version-flake
 kind: story
-status: draft
+status: archived
 title: The approval prepare test reads the store's data version without a race
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 2
+transitions:
+- {from: "draft", to: "archived", at: "2026-10-17T05:07:36Z", actor: "human:timo", revision: 2}
 ---
 ## Observed
 `connectors-host` test
