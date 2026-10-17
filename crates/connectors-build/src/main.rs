@@ -122,6 +122,20 @@ enum Action {
         #[arg(long)]
         amendments: Option<PathBuf>,
     },
+    /// Lower one `connectors-definition/1` file into a provider bundle, its index
+    /// entry and its `connectors-catalog-operations/1` selection in `--out`.
+    /// Deterministic; never touches the network.
+    Definition {
+        /// The definition, `providers/<id>.yaml`; the file stem is the provider id.
+        #[arg(long)]
+        file: PathBuf,
+        /// The definitions checkout the definition's source paths are under.
+        #[arg(long = "root")]
+        definitions: PathBuf,
+        /// The bundle directory to write the bundle, index and selection into.
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// Project a pinned Google Discovery document into OpenAPI 3.0.3, and write
     /// its projection record beside it as `<name>.projection.json`.
     /// Deterministic; never touches the network.
@@ -264,6 +278,24 @@ fn execute(args: Args) -> Result<()> {
         }
         .map_err(|failure| failure.to_string())?;
         println!("{}", serde_json::to_string_pretty(&run.coverage)?);
+        return Ok(());
+    }
+    if let Action::Definition {
+        file,
+        definitions,
+        out,
+    } = &args.command
+    {
+        let scratch = root.join(".local/tmp");
+        std::fs::create_dir_all(&scratch)?;
+        let lowered =
+            connectors_catalog::definition::lower(&connectors_catalog::definition::Request {
+                definition: file,
+                root: definitions,
+                out,
+                scratch: &scratch,
+            })?;
+        println!("{}", serde_json::to_string_pretty(&lowered.entry)?);
         return Ok(());
     }
     if let Action::Discovery { source, out } = &args.command {
@@ -939,5 +971,73 @@ mod tests {
         assert_eq!(bundle.source.derivation, None);
         let bytes = std::fs::read(temp.path().join("bundles/google-drive.bundle.json")).unwrap();
         assert!(!String::from_utf8(bytes).unwrap().contains("derivation"));
+    }
+
+    fn repository() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .unwrap()
+    }
+
+    /// `definition` against the Jira fixture, its vendored source resolved
+    /// against `--root`, into `out` under a throwaway repository root.
+    fn definition(temp: &Path, file: &Path) -> Result<()> {
+        let repository = repository();
+        let out = temp.join("out");
+        cli(
+            temp,
+            &[
+                "definition",
+                "--file",
+                file.to_str().unwrap(),
+                "--root",
+                repository.to_str().unwrap(),
+                "--out",
+                out.to_str().unwrap(),
+            ],
+        )
+    }
+
+    #[test]
+    fn definition_lowers_the_jira_definition_to_the_committed_bundle_and_a_selection() {
+        let temp = tempfile::tempdir().unwrap();
+        let file = repository()
+            .join("crates/connectors-catalog/tests/fixtures/definition/providers/jira.yaml");
+        definition(temp.path(), &file).expect("definition run");
+        let written = std::fs::read(temp.path().join("out/jira.bundle.json")).unwrap();
+        let committed =
+            std::fs::read(repository().join("adapters/catalog/generated/bundles/jira.bundle.json"))
+                .unwrap();
+        assert!(
+            written == committed,
+            "the lowered bundle is the committed one"
+        );
+        bundle::load(&temp.path().join("out"), "jira").expect("the index verifies");
+        let selection: Value = serde_json::from_slice(
+            &std::fs::read(temp.path().join("out/jira.operations.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(selection["format"], "connectors-catalog-operations/1");
+        assert_eq!(selection["operations"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn definition_refusal_is_reported_by_name_and_writes_nothing() {
+        let temp = tempfile::tempdir().unwrap();
+        let text = std::fs::read_to_string(
+            repository()
+                .join("crates/connectors-catalog/tests/fixtures/definition/providers/jira.yaml"),
+        )
+        .unwrap()
+        .replace("{op: getIssue}", "{op: getIssueThatIsNotThere}");
+        let file = temp.path().join("jira.yaml");
+        std::fs::write(&file, text).unwrap();
+        let refused = definition(temp.path(), &file).expect_err("an unknown op is refused");
+        assert!(
+            refused.to_string().starts_with("unknown_operation: "),
+            "{refused}"
+        );
+        assert!(!temp.path().join("out").exists());
     }
 }

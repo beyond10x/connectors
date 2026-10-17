@@ -7,7 +7,7 @@ title: Declarative provider definitions live in their own repository and reach r
 relations:
 - informed_by: architecture-decision-record:declarative-http-provider-runtime
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 ---
 ## Context
 
@@ -51,28 +51,38 @@ record and supersedes nothing in it.
 
 **D1. Provider definitions move to their own repository.** The repository is
 `beyond10x/connectors-definitions`, created on 2026-10-16 at the operator's choice
-(https://github.com/beyond10x/connectors-definitions). It holds one authored
-YAML file per declarative provider, the pinned upstream references with their digests, a README, an
+(https://github.com/beyond10x/connectors-definitions). It holds one YAML file per declarative
+provider, the vendored upstream documents, the definition schema's ESS source, a README, an
 AGENTS.md and a Taskfile. It holds no Rust and no build of Rust. Native connectors (Kubernetes, SQL,
 MCP, anything that starts a host process or reads host credentials) stay in this repository.
 
-**D2. One intermediate representation, `connectors-provider/1`, is the contract between
-definitions and runtimes.** It is the current bundle plus selection, reduced to the selected
-operations, with the auth profiles and transport binding inline: one canonical JSON document per
-provider. Its schema, semantics and conformance scenarios are owned here under `contracts/catalog/`.
-A definition declares the features it requires (for example `http`, `oauth2_authorization_code`,
-`feed`, `binary`); a runtime refuses by name a definition that requires a feature it lacks.
+**D2. Two layers: a short definition, and an internal representation a lowerer builds.** A
+definition, `providers/<id>.yaml`, starts with `schema: urn:beyond10x:connectors-definition:1`. It
+names a vendored source and says only what that source cannot: which operations to expose under
+which local key (`issue.get: {op: getIssue}`), configuration variables with defaults (`hostname`,
+default `gitlab.com`), auth profiles, and the sections v2 adds. Sections are maps keyed by id, so an
+operation is unique on its connector by construction. The file is written for few tokens; how a
+runtime names an operation atomically (`jira.issue.get`) is the lowerer's concern. The schema's
+source is ESS (`spec/domains/definition.yaml` in the definitions repository), projected to JSON
+Schema with that URN as `$id`, and `task check` validates every definition with `ess` and `yq`.
 
-**D3. Source formats are frontends, separate from runtimes.** OpenAPI 3.x, Swagger 2.0, Google
-Discovery and the authored YAML (or the existing TOML action) are lowered into
-`connectors-provider/1` by frontends. The reference frontends are the existing Rust ones in
-`crates/connectors-catalog`, exposed through a released `connectors` subcommand. A runtime needs no
-frontend. The definitions repository's CI runs the released binary to lower, validate and publish.
+The internal representation is each runtime's own. In Rust it is today's bundle plus selection, so
+the catalog engine runs a lowered definition unchanged. A definition section binds to a Connectors
+contract by name (`operations/v1alpha1`, `datasource.feed/v1alpha1`, …), so every runtime exposes
+the same behaviour as one trait or interface.
 
-**D4. Each tag of the definitions repository publishes the lowered documents.** A release carries
-`<provider>.provider.json` per provider and one `index.json` naming each file's SHA-256, the source
-commit and the frontend version. Authored YAML is the reviewed source; the published JSON is what
-runtimes load. Lowering is deterministic: the same commit and frontend version give the same bytes.
+**D3. Every target language has a lowerer; source formats are read by lowerers, not by runtimes'
+callers.** A lowerer reads a definition and its vendored source (OpenAPI 3.x first; Swagger 2.0
+and Google Discovery later) and builds the internal representation. The reference is the Rust
+lowerer, `connectors-build definition` over `crates/connectors-catalog/src/definition.rs`. A
+runtime's capability manifest lists the source kinds and definition sections its lowerer supports.
+
+**D4. Every upstream document is vendored.** The definitions repository commits each source
+gzipped under `upstream/<id>/`, with its license, retrieval date and URL beside it. The definition
+pins it by SHA-256, and `task check` and the lowerer both refuse a mismatch. A vendor removing a URL
+does not make a definition unreproducible (operator, 2026-10-16; follows "vendor as is",
+`decision-blocker:confluence-openapi-redistribution`, 2026-09-30). Each tag publishes the
+definitions, the vendored sources and one `index.json` naming each file's SHA-256 and the commit.
 
 **D5. `connectors` installs definitions explicitly and verifies them.** A command fetches a named
 tag from a configured source, checks every file against `index.json`, records source, tag, commit
@@ -92,13 +102,13 @@ other credential material never appear in a definition; they stay in custody.
 
 | Role | Holds | Must not |
 |---|---|---|
-| `executor` | runs `connectors-provider/1` operations with an auth capability a host injects | hold custody, decide admission or approval, serve callers, write the audit record itself |
+| `executor` | runs lowered definitions with an auth capability a host injects | hold custody, decide admission or approval, serve callers, write the audit record itself |
 | `host` | custody, admission, approval, audit, child-process confinement, serving, federation | — |
 
 The Rust implementation is the reference executor and the only host. A runtime in another language
 (Go, Node) starts as an executor, either embedded under the Rust host as a pinned child process over
 the existing private protocol or under a host of its own that passes the host suite. Each runtime
-publishes a manifest (`connectors-runtime/1`: language, version, role, formats, features, frontends);
+publishes a manifest (`connectors-runtime/1`: language, version, role, definition sections, source kinds, features);
 the support matrix is generated from conformance reports, never from the manifest alone.
 
 **D8. Operation semantics are separate from transport.** An operation is a request and a response.
@@ -114,7 +124,7 @@ gaps are listed in the companion design. A gap found during this work is filed a
 artifact; the split does not wait on closing it and does not widen it.
 
 **D10. Every definition is usable with no runtime at all.** The definitions repository publishes,
-per provider, a generated Markdown page lowered from the same `connectors-provider/1` document:
+per provider, a Markdown page generated by the reference lowerer from the definition and its source:
 how to authenticate (each auth profile as numbered steps with `curl`, for example the authorize
 URL, the code exchange and the refresh) and how to call each operation (method, URL template,
 parameters, one `curl` line, the response shape). Credentials appear only as environment-variable
@@ -130,7 +140,7 @@ Connectors; this path is equivalent to reading the vendor's documentation.
 - Adding or changing a declarative provider is a change to the definitions repository only. Its
   gate runs a released binary over YAML and needs no Rust toolchain.
 - This repository loses the provider data and the per-provider tests that only exercise data, and
-  keeps the frontends, the engine, the host and native connectors.
+  keeps the lowerer, the engine, the host and native connectors.
 - A second-language runtime implements one JSON format and a feature subset, and its standing is a
   conformance report. Before one exists, the generated page (D10) is the interface.
 - A definition becomes a supply-chain input. It is data, never code; it cannot name a binary, a
@@ -141,8 +151,6 @@ Connectors; this path is equivalent to reading the vendor's documentation.
 
 ## Not decided here
 
-- Whether upstream vendor documents are committed or only referenced by URL and digest; a
-  license-by-license call, as `decision-blocker:confluence-openapi-redistribution` was.
 - Signing of releases beyond digests.
 - Build-time changes in this repository (`incremental = false`, test-binary count); a separate
   milestone.

@@ -7,7 +7,7 @@ title: Provider definitions repository, connectors-provider/1, install, runtime 
 relations:
 - designs: architecture-decision-record:provider-definitions-and-runtimes
 - informed_by: architecture-decision-record:declarative-http-provider-runtime
-revision: 2
+revision: 3
 ---
 ## 1. Purpose
 
@@ -245,3 +245,24 @@ Documentation drift to correct, from the survey:
 Native connectors stay as they are. Closing the § 9 gaps is separate work. Session and media
 contracts are unchanged. Consumers outside this repository are migrated by their owners; the
 bundle format stays readable until they have moved.
+
+## 13. Revision 2026-10-17: two layers
+
+On 2026-10-17 the ADR (revision 4) replaced the single lowered document of §§ 3–5 with two
+layers. A definition, `schema: urn:beyond10x:connectors-definition:1`, names a vendored source and
+selects operations by `operationId`; a lowerer per target language builds that runtime's internal
+representation. In Rust that is today's bundle plus selection.
+
+The vertical slice, `story:definition-lowerer-slice`:
+
+| Check | Result |
+|---|---|
+| `crates/connectors-catalog/tests/definition.rs` | 18 passed |
+| Jira definition (3 reads) lowered vs `adapters/catalog/generated/bundles/jira.bundle.json` | SHA-256 `96a7508c…` on both |
+| GitLab definition (7 reads, YAML source, 4 amendments) lowered vs `gitlab.bundle.json` | SHA-256 `79ce6c95…` on both |
+| Catalog provider serves `issue.get` from the lowered Jira output | `adapters/catalog/tests/jira.rs` |
+
+Not yet carried by the definition, so lost on lowering today: `bounds`, guards, bodies, paging,
+curated descriptions (the OpenAPI `summary` is used), and `base_url`, `auth.scheme` and `config`
+defaults, which the bundle has no field for. Schema v2 adds them section by section; its inputs are
+`docs/drafts/schema-v2-inputs.md` in the definitions repository.
