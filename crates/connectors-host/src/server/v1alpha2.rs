@@ -475,7 +475,7 @@ async fn dispatch(
 fn base(code: connectors_core::ErrorCode) -> BaseErrorCode {
     use connectors_core::ErrorCode as Base;
     match code {
-        Base::InvalidInput => BaseErrorCode::InvalidInput,
+        Base::InvalidInput | Base::Conflict => BaseErrorCode::InvalidInput,
         Base::Unsupported => BaseErrorCode::Unsupported,
         Base::Unauthorized => BaseErrorCode::Unauthorized,
         Base::Forbidden => BaseErrorCode::Forbidden,
@@ -495,7 +495,7 @@ fn base(code: connectors_core::ErrorCode) -> BaseErrorCode {
 fn code(code: connectors_core::ErrorCode) -> ErrorCode {
     use connectors_core::ErrorCode as Base;
     match code {
-        Base::InvalidInput => ErrorCode::InvalidInput,
+        Base::InvalidInput | Base::Conflict => ErrorCode::InvalidInput,
         Base::Unsupported => ErrorCode::Unsupported,
         Base::Unauthorized => ErrorCode::Unauthorized,
         Base::Forbidden => ErrorCode::Forbidden,
@@ -527,7 +527,7 @@ fn http_status(code: ErrorCode) -> StatusCode {
         | InsufficientScope => StatusCode::FORBIDDEN,
         NotFound => StatusCode::NOT_FOUND,
         StaleDescription | StaleCursor | ApprovalReplayed | IdempotencyConflict
-        | StaleAuthority | ConnectionNotReady | SessionNotReady | OfferRejected => {
+        | StaleAuthority | ConnectionNotReady | SessionNotReady | OfferRejected | Conflict => {
             StatusCode::CONFLICT
         }
         SessionLost | OfferExpired | LeaseExpired | Revoked => StatusCode::GONE,

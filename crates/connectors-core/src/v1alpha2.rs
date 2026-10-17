@@ -64,6 +64,8 @@ pub enum ErrorCode {
     OfferRejected,
     LeaseExpired,
     Revoked,
+    /// The provider answered a write that its target changed since it was read.
+    Conflict,
 }
 
 impl ErrorCode {

@@ -195,7 +195,7 @@ async fn execute(service: &Service, request: &Invocation) -> Result<serde_json::
 
 fn status(error: &Error) -> StatusCode {
     match error.code {
-        ErrorCode::InvalidInput => StatusCode::BAD_REQUEST,
+        ErrorCode::InvalidInput | ErrorCode::Conflict => StatusCode::BAD_REQUEST,
         ErrorCode::Unauthorized => StatusCode::UNAUTHORIZED,
         ErrorCode::Forbidden => StatusCode::FORBIDDEN,
         ErrorCode::NotFound => StatusCode::NOT_FOUND,
@@ -208,7 +208,12 @@ fn status(error: &Error) -> StatusCode {
         ErrorCode::Internal => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
-fn error_http(error: Error) -> HttpResponse {
+fn error_http(mut error: Error) -> HttpResponse {
+    // The legacy binding emits no new code (compatibility.md §5): a provider
+    // conflict keeps the `invalid_input` it was.
+    if error.code == ErrorCode::Conflict {
+        error.code = ErrorCode::InvalidInput;
+    }
     (status(&error), Json(error)).into_response()
 }
 

@@ -211,6 +211,13 @@
       "resource": "rpc-error",
       "prompt": "rpc-error",
       "observation": "Preserve revoked and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "conflict",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve conflict and the admitted envelope; no retry authority."
     }
   ],
   "names": [
