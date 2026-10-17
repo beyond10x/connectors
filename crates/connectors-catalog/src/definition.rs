@@ -94,6 +94,36 @@ pub struct PagingStyle {
     pub last: Option<String>,
 }
 
+/// `connectors_definitions.definition.GuardBefore`: the read before a write.
+/// `read` is an operation key of the definition, else an `operationId` of the
+/// source; its path parameters take the input of the same name unless `with`
+/// binds them. `expect` maps a JSON pointer to an input reference (`sha`,
+/// `body.sha`), a literal (`=opened`) or a boolean (`=true`), in file order.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GuardBefore {
+    pub read: String,
+    pub with: Option<BTreeMap<String, String>>,
+    pub expect: serde_yaml_ng::Mapping,
+}
+
+/// `connectors_definitions.definition.GuardAfter`: comparisons against the
+/// write's answer; `any` holds when at least one of its comparisons holds.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GuardAfter {
+    pub expect: serde_yaml_ng::Mapping,
+    pub any: Option<serde_yaml_ng::Mapping>,
+}
+
+/// `connectors_definitions.definition.Guard`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Guard {
+    pub before: GuardBefore,
+    pub after: GuardAfter,
+}
+
 /// `connectors_definitions.definition.Operation`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -103,6 +133,10 @@ pub struct Operation {
     pub description: Option<String>,
     /// A style from `paging`, for an operation more than one style matches.
     pub paging: Option<String>,
+    /// The closed body of a write, by key: `string`, `integer`, `boolean` or
+    /// `any`, required with a trailing `!`; or `=<value>`, sent fixed.
+    pub body: Option<BTreeMap<String, String>>,
+    pub guard: Option<Guard>,
 }
 
 /// `connectors_definitions.definition.ProviderDefinition`. The maps are ordered
@@ -163,6 +197,18 @@ pub enum Refusal {
         style: String,
         parameter: String,
     },
+    /// A guard reads something that is neither an operation key of the
+    /// definition nor an `operationId` of the source.
+    UnknownGuardRead { key: String, read: String },
+    /// A guard binds, with `with`, a parameter its read does not have.
+    GuardParameter { key: String, parameter: String },
+    /// A body key whose spec is not `string`, `integer`, `boolean` or `any`
+    /// (each optionally ending in `!`), nor `=<value>`.
+    BodyType {
+        key: String,
+        field: String,
+        spec: String,
+    },
     /// The catalog pipeline refused the source; the message names its step.
     Pipeline(String),
     /// The output directory, the selection or the scratch copy cannot be written.
@@ -187,6 +233,9 @@ impl Refusal {
             Self::UnknownPaging { .. } => "unknown_paging",
             Self::AmbiguousPaging { .. } => "ambiguous_paging",
             Self::PagingParameter { .. } => "paging_parameter",
+            Self::UnknownGuardRead { .. } => "unknown_guard_read",
+            Self::GuardParameter { .. } => "guard_parameter",
+            Self::BodyType { .. } => "body_type",
             Self::Pipeline(_) => "pipeline",
             Self::Write(_) => "write",
         }
@@ -242,6 +291,18 @@ impl std::fmt::Display for Refusal {
             } => write!(
                 f,
                 "{name}: operation `{key}` names paging style `{style}`, but has no query parameter `{parameter}`"
+            ),
+            Self::UnknownGuardRead { key, read } => write!(
+                f,
+                "{name}: operation `{key}`'s guard reads `{read}`, which is neither an operation key nor a source operationId"
+            ),
+            Self::GuardParameter { key, parameter } => write!(
+                f,
+                "{name}: operation `{key}`'s guard binds `{parameter}`, which its read does not have"
+            ),
+            Self::BodyType { key, field, spec } => write!(
+                f,
+                "{name}: operation `{key}` body `{field}` is `{spec}`; expected string, integer, boolean or any, optionally with `!`, or `=<value>`"
             ),
         }
     }
@@ -314,6 +375,86 @@ struct SelectionEntry {
     description: Option<String>,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     bounds: BTreeMap<String, Bound>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    body_keys: Vec<String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    body_types: BTreeMap<String, String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    body_required: Vec<String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    body_fixed: BTreeMap<String, Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    guard: Option<Value>,
+}
+
+/// The closed body a definition declares, in the selection's `body_*` fields.
+#[derive(Default)]
+struct Body {
+    keys: Vec<String>,
+    types: BTreeMap<String, String>,
+    required: Vec<String>,
+    fixed: BTreeMap<String, Value>,
+}
+
+fn body(key: &str, declared: Option<&BTreeMap<String, String>>) -> Result<Body, Refusal> {
+    let mut body = Body::default();
+    for (field, spec) in declared.into_iter().flatten() {
+        body.keys.push(field.clone());
+        if let Some(value) = spec.strip_prefix('=') {
+            let fixed = match value {
+                "true" => Value::Bool(true),
+                "false" => Value::Bool(false),
+                _ => value
+                    .parse::<i64>()
+                    .map_or_else(|_| Value::String(value.to_owned()), Value::from),
+            };
+            body.fixed.insert(field.clone(), fixed);
+            continue;
+        }
+        let (kind, required) = match spec.strip_suffix('!') {
+            Some(kind) => (kind, true),
+            None => (spec.as_str(), false),
+        };
+        match kind {
+            "string" | "integer" | "boolean" => {
+                body.types.insert(field.clone(), kind.to_owned());
+            }
+            "any" => {}
+            _ => {
+                return Err(Refusal::BodyType {
+                    key: key.to_owned(),
+                    field: field.clone(),
+                    spec: spec.clone(),
+                });
+            }
+        }
+        if required {
+            body.required.push(field.clone());
+        }
+    }
+    Ok(body)
+}
+
+/// One `expect` entry as the engine's check: `=true`/`=false` a boolean, any
+/// other `=…` a literal, else an input reference.
+fn checks(mapping: &serde_yaml_ng::Mapping) -> Result<Vec<Value>, Refusal> {
+    mapping
+        .iter()
+        .map(|(pointer, expected)| {
+            let (Some(pointer), Some(expected)) = (pointer.as_str(), expected.as_str()) else {
+                return Err(Refusal::Malformed(
+                    "a guard's expect maps a pointer string to a string".to_owned(),
+                ));
+            };
+            let expect = match expected.strip_prefix('=') {
+                Some("true") => serde_json::json!({"boolean": true}),
+                Some("false") => serde_json::json!({"boolean": false}),
+                Some(literal) => serde_json::json!({"literal": literal}),
+                None => serde_json::json!({"input": expected}),
+            };
+            Ok(serde_json::json!({"pointer": pointer, "expect": expect}))
+        })
+        .collect()
 }
 
 /// A range bound, in the shape the catalog provider's `Bound` reads.
@@ -578,6 +719,53 @@ pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
                 },
             );
         }
+        let declared_body = body(key, operation.body.as_ref())?;
+        let guard = operation
+            .guard
+            .as_ref()
+            .map(|guard| {
+                let read = definition
+                    .operations
+                    .get(&guard.before.read)
+                    .map_or(guard.before.read.as_str(), |local| local.op.as_str());
+                let probe = bundle
+                    .inventory
+                    .operations
+                    .iter()
+                    .find(|candidate| candidate.operation_id.as_deref() == Some(read))
+                    .ok_or_else(|| Refusal::UnknownGuardRead {
+                        key: key.clone(),
+                        read: guard.before.read.clone(),
+                    })?;
+                let mut values: BTreeMap<String, String> = probe
+                    .parameters
+                    .iter()
+                    .filter(|parameter| parameter.location == crate::inventory::Location::Path)
+                    .map(|parameter| (parameter.name.clone(), parameter.name.clone()))
+                    .collect();
+                for (parameter, input) in guard.before.with.iter().flatten() {
+                    if !probe.parameters.iter().any(|p| &p.name == parameter) {
+                        return Err(Refusal::GuardParameter {
+                            key: key.clone(),
+                            parameter: parameter.clone(),
+                        });
+                    }
+                    values.insert(parameter.clone(), input.clone());
+                }
+                let mut postflight = serde_json::json!({"checks": checks(&guard.after.expect)?});
+                if let Some(any) = &guard.after.any {
+                    postflight["any_of"] = Value::Array(checks(any)?);
+                }
+                Ok(serde_json::json!({
+                    "preflight": {
+                        "operation_id": read,
+                        "values": values,
+                        "checks": checks(&guard.before.expect)?,
+                    },
+                    "postflight": postflight,
+                }))
+            })
+            .transpose()?;
         operations.push(SelectionEntry {
             id: key.clone(),
             operation_id: operation.op.clone(),
@@ -587,6 +775,11 @@ pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
                 .clone()
                 .or_else(|| summary(&document, &operation.op)),
             bounds,
+            body_keys: declared_body.keys,
+            body_types: declared_body.types,
+            body_required: declared_body.required,
+            body_fixed: declared_body.fixed,
+            guard,
         });
     }
     let mut selection = serde_json::to_vec_pretty(&OperationsFile {
