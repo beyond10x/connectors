@@ -8,7 +8,7 @@
       "Independent integrations.",
       "Shared guarantees."
     ],
-    "lede": "Connectors lets applications and agents discover and use integrations through typed, versioned contracts. Each adapter owns its provider's behaviour; a catalog provider serves ordinary HTTP APIs straight from their pinned OpenAPI documents. Credentials stay in custody, writes need an approval, and an uncertain outcome is never sent twice.",
+    "lede": "Connectors lets applications and agents discover and use integrations through typed, versioned contracts. Each connector keeps its provider's behaviour; a catalog provider serves ordinary HTTP APIs straight from their pinned OpenAPI documents. Credentials stay in custody, writes need an approval, and an uncertain outcome is never sent twice.",
     "actions": [
       {
         "label": "Get started",
@@ -24,7 +24,7 @@
         "href": "/docs/status"
       }
     ],
-    "meta": "Rust services, a local CLI and shared contracts · Linux x86_64 source release · MIT OR Apache-2.0",
+    "meta": "Rust services, a local CLI and shared contracts · Linux and macOS binaries · MIT OR Apache-2.0",
     "art": {
       "kind": "terminal",
       "session": "data/terminal.json"
@@ -40,7 +40,7 @@
       "kind": "features",
       "eyebrow": "What it does",
       "title": "One boundary between an application and every provider it calls.",
-      "lede": "A caller learns what an adapter offers from its descriptor and invokes it the same way everywhere. What a provider means stays with that provider's adapter.",
+      "lede": "A caller learns what a connector offers from its descriptor and invokes it the same way everywhere. What a provider means stays with that provider's connector.",
       "items": [
         {
           "title": "Contracts describe guarantees",
@@ -49,20 +49,20 @@
           "href": "/docs/concepts/contracts"
         },
         {
-          "title": "Adapters own their provider",
-          "description": "Kubernetes selectors, PostgreSQL query rules and Loki's LogQL stay in their adapter. Shared contracts never import a provider.",
+          "title": "Each connector keeps its provider's meaning",
+          "description": "Kubernetes selectors, PostgreSQL query rules and Loki's LogQL stay in their connector. Shared contracts never import a provider.",
           "status": "shipped",
-          "href": "/docs/concepts/adapters"
+          "href": "/docs/concepts/contracts"
         },
         {
-          "title": "HTTP APIs without adapter code",
+          "title": "HTTP APIs without code of their own",
           "description": "The catalog provider binds operations from a pinned OpenAPI document: GitLab, Jira, Confluence, HubSpot, Zendesk, Google and Runpod.",
           "status": "shipped",
           "href": "/docs/concepts/catalog-provider"
         },
         {
           "title": "Credentials in custody",
-          "description": "A saved connection keeps its credential in the Secret Service keyring. It never travels in operation input or through a federation gateway.",
+          "description": "A connection keeps its credential in the platform keyring. It never travels in operation input or through a federation gateway.",
           "status": "shipped",
           "href": "/docs/concepts/local-runtime"
         },
@@ -88,12 +88,12 @@
         {
           "label": "01",
           "title": "Describe",
-          "description": "The client reads the adapter's descriptor: operations, schemas, contract and profile, and a revision."
+          "description": "The client reads the connector's descriptor: operations, schemas, contract and profile, and a revision."
         },
         {
           "label": "02",
           "title": "Select access",
-          "description": "A connection binds a chosen target and credential. Discovering an endpoint grants nothing."
+          "description": "An instance names the endpoint, and its connection holds the credential. Discovering an endpoint grants nothing."
         },
         {
           "label": "03",

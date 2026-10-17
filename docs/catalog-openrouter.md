@@ -83,8 +83,8 @@ configuration.
 Bind the provider to the local CLI as [the catalog provider guide](local-catalog-provider.md#bind-the-provider-to-the-local-cli)
 describes, with `private_protocol = "connectors-private/2"`,
 `profiles = ["openrouter.api-key"]` and
-`operations = ["key.get", "workspaces.list", "keys.list"]`, here under the adapter
-alias `router`. Enter the management key through the protected credential prompt
+`operations = ["key.get", "workspaces.list", "keys.list"]`, here as the legacy
+`[adapters.<alias>]` entry `router`. Enter the management key through the protected credential prompt
 on your controlling terminal; it never goes in chat, an argument or the
 environment:
 
@@ -109,7 +109,7 @@ connectors --output json connections connect --adapter router --profile openrout
 ```
 
 Each read takes `--schema` and `--revision` from `operations describe`
-(`connectors --output json operations describe --adapter router --operation key.get`).
+(`operations describe --operation key.get`, with the deprecated `--adapter router` selector the run used).
 Connect evidence lasts 60 seconds; revalidate before reading after that.
 
 The management key's own record:
@@ -230,7 +230,7 @@ operator's home is shown as `~`. `secret_service_socket` and the clock sources a
 fixture's: a real install omits the socket and names real sources
 ([local clock](local-clock.md)).
 
-Print each native configuration's revision, then write both adapter entries into the
+Print each native configuration's revision, then write both legacy `[adapters.<alias>]` entries into the
 configuration `setup init` created, with the executable's SHA-256 and absolute paths:
 
 ```sh
@@ -280,7 +280,7 @@ sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
 args = ["--local-config", "/absolute/path/inference.json"]
 ```
 
-`[adapters.router.permissions.custody]` names, per operation, the alias and profile
+The legacy `[adapters.router.permissions.custody]` table names, per operation, the alias and profile
 that hold each created key (see
 [created credentials](local-mutation-ledger.md#created-credentials)). The writes need
 `private_protocol = "connectors-private/2"`, an `[approval_clock]` table and an

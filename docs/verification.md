@@ -1,6 +1,6 @@
-# Three adapters: verification record
+# Three internal adapters: verification record
 
-> The GitLab entries on this page record the native GitLab adapter, retired in
+> The GitLab entries on this page record the native internal GitLab adapter, retired in
 > 0.11.0 in favour of the catalog provider. The commands and paths they cite
 > existed at the recorded commits and are kept as history.
 
@@ -11,8 +11,8 @@ The dated acceptance records below retain their original counts and scope.
 
 Verified locally on **2026-09-08** against the executable scope in
 [the v1alpha1 contract](../contracts/service/v1alpha1/semantics.md). The three
-selected adapters are Kubernetes including discovery, GitLab, and SQL. All eight
-advertised operations ran through independent adapter processes and the generic
+selected internal adapters are Kubernetes including discovery, GitLab, and SQL. All eight
+advertised operations ran through independent internal adapter processes and the generic
 federation host. This is evidence for this first profile, not for every capability
 in the longer design.
 
@@ -22,10 +22,10 @@ in the longer design.
 |---|---|
 | `connectors-core` | Versioned invocation/description/error types, strict JSON decoding, canonical digests |
 | `connectors-contracts` | Pages, provenance, endpoint observations, relational results |
-| `connectors-sdk` | Abstract adapter, credential, secret-store and authenticated-HTTP ports; schema/cursor helpers |
+| `connectors-sdk` | Abstract internal adapter, credential, secret-store and authenticated-HTTP ports; schema/cursor helpers |
 | `connectors-client` | Provider-independent authenticated HTTP discovery/invocation |
 | `connectors-host` | Concrete credential stores, scoped HTTP, admission, logging, limits, serving and federation |
-| `connectors-spec` | Connectors-owned adapter-kind validation and deterministic descriptor compilation |
+| `connectors-spec` | Connectors-owned validation of the internal adapter kind and deterministic descriptor compilation |
 | `connectors-gitlab` | Scoped project metadata, issue pagination and repository file reads |
 | `connectors-kubernetes` | Scoped resource lists, EndpointSlice observations, optional node/host discovery |
 | `connectors-sql` | PostgreSQL schema discovery and bounded parameterized reads |
@@ -73,9 +73,9 @@ cargo build --locked -p connectors-kubernetes --lib --no-default-features
 cargo build --locked -p connectors-sql --lib --no-default-features
 ```
 
-`cargo tree --locked --edges normal --no-default-features -p <adapter>` confirmed
+`cargo tree --locked --edges normal --no-default-features -p <crate>` on each internal adapter confirmed
 the library boundaries above. `cargo tree --locked --edges normal -p connectors`
-confirmed that the generic CLI/host has no adapter dependency.
+confirmed that the generic CLI/host has no internal adapter dependency.
 
 Each compiler check exited 0 and printed the matching handler obligation count:
 
@@ -98,7 +98,7 @@ connectors v1 — 2 file(s), valid
 
 The planning store is validated with `aep plan artifact validate`; its final
 implementation/evidence state is recorded in
-[story:three-adapters-e2e](../.engineering/planning/story/three-adapters-e2e.md).
+[the story of the three internal adapters](../.engineering/planning/story/three-adapters-e2e.md).
 
 The shared sccache initially failed on a temporary-directory quota. Subsequent
 successful build/check commands used `RUSTC_WRAPPER=`,
@@ -133,14 +133,14 @@ private-token placement was exercised against HTTP fixtures, not a private live
 GitLab account. PostgreSQL TLS configuration is implemented but was not exercised
 against a TLS-enabled database in this run.
 
-The integration chain was also executed explicitly: the Kubernetes adapter returned
+The integration chain was also executed explicitly: the internal Kubernetes adapter returned
 the fixture PostgreSQL endpoint at `172.17.0.10:5432`; that observed address was
 selected into the SQL service configuration with a separately bound reader
 credential; `sql__query.read` then returned the fixture rows through the gateway.
 No discovery result created a credential or connection by itself.
 
 The final runner checked a five-million-byte SQL value and received `capacity`.
-The adapter bounds a row in PostgreSQL before transport, fetches the portal one row
+The internal SQL adapter bounds a row in PostgreSQL before transport, fetches the portal one row
 at a time, and bounds the accumulated JSON result. `pg_sleep(30)` returned `timeout`
 at the database's ten-second statement deadline on both routes. A first expanded
 run exposed a wrong boolean assertion in the test (`t` versus PostgreSQL's
@@ -178,7 +178,7 @@ database administrator's trust boundary. The limit does not eliminate query cost
 or turn arbitrary privileged functions into safe reads.
 
 There is no production tenant control plane, OAuth installation/refresh service,
-durable delivery/cache, media/session adapter, OpenAPI-to-executable ESS lowering,
+durable delivery/cache, internal media/session adapter, OpenAPI-to-executable ESS lowering,
 OCI image synthesis, or registry deployment in this slice. The Connectors custom
 spec kind and descriptor compiler are implemented; ESS validates the separate
 declaration model. Unsettled multi-tenant assignment cardinality stays explicitly
@@ -190,7 +190,7 @@ Connectors checkout were not integrated or changed by this implementation.
 The follow-up story is `story:gitlab-spec-service`. Local commit
 `75f1c7275d7b227d5a2e4a3e95bfc5c9b2de262a` preserves the previous workspace before
 this implementation. The generation and packaging guide, retired with the native
-adapter in 0.11.0, explained reproduction; [the evidence directory](evidence/gitlab-spec-service-2026-09-08/)
+internal adapter in 0.11.0, explained reproduction; [the evidence directory](evidence/gitlab-spec-service-2026-09-08/)
 contains the exact build, source, test, runtime and shutdown observations.
 
 Observed verification:
@@ -203,8 +203,8 @@ Observed verification:
 - `cargo build --workspace --locked --offline`: exit 0. Ordinary source builds
   consume checked-in generated Rust; no ESS invocation or source refresh occurs.
 - Each of GitLab, Kubernetes and SQL built with `--lib --no-default-features`.
-  Normal dependency trees exclude host/client/sibling adapters from those
-  libraries and exclude all adapter implementations from the generic CLI.
+  Normal dependency trees exclude host/client/sibling internal adapters from those
+  libraries and exclude all internal adapter implementations from the generic CLI.
 - `connectors-build check`, repository ESS validation, generated ESS validation/
   compilation/synthesis, ESS build compilation, BuildKit projection, Docker image
   build and exact-image realization validation/compilation passed.
@@ -217,7 +217,7 @@ Observed verification:
   a read-only root filesystem, and separate read-only `/config` and `/secrets`
   mounts. The configured upstream was public GitLab over verified HTTPS.
 - SIGTERM produced exit 0 for the GitLab container and all three host processes
-  (gateway, Kubernetes adapter, SQL adapter). All three owned containers were
+  (gateway, internal Kubernetes and SQL adapters). All three owned containers were
   removed. The PostgreSQL fixture exited 0; the k3s fixture exited 2 on Docker stop
   after acceptance had passed. `shutdown.json` preserves this distinction.
 
@@ -299,7 +299,7 @@ acceptance. [Release metadata](evidence/ess-toolchain-2026-09-08/release.json)
 records the exact tag commit, platform archive checksum and executable hashes.
 The verified release is at `.local/toolchains/ess/0.20.0/bin/ess`; both global
 installations remain unchanged. The generation guide (retired with the native
-adapter in 0.11.0) reviewed the two changed bundle files and the preserved
+internal adapter in 0.11.0) reviewed the two changed bundle files and the preserved
 vendor-import refusal.
 
 All of these commands exited 0 with `TMPDIR="$PWD/.local/tmp"`,
@@ -316,7 +316,7 @@ cargo run --locked -p connectors-build -- package --output .local/gitlab-package
 The [full gate](evidence/ess-toolchain-2026-09-08/gate-020.log) reports 39 passing
 tests (including generation 5/5, GitLab obligations 4/4 and the compile-fail test),
 zero failures/ignored tests, formatting, Clippy with warnings denied, offline
-builds, adapter/CLI dependency boundaries, Rust 1.88 all-target checks, and ESS/AEP
+builds, internal adapter/CLI dependency boundaries, Rust 1.88 all-target checks, and ESS/AEP
 validation. The explicit [drift check](evidence/ess-toolchain-2026-09-08/drift-020.log)
 passes. The [package run](evidence/ess-toolchain-2026-09-08/package-020.log)
 validates and compiles the physical realization and projects the compiler's

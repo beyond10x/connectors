@@ -16,8 +16,8 @@ Describe stays on `GET /v1/describe`, and the request carries that descriptor's 
 ## What the binding adds
 
 - **An audit anchor before dispatch.** Every admitted invocation is recorded in the host's
-  execution audit before the adapter is called, and the answer carries `audit_ref` and
-  `audit_status`. An anchor that cannot be written refuses the call before any adapter work.
+  execution audit before the connector is called, and the answer carries `audit_ref` and
+  `audit_status`. An anchor that cannot be written refuses the call before any connector work.
 - **The attempt a write produced.** An operation that writes gets an attempt record before its
   one dispatch, and the answer's `mutation` names it: `attempt: {instance, id}`, the
   `original_request_id`, `replayed: false` and the `classification` (`applied` on success).

@@ -310,7 +310,7 @@ fn catalog_cli_explicit_revalidation_after_real_expiry_without_reentry() {
     refusal(cli.run(&revalidate), "service_failure");
     assert_eq!(
         success(cli.run(&status))["connection"]["summary"]["state"],
-        "reauthorization_required"
+        "stale"
     );
     cli.shutdown();
     let before = provider.count();

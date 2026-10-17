@@ -1,0 +1,43 @@
+# Ledger expectations only: a legacy `[adapters.<alias>]` entry names no
+# connector, name or endpoint (decision 8), and is recorded although the owner
+# reads no connector default endpoint for it. Guards endpoint-required's
+# defined(connector_id) conjunct, which no other authored scenario reaches.
+type: ess-scenario/1
+domain: connectors.declarations
+scenario: legacy-instance-without-connector-needs-no-endpoint
+summary: 'A legacy instance with no connector, name or endpoint is recorded; endpoint-required applies only to an instance that names its connector.'
+timeline:
+- at: '2026-10-16T15:00:00Z'
+  command: connectors.declarations.RecordServiceConfiguration
+  input:
+    instance_id: legacy-alias
+    adapter_id: catalog
+    revision: r1
+    registry_epoch: 1
+  outcome: recorded
+  events:
+  - event: connectors.declarations.ServiceConfigurationRecorded
+    payload:
+      instance_id: legacy-alias
+- at: '2026-10-16T15:00:01Z'
+  command: connectors.declarations.RecordServiceConfiguration
+  input:
+    instance_id: mcp.local
+    adapter_id: mcp
+    revision: r1
+    registry_epoch: 1
+    connector_id: mcp
+    name: local
+  outcome: endpoint-required
+  error:
+    name: connectors.declarations.EndpointRequired
+  no_events:
+  - connectors.declarations.ServiceConfigurationRecorded
+assert:
+- view: connectors.declarations.ServiceConfigurations
+  contains:
+    instance_id: legacy-alias
+    adapter_id: catalog
+- view: connectors.declarations.ServiceConfigurations
+  excludes:
+    instance_id: mcp.local

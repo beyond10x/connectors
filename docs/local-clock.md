@@ -1,9 +1,11 @@
 # Check the local approval clock
 
-`connectors approvals clock-check --adapter forge` checks the explicitly configured
+`connectors approvals clock-check --connector gitlab --instance forge` checks the explicitly configured
 authenticated time sources. It returns a bounded UTC observation without starting
-the owner or adapter, reading credentials or writing metadata. Approval issuance
+the owner or the instance's process, reading credentials or writing metadata. Approval issuance
 and business writes still require their own admission and dispatch integration.
+
+Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
 
 The operator must trust the selected sources' UTC/radius assertions, that they are
 run by independent operators, and establish a local monotonic timer frequency
@@ -68,10 +70,10 @@ eight seconds, so int08h's 10-second interval still counts and the pair's answer
 about six seconds wide.
 
 ```sh
-connectors approvals clock-check --adapter forge --output json
+connectors approvals clock-check --connector gitlab --instance forge --output json
 ```
 
-Success contains `adapter` and `observation`, whose fields are
+Success contains `connector`, `instance`, the deprecated alias `adapter` and `observation`, whose fields are
 `configuration_sha256`, `lower_unix_ms`, `upper_unix_ms` and `sources`. Width is at
 most eight seconds. `sources` has one line per configured source, in configuration
 order: its `index`, `address`, `result` (`agreed` when its interval meets the answer,

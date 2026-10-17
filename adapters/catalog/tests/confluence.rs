@@ -270,16 +270,20 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
     }
 }
 
-/// The `auth` object of the guide's configuration example for `provider`.
-fn documented_auth(guide: &str, provider: &str) -> Value {
-    let guide = fs::read_to_string(root().join("../../docs").join(guide)).unwrap();
-    let example = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| body.contains(&format!("\"provider\": \"{provider}\"")))
-        .unwrap_or_else(|| panic!("the documented {provider} configuration"));
-    serde_json::from_str::<Value>(example).unwrap()["auth"].clone()
+/// The `auth` profile the connector `provider` declares
+/// (`providers/<provider>/connector.json`), which the guide's instance uses.
+fn documented_auth(provider: &str) -> Value {
+    let declaration: Value = serde_json::from_slice(
+        &fs::read(
+            root()
+                .join("providers")
+                .join(provider)
+                .join("connector.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    declaration["profiles"][0].clone()
 }
 
 /// Jira and Confluence use one profile: the same id, scheme, labels and
@@ -288,8 +292,8 @@ fn documented_auth(guide: &str, provider: &str) -> Value {
 /// also declares a v2 page read as its access probe.
 #[test]
 fn confluence_and_jira_document_one_profile() {
-    let confluence = documented_auth("catalog-confluence.md", "confluence");
-    let jira = documented_auth("catalog-jira.md", "jira");
+    let confluence = documented_auth("confluence");
+    let jira = documented_auth("jira");
     assert_eq!(confluence["profile"], PROFILE);
     assert_eq!(confluence["scheme"], "basic");
     assert_eq!(confluence["identity"]["kind"], "atlassian.account");
@@ -520,7 +524,7 @@ impl Provider {
                 "bundle_directory": root_path("generated/bundles"),
                 "api_base": format!("https://localhost:{}/wiki", address.port()),
                 "ca_file": ca,
-                "auth": documented_auth("catalog-confluence.md", "confluence"),
+                "auth": documented_auth("confluence"),
                 "operations_file": root_path("providers/confluence/operations.json"),
             }))
             .unwrap(),

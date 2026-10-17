@@ -1,12 +1,14 @@
 # Prometheus through the local CLI
 
-The `prometheus` adapter answers three PromQL reads, each one GET against Prometheus's HTTP
+The `prometheus` connector answers three PromQL reads, each one GET against Prometheus's HTTP
 API: `series.query` (an instant query), `series.query_range` (a range query at an explicit
 step) and `rules.list` (the alerting and recording rules, with each alerting rule's state).
 The mapping, bounds and errors are in [the Prometheus profile](contracts/series/v1alpha1/semantics.md)
 §§3–5 and 11; the connection is §11.4 and the Grafana placement §11.5. It requires Linux
 x86_64 and the [qualified Secret Service binding](../../docs/local-secret-service.md), like
 every saved credential.
+
+Connector, instance and connection are the terms of the [vocabulary](../../README.md#vocabulary).
 
 ```sh
 CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-prometheus
@@ -41,23 +43,30 @@ target/release/connectors-prometheus --local-config /absolute/path/prometheus.js
 sha256sum target/release/connectors-prometheus
 ```
 
-Copy `configuration_revision` from that output verbatim, then add an adapter entry to the
-configuration created by setup:
+Copy `configuration_revision` from that output verbatim. Prometheus is not a catalog connector, so
+the configuration pins its instance. Add the instance to the configuration created by setup:
+change its `format` line to `format = "connectors-local/5"`, which instances need, and add the
+instance `metrics` of the connector `prometheus`:
 
 ```toml
-[adapters.metrics]
+[connectors.prometheus]
+enabled = true
+
+[connectors.prometheus.instances.metrics]
+alias = "metrics"
 instance_id = "prometheus-prod"
 adapter_id = "prometheus"
 configuration_revision = "REPLACE_FROM_BOOTSTRAP"
 protocol = "v1alpha1"
+private_protocol = "connectors-private/1"
 startup = "on-demand"
 restart = "never"
 
-[adapters.metrics.permissions]
+[connectors.prometheus.instances.metrics.permissions]
 profiles = ["prometheus.bearer"]
 operations = ["series.query", "series.query_range", "rules.list"]
 
-[adapters.metrics.executable]
+[connectors.prometheus.instances.metrics.executable]
 path = "/absolute/path/target/release/connectors-prometheus"
 sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
 args = ["--local-config", "/absolute/path/prometheus.json"]
@@ -66,11 +75,11 @@ args = ["--local-config", "/absolute/path/prometheus.json"]
 ## Connect and read
 
 ```sh
-target/release/connectors --output json connections connect --adapter metrics --profile prometheus.bearer --credential-prompt
-target/release/connectors --output json operations describe --adapter metrics --operation series.query
-target/release/connectors --output json operations invoke --adapter metrics --connection CONNECTION --operation series.query --schema SCHEMA --revision REVISION --input-json '{"query":"up{job=\"api\"}"}'
-target/release/connectors --output json operations invoke --adapter metrics --connection CONNECTION --operation series.query_range --schema SCHEMA --revision REVISION --input-json '{"query":"sum by (status) (rate(http_requests_total[5m]))","start_unix_s":1788822000,"end_unix_s":1788825600,"step_s":60}'
-target/release/connectors --output json operations invoke --adapter metrics --connection CONNECTION --operation rules.list --schema SCHEMA --revision REVISION --input-json '{"kind":"alerting"}'
+target/release/connectors --output json connections connect --connector prometheus --instance metrics --profile prometheus.bearer --credential-prompt
+target/release/connectors --output json operations describe --connector prometheus --instance metrics --operation series.query
+target/release/connectors --output json operations invoke --connector prometheus --instance metrics --connection CONNECTION --operation series.query --schema SCHEMA --revision REVISION --input-json '{"query":"up{job=\"api\"}"}'
+target/release/connectors --output json operations invoke --connector prometheus --instance metrics --connection CONNECTION --operation series.query_range --schema SCHEMA --revision REVISION --input-json '{"query":"sum by (status) (rate(http_requests_total[5m]))","start_unix_s":1788822000,"end_unix_s":1788825600,"step_s":60}'
+target/release/connectors --output json operations invoke --connector prometheus --instance metrics --connection CONNECTION --operation rules.list --schema SCHEMA --revision REVISION --input-json '{"kind":"alerting"}'
 ```
 
 Each operation has its own schema and revision from `operations describe`. An omitted
@@ -81,8 +90,7 @@ result partial (`complete: false`) and is returned in `warnings`.
 
 ## What the connection is bound to
 
-**The identity is the configured connection, not a Prometheus account.** Connect, repair and
-`connections revalidate` prove the token with `GET api/v1/status/buildinfo`, which runs no
+**The identity is the configured connection, not a Prometheus account.** Connect, reconnect and`connections revalidate` prove the token with `GET api/v1/status/buildinfo`, which runs no
 query: a `200` admits it, a `401` or `403` refuses it. The identity kind is
 `prometheus.connection` and its subject is the configuration's `instance`. Use one `instance`
 per deployment and tenant.
@@ -108,7 +116,7 @@ that path and connect with the Grafana token as the `prometheus.bearer` token.
 }
 ```
 
-The uid is the `uid` member of the [Grafana adapter's](../grafana/README.md) `datasources.list`
+The uid is the `uid` member of the [Grafana connector's](../grafana/README.md) `datasources.list`
 record whose `type` is `prometheus` and `access` is `proxy`. The probe and every read then go
 to `<base_url>api/v1/...` with `Authorization: Bearer <Grafana token>`
 (`tests/local_runtime.rs`,
@@ -124,6 +132,6 @@ probe. A scheduled caller revalidates before reading.
 
 ## Replacing the executable
 
-The entry pins the executable's SHA-256. After rebuilding `connectors-prometheus`, update
-`sha256`, stop the running incarnation (`adapters stop`), then `connections revalidate` or
-repair the connection, which performs the admitted launch under the same connection id.
+The instance pins the executable's SHA-256. After rebuilding `connectors-prometheus`, update
+`sha256`, stop the running incarnation (`instances stop`), then `connections revalidate` or
+reconnect the connection, which performs the admitted launch under the same connection id.

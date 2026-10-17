@@ -1,24 +1,24 @@
 ---
-title: Federate adapter services
+title: Federate services
 sidebar_position: 1
-description: Put one federation host in front of an adapter service and invoke its operations through it.
+description: Put one federation host in front of a connector's standalone service and invoke its operations through it.
 lede: A federation host is one more service with its own credential; it prefixes each downstream operation and never holds a provider credential.
 source: crates/connectors-host/src/federation.rs, crates/connectors-host/tests/service.rs, examples/federation.yaml
 ---
 
-# Federate adapter services
+# Federate services
 
 `connectors serve` runs a federation host: one endpoint whose descriptor is the union of its
 downstream services' operations, each prefixed with the downstream's name. Callers authenticate
 to the host with the host's credential; the host authenticates to each downstream with a
 separate credential configured for it. It does one hop and never retries a provider request.
 
-This guide continues from [Getting started](../getting-started.md): the Kubernetes adapter is
+This guide continues from [Getting started](../getting-started.md): the Kubernetes service is
 running on `127.0.0.1:17102` from `target/try`, with its caller credential in `service.secret`.
 
 ## Configure the host
 
-Save this as `federation.yaml` in the same directory. `downstreams` lists each adapter service
+Save this as `federation.yaml` in the same directory. `downstreams` lists each service
 with the credential the host presents to it; `allow_plaintext` admits loopback HTTP explicitly.
 
 ```yaml title="federation.yaml"
@@ -45,15 +45,17 @@ head -c 32 /dev/urandom | base64 > gateway.secret && chmod 600 gateway.secret
 ```sh
 ../debug/connectors describe --endpoint http://127.0.0.1:17100/ \
   --allow-plaintext --token-file gateway.secret \
-  | jq '{instance, adapter, operations: [.operations[].id]}'
+  | jq '{instance, operations: [.operations[].id]}'
 ```
 
 ```json
 {
   "instance": "engineering-gateway",
-  "adapter": "federation",
   "operations": [
     "kubernetes__resources.list",
+    "kubernetes__resources.get",
+    "kubernetes__namespaces.list",
+    "kubernetes__deployments.history",
     "kubernetes__endpoints.discover"
   ]
 }
@@ -74,8 +76,8 @@ not interpret provider data.
 {"code":"unavailable","message":"dependency unavailable"}
 ```
 
-The adapter answered as it did when called directly, and the host passed its refusal on once
-without retrying it. The adapter's own caller credential does not open the host:
+The Kubernetes service answered as it did when called directly, and the host passed its refusal on once
+without retrying it. The service's own caller credential does not open the host:
 
 ```sh
 ../debug/connectors invoke --endpoint http://127.0.0.1:17100/ \
@@ -89,7 +91,7 @@ without retrying it. The adapter's own caller credential does not open the host:
 
 ## What the host does not do
 
-- It holds no provider credential. The Kubernetes token stays in the adapter's configuration.
+- It holds no provider credential. The Kubernetes token stays in the Kubernetes service's configuration.
 - It forwards one hop and never retries a provider request.
 - Its downstream clients use the built-in public roots and have no private-CA setting; a
   downstream other than loopback HTTP needs a TLS endpoint with a public certificate.

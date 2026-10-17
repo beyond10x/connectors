@@ -10,6 +10,8 @@
 //! a 5xx, a terminate answered 204, 200 and 404. No live Runpod account, no
 //! network, and the key is fictional.
 #![cfg(unix)]
+mod hand_written;
+
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{
@@ -259,17 +261,11 @@ fn the_pinned_source_is_the_one_the_bundle_and_its_record_name() {
     assert!(readme.contains(URL), "README does not name the source URL");
 }
 
-/// The configuration example in the Runpod guide, so the fixture runs the
-/// profile the guide tells a reader to write.
+/// The configuration the Runpod guide showed before connectors were declared
+/// (`hand_written`), whose profile the `runpod` connector declares field for
+/// field (`connector_declarations.rs`).
 fn documented_config() -> Value {
-    let guide = fs::read_to_string(root().join("../../docs/catalog-runpod.md")).unwrap();
-    let example = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| body.contains("\"provider\": \"runpod\""))
-        .expect("the documented Runpod configuration");
-    serde_json::from_str(example).unwrap()
+    serde_json::from_str(&hand_written::blocks("catalog-runpod.md")[0]).unwrap()
 }
 
 /// A bearer API key, and an identity that is the configured connection: the

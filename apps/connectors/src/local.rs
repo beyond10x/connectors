@@ -15,12 +15,45 @@ mod approvals;
 mod checkpoints;
 mod connections;
 mod cursor;
+mod migrate;
 mod operations;
 mod owner_stop;
+mod select;
 mod session;
 
 pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
-    let root_help = is_root_help(&args);
+    let args = migrate::shorthand(args);
+    // Help is no envelope and runs no command: it says nothing more on standard
+    // error, under a deprecated name too; the help itself marks that name.
+    if let Some(help) = connectors::help::render(&args) {
+        return help_output(help, is_root_help(&args));
+    }
+    let deprecations = select::deprecations(&args);
+    let json = select::json_output(&args);
+    let mut output = run_selected(args);
+    if !deprecations.is_empty() {
+        select::deprecate(&mut output, json, &deprecations);
+    }
+    output
+}
+
+/// The help `connectors::help` rendered; root help is followed by the explicit
+/// service commands, which the generated tree does not carry.
+fn help_output(mut stdout: String, root: bool) -> connectors_cli_contract::ProcessOutput {
+    if root {
+        stdout.push_str("\nExplicit service commands (use COMMAND --help for options):\n");
+        for (name, summary) in connectors::compat::SUMMARIES {
+            stdout.push_str(&format!("  {name:<8}  {summary}\n"));
+        }
+    }
+    connectors_cli_contract::ProcessOutput {
+        exit_code: 0,
+        stdout,
+        stderr: String::new(),
+    }
+}
+
+fn run_selected(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     let session = session::Session::new(&args);
     if let Some(output) = configuration_preflight(&session.borrow()) {
         return output;
@@ -40,14 +73,6 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
             stdout: String::new(),
             stderr: String::new(),
         };
-    }
-    if root_help && output.exit_code == 0 {
-        output
-            .stdout
-            .push_str("\nExplicit service commands (use COMMAND --help for options):\n");
-        for (name, summary) in connectors::compat::SUMMARIES {
-            output.stdout.push_str(&format!("  {name:<8}  {summary}\n"));
-        }
     }
     output
 }
@@ -72,8 +97,38 @@ fn is_root_help(args: &[OsString]) -> bool {
 
 struct LocalHandler(session::Shared);
 impl Handler for LocalHandler {
+    /// Every handler reads the selected alias in `adapter`, whichever selector
+    /// named it; a result names its connector and instance beside it.
     fn call(&mut self, call: &Invocation<'_>) -> HandlerReply {
-        let result = if matches!(call.callable, "connections-connect" | "connections-repair") {
+        let (mut input, config) = match select::resolve(call) {
+            Ok(resolved) => resolved,
+            Err(refusal) => return refusal,
+        };
+        if let Err(refusal) = connections::select(call, &mut input) {
+            return refusal;
+        }
+        let call = &Invocation {
+            callable: call.callable,
+            target: call.target,
+            context: call.context.clone(),
+            input,
+        };
+        match self.dispatch(call) {
+            HandlerReply::Success(mut result) => {
+                select::name(call, &mut result, config);
+                HandlerReply::Success(result)
+            }
+            reply => reply,
+        }
+    }
+}
+
+impl LocalHandler {
+    fn dispatch(&mut self, call: &Invocation<'_>) -> HandlerReply {
+        let result = if matches!(
+            call.callable,
+            "connections-connect" | "connections-reconnect"
+        ) {
             let mut session = self.0.borrow_mut();
             if call
                 .input
@@ -84,7 +139,7 @@ impl Handler for LocalHandler {
             } else {
                 session.complete(call)
             }
-            .map_err(owner_failure)
+            .map_err(|error| connect_failure(call.callable, error))
         } else if matches!(
             call.callable,
             "approval-policy-status"
@@ -142,6 +197,25 @@ fn invoke_failure(error: owner::Error) -> HandlerReply {
         && data["stage"] == "dispatch"
     {
         data["next_action"] = json!("repair_connection");
+    }
+    reply
+}
+
+/// `connections connect` and `reconnect` as `owner_failure` reports them, with
+/// one rule of their own (story:connect-refused-while-instance-holds-connection):
+/// a reconnect that validated another account's credential is
+/// `identity_mismatch` naming `revoke_connection`. Another account is another
+/// connection, which the instance holds only once its own is revoked, or a
+/// connection of another instance; reconnect again never gets there, and
+/// connect is refused naming that reconnect.
+fn connect_failure(callable: &str, error: owner::Error) -> HandlerReply {
+    let other_account =
+        callable == "connections-reconnect" && error.code == owner::Code::IdentityMismatch;
+    let mut reply = owner_failure(error);
+    if other_account
+        && let HandlerReply::Error { data, .. } | HandlerReply::UsageError { data, .. } = &mut reply
+    {
+        data["next_action"] = json!("revoke_connection");
     }
     reply
 }
@@ -204,6 +278,10 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
     // under this instance id helps, a new instance id does.
     let action = if error.reconfigure {
         "check_configuration"
+    } else if error.revoke {
+        "revoke_connection"
+    } else if error.held {
+        "repair_connection"
     } else if error.reconnect {
         "create_connection"
     } else if error.revalidate {
@@ -416,6 +494,9 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
     }
     if call.callable == "setup-owner-stop" {
         return owner_stop::execute(&paths);
+    }
+    if call.callable == "setup-migrate" {
+        return migrate::execute(call, &paths);
     }
     if call.callable == "setup-init" {
         let initialized = Config::initialize(&paths).map_err(host_failure)?;
@@ -914,6 +995,121 @@ mod tests {
             serde_json::from_value(serde_json::to_value(&keys).unwrap()).unwrap();
         for error in [keys, received] {
             assert_eq!(reply(owner_failure(error)), conflict("create_connection"));
+        }
+    }
+
+    /// story:connect-refused-while-instance-holds-connection: a connect refused
+    /// beside another connect in flight names `retry_status` and that
+    /// connect's acquisition, which `connections status --acquisition`
+    /// follows, also across the transport.
+    #[test]
+    fn a_connect_beside_one_in_flight_names_its_acquisition() {
+        use connectors_host::local::registry;
+        let mut error = owner::Error::from(registry::Failure::Conflict);
+        error.acquisition = Some("acq-in-flight".into());
+        let received: owner::Error =
+            serde_json::from_value(serde_json::to_value(&error).unwrap()).unwrap();
+        for error in [error, received] {
+            let HandlerReply::Error { data, .. } = connect_failure("connections-connect", error)
+            else {
+                panic!("not an operational failure");
+            };
+            assert_eq!(
+                (
+                    &data["code"],
+                    &data["stage"],
+                    &data["next_action"],
+                    &data["acquisition"]
+                ),
+                (
+                    &json!("lifecycle_conflict"),
+                    &json!("admission"),
+                    &json!("retry_status"),
+                    &json!("acq-in-flight")
+                ),
+                "{data}"
+            );
+        }
+    }
+
+    /// story:connect-refused-while-instance-holds-connection: a reconnect that
+    /// validated another account's credential names `revoke_connection`,
+    /// whether the registry or the adapter answered the other identity and as
+    /// the CLI receives it across the transport, so connect (refused naming
+    /// the reconnect) and reconnect never send each other round. A connect
+    /// and every other refusal of a reconnect keep `owner_failure`'s action.
+    #[test]
+    fn a_reconnect_to_another_account_names_revocation() {
+        use connectors_host::local::{registry, runtime};
+        let mismatch = (
+            json!("identity_mismatch"),
+            json!("admission"),
+            json!("revoke_connection"),
+        );
+        for error in [
+            owner::Error::from(registry::Failure::IdentityMismatch),
+            owner::Error::from(runtime::Failure::IdentityMismatch),
+        ] {
+            let received: owner::Error =
+                serde_json::from_value(serde_json::to_value(&error).unwrap()).unwrap();
+            for error in [error, received] {
+                assert_eq!(
+                    reply(connect_failure("connections-reconnect", error.clone())),
+                    mismatch
+                );
+                assert_eq!(
+                    reply(connect_failure("connections-connect", error.clone())),
+                    reply(owner_failure(error))
+                );
+            }
+        }
+        for failure in [
+            registry::Failure::Conflict,
+            registry::Failure::BindingChanged,
+            registry::Failure::Revoked,
+        ] {
+            let error = owner::Error::from(failure);
+            assert_eq!(
+                reply(connect_failure("connections-reconnect", error.clone())),
+                reply(owner_failure(error)),
+                "{failure:?}"
+            );
+        }
+    }
+
+    /// story:connect-refused-while-instance-holds-connection: a connect on an
+    /// instance that holds a published Live or Stale connection is
+    /// `lifecycle_conflict` at admission naming the step that clears it,
+    /// `connections reconnect` when it replaces that connection's credential
+    /// and `connections revoke` when no reconnect can, as the owner reports it
+    /// and as the CLI receives it across the transport.
+    #[test]
+    fn a_connect_on_an_instance_holding_its_connection_names_reconnect_or_revoke() {
+        use connectors_host::local::registry;
+        for (failure, action) in [
+            (registry::Failure::InstanceConnected, "repair_connection"),
+            (
+                registry::Failure::InstanceConnectionChanged,
+                "revoke_connection",
+            ),
+        ] {
+            let expected = (
+                json!("lifecycle_conflict"),
+                json!("admission"),
+                json!(action),
+            );
+            let error = owner::Error::from(failure);
+            assert_eq!(error.code, owner::Code::LifecycleConflict, "{failure:?}");
+            let received: owner::Error =
+                serde_json::from_value(serde_json::to_value(&error).unwrap()).unwrap();
+            for error in [error, received] {
+                assert_eq!(reply(owner_failure(error)), expected, "{failure:?}");
+            }
+            assert_eq!(
+                reply(connections::registry_failure(failure)),
+                expected,
+                "{failure:?}"
+            );
         }
     }
 }
