@@ -2,9 +2,11 @@
 format: aep.planning-md/3
 id: architecture-decision-record:credential-less-public-reads
 kind: architecture-decision-record
-status: proposed
+status: accepted
 title: A credential-less profile admitted only for operations a catalog declares public and read-only
-revision: 1
+revision: 3
+transitions:
+- {from: "proposed", to: "accepted", at: "2026-10-17T10:25:44Z", actor: "human:timo", revision: 3}
 ---
 ## Context
 
@@ -31,4 +33,4 @@ A consumer asks to read public GitHub repository metadata without a token. The h
 
 ## Status
 
-Proposed. The operator decides it before any implementing wave.
+Accepted by the operator on 2026-10-17. Implemented as one wave after story:catalog-github-reads and before story:catalog-zendesk-ticket-writes; story:catalog-github-anonymous-reads carries it.
