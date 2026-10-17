@@ -276,7 +276,7 @@ fn insert_profile(text: &str, profile: &str) -> String {
 #[test]
 fn an_unknown_field_is_refused() {
     for text in [
-        jira_text().replace("operations:\n", "datasources: {}\noperations:\n"),
+        jira_text().replace("operations:\n", "views: {}\noperations:\n"),
         jira_text().replace("{op: getIssue}", "{op: getIssue, retry: {}}"),
         jira_text().replace("{scheme: basic,", "{scheme: basic, token: x,"),
         jira_text().replace("{type: string}", "{type: string, secret: true}"),
@@ -499,6 +499,24 @@ fn every_refusal_has_a_distinct_name() {
             key: String::new(),
             field: String::new(),
             spec: String::new(),
+        }
+        .name(),
+        Refusal::UnknownDatasourceOperation {
+            datasource: String::new(),
+            key: String::new(),
+        }
+        .name(),
+        Refusal::DatasourceOperation {
+            datasource: String::new(),
+            key: String::new(),
+            detail: String::new(),
+        }
+        .name(),
+        Refusal::FeedCount(0).name(),
+        Refusal::FilterParameter {
+            datasource: String::new(),
+            filter: String::new(),
+            parameter: String::new(),
         }
         .name(),
         Refusal::Pipeline(String::new()).name(),

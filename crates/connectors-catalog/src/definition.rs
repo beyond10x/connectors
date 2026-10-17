@@ -189,6 +189,94 @@ pub struct Guard {
     pub after: GuardAfter,
 }
 
+/// `connectors_definitions.definition.DatasourceKind`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DatasourceKind {
+    Feed,
+}
+
+/// `connectors_definitions.definition.FeedCursor`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FeedCursor {
+    pub parameter: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last: Option<String>,
+}
+
+/// `connectors_definitions.definition.FeedContainers`: `list` and `lookup`
+/// are operation keys of the definition.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FeedContainers {
+    pub list: String,
+    pub lookup: String,
+    pub query: Option<BTreeMap<String, String>>,
+    pub cursor: FeedCursor,
+    pub records: Option<String>,
+    pub id: String,
+    pub name: Option<String>,
+    pub kind_word: Option<String>,
+}
+
+/// `connectors_definitions.definition.FeedPosition`: the query parameter that
+/// takes "changed since" as a time.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FeedPosition {
+    pub time: String,
+}
+
+/// `connectors_definitions.definition.FeedAuthor`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FeedAuthor {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+}
+
+/// `connectors_definitions.definition.FeedBody`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FeedBody {
+    pub pointer: String,
+    pub representation: String,
+}
+
+/// `connectors_definitions.definition.FeedItems`: `list` is an operation key.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FeedItems {
+    pub list: String,
+    pub query: Option<BTreeMap<String, String>>,
+    pub position: FeedPosition,
+    pub records: Option<String>,
+    pub id: String,
+    pub revision: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub author: Option<FeedAuthor>,
+    pub body: FeedBody,
+}
+
+/// `connectors_definitions.definition.Datasource`. `filters` name preset item
+/// queries, such as "mine and open"; each key is a query parameter of
+/// `items.list`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Datasource {
+    pub kind: DatasourceKind,
+    pub profile: String,
+    pub capabilities: BTreeMap<String, String>,
+    pub containers: FeedContainers,
+    pub items: FeedItems,
+    pub filters: Option<BTreeMap<String, BTreeMap<String, String>>>,
+}
+
 /// `connectors_definitions.definition.Operation`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -217,6 +305,7 @@ pub struct ProviderDefinition {
     pub auth: BTreeMap<String, Auth>,
     pub paging: Option<BTreeMap<String, PagingStyle>>,
     pub operations: BTreeMap<String, Operation>,
+    pub datasources: Option<BTreeMap<String, Datasource>>,
 }
 
 /// Why a definition was not lowered. Each case is distinct, and [`Refusal::name`]
@@ -283,6 +372,23 @@ pub enum Refusal {
         field: String,
         spec: String,
     },
+    /// A datasource names an operation key the definition does not declare.
+    UnknownDatasourceOperation { datasource: String, key: String },
+    /// A datasource operation lacks what the feed derives from it: a single
+    /// path parameter, or a paging style with `limit` and `max`.
+    DatasourceOperation {
+        datasource: String,
+        key: String,
+        detail: String,
+    },
+    /// More feed datasources than the catalog provider's selection carries (one).
+    FeedCount(usize),
+    /// A filter sets a parameter `items.list` does not take as a query parameter.
+    FilterParameter {
+        datasource: String,
+        filter: String,
+        parameter: String,
+    },
     /// The catalog pipeline refused the source; the message names its step.
     Pipeline(String),
     /// The output directory, the selection or the scratch copy cannot be written.
@@ -313,6 +419,10 @@ impl Refusal {
             Self::UnknownGuardRead { .. } => "unknown_guard_read",
             Self::GuardParameter { .. } => "guard_parameter",
             Self::BodyType { .. } => "body_type",
+            Self::UnknownDatasourceOperation { .. } => "unknown_datasource_operation",
+            Self::DatasourceOperation { .. } => "datasource_operation",
+            Self::FeedCount(_) => "feed_count",
+            Self::FilterParameter { .. } => "filter_parameter",
             Self::Pipeline(_) => "pipeline",
             Self::Write(_) => "write",
         }
@@ -389,6 +499,30 @@ impl std::fmt::Display for Refusal {
             Self::BodyType { key, field, spec } => write!(
                 f,
                 "{name}: operation `{key}` body `{field}` is `{spec}`; expected string, integer, boolean or any, optionally with `!`, or `=<value>`"
+            ),
+            Self::UnknownDatasourceOperation { datasource, key } => write!(
+                f,
+                "{name}: datasource `{datasource}` names operation `{key}`, which operations does not declare"
+            ),
+            Self::DatasourceOperation {
+                datasource,
+                key,
+                detail,
+            } => write!(
+                f,
+                "{name}: datasource `{datasource}` operation `{key}`: {detail}"
+            ),
+            Self::FeedCount(count) => write!(
+                f,
+                "{name}: {count} feed datasources; the catalog provider's selection carries one"
+            ),
+            Self::FilterParameter {
+                datasource,
+                filter,
+                parameter,
+            } => write!(
+                f,
+                "{name}: datasource `{datasource}` filter `{filter}` sets `{parameter}`, which items.list does not take"
             ),
         }
     }
@@ -611,6 +745,8 @@ struct OperationsFile<'a> {
     format: &'a str,
     provider: &'a str,
     operations: Vec<SelectionEntry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    feed: Option<Value>,
 }
 
 /// The `{name}` variables of a URL template, in order.
@@ -842,6 +978,170 @@ fn auth_block(id: &str, profile: &Auth) -> Result<Value, Refusal> {
     Ok(block)
 }
 
+/// The source operation an operation key names, with its query parameters.
+fn keyed<'a>(
+    definition: &'a ProviderDefinition,
+    inventory: &'a crate::inventory::Inventory,
+    datasource: &str,
+    key: &str,
+) -> Result<(&'a Operation, &'a crate::inventory::Operation, Vec<&'a str>), Refusal> {
+    let unknown = || Refusal::UnknownDatasourceOperation {
+        datasource: datasource.to_owned(),
+        key: key.to_owned(),
+    };
+    let operation = definition.operations.get(key).ok_or_else(unknown)?;
+    let found = inventory
+        .operations
+        .iter()
+        .find(|candidate| candidate.operation_id.as_deref() == Some(operation.op.as_str()))
+        .ok_or_else(unknown)?;
+    let query = found
+        .parameters
+        .iter()
+        .filter(|parameter| parameter.location == crate::inventory::Location::Query)
+        .map(|parameter| parameter.name.as_str())
+        .collect();
+    Ok((operation, found, query))
+}
+
+/// The one path parameter of a datasource operation.
+fn sole_path_parameter(
+    datasource: &str,
+    key: &str,
+    found: &crate::inventory::Operation,
+) -> Result<String, Refusal> {
+    let path: Vec<&str> = found
+        .parameters
+        .iter()
+        .filter(|parameter| parameter.location == crate::inventory::Location::Path)
+        .map(|parameter| parameter.name.as_str())
+        .collect();
+    match path[..] {
+        [only] => Ok(only.to_owned()),
+        _ => Err(Refusal::DatasourceOperation {
+            datasource: datasource.to_owned(),
+            key: key.to_owned(),
+            detail: format!(
+                "the feed needs exactly one path parameter, the operation has {}",
+                path.len()
+            ),
+        }),
+    }
+}
+
+/// The paging style's page-size parameter and cap for a datasource operation.
+fn page_size(
+    definition: &ProviderDefinition,
+    datasource: &str,
+    key: &str,
+    operation: &Operation,
+    query: &[&str],
+) -> Result<(String, u64), Refusal> {
+    let lacking = || Refusal::DatasourceOperation {
+        datasource: datasource.to_owned(),
+        key: key.to_owned(),
+        detail: "the feed needs a paging style with limit and max".to_owned(),
+    };
+    let (_, style) =
+        paging_style(key, operation, definition.paging.as_ref(), query)?.ok_or_else(lacking)?;
+    match (&style.limit, style.max) {
+        (Some(limit), Some(max)) => Ok((limit.clone(), max)),
+        _ => Err(lacking()),
+    }
+}
+
+/// The feed a definition's datasource lowers to, in the catalog provider's
+/// `datasource.feed/v1alpha1` declaration shape. Operation ids, page-size
+/// parameters, the cap, the lookup parameter and the items' container
+/// parameter are derived; the rest is carried as written.
+fn feed(
+    definition: &ProviderDefinition,
+    inventory: &crate::inventory::Inventory,
+) -> Result<Option<Value>, Refusal> {
+    let Some(datasources) = &definition.datasources else {
+        return Ok(None);
+    };
+    let [(name, datasource)] = datasources.iter().collect::<Vec<_>>()[..] else {
+        return if datasources.is_empty() {
+            Ok(None)
+        } else {
+            Err(Refusal::FeedCount(datasources.len()))
+        };
+    };
+    let containers = &datasource.containers;
+    let items = &datasource.items;
+    let (list_operation, list, list_query) = keyed(definition, inventory, name, &containers.list)?;
+    let (_, lookup, _) = keyed(definition, inventory, name, &containers.lookup)?;
+    let (items_operation, items_found, items_query) =
+        keyed(definition, inventory, name, &items.list)?;
+    let (containers_limit, _) = page_size(
+        definition,
+        name,
+        &containers.list,
+        list_operation,
+        &list_query,
+    )?;
+    let (items_limit, max_limit) =
+        page_size(definition, name, &items.list, items_operation, &items_query)?;
+    for (filter, values) in datasource.filters.iter().flatten() {
+        for parameter in values.keys() {
+            if !items_query.contains(&parameter.as_str()) {
+                return Err(Refusal::FilterParameter {
+                    datasource: name.clone(),
+                    filter: filter.clone(),
+                    parameter: parameter.clone(),
+                });
+            }
+        }
+    }
+    let mut containers_value = serde_json::json!({
+        "operation_id": list.operation_id,
+        "lookup": {
+            "operation_id": lookup.operation_id,
+            "parameter": sole_path_parameter(name, &containers.lookup, lookup)?,
+            "record": "",
+        },
+        "limit": containers_limit,
+        "cursor": containers.cursor,
+        "records": containers.records.clone().unwrap_or_default(),
+        "id": containers.id,
+    });
+    if let Some(query) = &containers.query {
+        containers_value["query"] = serde_json::json!(query);
+    }
+    if let Some(name) = &containers.name {
+        containers_value["name"] = Value::from(name.as_str());
+    }
+    if let Some(word) = &containers.kind_word {
+        containers_value["kind_word"] = Value::from(word.as_str());
+    }
+    let mut items_value = serde_json::json!({
+        "operation_id": items_found.operation_id,
+        "container": sole_path_parameter(name, &items.list, items_found)?,
+        "limit": items_limit,
+        "position": {"kind": "time", "value": {"parameter": items.position.time}},
+        "records": items.records.clone().unwrap_or_default(),
+        "id": items.id,
+        "revision": items.revision,
+        "created_at": items.created_at,
+        "updated_at": items.updated_at,
+        "body": items.body,
+    });
+    if let Some(query) = &items.query {
+        items_value["query"] = serde_json::json!(query);
+    }
+    if let Some(author) = &items.author {
+        items_value["author"] = serde_json::json!(author);
+    }
+    Ok(Some(serde_json::json!({
+        "profile": datasource.profile,
+        "capabilities": datasource.capabilities,
+        "max_limit": max_limit,
+        "containers": containers_value,
+        "items": items_value,
+    })))
+}
+
 /// Lower one definition. Every check that can refuse runs before the output
 /// directory is touched: the bundle is compiled into a staging directory under
 /// `scratch`, the selection is resolved against it, and only then are the bundle
@@ -1024,10 +1324,12 @@ pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
             guard,
         });
     }
+    let feed = feed(&definition, &bundle.inventory)?;
     let mut selection = serde_json::to_vec_pretty(&OperationsFile {
         format: OPERATIONS_FORMAT,
         provider,
         operations,
+        feed,
     })
     .map_err(|error| Refusal::Write(error.to_string()))?;
     selection.push(b'\n');
