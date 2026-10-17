@@ -14,7 +14,11 @@
 //! 4. with `--one-instance`, more than one line starts with `[connectors.` and holds
 //!    `.instances.`;
 //! 5. the repository's `README.md` is given and has no `## Vocabulary` section with a table row
-//!    for each term, or its `AGENTS.md` is given and links no `README.md#vocabulary`.
+//!    for each term, or its `AGENTS.md` is given and links no `README.md#vocabulary`;
+//! 6. the repository's `README.md` is given and a connector of its support table has no
+//!    onboarding page under `website/docs/connectors/` or does not link it, a page there lacks
+//!    the eight onboarding sections in order, or a page not marked Planned has no row
+//!    ([`crate::onboarding`]).
 
 use std::{
     fs,
@@ -185,6 +189,9 @@ pub fn check(root: &Path, files: &[PathBuf], options: Options) -> Result<Vec<Str
                 .into_iter()
                 .map(|problem| format!("{name}{problem}")),
         );
+        if role == Role::Readme {
+            found.extend(crate::onboarding::problems(&root, &text)?);
+        }
     }
     Ok(found)
 }
@@ -346,6 +353,8 @@ mod tests {
             found,
             vec![
                 "README.md: has no `## Vocabulary` section".to_owned(),
+                "README.md: has no connector support table (a table whose first header cell is `Connector`)"
+                    .to_owned(),
                 "adapters/x/README.md:1: defines the term \"instance\", which only README.md defines"
                     .to_owned(),
             ]
@@ -355,7 +364,8 @@ mod tests {
     }
 
     /// The story's checked set: the files this repository's README, AGENTS.md and site present
-    /// the vocabulary in. `concepts/adapters.md` describes implementations and is not checked.
+    /// the vocabulary in, the connector onboarding pages included. `concepts/adapters.md`
+    /// describes implementations and is not checked.
     #[test]
     fn the_readme_agents_and_site_speak_the_vocabulary() {
         let root = repository_root();
@@ -369,7 +379,11 @@ mod tests {
         ]
         .map(|file| root.join(file))
         .to_vec();
-        for directory in ["website/docs/guides", "website/docs/concepts"] {
+        for directory in [
+            "website/docs/guides",
+            "website/docs/concepts",
+            "website/docs/connectors",
+        ] {
             let mut pages: Vec<_> = std::fs::read_dir(root.join(directory))
                 .unwrap()
                 .map(|entry| entry.unwrap().path())

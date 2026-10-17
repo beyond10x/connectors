@@ -479,13 +479,26 @@ step the held connection's own reconnect admits:
 | one connection that reconnect refuses as changed (`create_connection` on a read), or more than one | `revoke_connection`: `connections revoke` it, then connect |
 
 A connection with another identity (provider authority or profile
-authentication) keeps `check_configuration`, as before. A connect is also
-refused while another connect of the instance is in flight, as
-`lifecycle_conflict` at `admission` with `next_action = retry_status`, so two
-concurrent connects never publish two connections. Revoked connections stay as
-history and do not count, and neither does a connection a connect allocated
-and never published: once that connect failed or its acquisition passed its
-deadline, the next connect is admitted. A second account is a second instance.
+authentication) keeps `check_configuration`, as before. The refusal is the same
+under every custody binding: under the read-only `mounted_secret` binding the
+second connect of an instance is this `lifecycle_conflict`, not
+`custody_read_only`. A connect is also refused while another connect of the
+instance is in flight, as `lifecycle_conflict` at `admission` with
+`next_action = retry_status`, and the failure data's `acquisition` names that
+connect's acquisition, which `connections status --acquisition` follows until
+it ends; it is absent when that connect ended before the refusal was read. Two
+concurrent connects therefore never publish two connections. Revoked
+connections stay as history and do not count, and neither does a connection a
+connect allocated and never published: once that connect failed or its
+acquisition passed its deadline, the next connect is admitted.
+
+A second account is a second instance. `connections reconnect` keeps the
+connection's external identity, so a reconnect whose credential the provider
+answers as another account is `identity_mismatch` at `admission` with
+`next_action = revoke_connection`, never `repair_connection`: connect names
+the reconnect, and reconnecting again with the other account answers the same.
+Revoking the connection lets the instance connect the other account; keeping
+it, the other account is a connection of another instance.
 
 An instance that held more than one published non-revoked connection before
 this rule keeps every one of them, references unchanged, and each stays
@@ -850,8 +863,10 @@ both connection reference and public semantic revision. Only separately admitted
 effect-relevant configuration/management changes advance that semantic revision
 under the shared fixed-binding rules; material renewal or evidence recollection
 alone does not. Different
-principal, account or provider target returns `identity_mismatch`; creating a new
-connection is the explicit replacement action. A failed or uncertain candidate
+principal, account or provider target returns `identity_mismatch` with
+`next_action = revoke_connection`: another account is another connection,
+which the instance holds only once its own is revoked
+([one connection per instance](#one-connection-per-instance)). A failed or uncertain candidate
 repair does not replace or globally invalidate a still-valid active generation.
 Expired/revoked old generations do not become valid merely because repair failed.
 
@@ -905,13 +920,13 @@ never replay a possible write after interruption, timeout or lost response.
 | no safe entry channel (in place of the presentation's `cli_source`) | `protected_entry_unavailable` | 2 |
 | `setup checkpoints-enable` without `--confirm one-way`; nothing changed (`stage = arguments`, `next_action = retry_explicitly`) | `confirmation_required` | 2 |
 | keyring unavailable or durable storage not acknowledged | `custody_unavailable` | 1 |
-| a read-only custody binding refused a write it would need (a second connection of a profile, a refresh-rotating profile, an approval-signing key; stage = custody, next_action = check_configuration) | `custody_read_only` | 1 |
+| a read-only custody binding refused a write it would need (a refresh-rotating profile, an approval-signing key; stage = custody, next_action = check_configuration) | `custody_read_only` | 1 |
 | the read-only binding's item no longer holds the bytes its version pinned (stage = custody, next_action = revalidate_connection) | `custody_unavailable` | 1 |
 | metadata authority unavailable | `metadata_unavailable` | 1 |
 | store written by a newer binary whose record model differs (its marker names a newer or an unorderable version), a store whose SQL level is above this binary's highest, or a store record carrying a field this binary's model does not declare; nothing read or written (`stage = admission`, `next_action = upgrade`, `store_version` and `binary_version` named) | `metadata_schema_newer` | 1 |
 | a non-guarded metadata write the store changed under (a concurrent commit); nothing was written (`stage = publication`, `next_action = retry_explicitly`). A guarded write keeps the guarded-write rule below: its mutation record, `next_action = retry_status` | `revision_conflict` | 1 |
 | metadata publication acknowledgement uncertain | `outcome_unknown` | 1 |
-| changed principal/account/target during repair | `identity_mismatch` | 1 |
+| changed principal/account/target during repair (`next_action = revoke_connection`, [one connection per instance](#one-connection-per-instance)) | `identity_mismatch` | 1 |
 | stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`: run `connectors setup owner-stop`); `connections connect` on an instance that holds its connection, or while another connect of it is in flight ([one connection per instance](#one-connection-per-instance)) | `lifecycle_conflict` | 1 |
 | stale/foreign stop target | `incarnation_mismatch` | 1 |
 | wrong readiness identity/version/revision | `readiness_mismatch` | 1 |
