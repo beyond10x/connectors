@@ -947,6 +947,29 @@ An HTTP 429 stays `service_failure` with
 named a delay. `unsupported` is always `admission`: every
 source of it is raised before dispatch.
 
+**Revalidation retries.** `connections revalidate` sends its validation (the
+adapter's identity probe, a read) again when the attempt failed transiently,
+inside the same dispatched revalidation and within its deadline. A transient
+failure is the adapter answering `unavailable` (a provider connection refused,
+reset or closed, such as a pooled keep-alive connection the provider closed
+while it was idle; a name that does not resolve; the catalog provider's
+identity or scope probe also on an HTTP 429 or 5xx), a provider timeout, rate
+limit, internal error or marked capacity answer. The owner sends at most three
+attempts, waiting 200 ms before the second and 1 s before the third, and only
+while the adapter process still runs, the owner is not stopping, and the wait,
+then an attempt as long as the last one took, then a 500 ms margin, all end
+before the deadline. A credential the provider refuses (HTTP 401), a
+permission refusal (403), a credential below the profile's scopes, an identity
+mismatch and a protocol violation are never sent again. When every attempt
+failed, the failure keeps its code, stage and next action, and additionally
+carries `cause`, the class of the last attempt
+(`connectors.cli.FailureCause`), and `attempts`, the number of validations the
+owner sent, when it sent any. `cause` is `adapter_exited` when the adapter
+process was no longer running after the failed attempt, and `owner_stopping` when the owner began to
+stop during the revalidation. No other command and no other failure carries
+either field; a revalidation whose reply never arrived stays `outcome_unknown`
+and carries neither.
+
 A guarded write's failure carries its `mutation` record, and its stage follows
 who refused and whether the write was attempted. A refusal the host made
 before anything was sent (`mutation.classification = not_attempted` — the

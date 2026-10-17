@@ -318,6 +318,7 @@ fn bootstrap() -> runtime::Bootstrap {
         }],
         requirements: vec![runtime::Requirement {
             operation: OPERATION.into(),
+            custody: false,
             profile: "token".into(),
             scopes: BTreeSet::new(),
             effect: runtime::Effect::Read,

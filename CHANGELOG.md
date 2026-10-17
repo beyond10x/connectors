@@ -1,5 +1,88 @@
 # Changelog
 
+## 0.53.1 — 2026-10-17
+
+### Changed
+
+- A Runpod `pod.create` refused for lack of capacity is now `refused` with code `capacity`, not
+  `invalid_input`: a 4xx whose `message` or `detail` contains one of the stock-out texts Runpod's own
+  clients recognise (case-insensitive; a 5xx stays `unknown`), declared through the new catalog
+  selection member `refusal_texts` (modelled as `connectors_catalog.selection.WriteRefusalTexts`).
+
+### Limitations
+
+- The stock-out texts are taken from Runpod's own clients and verified against a local fixture
+  only; no real stock-out answer has been recorded yet.
+
+## 0.53.0 — 2026-10-17
+
+### Added
+
+- OpenRouter management through the catalog provider (`openrouter`, profile
+  `openrouter.api-key`, pinned OpenRouter OpenAPI document): the reads `key.get`,
+  `workspaces.list` and `keys.list`, and the required-approval write `key.create`
+  (docs/catalog-openrouter.md).
+- A write that creates a credential holds it in custody. `key.create` sends the create once;
+  the key OpenRouter returns once goes straight into the protected store as a new connection
+  of the alias and profile `[adapters.<alias>.permissions.custody]` names for the operation,
+  and the caller receives only that connection's reference and the key's hash, never the key.
+  A create with no custody target, or a declaration and target that disagree, is refused
+  before anything is sent; a timeout or crash after dispatch is an unknown outcome that is
+  never re-sent (docs/local-mutation-ledger.md, "Created credentials").
+- Runpod: the read `billing.pods` (`PodBilling`, `GET /v1/billing/pods`) beside `pods.list`.
+- GitLab catalog reads `file.raw` and `project.languages`: a repository file's exact UTF-8 text at a ref (a file that is not UTF-8 is refused `upstream_protocol`, one over the 4 MiB provider response bound `capacity`, on its raw bytes) and a project's languages with their percentages; verified against fixtures only.
+
+### Fixed
+
+- An owner no longer outlives its state directory. A Unix owner exits, as a shutdown request
+  stops it, once its socket is no longer in its state directory or the state directory's path no
+  longer names the directory it opened (removed or replaced); it checks at least every 250 ms and
+  lets connected clients finish for at most 5 seconds. Such an owner was unreachable and, with its
+  directory deleted, never became idle, so it ran until killed. A Windows owner holds its state
+  directory open, so that directory cannot be removed beneath it; it has no such check. Idle
+  retirement after 10 minutes is unchanged.
+- Journey tests stop the owners they start (#175). A CLI built with debug assertions passes
+  `CONNECTORS_TEST_OWNER_PARENT` to the owner it starts on Unix, and that owner exits once the named
+  process has ended; a release build reads no such variable. The catalog journey harness names its
+  own test process, so its owners end with it however it ends, and on drop, pass or panic, it stops
+  every owner of its state directory: an owner that has not exited within 5 seconds of the
+  harness's shutdown request is killed through its pidfd (Linux) and waited for.
+
+### Limitations
+
+- A custody store that answers `outcome_unknown` while holding a created key is reported as
+  custody `failed`, though the connection may have been published; check `connections list` on
+  the custody alias before creating again.
+- The HTTP client's buffers that held OpenRouter's answer are not wiped after the key moves into
+  custody.
+- An owner crash between OpenRouter's applied answer and the settle recovers the attempt as
+  `unknown`, with the key's hash recorded nowhere; nothing is re-sent, and the created key is
+  visible (by hash and label) in `keys.list`.
+- The ignored CLI journeys, custody included, run in no CI job.
+
+## 0.52.1 — 2026-10-16
+
+### Fixed
+
+- `connections revalidate` no longer fails `unavailable` at `dispatch` when the provider closed
+  the adapter's idle keep-alive connection (beyond10x/connectors#174). The adapter child kept the
+  connection a connect or an earlier probe left in its pool; once the provider's keep-alive
+  timeout had closed it, the next identity probe went out on it and failed, the owner recorded
+  the revalidation as failed, and only a second command, on a new connection, succeeded. The
+  owner now sends a revalidation's validation again when it fails transiently (the adapter's
+  `unavailable`, a provider timeout, rate limit, internal error or capacity answer; the catalog
+  provider's probe also on a 429 or 5xx): at most three attempts, 200 ms and then 1 s apart, only
+  while the adapter runs, the owner is not stopping and the next attempt can end before the
+  revalidation's 30 s deadline. A credential (401), permission (403), scope, identity or protocol
+  refusal is never sent again. A revalidation that still fails keeps its code, stage and next
+  action and now names `cause` (`connectors.cli.FailureCause`: `provider_unavailable`,
+  `provider_timeout`, `provider_rate_limited`, `provider_internal`, `provider_capacity`,
+  `adapter_exited`, `owner_stopping`) and `attempts` in its error data; no other command or
+  failure carries them (contracts/cli/v1alpha1/semantics.md §6, "Revalidation retries"). A
+  provider that is down for longer than the deadline still fails the revalidation, now after
+  three probes instead of one. A provider's Retry-After is not read; a rate-limited probe is
+  re-sent after 200 ms and 1 s.
+
 ## 0.52.0 — 2026-10-15
 
 ### Added

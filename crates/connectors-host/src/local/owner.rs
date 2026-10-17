@@ -5,6 +5,8 @@ mod lifecycle;
 mod maintenance;
 pub mod mutation;
 mod supervisor;
+#[cfg(unix)]
+mod tether;
 mod transport;
 use super::{
     config::{Adapter, Config, Paths},
@@ -61,6 +63,20 @@ pub enum Code {
     /// The store was written by a newer binary with another record model;
     /// [`Error::store_version`] names its release or `unrecorded`.
     MetadataSchemaNewer,
+}
+/// The transient class a revalidation failure ended on after the owner's
+/// bounded retries (`connectors.cli.FailureCause`, contracts/cli/v1alpha1/semantics.md
+/// §6 "Revalidation retries").
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Cause {
+    ProviderUnavailable,
+    ProviderTimeout,
+    ProviderRateLimited,
+    ProviderInternal,
+    ProviderCapacity,
+    AdapterExited,
+    OwnerStopping,
 }
 /// Who refused. The same [`Code`] can be the host's own admission refusal or
 /// the provider's answer to a dispatched call; the CLI reports them at
@@ -120,6 +136,12 @@ pub struct Error {
     /// (`approval_clock_format_retired`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub clock_format_retired: bool,
+    /// On a revalidation's transient failure only: the class of its last
+    /// attempt, and the number of validations the owner sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cause: Option<Cause>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attempts: Option<u32>,
 }
 impl From<Code> for Error {
     fn from(code: Code) -> Self {
@@ -135,6 +157,8 @@ impl From<Code> for Error {
             revalidate: false,
             store_version: None,
             clock_format_retired: false,
+            cause: None,
+            attempts: None,
         }
     }
 }
@@ -273,6 +297,8 @@ impl From<runtime::Failure> for Error {
             revalidate: false,
             store_version: None,
             clock_format_retired: false,
+            cause: None,
+            attempts: None,
         }
     }
 }
@@ -804,6 +830,7 @@ mod cached_tests {
                 permissions: super::super::config::Permissions {
                     profiles: BTreeSet::new(),
                     operations: BTreeSet::new(),
+                    custody: Default::default(),
                 },
             },
         );

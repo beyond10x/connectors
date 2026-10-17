@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-17T02:29:05Z",
+  "actor": "human:timo",
+  "artifact": "story:runpod-billing-pods-read",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "package gates on b7c6a4104 (release 0.53.0): fmt, clippy -D warnings and tests of connectors-host, connectors, connectors-catalog-provider, connectors-build and connectors-docs, 1676 passed, 0 failed (the one identification-loop failure fixed in 6309d5bda and re-run: connectors 175 passed, 0 failed); cli, docs, metadata-entities, ess-boundary, source-hashes and release-binaries checks current; ignored inventory 0 unknown; plan validate passed",
+    "reference": "b7c6a4104700e145d2089a9a0153ae7c2ddcc2f8"
+  }
+}
