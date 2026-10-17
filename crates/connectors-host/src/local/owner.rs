@@ -548,12 +548,19 @@ pub fn admit_invoke(paths: &Paths, alias: &str, call: &Value, document: &[u8]) -
         runtime::INPUT_LIMIT,
     )?;
     let connection = input(call, "connection")?;
-    registry::Registry::with_system_clock(&paths.state).admit_read(
+    // Evidence that only lapsed is admitted here: the read's worker job
+    // recollects it once before it captures the read
+    // (contracts/cli/v1alpha1/semantics.md), and refuses it only if it is still
+    // not current after that.
+    match registry::Registry::with_system_clock(&paths.state).admit_read(
         &bootstrap.binding(&requirement.profile)?,
         &connection,
         &requirement.scopes,
         connectors_sdk::now_ms(),
-    )?;
+    ) {
+        Ok(()) | Err(registry::Failure::EvidenceExpired) => {}
+        Err(error) => return Err(error.into()),
+    }
     if !custody::available_for(&config.selection()) {
         return Err(Code::CustodyUnavailable.into());
     }

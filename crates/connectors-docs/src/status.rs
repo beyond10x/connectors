@@ -172,6 +172,13 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Local runtime",
+        "Unattended reads",
+        "A connection connected or revalidated once keeps serving reads across any number of evidence lifetimes: a read on lapsed evidence recollects it once from custody, with no re-entry, before it is served.",
+        "apps/connectors/tests/connection_lease.rs::a_revalidated_connection_serves_reads_across_three_evidence_lifetimes",
+        "/docs/concepts/local-runtime",
+    ),
+    shipped(
+        "Local runtime",
         "Mounted-secret custody",
         "An owner configuration can explicitly select read-only mounted-secret custody (mounted_secret, Linux): connect, list and a credentialed invoke run under an empty environment in a container, reading a Kubernetes-style Secret volume and writing nothing; rotation needs a revalidation.",
         "apps/connectors/tests/container_env_i.rs::env_i_mounted_custody_round_trip",
