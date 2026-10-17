@@ -6,6 +6,7 @@ status: draft
 title: Zendesk ticket update and internal note through the catalog provider, behind approvals
 relations:
 - depends_on: story:catalog-zendesk-reads
+- depends_on: story:catalog-github-reads
 scope:
 - confidence: cited
   path: adapters/catalog/generated/bundles/index.json
