@@ -37,7 +37,7 @@ scope:
   path: docs/catalog-github.md
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 21
+revision: 22
 ---
 ## Outcome
 
@@ -81,7 +81,7 @@ Paging stays caller-driven (`page`, `per_page`); the end condition (a short page
 ## Acceptance
 
 - `adapters/catalog/providers/github/operations.json` exposes exactly these ids, each `effect: read`; `adapters/catalog/tests/github.rs` pins ids, `operationId`s and paths.
-- Recorded-fixture tests assert the exact request (path, query with the time filter, auth header; the host's `Accept: application/json`, which GitHub serves, and no version header, so GitHub's default REST version applies and the doc names it) and a byte-identical answer; fixtures synthetic, `example.com` only.
+- Recorded-fixture tests assert the exact request (path, query with the time filter, auth header; the host's `Accept: */*`, which GitHub answers with JSON, and no version header, so GitHub's default REST version applies and the doc names it) and a byte-identical answer; fixtures synthetic, `example.com` only.
 - A paging test per list walks two pages and stops at the documented end; the search endpoint's 1,000-result cap is stated in the doc and a test proves the walk stops there.
 - A rate-limit answer (403/429 with `x-ratelimit-remaining: 0`) is `refused` code `rate_limited` with the reset time, never retried in a loop.
 - `docs/catalog-github.md` documents each operation, the token scopes needed (notifications need `notifications` or a classic token), the config block and the commands that set up a local install, with the release link.
