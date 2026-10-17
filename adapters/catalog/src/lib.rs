@@ -2278,10 +2278,29 @@ fn read_body(response: &HttpResponse, text: bool, rate_limit_reasons: &[String])
             "provider returned a body this engine cannot read",
         )
     };
+    // `connectors.transport.TextBodyOutcome` (`ess/domains/transport.yaml`):
+    // the provider response bound holds on the raw bytes, before decoding, so
+    // a port that does not bound its answer cannot hand on a larger text; then
+    // bytes that are not UTF-8 are refused by name, never decoded lossily.
     if text {
+        if response.body.len() > connectors_core::RESPONSE_LIMIT {
+            return Err(Error::new(
+                ErrorCode::Capacity,
+                format!(
+                    "text response of {} bytes exceeds the provider response bound of {} bytes",
+                    response.body.len(),
+                    connectors_core::RESPONSE_LIMIT
+                ),
+            ));
+        }
         return String::from_utf8(response.body.clone())
             .map(Value::String)
-            .map_err(|_| unreadable());
+            .map_err(|_| {
+                Error::new(
+                    ErrorCode::UpstreamProtocol,
+                    "provider returned a text body that is not UTF-8",
+                )
+            });
     }
     connectors_core::read_json(&response.body).map_err(|_| unreadable())
 }
