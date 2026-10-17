@@ -3,7 +3,7 @@ format: aep.planning-md/3
 id: story:catalog-github-reads
 kind: story
 status: draft
-title: GitHub review requests, assigned issues and pull requests, and notifications through the catalog provider
+title: 'GitHub reads through the catalog provider: what waits on the user, and public repository metadata'
 scope:
 - confidence: cited
   path: adapters/README.md
@@ -37,7 +37,7 @@ scope:
   path: docs/catalog-github.md
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 19
+revision: 20
 ---
 ## Outcome
 
