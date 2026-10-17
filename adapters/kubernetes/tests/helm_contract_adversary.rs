@@ -63,6 +63,8 @@ fn adapter(secret: Value) -> Kubernetes {
         helm_release_reads: HelmReleaseReads::RedactedContent,
         pod_logs: false,
         pod_exec: false,
+        node_reads: false,
+        custom_resources: Vec::new(),
         kubeconfig_contexts: false,
     };
     let effective = json!({"service":{"instance":"adversary","listen":"127.0.0.1:0",

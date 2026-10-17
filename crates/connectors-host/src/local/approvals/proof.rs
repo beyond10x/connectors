@@ -91,7 +91,7 @@ pub(super) fn now(clock: &impl Clock) -> Result<ClockInterval> {
     let t = clock.now().map_err(|_| Failure::Unavailable)?;
     if t.lower_unix_ms < 0
         || t.upper_unix_ms > MAX_SAFE
-        || !(0..=4000).contains(
+        || !(0..=crate::local::mutations::MAX_CLOCK_WIDTH_MS).contains(
             &t.upper_unix_ms
                 .checked_sub(t.lower_unix_ms)
                 .ok_or(Failure::Unavailable)?,

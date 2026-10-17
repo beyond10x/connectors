@@ -1641,4 +1641,89 @@ mod tests {
         };
         assert_eq!(error.code, ErrorCode::InvalidInput);
     }
+
+    /// beyond10x/connectors#174: a kept-alive connection the provider closed
+    /// while the adapter child's current-thread runtime was idle (it runs only
+    /// inside `block_on`, as `runtime::server` drives an adapter) is reused by
+    /// the next request, which then fails `Unavailable`, not as the provider's
+    /// answer, and opens no new connection: this transport never retries
+    /// (`retry::never`). A revalidation's owner sends its validation again
+    /// (`owner::supervisor::revalidate_with_retries`); the second request opens
+    /// a new connection. A connection the provider keeps open is reused.
+    #[test]
+    fn a_kept_alive_connection_the_provider_closed_while_idle_fails_the_next_request() {
+        use std::io::{Read as _, Write as _};
+        for closes in [true, false] {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let address = listener.local_addr().unwrap();
+            let accepted = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let counter = accepted.clone();
+            std::thread::spawn(move || {
+                for stream in listener.incoming() {
+                    let Ok(mut stream) = stream else { return };
+                    counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    std::thread::spawn(move || {
+                        loop {
+                            let mut head = Vec::new();
+                            let mut byte = [0u8; 1];
+                            while !head.ends_with(b"\r\n\r\n") {
+                                if stream.read(&mut byte).unwrap_or(0) == 0 {
+                                    return;
+                                }
+                                head.push(byte[0]);
+                            }
+                            if stream
+                                .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}")
+                                .is_err()
+                            {
+                                return;
+                            }
+                            if closes {
+                                // The provider's keep-alive timeout.
+                                std::thread::sleep(Duration::from_millis(200));
+                                let _ = stream.shutdown(std::net::Shutdown::Both);
+                                return;
+                            }
+                        }
+                    });
+                }
+            });
+            let http = ScopedHttp::new_with_ca_bytes(
+                &HttpConfig {
+                    base_url: format!("http://{address}/"),
+                    credential: None,
+                    credential_header: "authorization".into(),
+                    bearer: true,
+                    allow_plaintext: true,
+                    ca_file: None,
+                },
+                Some(Arc::new(FixtureCredential)),
+                None,
+            )
+            .unwrap();
+            let executor = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            let first = executor.block_on(http.get(&["user"], &[]));
+            assert_eq!(first.map(|r| r.status).map_err(|e| e.code), Ok(200));
+            // Idle past the provider's keep-alive timeout.
+            std::thread::sleep(Duration::from_millis(400));
+            let second = executor
+                .block_on(http.get(&["user"], &[]))
+                .map(|r| r.status)
+                .map_err(|e| (e.code, e.upstream_answer));
+            let expected = if closes {
+                Err((ErrorCode::Unavailable, false))
+            } else {
+                Ok(200)
+            };
+            assert_eq!(second, expected, "provider closes: {closes}");
+            assert_eq!(
+                accepted.load(std::sync::atomic::Ordering::SeqCst),
+                1,
+                "provider closes: {closes}"
+            );
+        }
+    }
 }

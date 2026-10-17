@@ -55,6 +55,8 @@ pub trait Adapter: Send + Sync {
 /// stdio fallback or process-wide credential environment is consulted.
 #[cfg(unix)]
 pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
+    // Before any protected byte arrives: a created credential passes through.
+    crate::local::core_dumps::forbid().map_err(|_| Failure::Unavailable)?;
     if fd != 3 {
         return Err(Failure::InvalidInput);
     }
@@ -89,6 +91,8 @@ pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
 /// current user (`client_token_query`). The adapter is never told a pipe name.
 #[cfg(windows)]
 pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
+    // Before any protected byte arrives: a created credential passes through.
+    crate::local::core_dumps::forbid().map_err(|_| Failure::Unavailable)?;
     let handle = usize::try_from(fd).map_err(|_| Failure::InvalidInput)?;
     let channel = channel::Stream::from_owned(channel::windows::adopt(handle)?)?;
     let peer = channel::peer(&channel)?;

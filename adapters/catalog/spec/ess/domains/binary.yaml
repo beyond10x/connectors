@@ -26,8 +26,12 @@ summary: The binary response of a selected read in a `connectors-catalog-operati
 types:
   # How a 2xx body is read. Absent: the bundle's declared media types decide between `json` and
   # `text`. `text` is the reviewed exception for a source that declares JSON where the provider
-  # answers with plain text. `binary` reads the body as bytes, whatever media type it carries, and
-  # answers with a `Body`; it needs `binary`.
+  # answers with plain text, or that declares a body of another type, such as
+  # `application/octet-stream`, which the caller reads as text. A text body is answered as the
+  # shared model's `connectors.transport.TextBodyOutcome` states (`ess/domains/transport.yaml`):
+  # more than 4194304 raw bytes is refused `capacity`, bytes that are not UTF-8 are refused
+  # `upstream_protocol`, and otherwise `body` is the exact decoded string. `binary` reads the
+  # body as bytes, whatever media type it carries, and answers with a `Body`; it needs `binary`.
   - name: connectors_catalog.binary.ResponseKind
     kind: enum
     variants: [json, text, binary]

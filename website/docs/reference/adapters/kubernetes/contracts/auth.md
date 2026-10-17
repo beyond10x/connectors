@@ -26,6 +26,11 @@ reads cannot invent this probe. Per-operation permission checks use the exact
 SelfSubjectAccessReview binding below. The original extraction evidence is
 `../connectors/docs/design/10-local-kubernetes-context-and-resource-discovery.md:50-116`.
 
+An exec credential plugin's token is validated by the same SelfSubjectReview probe
+as a configured token. Which plugin may run, with what arguments, environment and
+bounds, and how long its token is reused, is the implemented pinned binding in
+[reads, Exec-plugin credentials](./reads.md#exec-plugin-credentials).
+
 ### 4.4 Exact authorization targets and fan-out budget (F08)
 
 After host admission and configuration allowlist checks, build the complete bounded authorization target set from the operation and selected input before provider work. For Kubernetes a resource target is the exact `(verb, api_group, api_version, resource, namespace, name, subresource)` tuple. Empty group means core; empty subresource means none. Empty name is the selected collection-wide name attribute for list, not permission to substitute get/delete on arbitrary names. Namespace meaning depends on the declared resource and operation: a namespaced list carries its actual namespace; an explicitly selected all-namespaces list carries empty namespace; a cluster-scoped resource also carries empty namespace but is a different resource tuple. These distinctions follow Kubernetes [ResourceAttributes](https://kubernetes.io/docs/reference/kubernetes-api/definitions/resource-attributes-v1-authorization/) and cannot be inferred from a public null field or an empty result. A proxy forward has `get`, core/v1, `services`, the fixed namespace and Service name, and `proxy`. Exact configured kinds multiply finite per-namespace targets. Deduplicate identical tuples within the same checking binding and order them lexicographically by the seven fields in the order above, using their reviewed canonical UTF-8 representation. A required multi-target read with an empty normalized set is invalid_input; omitted selectors may expand only under an explicitly bounded configured selection. Neither grouping namespaces nor a list result grants permission to get another resource/name/subresource.

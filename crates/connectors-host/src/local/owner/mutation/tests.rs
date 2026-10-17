@@ -82,6 +82,7 @@ fn final_audit_recovery_preserves_every_live_business_result() {
                         service_code: Some(connectors_core::ErrorCode::UpstreamProtocol),
                         origin: crate::local::owner::Origin::Host,
                         store_version: None,
+                        created: None,
                     }),
                     Classification::Unknown => Some(Code::OutcomeUnknown.into()),
                     _ => Some(Code::Forbidden.into()),
@@ -257,6 +258,49 @@ mod replay {
         });
         assert_eq!(classification, Classification::Refused);
         serde_json::to_value(StoredOutcome::from(outcome)).unwrap()
+    }
+
+    /// A clock whose interval is `width` ms wide from a fixed lower bound.
+    struct Width(std::sync::Arc<std::sync::atomic::AtomicI64>);
+    impl ledger::Clock for Width {
+        fn now(&self) -> ledger::Result<ledger::ClockInterval> {
+            Ok(ledger::ClockInterval {
+                lower_unix_ms: 1_789_056_000_000,
+                upper_unix_ms: 1_789_056_000_000 + self.0.load(Ordering::SeqCst),
+            })
+        }
+    }
+
+    /// The ledger settles on an interval as wide as the clock's own 8,000 ms
+    /// cap (docs/local-mutation-ledger.md) and refuses 8,001 ms.
+    #[test]
+    fn ledger_clock_admits_8000_ms() {
+        for (width, admitted) in [(8000, true), (8001, false)] {
+            let root = root();
+            let wide = std::sync::Arc::new(std::sync::atomic::AtomicI64::new(2000));
+            let store =
+                ledger::Store::new(root.path(), Width(wide.clone()), ledger::Limits::default())
+                    .unwrap();
+            let ledger::Preparation::Prepared(prepared) = store.prepare(&candidate()).unwrap()
+            else {
+                panic!("unexpected existing attempt");
+            };
+            let reference = prepared.reference();
+            store.open_dispatch(prepared).unwrap().consume().unwrap();
+            wide.store(width, Ordering::SeqCst);
+            let settled = store.settle(
+                reference,
+                &ledger::Outcome::Refused(serde_json::json!({"code":"conflict"})),
+            );
+            if admitted {
+                settled.unwrap();
+            } else {
+                assert!(
+                    matches!(settled, Err(ledger::Failure::ClockUnavailable)),
+                    "{width}"
+                );
+            }
+        }
     }
 
     #[test]

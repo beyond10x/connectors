@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 pub mod auth;
 pub mod exec;
+pub mod exec_credential;
 pub mod helm;
 pub mod kubeconfig;
 pub mod logs;
@@ -48,6 +49,14 @@ pub struct Config {
     /// it also supplies the approved write exchange and an exec transport.
     #[serde(default, skip_serializing_if = "is_false")]
     pub pod_exec: bool,
+    /// Advertises `nodes.list`, the full Node objects. Separate from
+    /// `discover_hosts`, which advertises only a projection of them.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub node_reads: bool,
+    /// The namespaced custom resource collections `custom_resources.list` may
+    /// read. Serialized only when non-empty, like the flags above.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub custom_resources: Vec<CustomResource>,
     /// Advertises `contexts.list`. Never read from a configuration document:
     /// only a composition that itself holds the kubeconfig path its
     /// configuration fixed sets it, so no service configuration can.
@@ -56,6 +65,41 @@ pub struct Config {
 }
 fn is_false(value: &bool) -> bool {
     !*value
+}
+
+/// One namespaced custom resource collection, by group, version and plural
+/// (`connectors_kubernetes.reads.CustomResourceKind`).
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CustomResource {
+    pub group: String,
+    pub version: String,
+    pub plural: String,
+}
+impl CustomResource {
+    /// Kubernetes' own rule for a CustomResourceDefinition's group: a DNS-1123
+    /// subdomain with at least one dot, outside the built-in `k8s.io` and
+    /// `kubernetes.io` groups, so no entry can reach a built-in collection.
+    fn admissible(&self) -> bool {
+        let group = self.group.as_str();
+        (3..=253).contains(&group.len())
+            && group.contains('.')
+            && valid_name(group)
+            && !["k8s.io", "kubernetes.io"]
+                .iter()
+                .any(|builtin| group == *builtin || group.ends_with(&format!(".{builtin}")))
+            && valid_label(&self.version)
+            && valid_label(&self.plural)
+    }
+}
+/// At most this many custom resource collections may be configured.
+pub const MAX_CUSTOM_RESOURCES: usize = 32;
+fn custom_resources_admissible(entries: &[CustomResource]) -> bool {
+    let mut sorted = entries.to_vec();
+    sorted.sort();
+    entries.len() <= MAX_CUSTOM_RESOURCES
+        && entries.iter().all(CustomResource::admissible)
+        && sorted.windows(2).all(|pair| pair[0] != pair[1])
 }
 pub struct Kubernetes {
     http: Arc<dyn AuthenticatedHttp>,
@@ -87,6 +131,9 @@ impl Kubernetes {
         {
             return Err(Error::invalid("invalid namespace or resource-kind scope"));
         }
+        if !custom_resources_admissible(&config.custom_resources) {
+            return Err(Error::invalid("invalid custom resource scope"));
+        }
         let mut descriptor = instance_descriptor(
             include_str!("../generated/descriptor.json"),
             instance,
@@ -99,6 +146,8 @@ impl Kubernetes {
                 "resources.get",
                 "namespaces.list",
                 "deployments.history",
+                "nodes.list",
+                "custom_resources.list",
                 "endpoints.discover",
                 "hosts.discover",
                 "helm_releases.history",
@@ -119,6 +168,8 @@ impl Kubernetes {
             "pods.logs" => config.pod_logs,
             "contexts.list" => config.kubeconfig_contexts,
             "pods.exec" => config.pod_exec,
+            "nodes.list" => config.node_reads,
+            "custom_resources.list" => !config.custom_resources.is_empty(),
             _ => true,
         });
         // An operation whose disclosure the configuration did not admit is not
@@ -356,7 +407,32 @@ impl Kubernetes {
         if kind != "nodes" {
             self.namespace(namespace)?;
         }
-        let mut context = json!({"instance":self.descriptor.instance,"revision":self.descriptor.revision,"operation":operation,"namespace":namespace,"kind":kind,"limit":limit});
+        let context = json!({"instance":self.descriptor.instance,"revision":self.descriptor.revision,"operation":operation,"namespace":namespace,"kind":kind,"limit":limit});
+        let segments = if kind == "nodes" {
+            vec!["api", "v1", "nodes"]
+        } else {
+            collection(kind, namespace)?
+        };
+        self.page(
+            context,
+            &segments,
+            format!("{namespace}/{kind}"),
+            limit,
+            cursor,
+        )
+        .await
+    }
+    /// One bounded page of one provider collection, its continuation bound to
+    /// `context` (and the connection's partition), so a cursor issued for one
+    /// collection or operation never pages another.
+    async fn page(
+        &self,
+        mut context: Value,
+        segments: &[&str],
+        resource: String,
+        limit: u16,
+        cursor: Option<&str>,
+    ) -> Result<Page> {
         if let Some(partition) = &self.partition {
             context["partition"] = json!(partition);
         }
@@ -364,12 +440,7 @@ impl Kubernetes {
         if let Some(cursor) = self.admitted_cursor(cursor)? {
             query.push(("continue", self.cursors.read(&context, cursor)?));
         }
-        let segments = if kind == "nodes" {
-            vec!["api", "v1", "nodes"]
-        } else {
-            collection(kind, namespace)?
-        };
-        let response = self.http.get(&segments, &query).await?;
+        let response = self.http.get(segments, &query).await?;
         let value = upstream_json(&response)?;
         let items = value["items"]
             .as_array()
@@ -391,12 +462,44 @@ impl Kubernetes {
             items,
             complete,
             next_cursor,
-            provenance: provenance(
-                &self.descriptor.instance,
-                format!("{namespace}/{kind}"),
-                revision,
-            ),
+            provenance: provenance(&self.descriptor.instance, resource, revision),
         })
+    }
+    /// One bounded page of a configured namespaced custom resource collection.
+    /// The selection must equal a configured entry and the namespace must be
+    /// configured; both refusals precede any request. A collection the cluster
+    /// does not serve is the provider's 404, which answers not_found.
+    async fn custom_resources(&self, operation: &str, args: CustomResources) -> Result<Page> {
+        let selection = CustomResource {
+            group: args.group,
+            version: args.version,
+            plural: args.plural,
+        };
+        if !self.config.custom_resources.contains(&selection) {
+            return Err(Error::new(
+                ErrorCode::Forbidden,
+                "custom resource collection is outside configured scope",
+            ));
+        }
+        self.namespace(&args.namespace)?;
+        if !(1..=100).contains(&args.limit) {
+            return Err(Error::invalid("limit must be between one and 100"));
+        }
+        let CustomResource {
+            group,
+            version,
+            plural,
+        } = &selection;
+        let namespace = args.namespace.as_str();
+        let context = json!({"instance":self.descriptor.instance,"revision":self.descriptor.revision,"operation":operation,"namespace":namespace,"group":group,"version":version,"plural":plural,"limit":args.limit});
+        self.page(
+            context,
+            &["apis", group, version, "namespaces", namespace, plural],
+            format!("{namespace}/{group}/{version}/{plural}"),
+            args.limit,
+            args.cursor.as_deref(),
+        )
+        .await
     }
     fn kind(&self, kind: &str) -> Result<()> {
         if !self.config.resource_kinds.iter().any(|k| k == kind) {
@@ -726,6 +829,14 @@ fn collection<'a>(kind: &str, namespace: &'a str) -> Result<Vec<&'a str>> {
         "events" => vec!["api", "v1", "namespaces", namespace, "events"],
         "deployments" => vec!["apis", "apps", "v1", "namespaces", namespace, "deployments"],
         "replicasets" => vec!["apis", "apps", "v1", "namespaces", namespace, "replicasets"],
+        "statefulsets" => vec![
+            "apis",
+            "apps",
+            "v1",
+            "namespaces",
+            namespace,
+            "statefulsets",
+        ],
         "endpointslices" => vec![
             "apis",
             "discovery.k8s.io",
@@ -928,6 +1039,17 @@ struct Hosts {
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct CustomResources {
+    namespace: String,
+    group: String,
+    version: String,
+    plural: String,
+    limit: u16,
+    #[serde(default)]
+    cursor: Option<String>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Releases {
     namespace: String,
     release: String,
@@ -1014,6 +1136,35 @@ impl Adapter for Kubernetes {
                     )
                     .await?,
                 )
+            }
+            "nodes.list" => {
+                // Separate from discover_hosts: that admits a projection of the
+                // same collection, never the full objects. Zero requests here.
+                if !self.config.node_reads {
+                    return Err(Error::new(
+                        ErrorCode::Forbidden,
+                        "node reads are not configured for this connection",
+                    ));
+                }
+                let args: Hosts = decode(input)?;
+                if !(1..=100).contains(&args.limit) {
+                    return Err(Error::invalid("limit must be between one and 100"));
+                }
+                let context = json!({"instance":self.descriptor.instance,"revision":self.descriptor.revision,"operation":operation,"limit":args.limit});
+                encode(
+                    self.page(
+                        context,
+                        &["api", "v1", "nodes"],
+                        "nodes".into(),
+                        args.limit,
+                        args.cursor.as_deref(),
+                    )
+                    .await?,
+                )
+            }
+            "custom_resources.list" => {
+                let args: CustomResources = decode(input)?;
+                encode(self.custom_resources(operation, args).await?)
             }
             "endpoints.discover" => {
                 let args: Endpoints = decode(input)?;

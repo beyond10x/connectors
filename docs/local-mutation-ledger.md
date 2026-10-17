@@ -74,7 +74,7 @@ Indeterminate. Recovery never returns a gate receipt or sends. Indeterminate key
 remain Quarantined without automatic expiry or reconciliation.
 
 Known settlement requires a host clock interval containing actual current time.
-The interval is bounded to four seconds and sampled inside the transaction. The
+The interval is bounded to eight seconds and sampled inside the transaction. The
 upper bound fixes conservative settlement time; checked addition fixes expiry
 86,400 seconds later. Only a current trusted lower bound at or beyond expiry may
 retire the exact reservation generation. The store records a clock watermark,
@@ -103,6 +103,53 @@ Expiry releases the live-key index slot, retaining the attempt and safe outcome;
 it does not reclaim the independent historical attempt capacity. Metadata records
 and safe replay payloads have explicit byte bounds; provider
 credentials, approval evidence and raw input have no storage field.
+
+## Created credentials
+
+A write whose provider answer carries a credential it created, shown once (a newly
+minted API key), is held in custody as a new connection and never returned. The shared
+model is `connectors.mutations.CredentialCustody` in
+[mutations](../ess/domains/mutations.yaml); the catalog provider's mechanism is
+[catalog design section 8a](../adapters/catalog/design.md#8a-writes-that-create-a-credential).
+
+The operator names the target per operation:
+
+```toml
+[adapters.minter.permissions.custody]
+'key.create' = { adapter = "minted", profile = "fixture.key" }
+```
+
+The configuration is refused when it loads unless the operation is one the writer is
+granted, the target is another configured alias whose permissions grant the profile,
+and the target declares no custody target of its own. The table is omitted when
+empty, so existing configurations keep their bytes.
+
+Before any provider work the owner admits the target: configured, granting the
+profile, not stopped, with an available and writable custody binding. The adapter
+marks each operation that creates a credential in its bootstrap; a marked operation
+with no target, or a target for an unmarked one, is refused `invalid_configuration`.
+A failure there is a refusal with nothing sent. After the native commit the adapter hands the created
+bytes over in the protected slot of its `write_result` frame, beside a public result
+that holds none of them; an unexpected or missing secret is a protocol fault on an
+applied write. Before the attempt settles, the owner builds the protected document the
+target profile's single entry field describes, has the target alias validate it on
+its own worker and stores it with the registry exactly as a protected-prompt connect
+does. The writer's worker reaches the target's worker through the pool handle it
+holds; since a target is never the writer and holds no custody of its own, no worker
+waits on itself or on a worker waiting on it.
+
+| Outcome | Settled as | Caller receives | Exit |
+|---|---|---|---|
+| stored | applied, `{custody: stored, connection, <returns>}` | the result | zero |
+| custody failed (validation, custody, a stop, the deadline) | applied, the error `custody_unavailable` whose data carries `custody: failed` and `created: {<returns>}` | the error, naming the public identifier | non-zero |
+| refused by the provider | refused | the provider's refusal | non-zero |
+| timeout, 5xx or loss after the request was sent | unknown | `outcome_unknown` | non-zero |
+
+An unknown create is never sent again, by a retry, a restart or a recovery: the
+attempt ledger above already fences re-dispatch. The created bytes are in no result,
+ledger entry, audit record, log or error. The catalog fixture journey
+`custody_journey` (`adapters/catalog/tests/local_runtime/custody_journey.rs`) holds each
+row and searches every CLI output and every file under its root for the bytes.
 
 ## Delivery boundary
 

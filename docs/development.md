@@ -252,6 +252,47 @@ fixture files default to `.local/tmp`. For long managed checkouts, supply
 report this option as the missing prerequisite. The runner creates and removes
 its own subdirectory there; the supplied directory, reports and logs remain.
 
+## Live read loop
+
+`connectors-build live-read-loop` is the sustained live acceptance run. For a bounded time, it
+runs a declared set of reads through the `connectors` command line against live connections the
+operator names. It issues no `connections revalidate` and takes no other step between calls.
+It runs on demand on the operator's host, never in CI and never in the gate.
+
+The reads are a `connectors-live-read-loop/1` file kept outside the repository, because it names
+live connections:
+
+```json
+{"format": "connectors-live-read-loop/1", "reads": [
+  {"name": "slack-channels", "adapter": "slack-bot", "connection": "conn_…",
+   "operation": "conversations.list", "input": {"limit": 20}}
+]}
+```
+
+Each read is resolved once with `operations describe` (retried in the next round if that fails).
+It is then invoked every round with `operations invoke`; those are the only two commands the
+loop issues. A call is answered only when it exits 0 with `{"ok":true}`, any provider `status`
+in the result is 2xx and the provider body is not `{"ok":false}`. Anything else is unanswered:
+a refusal, a timeout, a non-JSON answer, or an exit status that contradicts the envelope.
+
+```sh
+cargo run --locked -p connectors-build -- live-read-loop \
+  --reads ~/connectors-live/reads.json --report ~/connectors-live/report-$(date +%Y%m%dT%H%M%S).json \
+  --connectors target/release/connectors --duration-seconds 600
+```
+
+`--config` and `--state-dir` are passed through to `connectors`. `--pause-seconds` (default 10)
+sets the pause between rounds, and `--call-timeout-seconds` (default 60) sets when a call is
+killed and counted unanswered. A round that has started finishes.
+
+The `connectors-live-read-loop-report/1` report must be a new file outside the repository; both
+conditions are checked before the first call. For every call, it records the read, phase,
+round, start, latency, outcome and, for an unanswered call, the refusal: the envelope's `error`
+object or a description of what happened instead. It never records an input, a result or any
+other output. Per-read summaries and totals follow, along with the distinct commands issued
+and the number of revalidations. The command fails when any call went unanswered, when any read
+was never answered or when anything revalidated, and it still writes the report.
+
 ## Documentation website
 
 The Docusaurus site under `website/` builds Connectors' own documentation site on the shared

@@ -466,7 +466,7 @@ impl<C: Clock> Store<C> {
             .upper_unix_ms
             .checked_sub(value.lower_unix_ms)
             .ok_or(Failure::ClockUnavailable)?;
-        if value.lower_unix_ms < 0 || !(0..=4000).contains(&width) {
+        if value.lower_unix_ms < 0 || !(0..=MAX_CLOCK_WIDTH_MS).contains(&width) {
             return Err(Failure::ClockUnavailable);
         }
         let previous: i64 = tx

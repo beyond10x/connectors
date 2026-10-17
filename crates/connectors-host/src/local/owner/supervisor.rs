@@ -3,7 +3,7 @@ use connectors_sdk::Secret;
 use std::{
     collections::BTreeMap,
     sync::{
-        Arc, Condvar, Mutex,
+        Arc, Condvar, Mutex, Weak,
         atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering},
         mpsc,
     },
@@ -79,6 +79,91 @@ fn replaces_a_stale_child(task: &Task) -> bool {
         | Task::Revalidate { .. } => true,
         Task::Validate { .. } | Task::ObserveWrite { .. } => false,
     }
+}
+/// contracts/cli/v1alpha1/semantics.md §6 "Revalidation retries": at most three
+/// validations, 200 ms before the second and 1 s before the third.
+const REVALIDATION_PAUSES: [Duration; 2] = [Duration::from_millis(200), Duration::from_secs(1)];
+/// What must remain before the deadline after a pause and an attempt as long as
+/// the last one.
+const REVALIDATION_MARGIN: Duration = Duration::from_millis(500);
+
+/// The transient class of a failed validation, which a revalidation sends
+/// again; `None` for every other failure, a credential (401), permission (403),
+/// scope, identity or protocol refusal among them, which is never sent again.
+fn transient(failure: runtime::Failure) -> Option<Cause> {
+    use runtime::Failure as F;
+    match failure {
+        F::Unavailable => Some(Cause::ProviderUnavailable),
+        F::Timeout | F::ProviderTimeout => Some(Cause::ProviderTimeout),
+        F::ProviderRateLimited => Some(Cause::ProviderRateLimited),
+        F::ProviderInternal => Some(Cause::ProviderInternal),
+        F::ProviderCapacity => Some(Cause::ProviderCapacity),
+        _ => None,
+    }
+}
+
+/// A revalidation's validation, sent again while it fails transiently, the
+/// adapter process still runs (`attempt` answers its result and whether the
+/// process runs after it), the owner is not `stopping`, and the next pause,
+/// an attempt as long as the last one and the margin end before
+/// `deadline_ms`. A pooled keep-alive connection the provider closed while
+/// the adapter was idle fails one request; the next opens a new connection.
+///
+/// Answers the last result, the number of attempts sent, and the cause class
+/// of a transient final failure.
+fn revalidate_with_retries<T>(
+    deadline_ms: u64,
+    mut attempt: impl FnMut() -> (runtime::Result<T>, bool),
+    mut stopping: impl FnMut() -> bool,
+    mut pause: impl FnMut(Duration),
+) -> (runtime::Result<T>, u32, Option<Cause>) {
+    let mut attempts = 0u32;
+    loop {
+        let started = Instant::now();
+        let (result, alive) = attempt();
+        attempts += 1;
+        let Err(failure) = result else {
+            return (result, attempts, None);
+        };
+        let Some(cause) = transient(failure) else {
+            return (result, attempts, None);
+        };
+        if !alive {
+            // The owner itself ends a child whose request passed its deadline.
+            let cause = if cause == Cause::ProviderTimeout {
+                cause
+            } else {
+                Cause::AdapterExited
+            };
+            return (result, attempts, Some(cause));
+        }
+        if stopping() {
+            return (result, attempts, Some(Cause::OwnerStopping));
+        }
+        let Some(wait) = REVALIDATION_PAUSES.get(attempts as usize - 1).copied() else {
+            return (result, attempts, Some(cause));
+        };
+        let needed = wait + started.elapsed() + REVALIDATION_MARGIN;
+        let remaining = deadline_ms.saturating_sub(connectors_sdk::now_ms());
+        if needed.as_millis() >= u128::from(remaining) {
+            return (result, attempts, Some(cause));
+        }
+        pause(wait);
+        if stopping() {
+            return (result, attempts, Some(Cause::OwnerStopping));
+        }
+    }
+}
+
+/// The owner's failure for a revalidation's validation, naming the cause class
+/// and the attempts only for a transient one.
+fn retried(failure: runtime::Failure, attempts: u32, cause: Option<Cause>) -> Error {
+    let mut error = Error::from(failure);
+    if cause.is_some() {
+        error.cause = cause;
+        error.attempts = Some(attempts);
+    }
+    error
 }
 pub(super) enum Output {
     Bootstrap(runtime::Bootstrap, u64),
@@ -222,9 +307,23 @@ pub(super) struct Pool {
     shutdown_lock: Mutex<()>,
     /// Attempts recovery has settled; the owner's idle clock counts only these.
     settled: Arc<AtomicU64>,
+    /// This pool, as the handle a worker's job reaches another instance's
+    /// worker through: a write that created a credential holds it on its
+    /// custody target's worker. Weak, so a worker never keeps its pool alive;
+    /// empty for a pool not built by [`Pool::shared`].
+    this: Weak<Pool>,
 }
 impl Pool {
+    /// A pool whose workers hold no handle to it: its custody step finds none.
+    #[cfg(test)]
     pub fn new(paths: Arc<Paths>, incarnation: String) -> Self {
+        Self::with_handle(paths, incarnation, Weak::new())
+    }
+    /// [`Pool::new`], shared, its workers holding a handle to it.
+    pub fn shared(paths: Arc<Paths>, incarnation: String) -> Arc<Self> {
+        Arc::new_cyclic(|this| Self::with_handle(paths, incarnation, this.clone()))
+    }
+    fn with_handle(paths: Arc<Paths>, incarnation: String, this: Weak<Pool>) -> Self {
         Self {
             workers: Mutex::new(BTreeMap::new()),
             paths,
@@ -233,6 +332,7 @@ impl Pool {
             stopped: Arc::new(AtomicBool::new(false)),
             shutdown_lock: Mutex::new(()),
             settled: Arc::new(AtomicU64::new(0)),
+            this,
         }
     }
     fn send(
@@ -265,11 +365,12 @@ impl Pool {
             };
             let recovery_pending = Arc::new(AtomicBool::new(false));
             let instance = adapter.instance_id.clone();
+            let pool = self.this.clone();
             let thread = std::thread::Builder::new()
                 .name("connectors-adapter-owner".into())
                 .spawn(move || {
                     worker(
-                        paths, launches, shared, stopped, activity, instance, receiver,
+                        paths, launches, shared, stopped, activity, instance, receiver, pool,
                     )
                 })
                 .map_err(|_| Code::Unavailable)?;
@@ -524,6 +625,8 @@ impl Pool {
         result
     }
 }
+// One argument per piece of state the worker thread shares with its pool.
+#[allow(clippy::too_many_arguments)]
 fn worker(
     paths: Arc<Paths>,
     launches: Arc<Launches>,
@@ -532,6 +635,7 @@ fn worker(
     activity: Activity,
     instance: String,
     receiver: mpsc::Receiver<Work>,
+    pool: Weak<Pool>,
 ) {
     let Activity {
         busy,
@@ -755,6 +859,7 @@ fn worker(
                             lifecycle: &control,
                             epoch: job.epoch,
                             stopped: &stopped,
+                            pool: &pool,
                         },
                     )
                     .map(Output::Write)
@@ -797,7 +902,7 @@ fn worker(
                         &registry,
                         &binding,
                         captured,
-                        Cause::Explicit {
+                        Admission::Explicit {
                             connection: &connection,
                             revision: &revision,
                         },
@@ -907,7 +1012,7 @@ fn worker(
                                 &registry,
                                 &binding,
                                 recollection,
-                                Cause::ReadRecollection,
+                                Admission::ReadRecollection,
                             )?;
                             capture()?
                         }
@@ -994,7 +1099,7 @@ fn worker(
 /// What admitted a revalidation (`connectors.cli.LocalRevalidationCause`,
 /// ess/domains/cli.yaml).
 #[derive(Clone, Copy)]
-enum Cause<'a> {
+enum Admission<'a> {
     /// `connections revalidate`: the only cause that re-pins changed mounted
     /// material or follows a configuration upgrade.
     Explicit {
@@ -1033,7 +1138,29 @@ fn revalidate(
     registry: &registry::Registry,
     binding: &registry::Binding,
     captured: registry::Revalidation,
-    cause: Cause<'_>,
+    admission: Admission<'_>,
+) -> Result<()> {
+    let explicit = matches!(admission, Admission::Explicit { .. });
+    // Only `connections revalidate` carries `cause` and `attempts`
+    // (contracts/cli/v1alpha1/semantics.md, "Revalidation retries"); a read's
+    // recollection answers the read's own failure without them.
+    let answer = |mut error: Error| -> Error {
+        if !explicit {
+            error.cause = None;
+            error.attempts = None;
+        }
+        error
+    };
+    revalidate_inner(scope, active, registry, binding, captured, admission).map_err(answer)
+}
+
+fn revalidate_inner(
+    scope: &Scope<'_>,
+    active: &mut runtime::Child,
+    registry: &registry::Registry,
+    binding: &registry::Binding,
+    captured: registry::Revalidation,
+    admission: Admission<'_>,
 ) -> Result<()> {
     let Scope {
         paths,
@@ -1061,7 +1188,10 @@ fn revalidate(
             return Err(Code::Forbidden.into());
         }
         if stopped.load(Ordering::SeqCst) {
-            return Err(Code::Unavailable.into());
+            return Err(Error {
+                cause: Some(Cause::OwnerStopping),
+                ..Error::from(Code::Unavailable)
+            });
         }
         Ok(())
     };
@@ -1073,10 +1203,10 @@ fn revalidate(
         #[cfg(target_os = "linux")]
         Err(custody::Failure::Missing) if selection.read_only() => {
             registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
-            let Cause::Explicit {
+            let Admission::Explicit {
                 connection,
                 revision,
-            } = cause
+            } = admission
             else {
                 // A read never re-pins changed material.
                 return Err(super::read_error(&selection, custody::Failure::Missing));
@@ -1084,6 +1214,7 @@ fn revalidate(
             let acquired =
                 registry.begin_repair(binding, connection, revision, connectors_sdk::now_ms())?;
             let claim = registry.consume(acquired, connectors_sdk::now_ms())?;
+            let sent = std::cell::Cell::new(0u32);
             let published = super::publish_mounted(
                 paths,
                 &selection,
@@ -1097,7 +1228,19 @@ fn revalidate(
                         .map_err(|_| Code::Unavailable)?
                         .check(epoch)
                         .and_then(|_| check())?;
-                    Ok(active.validate(profile, &secret, deadline)?.into_registry())
+                    let (result, attempts, cause) = revalidate_with_retries(
+                        deadline,
+                        || {
+                            let result = active.validate(profile, &secret, deadline);
+                            (result, active.running().unwrap_or(false))
+                        },
+                        || stopped.load(Ordering::SeqCst),
+                        std::thread::sleep,
+                    );
+                    sent.set(attempts);
+                    result
+                        .map(runtime::Baseline::into_registry)
+                        .map_err(|failure| retried(failure, attempts, cause))
                 },
                 || {
                     control
@@ -1108,6 +1251,10 @@ fn revalidate(
                 },
             );
             if let Err(error) = published {
+                let mut error = error;
+                if sent.get() > 0 && error.attempts.is_none() {
+                    error.attempts = Some(sent.get());
+                }
                 if error.code != Code::OutcomeUnknown {
                     registry.fail(&claim, connectors_sdk::now_ms())?;
                 }
@@ -1121,9 +1268,9 @@ fn revalidate(
             } else {
                 registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
             }
-            return Err(match cause {
-                Cause::Explicit { .. } => Code::CustodyUnavailable.into(),
-                Cause::ReadRecollection => super::read_error(&selection, error),
+            return Err(match admission {
+                Admission::Explicit { .. } => Code::CustodyUnavailable.into(),
+                Admission::ReadRecollection => super::read_error(&selection, error),
             });
         }
     };
@@ -1132,13 +1279,27 @@ fn revalidate(
         registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
         return Err(error);
     }
+    // Only an explicit revalidation follows a configuration upgrade; a read's
+    // recollection is captured against the connection's own binding.
     let upgrade = captured.upgrades();
     let dispatched = registry.dispatch_revalidation(captured, connectors_sdk::now_ms())?;
     drop(guard);
-    let result = active.validate(profile, &material, deadline);
+    let (result, attempts, cause) = revalidate_with_retries(
+        deadline,
+        || {
+            let result = active.validate(profile, &material, deadline);
+            (result, active.running().unwrap_or(false))
+        },
+        || stopped.load(Ordering::SeqCst),
+        std::thread::sleep,
+    );
     let guard = control.lock().map_err(|_| Code::Unavailable)?;
     if let Err(error) = guard.check(epoch).and_then(|_| check()) {
         registry.finish_revalidation(dispatched, Err(None), connectors_sdk::now_ms())?;
+        let mut error = error;
+        if attempts > 0 {
+            error.attempts = Some(attempts);
+        }
         return Err(error);
     }
     match result {
@@ -1160,7 +1321,7 @@ fn revalidate(
             registry.finish_revalidation(dispatched, Err(reason), connectors_sdk::now_ms())?;
             // Repair refuses the changed binding of an upgrade, so a
             // credential the new provider refuses needs a new connection.
-            let mut error = Error::from(error);
+            let mut error = retried(error, attempts, cause);
             error.reconnect = upgrade && reason.is_some();
             return Err(error);
         }
@@ -1685,5 +1846,137 @@ mod dispatch_wait_tests {
             "a read the waiter reported as not dispatched was dispatched after all"
         );
         pool.shutdown().unwrap();
+    }
+}
+
+/// story:revalidation-retries-a-transient-failure: the owner's bounded retry of
+/// a revalidation's validation (contracts/cli/v1alpha1/semantics.md §6
+/// "Revalidation retries").
+#[cfg(test)]
+mod revalidation_retry_tests {
+    use super::*;
+    use runtime::Failure as F;
+
+    /// Runs the retry over scripted attempts, each answering its failure (or
+    /// success) and whether the adapter still runs; answers the outcome and
+    /// the pauses taken.
+    fn run(
+        deadline_ms: u64,
+        script: &[(Option<F>, bool)],
+        stopping: bool,
+    ) -> ((runtime::Result<()>, u32, Option<Cause>), Vec<Duration>) {
+        let mut next = script.iter();
+        let mut pauses = Vec::new();
+        let outcome = revalidate_with_retries(
+            deadline_ms,
+            || {
+                let (failure, alive) = next.next().expect("an attempt past the script");
+                (failure.map_or(Ok(()), Err), *alive)
+            },
+            || stopping,
+            |wait| pauses.push(wait),
+        );
+        (outcome, pauses)
+    }
+
+    fn later() -> u64 {
+        connectors_sdk::now_ms() + 30_000
+    }
+
+    #[test]
+    fn a_stale_pooled_connection_fails_one_attempt_and_the_next_succeeds() {
+        let (outcome, pauses) = run(
+            later(),
+            &[(Some(F::Unavailable), true), (None, true)],
+            false,
+        );
+        assert_eq!(outcome, (Ok(()), 2, None));
+        assert_eq!(pauses, [Duration::from_millis(200)]);
+    }
+
+    #[test]
+    fn a_persistent_transient_failure_is_sent_three_times_and_names_its_class() {
+        for (failure, cause) in [
+            (F::Unavailable, Cause::ProviderUnavailable),
+            (F::ProviderTimeout, Cause::ProviderTimeout),
+            (F::ProviderRateLimited, Cause::ProviderRateLimited),
+            (F::ProviderInternal, Cause::ProviderInternal),
+            (F::ProviderCapacity, Cause::ProviderCapacity),
+        ] {
+            let (outcome, pauses) = run(later(), &[(Some(failure), true); 3], false);
+            assert_eq!(outcome, (Err(failure), 3, Some(cause)), "{failure:?}");
+            assert_eq!(
+                pauses,
+                [Duration::from_millis(200), Duration::from_secs(1)],
+                "{failure:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_credential_permission_or_scope_refusal_is_never_sent_again() {
+        for failure in [
+            F::InvalidCredential,
+            F::Forbidden,
+            F::ProviderForbidden,
+            F::InsufficientScope,
+            F::IdentityMismatch,
+            F::Protocol,
+            F::InvalidConfiguration,
+            F::Unsupported,
+        ] {
+            let (outcome, pauses) = run(later(), &[(Some(failure), true)], false);
+            assert_eq!(outcome, (Err(failure), 1, None), "{failure:?}");
+            assert!(pauses.is_empty(), "{failure:?}");
+        }
+    }
+
+    #[test]
+    fn no_attempt_is_sent_that_could_not_end_before_the_deadline() {
+        // 200 ms pause + 500 ms margin fit in 1 s; the 1 s pause does not.
+        let deadline = connectors_sdk::now_ms() + 1_000;
+        let (outcome, pauses) = run(deadline, &[(Some(F::Unavailable), true); 2], false);
+        assert_eq!(
+            outcome,
+            (Err(F::Unavailable), 2, Some(Cause::ProviderUnavailable))
+        );
+        assert_eq!(pauses, [Duration::from_millis(200)]);
+        // Not even the 200 ms pause and the margin fit.
+        let deadline = connectors_sdk::now_ms() + 600;
+        let (outcome, pauses) = run(deadline, &[(Some(F::Unavailable), true)], false);
+        assert_eq!(
+            outcome,
+            (Err(F::Unavailable), 1, Some(Cause::ProviderUnavailable))
+        );
+        assert!(pauses.is_empty());
+    }
+
+    #[test]
+    fn an_exited_adapter_or_a_stopping_owner_ends_the_retries_by_name() {
+        let (outcome, _) = run(later(), &[(Some(F::Unavailable), false)], false);
+        assert_eq!(
+            outcome,
+            (Err(F::Unavailable), 1, Some(Cause::AdapterExited))
+        );
+        // The owner ends a child whose request timed out; the class stays the timeout.
+        let (outcome, _) = run(later(), &[(Some(F::Timeout), false)], false);
+        assert_eq!(outcome, (Err(F::Timeout), 1, Some(Cause::ProviderTimeout)));
+        let (outcome, pauses) = run(later(), &[(Some(F::Unavailable), true)], true);
+        assert_eq!(
+            outcome,
+            (Err(F::Unavailable), 1, Some(Cause::OwnerStopping))
+        );
+        assert!(pauses.is_empty());
+    }
+
+    #[test]
+    fn only_a_transient_failure_names_its_cause_and_attempts() {
+        let error = retried(F::Unavailable, 3, Some(Cause::ProviderUnavailable));
+        assert_eq!(
+            (error.code, error.cause, error.attempts),
+            (Code::Unavailable, Some(Cause::ProviderUnavailable), Some(3))
+        );
+        let error = retried(F::InvalidCredential, 1, None);
+        assert_eq!((error.cause, error.attempts), (None, None));
     }
 }

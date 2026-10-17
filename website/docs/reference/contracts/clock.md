@@ -17,32 +17,67 @@ Rendered from [`contracts/service/clock.md`](https://github.com/beyond10x/connec
 
 The approval and retention clocks require an interval containing current UTC;
 [delegation](./delegation.md#5-time-deadlines-and-durable-uniqueness) limits approval
-interval width to 4,000 ms. This binding supplies that interval under explicit
-infrastructure trust. A signed timestamp authenticates a source's assertion; it
-does not prove that the source or the local hardware keeps correct time.
+interval width to 8,000 ms. This binding supplies that interval from a quorum of
+explicitly trusted Roughtime sources. A signed timestamp authenticates a source's
+assertion; it does not prove that the source or the local hardware keeps correct
+time.
 
 ## Configuration and trust
 
 The optional `approval_clock` table in local configuration selects format
-`roughtime-clock/1`, one numeric UDP `address`, an exact canonical base64 Ed25519
-`public_key`, and `max_rate_error_ppm` in 1..10,000. There is no ambient server,
-DNS/key discovery, default key or fallback to SystemTime. The configured owner
-admits the source's UTC uncertainty assertions and a bound on the local Linux
+`roughtime-quorum/1`, a `quorum`, `max_rate_error_ppm` in 1..10,000 and two to
+eight `[[approval_clock.sources]]`. Each source names one numeric UDP `address`,
+an exact canonical base64 Ed25519 `public_key` and the one wire `version` it
+speaks. The one admitted version is `roughtime-0x8000000c` (the draft-19 test
+version); a version ships only with its verifier and a recorded signed reply, so
+any other value, `roughtime-1` included, is refused as an unknown version. `quorum` is two to eight and at
+most the number of sources. No two sources share an address or a key (an
+IPv4-mapped IPv6 address is its IPv4 address): two entries
+for one key are one operator counted twice. There is no ambient server, DNS/key
+discovery, default key or fallback to SystemTime. The configured owner admits the
+sources' UTC uncertainty assertions and a bound on the local Linux
 CLOCK_MONOTONIC frequency error, including oscillator and kernel adjustments.
 The rate bound is a deployment assertion, not a value measured or certified by
-this client; selecting an arbitrary value does not qualify a machine. A deployment
-without those assurances must leave this profile unavailable.
+this client; selecting an arbitrary value does not qualify a machine. That the
+sources are run by independent operators is a deployment assertion too, which
+the client cannot check. A deployment without those assurances must leave this
+profile unavailable.
 
-The source must include UTC/leap-second uncertainty in its signed radius. This
-is an explicitly trusted single-source binding, not the Roughtime ecosystem's
-multi-server measurement, malfeasance-reporting or automatic trust-update client.
-The owning operator must retire compromised/stale source keys. A cryptographically
-valid but false source assertion violates the admitted infrastructure assumption.
-There is no defense against a compromised local kernel, time namespace changes,
-VM snapshot/time rollback or a timer whose configured rate bound does not hold.
+```toml
+[approval_clock]
+format = "roughtime-quorum/1"
+quorum = 2
+max_rate_error_ppm = 10000
+
+[[approval_clock.sources]]
+address = "192.0.2.10:2002"
+public_key = "<44-character base64 Ed25519 root key>"
+version = "roughtime-0x8000000c"
+
+[[approval_clock.sources]]
+address = "198.51.100.20:2002"
+public_key = "<another source's key>"
+version = "roughtime-0x8000000c"
+```
+
+The retired single-source format `roughtime-clock/1` (one `address`, one
+`public_key`) still parses, so the rest of the configuration loads, but every use
+of the clock refuses it as `invalid_configuration` naming the configuration rule
+`approval_clock_format_retired`; it is never read as a one-source quorum. Any other
+format string, or a malformed quorum table, refuses the whole configuration.
+
+Each source must include UTC/leap-second uncertainty in its signed radius. The
+answer contains true UTC whenever at least `quorum` counted sources tell the truth;
+one lying source among honest ones cannot move it off true time, only widen it up to
+the cap. `quorum` or more colluding sources can set a false answer, and a quorum
+equal to the number of sources tolerates no liar. This is not the Roughtime
+ecosystem's malfeasance-reporting or automatic trust-update client. The owning
+operator must retire compromised/stale source keys. There is no defense against a
+compromised local kernel, time namespace changes, VM snapshot/time rollback or a
+timer whose configured rate bound does not hold.
 
 Configuration is non-secret, private-owner-checked TOML. Its complete canonical
-digest identifies the clock selection. A sampled clock grants no key, caller,
+digest, source order included, identifies the clock selection. A sampled clock grants no key, caller,
 approval or dispatch authority; the consuming coordinator must retain/recheck its
 current clock trust selection alongside its current policy before admitting use.
 The clock client itself adds no SQLite migration, persistent clock cache or
@@ -66,17 +101,22 @@ older value can admit at most 60,000 ms of regression.
 
 ## Authenticated acquisition
 
-The selected wire format is the explicit test version `0x8000000c` of
+Each source is asked at its configured version only, in the wire format of
 [Roughtime draft 19](https://datatracker.ietf.org/doc/html/draft-ietf-ntp-roughtime-19),
-using seconds for MIDP/MINT/MAXT/RADI. No version downgrade is attempted. A fresh
-32-byte cryptographic nonce and server-key commitment bind a 1,024-byte request.
-The client makes one connected UDP exchange, with a two-second overall deadline
-and a response no larger than the request. Numeric endpoints avoid an unbounded
-resolver step. There are no automatic network retries.
+using seconds for MIDP/MINT/MAXT/RADI; the request carries that version as VER.
+There is no negotiation and no downgrade. A fresh 32-byte cryptographic nonce and
+server-key commitment per source bind a 1,024-byte request. All sources are asked
+in parallel, each over its own connected UDP socket; one shared two-second deadline
+starts after every socket is connected and covers every send, receive and
+verification, so the total network wait does not grow with the number of sources.
+A source with no verified reply by the deadline is `unreachable`. A response is no
+larger than the request. Numeric endpoints avoid an unbounded resolver step. There
+are no automatic network retries.
 
 Before accepting a response, verify exact framing, bounded/ordered unique tags
-and offsets, required field widths, response TYPE, echoed NONC, selected signed
-VER, bounded strictly ordered VERS including the selected version, positive RADI,
+and offsets, required field widths, response TYPE, echoed NONC, signed VER equal
+to the source's configured version, bounded strictly ordered VERS including that
+version, positive RADI,
 both Ed25519 signatures, the inclusive delegated-key time interval, and the
 Merkle path using the first 32 bytes of SHA-512 over the complete request packet, including
 zero remaining index bits. Unknown tags and advertised versions have no authority;
@@ -87,8 +127,10 @@ failure. Acquisition happens outside metadata transactions.
 
 ## Local continuation and bounds
 
-The estimate is a non-serializable process-bound value, valid for at most 30 seconds
-from the monotonic sample preceding nonce creation. A new process or restart must
+The estimate is a non-serializable process-bound value, valid while every counted
+source is within 30 seconds of its own monotonic sample preceding nonce creation.
+The counted set is fixed at acquisition: a later reading never adds a source or
+drops one whose window passed; it refuses. A new process or restart must
 acquire new evidence. It holds no socket after acquisition. Each `Clock::now`
 performs bounded local clock reads and checked arithmetic only, with no network,
 metadata or blocking synchronization.
@@ -115,24 +157,43 @@ time the machine sleeps, so their offset moves only by time asleep.
 `QueryUnbiasedInterruptTime` and `QueryInterruptTime` advance only at each timer
 interrupt, about 15.6 ms by default, and are not used.
 
-Let S and R be monotonic readings before nonce creation and after receipt, N the
-current reading, p the admitted parts-per-million rate error, and q=1,000,000.
-For measured elapsed d, conservative real elapsed bounds are
-`max(0, d - 2 ms) * q / (q + p)` and
-`(d + 2 ms) * q / (q - p)`, rounded outward. With signed midpoint M and radius A,
-the current interval is `[M-A + elapsed_lower(N-R) - 3 ms,
-M+A + elapsed_upper(N-S) + 3 ms]`, rounded outward to Unix milliseconds.
+Let S_i and R_i be source i's monotonic readings before its nonce creation and
+after its reply's receipt, N the current reading, p the admitted parts-per-million
+rate error, and q=1,000,000. For measured elapsed d, conservative real elapsed
+bounds are `max(0, d - 2 ms) * q / (q + p)` and `(d + 2 ms) * q / (q - p)`, rounded
+outward. With source i's signed midpoint M_i and radius A_i, its interval is
+`[M_i-A_i + elapsed_lower(N-R_i) - 3 ms, M_i+A_i + elapsed_upper(N-S_i) + 3 ms]`.
 The complete request/response delay is therefore included; no symmetric-delay
 assumption or best-case network subtraction is permitted.
 
-The conservative elapsed upper bound from S must remain at most 30,000 ms.
-Every observation must be within 0..9007199254740991 Unix ms, ordered and at most
-4,000 ms wide. Expiry, overflow, uncertain continuity, excessive radius/delay or
-clock-read failure returns unavailable, never expiry proof for a retained key.
+A source is counted when its reply verified, whatever its own radius or interval
+width; no single source is too imprecise, and only the combined answer is capped.
+A counted source whose signed values give no interval (M_i below A_i + 3 ms, or an
+endpoint past the representable range) contributes none and is an `outlier`; it
+never refuses the acquisition or a later reading on its own.
+Fewer than `quorum` counted sources
+refuses `below_quorum`. The answer is the hull of the instants that at least
+`quorum` counted intervals contain (closed intervals), rounded outward to Unix
+milliseconds: its lower bound is the earliest such instant, its upper bound the
+latest. If no instant lies in `quorum` counted intervals the acquisition refuses
+`split`. Every interval is convex, so if at least `quorum` counted intervals contain
+true UTC the answer does too, whatever the other intervals are; the guarantee needs
+no per-source width bound, and a wide or lying interval can only widen the answer.
+
+Each counted source's conservative elapsed upper bound from S_i must remain at most
+30,000 ms. Every answer must be within 0..9007199254740991 Unix ms, ordered and at
+most 8,000 ms wide; a wider answer refuses `too_imprecise`. Expiry, overflow,
+uncertain continuity, excessive delay or clock-read failure returns
+unavailable, never expiry proof for a retained key.
 Without an admitted leap-announcement source, do not extrapolate across any UTC
-midnight: the original lower bound and current upper bound must lie in the same
-UTC day, at least one second after its start and strictly more than one second
-before its end. This conservative daily refusal window covers both positive and
+midnight. The origin is the answer's lower bound as acquired, at the latest
+counted R_i, back-dated by the conservative elapsed upper bound from the earliest
+counted S_i to that R_i; it depends only on the counted samples. The origin and
+each reading's upper bound must lie in the same UTC day, the origin at least one
+second after its start and the upper bound strictly more than one second before
+its end, so no span from a sample to a reading crosses a possible leap.
+No single source's interval is the origin, so an outlier on another UTC day or a
+wide counted source reaching across midnight never refuses the answer. This conservative daily refusal window covers both positive and
 negative leap seconds without claiming leap-calendar authority; see
 [NIST's UTC explanation](https://www.nist.gov/pml/time-and-frequency-division/leap-seconds-faqs).
 This bound is conditional on the explicitly admitted source and timer assumptions;
@@ -142,7 +203,8 @@ deterministic tests establish the calculation, not those physical assumptions.
 
 `connectors approvals clock-check --adapter <alias>` resolves the configured owner
 and adapter, checks the configured clock and returns the adapter alias, clock
-configuration digest and current interval. It creates no metadata, reads no secret,
+configuration digest, current interval and one line per configured source. It
+creates no metadata, reads no secret,
 starts no owner/adapter and issues no approval. Unconfigured/invalid clock selection
 is a configuration refusal; authentication, transport or time-bound failure is a
 safe operational refusal. Its output is an observation, never reusable evidence
@@ -150,22 +212,38 @@ for a later operation. Listing and existing setup/status commands do not query i
 
 ### Refusals
 
-An acquisition that yields no observation names one of three causes, each with its
-own next action. None changes a bound above: the deadline, the width, the protocol
-version and the trusted source stay as configured.
+Every observation and every quorum refusal carries one line per configured source,
+in configuration order (`connectors.clock.SourceReport`): its zero-based `index`, its
+`address`, its `result` and, exactly when its reply verified, its signed radius in
+`radius_ms`.
 
-| Cause | When | Next action |
+| `result` | Meaning |
+|---|---|
+| `agreed` | counted; its interval meets the answer |
+| `outlier` | counted; its interval is disjoint from the answer, so it is wrong or its operator's assertion failed |
+| `verified` | counted; no answer formed (a refusal) |
+| `unreachable` | no verified reply by the shared deadline, or a send or receive error |
+| `unverified` | a reply that does not parse, carries another nonce or version, or fails either signature, the delegation interval or the Merkle path |
+
+An acquisition that forms no answer names one combined refusal
+(`connectors.clock.Refusal`), each with its own next action. None changes a bound
+above: the deadline, the width, the versions and the trusted sources stay as
+configured.
+
+| Refusal | When | Next action |
 |---|---|---|
-| `unreachable` | no reply within the query deadline, or a send or receive error | `retry_explicitly`: retry later, or check the configured address |
-| `unverified` | a reply that does not parse, carries another nonce or version, or fails either signature, the delegation interval or the Merkle path | `check_configuration`: check the configured key and the source's protocol version |
-| `too_imprecise` | a verified reply whose signed radius, with the measured delay and timer-rate error, makes the interval wider than 4,000 ms | `choose_clock_source`: select a source with a smaller radius |
+| `below_quorum` | fewer than `quorum` counted sources | `check_configuration` if any source is `unverified`; else `retry_explicitly` |
+| `split` | no instant lies in `quorum` counted intervals | `choose_clock_source`: a source is wrong; find it from the per-source lines and retire its key |
+| `too_imprecise` | the combined answer is wider than 8,000 ms (never a single source) | `choose_clock_source`: select more precise sources |
 
-`too_imprecise` carries the signed radius in milliseconds. A local timer,
-continuity or UTC-midnight refusal names no cause. No refusal carries the
-observation's bounds, the request or the reply bytes.
+An `outlier` on a successful observation is not a refusal: the answer still holds
+under the quorum, and the line names the key to examine. A local timer, continuity,
+overflow or UTC-midnight refusal names no refusal and no source lines. No
+observation or refusal carries a source's own interval, the request or the reply
+bytes.
 
 Verification must cover independent signed response fixtures and an explicit live
-source check; nonce/key/version/framing/Merkle substitutions; unknown metadata;
+quorum check; nonce/key/version/framing/Merkle substitutions; unknown metadata;
 oversized, unavailable and delayed peers; exact interval/expiry/rate/overflow
 boundaries; process restart/fork and suspend/clock discontinuity; and production
 CLI checks with unchanged read-only lifecycle and no service start or secret access.

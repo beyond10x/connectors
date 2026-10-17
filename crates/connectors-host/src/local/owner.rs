@@ -5,6 +5,8 @@ mod lifecycle;
 mod maintenance;
 pub mod mutation;
 mod supervisor;
+#[cfg(unix)]
+mod tether;
 mod transport;
 use super::{
     config::{Adapter, Config, Paths},
@@ -62,6 +64,20 @@ pub enum Code {
     /// [`Error::store_version`] names its release or `unrecorded`.
     MetadataSchemaNewer,
 }
+/// The transient class a revalidation failure ended on after the owner's
+/// bounded retries (`connectors.cli.FailureCause`, contracts/cli/v1alpha1/semantics.md
+/// §6 "Revalidation retries").
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Cause {
+    ProviderUnavailable,
+    ProviderTimeout,
+    ProviderRateLimited,
+    ProviderInternal,
+    ProviderCapacity,
+    AdapterExited,
+    OwnerStopping,
+}
 /// Who refused. The same [`Code`] can be the host's own admission refusal or
 /// the provider's answer to a dispatched call; the CLI reports them at
 /// different stages.
@@ -115,6 +131,17 @@ pub struct Error {
     /// names, or `unrecorded` (semantics.md §3).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub store_version: Option<String>,
+    /// On `invalid_configuration` from a clock use only: the configured
+    /// `[approval_clock]` is the retired `roughtime-clock/1` table
+    /// (`approval_clock_format_retired`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub clock_format_retired: bool,
+    /// On a revalidation's transient failure only: the class of its last
+    /// attempt, and the number of validations the owner sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cause: Option<Cause>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attempts: Option<u32>,
 }
 impl From<Code> for Error {
     fn from(code: Code) -> Self {
@@ -129,10 +156,29 @@ impl From<Code> for Error {
             reconfigure: false,
             revalidate: false,
             store_version: None,
+            clock_format_retired: false,
+            cause: None,
+            attempts: None,
         }
     }
 }
 impl Error {
+    /// A clock use that got no clock: a retired `roughtime-clock/1` table or
+    /// another invalid clock configuration is `invalid_configuration`, and
+    /// any other refusal is `unavailable`.
+    pub(crate) fn clock(
+        selected: &super::clock::ApprovalClock,
+        failure: super::clock::Failure,
+    ) -> Self {
+        match failure {
+            super::clock::Failure::InvalidConfiguration => {
+                let mut error = Self::from(Code::InvalidConfiguration);
+                error.clock_format_retired = selected.is_retired();
+                error
+            }
+            super::clock::Failure::Unavailable => Code::Unavailable.into(),
+        }
+    }
     /// `metadata_schema_newer`, naming the marker's release or `unrecorded`.
     #[must_use]
     pub fn schema_newer(store: Option<super::Release>) -> Self {
@@ -250,6 +296,9 @@ impl From<runtime::Failure> for Error {
             reconfigure: false,
             revalidate: false,
             store_version: None,
+            clock_format_retired: false,
+            cause: None,
+            attempts: None,
         }
     }
 }
@@ -788,6 +837,7 @@ mod cached_tests {
                 permissions: super::super::config::Permissions {
                     profiles: BTreeSet::new(),
                     operations: BTreeSet::new(),
+                    custody: Default::default(),
                 },
             },
         );

@@ -1,0 +1,11 @@
+[
+  {
+    "file": "openrouter-openapi.json",
+    "url": "https://openrouter.ai/openapi.json",
+    "upstream_sha256": "8287890b719d375d64b5651ca4fa2bc34be3af84b24e8fceb8ab13ae9894fe12",
+    "upstream_bytes": 2690928,
+    "redaction": "upstream-redaction/3",
+    "sha256": "fe4f1ad414f5bd25e69b387598d23f3abd24fe74801cd157c633e30bbf766142",
+    "bytes": 2690724
+  }
+]

@@ -94,6 +94,8 @@ fn adapter(pod_logs: bool, routes: Vec<(&str, u16, &[u8])>) -> (Kubernetes, Arc<
         helm_release_reads: HelmReleaseReads::Off,
         pod_logs,
         pod_exec: false,
+        node_reads: false,
+        custom_resources: Vec::new(),
         kubeconfig_contexts: false,
     };
     let effective = json!({"service":{"instance":"recorded","listen":"127.0.0.1:0","service_credential":{"kind":"environment","name":"UNUSED"}},"http":{"base_url":"https://fixture.invalid/"},"adapter":config});

@@ -76,7 +76,7 @@ types:
     fields:
       - {name: adapter, type: String}
       - {name: observation, type: connectors.clock.Observation}
-    # ESS-LIMIT: clock.md:84 orders an observation (upper >= lower). The comparison
+    # ESS-LIMIT: clock.md:163 orders an observation (upper >= lower). The comparison
     # is writable here, but ESS 0.52 `specify cli` refuses any invariant on a CLI
     # type ("unsupported invariants or union semantics"), so it is not declared.
   - name: connectors.cli.ApprovalKeyState
@@ -319,6 +319,9 @@ types:
       - {name: profile, type: String}
       - {name: scopes, type: "List<String>"}
       - {name: effect, type: connectors.cli.PrivateOperationEffect}
+      # Present and true only for a write whose answer carries a credential it
+      # created (connectors.mutations.CredentialCustody); absent otherwise.
+      - {name: custody, type: "Optional<Boolean>"}
   - name: connectors.cli.PrivateAdapterBootstrap
     kind: struct
     fields:
@@ -566,6 +569,19 @@ types:
   - name: connectors.cli.NextAction
     kind: enum
     variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, upgrade, choose_clock_source, none]
+  # Which transient class a `connections revalidate` failure at stage dispatch ended on,
+  # after the owner's bounded retries within the revalidation deadline
+  # (contracts/cli/v1alpha1/semantics.md §6, "Revalidation retries"). provider_unavailable:
+  # the adapter's validation answered unavailable (a provider connection refused, reset or
+  # closed, a name that does not resolve; an adapter whose identity or scope probe maps
+  # an HTTP 429 or 5xx to unavailable). provider_timeout: the probe's deadline passed.
+  # provider_rate_limited and provider_internal: an adapter that reports the provider's 429
+  # or internal error itself. provider_capacity: a marked upstream capacity answer.
+  # adapter_exited: the adapter process was no longer running after the failed attempt.
+  # owner_stopping: the owner began to stop during the revalidation.
+  - name: connectors.cli.FailureCause
+    kind: enum
+    variants: [provider_unavailable, provider_timeout, provider_rate_limited, provider_internal, provider_capacity, adapter_exited, owner_stopping]
   - name: connectors.cli.ConfigurationFormat
     kind: enum
     variants: [connectors-local/1, connectors-local/2, connectors-local/3, connectors-local/4]
@@ -573,10 +589,14 @@ types:
   # §3): no absolute configuration path resolves (config_path_unresolved), no file is
   # at the resolved path (config_missing), the file or a directory above it is not
   # owner-only (config_not_private), or owner_uid is not the effective user
-  # (owner_uid_mismatch). It names the rule only, never a path or OS text.
+  # (owner_uid_mismatch). approval_clock_format_retired is a clock use's refusal, not a
+  # whole-configuration one: the [approval_clock] table is the retired single-source
+  # roughtime-clock/1 shape, which loads but answers no clock use until it is rewritten
+  # as roughtime-quorum/1 (docs/local-clock.md). It names the rule only, never a path
+  # or OS text.
   - name: connectors.cli.ConfigurationRule
     kind: enum
-    variants: [config_path_unresolved, config_missing, config_not_private, owner_uid_mismatch]
+    variants: [config_path_unresolved, config_missing, config_not_private, owner_uid_mismatch, approval_clock_format_retired]
   - name: connectors.cli.InitDisposition
     kind: enum
     variants: [created, state_initialized]
@@ -643,23 +663,33 @@ types:
       # by tests.
       - {name: store_version, type: "Optional<String>"}
       - {name: binary_version, type: "Optional<String>"}
-      # ESS-LIMIT: clock_refusal appears only on an approval clock's `unavailable`
-      # (`stage = observation`), naming why no observation resulted
-      # (contracts/service/clock.md, "Refusals"); clock_radius_ms, the source's signed
-      # radius in milliseconds, appears exactly when it is too_imprecise. As for
-      # instance_id above, ESS declares no invariant on a CLI type, so the presence
-      # rules are enforced by the host and pinned by tests.
-      - {name: clock_refusal, type: "Optional<connectors.cli.ClockRefusal>"}
-      - {name: clock_radius_ms, type: "Optional<Integer>"}
-  # Why an approval clock acquisition produced no observation, each with its own
-  # next action: unreachable (no reply within the query timeout, or a send or receive
-  # error; retry_explicitly), unverified (the reply did not parse or verify against the
-  # configured key and protocol version; check_configuration), too_imprecise (a verified
-  # reply whose signed radius, with the measured delay and timer-rate error, is wider
-  # than the clock contract admits; choose_clock_source).
-  - name: connectors.cli.ClockRefusal
-    kind: enum
-    variants: [unreachable, unverified, too_imprecise]
+      # ESS-LIMIT: custody and created appear together, only on `custody_unavailable` after
+      # a write that created a credential and applied (connectors.mutations.CredentialCustody):
+      # custody is `failed` and created holds the public members the selection returns, such
+      # as a key's hash, so the operator can revoke the credential at the provider. Never the
+      # credential. As for instance_id above, the presence rule is enforced by the host and
+      # pinned by tests.
+      - {name: custody, type: "Optional<connectors.mutations.CustodyOutcome>"}
+      - {name: created, type: "Optional<Map<String, String>>"}
+      # ESS-LIMIT: clock_refusal and clock_sources appear together, only on an approval
+      # clock's `unavailable` (`stage = observation`) when the quorum formed no answer
+      # (contracts/service/clock.md, "Refusals"): clock_refusal is the combined
+      # connectors.clock.Refusal with its next action, clock_sources one line per
+      # configured source in configuration order. A local timer, continuity, overflow
+      # or UTC-midnight refusal carries neither. As for instance_id above, ESS declares
+      # no invariant on a CLI type, so the presence rules are enforced by the host and
+      # pinned by tests.
+      - {name: clock_refusal, type: "Optional<connectors.clock.Refusal>"}
+      - {name: clock_sources, type: "Optional<List<connectors.clock.SourceReport>>"}
+      # ESS-LIMIT: cause and attempts appear only on a `connections revalidate` failure at
+      # stage dispatch that the owner classified as transient (contracts/cli/v1alpha1/semantics.md
+      # §6, "Revalidation retries"): cause names the class of the last attempt, attempts the
+      # number of validations the owner sent (1 to 3), when it sent any. A credential,
+      # permission or scope refusal is never retried and carries neither. As for instance_id
+      # above, ESS declares no invariant on a CLI type, so the presence rule and the range are
+      # enforced by the host and pinned by tests.
+      - {name: cause, type: "Optional<connectors.cli.FailureCause>"}
+      - {name: attempts, type: "Optional<Integer>"}
   # setup check names its prerequisites: configuration, metadata, artifact:<alias>,
   # keyring and persistent_custody_qualification under a platform binding; under the
   # explicitly selected mounted_secret binding, mounted_custody (the configured
@@ -1195,7 +1225,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:534, docs/local-connection-registry.md:184-185;
+    # contracts/cli/v1alpha1/semantics.md:541, docs/local-connection-registry.md:184-185;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1355,7 +1385,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:538) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:545) and the host
     # removal path (er.rs:4327-4329) only expires Active cursors. The error name is
     # the decision; no source names one.
 

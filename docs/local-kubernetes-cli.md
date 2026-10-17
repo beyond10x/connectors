@@ -40,12 +40,12 @@ Replace the example target and scope with your cluster coordinates:
 `resource_kinds` are the complete configured scope: a request outside either is
 refused before any provider work, and no wildcard or all-namespaces mode is
 available in this profile. `resource_kinds` accepts only `pods`, `services`,
-`deployments`, `endpointslices`, `replicasets` and `events` (the core/v1 Event
+`deployments`, `endpointslices`, `replicasets`, `statefulsets` and `events` (the core/v1 Event
 collection that `kubectl get events` reads). The optional `ca_file` names an owner-only PEM
 certificate file; supply the cluster CA there when it is not in the system store.
 
 `discover_hosts` is optional and defaults to false. While it is false the adapter
-does not advertise `hosts.discover` at all, so node reads cannot be requested.
+does not advertise `hosts.discover` at all, so the node projection cannot be requested; `node_reads` below admits the full Node objects separately.
 
 `helm_release_reads` is optional and defaults to `"off"`. It selects how much of
 a Helm release this binding may read:
@@ -56,13 +56,13 @@ a Helm release this binding may read:
 | `"metadata"` | `helm_releases.history`, `helm_releases.status` |
 | `"redacted_content"` | those two plus `helm_releases.values`, `helm_releases.manifest` |
 
-Release reads do not touch `resource_kinds`: that enum stays the six kinds above,
+Release reads do not touch `resource_kinds`: that enum stays the seven kinds above,
 and no setting adds a general Secret read.
 Adding or changing this field changes the effective document, so the
 `configuration_revision` changes with it and must be copied from
 `--print-local-bootstrap` again.
 
-Three more fields are optional and each enables one operation. Absent, each is
+Five more fields are optional and each enables one operation. Absent, each is
 off and leaves the effective document, and so the `configuration_revision`, as it
 was before the field existed; set, it changes the revision.
 
@@ -71,6 +71,8 @@ was before the field existed; set, it changes the revision.
 | `pod_logs` | `pods.logs` ([Read pod logs](#read-pod-logs)) | `true`; absent means false |
 | `kubeconfig` | `contexts.list` ([List kubeconfig contexts](#list-kubeconfig-contexts)) | the absolute path of an owner-only kubeconfig file |
 | `pod_exec` | `pods.exec`, a write ([Run a command in a pod](#run-a-command-in-a-pod)) | `true`; absent means false |
+| `node_reads` | `nodes.list` ([Read statefulsets, nodes and custom resources](#read-statefulsets-nodes-and-custom-resources)) | `true`; absent means false |
+| `custom_resources` | `custom_resources.list` (same section) | a list of `{"group","version","plural"}` collections; absent or empty means none |
 
 ```json
 {
@@ -91,8 +93,10 @@ Pod logs are admitted apart from `resource_kinds`, because log text routinely
 carries values a pod object does not. The kubeconfig is read and parsed once when
 the configuration loads, and a path that is not an owner-only, readable kubeconfig
 refuses the configuration; the revision records a digest of the path, not of the
-file. The federated service configuration can enable `pod_logs`, but not
-`kubeconfig` or `pod_exec`.
+file. The federated service configuration can enable `pod_logs`, `node_reads`
+and `custom_resources`, but not
+`kubeconfig`, `pod_exec` or `exec_plugin`
+([Authenticate through an exec credential plugin](#authenticate-through-an-exec-credential-plugin)).
 
 The block above is the file format. The adapter's published
 `configuration_schema` has two branches, and the local one describes the
@@ -217,6 +221,116 @@ carries its own lifetime inside the credential, which this adapter does not deco
 so `credential_expires_at_ms` is absent — meaning not observed, not unlimited. An
 expired token is reported when it is next used.
 
+## Authenticate through an exec credential plugin
+
+A cluster whose kubeconfig user authenticates through an `exec` credential plugin,
+such as `aws eks get-token` for EKS, is reached by naming that plugin in the native
+configuration. The adapter runs it only under these rules, from the
+[reads contract](../adapters/kubernetes/contracts/reads/v1alpha1/semantics.md#exec-plugin-credentials):
+
+- **Pinned.** `exec_plugin.path` is the plugin's absolute path and
+  `exec_plugin.sha256` the SHA-256 of its bytes. Both are checked before every run;
+  a different file refuses with `invalid_configuration` and nothing runs. The file
+  must not be writable by group or others, must carry no set-user-ID or
+  set-group-ID bit and no file capabilities (`getcap` shows none), and must be
+  owned by root or by you. `path` must name the file
+  itself, not a symbolic link: the adapter opens it once without following a
+  link, hashes it through that open file and runs that same open file, so a file
+  swapped in at `path` after the check never runs. The plugin inherits no open
+  file of the adapter beyond its standard streams. Plugins run on Linux only.
+- **Arguments from the kubeconfig, as data.** `exec_plugin.user` names the
+  kubeconfig `users` entry; its `exec.args` become the argument vector, and no shell
+  runs. The entry's `exec.command` must be the pinned path, written exactly as in
+  `exec_plugin.path`, or its bare file name
+  (`aws` for `/usr/local/aws-cli/v2/current/bin/aws`): the kubeconfig cannot pick
+  another program. The kubeconfig is read each time the plugin runs, not while a
+  held token is reused.
+- **Nothing inherited that you did not name.** The plugin starts from an empty
+  environment. It receives `HOME` only when `exec_plugin.home` is set (and runs in
+  that directory, otherwise in `/`), `KUBERNETES_EXEC_INFO`, and each name in
+  `exec_plugin.env`, valued from the kubeconfig's `exec.env` or, failing that, from
+  the adapter's own environment. A kubeconfig `exec.env`
+  name that is not in `exec_plugin.env` refuses. `exec_plugin.env` itself cannot
+  name one of the variables the
+  [reads contract](../adapters/kubernetes/contracts/reads/v1alpha1/semantics.md#exec-plugin-credentials)
+  lists because they load code or change how a loader or shell starts (`LD_*`,
+  `PYTHON*`, `DOTNET_*`, `BASH_ENV`, `ZDOTDIR`, `OPENSSL_CONF`, `GLIBC_TUNABLES`
+  and the rest); a configuration that does is refused. That list is exact, not
+  every variable a plugin might read: any other name you allow-list is yours to
+  judge. File reads are not sandboxed: point
+  `home` at the directory holding the plugin's profile files (for the AWS CLI, the
+  one containing `.aws/config` and `.aws/credentials`).
+- **Bounded, and only when admitted.** It runs inside a connect, repair or
+  operation, never while loading the configuration, listing or describing.
+  `exec_plugin.timeout_ms` (1 to 60000, default 10000) bounds one run; at the
+  deadline its whole process group and the plugin itself are killed (`timeout`),
+  even if the plugin moved itself to another group, and anything it left
+  running in its group is killed when it finishes. A process that left the
+  plugin's group is not followed and keeps running. More than 64 KiB of
+  output is refused (`protocol`), as is an answer that is not an `ExecCredential`
+  with a bearer token; a non-zero exit is `unavailable`.
+- **Token in memory only.** The token is reused until its `expirationTimestamp`,
+  then the plugin runs again; an `expirationTimestamp` already past (Go's zero
+  time `0001-01-01T00:00:00Z` included) serves only the use that ran it. It is never written to disk. The adapter process
+  holds it, so stopping the adapter forgets it.
+
+`exec_plugin` requires `kubeconfig`. No default configuration sets it. With it set,
+the bootstrap offers the profile `kubernetes.exec_plugin` instead of
+`kubernetes.token`, and every operation requires that profile.
+
+```json
+{
+  "format": "connectors-kubernetes-local/1",
+  "instance": "eks-local",
+  "api_base": "https://ABCDEF0123456789.gr7.eu-central-1.eks.amazonaws.com/",
+  "ca_file": "/absolute/private/eks-ca.pem",
+  "namespaces": ["default"],
+  "resource_kinds": ["pods", "deployments", "statefulsets"],
+  "kubeconfig": "/absolute/private/kubeconfig",
+  "exec_plugin": {
+    "path": "/usr/local/aws-cli/v2/current/bin/aws",
+    "sha256": "REPLACE_WITH_sha256sum_OF_THE_PLUGIN",
+    "user": "arn:aws:eks:eu-central-1:111122223333:cluster/fixture",
+    "env": ["AWS_PROFILE", "AWS_REGION"],
+    "home": "/absolute/private/eks-home",
+    "timeout_ms": 15000
+  }
+}
+```
+
+The kubeconfig entry it selects is the one `aws eks update-kubeconfig` writes:
+
+```yaml
+users:
+- name: arn:aws:eks:eu-central-1:111122223333:cluster/fixture
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      command: aws
+      args: ["--region", "eu-central-1", "eks", "get-token", "--cluster-name", "fixture", "--output", "json"]
+      env:
+      - name: AWS_PROFILE
+        value: fixture
+```
+
+Pin the plugin with `sha256sum` of the file `path` names. The AWS CLI's
+installer makes `/usr/local/bin/aws` a symbolic link, so name the file it
+resolves to (`readlink -f "$(command -v aws)"`); a directory link on the way,
+such as `current`, is followed. Upgrading the plugin changes its digest, so the
+configuration and its `configuration_revision` change with it. Grant
+`profiles = ["kubernetes.exec_plugin"]` in the adapter entry. The protected
+entry is not a secret: it is `{"user":"..."}`, the same kubeconfig user name,
+which confirms whom the plugin runs for:
+
+```sh
+printf '{"user":"%s"}' 'arn:aws:eks:eu-central-1:111122223333:cluster/fixture' |
+  target/release/connectors --output json connections connect --adapter cluster --profile kubernetes.exec_plugin --credential-stdin
+```
+
+Connect runs the plugin once and validates its token with the SelfSubjectReview
+above; the identity saved is the username the cluster maps the plugin's identity
+to.
+
 ## Read resources, endpoints and hosts
 
 Use `operations describe` for each operation's current schema and descriptor
@@ -230,6 +344,8 @@ revision, then invoke with the saved connection as above. The request shapes are
 | `deployments.history` | `{"namespace":"default","name":"api","limit":50}` |
 | `endpoints.discover` | `{"namespace":"default","limit":50}` |
 | `hosts.discover` | `{"limit":50}` |
+| `nodes.list` | `{"limit":50}` |
+| `custom_resources.list` | `{"namespace":"default","group":"monitoring.coreos.com","version":"v1","plural":"servicemonitors","limit":50}` |
 | `helm_releases.history` | `{"namespace":"default","release":"api","limit":50}` |
 | `helm_releases.status` | `{"namespace":"default","release":"api","limit":50}` |
 | `helm_releases.values` | `{"namespace":"default","release":"api","revision":3,"limit":50}` |
@@ -304,6 +420,44 @@ The authorization namespace of a namespace object is its own name, so a Role in
 namespace `default` granting `get` on `namespaces` is enough to read the
 `default` namespace. No ClusterRole is needed, and the binding never asks for
 `list` on namespaces.
+
+## Read statefulsets, nodes and custom resources
+
+StatefulSets are a resource kind: add `statefulsets` to `resource_kinds` and read
+them with `resources.list` and `resources.get`. The credential needs `list` (and
+`get` for `resources.get`) on `statefulsets` in `apps` in each configured
+namespace.
+
+`nodes.list` lists the cluster's Node objects in full, one bounded page at a
+time, and is advertised only while `node_reads` is true. Nodes are not in any
+namespace, so the read needs a ClusterRole granting `list` on `nodes`, and the
+configured `namespaces` neither grant nor limit it. It is separate from
+`hosts.discover`: that operation reads the same collection under
+`discover_hosts` but returns only names, addresses and conditions.
+
+`custom_resources.list` lists one namespaced custom resource collection in a
+configured namespace, one bounded page at a time, and is advertised only while
+`custom_resources` names at least one collection:
+
+```json
+"custom_resources": [
+  {"group": "monitoring.coreos.com", "version": "v1", "plural": "servicemonitors"}
+]
+```
+
+A request for a collection that is not listed there, or in a namespace outside
+`namespaces`, is refused as `forbidden` before any request. A `group` must
+contain a dot and must not be `k8s.io`, `kubernetes.io` or end in either, so
+this list cannot reach Secrets or any other built-in collection; `version` and
+`plural` are lower-case DNS labels. At most 32 collections, without duplicates;
+a configuration breaking any of these is refused when it loads. A listed
+collection the cluster does not serve answers `not_found`, not an empty page.
+Cluster-scoped custom resources are not read. The credential needs `list` on
+the plural in its API group in each namespace it reads.
+
+A kubeconfig user that authenticates through an `exec` credential plugin, such as
+`aws eks get-token` for EKS, is supported in one pinned form: see
+[Authenticate through an exec credential plugin](#authenticate-through-an-exec-credential-plugin).
 
 ## Read pod logs
 
@@ -440,7 +594,7 @@ page.
 
 ## Limitations
 
-This binding advertises up to twelve read operations and one write, `pods.exec`.
+This binding advertises up to fourteen read operations and one write, `pods.exec`.
 Events are read as a list of core/v1 Event objects in one namespace; there is no
 watch, and no read filters events by the object they involve. Conditions, log
 following, interactive exec (stdin or a terminal), copy, port forwarding and

@@ -63,7 +63,17 @@ impl Target {
         metadata.persist().unwrap();
     }
 }
-fn setup(root: &Path, socket: Option<&Path>, clock_address: &str) -> Target {
+/// Addresses where nothing answers, for tests that never reach the clock.
+const NO_CLOCK: [&str; 2] = ["127.0.0.1:9", "127.0.0.1:10"];
+/// The quorum table of `config`, which these tests always configure.
+fn quorum(config: &mut Config) -> &mut clock::Configuration {
+    match config.approval_clock.as_mut().unwrap() {
+        clock::ApprovalClock::Quorum(quorum) => quorum,
+        clock::ApprovalClock::Retired(_) => panic!("a retired clock table"),
+    }
+}
+/// `clock_addresses` are two sources at quorum two, keyed by fixture seeds 7 and 8.
+fn setup(root: &Path, socket: Option<&Path>, clock_addresses: [&str; 2]) -> Target {
     let paths = Paths {
         config: root.join("config/config.toml"),
         state: root.join("state"),
@@ -76,12 +86,20 @@ fn setup(root: &Path, socket: Option<&Path>, clock_address: &str) -> Target {
             .map(Path::to_owned)
             .unwrap_or_else(|| root.join("absent-bus")),
     );
-    config.approval_clock = Some(clock::Configuration {
-        format: "roughtime-clock/1".into(),
-        address: clock_address.into(),
-        public_key: STANDARD.encode(clock_fixture::root_key()),
+    config.approval_clock = Some(clock::ApprovalClock::Quorum(clock::Configuration {
+        format: "roughtime-quorum/1".into(),
+        quorum: 2,
         max_rate_error_ppm: 100,
-    });
+        sources: clock_addresses
+            .into_iter()
+            .zip([7, 8])
+            .map(|(address, seed)| clock::Source {
+                address: address.into(),
+                public_key: STANDARD.encode(clock_fixture::key(seed)),
+                version: clock::RoughtimeVersion::Draft0x8000000c,
+            })
+            .collect(),
+    }));
     let adapter = Adapter {
         instance_id: "fixture-instance".into(),
         adapter_id: "fixture-adapter".into(),
@@ -98,6 +116,7 @@ fn setup(root: &Path, socket: Option<&Path>, clock_address: &str) -> Target {
         permissions: crate::local::config::Permissions {
             profiles: BTreeSet::from(["token".into()]),
             operations: BTreeSet::from(["item.write".into(), "item.read".into()]),
+            custody: Default::default(),
         },
     };
     config.adapters.insert("fixture".into(), adapter.clone());
@@ -142,12 +161,14 @@ fn setup(root: &Path, socket: Option<&Path>, clock_address: &str) -> Target {
         requirements: vec![
             runtime::Requirement {
                 operation: "item.write".into(),
+                custody: false,
                 profile: "token".into(),
                 scopes: BTreeSet::from(["write".into()]),
                 effect: runtime::Effect::Write,
             },
             runtime::Requirement {
                 operation: "item.read".into(),
+                custody: false,
                 profile: "token".into(),
                 scopes: BTreeSet::new(),
                 effect: runtime::Effect::Read,
@@ -208,7 +229,7 @@ fn root() -> tempfile::TempDir {
 #[test]
 fn prepare_is_passive_and_digests_the_strict_input_and_current_policy() {
     let root = root();
-    let t = setup(root.path(), None, "127.0.0.1:9");
+    let t = setup(root.path(), None, NO_CLOCK);
     t.fake_issuer();
     let policy = t.policy();
     let metadata = Metadata::inspect(&t.paths.state).unwrap();
@@ -295,7 +316,7 @@ fn publication_refusal_and_unknown_acknowledgement_preserve_the_protected_file()
 #[test]
 fn policy_and_prepare_refuse_wrong_permissions_pins_input_and_revision() {
     let root = root();
-    let t = setup(root.path(), None, "127.0.0.1:9");
+    let t = setup(root.path(), None, NO_CLOCK);
     assert!(policy_status(&t.paths, "fixture").unwrap().is_none());
     t.fake_issuer();
     for document in [
@@ -374,7 +395,7 @@ impl Target {
 #[test]
 fn preparation_bounds_the_target_envelope_and_keeps_original_deadline() {
     let root = root();
-    let t = setup(root.path(), None, "127.0.0.1:9");
+    let t = setup(root.path(), None, NO_CLOCK);
     t.fake_issuer();
     t.policy();
     // The business document alone fits; its projected target wrapper does not.
@@ -417,7 +438,7 @@ fn preparation_bounds_the_target_envelope_and_keeps_original_deadline() {
 #[test]
 fn changed_clock_or_connection_refuses_without_issuing_or_contacting_services() {
     let root = root();
-    let t = setup(root.path(), None, "127.0.0.1:9");
+    let t = setup(root.path(), None, NO_CLOCK);
     t.fake_issuer();
     t.policy();
     let preparation = prepare(&t.paths, "fixture", &t.request(), until()).unwrap();
@@ -438,7 +459,7 @@ fn changed_clock_or_connection_refuses_without_issuing_or_contacting_services() 
     ));
     assert!(!output.exists());
     let mut config = Config::load(&t.paths.config).unwrap();
-    config.approval_clock.as_mut().unwrap().max_rate_error_ppm = 101;
+    quorum(&mut config).max_rate_error_ppm = 101;
     std::fs::write(&t.paths.config, toml::to_string(&config).unwrap()).unwrap();
     assert_eq!(
         prepare(&t.paths, "fixture", &t.request(), until())
@@ -446,7 +467,7 @@ fn changed_clock_or_connection_refuses_without_issuing_or_contacting_services() 
             .code,
         Code::Forbidden
     );
-    config.approval_clock.as_mut().unwrap().max_rate_error_ppm = 100;
+    quorum(&mut config).max_rate_error_ppm = 100;
     std::fs::write(&t.paths.config, toml::to_string(&config).unwrap()).unwrap();
     registry::Registry::new(&t.paths.state)
         .revoke(
@@ -465,11 +486,9 @@ fn changed_clock_or_connection_refuses_without_issuing_or_contacting_services() 
     );
 }
 
+/// Two answering sources at quorum two, keyed by fixture seeds 7 and 8.
 struct ClockServer {
-    address: String,
-    count: std::sync::Arc<std::sync::atomic::AtomicUsize>,
-    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    thread: Option<std::thread::JoinHandle<()>>,
+    sources: [clock_fixture::Server; 2],
 }
 
 #[test]
@@ -484,7 +503,12 @@ fn clock_exchange_precedes_leases_and_policy_is_rechecked_after_network() {
     socket
         .set_read_timeout(Some(Duration::from_secs(5)))
         .unwrap();
-    let t = setup(root.path(), None, &socket.local_addr().unwrap().to_string());
+    let second = clock_fixture::Server::fixture(clock_fixture::Fixture {
+        seed: 8,
+        ..Default::default()
+    });
+    let first = socket.local_addr().unwrap().to_string();
+    let t = setup(root.path(), None, [&first, &second.address]);
     t.fake_issuer();
     t.policy();
     let approved = prepare(&t.paths, "fixture", &t.request(), until()).unwrap();
@@ -530,56 +554,24 @@ fn clock_exchange_precedes_leases_and_policy_is_rechecked_after_network() {
 }
 impl ClockServer {
     fn new() -> Self {
-        use std::sync::{
-            Arc,
-            atomic::{AtomicBool, AtomicUsize, Ordering},
+        let source = |seed| {
+            clock_fixture::Server::fixture(clock_fixture::Fixture {
+                seed,
+                ..Default::default()
+            })
         };
-        let socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
-        socket
-            .set_read_timeout(Some(Duration::from_millis(100)))
-            .unwrap();
-        let address = socket.local_addr().unwrap().to_string();
-        let stop = Arc::new(AtomicBool::new(false));
-        let count = Arc::new(AtomicUsize::new(0));
-        let stopped = stop.clone();
-        let counted = count.clone();
-        let thread = std::thread::spawn(move || {
-            let mut packet = [0; 4096];
-            while !stopped.load(Ordering::SeqCst) {
-                match socket.recv_from(&mut packet) {
-                    Ok((size, peer)) => {
-                        counted.fetch_add(1, Ordering::SeqCst);
-                        socket
-                            .send_to(
-                                &clock_fixture::Fixture::default().reply(&packet[..size]),
-                                peer,
-                            )
-                            .unwrap();
-                    }
-                    Err(e)
-                        if matches!(
-                            e.kind(),
-                            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
-                        ) => {}
-                    Err(e) => panic!("fixture clock socket: {e}"),
-                }
-            }
-        });
         Self {
-            address,
-            count,
-            stop,
-            thread: Some(thread),
+            sources: [source(7), source(8)],
         }
     }
-    fn requests(&self) -> usize {
-        self.count.load(std::sync::atomic::Ordering::SeqCst)
+    fn addresses(&self) -> [&str; 2] {
+        [&self.sources[0].address, &self.sources[1].address]
     }
-}
-impl Drop for ClockServer {
-    fn drop(&mut self) {
-        self.stop.store(true, std::sync::atomic::Ordering::SeqCst);
-        self.thread.take().unwrap().join().unwrap();
+    /// Acquisitions so far: each asks every source exactly once.
+    fn requests(&self) -> usize {
+        self.sources[0]
+            .requests
+            .load(std::sync::atomic::Ordering::SeqCst)
     }
 }
 
@@ -592,7 +584,11 @@ fn production_cli_approval_issuance_and_restart() {
         std::env::var_os("CONNECTORS_TEST_CLI").expect("exact built CLI path required");
     let mut custody = custody::tests::Fixture::new();
     let clock = ClockServer::new();
-    let t = setup(custody.root.path(), Some(&custody.socket), &clock.address);
+    let t = setup(
+        custody.root.path(),
+        Some(&custody.socket),
+        clock.addresses(),
+    );
     let run = |args: &[&str], success: bool| {
         let output = Command::new(&executable)
             .args(["--output", "json", "--config"])

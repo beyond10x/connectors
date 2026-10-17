@@ -1,4 +1,6 @@
-//! Roughtime draft-19 test version, with ring cryptography and bounded framing.
+//! Roughtime at one configured wire version per source (the draft-19 test
+//! version 0x8000000c, the only one with a verifier and a recorded reply), with ring
+//! cryptography and bounded framing. There is no negotiation or downgrade.
 //! Verify original signed byte strings, never a reconstructed projection.
 use super::{Failure, Result};
 use ring::{
@@ -11,7 +13,6 @@ use sha2::{Digest, Sha512};
 mod tests;
 
 pub(super) const PACKET_SIZE: usize = 1024;
-const VERSION: u32 = 0x8000000c;
 const DELEGATION: &[u8] = b"RoughTime v1 delegation signature\0";
 const RESPONSE: &[u8] = b"RoughTime v1 response signature\0";
 pub(super) struct Sample {
@@ -30,13 +31,13 @@ fn hash(parts: &[&[u8]]) -> [u8; 32] {
     out.copy_from_slice(&h.finalize()[..32]);
     out
 }
-pub(super) fn request(key: &[u8; 32]) -> Result<([u8; PACKET_SIZE], [u8; 32])> {
+pub(super) fn request(key: &[u8; 32], version: u32) -> Result<([u8; PACKET_SIZE], [u8; 32])> {
     let mut nonce = [0; 32];
     SystemRandom::new()
         .fill(&mut nonce)
         .map_err(|_| Failure::Unavailable)?;
     let body = encode(vec![
-        (tag(b"VER\0"), VERSION.to_le_bytes().to_vec()),
+        (tag(b"VER\0"), version.to_le_bytes().to_vec()),
         (tag(b"SRV\0"), hash(&[&[0xff], key]).to_vec()),
         (tag(b"NONC"), nonce.to_vec()),
         (tag(b"TYPE"), 0u32.to_le_bytes().to_vec()),
@@ -141,6 +142,7 @@ pub(super) fn verify(
     request: &[u8],
     nonce: &[u8; 32],
     key: &[u8; 32],
+    version: u32,
 ) -> Result<Sample> {
     let response = frame(bytes)?;
     if response.get(b"NONC")? != nonce || u32le(response.get(b"TYPE")?)? != 1 {
@@ -148,7 +150,7 @@ pub(super) fn verify(
     }
     let srep_bytes = response.get(b"SREP")?;
     let srep = Message::parse(srep_bytes)?;
-    if u32le(srep.get(b"VER\0")?)? != VERSION {
+    if u32le(srep.get(b"VER\0")?)? != version {
         return Err(Failure::Unavailable);
     }
     let versions = srep.get(b"VERS")?;
@@ -162,7 +164,7 @@ pub(super) fn verify(
         if previous.is_some_and(|p| p >= v) {
             return Err(Failure::Unavailable);
         }
-        selected |= v == VERSION;
+        selected |= v == version;
         previous = Some(v);
     }
     let midpoint = u64le(srep.get(b"MIDP")?)?;
