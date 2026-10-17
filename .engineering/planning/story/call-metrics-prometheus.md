@@ -4,11 +4,11 @@ id: story:call-metrics-prometheus
 kind: story
 status: draft
 title: Per-call metrics a caller exports to Prometheus, with no credential or content in any label
-revision: 1
+revision: 2
 ---
 ## Outcome
 
-A caller of the Connectors CLI exports per-call metrics to Prometheus: calls by provider, operation and outcome; a call-duration histogram; rate-limit waits; retries. No metric carries a credential, a request or answer body, a prompt or any document content; labels are drawn only from declared identifiers (provider id, operation id, outcome code, connection alias).
+A caller of the Connectors CLI exports per-call metrics to Prometheus: calls by provider, operation and outcome; a call-duration histogram; rate-limit waits; retries. No metric carries a credential, a request or answer body, a prompt or any document content; labels are a closed, low-cardinality set: `provider`, `operation`, `outcome`, `reason`; no connection, instance or resource name appears in any label.
 
 ## Shape (to settle in the specification first)
 
@@ -26,6 +26,9 @@ The CLI runs per call and the owner daemon is optional, so a scrape endpoint alo
 Label sets are bounded: an operation id comes from the loaded bundle, never from caller input.
 
 ## Acceptance
+
+- A window flag limits the output to one run's calls: `--since <unix_ms>` (calls whose audit record starts at or after it) or `--run <id>` (calls the caller tagged with that run id); the audit record persists across runs, so an all-time total pushed under a per-run Pushgateway group would be counted again each run. A test drives two runs and asserts each window counts only its own calls.
+- The label set is closed: a test asserts every exposed series carries only `provider`, `operation`, `outcome` and `reason`, and that no connection alias, instance id or resource name (path parameter value) appears.
 
 - The metric names, types, labels and buckets are declared in the ESS specification (spec first) and the CLI contract; the generated reference lists them.
 - A test drives fixture calls (applied, refused, rate-limited with one wait, one transient retry) and asserts the exact exposition text, parsed by a Prometheus text-format parser.
