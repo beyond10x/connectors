@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.53.1 — 2026-10-17
+
+### Changed
+
+- A Runpod `pod.create` refused for lack of capacity is now `refused` with code `capacity`, not
+  `invalid_input`: a 4xx whose `message` or `detail` contains one of the stock-out texts Runpod's own
+  clients recognise (case-insensitive; a 5xx stays `unknown`), declared through the new catalog
+  selection member `refusal_texts` (modelled as `connectors_catalog.selection.WriteRefusalTexts`).
+
+### Limitations
+
+- The stock-out texts are taken from Runpod's own clients and verified against a local fixture
+  only; no real stock-out answer has been recorded yet.
+
 ## 0.53.0 — 2026-10-17
 
 ### Added
@@ -17,13 +31,6 @@
   never re-sent (docs/local-mutation-ledger.md, "Created credentials").
 - Runpod: the read `billing.pods` (`PodBilling`, `GET /v1/billing/pods`) beside `pods.list`.
 - GitLab catalog reads `file.raw` and `project.languages`: a repository file's exact UTF-8 text at a ref (a file that is not UTF-8 is refused `upstream_protocol`, one over the 4 MiB provider response bound `capacity`, on its raw bytes) and a project's languages with their percentages; verified against fixtures only.
-
-### Changed
-
-- A Runpod `pod.create` refused for lack of capacity is now `refused` with code `capacity`, not
-  `invalid_input`: a 4xx whose `message` or `detail` contains one of the stock-out texts Runpod's own
-  clients recognise (case-insensitive; a 5xx stays `unknown`), declared through the new catalog
-  selection member `refusal_texts` (modelled as `connectors_catalog.selection.WriteRefusalTexts`).
 
 ### Fixed
 
