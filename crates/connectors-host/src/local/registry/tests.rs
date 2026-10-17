@@ -30,6 +30,10 @@ fn approval_target_is_passive_but_requires_exact_retained_admission() {
         .unwrap();
     // A system-clock registry must not sample that clock on this path. The
     // retained evidence is expired, but it still identifies this exact target.
+    // The calls below open the store as a fresh process does, as a command run
+    // directly does, not from a handle this thread already pooled; another test
+    // thread can evict that handle from the shared pool anyway.
+    crate::local::metadata::simulate_process(0x9a55_1001);
     let passive = Registry::with_system_clock(root.path());
     assert_eq!(
         passive
@@ -79,6 +83,8 @@ fn approval_target_is_passive_but_requires_exact_retained_admission() {
         passive.approval_target(&binding(), &reference, &BTreeSet::new()),
         Err(Failure::Revoked)
     );
+    crate::local::metadata::exit_process();
+    crate::local::metadata::simulate_process(0);
 }
 
 #[test]
