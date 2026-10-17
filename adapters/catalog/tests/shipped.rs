@@ -37,7 +37,8 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
     // single tag and release reads, the release link list and the guarded tag
     // create and delete and release create and update, and the guarded
     // pipeline retry, cancel and create, the environment list, and the guarded
-    // commit create, file update, branch create and delete and project create.
+    // commit create, file update, branch create and delete and project create,
+    // and the raw file text and project language reads.
     // A renamed, dropped or added id fails here.
     let mut expected = vec![
         "project.get",
@@ -91,10 +92,12 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
         "branch.create",
         "branch.delete",
         "project.create",
+        "file.raw",
+        "project.languages",
     ];
     expected.sort();
     assert_eq!(declared, expected);
-    assert_eq!(declared.len(), 51);
+    assert_eq!(declared.len(), 53);
     for write in [
         "tag.create",
         "tag.delete",
@@ -145,6 +148,8 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
             "getApiV4ProjectsIdReleasesTagNameAssetsLinks",
         ),
         ("environments.list", "getApiV4ProjectsIdEnvironments"),
+        ("file.raw", "getApiV4ProjectsIdRepositoryFilesFilePathRaw"),
+        ("project.languages", "getApiV4ProjectsIdLanguages"),
     ] {
         let selection = selections
             .iter()

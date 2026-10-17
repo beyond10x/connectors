@@ -121,7 +121,8 @@ auto-merge and reopen variants of merge and update
 merge-request list reads, its diffs and its discussions, project code
 search, tags and releases ([below](#tags-and-releases)), and the environment list
 and the pipeline, commit, file, branch and project writes
-([below](#pipeline-commit-branch-and-project-writes)):
+([below](#pipeline-commit-branch-and-project-writes)), and a file's raw text and a
+project's languages ([below](#raw-file-text-and-languages)):
 
 | id | source operation | effect |
 |---|---|---|
@@ -129,6 +130,8 @@ and the pipeline, commit, file, branch and project writes
 | `merge_requests.list`, `merge_request.get` | `getApiV4ProjectsIdMergeRequests`, `…MergeRequestIid` | read |
 | `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get` | the matching `getApiV4Projects…` | read |
 | `job.trace` | `getApiV4ProjectsIdJobsJobIdTrace`, `"response": "text"` | read |
+| `file.raw` | `getApiV4ProjectsIdRepositoryFilesFilePathRaw`, `"response": "text"` ([below](#raw-file-text-and-languages)) | read |
+| `project.languages` | `getApiV4ProjectsIdLanguages` ([below](#raw-file-text-and-languages)) | read |
 | `issue.create` | `postApiV4ProjectsIdIssues`, unguarded | write |
 | `merge_request.create` | `postApiV4ProjectsIdMergeRequests`, guarded | write |
 | `merge_request.update` | `putApiV4ProjectsIdMergeRequestsMergeRequestIid`, guarded | write |
@@ -264,6 +267,66 @@ say) leaves the outcome `unknown`, never refused, and no corrective request is
 sent. A tag that already exists is GitLab's own `400`, a second release of one
 tag its `409`; both are definite refusals. Release deletion and the release-link
 writes are not selected.
+
+### Raw file text and languages
+
+Two reads for an indexer: a file's text without base64 in JSON, and a project's
+language breakdown. Both need `read_api`.
+
+| id | source operation | request | effect |
+|---|---|---|---|
+| `file.raw` | `getApiV4ProjectsIdRepositoryFilesFilePathRaw`, `"response": "text"` | `GET /projects/{id}/repository/files/{file_path}/raw` with `ref` (a branch, tag or commit) and `lfs`; `file_path` is sent as one path segment. `body` is the file's text, byte for byte, as one JSON string | read |
+| `project.languages` | `getApiV4ProjectsIdLanguages` | `GET /projects/{id}/languages`; `body` is GitLab's object of language name to percentage, unchanged | read |
+
+The pinned source declares the raw file `application/octet-stream`; the
+selection reads it as text, as [`response`](#configure-the-provider) states: a
+file that is not UTF-8 is refused `upstream_protocol`, never decoded lossily or
+answered as base64 (`file.get` still answers base64 `content` for any file), and
+a file over the provider's 4 MiB response bound is refused `capacity` with no
+body. `file.get` stays as it is.
+
+The commands below were run in this tree with the debug `target/debug/connectors`
+against the local HTTPS GitLab fixture (the ignored test
+`cli_journey::serve_the_raw_file_fixture` in
+`adapters/catalog/tests/local_runtime.rs`), whose files and languages are
+synthetic. Its disposable tree is named with `--config` and `--state-dir`, which
+the commands omit, and `$schema` and `$revision` come from
+`connectors --output json operations describe --adapter gitlab --operation <id>`.
+
+```sh
+connectors --output json operations invoke --adapter gitlab --connection "$connection" \
+  --operation file.raw --schema "$schema" --revision "$revision" \
+  --input-json '{"id":"org/project","file_path":"docs/guide.md","ref":"v1.0.0"}'
+```
+
+```json
+{"ok":true,"result":{"adapter":"gitlab","operation":"file.raw","result":{"body":"# Guide\nfirst release\n","provenance":{"instance":"fixture-gitlab","observed_at_unix_ms":1792194048246,"resource":"/api/v4/projects/{id}/repository/files/{file_path}/raw","source_revision":"f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"},"status":200},"revision":"7b95112a56d28803c09f5d58beedcc4ce448b4ae7086358faee060fa770f8ebe"}}
+```
+
+A file that is not UTF-8 (`latin1.txt` in the fixture) fails with exit status 1:
+
+```json
+{"error":{"code":"failure","data":{"code":"service_failure","kind":"operational","next_action":"retry_explicitly","service_code":"upstream_protocol","stage":"dispatch"}},"ok":false}
+```
+
+A file of 4 MiB and one byte (`huge.log`) fails with exit status 1; the
+transport refuses the body while reading it, before the adapter answers:
+
+```json
+{"error":{"code":"failure","data":{"code":"capacity","kind":"operational","next_action":"retry_explicitly","stage":"admission"}},"ok":false}
+```
+
+```sh
+connectors --output json operations invoke --adapter gitlab --connection "$connection" \
+  --operation project.languages --schema "$schema" --revision "$revision" \
+  --input-json '{"id":"org/project"}'
+```
+
+```json
+{"ok":true,"result":{"adapter":"gitlab","operation":"project.languages","result":{"body":{"Dockerfile":8.58,"Rust":71.42,"Shell":20.0},"provenance":{"instance":"fixture-gitlab","observed_at_unix_ms":1792194050329,"resource":"/api/v4/projects/{id}/languages","source_revision":"f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"},"status":200},"revision":"7b95112a56d28803c09f5d58beedcc4ce448b4ae7086358faee060fa770f8ebe"}}
+```
+
+Neither read has run against a live GitLab.
 
 ### Pipeline, commit, branch and project writes
 
@@ -519,7 +582,17 @@ The complete configuration used against the sandbox is
   bundle's media types say. Without it the bundle decides: a 2xx declared only as
   `text/…` is read as text, anything else as JSON. `text` is for a source that
   declares JSON where the provider answers plain text, as GitLab does for a job
-  trace. `binary` reads the body as bytes, whatever media type it carries, and
+  trace, or that declares another type, such as GitLab's
+  `application/octet-stream` for a raw file, for a body the caller reads as
+  text. A text body of more than 4,194,304 bytes, the provider response bound,
+  is refused as `capacity` on its raw bytes, never truncated; one that is not
+  UTF-8 is refused as `upstream_protocol` ("provider returned a text body that
+  is not UTF-8"), never decoded lossily or answered as base64; otherwise `body`
+  is exactly the decoded string, an empty body the empty string. The result
+  still holds the served result limit (4 MiB less 1 KiB, the JSON string's
+  escapes included), so a text near the bound can be refused `capacity` there.
+  This is `connectors.transport.TextBodyOutcome` in `ess/domains/transport.yaml`.
+  `binary` reads the body as bytes, whatever media type it carries, and
   needs `binary` beside it. A write never carries either.
 - `binary` is required with `"response": "binary"` and refused without it:
   `{"max_bytes": <n>, "hosts": ["https://<host>", …]}`.
