@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: decision-blocker:provider-definitions-adr-acceptance
 kind: decision-blocker
-status: open
+status: cleared
 title: Accept the provider definitions and runtimes decision record
 relations:
 - blocks: story:definition-lowerer-declarations-onto-vocabulary
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-17T12:17:40Z", actor: "human:timo", revision: 3}
 ---
 ## Question
 
@@ -24,3 +26,8 @@ accepted. Work on both branches goes on: `story:definition-lowerer-declarations-
 The design (`architecture-design:provider-definitions-and-runtimes`, revision 9) lists in section
 14 what cannot be lowered and why; the round-trip tests show all 15 shipped selections lowered
 byte-identical (bundle, selection on every field, declaration).
+
+
+## Decided
+
+The operator accepted `architecture-decision-record:provider-definitions-and-runtimes` on 2026-10-17. #179 and connectors-definitions #1 merge after the connector-vocabulary landing, as `story:definition-lowerer-declarations-onto-vocabulary` says.

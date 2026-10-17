@@ -2,12 +2,14 @@
 format: aep.planning-md/3
 id: architecture-decision-record:provider-definitions-and-runtimes
 kind: architecture-decision-record
-status: proposed
+status: accepted
 title: Connector definitions live in their own repository and reach each runtime through its lowerer
 relations:
 - informed_by: architecture-decision-record:declarative-http-provider-runtime
 - serves: vision:independent-contract-adapters
-revision: 7
+revision: 9
+transitions:
+- {from: "proposed", to: "accepted", at: "2026-10-17T12:17:39Z", actor: "human:timo", revision: 8}
 ---
 ## Context
 
@@ -181,3 +183,7 @@ and the bundle and selection digests, not the order of `profiles[]`; the lowered
 today's values, absent optional fields included, so the `derived_instance` and
 `connector_declarations` tests stay green. The interim `<provider>.auth.json` the lowerer writes
 until then is dropped. Agreed with the session that owns the vocabulary change on 2026-10-17.
+
+## Acceptance
+
+Accepted by the operator on 2026-10-17, with D1 to D11 as written; #179 and connectors-definitions #1 merge after the connector-vocabulary landing.
