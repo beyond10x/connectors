@@ -253,6 +253,15 @@ entities:
       # refuses it otherwise (`endpoint-required`, decision 7).
       - name: default_endpoint
         type: Optional<String>
+      # Appended to an instance's endpoint to form the API base, for a
+      # connector whose users know the host and not the API under it (an
+      # endpoint `https://code.example.com` and an api_path `/api/v4` give
+      # the API base `https://code.example.com/api/v4`). An absolute path
+      # without a trailing `/`. Absent, the endpoint is the API base. An
+      # endpoint that already ends with it is refused, not doubled; a path
+      # under the host's root is kept in front of it.
+      - name: api_path
+        type: Optional<String>
     relations:
       - name: provider
         kind: references
@@ -310,8 +319,8 @@ entities:
   # connector-vocabulary decision 3), the user's name for one configured
   # connector. Reused, not a parallel entity: its identity is the
   # `instance_id` of an `[adapters.<alias>]` entry
-  # (crates/connectors-host/src/local/config.rs:269), the host's
-  # `registry_instances` row (registry/lifecycle.rs:451), and the key
+  # (crates/connectors-host/src/local/config.rs:298), the host's
+  # `registry_instances` row (registry/lifecycle.rs:462), and the key
   # Connection.instance_id references (auth_bindings.yaml). A migrated
   # instance keeps that value byte for byte (migration-plan
   # connector-vocabulary § Invariant, step 2). Old -> new: "adapter alias" /
@@ -327,7 +336,7 @@ entities:
   # (decision-blocker instance-connection-cardinality, option A; decision
   # 11). AllocateConnection (auth_bindings.yaml) states the refusal; the
   # host's bound of 1000 connections per instance_id
-  # (registry/lifecycle.rs:20-22) stays the storage bound for that history.
+  # (registry/lifecycle.rs:569-581) stays the storage bound for that history.
   - name: connectors.declarations.ServiceConfiguration
     identity:
       name: instance_id
