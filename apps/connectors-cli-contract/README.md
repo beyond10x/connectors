@@ -1,42 +1,10 @@
 # `connectors` CLI contract
 
-Local integration access through explicitly configured adapters. After an upgrade, `connectors setup owner-stop` stops the owner an older binary started
+Local integration access through explicitly configured connector instances. After an upgrade, `connectors setup owner-stop` stops the owner an older binary started
 
 This generated package installs an unavailable handler. Application behavior enters through the `Handler` seam; schema-selected calls also require `DynamicValidator`. See `help.txt` for process options and `binding.json` for resolved types and targets.
 
 ## Commands
-
-### `adapters describe`
-
-Inspect one configured adapter and cached descriptor
-
-Callable: `adapters-describe`. Input: `connectors.cli.AdapterDescribeInput`. Result: `connectors.cli.AdapterDescribeResult`.
-
-Error `failure`: `connectors.cli.Failure`.
-
-### `adapters list`
-
-List configured adapter entries
-
-Callable: `adapters-list`. Input: `connectors.cli.AdapterListInput`. Result: `connectors.cli.AdapterListResult`.
-
-Error `failure`: `connectors.cli.Failure`.
-
-### `adapters status`
-
-Observe the existing adapter lifecycle owner
-
-Callable: `adapters-status`. Input: `connectors.cli.AdapterStatusInput`. Result: `connectors.cli.AdapterStatusResult`.
-
-Error `failure`: `connectors.cli.Failure`.
-
-### `adapters stop`
-
-Stop only the exact owned adapter incarnation
-
-Callable: `adapters-stop`. Input: `connectors.cli.AdapterStopInput`. Result: `connectors.cli.AdapterStopResult`.
-
-Error `failure`: `connectors.cli.Failure`.
 
 ### `approvals clock-check`
 
@@ -158,11 +126,13 @@ Callable: `connections-list`. Input: `connectors.cli.ConnectionListInput`. Resul
 
 Error `failure`: `connectors.cli.Failure`.
 
-### `connections repair`
+### `connections reconnect`
 
-Repair the exact connection without changing its identity
+Publish a new credential on the exact connection without changing its identity; `connections repair` is its deprecated name
 
-Callable: `connections-repair`. Input: `connectors.cli.ConnectionRepairInput`. Result: `connectors.cli.ConnectionRepairResult`.
+Callable: `connections-reconnect`. Input: `connectors.cli.ConnectionReconnectInput`. Result: `connectors.cli.ConnectionReconnectResult`.
+
+Alias: `connections repair`.
 
 Error `failure`: `connectors.cli.Failure`.
 
@@ -187,6 +157,46 @@ Error `failure`: `connectors.cli.Failure`.
 Observe exactly one connection or acquisition
 
 Callable: `connections-status`. Input: `connectors.cli.ConnectionStatusInput`. Result: `connectors.cli.ConnectionStatusResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `instances describe`
+
+Inspect one configured instance and its cached descriptor; `adapters describe` is its deprecated name
+
+Callable: `adapters-describe`. Input: `connectors.cli.AdapterDescribeInput`. Result: `connectors.cli.AdapterDescribeResult`.
+
+Alias: `adapters describe`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `instances list`
+
+List configured instances; `adapters list` is its deprecated name
+
+Callable: `adapters-list`. Input: `connectors.cli.AdapterListInput`. Result: `connectors.cli.AdapterListResult`.
+
+Alias: `adapters list`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `instances status`
+
+Observe the lifecycle owner of the process that serves one instance; `adapters status` is its deprecated name
+
+Callable: `adapters-status`. Input: `connectors.cli.AdapterStatusInput`. Result: `connectors.cli.AdapterStatusResult`.
+
+Alias: `adapters status`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `instances stop`
+
+Stop only the exact owned incarnation of the process that serves one instance; `adapters stop` is its deprecated name
+
+Callable: `adapters-stop`. Input: `connectors.cli.AdapterStopInput`. Result: `connectors.cli.AdapterStopResult`.
+
+Alias: `adapters stop`.
 
 Error `failure`: `connectors.cli.Failure`.
 
@@ -238,6 +248,14 @@ Callable: `setup-init`. Input: `null (inputless)`. Result: `connectors.cli.Setup
 
 Error `failure`: `connectors.cli.Failure`.
 
+### `setup migrate`
+
+Rewrite each entry of the legacy configuration format that maps to a shipped connector as that connector's instance, keeping its instance id, revision and selection; --mode dry-run (or --dry-run) prints the new file, --mode apply (or --apply) writes it and keeps the old one as config.toml.before-migrate-TIMESTAMP (UTC)
+
+Callable: `setup-migrate`. Input: `connectors.cli.SetupMigrateInput`. Result: `connectors.cli.SetupMigrateResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
 ### `setup owner-stop`
 
 Stop this state directory's running owner, of any build, within 30 seconds; run it after an upgrade when a command answers next_action stop_owner
@@ -267,7 +285,7 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:connections-describe: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-launch: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-list: implement the owner-qualified callable and its declared result/error contract
-- handler:connections-repair: implement the owner-qualified callable and its declared result/error contract
+- handler:connections-reconnect: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-revalidate: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-revoke: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-status: implement the owner-qualified callable and its declared result/error contract
@@ -278,4 +296,5 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:setup-check: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-checkpoints-enable: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-init: implement the owner-qualified callable and its declared result/error contract
+- handler:setup-migrate: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-owner-stop: implement the owner-qualified callable and its declared result/error contract

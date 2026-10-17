@@ -6,6 +6,7 @@ pub enum State {
     Ready,
     Pending,
     ReauthorizationRequired,
+    Stale,
     CustodyUnavailable,
     Revoked,
 }
@@ -99,7 +100,9 @@ impl Registry {
         if !ack || retired {
             return Err(Failure::MetadataUnavailable);
         }
-        if deleted || invalid.is_some() || row.identity.is_none() {
+        // A Stale connection's credential was refused, as a known invalid
+        // one was (`readiness`).
+        if deleted || invalid.is_some() || row.kept.stale || row.identity.is_none() {
             return Err(Failure::NotReady);
         }
         let baseline = row.baseline.as_ref().ok_or(Failure::MetadataUnavailable)?;
@@ -218,8 +221,14 @@ fn observe(
     now: u64,
     custody_available: bool,
 ) -> Result<ObservedConnection> {
+    // A Stale connection (`lifecycle::mark_stale`) reports so before any
+    // other state: the provider refused its credential, and only a reconnect's
+    // publication changes that. It is not ready (`readiness`), so no read,
+    // launch or write is admitted (contract connection section 4.1 row 3).
     let state = if row.state == "revoked" {
         State::Revoked
+    } else if row.kept.stale {
+        State::Stale
     } else if row.binding.configuration_revision != configured_revision {
         State::Pending
     } else {
@@ -258,6 +267,11 @@ pub(super) fn readiness(
 ) -> Result<State> {
     if row.state == "revoked" {
         return Ok(State::Revoked);
+    }
+    // Whatever made it Stale, the credential was refused: not ready, so every
+    // caller that requires Ready (or admits Pending) refuses it as `NotReady`.
+    if row.kept.stale {
+        return Ok(State::Stale);
     }
     let Some(version) = &row.material else {
         return Ok(State::Pending);

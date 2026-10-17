@@ -115,7 +115,7 @@ fn initialises_state_for(root: &tempfile::TempDir, before: &[u8]) {
         "{init}"
     );
     assert_eq!(fs::read(config_path(root)).unwrap(), before);
-    let adapters = success(&command(root, &["adapters", "list"]));
+    let adapters = success(&command(root, &["instances", "list"]));
     let listed: Vec<_> = adapters["adapters"]
         .as_array()
         .unwrap()

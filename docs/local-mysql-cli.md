@@ -1,6 +1,6 @@
 # MySQL through the local CLI
 
-The SQL adapter serves MySQL as well as PostgreSQL, chosen per connection by the
+The SQL implementation, `connectors-sql`, serves the `mysql` connector as well as `postgres`, chosen per connection by the
 `engine` member of its native file. A MySQL connection has the same reads —
 `schema.list`, `query.read`, the four [catalogue reads](#catalogue-reads) and
 [`profile.read`](#read-profiles) — the same
@@ -8,6 +8,8 @@ input bounds and the same output shape as a PostgreSQL one; what differs is the 
 protocol, the profile id and how a value is written. Everything this guide does not
 repeat — setup, the TOML entry, credential prompts and files, consumer launch — is as in
 the [PostgreSQL guide](local-postgres-cli.md).
+
+Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
 
 ```sh
 CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-sql
@@ -52,11 +54,17 @@ target/release/connectors-sql --local-config /absolute/path/mysql.json --print-l
 sha256sum target/release/connectors-sql
 ```
 
-Copy `configuration_revision` from that output verbatim into the adapter entry,
-and permit the MySQL profile:
+Copy `configuration_revision` from that output verbatim into the instance. MySQL
+is not a catalog connector, so the configuration pins the instance `incidents` of
+the connector `mysql` in a `connectors-local/5` file (change the `format` line of
+the file setup created), and permits the MySQL profile:
 
 ```toml
-[adapters.incidents]
+[connectors.mysql]
+enabled = true
+
+[connectors.mysql.instances.incidents]
+alias = "incidents"
 instance_id = "mysql-local"
 adapter_id = "sql"
 configuration_revision = "REPLACE_FROM_BOOTSTRAP"
@@ -65,11 +73,11 @@ private_protocol = "connectors-private/1"
 startup = "on-demand"
 restart = "never"
 
-[adapters.incidents.permissions]
+[connectors.mysql.instances.incidents.permissions]
 profiles = ["mysql.password"]
 operations = ["schema.list", "query.read", "database.list", "table.list", "table.describe", "index.list"]
 
-[adapters.incidents.executable]
+[connectors.mysql.instances.incidents.executable]
 path = "/absolute/path/connectors-sql"
 sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
 args = ["--local-config", "/absolute/path/mysql.json"]
@@ -78,10 +86,10 @@ args = ["--local-config", "/absolute/path/mysql.json"]
 ## Connect and read
 
 ```sh
-target/release/connectors --output json connections connect --adapter incidents --profile mysql.password --credential-prompt
-target/release/connectors --output json connections revalidate --adapter incidents --connection CONNECTION --expected-revision CONNECTION_REVISION
-target/release/connectors --output json operations invoke --adapter incidents --connection CONNECTION --operation schema.list --schema SCHEMA --revision REVISION --input-json '{"limit":200}'
-target/release/connectors --output json operations invoke --adapter incidents --connection CONNECTION --operation query.read --schema SCHEMA --revision REVISION --input-json '{"query":"SELECT id, opened_at FROM incidents WHERE severity = ? ORDER BY opened_at DESC","parameters":["critical"],"limit":100}'
+target/release/connectors --output json connections connect --connector mysql --instance incidents --profile mysql.password --credential-prompt
+target/release/connectors --output json connections revalidate --connector mysql --instance incidents --connection CONNECTION --expected-revision CONNECTION_REVISION
+target/release/connectors --output json operations invoke --connector mysql --instance incidents --connection CONNECTION --operation schema.list --schema SCHEMA --revision REVISION --input-json '{"limit":200}'
+target/release/connectors --output json operations invoke --connector mysql --instance incidents --connection CONNECTION --operation query.read --schema SCHEMA --revision REVISION --input-json '{"query":"SELECT id, opened_at FROM incidents WHERE severity = ? ORDER BY opened_at DESC","parameters":["critical"],"limit":100}'
 ```
 
 MySQL placeholders are `?`, not `$1`. Parameters are text or `null` and are
@@ -94,7 +102,7 @@ The credential document is `{"password":"..."}`, as for PostgreSQL.
 **The session is the credential check.** The server accepts or rejects the
 password during its handshake (`caching_sha2_password`, or
 `mysql_native_password` on servers that ask for it), before any statement runs.
-Connect, repair and `connections revalidate` open one session and close it
+Connect, reconnect and `connections revalidate` open one session and close it
 without running a statement. A rejected password is the server's own error 1045,
 reported as `unauthorized`.
 
@@ -116,7 +124,7 @@ SET SESSION TRANSACTION READ ONLY
 SET SESSION max_execution_time = 10000, SESSION lock_wait_timeout = 2, SESSION innodb_lock_wait_timeout = 2, SESSION time_zone = '+00:00'
 ```
 
-The session time zone is UTC so that a `TIMESTAMP` reaches the adapter as its
+The session time zone is UTC so that a `TIMESTAMP` reaches the instance as its
 instant in UTC whatever the server's own `time_zone` is (see below). It also
 means that time functions evaluated in the session, such as `NOW()` or
 `CURRENT_TIMESTAMP`, answer in UTC.
@@ -131,7 +139,7 @@ sends at most one row past the limit and only one result-returning statement
 runs. The derived table closes on a line of its own, so a trailing `--` or `#`
 comment in the statement cannot reach the aliases or the limit. A statement that
 prepares with columns but cannot be a derived table (`SHOW`, `EXPLAIN`) is refused
-by the server's syntax check of the wrapper, which the adapter answers
+by the server's syntax check of the wrapper, which the instance answers
 `unsupported`, as it does a statement that returns no columns.
 
 What this guarantees is a read-only session plus one result-returning
@@ -140,14 +148,14 @@ refused by the server (error 1792, reported as `forbidden`). It does **not**
 stop the side effects of a routine the statement calls: a function the user may
 execute runs with its own rights, and on a live MySQL 8.0.46 a definer-rights
 function called as `SELECT f()` through `query.read` ran `SET PERSIST`
-(`SET GLOBAL` likewise) and the change persisted. The adapter cannot tell such a
+(`SET GLOBAL` likewise) and the change persisted. The instance cannot tell such a
 call from a built-in function. **Grant the configured user `SELECT` only, and no
 `EXECUTE` on any routine with side effects** (server variables, external
-calls, definer-rights writes); the user's grants, not the adapter, are the
+calls, definer-rights writes); the user's grants, not the instance, are the
 boundary for routines.
 
 The input bounds, the 1,000-row limit and the 5 s / 10 s / 15 s deadlines with 2 s
-reserved for cleanup are the PostgreSQL path's. When the adapter's own deadline
+reserved for cleanup are the PostgreSQL path's. When the instance's own deadline
 passes, or the invocation is dropped, it kills the statement with
 `KILL QUERY <connection id>` from a second session, then closes the first; a
 server that ignores the kill cannot hold the session past the cleanup budget.
@@ -204,10 +212,10 @@ serve MySQL with the same columns, bounds and read-only session, each as one fix
 `information_schema` statement with the schema and table bound as `?` parameters:
 
 ```sh
-target/release/connectors --output json operations invoke --adapter incidents --connection CONNECTION --operation database.list --schema SCHEMA --revision REVISION --input-json '{"limit":100}'
-target/release/connectors --output json operations invoke --adapter incidents --connection CONNECTION --operation table.list --schema SCHEMA --revision REVISION --input-json '{"limit":200}'
-target/release/connectors --output json operations invoke --adapter incidents --connection CONNECTION --operation table.describe --schema SCHEMA --revision REVISION --input-json '{"table":"incidents","limit":200}'
-target/release/connectors --output json operations invoke --adapter incidents --connection CONNECTION --operation index.list --schema SCHEMA --revision REVISION --input-json '{"table":"incidents","limit":200}'
+target/release/connectors --output json operations invoke --connector mysql --instance incidents --connection CONNECTION --operation database.list --schema SCHEMA --revision REVISION --input-json '{"limit":100}'
+target/release/connectors --output json operations invoke --connector mysql --instance incidents --connection CONNECTION --operation table.list --schema SCHEMA --revision REVISION --input-json '{"limit":200}'
+target/release/connectors --output json operations invoke --connector mysql --instance incidents --connection CONNECTION --operation table.describe --schema SCHEMA --revision REVISION --input-json '{"table":"incidents","limit":200}'
+target/release/connectors --output json operations invoke --connector mysql --instance incidents --connection CONNECTION --operation index.list --schema SCHEMA --revision REVISION --input-json '{"table":"incidents","limit":200}'
 ```
 
 - `database.list` reads `information_schema.SCHEMATA`: the databases the user holds a
@@ -275,7 +283,7 @@ with a number as a double), a `timestamp` column as `CAST(… AS DATETIME(6))` (
 `TIMESTAMP` column, and a `text` ordering a text string (`CHAR`, `VARCHAR`, `TEXT`, `ENUM`,
 `SET`); a binary string (written as base64, which orders otherwise than its bytes) or any
 other column is refused as `unsupported`, by the profile's column name, before a row is
-read. Add `"profile.read"` to `operations` in the adapter entry. The paging is checked on
+read. Add `"profile.read"` to `operations` in the instance's `permissions`. The paging is checked on
 the scripted fixture with a server that returns fewer rows than the limit asks for
 (`adapters/sql/tests/profiles.rs`).
 
@@ -295,5 +303,5 @@ the scripted fixture with a server that returns fewer rows than the limit asks f
   may execute can change server variables (`SET PERSIST`, `SET GLOBAL`) or write with
   definer rights. Grant `SELECT` only, and no `EXECUTE` on such routines.
 - No write, DDL, transaction control, cursor, stored procedure, `LOAD DATA LOCAL`
-  or connection pooling is exposed. The adapter never follows a server-named Unix
+  or connection pooling is exposed. The instance never follows a server-named Unix
   socket and installs no local-file handler.

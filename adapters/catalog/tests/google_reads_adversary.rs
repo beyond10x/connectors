@@ -3,6 +3,8 @@
 //! against the code that is supposed to keep it. Fixture secrets are
 //! fictional and only ever compared, never printed.
 #![cfg(unix)]
+mod hand_written;
+
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{
@@ -126,15 +128,10 @@ fn id_token() -> String {
     )
 }
 
+/// The read configuration the guide showed before connectors were declared
+/// (`hand_written`).
 fn documented_config() -> Value {
-    let guide = fs::read_to_string(root().join("../../docs/catalog-google-drive.md")).unwrap();
-    let example = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| body.contains(&format!("\"provider\": \"{PROVIDER}\"")))
-        .unwrap();
-    serde_json::from_str::<Value>(example).unwrap()
+    serde_json::from_str(&hand_written::blocks("catalog-google-drive.md")[0]).unwrap()
 }
 
 struct Provider {

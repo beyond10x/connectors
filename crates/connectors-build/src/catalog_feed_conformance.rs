@@ -920,7 +920,8 @@ fn direct_conversations_are_neither_listed_nor_readable() {
 }
 
 /// No Rust in the catalog engine, or in this suite adapter, names a declared provider, a fixture
-/// or a shipped one: not its provider id, its profile or an operation it reads.
+/// or a shipped one: not its provider id, its profile or an operation it reads, in any letter
+/// case. What one provider needs is data in its declaration.
 #[test]
 fn no_rust_names_a_declared_provider() {
     let root = feed_conformance::root();
@@ -939,10 +940,13 @@ fn no_rust_names_a_declared_provider() {
             &feed["items"]["operation_id"],
         ];
         for source in &sources {
-            let text = std::fs::read_to_string(source).unwrap();
+            let text = std::fs::read_to_string(source).unwrap().to_lowercase();
             for name in names {
                 let name = name.as_str().unwrap();
-                assert!(!text.contains(name), "{source:?} names `{name}`");
+                assert!(
+                    !text.contains(&name.to_lowercase()),
+                    "{source:?} names `{name}`"
+                );
             }
         }
     }

@@ -226,16 +226,13 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
     }
 }
 
-/// The `auth` object of the guide's configuration example.
+/// The `auth` profile the `hubspot` connector declares
+/// (`providers/hubspot/connector.json`), which the guide's instance uses.
 fn documented_auth() -> Value {
-    let guide = fs::read_to_string(root().join("../../docs/catalog-hubspot.md")).unwrap();
-    let example = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| body.contains("\"provider\": \"hubspot\""))
-        .expect("the documented hubspot configuration");
-    serde_json::from_str::<Value>(example).unwrap()["auth"].clone()
+    let declaration: Value =
+        serde_json::from_slice(&fs::read(root().join("providers/hubspot/connector.json")).unwrap())
+            .unwrap();
+    declaration["profiles"][0].clone()
 }
 
 #[test]

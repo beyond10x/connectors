@@ -1,0 +1,66 @@
+# Ledger expectations only: connector_default_endpoint is the trusted owner's
+# read of the Connector declaration's default_endpoint inside the recording
+# transaction. See ess/domains/declarations.yaml RecordServiceConfiguration.
+type: ess-scenario/1
+domain: connectors.declarations
+scenario: instance-without-endpoint-needs-connector-default
+summary: 'An instance that states no endpoint is refused when its connector has no default endpoint, and recorded when it states one or the connector has a default.'
+timeline:
+- at: '2026-10-16T13:00:00Z'
+  command: connectors.declarations.RecordServiceConfiguration
+  input:
+    instance_id: mcp.local
+    adapter_id: mcp
+    revision: r1
+    registry_epoch: 1
+    connector_id: mcp
+    name: local
+  outcome: endpoint-required
+  error:
+    name: connectors.declarations.EndpointRequired
+  no_events:
+  - connectors.declarations.ServiceConfigurationRecorded
+- at: '2026-10-16T13:00:01Z'
+  command: connectors.declarations.RecordServiceConfiguration
+  input:
+    instance_id: mcp.local
+    adapter_id: mcp
+    revision: r1
+    registry_epoch: 1
+    connector_id: mcp
+    name: local
+    endpoint: http://127.0.0.1:8931/mcp
+  outcome: recorded
+  events:
+  - event: connectors.declarations.ServiceConfigurationRecorded
+    payload:
+      instance_id: mcp.local
+- at: '2026-10-16T13:00:02Z'
+  command: connectors.declarations.RecordServiceConfiguration
+  input:
+    instance_id: gitlab.work
+    adapter_id: catalog
+    revision: r1
+    registry_epoch: 1
+    connector_id: gitlab
+    name: work
+    connector_default_endpoint: https://gitlab.com
+  outcome: recorded
+  events:
+  - event: connectors.declarations.ServiceConfigurationRecorded
+    payload:
+      instance_id: gitlab.work
+assert:
+- view: connectors.declarations.ServiceConfigurations
+  contains:
+    instance_id: mcp.local
+    connector_id: mcp
+    name: local
+    endpoint: http://127.0.0.1:8931/mcp
+- view: connectors.declarations.ServiceConfigurations
+  contains:
+    instance_id: gitlab.work
+    connector_id: gitlab
+    name: work
+- view: connectors.declarations.ServiceConfigurations
+  counts: {at_most: 2}

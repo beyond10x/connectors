@@ -1,3 +1,4 @@
+> This dated record predates the [connector vocabulary](../README.md#vocabulary) and keeps the terms of its date.
 # Connectors CLI: from 0.7.x to v2
 
 ## Runtime foundation, 2026-09-10

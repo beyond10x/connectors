@@ -1,6 +1,6 @@
 # Grafana through the local CLI
 
-The `grafana` adapter answers `datasources.list`: the data sources a Grafana service account
+The `grafana` connector answers `datasources.list`: the data sources a Grafana service account
 can read, each as its uid, name, plugin type, access mode and default flag, from one
 `GET /api/datasources`. On a Grafana Cloud stack with IRM it also answers four IRM reads, all
 read only: alert groups and incidents over a since window, and one of each by id (see
@@ -9,6 +9,8 @@ read only: alert groups and incidents over a since window, and one of each by id
 connection in [the connection domain](spec/ess/domains/connection.yaml). It requires Linux
 x86_64 and the [qualified Secret Service binding](../../docs/local-secret-service.md), like
 every saved credential.
+
+Connector, instance and connection are the terms of the [vocabulary](../../README.md#vocabulary).
 
 Querying a Loki data source through Grafana is a [Loki connection](../loki/README.md#through-grafana)
 whose `base_url` is that data source's Grafana proxy path; the uid comes from
@@ -53,23 +55,30 @@ target/release/connectors-grafana --local-config /absolute/path/grafana.json --p
 sha256sum target/release/connectors-grafana
 ```
 
-Copy `configuration_revision` from that output verbatim, then add an adapter entry to the
-configuration created by setup:
+Copy `configuration_revision` from that output verbatim. Grafana is not a catalog connector, so
+the configuration pins its instance. Add the instance to the configuration created by setup:
+change its `format` line to `format = "connectors-local/5"`, which instances need, and add the
+instance `grafana` of the connector `grafana`:
 
 ```toml
-[adapters.grafana]
+[connectors.grafana]
+enabled = true
+
+[connectors.grafana.instances.grafana]
+alias = "grafana"
 instance_id = "grafana-prod"
 adapter_id = "grafana"
 configuration_revision = "REPLACE_FROM_BOOTSTRAP"
 protocol = "v1alpha1"
+private_protocol = "connectors-private/1"
 startup = "on-demand"
 restart = "never"
 
-[adapters.grafana.permissions]
+[connectors.grafana.instances.grafana.permissions]
 profiles = ["grafana.service_account"]
 operations = ["datasources.list"]
 
-[adapters.grafana.executable]
+[connectors.grafana.instances.grafana.executable]
 path = "/absolute/path/target/release/connectors-grafana"
 sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
 args = ["--local-config", "/absolute/path/grafana.json"]
@@ -82,9 +91,9 @@ permission that `GET /api/datasources` requires) and a token for it. Which basic
 role grants that is Grafana's configuration; Connectors only observes the `200` or `403`.
 
 ```sh
-target/release/connectors --output json connections connect --adapter grafana --profile grafana.service_account --credential-prompt
-target/release/connectors --output json operations describe --adapter grafana --operation datasources.list
-target/release/connectors --output json operations invoke --adapter grafana --connection CONNECTION --operation datasources.list --schema SCHEMA --revision REVISION --input-json '{}'
+target/release/connectors --output json connections connect --connector grafana --instance grafana --profile grafana.service_account --credential-prompt
+target/release/connectors --output json operations describe --connector grafana --instance grafana --operation datasources.list
+target/release/connectors --output json operations invoke --connector grafana --instance grafana --connection CONNECTION --operation datasources.list --schema SCHEMA --revision REVISION --input-json '{}'
 ```
 
 For automation, `--credential-stdin` or `--credential-file /absolute/private/file.json` carries
@@ -110,12 +119,11 @@ Grafana answers the list unpaged. At most 1,000 records are returned, in Grafana
 
 ## What the connection is bound to
 
-**The identity is the configured connection, not a Grafana account.** Connect, repair and
-`connections revalidate` prove the token with `GET /api/datasources` under
+**The identity is the configured connection, not a Grafana account.** Connect, reconnect and`connections revalidate` prove the token with `GET /api/datasources` under
 `grafana.service_account`, and with the fixed-window alert-group read under
 `grafana.irm_service_account` (refused as `unavailable` without `irm_api_url`): a `200` admits
 it, a `401` or `403` refuses it. The identity kind is `grafana.connection` and its subject is the
-configuration's `instance`. Any token Grafana accepts is the same identity, so a repair cannot
+configuration's `instance`. Any token Grafana accepts is the same identity, so a reconnect cannot
 detect a token of another organization. Use one `instance` per Grafana organization.
 
 **A token grants no scopes and exposes no expiry.** The profile requires no scopes;
@@ -132,7 +140,7 @@ probe. A scheduled caller revalidates before reading.
 
 Four reads, none of which acknowledges, resolves, silences or changes anything:
 
-| Operation | Request | Returns |
+| Operation id | Request | Returns |
 |---|---|---|
 | `irm.alert_groups.list` | `GET <irm_api_url>api/v1/alert_groups/?started_at=<since>_<until>&perpage=100&page=<n>` | alert groups started in the window, at most 100 per page |
 | `irm.alert_group.get` | `GET <irm_api_url>api/v1/alert_groups/<id>` | one alert group, to re-read its state |
@@ -145,16 +153,25 @@ reads: the stack port may send exactly those two paths and nothing else.
 
 Connect them under the second profile, whose probe is one alert-group read over a fixed
 one-second window in 2000, so a token whose role grants the IRM reads (IRM's
-`grafana-irm-app.alert-groups:read`, and the incident reads) and no data-source read connects:
+`grafana-irm-app.alert-groups:read`, and the incident reads) and no data-source read connects.
+An instance holds one connection, so the IRM connection is a second instance, `irm`, with a
+native file of its own (another `instance`) and the `configuration_revision` its bootstrap
+prints:
 
 ```toml
-[adapters.grafana.permissions]
-profiles = ["grafana.service_account", "grafana.irm_service_account"]
-operations = ["datasources.list", "irm.alert_groups.list", "irm.alert_group.get", "irm.incidents.list", "irm.incident.get"]
+[connectors.grafana.instances.irm]
+alias = "grafana-irm"
+instance_id = "grafana-irm"
+# adapter_id, configuration_revision, protocol, private_protocol, startup, restart and the
+# executable as for the instance grafana, with args naming the second native file.
+
+[connectors.grafana.instances.irm.permissions]
+profiles = ["grafana.irm_service_account"]
+operations = ["irm.alert_groups.list", "irm.alert_group.get", "irm.incidents.list", "irm.incident.get"]
 ```
 
 ```sh
-target/release/connectors --output json connections connect --adapter grafana --profile grafana.irm_service_account --credential-prompt
+target/release/connectors --output json connections connect --connector grafana --instance irm --profile grafana.irm_service_account --credential-prompt
 ```
 
 A connection keeps the profile it was made with: an IRM read on a `grafana.service_account`
@@ -164,7 +181,7 @@ connection is refused at admission, and `datasources.list` on an IRM connection 
 
 Both list reads take `since` and `until` (required), each `YYYY-MM-DDTHH:MM:SSZ`: UTC, whole
 seconds, `since` before `until`. Anything else, an offset included, is refused before any
-request. The adapter always sends both bounds, so a call never means IRM's default of the last
+request. The instance always sends both bounds, so a call never means IRM's default of the last
 30 days. A run stores `until` and passes it back as the next run's `since`; both bounds are
 read as inclusive, so a record created at that instant can appear in both runs, and the caller
 deduplicates by `id` or `incident_id`. Each answer echoes its `window`.
@@ -217,6 +234,6 @@ its own `base_url`, and Grafana, not Connectors, decides which data sources the 
 
 ## Replacing the executable
 
-The entry pins the executable's SHA-256. After rebuilding `connectors-grafana`, update `sha256`,
-stop the running incarnation (`adapters stop`), then `connections revalidate` or repair the
+The instance pins the executable's SHA-256. After rebuilding `connectors-grafana`, update `sha256`,
+stop the running incarnation (`instances stop`), then `connections revalidate` or reconnect the
 connection, which performs the admitted launch under the same connection id.

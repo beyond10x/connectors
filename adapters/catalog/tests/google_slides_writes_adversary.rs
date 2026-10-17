@@ -4,6 +4,8 @@
 //! provider's own bootstrap and the host's connection registry. No network, no
 //! credential.
 #![cfg(unix)]
+mod hand_written;
+
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Engine, Selection};
 use connectors_core::Result;
@@ -192,15 +194,17 @@ async fn a_batch_update_narrowed_without_presentation_id_is_reported_unknown_as_
     }
 }
 
-/// A JSON block of the guide, by a string it contains.
+/// A configuration block the guide showed before connectors were declared
+/// (`hand_written`), the write values included, by a string it contains.
 fn guide_block(marker: &str) -> Value {
-    let guide = fs::read_to_string(root().join("../../docs/catalog-google-slides.md")).unwrap();
-    let block = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
+    let mut blocks = hand_written::blocks("catalog-google-slides.md");
+    blocks.push(hand_written::file(
+        "catalog-google-slides.write-values.json",
+    ));
+    let block = blocks
+        .iter()
         .find(|body| body.contains(marker))
-        .unwrap_or_else(|| panic!("the guide has no JSON block with {marker}"));
+        .unwrap_or_else(|| panic!("no hand-written block with {marker}"));
     serde_json::from_str(block).unwrap()
 }
 /// The guide's documented `google-slides` configuration, changed by `adjust`,

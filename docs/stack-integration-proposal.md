@@ -1,3 +1,4 @@
+> This dated record predates the [connector vocabulary](../README.md#vocabulary) and keeps the terms of its date.
 # Proposal: extensions and adjustments for stack integration — 2026-09-08
 
 **Local-stage update, 2026-09-09:** this dated proposal retains its hosted stack

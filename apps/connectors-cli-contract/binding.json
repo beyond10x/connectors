@@ -1,7 +1,7 @@
 {
   "format": "ess-cli-plan/1",
   "binary": "connectors",
-  "about": "Local integration access through explicitly configured adapters. After an upgrade, `connectors setup owner-stop` stops the owner an older binary started",
+  "about": "Local integration access through explicitly configured connector instances. After an upgrade, `connectors setup owner-stop` stops the owner an older binary started",
   "globals": {
     "config": "config",
     "state": "state-dir",
@@ -20,7 +20,22 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -63,6 +78,12 @@
                       "kind": "string"
                     },
                     "adapter_id": {
+                      "kind": "string"
+                    },
+                    "connector": {
+                      "kind": "string"
+                    },
+                    "instance": {
                       "kind": "string"
                     },
                     "instance_id": {
@@ -269,6 +290,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -277,8 +304,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -290,7 +324,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -421,6 +456,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -581,6 +617,12 @@
                   "adapter_id": {
                     "kind": "string"
                   },
+                  "connector": {
+                    "kind": "string"
+                  },
+                  "instance": {
+                    "kind": "string"
+                  },
                   "instance_id": {
                     "kind": "string"
                   },
@@ -738,6 +780,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -746,8 +794,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -759,7 +814,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -890,6 +946,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -1020,7 +1077,22 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -1043,6 +1115,9 @@
                   }
                 },
                 "configuration_revision": {
+                  "kind": "string"
+                },
+                "connector": {
                   "kind": "string"
                 },
                 "failure": {
@@ -1165,6 +1240,12 @@
                           "metadata_schema_newer"
                         ]
                       },
+                      "configuration_bytes": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
                       "configuration_format": {
                         "kind": "optional",
                         "of": {
@@ -1173,8 +1254,15 @@
                             "connectors-local/1",
                             "connectors-local/2",
                             "connectors-local/3",
-                            "connectors-local/4"
+                            "connectors-local/4",
+                            "connectors-local/5"
                           ]
+                        }
+                      },
+                      "configuration_limit": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
                         }
                       },
                       "configuration_rule": {
@@ -1186,7 +1274,8 @@
                             "config_missing",
                             "config_not_private",
                             "owner_uid_mismatch",
-                            "approval_clock_format_retired"
+                            "approval_clock_format_retired",
+                            "config_too_large"
                           ]
                         }
                       },
@@ -1317,6 +1406,7 @@
                           "repair_connection",
                           "revalidate_connection",
                           "create_connection",
+                          "revoke_connection",
                           "refresh_description",
                           "request_permission",
                           "retry_explicitly",
@@ -1438,6 +1528,9 @@
                   "of": {
                     "kind": "string"
                   }
+                },
+                "instance": {
+                  "kind": "string"
                 },
                 "observed_at_ms": {
                   "kind": "integer"
@@ -1581,6 +1674,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -1589,8 +1688,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -1602,7 +1708,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -1733,6 +1840,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -1863,16 +1971,31 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "child_incarnation": {
               "kind": "string"
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "expected_revision": {
               "kind": "string"
             },
             "host_incarnation": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -1895,6 +2018,9 @@
                   }
                 },
                 "configuration_revision": {
+                  "kind": "string"
+                },
+                "connector": {
                   "kind": "string"
                 },
                 "failure": {
@@ -2017,6 +2143,12 @@
                           "metadata_schema_newer"
                         ]
                       },
+                      "configuration_bytes": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
                       "configuration_format": {
                         "kind": "optional",
                         "of": {
@@ -2025,8 +2157,15 @@
                             "connectors-local/1",
                             "connectors-local/2",
                             "connectors-local/3",
-                            "connectors-local/4"
+                            "connectors-local/4",
+                            "connectors-local/5"
                           ]
+                        }
+                      },
+                      "configuration_limit": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
                         }
                       },
                       "configuration_rule": {
@@ -2038,7 +2177,8 @@
                             "config_missing",
                             "config_not_private",
                             "owner_uid_mismatch",
-                            "approval_clock_format_retired"
+                            "approval_clock_format_retired",
+                            "config_too_large"
                           ]
                         }
                       },
@@ -2169,6 +2309,7 @@
                           "repair_connection",
                           "revalidate_connection",
                           "create_connection",
+                          "revoke_connection",
                           "refresh_description",
                           "request_permission",
                           "retry_explicitly",
@@ -2290,6 +2431,9 @@
                   "of": {
                     "kind": "string"
                   }
+                },
+                "instance": {
+                  "kind": "string"
                 },
                 "observed_at_ms": {
                   "kind": "integer"
@@ -2433,6 +2577,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -2441,8 +2591,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -2454,7 +2611,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -2585,6 +2743,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -2715,7 +2874,22 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -2726,6 +2900,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "observation": {
@@ -2896,6 +3076,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -2904,8 +3090,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -2917,7 +3110,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -3048,6 +3242,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -3178,7 +3373,10 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "approve_subject": {
               "kind": "string"
@@ -3186,8 +3384,20 @@
             "connection": {
               "kind": "string"
             },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
             "input": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "operation": {
               "kind": "string"
@@ -3212,11 +3422,17 @@
             "adapter": {
               "kind": "string"
             },
+            "connector": {
+              "kind": "string"
+            },
             "disposition": {
               "kind": "enum",
               "variants": [
                 "published"
               ]
+            },
+            "instance": {
+              "kind": "string"
             },
             "reference": {
               "kind": "string"
@@ -3348,6 +3564,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -3356,8 +3578,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -3369,7 +3598,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -3500,6 +3730,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -3630,9 +3861,24 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "expected_revision": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -3647,6 +3893,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "issuer": {
@@ -3814,6 +4066,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -3822,8 +4080,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -3835,7 +4100,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -3966,6 +4232,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -4096,13 +4363,28 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "candidate": {
               "kind": "string"
             },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
             "expected_revision": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -4113,6 +4395,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "issuer": {
@@ -4280,6 +4568,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -4288,8 +4582,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -4301,7 +4602,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -4432,6 +4734,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -4562,10 +4865,25 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "expected_revision": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "key": {
               "kind": "string"
@@ -4579,6 +4897,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "issuer": {
@@ -4746,6 +5070,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -4754,8 +5084,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -4767,7 +5104,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -4898,6 +5236,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -5028,13 +5367,28 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "expected_key": {
               "kind": "string"
             },
             "expected_revision": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -5045,6 +5399,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "issuer": {
@@ -5212,6 +5572,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -5220,8 +5586,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -5233,7 +5606,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -5364,6 +5738,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -5494,13 +5869,28 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "expected_key": {
               "kind": "string"
             },
             "expected_revision": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -5511,6 +5901,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "issuer": {
@@ -5678,6 +6074,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -5686,8 +6088,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -5699,7 +6108,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -5830,6 +6240,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -5960,7 +6371,22 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -5971,6 +6397,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "issuer": {
@@ -6138,6 +6570,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -6146,8 +6584,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -6159,7 +6604,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -6290,6 +6736,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -6420,7 +6867,16 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "expected_revision": {
               "kind": "optional",
@@ -6430,6 +6886,12 @@
             },
             "input_file": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -6440,6 +6902,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "policy": {
@@ -6612,6 +7080,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -6620,8 +7094,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -6633,7 +7114,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -6764,6 +7246,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -6894,7 +7377,22 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -6905,6 +7403,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "policy": {
@@ -7077,6 +7581,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -7085,8 +7595,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -7098,7 +7615,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -7229,6 +7747,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -7359,13 +7878,28 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connection": {
               "kind": "string"
             },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
             "input": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "operation": {
               "kind": "string"
@@ -7385,6 +7919,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "preparation": {
@@ -7723,6 +8263,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -7731,8 +8277,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -7744,7 +8297,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -7875,6 +8429,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -8005,9 +8560,24 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "credential_document": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -8070,6 +8640,12 @@
                     "connection": {
                       "kind": "string"
                     },
+                    "connector": {
+                      "kind": "string"
+                    },
+                    "instance": {
+                      "kind": "string"
+                    },
                     "instance_id": {
                       "kind": "string"
                     },
@@ -8085,6 +8661,7 @@
                         "pending",
                         "ready",
                         "reauthorization_required",
+                        "stale",
                         "custody_unavailable",
                         "parent_degraded",
                         "disabled",
@@ -8222,6 +8799,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -8230,8 +8813,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -8243,7 +8833,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -8374,6 +8965,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -8504,10 +9096,28 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connection": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -8557,6 +9167,12 @@
                     "connection": {
                       "kind": "string"
                     },
+                    "connector": {
+                      "kind": "string"
+                    },
+                    "instance": {
+                      "kind": "string"
+                    },
                     "instance_id": {
                       "kind": "string"
                     },
@@ -8572,6 +9188,7 @@
                         "pending",
                         "ready",
                         "reauthorization_required",
+                        "stale",
                         "custody_unavailable",
                         "parent_degraded",
                         "disabled",
@@ -8709,6 +9326,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -8717,8 +9340,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -8730,7 +9360,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -8861,6 +9492,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -8991,7 +9623,10 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "args": {
               "kind": "optional",
@@ -9000,10 +9635,25 @@
               }
             },
             "connection": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "consumer": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -9143,6 +9793,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -9151,8 +9807,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -9164,7 +9827,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -9295,6 +9959,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -9425,9 +10090,24 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "cursor": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -9458,6 +10138,12 @@
                   "connection": {
                     "kind": "string"
                   },
+                  "connector": {
+                    "kind": "string"
+                  },
+                  "instance": {
+                    "kind": "string"
+                  },
                   "instance_id": {
                     "kind": "string"
                   },
@@ -9473,6 +10159,7 @@
                       "pending",
                       "ready",
                       "reauthorization_required",
+                      "stale",
                       "custody_unavailable",
                       "parent_degraded",
                       "disabled",
@@ -9632,6 +10319,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -9640,8 +10333,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -9653,7 +10353,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -9784,6 +10485,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -9902,22 +10604,34 @@
         }
       }
     },
-    "connections-repair": {
+    "connections-reconnect": {
       "target": {
         "kind": "local",
         "owner": "connectors.cli",
-        "action": "connections-repair"
+        "action": "connections-reconnect"
       },
       "input": {
-        "type_ref": "connectors.cli.ConnectionRepairInput",
+        "type_ref": "connectors.cli.ConnectionReconnectInput",
         "shape": {
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connection": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "credential_document": {
               "kind": "optional",
@@ -9927,12 +10641,18 @@
             },
             "expected_revision": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
       },
       "result": {
-        "type_ref": "connectors.cli.ConnectionRepairResult",
+        "type_ref": "connectors.cli.ConnectionReconnectResult",
         "shape": {
           "kind": "struct",
           "fields": {
@@ -9982,6 +10702,12 @@
                     "connection": {
                       "kind": "string"
                     },
+                    "connector": {
+                      "kind": "string"
+                    },
+                    "instance": {
+                      "kind": "string"
+                    },
                     "instance_id": {
                       "kind": "string"
                     },
@@ -9997,6 +10723,7 @@
                         "pending",
                         "ready",
                         "reauthorization_required",
+                        "stale",
                         "custody_unavailable",
                         "parent_degraded",
                         "disabled",
@@ -10134,6 +10861,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -10142,8 +10875,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -10155,7 +10895,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -10286,6 +11027,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -10416,13 +11158,31 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connection": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "expected_revision": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -10472,6 +11232,12 @@
                     "connection": {
                       "kind": "string"
                     },
+                    "connector": {
+                      "kind": "string"
+                    },
+                    "instance": {
+                      "kind": "string"
+                    },
                     "instance_id": {
                       "kind": "string"
                     },
@@ -10487,6 +11253,7 @@
                         "pending",
                         "ready",
                         "reauthorization_required",
+                        "stale",
                         "custody_unavailable",
                         "parent_degraded",
                         "disabled",
@@ -10624,6 +11391,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -10632,8 +11405,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -10645,7 +11425,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -10776,6 +11557,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -10906,13 +11688,31 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connection": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "expected_revision": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -10926,6 +11726,12 @@
               "kind": "string"
             },
             "connection": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "local_state": {
@@ -11067,6 +11873,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -11075,8 +11887,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -11088,7 +11907,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -11219,6 +12039,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -11355,9 +12176,24 @@
               }
             },
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connection": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -11401,6 +12237,7 @@
                       "repair_connection",
                       "revalidate_connection",
                       "create_connection",
+                      "revoke_connection",
                       "refresh_description",
                       "request_permission",
                       "retry_explicitly",
@@ -11477,6 +12314,12 @@
                       "connection": {
                         "kind": "string"
                       },
+                      "connector": {
+                        "kind": "string"
+                      },
+                      "instance": {
+                        "kind": "string"
+                      },
                       "instance_id": {
                         "kind": "string"
                       },
@@ -11492,6 +12335,7 @@
                           "pending",
                           "ready",
                           "reauthorization_required",
+                          "stale",
                           "custody_unavailable",
                           "parent_degraded",
                           "disabled",
@@ -11630,6 +12474,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -11638,8 +12488,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -11651,7 +12508,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -11782,6 +12640,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -11912,7 +12771,22 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "operation": {
               "kind": "string"
@@ -11926,6 +12800,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "operation": {
@@ -12092,6 +12972,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -12100,8 +12986,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -12113,7 +13006,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -12244,6 +13138,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -12376,7 +13271,10 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "approval_file": {
               "kind": "optional",
@@ -12390,6 +13288,12 @@
                 "kind": "string"
               }
             },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
             "idempotency_key": {
               "kind": "optional",
               "of": {
@@ -12398,6 +13302,12 @@
             },
             "input": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "operation": {
               "kind": "string"
@@ -12417,6 +13327,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "mutation": {
@@ -12662,6 +13578,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -12670,8 +13592,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -12683,7 +13612,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -12814,6 +13744,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -12944,7 +13875,16 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "cursor": {
               "kind": "optional",
@@ -12953,6 +13893,12 @@
               }
             },
             "family": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -12973,6 +13919,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "next_cursor": {
@@ -13139,6 +14091,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -13147,8 +14105,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -13160,7 +14125,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -13291,6 +14257,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -13467,6 +14434,7 @@
                       "repair_connection",
                       "revalidate_connection",
                       "create_connection",
+                      "revoke_connection",
                       "refresh_description",
                       "request_permission",
                       "retry_explicitly",
@@ -13614,6 +14582,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -13622,8 +14596,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -13635,7 +14616,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -13766,6 +14748,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -14055,6 +15038,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -14063,8 +15052,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -14076,7 +15072,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -14207,6 +15204,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -14482,6 +15480,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -14490,8 +15494,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -14503,7 +15514,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -14634,6 +15646,576 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "stop_owner",
+                  "upgrade",
+                  "choose_clock_source",
+                  "none"
+                ]
+              },
+              "request_id": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "source_audit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "struct",
+                  "fields": {
+                    "audit_ref": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "string"
+                      }
+                    },
+                    "audit_status": {
+                      "kind": "enum",
+                      "variants": [
+                        "complete",
+                        "incomplete",
+                        "unavailable",
+                        "not_required"
+                      ]
+                    },
+                    "instance": {
+                      "kind": "string"
+                    }
+                  }
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "setup-migrate": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "setup-migrate"
+      },
+      "input": {
+        "type_ref": "connectors.cli.SetupMigrateInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "mode": {
+              "kind": "enum",
+              "variants": [
+                "dry-run",
+                "apply"
+              ]
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.SetupMigrateResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "backup_path": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "config_path": {
+              "kind": "string"
+            },
+            "configuration": {
+              "kind": "string"
+            },
+            "disposition": {
+              "kind": "enum",
+              "variants": [
+                "planned",
+                "applied",
+                "unchanged"
+              ]
+            },
+            "entries": {
+              "kind": "list",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "adapter": {
+                    "kind": "string"
+                  },
+                  "after": {
+                    "kind": "struct",
+                    "fields": {
+                      "configuration_revision": {
+                        "kind": "string"
+                      },
+                      "custody_items": {
+                        "kind": "list",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "executable_selection": {
+                        "kind": "string"
+                      },
+                      "instance_id": {
+                        "kind": "string"
+                      }
+                    }
+                  },
+                  "before": {
+                    "kind": "struct",
+                    "fields": {
+                      "configuration_revision": {
+                        "kind": "string"
+                      },
+                      "custody_items": {
+                        "kind": "list",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "executable_selection": {
+                        "kind": "string"
+                      },
+                      "instance_id": {
+                        "kind": "string"
+                      }
+                    }
+                  },
+                  "connector": {
+                    "kind": "string"
+                  },
+                  "differing_field": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "enum",
+                      "variants": [
+                        "instance_id",
+                        "configuration_revision",
+                        "adapter_id",
+                        "protocol",
+                        "private_protocol",
+                        "startup",
+                        "restart",
+                        "executable",
+                        "permissions",
+                        "instance",
+                        "enabled",
+                        "description",
+                        "endpoint",
+                        "profile",
+                        "format"
+                      ]
+                    }
+                  },
+                  "disposition": {
+                    "kind": "enum",
+                    "variants": [
+                      "migrated",
+                      "kept"
+                    ]
+                  },
+                  "instance": {
+                    "kind": "string"
+                  },
+                  "reason": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "enum",
+                      "variants": [
+                        "implementation_unmapped",
+                        "connector_undeclared",
+                        "gateway_prefix",
+                        "native_configuration_unreadable",
+                        "instance_conflict",
+                        "selection_changes"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "format_after": {
+              "kind": "string"
+            },
+            "format_before": {
+              "kind": "string"
+            },
+            "mode": {
+              "kind": "enum",
+              "variants": [
+                "dry-run",
+                "apply"
+              ]
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "attempts": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "cause": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "provider_unavailable",
+                    "provider_timeout",
+                    "provider_rate_limited",
+                    "provider_internal",
+                    "provider_capacity",
+                    "adapter_exited",
+                    "owner_stopping"
+                  ]
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "below_quorum",
+                    "split",
+                    "too_imprecise"
+                  ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "custody_read_only",
+                  "metadata_unavailable",
+                  "revision_conflict",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure",
+                  "approval_required",
+                  "approval_refused",
+                  "approval_replayed",
+                  "idempotency_conflict",
+                  "owner_build_mismatch",
+                  "confirmation_required",
+                  "metadata_schema_newer"
+                ]
+              },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2",
+                    "connectors-local/3",
+                    "connectors-local/4",
+                    "connectors-local/5"
+                  ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "configuration_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "config_path_unresolved",
+                    "config_missing",
+                    "config_not_private",
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired",
+                    "config_too_large"
+                  ]
+                }
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
+              "instance_id": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "mutation": {
+                "kind": "optional",
+                "of": {
+                  "kind": "struct",
+                  "fields": {
+                    "attempt": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "struct",
+                        "fields": {
+                          "id": {
+                            "kind": "string"
+                          },
+                          "instance": {
+                            "kind": "string"
+                          }
+                        }
+                      }
+                    },
+                    "cause": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "struct",
+                        "fields": {
+                          "code": {
+                            "kind": "enum",
+                            "variants": [
+                              "invalid_input",
+                              "unsupported",
+                              "unauthorized",
+                              "forbidden",
+                              "not_found",
+                              "stale_description",
+                              "stale_cursor",
+                              "rate_limited",
+                              "unavailable",
+                              "capacity",
+                              "timeout",
+                              "upstream_protocol",
+                              "internal"
+                            ]
+                          },
+                          "stage": {
+                            "kind": "enum",
+                            "variants": [
+                              "preflight",
+                              "attempt_store",
+                              "approval",
+                              "dispatch",
+                              "response",
+                              "observation",
+                              "audit"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "classification": {
+                      "kind": "enum",
+                      "variants": [
+                        "not_attempted",
+                        "refused",
+                        "applied",
+                        "unknown"
+                      ]
+                    },
+                    "original_request_id": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "string"
+                      }
+                    },
+                    "replayed": {
+                      "kind": "boolean"
+                    }
+                  }
+                }
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "revalidate_connection",
+                  "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -14904,6 +16486,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -14912,8 +16500,15 @@
                     "connectors-local/1",
                     "connectors-local/2",
                     "connectors-local/3",
-                    "connectors-local/4"
+                    "connectors-local/4",
+                    "connectors-local/5"
                   ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "configuration_rule": {
@@ -14925,7 +16520,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -15056,6 +16652,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -15178,106 +16775,6 @@
   "commands": [
     {
       "path": [
-        "adapters",
-        "describe"
-      ],
-      "aliases": [],
-      "callable": "adapters-describe",
-      "about": "Inspect one configured adapter and cached descriptor",
-      "arguments": [
-        {
-          "field": "adapter",
-          "source": {
-            "kind": "option",
-            "long": "adapter"
-          }
-        }
-      ]
-    },
-    {
-      "path": [
-        "adapters",
-        "list"
-      ],
-      "aliases": [],
-      "callable": "adapters-list",
-      "about": "List configured adapter entries",
-      "arguments": [
-        {
-          "field": "limit",
-          "source": {
-            "kind": "option",
-            "long": "limit"
-          }
-        },
-        {
-          "field": "cursor",
-          "source": {
-            "kind": "option",
-            "long": "cursor"
-          }
-        }
-      ]
-    },
-    {
-      "path": [
-        "adapters",
-        "status"
-      ],
-      "aliases": [],
-      "callable": "adapters-status",
-      "about": "Observe the existing adapter lifecycle owner",
-      "arguments": [
-        {
-          "field": "adapter",
-          "source": {
-            "kind": "option",
-            "long": "adapter"
-          }
-        }
-      ]
-    },
-    {
-      "path": [
-        "adapters",
-        "stop"
-      ],
-      "aliases": [],
-      "callable": "adapters-stop",
-      "about": "Stop only the exact owned adapter incarnation",
-      "arguments": [
-        {
-          "field": "adapter",
-          "source": {
-            "kind": "option",
-            "long": "adapter"
-          }
-        },
-        {
-          "field": "expected_revision",
-          "source": {
-            "kind": "option",
-            "long": "expected-revision"
-          }
-        },
-        {
-          "field": "host_incarnation",
-          "source": {
-            "kind": "option",
-            "long": "host-incarnation"
-          }
-        },
-        {
-          "field": "child_incarnation",
-          "source": {
-            "kind": "option",
-            "long": "child-incarnation"
-          }
-        }
-      ]
-    },
-    {
-      "path": [
         "approvals",
         "clock-check"
       ],
@@ -15290,6 +16787,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         }
       ]
@@ -15308,6 +16819,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -15380,6 +16905,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "expected_revision",
           "source": {
             "kind": "option",
@@ -15402,6 +16941,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -15437,6 +16990,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "expected_revision",
           "source": {
             "kind": "option",
@@ -15466,6 +17033,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -15501,6 +17082,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "expected_revision",
           "source": {
             "kind": "option",
@@ -15531,6 +17126,20 @@
             "kind": "option",
             "long": "adapter"
           }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
         }
       ]
     },
@@ -15548,6 +17157,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -15581,6 +17204,20 @@
             "kind": "option",
             "long": "adapter"
           }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
         }
       ]
     },
@@ -15598,6 +17235,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -15656,6 +17307,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "profile",
           "source": {
             "kind": "option",
@@ -15690,6 +17355,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "connection",
           "source": {
             "kind": "option",
@@ -15712,6 +17391,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -15754,6 +17447,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "limit",
           "source": {
             "kind": "option",
@@ -15772,17 +17479,36 @@
     {
       "path": [
         "connections",
-        "repair"
+        "reconnect"
       ],
-      "aliases": [],
-      "callable": "connections-repair",
-      "about": "Repair the exact connection without changing its identity",
+      "aliases": [
+        [
+          "connections",
+          "repair"
+        ]
+      ],
+      "callable": "connections-reconnect",
+      "about": "Publish a new credential on the exact connection without changing its identity; `connections repair` is its deprecated name",
       "arguments": [
         {
           "field": "adapter",
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -15827,6 +17553,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "connection",
           "source": {
             "kind": "option",
@@ -15856,6 +17596,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -15891,6 +17645,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "connection",
           "source": {
             "kind": "option",
@@ -15902,6 +17670,168 @@
           "source": {
             "kind": "option",
             "long": "acquisition"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "instances",
+        "describe"
+      ],
+      "aliases": [
+        [
+          "adapters",
+          "describe"
+        ]
+      ],
+      "callable": "adapters-describe",
+      "about": "Inspect one configured instance and its cached descriptor; `adapters describe` is its deprecated name",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "instances",
+        "list"
+      ],
+      "aliases": [
+        [
+          "adapters",
+          "list"
+        ]
+      ],
+      "callable": "adapters-list",
+      "about": "List configured instances; `adapters list` is its deprecated name",
+      "arguments": [
+        {
+          "field": "limit",
+          "source": {
+            "kind": "option",
+            "long": "limit"
+          }
+        },
+        {
+          "field": "cursor",
+          "source": {
+            "kind": "option",
+            "long": "cursor"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "instances",
+        "status"
+      ],
+      "aliases": [
+        [
+          "adapters",
+          "status"
+        ]
+      ],
+      "callable": "adapters-status",
+      "about": "Observe the lifecycle owner of the process that serves one instance; `adapters status` is its deprecated name",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "instances",
+        "stop"
+      ],
+      "aliases": [
+        [
+          "adapters",
+          "stop"
+        ]
+      ],
+      "callable": "adapters-stop",
+      "about": "Stop only the exact owned incarnation of the process that serves one instance; `adapters stop` is its deprecated name",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
+          "field": "expected_revision",
+          "source": {
+            "kind": "option",
+            "long": "expected-revision"
+          }
+        },
+        {
+          "field": "host_incarnation",
+          "source": {
+            "kind": "option",
+            "long": "host-incarnation"
+          }
+        },
+        {
+          "field": "child_incarnation",
+          "source": {
+            "kind": "option",
+            "long": "child-incarnation"
           }
         }
       ]
@@ -15920,6 +17850,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -15945,6 +17889,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -16017,6 +17975,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "family",
           "source": {
             "kind": "option",
@@ -16080,6 +18052,24 @@
     {
       "path": [
         "setup",
+        "migrate"
+      ],
+      "aliases": [],
+      "callable": "setup-migrate",
+      "about": "Rewrite each entry of the legacy configuration format that maps to a shipped connector as that connector's instance, keeping its instance id, revision and selection; --mode dry-run (or --dry-run) prints the new file, --mode apply (or --apply) writes it and keeps the old one as config.toml.before-migrate-TIMESTAMP (UTC)",
+      "arguments": [
+        {
+          "field": "mode",
+          "source": {
+            "kind": "option",
+            "long": "mode"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "setup",
         "owner-stop"
       ],
       "aliases": [],
@@ -16108,7 +18098,7 @@
     "handler:connections-describe: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-launch: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-list: implement the owner-qualified callable and its declared result/error contract",
-    "handler:connections-repair: implement the owner-qualified callable and its declared result/error contract",
+    "handler:connections-reconnect: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-revalidate: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-revoke: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-status: implement the owner-qualified callable and its declared result/error contract",
@@ -16119,6 +18109,7 @@
     "handler:setup-check: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-checkpoints-enable: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-init: implement the owner-qualified callable and its declared result/error contract",
+    "handler:setup-migrate: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-owner-stop: implement the owner-qualified callable and its declared result/error contract"
   ]
 }
