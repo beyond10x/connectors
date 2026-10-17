@@ -22,10 +22,10 @@ OpenRouter account is shown without output.
 
 ## What it reads and writes
 
-| Instance | Reads | Writes |
+| Key | Reads | Writes |
 |---|---|---|
-| management (`router`) | `key.get`, `workspaces.list`, `keys.list` | `key.create`, unguarded, under approval; the created key goes into custody and is never returned |
-| created keys (`inference`) | `key.get` | none |
+| management key, instance `router` | `key.get`, `workspaces.list`, `keys.list` | `key.create`, unguarded, under approval; the created key goes into custody and is never returned |
+| created keys, instance `inference` | `key.get` | none |
 
 `keys.list` lists keys by hash, label, limits and usage, never their secrets. Every list returns
 one page per call.

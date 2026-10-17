@@ -2370,6 +2370,7 @@ mod derived_instance_tests {
                 .iter()
                 .map(|id| Requirement {
                     operation: (*id).into(),
+                    custody: false,
                     profile: "google.oauth".into(),
                     scopes: BTreeSet::new(),
                     effect: if id.starts_with("users.drafts.") {
