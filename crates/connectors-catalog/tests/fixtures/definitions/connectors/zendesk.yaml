@@ -1,0 +1,40 @@
+schema: urn:beyond10x:connectors-definition:1
+source:
+  openapi: upstream/zendesk/zendesk-support.yaml.gz
+  sha256: 5dd6cf1eda8febf02f8fb2f2cfa72d7cb6bc7d5bab188ba97b49ab55fc51dbf2
+  amendments: upstream/zendesk/zendesk-support.amendments.json
+base_url: https://{subdomain}.zendesk.com
+config: {subdomain: {type: string}}
+auth:
+  zendesk.oauth:
+    scheme: oauth2_client_credentials
+    label: OAuth client secret
+    identity: {path: api/v2/users/me, kind: zendesk.user, subject: /user/id}
+    scopes: {requested: [read]}
+    token_url: https://{subdomain}.zendesk.com/oauth/tokens
+  zendesk.basic:
+    default: true
+    scheme: basic
+    label: API token
+    account_label: Account email followed by /token
+    identity: {path: api/v2/users/me, kind: zendesk.user, subject: /user/id}
+operations:
+  tickets.incremental:
+    op: IncrementalTicketExportCursor
+    bounds: {per_page: {minimum: 1, maximum: 1000}}
+    description: Export the tickets changed since start_time, one page per call of at most per_page tickets; the first call sends start_time, each later call sends the previous page's after_cursor as cursor, and the walk ends on a page with end_of_stream true
+  ticket.show:
+    op: ShowTicket
+    description: Read one ticket by ticket_id, without its comment thread
+  ticket.comments:
+    op: ListTicketComments
+    withhold: [per_page, sort_order]
+    description: List one ticket's comments by cursor, one page per call; the walk sends meta.after_cursor as page[after] and ends on a page with meta.has_more false
+  users.incremental:
+    op: IncrementalUserExportCursor
+    description: Export the users changed since start_time, one page per call; the first call sends start_time, each later call sends the previous page's after_cursor as cursor, and the walk ends on a page with end_of_stream true
+  user.show: {op: ShowUser, description: Read one user by user_id}
+  organizations.incremental:
+    op: IncrementalOrganizationExport
+    description: Export the organizations changed since start_time, one page per call; each later call sends the previous page's end_time as start_time, and the walk ends on a page with end_of_stream true
+  organization.show: {op: ShowOrganization, description: Read one organization by organization_id}

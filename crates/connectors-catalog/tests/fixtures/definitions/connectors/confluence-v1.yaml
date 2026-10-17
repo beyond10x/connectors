@@ -1,0 +1,34 @@
+schema: urn:beyond10x:connectors-definition:1
+source:
+  openapi: upstream/confluence-v1/confluence-rest-v1.yaml.gz
+  sha256: fed740a5343255686c481d63c53644eb3163a90676061f9fb1c12659c4fa234e
+base_url: https://{domain}.atlassian.net/wiki
+config: {domain: {type: string}}
+auth:
+  atlassian.basic:
+    use: atlassian
+    identity: {path: rest/api/user/current}
+    access: {path: rest/api/space, query: {limit: "1"}}
+paging:
+  offset: {request: start, limit: limit, max: 100}
+  cursor: {request: cursor, next: /_links/next, limit: limit, max: 100}
+operations:
+  spaces.list:
+    op: getSpaces
+    description: List the spaces the account can see, one page per call; the walk sends the start from _links.next and ends on a page without it
+  space.get: {op: getSpace, description: Read one space by its key}
+  space.pages:
+    op: getContent
+    description: List one space's content of one type (spaceKey, type page or blogpost), one page per call; the walk sends the start from _links.next and ends on a page without it
+  pages.changed:
+    op: searchContentByCQL
+    description: List the content a CQL query selects, such as the pages of one space modified since a time (space = KEY and type = page and lastmodified >= "2026-09-01" order by lastmodified desc), one page per call; the walk sends the cursor from _links.next and ends on a page without it
+  page.get:
+    op: getContentById
+    description: Read one page; ask for expand body.storage to receive its body in storage format
+  page.comments:
+    op: getContentComments
+    description: List one page's comments (location footer for footer comments), one page per call; the walk sends the start from _links.next and ends on a page without it
+  content.search:
+    op: searchByCQL
+    description: Search the site with a CQL query (cql, required; such as type = page and text ~ "release notes"), one page of results per call, each with title, excerpt, url, lastModified and the matched content; the walk sends the cursor from _links.next and ends on a page without it

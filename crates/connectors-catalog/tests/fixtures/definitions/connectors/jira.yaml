@@ -1,0 +1,76 @@
+schema: urn:beyond10x:connectors-definition:1
+source:
+  openapi: upstream/jira/jira-platform-v3.json.gz
+  sha256: 655b4790a5c8543c81755c8250c6a8b8f58ee62712168a39d628d6d927549709
+base_url: https://{domain}.atlassian.net/rest/api/3
+config: {domain: {type: string}}
+auth:
+  atlassian.basic: {use: atlassian, default: true, identity: {path: myself}}
+  atlassian.bearer: {use: atlassian, identity: {path: myself}}
+paging:
+  token: {request: nextPageToken, next: /nextPageToken, limit: maxResults, last: /isLast}
+  offset: {request: startAt, limit: maxResults, total: /total}
+  offset-last: {request: startAt, limit: maxResults, last: /isLast}
+  offset-empty: {request: startAt, limit: maxResults}
+operations:
+  issues.search:
+    op: searchAndReconsileIssuesUsingJql
+    description: Search issues by JQL, one page per call; a JQL `updated >=` clause filters by time, and the walk ends on a page without nextPageToken
+  issue.comments:
+    op: getComments
+    paging: offset
+    description: List one issue's comments, one page per call; the walk ends when startAt plus the page's comments reaches total
+  issue.changelog:
+    op: getChangeLogs
+    paging: offset-last
+    description: List one issue's changelog, one page per call; the walk ends on a page with isLast true
+  issue.get:
+    op: getIssue
+    description: Read one issue by id or key, with the fields named in fields (default all fields, attachment among them) and the expansions named in expand, such as renderedFields,names
+  issue.transitions:
+    op: getTransitions
+    description: List the transitions the account may run on one issue by id or key, each with its target status in to; transitionId narrows to one, expand=transitions.fields adds the transition screen's fields, includeUnavailableTransitions=true adds those that fail a condition
+  issue.create_meta:
+    op: getCreateIssueMetaIssueTypes
+    paging: offset
+    description: List the issue types the account can create in one project, by id or key, one page per call; the walk ends when startAt plus the page's issueTypes reaches total
+  users.search:
+    op: findUsers
+    paging: offset-empty
+    description: Find active users whose display name or email address starts with query, or by exact accountId, one page per call of the first 1,000 matches; the walk ends on an empty page
+  attachment.content:
+    op: getAttachmentContent
+    response: binary
+    binary: {max_bytes: 2097152, hosts: ["https://api.media.atlassian.com"]}
+    description: Read one attachment's content by its id, as issue.get lists it under fields.attachment. Answers the bytes in base64 with their media_type, length and sha256, refused above 2 MiB. With redirect false Jira answers the content itself; otherwise it answers 303 to a download URL, which is followed only to api.media.atlassian.com, and only when the connection admits that host, without the connection's credential
+  issue.transition.run:
+    op: doTransition
+    effect: write
+    body: {transition: any, fields: any, update: any}
+    guard:
+      before: {read: issue.get, expect: {/fields/status/id: current_status}}
+      also:
+        - read: issue.transitions
+          with: {transitionId: body.transition.id}
+          expect:
+            /transitions/0/id: body.transition.id
+            /transitions/0/isAvailable: =true
+            /transitions/0/to/id: target_status
+      after: {expect: {/fields/status/id: target_status}, read: {read: issue.get}}
+    description: "Run one transition on one issue by id or key: body.transition.id names it, and fields and update set the transition screen's fields. Refused before the write unless the issue's status id is current_status and the transition is open on it with target status id target_status; Jira answers 204, and the issue read again after the write must be in target_status"
+references:
+  issue:
+    match:
+      - url: "https://{domain}.atlassian.net/browse/{key}"
+      - pattern: "\\b(?P<key>[A-Z][A-Z0-9_]+-[0-9]+)\\b"
+    resolve: {operation: issue.get, with: {issueIdOrKey: "{key}"}}
+    outputs:
+      summary: "{key} {/fields/issuetype/name} {/fields/status/name}: {/fields/summary}"
+views:
+  issue.card:
+    of: issue
+    fields:
+      - {label: Summary, pointer: /fields/summary}
+      - {label: Status, pointer: /fields/status/name}
+      - {label: Assignee, pointer: /fields/assignee/displayName}
+      - {label: Description, pointer: /fields/description, renderer: adf}
