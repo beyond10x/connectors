@@ -321,3 +321,61 @@ fn every_shipped_envelope_is_a_value_of_the_catalog_selection_model() {
         );
     }
 }
+
+/// Every shipped write's `refusal_texts` is a value of
+/// `connectors_catalog.selection.WriteRefusalTexts`, and the engine's reader admits exactly the
+/// shapes the compiled model admits: an unknown code or member, or a refusal without a code, is
+/// neither. The model states a refusal's non-empty `pointers` and `contains` as invariants,
+/// which the engine enforces when the selection loads (story:runpod-create-capacity-refusal).
+#[test]
+fn every_shipped_refusal_text_is_a_value_of_the_catalog_selection_model() {
+    let schema = compiled("connectors_catalog.selection.WriteRefusalTexts");
+    let invariants =
+        schema["$defs"]["connectors_catalog.selection.TextRefusal"]["x-ess-invariants"].to_string();
+    for clause in ["pointers.count", "contains.count"] {
+        assert!(
+            invariants.contains(clause),
+            "the model no longer states `{clause}` of a refusal text: {invariants}"
+        );
+    }
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let declared: Vec<(String, Value)> = shipped()
+        .into_iter()
+        .filter_map(|(name, s)| Some((name, s.get("refusal_texts")?.clone())))
+        .collect();
+    assert!(
+        !declared.is_empty(),
+        "no shipped selection declares `refusal_texts`, so this check would not cover it"
+    );
+    for (name, texts) in &declared {
+        assert_valid(
+            &validator,
+            name,
+            &serde_json::json!({ "refusal_texts": texts }),
+        );
+    }
+    let (_, shipped) = &declared[0];
+    type Change<'a> = &'a dyn Fn(&mut Value);
+    let variations: [(&str, Change); 4] = [
+        ("as shipped", &|_| {}),
+        ("unknown code", &|t| t[0]["code"] = "invalid_input".into()),
+        ("unknown member", &|t| t[0]["extra"] = true.into()),
+        ("no code", &|t| {
+            t[0].as_object_mut().unwrap().remove("code");
+        }),
+    ];
+    for (name, change) in variations {
+        let mut texts = shipped.clone();
+        change(&mut texts);
+        let model = validator.is_valid(&serde_json::json!({ "refusal_texts": texts }));
+        let reader = serde_json::from_value::<Selection>(serde_json::json!({
+            "id": "thing.create", "operation_id": "createThing", "effect": "write",
+            "refusal_texts": texts
+        }))
+        .is_ok();
+        assert_eq!(
+            reader, model,
+            "{name}: reader admits {reader}, model admits {model}"
+        );
+    }
+}

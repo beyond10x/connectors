@@ -222,6 +222,68 @@ impl Envelope {
     }
 }
 
+/// The code a refusal text answers with
+/// (`connectors_catalog.selection.TextRefusalCode`): `capacity` for a request
+/// the provider had no room to serve now.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TextRefusalCode {
+    Capacity,
+}
+
+impl TextRefusalCode {
+    fn code(self) -> ErrorCode {
+        match self {
+            Self::Capacity => ErrorCode::Capacity,
+        }
+    }
+}
+
+/// The most refusal texts a write may declare.
+pub const REFUSAL_TEXTS: usize = 16;
+
+/// One refusal a provider names only in its text
+/// (`connectors_catalog.selection.TextRefusal`): a definite 4xx refusal of a
+/// write whose JSON body holds, at one of `pointers`, a string containing one
+/// of `contains`, compared without regard to case, is refused with `code`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TextRefusal {
+    pub pointers: Vec<String>,
+    pub contains: Vec<String>,
+    pub code: TextRefusalCode,
+}
+
+impl TextRefusal {
+    /// Whether `body`, a refusal's JSON answer, carries one of the texts at
+    /// one of the pointers.
+    fn matches(&self, body: &Value) -> bool {
+        self.pointers.iter().any(|pointer| {
+            body.pointer(pointer)
+                .and_then(Value::as_str)
+                .is_some_and(|found| {
+                    let found = found.to_lowercase();
+                    self.contains
+                        .iter()
+                        .any(|text| found.contains(&text.to_lowercase()))
+                })
+        })
+    }
+}
+
+/// The code the first of `texts` matching a definite refusal's `body` gives,
+/// if any; a body that is not JSON matches none.
+fn text_refusal(texts: &[TextRefusal], body: &[u8]) -> Option<ErrorCode> {
+    if texts.is_empty() {
+        return None;
+    }
+    let body: Value = serde_json::from_slice(body).ok()?;
+    texts
+        .iter()
+        .find(|refusal| refusal.matches(&body))
+        .map(|refusal| refusal.code.code())
+}
+
 /// One declared refusal (`connectors_catalog.guard.Refusal`): the string at
 /// `pointer` in the write's own answer equal to one of `values` refuses the
 /// write with `code`, the matched value carried as the provider's reason.
@@ -540,6 +602,12 @@ pub struct Selection {
     /// `403` stays `forbidden`. Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rate_limit_reasons: Vec<String>,
+    /// The refusals a provider names only in the text of a write's definite
+    /// 4xx refusal ([`TextRefusal`]), the first match deciding; every other
+    /// answer keeps the classification its status gives. Only on a write.
+    /// Omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refusal_texts: Vec<TextRefusal>,
     /// The success envelope of a read whose provider signals failure in the
     /// body of a 2xx answer, such as Slack's `ok`: a 2xx JSON answer is a
     /// success only when it holds `true` there, and is refused otherwise.
@@ -855,6 +923,8 @@ pub struct Prepared {
     instance: String,
     source_revision: String,
     rate_limit_reasons: Vec<String>,
+    /// The selection's refusal texts, read from a definite refusal's body.
+    refusal_texts: Vec<TextRefusal>,
     /// The created credential the answer carries, when the selection declares it.
     custody: Option<Custody>,
 }
@@ -922,6 +992,7 @@ impl Engine {
             }
             check_binary(selection)?;
             check_envelope(selection)?;
+            check_refusal_texts(selection)?;
             check_custody(selection)?;
             if let Some(download) = &selection.download {
                 check_download(selection, download)?;
@@ -1922,6 +1993,7 @@ impl Engine {
             instance: instance.to_owned(),
             source_revision: self.source_revision.clone(),
             rate_limit_reasons: exposed.selection.rate_limit_reasons.clone(),
+            refusal_texts: exposed.selection.refusal_texts.clone(),
             custody: exposed.selection.custody.clone(),
         })
     }
@@ -2045,14 +2117,20 @@ impl Prepared {
             400 | 401 | 403 | 404 | 405 | 409 | 410 | 412 | 415 | 422
         ) {
             // The same split a read's refusal gets; each is the provider's answer.
-            let code = match response.status {
-                400 | 409 | 412 | 422 => ErrorCode::InvalidInput,
-                401 => ErrorCode::Unauthorized,
-                403 if quota(&response.body, &self.rate_limit_reasons) => ErrorCode::RateLimited,
-                403 => ErrorCode::Forbidden,
-                404 | 410 => ErrorCode::NotFound,
-                _ => ErrorCode::Forbidden,
-            };
+            // A declared refusal text names the cause the status does not.
+            let code =
+                text_refusal(&self.refusal_texts, &response.body).unwrap_or_else(|| match response
+                    .status
+                {
+                    400 | 409 | 412 | 422 => ErrorCode::InvalidInput,
+                    401 => ErrorCode::Unauthorized,
+                    403 if quota(&response.body, &self.rate_limit_reasons) => {
+                        ErrorCode::RateLimited
+                    }
+                    403 => ErrorCode::Forbidden,
+                    404 | 410 => ErrorCode::NotFound,
+                    _ => ErrorCode::Forbidden,
+                });
             return WriteOutcome::Refused(
                 Error::new(code, "provider refused the write")
                     .answered()
@@ -2719,6 +2797,47 @@ fn check_envelope(selection: &Selection) -> Result<()> {
     match problem {
         Some(problem) => Err(refuse(format!(
             "selection `{}` declares an envelope {problem}",
+            selection.id
+        ))),
+        None => Ok(()),
+    }
+}
+
+/// What a selection's refusal texts must be: on a write, at most
+/// [`REFUSAL_TEXTS`], each with at least one pointer, every pointer led by
+/// `/`, at least one text, and every text non-empty and not repeated within
+/// its refusal without regard to case.
+fn check_refusal_texts(selection: &Selection) -> Result<()> {
+    if selection.refusal_texts.is_empty() {
+        return Ok(());
+    }
+    let problem = if selection.effect != Effect::Write {
+        Some("on a read")
+    } else if selection.refusal_texts.len() > REFUSAL_TEXTS {
+        Some("more than sixteen")
+    } else if selection.refusal_texts.iter().any(|refusal| {
+        refusal.pointers.is_empty()
+            || refusal
+                .pointers
+                .iter()
+                .any(|pointer| !pointer.starts_with('/'))
+    }) {
+        Some("with no pointer or a pointer without a leading `/`")
+    } else if selection.refusal_texts.iter().any(|refusal| {
+        let mut seen = BTreeSet::new();
+        refusal.contains.is_empty()
+            || refusal
+                .contains
+                .iter()
+                .any(|text| text.is_empty() || !seen.insert(text.to_lowercase()))
+    }) {
+        Some("with no text, an empty text or a text repeated in one refusal")
+    } else {
+        None
+    };
+    match problem {
+        Some(problem) => Err(refuse(format!(
+            "selection `{}` declares refusal_texts {problem}",
             selection.id
         ))),
         None => Ok(()),
