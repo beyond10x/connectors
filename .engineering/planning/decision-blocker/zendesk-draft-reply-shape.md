@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: decision-blocker:zendesk-draft-reply-shape
 kind: decision-blocker
-status: open
+status: cleared
 title: What a Zendesk draft reply is, with no draft endpoint upstream
 relations:
 - blocks: story:catalog-zendesk-ticket-writes
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-17T06:47:40Z", actor: "human:timo", revision: 3}
 ---
 ## Question
 
@@ -21,3 +23,7 @@ What is a Zendesk "draft reply" written through the Connectors CLI? The pinned Z
 ## Recommendation
 
 (a): it keeps the draft on the ticket where the agent works, and it reuses `ticket.note`'s guard, so it adds little.
+
+## Decided (2026-10-17)
+
+(a). A draft reply is a private (internal) note whose first line is a fixed draft marker; a person copies it into the public reply. It is one more write id, `ticket.draft_reply`, with the same `safe_update` guard and approval as `ticket.note`, and it never sends anything to the requester. Why: the person who sends the reply works in Zendesk, so the draft belongs where they read it; dropping the one id undoes it.
