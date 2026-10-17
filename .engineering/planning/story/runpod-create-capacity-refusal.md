@@ -2,11 +2,15 @@
 format: aep.planning-md/3
 id: story:runpod-create-capacity-refusal
 kind: story
-status: draft
+status: implemented
 title: A Runpod create refused for lack of capacity is a capacity refusal
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-17T03:03:00Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-17T03:03:00Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-17T03:03:01Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 A Runpod `pod.create` that Runpod refuses for lack of capacity is classified `refused` with code
