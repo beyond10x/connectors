@@ -3,11 +3,11 @@ format: aep.planning-md/3
 id: architecture-decision-record:provider-definitions-and-runtimes
 kind: architecture-decision-record
 status: proposed
-title: Declarative provider definitions live in their own repository and reach runtimes as one IR
+title: Connector definitions live in their own repository and reach each runtime through its lowerer
 relations:
 - informed_by: architecture-decision-record:declarative-http-provider-runtime
 - serves: vision:independent-contract-adapters
-revision: 4
+revision: 7
 ---
 ## Context
 
@@ -47,17 +47,22 @@ optional catalog service. This record decides where those definitions live, what
 runtimes implement, how they reach a host, and what a simplification must keep. It refines that
 record and supersedes nothing in it.
 
+Vocabulary follows `architecture-decision-record:connector-vocabulary`: a provider is the company
+(Atlassian, Google), a connector one service or API it offers (Jira, Gmail), an auth profile one
+way to authenticate to a connector. A connector definition is one file `connectors/<id>.yaml` in
+the definitions repository. Planning ids of this record keep their original wording.
+
 ## Decision
 
-**D1. Provider definitions move to their own repository.** The repository is
+**D1. Connector definitions move to their own repository.** The repository is
 `beyond10x/connectors-definitions`, created on 2026-10-16 at the operator's choice
 (https://github.com/beyond10x/connectors-definitions). It holds one YAML file per declarative
-provider, the vendored upstream documents, the definition schema's ESS source, a README, an
+connector, the vendored upstream documents, the definition schema's ESS source, a README, an
 AGENTS.md and a Taskfile. It holds no Rust and no build of Rust. Native connectors (Kubernetes, SQL,
 MCP, anything that starts a host process or reads host credentials) stay in this repository.
 
 **D2. Two layers: a short definition, and an internal representation a lowerer builds.** A
-definition, `providers/<id>.yaml`, starts with `schema: urn:beyond10x:connectors-definition:1`. It
+definition, `connectors/<id>.yaml`, starts with `schema: urn:beyond10x:connectors-definition:1`. It
 names a vendored source and says only what that source cannot: which operations to expose under
 which local key (`issue.get: {op: getIssue}`), configuration variables with defaults (`hostname`,
 default `gitlab.com`), auth profiles, and the sections v2 adds. Sections are maps keyed by id, so an
@@ -137,7 +142,7 @@ Connectors; this path is equivalent to reading the vendor's documentation.
 
 ## Consequences
 
-- Adding or changing a declarative provider is a change to the definitions repository only. Its
+- Adding or changing a declarative connector is a change to the definitions repository only. Its
   gate runs a released binary over YAML and needs no Rust toolchain.
 - This repository loses the provider data and the per-provider tests that only exercise data, and
   keeps the lowerer, the engine, the host and native connectors.
@@ -161,3 +166,18 @@ Connectors; this path is equivalent to reading the vendor's documentation.
 - Prior decision: `architecture-decision-record:declarative-http-provider-runtime`.
 - Contracts: `contracts/catalog/v1alpha1/semantics.md` (bundle transport, line 320),
   `contracts/auth/profile/v1alpha1/semantics.md`.
+
+## Decision: D11 connector declaration
+
+**D11. The definition owns the connector declaration; `connector.json` becomes lowered output.**
+`architecture-decision-record:connector-vocabulary` adds
+`adapters/catalog/providers/<catalog provider>/connector.json`
+(`connectors-catalog-connector/1`): connector and provider ids, default endpoint, `api_path`,
+the selection and the auth profile blocks. A connector definition states the same facts. The
+definition owns them: the Rust lowerer writes `connector.json`, and a check holds the committed
+file byte-identical to what the definition lowers to, as it already does for the bundle. A
+configured instance's revision digests the selected auth block, the endpoint, the catalog provider
+and the bundle and selection digests, not the order of `profiles[]`; the lowered blocks must keep
+today's values, absent optional fields included, so the `derived_instance` and
+`connector_declarations` tests stay green. The interim `<provider>.auth.json` the lowerer writes
+until then is dropped. Agreed with the session that owns the vocabulary change on 2026-10-17.
