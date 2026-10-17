@@ -115,6 +115,8 @@ enum Parent {
     #[cfg(target_os = "linux")]
     Handle(std::os::fd::OwnedFd),
     Id(libc::pid_t),
+    /// pidfd_open answered ESRCH: the process had already ended.
+    #[cfg(target_os = "linux")]
     Gone,
 }
 
@@ -172,6 +174,7 @@ impl Parent {
                 let alive = unsafe { libc::kill(*pid, 0) } == 0;
                 !alive && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH)
             }
+            #[cfg(target_os = "linux")]
             Self::Gone => true,
         }
     }
