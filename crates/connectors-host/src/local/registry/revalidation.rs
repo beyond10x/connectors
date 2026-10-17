@@ -279,13 +279,50 @@ impl Registry {
         now: u64,
         expires: u64,
     ) -> Result<Revalidation> {
+        self.capture(binding, reference, Some(revision), now, expires)
+    }
+
+    /// The one recollection a read runs when only its connection's evidence
+    /// lapsed (`connectors.cli.LocalRevalidationCause` `read_recollection`,
+    /// contracts/cli/v1alpha1/semantics.md): a revalidation capture at the
+    /// connection's current revision, under the binding it was admitted under.
+    /// It never follows a configuration upgrade; only an explicit revalidation
+    /// does, so a binding other than the connection's is a conflict here.
+    pub fn capture_recollection(
+        &self,
+        binding: &Binding,
+        reference: &str,
+        now: u64,
+        expires: u64,
+    ) -> Result<Revalidation> {
+        self.capture(binding, reference, None, now, expires)
+    }
+
+    fn capture(
+        &self,
+        binding: &Binding,
+        reference: &str,
+        revision: Option<&str>,
+        now: u64,
+        expires: u64,
+    ) -> Result<Revalidation> {
         binding.validate()?;
         if expires <= now || expires > deadline(now, 30_000)? {
             return Err(Failure::InvalidInput);
         }
         self.transaction_admission(now, false, |tx, authority, now| {
             if expires <= now { return Err(Failure::Expired); }
+            let recollection = revision.is_none();
+            let current;
+            let revision = match revision {
+                Some(revision) => revision,
+                None => {
+                    current = Self::connection(tx, reference)?.revision;
+                    current.as_str()
+                }
+            };
             let (row, upgrade) = admitted(tx,binding,reference,revision,now)?;
+            if upgrade && recollection { return Err(Failure::Conflict); }
             tx.execute("DELETE FROM registry_uses WHERE expires_at_ms<=?1", [timestamp(now)?]).map_err(db)?;
             let count: i64 = tx.query_row("SELECT count(*) FROM registry_uses", [], |r| r.get(0)).map_err(db)?;
             if count >= 1000 { return Err(Failure::Capacity); }

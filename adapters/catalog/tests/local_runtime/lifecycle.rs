@@ -201,7 +201,7 @@ fn catalog_cli_failed_repair_and_busy_stop_preserve_authority() {
 }
 #[test]
 #[ignore = "requires built production CLI and qualified disposable Secret Service"]
-fn catalog_cli_explicit_revalidation_after_real_expiry_without_reentry() {
+fn catalog_cli_read_recollects_expired_evidence_without_reentry() {
     let provider = Provider::new();
     let custody = Custody::new(provider.root.path());
     let cli = Cli::new(provider.root.path());
@@ -274,23 +274,23 @@ fn catalog_cli_explicit_revalidation_after_real_expiry_without_reentry() {
         success(cli.run(&status))["connection"]["summary"]["state"],
         "pending"
     );
-    // story:expired-evidence-invoke-advises-revalidate: the credential is
-    // intact, so the read names the revalidation that helps, not a repair.
-    let expired = refusal(cli.run(&invoke), "not_granted");
-    assert_eq!(
-        (&expired["stage"], &expired["next_action"]),
-        (&json!("admission"), &json!("revalidate_connection")),
-        "{expired}"
-    );
-    assert_eq!(provider.count(), before);
-    assert!(!cli.paths.state.join("owner.sock").exists());
-    let refreshed = success(cli.run(&revalidate))["connection"].clone();
-    assert_eq!(refreshed["summary"], connected["summary"]);
-    assert!(refreshed["valid_until_ms"].as_u64().unwrap() > until);
-    assert_eq!(provider.count(), before + 2);
+    // story:connection-lease-holds-unattended: the credential is intact, so
+    // the read recollects the lapsed evidence once from custody, with no
+    // re-entry (the credential file is gone), and is then served.
     let result = success(cli.run(&invoke));
     let result: Value = result["result"].clone();
     assert_eq!(result["body"]["name"], "fixture-project");
+    assert!(provider.count() > before);
+    let refreshed = success(cli.run(&status))["connection"].clone();
+    assert_eq!(refreshed["summary"]["state"], "ready", "{refreshed}");
+    assert_eq!(
+        refreshed["summary"]["revision"], connected["summary"]["revision"],
+        "{refreshed}"
+    );
+    assert!(refreshed["valid_until_ms"].as_u64().unwrap() > until);
+    // An explicit revalidation still answers the unchanged connection.
+    let revalidated = success(cli.run(&revalidate))["connection"].clone();
+    assert_eq!(revalidated["summary"], connected["summary"]);
     // Upstream unavailability is not positive invalidity of the retained token.
     provider
         .response_status

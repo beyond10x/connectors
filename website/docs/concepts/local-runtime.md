@@ -31,8 +31,9 @@ its scope and access reads) and saves the credential in custody. The credential 
 hidden prompt or a protected file, never as an argument. Then:
 
 - `connections revalidate` renews the validation evidence without asking for the credential
-  again. Evidence lasts 60 seconds; an invoke on lapsed evidence answers with the next action
-  `revalidate_connection`.
+  again. Evidence lasts 60 seconds by default; a read on lapsed evidence renews it once the same
+  way before it is served, so a connection keeps serving reads with no caller revalidation while
+  its credential stays valid. A consumer launch does not, and answers `unavailable`.
 - `connections repair` replaces an invalid credential and refuses one that names a different
   identity.
 - `connections revoke` ends local use. It does not revoke the token at the provider.
