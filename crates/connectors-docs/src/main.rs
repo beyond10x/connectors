@@ -11,7 +11,9 @@
 //!   selected ESS model, from the pinned `ess generate --kind docs`;
 //! - `website/data/status.json` (`b10x-status/1`) and `website/docs/status.md` ([`status`]), where
 //!   every shipped capability names the test that holds it and generation fails when that test is
-//!   gone.
+//!   gone;
+//! - `website/docs/connectors/index.md`, every connector with its provider, reads, writes and
+//!   auth profiles, from the catalog declarations and the hand-written rows ([`onboarding`]).
 //!
 //! `generate --check` writes nothing and fails on a missing, stale, hand-edited or orphaned
 //! generated file. Both also check every page ([`pages`]): front matter, bracketed admonition
@@ -21,11 +23,13 @@
 //! `.well-known/b10x-routes.json` into a built site ([`routes`]).
 //!
 //! `vocabulary` checks that the given files speak the connector vocabulary `README.md` defines
-//! ([`vocabulary`]).
+//! ([`vocabulary`]), and, given `README.md`, that every connector of its support table has an
+//! onboarding page with the eight onboarding sections ([`onboarding`]).
 
 mod cli;
 mod crates;
 mod markdown;
+mod onboarding;
 mod pages;
 mod reference;
 mod routes;
@@ -110,6 +114,7 @@ fn outputs(root: &Path, ess: &Path) -> Result<Outputs> {
     outputs.insert(crates::PAGE.to_owned(), crates::page(root)?);
     outputs.insert(status::DATA.to_owned(), status::data(root)?);
     outputs.insert(status::PAGE.to_owned(), status::page(root)?);
+    outputs.insert(onboarding::INDEX.to_owned(), onboarding::index(root)?);
     for (relative, content) in reference::outputs(root, ess)? {
         if outputs.insert(relative.clone(), content).is_some() {
             return Err(format!("{relative} is generated twice"));
