@@ -299,6 +299,40 @@ fn an_expired_evidence_read_is_refused_by_name_and_revalidation_readmits_it() {
     );
 }
 
+/// story:connection-lease-holds-unattended: a captured read carries its
+/// evidence's own lifetime (collection to `valid_until`, here shorter than the
+/// profile's bound), and a read whose evidence lapses between its capture and
+/// its dispatch is refused as expired evidence, not as the read's own timeout.
+/// A use bound by the read's deadline alone still expires as a timeout.
+#[test]
+fn a_read_whose_evidence_lapses_before_dispatch_is_refused_as_expired_evidence() {
+    let (_root, registry) = fixture();
+    let acquisition = registry.begin(&binding(), NOW).unwrap();
+    let claim = registry.consume(acquisition, NOW).unwrap();
+    let mut short = baseline("one", NOW);
+    short.valid_until_ms = NOW + 8_000;
+    let candidate = registry.prepare(&claim, short, 12, NOW).unwrap();
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let none = BTreeSet::new();
+    let bounded = registry
+        .capture_read(&binding(), &reference, &none, NOW, NOW + 1000)
+        .unwrap();
+    assert_eq!(bounded.evidence_lifetime_ms(), 8_000);
+    assert!(matches!(
+        registry.dispatch_read(bounded, NOW + 1000),
+        Err(Failure::Expired)
+    ));
+    let at = NOW + 7_500;
+    let read = registry
+        .capture_read(&binding(), &reference, &none, at, at + 30_000)
+        .unwrap();
+    assert_eq!(read.expires_at_ms(), NOW + 8_000);
+    assert!(matches!(
+        registry.dispatch_read(read, NOW + 8_000),
+        Err(Failure::EvidenceExpired)
+    ));
+}
+
 /// Known invalid material is not expired evidence either: only a repair helps.
 #[test]
 fn an_invalid_credential_read_stays_not_ready_after_its_evidence_expired() {

@@ -881,13 +881,14 @@ target/release/connectors --output json operations describe --adapter forge --op
 Connect runs the declared identity and scope reads and refuses a token below
 `minimum_scopes`. Validation evidence lasts the `auth` object's `evidence_lifetime_ms`
 (60 seconds when omitted, at most 300 000 ms); after expiry the
-connection reports `pending`, and `operations invoke` of a read refuses with
-`not_granted` at `admission` and `next_action: revalidate_connection` until
+connection reports `pending`. The next `operations invoke` of a read recollects
+the evidence once from the credential already in custody, with no re-entry, as
 `connections revalidate --adapter forge --connection CONNECTION --expected-revision REVISION`
-renews it with no credential re-entry. `operations invoke` never revalidates on
-its own, and validation evidence lasts 60 s by default, so a caller that invokes
-more than a minute after its last connect or revalidation runs `connections
-revalidate` right before the invoke.
+would, and is then served: a connection connected or revalidated once keeps
+serving reads with no caller revalidation for as long as its credential stays
+valid. A read is refused with `not_granted` at `admission` and
+`next_action: revalidate_connection` only when the evidence is still not current
+after that recollection.
 A credential the provider refused or one below an operation's scopes still
 answers `next_action: repair_connection`. `connections repair` replaces an invalid
 credential and refuses a changed identity; `connections revoke` is terminal local

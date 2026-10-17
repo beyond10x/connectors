@@ -124,7 +124,8 @@ the exact retained generation/version and private publication fence for at most
 through qualified custody. The existing bounded transient-use records retain the
 version during validation; they create no new generation or custody owner. The
 capture is consumed once before the declared native identity/grant read. The
-original deadline includes queueing, startup, custody and provider work.
+original deadline, which starts after admission, includes queueing, startup,
+custody and provider work.
 
 Successful same-identity evidence replaces the one baseline under the unchanged
 generation and current binding/fence. Publication advances the private fence,
@@ -133,9 +134,24 @@ revision and custody version stay unchanged. Known invalidity, expiry, retiremen
 or revocation cannot be cleared by recollection. Positive invalidity or a proved
 identity mismatch in this retained material cuts off that material; transient
 provider/custody failures preserve any still-valid baseline. No credential is
-written, no new acquisition is created, and business invocation never performs
-implicit revalidation. A lost publication acknowledgement is outcome_unknown;
-connection status observes the resulting baseline and no request is replayed.
+written and no new acquisition is created. A lost publication acknowledgement is
+outcome_unknown; connection status observes the resulting baseline and no
+request is replayed.
+
+A read on `operations invoke` whose connection's evidence expired while its
+credential is intact, or would expire before the read could use it
+([semantics.md](semantics.md)), runs this same recollection once, as the first step of its
+own job on the instance's serialized worker, within the read's deadline and at
+most 30 seconds, before it captures its read use ([semantics.md](semantics.md)).
+It never re-pins changed mounted material and never follows a configuration
+upgrade: those stay with explicit `connections revalidate`.
+
+A running owner of the CLI's own build admits `connections revalidate` from its
+held metadata handle; only without one does the CLI admit it directly, which
+verifies the whole store, before it starts an owner, as for `operations invoke`.
+The command's 30-second deadline starts once it is admitted, so the store's size
+never consumes it. Two revalidations of one connection queue on the instance's
+worker and each runs its own identity probe; each deadline covers its queueing.
 
 ## Stopping an owner
 

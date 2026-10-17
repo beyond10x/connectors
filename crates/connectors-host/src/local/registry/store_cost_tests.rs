@@ -670,3 +670,151 @@ fn owner_start_of_a_grown_store() {
         }
     }
 }
+
+/// story:connection-lease-holds-unattended, the diagnosis: the stages of two
+/// `connections revalidate` of one connection started together, on a store
+/// grown by read invokes, as the CLI and the owner run them today. Each CLI is
+/// its own fresh process and admits directly; the owner repeats the admission
+/// from its held handles and its one instance worker then runs each
+/// revalidation's capture, dispatch, finish and description in turn:
+/// `CONNECTORS_STORE_COST_STORES=<dir> CONNECTORS_STORE_COST_EVENTS=1200 cargo test -p connectors-host --lib two_revalidations_of_a_grown_store -- --ignored --nocapture`.
+#[test]
+#[ignore = "diagnosis; run explicitly"]
+fn two_revalidations_of_a_grown_store() {
+    use super::super::metadata::{exit_process, simulate_process, take_costs};
+    let saved = std::env::var_os("CONNECTORS_STORE_COST_STORES").map(std::path::PathBuf::from);
+    let events: i64 = std::env::var("CONNECTORS_STORE_COST_EVENTS")
+        .map_or(1200, |events| events.trim().parse().unwrap());
+    let (root, registry, reference) = grown_stores(&[events], saved.as_deref()).pop().unwrap();
+    println!("events={}", recorded_events(root.path()));
+    let now = NOW + 10_000;
+    let fixed = binding();
+    let revision = registry
+        .describe(
+            &fixed.instance_id,
+            &fixed.adapter_id,
+            &fixed.configuration_revision,
+            &reference,
+            now,
+            true,
+        )
+        .unwrap()
+        .revision;
+    let report = |who: &str, name: &str, started: std::time::Instant, outcome: String| {
+        let costs = take_costs()
+            .into_iter()
+            .map(|(kind, (calls, spent))| format!("{kind}={calls}/{:.0}", ms(spent)))
+            .collect::<Vec<_>>()
+            .join(" ");
+        println!(
+            "{who} {name}: {:.0} ms -> {outcome} [{costs}]",
+            ms(started.elapsed())
+        );
+    };
+    let started_all = std::time::Instant::now();
+    // The two CLIs, started together, each in its own fresh process.
+    std::thread::scope(|scope| {
+        for cli in 0..2u64 {
+            let (root, registry, reference, revision, fixed) =
+                (&root, &registry, &reference, &revision, &fixed);
+            scope.spawn(move || {
+                simulate_process(50_000 + cli);
+                take_costs();
+                let who = format!("cli{cli} +{:.0}ms", ms(started_all.elapsed()));
+                let started = std::time::Instant::now();
+                let outcome = format!(
+                    "{:?}",
+                    registry
+                        .revalidation_binding(
+                            &fixed.instance_id,
+                            &fixed.adapter_id,
+                            reference,
+                            revision
+                        )
+                        .map(drop)
+                );
+                report(&who, "revalidation_binding", started, outcome);
+                let started = std::time::Instant::now();
+                let outcome = format!(
+                    "{:?}",
+                    registry.admit_revalidation(&binding(), reference, revision, now)
+                );
+                report(&who, "admit_revalidation", started, outcome);
+                exit_process();
+                let _ = root;
+            });
+        }
+    });
+    println!("both CLIs admitted at +{:.0} ms", ms(started_all.elapsed()));
+    // The owner, one process: its admission, then its worker's job, per CLI.
+    simulate_process(1);
+    take_costs();
+    for cli in 0..2 {
+        let who = format!("owner{cli}");
+        let started = std::time::Instant::now();
+        let outcome = format!(
+            "{:?}",
+            registry
+                .revalidation_binding(&fixed.instance_id, &fixed.adapter_id, &reference, &revision)
+                .map(drop)
+                .and_then(|()| registry.admit_revalidation(&binding(), &reference, &revision, now))
+        );
+        report(&who, "admit", started, outcome);
+        let started = std::time::Instant::now();
+        let captured =
+            registry.capture_revalidation(&binding(), &reference, &revision, now, now + 30_000);
+        report(
+            &who,
+            "capture_revalidation",
+            started,
+            format!("{:?}", captured.as_ref().map(drop)),
+        );
+        let Ok(captured) = captured else { continue };
+        let started = std::time::Instant::now();
+        let dispatched = registry.dispatch_revalidation(captured, now);
+        report(
+            &who,
+            "dispatch_revalidation",
+            started,
+            format!("{:?}", dispatched.as_ref().map(drop)),
+        );
+        let Ok(dispatched) = dispatched else { continue };
+        let started = std::time::Instant::now();
+        let finished = registry.finish_revalidation(
+            dispatched,
+            Ok(ValidatedBaseline {
+                identity: ExternalIdentity {
+                    kind: "fixture-account".into(),
+                    subject: "one".into(),
+                },
+                granted_scopes: Some(BTreeSet::from(["read".into()])),
+                credential_expires_at_ms: Some(now + 3_600_000),
+                collected_at_ms: now,
+                valid_until_ms: now + 60_000,
+            }),
+            now,
+        );
+        report(
+            &who,
+            "finish_revalidation",
+            started,
+            format!("{finished:?}"),
+        );
+        let started = std::time::Instant::now();
+        let observed = registry.describe(
+            &fixed.instance_id,
+            &fixed.adapter_id,
+            &fixed.configuration_revision,
+            &reference,
+            now,
+            true,
+        );
+        report(
+            &who,
+            "describe",
+            started,
+            format!("{:?}", observed.map(|o| o.state)),
+        );
+    }
+    println!("total {:.0} ms", ms(started_all.elapsed()));
+}

@@ -189,7 +189,7 @@ fn classify(suite: &Suite, name: &str) -> Entry {
         (
             "connectors-catalog-provider",
             "local_runtime",
-            "cli_journey::lifecycle::catalog_cli_explicit_revalidation_after_real_expiry_without_reentry",
+            "cli_journey::lifecycle::catalog_cli_read_recollects_expired_evidence_without_reentry",
         ) => Some((Timing, vec![CUSTODY, CLI])),
         (
             "connectors-catalog-provider",

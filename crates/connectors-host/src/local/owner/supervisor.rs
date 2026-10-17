@@ -781,143 +781,27 @@ fn worker(
                         connectors_sdk::now_ms(),
                         job.deadline,
                     )?;
-                    let version = captured.version();
-                    let selection = config.selection();
-                    let read = custody::Store::open_for(version.scope(), &selection, &paths.state)
-                        .and_then(|store| store.read(version));
-                    let check = || -> Result<()> {
-                        let (latest_config, latest) = selected(&paths, &job.alias)?;
-                        if latest.selection() != current.selection()
-                            || latest_config.selection() != config.selection()
-                        {
-                            return Err(Code::LifecycleConflict.into());
-                        }
-                        if !latest.permissions.profiles.contains(&profile) {
-                            return Err(Code::Forbidden.into());
-                        }
-                        if stopped.load(Ordering::SeqCst) {
-                            return Err(Code::Unavailable.into());
-                        }
-                        Ok(())
-                    };
-                    let material = match read {
-                        Ok(value) => value,
-                        // The mounted item's bytes are no longer the pinned
-                        // ones: re-read it, validate the new bytes with the
-                        // provider and publish them as a new version, without
-                        // re-entry. The old bytes' version is retired.
-                        #[cfg(target_os = "linux")]
-                        Err(custody::Failure::Missing) if selection.read_only() => {
-                            registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
-                            let acquired = registry.begin_repair(
-                                &binding,
-                                &connection,
-                                &revision,
-                                connectors_sdk::now_ms(),
-                            )?;
-                            let claim = registry.consume(acquired, connectors_sdk::now_ms())?;
-                            let published = super::publish_mounted(
-                                &paths,
-                                &selection,
-                                &registry,
-                                &claim,
-                                &job.alias,
-                                &profile,
-                                |secret| {
-                                    control
-                                        .lock()
-                                        .map_err(|_| Code::Unavailable)?
-                                        .check(job.epoch)
-                                        .and_then(|_| check())?;
-                                    Ok(active
-                                        .validate(&profile, &secret, job.deadline)?
-                                        .into_registry())
-                                },
-                                || {
-                                    control
-                                        .lock()
-                                        .map_err(|_| Code::Unavailable)?
-                                        .check(job.epoch)
-                                        .and_then(|_| check())
-                                },
-                            );
-                            if let Err(error) = published {
-                                if error.code != Code::OutcomeUnknown {
-                                    registry.fail(&claim, connectors_sdk::now_ms())?;
-                                }
-                                return Err(error);
-                            }
-                            let observed = registry.describe(
-                                &current.instance_id,
-                                &current.adapter_id,
-                                &current.configuration_revision,
-                                &connection,
-                                connectors_sdk::now_ms(),
-                                true,
-                            )?;
-                            return Ok(Output::Value(
-                                json!({"connection":connection_value(&job.alias,observed)}),
-                            ));
-                        }
-                        Err(error) => {
-                            if super::read_invalidates(&selection, error) {
-                                registry
-                                    .missing_revalidation(captured, connectors_sdk::now_ms())?;
-                            } else {
-                                registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
-                            }
-                            return Err(Code::CustodyUnavailable.into());
-                        }
-                    };
-                    let guard = control.lock().map_err(|_| Code::Unavailable)?;
-                    if let Err(error) = guard.check(job.epoch).and_then(|_| check()) {
-                        registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
-                        return Err(error);
-                    }
-                    let upgrade = captured.upgrades();
-                    let dispatched =
-                        registry.dispatch_revalidation(captured, connectors_sdk::now_ms())?;
-                    drop(guard);
-                    let result = active.validate(&profile, &material, job.deadline);
-                    let guard = control.lock().map_err(|_| Code::Unavailable)?;
-                    if let Err(error) = guard.check(job.epoch).and_then(|_| check()) {
-                        registry.finish_revalidation(
-                            dispatched,
-                            Err(None),
-                            connectors_sdk::now_ms(),
-                        )?;
-                        return Err(error);
-                    }
-                    match result {
-                        Ok(baseline) => registry.finish_revalidation(
-                            dispatched,
-                            Ok(baseline.into_registry()),
-                            connectors_sdk::now_ms(),
-                        )?,
-                        Err(error) => {
-                            let reason = match error {
-                                runtime::Failure::InvalidCredential
-                                | runtime::Failure::IdentityMismatch => {
-                                    Some(registry::InvalidCredential::Invalid)
-                                }
-                                runtime::Failure::InsufficientScope => {
-                                    Some(registry::InvalidCredential::Insufficient)
-                                }
-                                _ => None,
-                            };
-                            registry.finish_revalidation(
-                                dispatched,
-                                Err(reason),
-                                connectors_sdk::now_ms(),
-                            )?;
-                            // Repair refuses the changed binding of an upgrade, so a
-                            // credential the new provider refuses needs a new connection.
-                            let mut error = Error::from(error);
-                            error.reconnect = upgrade && reason.is_some();
-                            return Err(error);
-                        }
-                    }
-                    drop(guard);
+                    revalidate(
+                        &Scope {
+                            paths: &paths,
+                            alias: &job.alias,
+                            config: &config,
+                            current: &current,
+                            control: &control,
+                            stopped: &stopped,
+                            epoch: job.epoch,
+                            deadline: job.deadline,
+                            profile: &profile,
+                        },
+                        active,
+                        &registry,
+                        &binding,
+                        captured,
+                        Cause::Explicit {
+                            connection: &connection,
+                            revision: &revision,
+                        },
+                    )?;
                     let observed = registry.describe(
                         &current.instance_id,
                         &current.adapter_id,
@@ -968,13 +852,67 @@ fn worker(
                     .map_err(|_| Code::InvalidInput)?;
                     let registry = registry::Registry::with_system_clock(&paths.state);
                     let binding = bootstrap.binding(&requirement.profile)?;
-                    let captured = registry.capture_read(
-                        &binding,
-                        &connection,
-                        &requirement.scopes,
-                        connectors_sdk::now_ms(),
-                        job.deadline,
-                    )?;
+                    let capture = || {
+                        registry.capture_read(
+                            &binding,
+                            &connection,
+                            &requirement.scopes,
+                            connectors_sdk::now_ms(),
+                            job.deadline,
+                        )
+                    };
+                    // Evidence still current that would lapse before this read
+                    // could use it: under half its lifetime and under the
+                    // read's own remaining deadline left. The use, and so the
+                    // provider deadline, never outlasts the evidence.
+                    let lapses_early = |captured: &registry::ReadUse| {
+                        let now = connectors_sdk::now_ms();
+                        let window = (binding.profile.evidence_lifetime_ms / 2)
+                            .min(job.deadline.saturating_sub(now));
+                        captured.expires_at_ms() < now.saturating_add(window)
+                    };
+                    let captured = match capture() {
+                        Ok(captured) if !lapses_early(&captured) => captured,
+                        // Only the evidence lapsed, or is about to, for an
+                        // intact credential: recollect it once from the
+                        // retained custody version, as `connections
+                        // revalidate` would, within this read's deadline, then
+                        // capture the read against it. Still not current after
+                        // that is the read's refusal.
+                        result @ (Ok(_) | Err(registry::Failure::EvidenceExpired)) => {
+                            if let Ok(early) = result {
+                                registry.cancel_read(early, connectors_sdk::now_ms())?;
+                            }
+                            let now = connectors_sdk::now_ms();
+                            let expires = job.deadline.min(now.saturating_add(30_000));
+                            let recollection = registry.capture_recollection(
+                                &binding,
+                                &connection,
+                                now,
+                                expires,
+                            )?;
+                            revalidate(
+                                &Scope {
+                                    paths: &paths,
+                                    alias: &job.alias,
+                                    config: &config,
+                                    current: &current,
+                                    control: &control,
+                                    stopped: &stopped,
+                                    epoch: job.epoch,
+                                    deadline: expires,
+                                    profile: &requirement.profile,
+                                },
+                                active,
+                                &registry,
+                                &binding,
+                                recollection,
+                                Cause::ReadRecollection,
+                            )?;
+                            capture()?
+                        }
+                        other => other?,
+                    };
                     let version = captured.version();
                     let selection = config.selection();
                     let material =
@@ -1051,6 +989,184 @@ fn worker(
         busy.store(false, Ordering::SeqCst);
         let _ = job.reply.send(result);
     }
+}
+
+/// What admitted a revalidation (`connectors.cli.LocalRevalidationCause`,
+/// ess/domains/cli.yaml).
+#[derive(Clone, Copy)]
+enum Cause<'a> {
+    /// `connections revalidate`: the only cause that re-pins changed mounted
+    /// material or follows a configuration upgrade.
+    Explicit {
+        connection: &'a str,
+        revision: &'a str,
+    },
+    /// The one recollection a read runs, first in its own job, when only its
+    /// connection's evidence lapsed (contracts/cli/v1alpha1/semantics.md).
+    ReadRecollection,
+}
+
+/// The job a revalidation runs in, on the instance's serialized worker.
+#[derive(Clone, Copy)]
+struct Scope<'a> {
+    paths: &'a Paths,
+    alias: &'a str,
+    config: &'a Config,
+    current: &'a Adapter,
+    control: &'a Mutex<lifecycle::Control>,
+    stopped: &'a AtomicBool,
+    epoch: u64,
+    /// The validation's deadline, at most the captured use's expiry.
+    deadline: u64,
+    profile: &'a str,
+}
+
+/// Validates the captured custody version's bytes with the provider and
+/// publishes the recollected baseline under the unchanged generation, or
+/// records the provider's refusal (`connections revalidate`, owner.md). Under
+/// the read-only binding, bytes no longer the pinned ones are re-pinned only
+/// for an explicit revalidation; a read's recollection refuses them as its
+/// read would.
+fn revalidate(
+    scope: &Scope<'_>,
+    active: &mut runtime::Child,
+    registry: &registry::Registry,
+    binding: &registry::Binding,
+    captured: registry::Revalidation,
+    cause: Cause<'_>,
+) -> Result<()> {
+    let Scope {
+        paths,
+        alias,
+        config,
+        current,
+        control,
+        stopped,
+        epoch,
+        deadline,
+        profile,
+    } = *scope;
+    let version = captured.version();
+    let selection = config.selection();
+    let read = custody::Store::open_for(version.scope(), &selection, &paths.state)
+        .and_then(|store| store.read(version));
+    let check = || -> Result<()> {
+        let (latest_config, latest) = selected(paths, alias)?;
+        if latest.selection() != current.selection()
+            || latest_config.selection() != config.selection()
+        {
+            return Err(Code::LifecycleConflict.into());
+        }
+        if !latest.permissions.profiles.iter().any(|p| p == profile) {
+            return Err(Code::Forbidden.into());
+        }
+        if stopped.load(Ordering::SeqCst) {
+            return Err(Code::Unavailable.into());
+        }
+        Ok(())
+    };
+    let material = match read {
+        Ok(value) => value,
+        // The mounted item's bytes are no longer the pinned ones: re-read it,
+        // validate the new bytes with the provider and publish them as a new
+        // version, without re-entry. The old bytes' version is retired.
+        #[cfg(target_os = "linux")]
+        Err(custody::Failure::Missing) if selection.read_only() => {
+            registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+            let Cause::Explicit {
+                connection,
+                revision,
+            } = cause
+            else {
+                // A read never re-pins changed material.
+                return Err(super::read_error(&selection, custody::Failure::Missing));
+            };
+            let acquired =
+                registry.begin_repair(binding, connection, revision, connectors_sdk::now_ms())?;
+            let claim = registry.consume(acquired, connectors_sdk::now_ms())?;
+            let published = super::publish_mounted(
+                paths,
+                &selection,
+                registry,
+                &claim,
+                alias,
+                profile,
+                |secret| {
+                    control
+                        .lock()
+                        .map_err(|_| Code::Unavailable)?
+                        .check(epoch)
+                        .and_then(|_| check())?;
+                    Ok(active.validate(profile, &secret, deadline)?.into_registry())
+                },
+                || {
+                    control
+                        .lock()
+                        .map_err(|_| Code::Unavailable)?
+                        .check(epoch)
+                        .and_then(|_| check())
+                },
+            );
+            if let Err(error) = published {
+                if error.code != Code::OutcomeUnknown {
+                    registry.fail(&claim, connectors_sdk::now_ms())?;
+                }
+                return Err(error);
+            }
+            return Ok(());
+        }
+        Err(error) => {
+            if super::read_invalidates(&selection, error) {
+                registry.missing_revalidation(captured, connectors_sdk::now_ms())?;
+            } else {
+                registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+            }
+            return Err(match cause {
+                Cause::Explicit { .. } => Code::CustodyUnavailable.into(),
+                Cause::ReadRecollection => super::read_error(&selection, error),
+            });
+        }
+    };
+    let guard = control.lock().map_err(|_| Code::Unavailable)?;
+    if let Err(error) = guard.check(epoch).and_then(|_| check()) {
+        registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+        return Err(error);
+    }
+    let upgrade = captured.upgrades();
+    let dispatched = registry.dispatch_revalidation(captured, connectors_sdk::now_ms())?;
+    drop(guard);
+    let result = active.validate(profile, &material, deadline);
+    let guard = control.lock().map_err(|_| Code::Unavailable)?;
+    if let Err(error) = guard.check(epoch).and_then(|_| check()) {
+        registry.finish_revalidation(dispatched, Err(None), connectors_sdk::now_ms())?;
+        return Err(error);
+    }
+    match result {
+        Ok(baseline) => registry.finish_revalidation(
+            dispatched,
+            Ok(baseline.into_registry()),
+            connectors_sdk::now_ms(),
+        )?,
+        Err(error) => {
+            let reason = match error {
+                runtime::Failure::InvalidCredential | runtime::Failure::IdentityMismatch => {
+                    Some(registry::InvalidCredential::Invalid)
+                }
+                runtime::Failure::InsufficientScope => {
+                    Some(registry::InvalidCredential::Insufficient)
+                }
+                _ => None,
+            };
+            registry.finish_revalidation(dispatched, Err(reason), connectors_sdk::now_ms())?;
+            // Repair refuses the changed binding of an upgrade, so a
+            // credential the new provider refuses needs a new connection.
+            let mut error = Error::from(error);
+            error.reconnect = upgrade && reason.is_some();
+            return Err(error);
+        }
+    }
+    drop(guard);
+    Ok(())
 }
 
 /// The answer to a read: the provider result as the JSON value the adapter
