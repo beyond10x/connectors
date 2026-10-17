@@ -564,7 +564,7 @@ impl InstanceTable {
             awaiting_profile: None,
         };
         match installation.derive(&instance.alias, args, instance.profile.is_some())? {
-            Derived::Entry(adapter) => Ok((instance, Some(adapter))),
+            Derived::Entry(adapter) => Ok((instance, Some(*adapter))),
             Derived::Awaiting(profiles) => {
                 instance.awaiting_profile = Some(profiles);
                 Ok((instance, None))
@@ -1094,7 +1094,7 @@ impl Installation {
         };
         executable.validate()?;
         let derived = match executable.print("--print-local-bootstrap") {
-            Ok(printed) => Derived::Entry(self.entry(alias, executable, &printed)?),
+            Ok(printed) => Derived::Entry(Box::new(self.entry(alias, executable, &printed)?)),
             // Only a refusal is asked about; a provider past its deadline is
             // not started again.
             Err(Unprinted::Refused) if !stated => {
@@ -1172,7 +1172,7 @@ impl Installation {
 #[derive(Clone)]
 enum Derived {
     /// The instance's entry.
-    Entry(Adapter),
+    Entry(Box<Adapter>),
     /// The profiles its connector declares, more than one, of which the
     /// instance names none: nothing is derived until it does.
     Awaiting(BTreeSet<String>),

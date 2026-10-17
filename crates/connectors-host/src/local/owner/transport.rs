@@ -2834,7 +2834,7 @@ mod idle_sweep_tests {
         let mut tether = tether::Tether::new(&directory, &state, &socket).unwrap();
         assert!(!tether.ended());
         // Queued before the socket is removed: retirement serves it and listens again.
-        let client = UnixStream::connect(state.join("owner.sock")).unwrap();
+        let client = UnixStream::connect(&socket).unwrap();
         let retirement = retire(&owner, &recovery, &mut listener, &socket, &mut tether);
         assert!(matches!(retirement, Retirement::Serve));
         assert!(state.join("owner.sock").exists(), "the owner listens again");
