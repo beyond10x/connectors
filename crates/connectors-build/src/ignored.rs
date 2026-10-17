@@ -181,7 +181,8 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "connectors-catalog-provider",
             "local_runtime",
             "cli_journey::guarded_merge::prepared_attempt_exit_fixture"
-            | "cli_journey::guarded_merge::owner_replay::catalog_same_image_owner_fixture",
+            | "cli_journey::guarded_merge::owner_replay::catalog_same_image_owner_fixture"
+            | "cli_journey::serve_the_raw_file_fixture",
         ) => {
             entry.helper = true;
             return entry;
