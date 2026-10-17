@@ -6,7 +6,38 @@ status: draft
 title: Zendesk ticket update and internal note through the catalog provider, behind approvals
 relations:
 - depends_on: story:catalog-zendesk-reads
-revision: 2
+scope:
+- confidence: cited
+  path: adapters/catalog/generated/bundles/index.json
+- confidence: cited
+  path: adapters/catalog/generated/bundles/zendesk.bundle.json
+- confidence: cited
+  path: adapters/catalog/providers/zendesk/operations.json
+- confidence: cited
+  path: adapters/catalog/spec/ess/domains/guard.yaml
+- confidence: cited
+  path: adapters/catalog/spec/ess/domains/selection.yaml
+- confidence: cited
+  path: adapters/catalog/src/lib.rs
+- confidence: inferred
+  path: adapters/catalog/src/local.rs
+- confidence: cited
+  path: adapters/catalog/tests/zendesk.rs
+- confidence: cited
+  path: contracts/catalog/v1alpha1/semantics.md
+- confidence: inferred
+  path: crates/connectors-core/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-core/src/v1alpha2.rs
+- confidence: cited
+  path: crates/connectors-docs/src/status.rs
+- confidence: cited
+  path: docs/catalog-zendesk.md
+- confidence: cited
+  path: spec-kinds/adapter/v2/schema.json
+- confidence: cited
+  path: spec-kinds/adapter/v2/semantics.md
+revision: 18
 ---
 ## Outcome
 
@@ -29,9 +60,16 @@ The assistant repository calls reviewed Zendesk Support writes through the Conne
 
 The pinned document has no draft object or endpoint. A draft reply is a private note whose first line is a fixed draft marker, which a person copies into the public reply; same guard and approval as `ticket.note`, nothing sent to the requester.
 
-## Engine prerequisite to check first
+## Engine prerequisites (scoped 2026-10-17)
 
-Zendesk wraps the body in `ticket` (and `ticket.comment`); the catalog's write bodies so far are flat (`body_keys`). If the operation shape cannot carry a nested body, model that first in the adapter specification kind (spec first), then the operations.
+The catalog write shape cannot carry these writes today (`adapters/catalog/src/lib.rs`): `body_keys` closes top-level keys only and `ValueType` has no object; `body_fixed` fixes top-level keys only; enums exist for bounded parameters only; writes map 409 to `invalid_input` and `ErrorCode` has no conflict. Each is modelled first in `adapters/catalog/spec/ess/domains/{selection,guard}.yaml` and `spec-kinds/adapter/v2`, then implemented:
+
+1. Nested closed bodies: body keys, types and required/non-empty rules addressed by JSON pointer (`/ticket/group_id`, `/ticket/comment/body`).
+2. Fixed values at a pointer (`/ticket/comment/public` = false, `/ticket/safe_update` = true), refused if the caller sends them.
+3. An enum on a body value (`/ticket/priority`, `/ticket/type`), refused as `invalid_input` naming the field.
+4. A generic `conflict` refusal code in the shared contract (`connectors-core` `ErrorCode`): the provider answered that the target changed since it was read; nothing was applied. A write declares which status maps to it (Zendesk 409).
+
+The caller passes `updated_stamp` (read from `ticket.show`); the preflight `ShowTicket` check compares it with `/ticket/updated_at` and refuses before dispatch on a mismatch, so the 409 only covers the window between the preflight and the write.
 
 ## Acceptance
 
