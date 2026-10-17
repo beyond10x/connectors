@@ -15,7 +15,7 @@ it does not identify an installed executable.
 and the Eventlog-backed runtime roots on installed Rust 1.91.0. The Rust gate runs
 formatting, descriptor drift, offline builds/tests/Clippy, library dependency
 boundaries, the [shared ESS provider boundary](../adapters/README.md),
-independent adapter-model compilation, the release-binaries check of the guides
+independent compilation of each internal adapter's model, the release-binaries check of the guides
 (`connectors-build release-binaries`, below), the website examples model synthesis
 (`connectors-build examples` without its WASM build), the drift check of the documentation
 site's generated pages (`connectors-docs generate --check`) and AEP validation. It uses a task-owned temporary directory under
@@ -52,7 +52,7 @@ dependencies and runs `cargo run --locked -p connectors-build -- gate`. It reads
 repository with `contents: read` only and carries no credential. The `--msrv`
 checks remain local.
 
-The local Entity Runtime/Eventlog adapter replays the complete recorded store
+The host's internal Entity Runtime/Eventlog adapter replays the complete recorded store
 once per process and store; later opens and writes in that process read back
 only what was appended since. Every verified read and every batch execution
 still costs time that grows with the store, so a long-lived fixture can make
@@ -135,13 +135,13 @@ by the catalog provider from a bundle compiled with `connectors-build catalog`;
 see [the catalog provider guide](local-catalog-provider.md).
 
 The v2 generator (`connectors-spec --generate`, ESS-backed Rust for a GET-only
-adapter document) keeps its tests against the frozen fixture
+internal adapter document) keeps its tests against the frozen fixture
 `crates/connectors-spec/tests/fixtures/gitlab-v2.json`, whose upstream pin names
 `adapters/gitlab/upstream/openapi_v3.yaml`; no committed adapter selects it
 today. Generation and its tests need the pinned ESS release and the recorded rustfmt
 version, resolved as described under [Pinned tools](#pinned-tools).
 
-Each adapter's default `service` feature adds its standalone executable and host
+Each internal adapter's default `service` feature adds its standalone executable and host
 wiring. To embed only its contract implementation, disable default features:
 
 ```sh
@@ -150,8 +150,8 @@ cargo build --locked -p connectors-kubernetes --lib --no-default-features
 
 The same command works for `connectors-sql` and `connectors-catalog-provider`. These libraries
 depend on shared contracts/SDK and their protocol dependencies, with no host,
-client, or sibling adapter dependency. The generic client and federation host have
-no adapter dependencies. A new provider supplies an `Adapter` implementation and
+client, or sibling internal adapter dependency. The generic client and federation host have
+no internal adapter dependencies. A new provider supplies an `Adapter` implementation and
 configuration; it requires no provider switch in the shared client or host.
 
 ## Release binaries
@@ -260,13 +260,15 @@ operator names. It issues no `connections revalidate` and takes no other step be
 It runs on demand on the operator's host, never in CI and never in the gate.
 
 The reads are a `connectors-live-read-loop/1` file kept outside the repository, because it names
-live connections:
+live connections. Each read names its instance in an `adapter` field, which the loop
+passes as the deprecated `--adapter` selector:
 
-```json
-{"format": "connectors-live-read-loop/1", "reads": [
-  {"name": "slack-channels", "adapter": "slack-bot", "connection": "conn_…",
-   "operation": "conversations.list", "input": {"limit": 20}}
-]}
+```sh
+jq -n '{format: "connectors-live-read-loop/1", reads: [
+  {name: "slack-channels",
+   adapter: "slack-bot",  # the instance, passed as the deprecated --adapter
+   connection: "conn_…", operation: "conversations.list", input: {limit: 20}}]}' \
+  > ~/connectors-live/reads.json
 ```
 
 Each read is resolved once with `operations describe` (retried in the next round if that fails).
@@ -296,7 +298,7 @@ was never answered or when anything revalidated, and it still writes the report.
 ## Documentation website
 
 The Docusaurus site under `website/` builds Connectors' own documentation site on the shared
-Docs System shell: hand-written concepts, guides and adapter pages, generated reference pages
+Docs System shell: hand-written concepts, guides and pages on internal adapters, generated reference pages
 and status, and Rust/WASM examples. Node is needed for the site, not for ordinary Cargo builds.
 Follow [website setup and checks](../website/README.md).
 
