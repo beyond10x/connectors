@@ -397,14 +397,18 @@ fn under_root(root: &Path, relative: &str) -> Option<Vec<u8>> {
 }
 
 /// A path the definition names under the definitions root, as the lowerer
-/// admits it: plain relative components only.
-fn relative(path: &str) -> Option<PathBuf> {
-    let relative = PathBuf::from(path);
-    (!path.is_empty()
-        && relative
-            .components()
-            .all(|component| matches!(component, Component::Normal(_))))
-    .then_some(relative)
+/// admits it (plain relative components only), as the cache key names it: its
+/// components joined with `/`, on every platform and for every spelling of
+/// the same path.
+fn relative(path: &str) -> Option<String> {
+    let components = Path::new(path)
+        .components()
+        .map(|component| match component {
+            Component::Normal(name) => name.to_str(),
+            _ => None,
+        })
+        .collect::<Option<Vec<_>>>()?;
+    (!components.is_empty()).then(|| components.join("/"))
 }
 
 /// Every file a lowering of the definition reads, by its path under the
@@ -417,11 +421,9 @@ fn inputs(
     root: &Path,
     bytes: &[u8],
     parsed: &lowering::ProviderDefinition,
-) -> Option<BTreeMap<PathBuf, Vec<u8>>> {
-    let mut named = vec![(
-        PathBuf::from("connectors").join(file.file_name()?),
-        bytes.to_vec(),
-    )];
+) -> Option<BTreeMap<String, Vec<u8>>> {
+    let name = file.file_name()?.to_str()?;
+    let mut named = vec![(relative(&format!("connectors/{name}"))?, bytes.to_vec())];
     let (_, source) = parsed.source.document().ok()?;
     let mut referenced = vec![source.to_owned()];
     referenced.extend(parsed.source.amendments.clone());
@@ -449,7 +451,7 @@ fn inputs(
 
 /// The cache key of a definition: the digest of this build's lowerer and of
 /// every file its lowering reads, by path ([`inputs`]).
-fn key(files: &BTreeMap<PathBuf, Vec<u8>>) -> String {
+fn key(files: &BTreeMap<String, Vec<u8>>) -> String {
     let mut hash = Sha256::new();
     let mut part = |label: &[u8], data: &[u8]| {
         hash.update((label.len() as u64).to_be_bytes());
@@ -460,7 +462,7 @@ fn key(files: &BTreeMap<PathBuf, Vec<u8>>) -> String {
     part(b"format", b"connectors-definition-cache/2");
     part(b"lowerer", env!("CARGO_PKG_VERSION").as_bytes());
     for (path, bytes) in files {
-        part(path.to_string_lossy().as_bytes(), bytes);
+        part(path.as_bytes(), bytes);
     }
     hex::encode(hash.finalize())
 }
@@ -502,7 +504,9 @@ fn cache(
     let lowered = (|| {
         filesystem::directory(&copied, true, true).map_err(host_failure)?;
         for (path, bytes) in &files {
-            let target = copied.join(path);
+            let target = path
+                .split('/')
+                .fold(copied.clone(), |at, name| at.join(name));
             std::fs::create_dir_all(target.parent().ok_or_else(usage)?)
                 .and_then(|()| std::fs::write(&target, bytes))
                 .map_err(|_| host_failure(Failure::InvalidConfiguration))?;
@@ -867,10 +871,7 @@ operations:
         let (root, file, bytes, parsed) = tree(DEFINITION);
         let files = inputs(&file, root.path(), &bytes, &parsed).unwrap();
         assert_eq!(
-            files
-                .keys()
-                .map(|p| p.to_str().unwrap())
-                .collect::<Vec<_>>(),
+            files.keys().map(String::as_str).collect::<Vec<_>>(),
             [
                 "auth/forge.yaml",
                 "connectors/forge.yaml",
@@ -893,6 +894,36 @@ operations:
         }
         let renamed = root.path().join("connectors/other.yaml");
         assert_ne!(digest(root.path(), &renamed, &bytes, &parsed), first);
+    }
+
+    /// The key names each file by its components joined with `/`, whatever the
+    /// platform's separator and however the definition spells the path: the
+    /// same files are one key on every platform.
+    #[test]
+    fn the_key_names_each_file_by_slash_joined_components() {
+        let (root, file, bytes, parsed) = tree(DEFINITION);
+        let clean = inputs(&file, root.path(), &bytes, &parsed).unwrap();
+        let text = DEFINITION
+            .replace(
+                "openapi: upstream/forge/openapi.json.gz",
+                "openapi: upstream//forge/./openapi.json.gz",
+            )
+            .replace(
+                "amendments: upstream/forge/amendments.json",
+                "amendments: upstream/forge//amendments.json",
+            );
+        let spelled = lowering::parse(text.as_bytes()).unwrap();
+        let other = inputs(&file, root.path(), text.as_bytes(), &spelled).unwrap();
+        let names = |files: &BTreeMap<String, Vec<u8>>| files.keys().cloned().collect::<Vec<_>>();
+        assert_eq!(names(&other), names(&clean));
+        let built = Path::new("upstream").join("forge").join("openapi.json.gz");
+        assert_eq!(
+            relative(built.to_str().unwrap()).as_deref(),
+            Some("upstream/forge/openapi.json.gz")
+        );
+        for name in names(&clean) {
+            assert!(!name.contains('\\'), "{name}");
+        }
     }
 
     #[test]
