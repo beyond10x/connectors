@@ -1,9 +1,9 @@
 ---
 title: Jira
 sidebar_position: 7
-description: Read Jira Cloud issues, comments, changelogs, transitions and users, and run one transition under approval.
-lede: One Jira instance per Atlassian site reads issues by JQL and runs a transition only from the status you read to the status you approved.
-source: docs/catalog-jira.md, adapters/catalog/providers/jira/connector.json, adapters/catalog/providers/jira/operations.json, adapters/catalog/tests/jira.rs, adapters/catalog/tests/jira_transition_run.rs
+description: Read Jira Cloud issues, comments, changelogs, transitions, create fields and users; under approval, run a transition and create, comment on, edit, link and delete issues.
+lede: One Jira instance per Atlassian site reads issues by JQL and writes only what you approved, each write refused unsent when the issue is not as you read it.
+source: docs/catalog-jira.md, adapters/catalog/providers/jira/connector.json, adapters/catalog/providers/jira/operations.json, adapters/catalog/tests/jira.rs, adapters/catalog/tests/jira_transition_run.rs, adapters/catalog/tests/jira_issue_writes.rs
 connectors: "jira"
 ---
 
@@ -23,7 +23,7 @@ out here. A command that needs an Atlassian account is shown without output.
 
 | Reads | Writes |
 |---|---|
-| `issues.search`, `issue.get`, `issue.comments`, `issue.changelog`, `issue.transitions`, `issue.create_meta`, `users.search`, `attachment.content` | `issue.transition.run`, guarded: it reads the issue and the transition first and sends nothing unless the issue is in the status you named and the transition leads to the status you named; it reads the issue again afterwards |
+| `issues.search`, `issue.get`, `issue.comments`, `issue.changelog`, `issue.transitions`, `issue.create_meta`, `issue.create_meta.fields`, `users.search`, `attachment.content` | `issue.transition.run`, guarded: it reads the issue and the transition first and sends nothing unless the issue is in the status you named and the transition leads to the status you named; it reads the issue again afterwards. `issue.create`, `issue.comment.add` and `issue.link.add` read the project or issues first; `issue.edit` and `issue.delete` send nothing unless the issue's `fields.updated` is the stamp you read, and are read again afterwards |
 
 ## Prerequisites at the provider
 
@@ -125,6 +125,18 @@ connectors operations invoke --connector jira --instance work --connection "$con
 An issue in another status, or a transition not open on it, is refused with the POST unsent.
 When the read afterwards finds another status, the outcome is `unknown` and nothing is sent again.
 
+The other writes go the same way, each named in the policy. `issue.edit` and `issue.delete` pin
+the issue's `fields.updated` from `issue.get` as `updated_stamp`, and an issue changed since is
+refused as `conflict` with nothing sent:
+
+```json
+{"issueIdOrKey":"PROJ-1","updated_stamp":"2026-10-01T09:00:00.000+0000","body":{"fields":{"summary":"Edited summary"}}}
+```
+
+A description or comment is an Atlassian Document Format value you write; plain text is not
+converted. The [full guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-jira.md#issue-writes)
+lists each write's input and guard.
+
 ## Reconnect when the connection is Stale
 
 A token Atlassian refuses (revoked, expired) makes the connection `stale`, and an invoke answers
@@ -141,8 +153,9 @@ connectors connections reconnect --connector jira --instance work \
 ## Limits
 
 - Live, only the gateway form with a service-account token has run (`issues.search` returned
-  issues on 2026-09-30); the site form, the other reads and the transition are checked against a
-  local fixture in the pinned document's shapes.
+  issues on 2026-09-30); the site form, the other reads and the six writes are checked against
+  local fixtures in the pinned document's shapes.
+- A create or comment approved and sent twice is made twice; a link is not read back.
 - The provider does not walk pages or bound `maxResults`; a read answered `429` is
   `rate_limited` with `retry_after_seconds` when the retry does not fit.
 - `attachment.content` reads at most 2 MiB.

@@ -731,15 +731,15 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "12 catalog-jira.md",
-            "6794558b21b53fe9995de5028325b88e8338b17754c641bd1c7a5b80c3299b59",
+            "717881d0e9f55a316cf22029aa4cfff2803ceecd29e9b31d3edfa55e839f508c",
         ),
         (
             "13 catalog-jira.md",
-            "69b065c3e48c24ca541bfb9d3a8b8bcb3486b770b11acd4dfd739dcb42426812",
+            "5ac4de0707cd592352a5bee8f88e33b1714c947d55a2e885f74ff14fd551fc59",
         ),
         (
             "14 catalog-jira.md",
-            "402975480d4f1d1bc4721b82216b23a4598298838d1bf38056ca3ae136d733dd",
+            "0ebc9ab5cbde840d682a13cc6d4deda057f0d26e4d628d042b11f35618abb248",
         ),
         (
             "15 catalog-openrouter.md",

@@ -2,10 +2,11 @@
 
 The catalog provider reads Jira Cloud issues by JQL or one by key, their comments
 and their changelog, the transitions open on an issue, the issue types a project
-can create, users and an attachment's content, and runs one transition on an
-issue, from the pinned Jira Cloud platform REST v3 OpenAPI document. Nothing here is
+can create and the fields each takes, users and an attachment's content; it runs
+one transition on an issue, and creates, edits, comments on, links and deletes
+issues, from the pinned Jira Cloud platform REST v3 OpenAPI document. Nothing here is
 Jira-specific code: the pinned document is compiled into a bundle, a reviewed
-selection set exposes eight reads and one guarded write, and the engine described in
+selection set exposes nine reads and six guarded writes, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Connection, approval and invocation work as described there; this page
 configures the `jira` connector and covers what differs for Jira. Connector,
@@ -35,8 +36,10 @@ fresh run would not reproduce byte for byte.
 ## The shipped selection set
 
 [`adapters/catalog/providers/jira/operations.json`](../adapters/catalog/providers/jira/operations.json)
-exposes eight reads and one write, `issue.transition.run`, guarded as
-[Running a transition](#running-a-transition) describes. `adapters/catalog/tests/jira.rs` pins this exact id list and each id's
+exposes nine reads and six writes: `issue.transition.run`, guarded as
+[Running a transition](#running-a-transition) describes, and `issue.create`,
+`issue.comment.add`, `issue.edit`, `issue.link.add` and `issue.delete`, guarded as
+[Issue writes](#issue-writes) describes. `adapters/catalog/tests/jira.rs` pins this exact id list and each id's
 `operationId` and path in the pinned document, so a renamed or dropped id, or a
 source operation that moved, fails the gate. The bundle refuses at load any
 `operation_id` the pinned document lacks.
@@ -53,6 +56,7 @@ the end of a walk are in it.
 | `issue.get` | `getIssue` | `GET /rest/api/3/issue/{issueIdOrKey}` | none | one issue per call | none; deltas come from `issues.search` |
 | `issue.transitions` | `getTransitions` | `GET /rest/api/3/issue/{issueIdOrKey}/transitions` | none | one issue per call | none |
 | `issue.create_meta` | `getCreateIssueMetaIssueTypes` | `GET /rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes` | `startAt`, `maxResults` | `startAt + len(issueTypes) >= total` | none |
+| `issue.create_meta.fields` | `getCreateIssueMetaIssueTypeId` | `GET /rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes/{issueTypeId}` | `startAt`, `maxResults` | `startAt + len(fields) >= total` | none |
 | `users.search` | `findUsers` | `GET /rest/api/3/user/search` | `startAt`, `maxResults` | an empty page | none |
 | `attachment.content` | `getAttachmentContent` | `GET /rest/api/3/attachment/content/{id}` | none | one attachment per call | none; see [Attachment content](#attachment-content) |
 
@@ -126,8 +130,15 @@ the end of a walk are in it.
   account can create in that project, the input a create request needs. The next
   page starts at `startAt` plus the number of `issueTypes`; the walk ends when
   that reaches `total`. The pinned default `maxResults` is 50 and its maximum
-  200. The fields of one issue type (`getCreateIssueMetaIssueTypeId`) are not
-  selected.
+  200.
+- **`issue.create_meta.fields`** takes `projectIdOrKey` and `issueTypeId`, the
+  `id` of an issue type `issue.create_meta` lists, both required, and lists the
+  fields that issue type takes on `issue.create`: each with `fieldId`, `name`,
+  `required`, `schema` and, where the field has a closed set, `allowedValues`.
+  The next page starts at `startAt` plus the number of `fields`; the walk ends
+  when that reaches `total`. The pinned default `maxResults` is 50 and its
+  maximum 200. A call without `issueTypeId` is refused as `invalid_input` before
+  any request.
 - **`users.search`** takes `query`, matched against the start of a user's
   display name or email address, or `accountId` for an exact match; the pinned
   document requires one of `query`, `accountId` or `property` without marking
@@ -238,6 +249,73 @@ it sends `GET /rest/api/3/issue/FIX-1`,
 Verified against the local fixture `adapters/catalog/tests/jira_transition_run.rs`
 in the pinned document's shapes, not against a live site.
 
+## Issue writes
+
+Five more writes act on issues. Each needs an approval like every catalog write
+([the catalog provider guide](local-catalog-provider.md#invoke)), and each body is
+closed: a key it does not list is refused as `invalid_input` before any request.
+
+| id | pinned `operationId` | request | read before | read after |
+|---|---|---|---|---|
+| `issue.create` | `createIssue` | `POST /rest/api/3/issue` | `getProject` on `body.fields.project.key`: `/key` must be that key | none; Jira's `201` answers `id`, `key` and `self` |
+| `issue.comment.add` | `addComment` | `POST /rest/api/3/issue/{issueIdOrKey}/comment` | `getIssue`: `/key` must be `issueIdOrKey` | none; Jira's `201` answers the comment, whose `/body/type` must be `doc` |
+| `issue.edit` | `editIssue` | `PUT /rest/api/3/issue/{issueIdOrKey}` | `getIssue`: `/key` must be `issueIdOrKey` and `/fields/updated` `updated_stamp`, else `conflict` | `getIssue`: `/key` must be `issueIdOrKey` |
+| `issue.link.add` | `linkIssues` | `POST /rest/api/3/issueLink` | `getIssue` on `body.inwardIssue.key`, then on `body.outwardIssue.key`: each `/key` must be the key named | none; Jira's `201` has no body |
+| `issue.delete` | `deleteIssue` | `DELETE /rest/api/3/issue/{issueIdOrKey}` | `getIssue`: `/key` must be `issueIdOrKey` and `/fields/updated` `updated_stamp`, else `conflict` | `getIssue`: only a `404` proves the issue gone |
+
+Rich text is an Atlassian Document Format (ADF) value the caller writes and the
+provider sends as given: the description of `issue.create` and `issue.edit`, and
+the content of a comment. Plain text or Markdown is not converted.
+
+- **`issue.create`** takes `body.fields` with `issuetype.id` and `summary`
+  (required, non-empty), `project.key` (non-empty; the read before needs it, so
+  a create without it is refused as `invalid_input`), and optionally
+  `description` (ADF), `labels` (a list of strings), `priority.id`,
+  `assignee.accountId` and `parent.key` (non-empty). `issue.create_meta.fields`
+  lists what an issue type takes. Nothing can be compared before a create: the
+  same input approved and sent twice creates two issues.
+- **`issue.comment.add`** takes `issueIdOrKey` and `body.body.content`, the
+  content array of an ADF document; the provider sets `body.body.type` to `doc`
+  and `body.body.version` to `1`, and a caller sending either is refused.
+  `body.visibility.type` (`group` or `role`) and `body.visibility.value`
+  restrict who sees the comment. A comment sent twice is two comments.
+- **`issue.edit`** takes `issueIdOrKey`, `updated_stamp` (the `fields.updated`
+  of `issue.get`) and `body.fields` with at least one of `summary` (non-empty),
+  `description` (ADF), `labels` (replacing the issue's labels), `priority` and
+  `assignee`, as Jira's `IssueUpdateDetails` defines them. `notifyUsers` is
+  passed through; `overrideScreenSecurity`, `overrideEditableFlag`,
+  `returnIssue` and `expand` are withheld. Jira's `409` is `conflict`, the
+  write refused and never sent again. The read after the edit checks the key
+  only, not the fields changed.
+- **`issue.link.add`** takes `body.type.name` (required, such as `Blocks`),
+  `body.inwardIssue.key` and `body.outwardIssue.key`. Jira answers `201` with no
+  body, also for a link that already exists, and the link is not read after the
+  write: `issue.get` with `fields` `issuelinks` shows it.
+- **`issue.delete`** takes `issueIdOrKey` and `updated_stamp`. `deleteSubtasks`
+  is withheld, so Jira refuses an issue with subtasks (`400`, in the pinned
+  document). A `204` followed by a read that still finds the issue, or a read
+  that fails, leaves the outcome `unknown`.
+
+Name issues by key: every read before compares `/key` with the value given, so
+an issue id is refused with nothing written, as `conflict` on `issue.edit` and
+`issue.delete` (their first read refuses every difference so) and as
+`forbidden` on the others. A project or issue Jira does not find is refused as
+`forbidden`, the write unsent, the outcome `not_attempted`; a stale
+`updated_stamp` is refused as `conflict`.
+
+```json
+{"issueIdOrKey":"PROJ-1","updated_stamp":"2026-10-01T09:00:00.000+0000",
+ "body":{"fields":{"summary":"Edited summary"}}}
+```
+
+Prepare, issue and invoke a write with its input as
+[the guarded merge guide](local-gitlab-merge.md) describes for a merge. Approved,
+that edit sends `GET /rest/api/3/issue/PROJ-1`, `PUT /rest/api/3/issue/PROJ-1`
+with the body as given, and `GET /rest/api/3/issue/PROJ-1`, and answers with
+Jira's `204` and a `null` body. Verified against the local fixture
+`adapters/catalog/tests/jira_issue_writes.rs` in the pinned document's shapes, not
+against a live site.
+
 ## Authentication
 
 Jira Cloud API tokens use HTTP basic with the account email, under the profile
@@ -264,7 +342,7 @@ enabled = true
 endpoint = "https://your-domain.atlassian.net/rest/api/3"
 ```
 
-The bundle, the nine operations, the profile and the provider executable are
+The bundle, the fifteen operations, the profile and the provider executable are
 derived from the shipped connector:
 
 ```console
@@ -340,7 +418,7 @@ An OAuth 2.0 (3LO) access token is sent as a bearer token, under a profile the
 The credential document is `{"token": "<access token>"}`, sent as
 `Authorization: Bearer <access token>`. The provider does not refresh an OAuth
 token; connect again when it expires. The token must carry the read scopes the
-eight reads and `myself` need, and the write scope a transition needs; Atlassian names them per
+nine reads and `myself` need, and the write scopes the six writes need; Atlassian names them per
 operation.
 
 ## Limits
@@ -361,6 +439,14 @@ operation.
   service-account API token connected and `issues.search` returned issues
   (2026-09-30). The site form, the other reads and the OAuth form have not been
   run against a live site.
+- The six writes are verified against local fixtures only
+  (`adapters/catalog/tests/jira_transition_run.rs`,
+  `adapters/catalog/tests/jira_issue_writes.rs`), in the pinned document's
+  shapes. Rich text is ADF the caller writes; no plain-text or Markdown
+  conversion is offered. `issue.create` and `issue.comment.add` cannot be
+  compared before they run, so a repeated input creates again, and
+  `issue.link.add` is not read back. A delete's approval binds the input it was
+  issued for, the key and `updated_stamp` among it, like every catalog write.
 - The engine parses and re-serialises the body, so it is returned as equal JSON,
   not as Jira's exact bytes.
 - `fields`, `properties` and `reconcileIssues` on `issues.search` are declared

@@ -450,11 +450,11 @@ fn transition_run_is_shipped_as_a_guarded_write_of_do_transition() {
         .into_iter()
         .map(|o| o.id)
         .collect();
-    assert_eq!(writes, [RUN]);
+    assert!(writes.iter().any(|id| id == RUN), "{writes:?}");
     let declared = engine
         .declarations(&[Effect::Write])
         .into_iter()
-        .next()
+        .find(|o| o.id == RUN)
         .unwrap();
     let mut keys: Vec<&str> = declared.input_schema["properties"]
         .as_object()
