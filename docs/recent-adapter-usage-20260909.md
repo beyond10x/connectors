@@ -113,18 +113,18 @@ every underlying process or network effect.
 
 ### Artifacts and private traceability
 
-- [Action inventory](evidence/recent-adapter-usage-20260909/actions.csv): normalized
+- [Action inventory](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/recent-adapter-usage-20260909/actions.csv): normalized
   command/operation groups, counts and example evidence IDs. Action labels are
   coarse; unresolved/dynamic values do not become invented operation names.
-- [Command-site inventory](evidence/recent-adapter-usage-20260909/command-sites.jsonl.gz):
+- [Command-site inventory](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/recent-adapter-usage-20260909/command-sites.jsonl.gz):
   every recognized site plus the selected helpers, with timestamp, client,
   opaque evidence ID and interpretation flags. It contains no command arguments,
   result bodies, session IDs, source paths or user prompts.
-- [Scan summary](evidence/recent-adapter-usage-20260909/summary.json).
-- [Reviewed programmatic invocations](evidence/recent-adapter-usage-20260909/programmatic-invocations.csv):
+- [Scan summary](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/recent-adapter-usage-20260909/summary.json).
+- [Reviewed programmatic invocations](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/recent-adapter-usage-20260909/programmatic-invocations.csv):
   additional operations resolved inside submitted scripts, with separately traced
   continuation outcomes. These are examples, not inferred loop execution totals.
-- [Verification and reproduction notes](evidence/recent-adapter-usage-20260909/verification.md).
+- [Verification and reproduction notes](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/recent-adapter-usage-20260909/verification.md).
 
 `E-…` references below resolve locally through the ignored
 `.local/tmp/session-intake-20260909/` extraction. Its source manifest records

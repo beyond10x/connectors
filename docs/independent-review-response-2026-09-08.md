@@ -61,13 +61,13 @@ TMPDIR="$PWD/.local/tmp" CARGO_BUILD_JOBS=2 \
 | MSRV target isolation | 1,991 pre-existing default-target files unchanged; 1,997 files under the caller-selected private MSRV target |
 | Toolchain fixture stress | 100/100 default-thread runs passed |
 
-See the [full gate log](evidence/independent-review-fixes-20260908/full-gate.log),
-[summary](evidence/independent-review-fixes-20260908/gate-summary.json),
-[isolation check](evidence/independent-review-fixes-20260908/target-isolation.json),
-[stress evidence](evidence/independent-review-fixes-20260908/toolchain-stress.json),
-[live SQL log](evidence/independent-review-fixes-20260908/sql-live.log),
-[inventory audit](evidence/independent-review-fixes-20260908/inventory.json), and
-[verified source digests](evidence/independent-review-fixes-20260908/verified-sources.json).
+See the [full gate log](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/independent-review-fixes-20260908/full-gate.log),
+[summary](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/independent-review-fixes-20260908/gate-summary.json),
+[isolation check](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/independent-review-fixes-20260908/target-isolation.json),
+[stress evidence](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/independent-review-fixes-20260908/toolchain-stress.json),
+[live SQL log](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/independent-review-fixes-20260908/sql-live.log),
+[inventory audit](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/independent-review-fixes-20260908/inventory.json), and
+[verified source digests](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/independent-review-fixes-20260908/verified-sources.json).
 ESS proves model structure and authored traces here; runtime SQL proof comes from
 the protocol and live database checks.
 

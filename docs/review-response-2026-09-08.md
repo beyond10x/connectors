@@ -27,7 +27,7 @@ committed implementation at `19ce58b`. The original review remains unchanged.
 
 ## Verification
 
-The [complete gate log](evidence/review-2026-09-08/gate.log) records **35 passing
+The [complete gate log](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/review-2026-09-08/gate.log) records **35 passing
 tests, zero failures and zero ignored tests**, warning-denying workspace Clippy,
 all three generated descriptors, the complete GitLab generation/reproducibility
 suite, offline workspace builds, independent provider libraries, and the generic
@@ -35,7 +35,7 @@ CLI's dependency boundary. All targets also pass `cargo +1.88.0 check`; workspac
 packages now explicitly inherit the declared `rust-version = "1.88"`.
 Tests execute on Rust 1.98.1; the minimum-version result is a compile check of
 all targets, not a second runtime test run. The
-[audit report](evidence/review-2026-09-08/audit.json) records the advisory database
+[audit report](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/review-2026-09-08/audit.json) records the advisory database
 revision and no vulnerabilities or warnings.
 
 AEP initially reported a missing machine-readable scope while still returning

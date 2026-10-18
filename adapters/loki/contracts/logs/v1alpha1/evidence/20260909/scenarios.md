@@ -4,7 +4,7 @@ Owner: `story:contracts-log-continuation` (original F12). Base before this
 completion pass: `8e1836cad8ae1b2127ce9ae306c6d8131960db4c`.
 
 The initial reports remain unchanged in the
-[datasource intake](../../../../../../../docs/evidence/datasource-semantics-20260908/reviews/).
+[datasource intake](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/datasource-semantics-20260908/reviews/).
 This implementor record supplies proposed dispositions and a manual textual audit;
 it is neither an independent review verdict nor executed runtime conformance.
 The base already contained the main remedies; this pass makes simultaneous/native

@@ -462,7 +462,7 @@ Release archives after 0.50.0 carry both binaries for each target
 ```
 
 The complete configuration used against the sandbox is
-[gitlab-catalog-2.json](evidence/gitlab-sandbox-20260913/gitlab-catalog-2.json).
+[gitlab-catalog-2.json](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/gitlab-sandbox-20260913/gitlab-catalog-2.json).
 
 - `auth` is the whole authentication profile: the header the token travels in,
   the read that names the credential's subject, an optional read that lists its
@@ -1271,7 +1271,7 @@ GitLab's 409, an update that retitled 10, the same update at a stale pin refused
 before dispatch, and a create whose branch was moved the moment the preflight GET
 appeared, which opened merge request 11 at the moved head and was classified
 `unknown`. The full record is in
-[the sandbox evidence](evidence/gitlab-sandbox-20260913/README.md).
+[the sandbox evidence](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/gitlab-sandbox-20260913/README.md).
 
 ## Limits
 

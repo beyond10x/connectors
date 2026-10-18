@@ -3,7 +3,7 @@
 - **Status:** proposed semantics and private ESS values; no adapter, public codec or runtime cache implementation.
 - **Shared dependency:** this adapter binding specializes the shared datasource contract of the same family and version. Native rules and future conformance fixtures are owned here.
 - **Base:** bounded record reads in [service v1alpha1](../../../../../contracts/service/v1alpha1/semantics.md), with explicit selected-payload compatibility in [service compatibility](../../../../../contracts/service/compatibility.md). A new payload is not an extension accepted by today's closed Page reader.
-- **Evidence:** [exact provider sources and their limits](../../../../../docs/evidence/datasource-semantics-20260908/provider-evidence.md). Historical declarations are evidence of intended behavior, not proof of current provider guarantees.
+- **Evidence:** [exact provider sources and their limits](../../../../../docs/evidence/README.md "git show history/evidence-2026-10:docs/evidence/datasource-semantics-20260908/provider-evidence.md"). Historical declarations are evidence of intended behavior, not proof of current provider guarantees.
 
 ## 1. Identity and preserved behavior
 
