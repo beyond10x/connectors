@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:connection-binding-excludes-operations
 kind: story
-status: draft
+status: active
 title: A bundle- or selection-only change leaves a connection usable; its credential stays bound to authority, profile, identity and executable
 relations:
 - implements: architecture-decision-record:provider-definitions-and-runtimes
@@ -69,7 +69,10 @@ scope:
   path: ess/domains/cli.yaml
 - confidence: cited
   path: website/docs/concepts/local-runtime.md
-revision: 5
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-18T03:30:17Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":4}}}
+- {from: "proposed", to: "active", at: "2026-10-18T03:30:17Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":4}}}
 ---
 ## Problem
 
