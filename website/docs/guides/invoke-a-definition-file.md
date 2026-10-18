@@ -68,6 +68,21 @@ to the operation list. `--schema` and `--revision` may be left out; they are the
 The instance is the connector's instance `definition`: `--connector gitlab --instance
 definition` selects it in every other command, and results name it so.
 
+## Reuse a stored credential
+
+When another instance of the same connector already holds a connection, for example a configured
+`[connectors.gitlab.instances.selfhosted]` at the same self-hosted GitLab, the one question lists
+it instead: its number, `gitlab/selfhosted`, its API base and the account it validated as, never
+the token. The question ends `[1/c/N]`. Answered `1`, the owner copies that connection's stored
+credential to a new connection of the definition's instance, has the definition's provider
+validate it, and saves it only when the provider answers the same account; the operation then runs
+with no token prompt. `c` connects fresh as above; anything else, or no terminal, refuses as
+above. A connection is offered only when it is ready, not stale or revoked, and bound to the same
+API base and the same auth profile; an OAuth profile whose refresh rotates is never copied. When
+the provider answers another account, nothing is saved, the configured instance's connection is
+left as it was, and the command offers to connect fresh. After a copy the two connections are
+independent: revoking one leaves the other.
+
 Without a terminal, as in a script or a CI job, nothing is asked and nothing is sent; `setsid`
 runs the same command that way. The refusal names the step that clears it:
 

@@ -241,3 +241,28 @@ Business approval, audit, idempotency, coordinator OAuth flows, host-owned
 refresh, configuration upgrades across a changed provider authority or profile
 declaration, and the supervised provider journeys need their own implementation
 and evidence.
+
+## Reusing a stored credential
+
+`operations invoke --definition` may make the definition's first connection from
+a credential another instance of the same connector already holds, when the
+operator answers its one question with a listed candidate
+([CLI semantics](../contracts/cli/v1alpha1/semantics.md#invoking-a-definition-file),
+story:invoke-definition-reuse-credential). `Registry::reuse_candidates` lists, and
+`Registry::capture_reuse` captures, only a connection of another instance that is
+published, Live and not Stale, holds its material, has current evidence, is
+current under its own configured entry and whose upgrade that entry has not
+refused, under the target's `adapter_id`, provider authority and profile
+authentication (`StaticProfile::same_authentication`). Listing records only the
+clock observation every observation records. The capture is a read use of the
+source (`connectors.credential_evidence.ReadUse`) like a dispatch's: the owner
+dispatches it once around the validation and releases it, or cancels it, so the
+version cannot be retired beneath the read. The new connection is a connect of
+the target instance: `begin` (refused while the instance holds a connection),
+`consume`, `prepare` under the validated baseline, then the guarded write of the
+same bytes as a new version in the new connection's own scope and publication.
+The owner refuses a validated identity other than the source's before
+`prepare`, failing the acquisition; the source's row, generation, material,
+evidence and revision are written by nothing but its read use. A definition
+instance's own connection under a changed authority or profile is not a
+candidate: changing those still needs a new instance id.

@@ -564,6 +564,22 @@ pub fn confirm(question: &str, deadline: u64) -> Result<bool> {
     if question.is_empty() || question.len() > 256 || question.chars().any(char::is_control) {
         return Err(Code::InvalidInput.into());
     }
+    Ok(matches!(ask(question, deadline)?.as_str(), "y" | "yes"))
+}
+/// The longest question [`ask`] shows.
+const QUESTION_LIMIT: usize = 4096;
+
+/// Ask `question`, which may span lines, on the controlling terminal and
+/// answer the one line typed, trimmed and in lower case, at most
+/// [`ANSWER_LIMIT`] bytes of it; refused as [`confirm`] is refused. A
+/// question with any control character but a line feed is `invalid_input`.
+pub fn ask(question: &str, deadline: u64) -> Result<String> {
+    if question.is_empty()
+        || question.len() > QUESTION_LIMIT
+        || question.chars().any(|c| c.is_control() && c != '\n')
+    {
+        return Err(Code::InvalidInput.into());
+    }
     let mut terminal = Terminal::open()?;
     terminal
         .write_all(question.as_bytes())
@@ -592,8 +608,7 @@ pub fn confirm(question: &str, deadline: u64) -> Result<bool> {
     }
     terminal.write_all(b"\n").map_err(source_error)?;
     check(deadline)?;
-    let answer = String::from_utf8_lossy(&answer).trim().to_ascii_lowercase();
-    Ok(matches!(answer.as_str(), "y" | "yes"))
+    Ok(String::from_utf8_lossy(&answer).trim().to_ascii_lowercase())
 }
 fn append(target: &mut Secret, bytes: &[u8]) -> Result<()> {
     if target.0.len() + bytes.len() > 65536 {

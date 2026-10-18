@@ -10,7 +10,10 @@
 //! the operator's configuration as the instance `definition` of the
 //! definition's connector (`connectors_host::local::definitions`). When the
 //! instance holds no connection the command asks once whether to connect and,
-//! on yes, runs the profile's own acquisition. The command line is then
+//! on yes, runs the profile's own acquisition; when another instance of the
+//! connector holds a connection whose credential can be reused, the question
+//! lists those, and a chosen one is copied and validated by the owner
+//! (story:invoke-definition-reuse-credential). The command line is then
 //! rewritten to select that instance and its connection, with the schema and
 //! revision of the lowered description where the caller gave none, and the
 //! generated runner admits, approves, audits and invokes it as it does any
@@ -312,7 +315,7 @@ fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerRep
     interrupted()?;
     let connection = match &request.connection {
         Some(connection) => Ok(connection.clone()),
-        None => connection(&paths, &connector, &alias, &adapter, request),
+        None => connection(&paths, &connector, &alias, &adapter, &reported, request),
     };
     interrupted()?;
     let connection = connection?;
@@ -681,15 +684,22 @@ fn native_configuration(
     serde_json::to_vec_pretty(&native).map_err(|_| usage())
 }
 
+/// The most candidates the reuse question lists.
+const LISTED: usize = 16;
+
 /// The connection the command runs on: the instance's one connection, or, when
-/// it holds none, the one made after the operator answers the one question
-/// yes. Without a terminal to ask on, or answered anything but yes, the command
-/// is refused naming the connect, and nothing is acquired or sent.
+/// it holds none, the one made after the operator answers the one question.
+/// When another instance of the connector holds a connection whose credential
+/// can be reused (story:invoke-definition-reuse-credential), the question lists
+/// those and a number reuses one; otherwise it asks whether to connect. Without
+/// a terminal to ask on, or answered anything else, the command is refused
+/// naming the connect, and nothing is acquired, copied or sent.
 fn connection(
     paths: &Paths,
     connector: &str,
     alias: &str,
     adapter: &connectors_host::local::config::Adapter,
+    reported: &connectors_host::local::runtime::Bootstrap,
     request: &Request,
 ) -> Result<String, HandlerReply> {
     let held = Registry::with_system_clock(&paths.state)
@@ -700,23 +710,161 @@ fn connection(
         [] => {}
         _ => return Err(usage()),
     }
-    let refused = || failure("not_found", "admission", "create_connection", false);
-    let question = format!(
-        "No connection for {connector}/{}. Connect now? [y/N] ",
-        definitions::INSTANCE
-    );
-    match protected::confirm(&question, connectors_sdk::now_ms() + QUESTION_MS) {
-        Ok(true) => {}
-        Ok(false) => return Err(refused()),
-        // No controlling terminal in the foreground: nothing can be asked.
-        Err(error) if error.code == owner::Code::InvalidInput => return Err(refused()),
-        Err(error) => return Err(owner_failure(error)),
-    }
     let profiles: Vec<&String> = adapter.permissions.profiles.iter().collect();
     let [profile] = profiles.as_slice() else {
         return Err(host_failure(Failure::InvalidConfiguration));
     };
-    connect(paths, alias, profile, request.credential_file.as_deref())
+    let fresh = || connect(paths, alias, profile, request.credential_file.as_deref());
+    let refused = || failure("not_found", "admission", "create_connection", false);
+    let deadline = connectors_sdk::now_ms() + QUESTION_MS;
+    let candidates = candidates(paths, alias, adapter, reported, profile)?;
+    if candidates.is_empty() {
+        let question = format!(
+            "No connection for {connector}/{}. Connect now? [y/N] ",
+            definitions::INSTANCE
+        );
+        return if answered(protected::confirm(&question, deadline))? {
+            fresh()
+        } else {
+            Err(refused())
+        };
+    }
+    let mut question = format!(
+        "No connection for {connector}/{}. A stored credential of {connector} can be reused:\n",
+        definitions::INSTANCE
+    );
+    for (number, reusable) in candidates.iter().enumerate() {
+        let candidate = &reusable.candidate;
+        question.push_str(&format!(
+            "  {}  {}/{}  {}  {} {}\n",
+            number + 1,
+            reusable.connector,
+            reusable.instance,
+            shown(&candidate.provider_authority),
+            shown(&candidate.identity.kind),
+            shown(&candidate.identity.subject),
+        ));
+    }
+    let range = match candidates.len() {
+        1 => "1".to_owned(),
+        n => format!("1-{n}"),
+    };
+    question.push_str(&format!(
+        "Reuse one (its number), connect fresh (c), or cancel? [{range}/c/N] "
+    ));
+    let answer = answered(protected::ask(&question, deadline))?;
+    if matches!(answer.as_str(), "c" | "connect") {
+        return fresh();
+    }
+    let Some(chosen) = answer
+        .parse::<usize>()
+        .ok()
+        .and_then(|number| number.checked_sub(1))
+        .and_then(|index| candidates.get(index))
+    else {
+        return Err(refused());
+    };
+    let error = match reuse(paths, alias, chosen, profile) {
+        Ok(connection) => return Ok(connection),
+        Err(error) => error,
+    };
+    // Nothing was published, or that is not known: only a definite refusal
+    // offers the fresh connect.
+    if matches!(
+        error.code,
+        owner::Code::OutcomeUnknown | owner::Code::Interrupted
+    ) {
+        return Err(connect_failure("connections-connect", error));
+    }
+    let question = format!(
+        "The stored credential was not reused ({}); nothing was saved. Connect fresh? [y/N] ",
+        serde_json::to_value(error.code)
+            .ok()
+            .and_then(|code| code.as_str().map(str::to_owned))
+            .unwrap_or_default()
+    );
+    match protected::confirm(&question, connectors_sdk::now_ms() + QUESTION_MS) {
+        Ok(true) => fresh(),
+        Ok(false) => Err(connect_failure("connections-connect", error)),
+        Err(asked) if asked.code == owner::Code::InvalidInput => {
+            Err(connect_failure("connections-connect", error))
+        }
+        Err(asked) => Err(owner_failure(asked)),
+    }
+}
+
+/// A listed value, cut to 128 characters so every listed candidate fits the
+/// question.
+fn shown(value: &str) -> String {
+    match value.char_indices().nth(128) {
+        Some((end, _)) => format!("{}...", &value[..end]),
+        None => value.to_owned(),
+    }
+}
+
+/// The answer to a question, or the refusal when none could be asked: no
+/// controlling terminal in the foreground is the connect's `not_found`.
+fn answered<T>(answer: owner::Result<T>) -> Result<T, HandlerReply> {
+    match answer {
+        Ok(answer) => Ok(answer),
+        Err(error) if error.code == owner::Code::InvalidInput => Err(failure(
+            "not_found",
+            "admission",
+            "create_connection",
+            false,
+        )),
+        Err(error) => Err(owner_failure(error)),
+    }
+}
+
+/// The connections other instances of the definition's connector hold whose
+/// credential its instance may reuse under `profile`, at most [`LISTED`]: none
+/// for a profile whose entry an OAuth acquisition refreshes, since one
+/// rotation would end the other's refresh.
+fn candidates(
+    paths: &Paths,
+    alias: &str,
+    adapter: &connectors_host::local::config::Adapter,
+    reported: &connectors_host::local::runtime::Bootstrap,
+    profile: &str,
+) -> Result<Vec<owner::Reusable>, HandlerReply> {
+    let mut bootstrap = reported.clone();
+    bootstrap.configure(adapter);
+    let declared = bootstrap
+        .profile(profile)
+        .map_err(|failure| owner_failure(owner::Error::from(failure)))?;
+    if declared.acquisition.is_some() {
+        return Ok(Vec::new());
+    }
+    let binding = bootstrap
+        .binding(profile)
+        .map_err(|failure| owner_failure(owner::Error::from(failure)))?;
+    let mut found = owner::reusable(paths, alias, &binding).map_err(owner_failure)?;
+    found.truncate(LISTED);
+    Ok(found)
+}
+
+/// The reuse of `chosen` for the instance under `profile`, in the owner, which
+/// alone reads and copies the credential; answers the published connection.
+fn reuse(
+    paths: &Paths,
+    alias: &str,
+    chosen: &owner::Reusable,
+    profile: &str,
+) -> owner::Result<String> {
+    let reused = owner::Client::connect(paths, true).and_then(|client| {
+        client.reuse(
+            alias,
+            &chosen.alias,
+            &chosen.candidate.reference,
+            &chosen.candidate.revision,
+            profile,
+        )
+    })?;
+    reused["connection"]["summary"]["connection"]
+        .as_str()
+        .map(str::to_owned)
+        .ok_or_else(|| owner::Code::OutcomeUnknown.into())
 }
 
 /// `connections connect` of the instance under `profile`, with its protected

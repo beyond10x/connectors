@@ -365,6 +365,11 @@ commands:
           local_static_profile: input.local_static_profile
         emits: [connectors.auth_bindings.ProfileRecorded]
         payload: {connectors.auth_bindings.ProfileRecorded: {profile_record_ref: {generated: true}}}
+  # A reuse of a stored credential (story:invoke-definition-reuse-credential) allocates
+  # its new connection through this command as a connect does. The source connection is
+  # not recorded on the new one: the copy is recorded as the source's
+  # connectors.credential_evidence.ReadUse and the new connection's own Acquisition and
+  # CustodyVersion, and the two connections share no version or scope.
   - name: connectors.auth_bindings.AllocateConnection
     input:
       - {name: decision, type: connectors.auth_bindings.Decision}
