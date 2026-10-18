@@ -27,7 +27,7 @@ an installed capability: the runtime column says what runs.
 
 | Adapter | What exists |
 |---|---|
-| [Atlassian](./atlassian/index.md) | native document contracts and an ESS model for Jira and Confluence; Jira and Confluence reads run through the catalog provider instead |
+| [Atlassian](./atlassian/index.md) | an ESS model of the native document vocabulary for Jira and Confluence; Jira and Confluence reads run through the catalog provider |
 | [Docker](./docker/index.md) | native log and mutation contracts and an ESS model |
 | [Alertmanager](./alertmanager/index.md) | a design |
 | [SIP](./sip/index.md) | a native dial contract |
