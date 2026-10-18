@@ -28,10 +28,7 @@ an installed capability: the runtime column says what runs.
 | Adapter | What exists |
 |---|---|
 | [Atlassian](./atlassian/index.md) | an ESS model of the native document vocabulary for Jira and Confluence; Jira and Confluence reads run through the catalog provider |
-| [Docker](./docker/index.md) | native log and mutation contracts and an ESS model |
 | [Alertmanager](./alertmanager/index.md) | a design |
-| [SIP](./sip/index.md) | a native dial contract |
-| [RTVBP](./rtvbp/index.md) | a native session contract |
 
 MCP has specified invocation, projection, auth lifecycle, mutation replay and composition
 contracts in the repository's `adapters/mcp/` directory and no runtime. Slack and WebRTC have no

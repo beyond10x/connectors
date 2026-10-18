@@ -13,9 +13,8 @@ source protocol, stream metadata, ordering and source-exhaustion proof. Profile
 identifiers are open. The shared family does not impose a query language, absolute
 time window, provider catalog or universal continuation model.
 
-Current proposed bindings are [Loki](../../../../adapters/loki/contracts/logs/v1alpha1/semantics.md),
-[Kubernetes](../../../../adapters/kubernetes/contracts/logs/v1alpha1/semantics.md)
-and [Docker](../../../../adapters/docker/contracts/logs/v1alpha1/semantics.md).
+Current proposed bindings are [Loki](../../../../adapters/loki/contracts/logs/v1alpha1/semantics.md)
+and [Kubernetes](../../../../adapters/kubernetes/contracts/logs/v1alpha1/semantics.md).
 These index links create no dependency on a concrete adapter. Each adapter carries
 its own profile schema and conformance obligations when extracted.
 

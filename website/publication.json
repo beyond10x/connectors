@@ -253,20 +253,6 @@
       "status": "Specified; runtime pending"
     },
     {
-      "route": "/adapters/docker/contracts/logs",
-      "title": "Docker logs",
-      "source": "adapters/docker/contracts/logs/v1alpha1/semantics.md",
-      "owner": "docker",
-      "status": "Specified; runtime pending"
-    },
-    {
-      "route": "/adapters/docker/contracts/mutations",
-      "title": "Docker mutations",
-      "source": "adapters/docker/contracts/mutations/v1alpha1/semantics.md",
-      "owner": "docker",
-      "status": "Specified; runtime pending"
-    },
-    {
       "route": "/adapters/grafana/contracts/discovery",
       "title": "Grafana datasource discovery",
       "source": "adapters/grafana/contracts/discovery/v1alpha1/semantics.md",
@@ -295,20 +281,6 @@
       "status": "Implemented by the prometheus adapter: instant, range and rules reads"
     },
     {
-      "route": "/adapters/sip/contracts/dial",
-      "title": "SIP dial",
-      "source": "adapters/sip/contracts/dial/v1alpha1/semantics.md",
-      "owner": "sip",
-      "status": "Specified; runtime pending"
-    },
-    {
-      "route": "/adapters/rtvbp/contracts/session",
-      "title": "RTVBP sessions",
-      "source": "adapters/rtvbp/contracts/session/v1alpha1/semantics.md",
-      "owner": "rtvbp",
-      "status": "Specified; runtime pending"
-    },
-    {
       "route": "/adapters/catalog/contracts/feed",
       "title": "GitLab merge-request feed",
       "source": "adapters/catalog/contracts/feed/v1alpha1/gitlab.md",
@@ -326,11 +298,6 @@
       "source": "adapters/atlassian/spec/ess",
       "route": "/adapters/atlassian/model",
       "owner": "atlassian"
-    },
-    {
-      "source": "adapters/docker/spec/ess",
-      "route": "/adapters/docker/model",
-      "owner": "docker"
     },
     {
       "source": "adapters/grafana/spec/ess",

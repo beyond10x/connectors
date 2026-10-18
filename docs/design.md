@@ -210,8 +210,6 @@ connectors/
 │   ├── loki/
 │   ├── prometheus/
 │   ├── sql/
-│   ├── sip/
-│   ├── rtvbp/
 │   ├── slack/                         # Auth/events example and later provider
 │   └── catalog/
 ├── compositions/
