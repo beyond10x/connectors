@@ -351,6 +351,89 @@ fn a_use_that_is_not_a_plain_name_or_names_no_file_is_refused() {
     }
 }
 
+/// The declaration text of `lowering`, for the order of a profile's fields.
+fn declaration_text(lowering: &Lowering) -> String {
+    std::fs::read_to_string(&lowering.lowered().connector).unwrap()
+}
+
+#[test]
+fn a_profile_states_its_evidence_lifetime_where_the_catalog_provider_reads_it() {
+    let root = root();
+    let text = GITLAB.replace(
+        "minimum: [api]}}",
+        "minimum: [api]}, evidence_lifetime_ms: 300000}",
+    );
+    let lowering = lower("gitlab", &text, root.path());
+    assert_eq!(
+        lowering.profile("gitlab.pat")["evidence_lifetime_ms"],
+        300_000
+    );
+    // `AuthConfig` order: after `minimum_scopes`, before any OAuth field.
+    assert!(
+        declaration_text(&lowering)
+            .contains("\"minimum_scopes\": [\"api\"],\n      \"evidence_lifetime_ms\": 300000\n"),
+        "{}",
+        declaration_text(&lowering)
+    );
+    // Unstated, the declaration says nothing and the provider's 60 s holds.
+    let unstated = lower("gitlab", GITLAB, root.path());
+    assert_eq!(
+        unstated.profile("gitlab.pat").get("evidence_lifetime_ms"),
+        None
+    );
+}
+
+#[test]
+fn a_shared_profile_gives_an_evidence_lifetime_a_connector_may_replace() {
+    let root = root();
+    std::fs::write(
+        root.path().join("auth/atlassian.yaml"),
+        ATLASSIAN.replace(
+            "label: API token,",
+            "label: API token, evidence_lifetime_ms: 120000,",
+        ),
+    )
+    .unwrap();
+    let lowering = lower("jira", JIRA, root.path());
+    assert_eq!(
+        lowering.profile("atlassian.basic")["evidence_lifetime_ms"],
+        120_000
+    );
+    assert_eq!(
+        lowering
+            .profile("atlassian.bearer")
+            .get("evidence_lifetime_ms"),
+        None
+    );
+    let text = JIRA.replace(
+        "{use: atlassian, default: true,",
+        "{use: atlassian, default: true, evidence_lifetime_ms: 30000,",
+    );
+    let lowering = lower("jira", &text, root.path());
+    assert_eq!(
+        lowering.profile("atlassian.basic")["evidence_lifetime_ms"],
+        30_000
+    );
+}
+
+#[test]
+fn an_evidence_lifetime_the_catalog_provider_refuses_is_refused() {
+    let root = root();
+    for lifetime in ["0", "300001"] {
+        let text = GITLAB.replace(
+            "minimum: [api]}}",
+            &format!("minimum: [api]}}, evidence_lifetime_ms: {lifetime}}}"),
+        );
+        match lower("gitlab", &text, root.path()).refusal() {
+            Refusal::AuthLifetime { key, value } => {
+                assert_eq!(key, "gitlab.pat");
+                assert_eq!(value.to_string(), lifetime);
+            }
+            other => panic!("{lifetime}: refused as {other:?}"),
+        }
+    }
+}
+
 #[test]
 fn a_profile_missing_a_field_its_scheme_needs_is_refused() {
     let root = root();

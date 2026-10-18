@@ -117,3 +117,42 @@ fn every_lowered_auth_profile_loads_in_the_catalog_provider() {
     }
     assert_eq!(loaded, 17, "every profile of every definition is loaded");
 }
+
+/// A definition's `evidence_lifetime_ms` reaches the profile the provider
+/// announces, so an instance needs no hand-edited `auth` block for it.
+#[test]
+fn a_lowered_evidence_lifetime_is_the_lifetime_the_provider_announces() {
+    let temp = tempfile::tempdir().unwrap();
+    let connectors = temp.path().join("connectors");
+    fs::create_dir_all(&connectors).unwrap();
+    let text = fs::read_to_string(definitions().join("connectors/gitlab.yaml")).unwrap();
+    let text = text.replace(
+        "minimum: [api]}\n",
+        "minimum: [api]}\n    evidence_lifetime_ms: 300000\n",
+    );
+    assert!(text.contains("evidence_lifetime_ms"), "{text}");
+    let file = connectors.join("gitlab.yaml");
+    fs::write(&file, text).unwrap();
+    let declaration: Value = serde_json::from_str(
+        &definition::connector(&file, temp.path())
+            .unwrap_or_else(|refusal| panic!("lowers its declaration: {refusal}")),
+    )
+    .unwrap();
+    let config = json!({
+        "format": "connectors-catalog-local/2",
+        "instance": "definition-check",
+        "provider": "gitlab",
+        "bundle_directory": root_path("generated/bundles"),
+        "api_base": "https://gitlab.example.com/api/v4",
+        "auth": declaration["profiles"][0],
+        "operations_file": root_path("providers/gitlab/operations.json"),
+    });
+    let output = print_bootstrap(&config);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let bootstrap: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(bootstrap["profiles"][0]["evidence_lifetime_ms"], 300_000);
+}

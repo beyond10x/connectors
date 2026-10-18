@@ -25,6 +25,8 @@ use std::path::{Component, Path, PathBuf};
 
 /// The one schema identifier this reader accepts.
 pub const SCHEMA: &str = "urn:beyond10x:connectors-definition:1";
+/// The longest `evidence_lifetime_ms` the catalog provider takes.
+pub const EVIDENCE_LIFETIME_MS: u64 = 300_000;
 /// The selection format the catalog provider's `operations_file` reads.
 pub const OPERATIONS_FORMAT: &str = "connectors-catalog-operations/1";
 
@@ -220,6 +222,11 @@ pub struct Auth {
     pub scopes: Option<AuthScopes>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub access: Option<AuthAccess>,
+    /// How long a validation of the credential stays current, in
+    /// milliseconds; the catalog provider takes 1 to 300000 and holds 60000
+    /// when the declaration states none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evidence_lifetime_ms: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -740,6 +747,9 @@ pub enum Refusal {
     AuthIncomplete { key: String, field: String },
     /// A profile, after `use`, gives a field its scheme does not take.
     AuthMisplaced { key: String, field: String },
+    /// A profile, after `use`, gives an `evidence_lifetime_ms` outside the
+    /// catalog provider's 1 to [`EVIDENCE_LIFETIME_MS`].
+    AuthLifetime { key: String, value: u64 },
     /// A `{variable}` in `base_url` or an OAuth URL that `config` does not declare.
     UndeclaredVariable(String),
     /// Profile ids that do not all start with one provider id and a `.`.
@@ -828,6 +838,7 @@ impl Refusal {
             Self::AuthProfileMissing { .. } => "auth_profile_missing",
             Self::AuthIncomplete { .. } => "auth_incomplete",
             Self::AuthMisplaced { .. } => "auth_misplaced",
+            Self::AuthLifetime { .. } => "auth_lifetime",
             Self::UndeclaredVariable(_) => "undeclared_variable",
             Self::ProviderId(_) => "provider_id",
             Self::SourceKind(_) => "source_kind",
@@ -889,6 +900,10 @@ impl std::fmt::Display for Refusal {
                     "{name}: auth profile `{key}` gives `{field}`, which its scheme does not take"
                 )
             }
+            Self::AuthLifetime { key, value } => write!(
+                f,
+                "{name}: auth profile `{key}` gives evidence_lifetime_ms {value}; the catalog provider takes 1 to {EVIDENCE_LIFETIME_MS}"
+            ),
             Self::UndeclaredVariable(variable) => write!(
                 f,
                 "{name}: URL variable `{variable}` is not declared in config"
@@ -1022,7 +1037,9 @@ pub struct Request<'a> {
     pub definition: &'a Path,
     /// The definitions checkout the source paths and `auth/` are under.
     pub root: &'a Path,
-    /// The bundle directory the bundle, its index entry and the selection go to.
+    /// The bundle directory the bundle and its index entry go to; the
+    /// declaration and its selection go to `<catalog>/` under it, as the
+    /// catalog keeps them in `providers/<catalog>/`.
     pub out: &'a Path,
     /// An existing directory owned by the caller; the decompressed source and
     /// the staged bundle live in a fresh directory under it, removed on return.
@@ -1036,9 +1053,10 @@ pub struct Lowered {
     pub provider: String,
     pub entry: bundle::Entry,
     pub bundle: PathBuf,
-    /// `<id>.operations.json`.
+    /// `<catalog>/operations.json`, or `<catalog>/<x>-operations.json` for a
+    /// definition `<catalog>-<x>`: the file the declaration names.
     pub operations: PathBuf,
-    /// `<id>.connector.json`: the connector declaration.
+    /// `<catalog>/connector.json`: the connector declaration.
     pub connector: PathBuf,
 }
 
@@ -1342,6 +1360,7 @@ pub fn merged(base: &Auth, over: &Auth) -> Auth {
         identity,
         scopes: over.scopes.clone().or_else(|| base.scopes.clone()),
         access: over.access.clone().or_else(|| base.access.clone()),
+        evidence_lifetime_ms: over.evidence_lifetime_ms.or(base.evidence_lifetime_ms),
         token_url: pick(&over.token_url, &base.token_url),
         authorize_url: pick(&over.authorize_url, &base.authorize_url),
     }
@@ -1412,6 +1431,7 @@ fn resolve_auth(
 enum Node {
     Text(String),
     Flag(bool),
+    Number(u64),
     Inline(Fields),
     List(Vec<String>),
 }
@@ -1431,6 +1451,7 @@ impl Node {
         match self {
             Self::Text(value) => quoted(value),
             Self::Flag(value) => value.to_string(),
+            Self::Number(value) => value.to_string(),
             Self::Inline(fields) => {
                 let pairs: Vec<String> = fields
                     .iter()
@@ -1594,6 +1615,15 @@ fn profile_block(id: &str, profile: &Auth, base_url: &str) -> Result<Fields, Ref
     if let Some(minimum) = scopes.and_then(|scopes| scopes.minimum.as_ref()) {
         block.push(field("minimum_scopes", Node::List(minimum.clone())));
     }
+    if let Some(lifetime) = profile.evidence_lifetime_ms {
+        if !(1..=EVIDENCE_LIFETIME_MS).contains(&lifetime) {
+            return Err(Refusal::AuthLifetime {
+                key: id.to_owned(),
+                value: lifetime,
+            });
+        }
+        block.push(field("evidence_lifetime_ms", Node::Number(lifetime)));
+    }
     if scheme.is_oauth() {
         let token_url = profile
             .token_url
@@ -1659,6 +1689,20 @@ fn endpoint(definition: &ProviderDefinition) -> Result<(Option<String>, Option<S
     Ok((Some(resolved), api_path))
 }
 
+/// The name of the selection file in the catalog's provider directory, which
+/// the declaration names and the lowering writes beside it: `operations.json`,
+/// or `<x>-operations.json` for a definition `<catalog>-<x>` over another
+/// catalog, as Slack's `user-operations.json`.
+fn selection_file(definition: &ProviderDefinition, name: &str) -> String {
+    match &definition.catalog {
+        None => "operations.json".to_owned(),
+        Some(catalog) => {
+            let suffix = name.strip_prefix(&format!("{catalog}-")).unwrap_or(name);
+            format!("{suffix}-operations.json")
+        }
+    }
+}
+
 /// The connector declaration a definition lowers to, `use` resolved against
 /// `root`, and the profile its bundle records. The provider id is the part of
 /// the profile ids before their first `.`, which every profile shares.
@@ -1700,13 +1744,7 @@ fn declaration(
         }
     };
     let (default_endpoint, api_path) = endpoint(definition)?;
-    let selection = match &definition.catalog {
-        None => "operations.json".to_owned(),
-        Some(catalog) => {
-            let suffix = name.strip_prefix(&format!("{catalog}-")).unwrap_or(name);
-            format!("{suffix}-operations.json")
-        }
-    };
+    let selection = selection_file(definition, name);
     let mut head = vec![
         field("format", text(CONNECTOR_FORMAT)),
         field(
@@ -2315,7 +2353,8 @@ fn plain_file_name(name: &str) -> bool {
 /// Lower one definition. Every check that can refuse runs before the output
 /// directory is touched: the bundle is compiled into a staging directory under
 /// `scratch`, the selection is resolved against it, and only then are the bundle
-/// (with its index entry) and the selection written to `out`.
+/// (with its index entry) written to `out` and the declaration and the selection
+/// it names to `out/<catalog>/`.
 pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
     let shown = request.definition.display();
     let bytes = std::fs::read(request.definition)
@@ -2424,9 +2463,11 @@ pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
 
     let entry = bundle::write(request.out, &bundle, true)
         .map_err(|error| Refusal::Write(error.to_string()))?;
-    let operations_path = request.out.join(format!("{name}.operations.json"));
+    let directory = request.out.join(provider);
+    std::fs::create_dir_all(&directory).map_err(write)?;
+    let operations_path = directory.join(selection_file(&definition, name));
     std::fs::write(&operations_path, selection).map_err(write)?;
-    let connector_path = request.out.join(format!("{name}.connector.json"));
+    let connector_path = directory.join("connector.json");
     std::fs::write(&connector_path, declared).map_err(write)?;
     Ok(Lowered {
         provider: provider.to_owned(),
