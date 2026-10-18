@@ -6,6 +6,7 @@ status: draft
 title: A connect under a changed native configuration names the cause
 relations:
 - serves: vision:independent-contract-adapters
+- depends_on: story:connection-binding-excludes-operations
 scope:
 - confidence: inferred
   path: apps/connectors-cli-contract/binding.json
