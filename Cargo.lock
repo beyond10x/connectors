@@ -621,8 +621,11 @@ name = "connectors-catalog"
 version = "0.53.1"
 dependencies = [
  "connectors-core",
+ "flate2",
  "hex",
+ "indexmap",
  "openapiv3",
+ "regex",
  "serde",
  "serde_json",
  "serde_yaml_ng",

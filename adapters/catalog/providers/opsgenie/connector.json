@@ -13,7 +13,7 @@
       "bearer": false,
       "prefix": "GenieKey",
       "label": "Opsgenie API integration key",
-      "identity": {"path": "v2/alerts", "kind": "opsgenie.integration", "source": "configuration"}
+      "identity": {"source": "configuration", "path": "v2/alerts", "kind": "opsgenie.integration"}
     }
   ]
 }
