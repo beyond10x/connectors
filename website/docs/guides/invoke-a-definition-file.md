@@ -88,7 +88,7 @@ without the question.
 ## What it keeps
 
 The lowered definition is cached under the state directory, in an owner-only directory named by
-the digest of the definition, its declaration, its source and the lowerer's release; a run with
+the digest of every file its lowering reads and the lowerer's release; a run with
 unchanged inputs reuses it. The instance's entry is held in the owner-only file
 `definitions/instances.toml` beside the cache:
 
