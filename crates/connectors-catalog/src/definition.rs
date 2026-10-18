@@ -820,6 +820,10 @@ pub enum Refusal {
     Reference { reference: String, detail: String },
     /// A view names a reference kind the definition does not declare.
     ViewReference { view: String, of: String },
+    /// A `catalog` or file stem that is not a plain name: empty, `.` or `..`,
+    /// or holding `/`, `\` or NUL. It names the directory under the output
+    /// directory the declaration and its selection are written to.
+    NotPlainName { field: String, value: String },
     /// The catalog pipeline refused the source; the message names its step.
     Pipeline(String),
     /// The output directory, the selection or the scratch copy cannot be written.
@@ -861,6 +865,7 @@ impl Refusal {
             Self::FilterParameter { .. } => "filter_parameter",
             Self::Reference { .. } => "reference",
             Self::ViewReference { .. } => "view_reference",
+            Self::NotPlainName { .. } => "not_plain_name",
             Self::Pipeline(_) => "pipeline",
             Self::Write(_) => "write",
         }
@@ -985,6 +990,11 @@ impl std::fmt::Display for Refusal {
                 f,
                 "{name}: view `{view}` is of `{of}`, which references does not declare"
             ),
+            Self::NotPlainName { field, value } => write!(
+                f,
+                "{name}: {field} `{}` is not a plain name; it names a directory under the output directory",
+                value.escape_debug()
+            ),
         }
     }
 }
@@ -1019,12 +1029,13 @@ pub fn parse(bytes: &[u8]) -> Result<ProviderDefinition, Refusal> {
             "source.sha256 `{digest}` is not lowercase hexadecimal"
         )));
     }
-    if let Some(catalog) = &definition.catalog
-        && !connectors_core::valid_id(catalog)
-    {
-        return Err(Refusal::Malformed(format!(
-            "catalog `{catalog}` is not a provider id"
-        )));
+    if let Some(catalog) = &definition.catalog {
+        plain_name("catalog", catalog)?;
+        if !connectors_core::valid_id(catalog) {
+            return Err(Refusal::Malformed(format!(
+                "catalog `{catalog}` is not a provider id"
+            )));
+        }
     }
     Ok(definition)
 }
@@ -1789,10 +1800,15 @@ pub fn connector(file: &Path, root: &Path) -> Result<String, Refusal> {
     Ok(declaration(&definition, name, provider, root)?.0)
 }
 
+/// The file stem, which names the selection and, without a `catalog`, the
+/// directory under the output directory; so it is a plain name.
 fn stem(file: &Path) -> Result<&str, Refusal> {
-    file.file_stem()
+    let stem = file
+        .file_stem()
         .and_then(|stem| stem.to_str())
-        .ok_or_else(|| Refusal::Unreadable(format!("{}: no file stem", file.display())))
+        .ok_or_else(|| Refusal::Unreadable(format!("{}: no file stem", file.display())))?;
+    plain_name("file stem", stem)?;
+    Ok(stem)
 }
 
 /// The source operation an operation key names, with its query parameters.
@@ -2348,6 +2364,18 @@ fn plain_file_name(name: &str) -> bool {
     !name.is_empty()
         && Path::new(name).components().collect::<Vec<_>>().as_slice()
             == [Component::Normal(name.as_ref())]
+}
+
+/// Refuse `value` of `field` unless it is a plain file name on every platform
+/// the output may be read on: no `\` (a separator on Windows) and no NUL.
+fn plain_name(field: &str, value: &str) -> Result<(), Refusal> {
+    if plain_file_name(value) && !value.contains(['\\', '\0']) {
+        return Ok(());
+    }
+    Err(Refusal::NotPlainName {
+        field: field.to_owned(),
+        value: value.to_owned(),
+    })
 }
 
 /// Lower one definition. Every check that can refuse runs before the output
