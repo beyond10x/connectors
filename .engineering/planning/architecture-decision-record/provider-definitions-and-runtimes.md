@@ -7,7 +7,7 @@ title: Connector definitions live in their own repository and reach each runtime
 relations:
 - informed_by: architecture-decision-record:declarative-http-provider-runtime
 - serves: vision:independent-contract-adapters
-revision: 10
+revision: 11
 transitions:
 - {from: "proposed", to: "accepted", at: "2026-10-17T12:17:39Z", actor: "human:timo", revision: 8}
 ---
@@ -249,3 +249,8 @@ Delivered by `story:connection-binding-excludes-operations`, `story:invoke-defin
 
 Approved by the operator on 2026-10-18 as option "A"; recorded by the planning session the same day.
 D1 to D11 are unchanged.
+
+Contract change for point 2 (2026-10-18, recorded with story:connection-binding-excludes-operations):
+a read command (`operations describe`, `list`, `invoke`) starts the configured, digest-pinned
+adapter without any credential when no description is cached for the configuration and the
+instance holds a connection current under it, replacing the CLI contract's "never implicit launch".

@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-18T06:48:14Z",
+  "actor": "human:timo",
+  "artifact": "story:connection-binding-excludes-operations",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "implementor: F1, F3, N1 fixed; F2 resolved by narrowing semantics.md, case restated; N2, N3 noted",
+    "review": "review-result:connection-binding-adversary-r2",
+    "outcome": "fixed"
+  }
+}

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:connection-binding-excludes-operations
 kind: story
-status: active
+status: implemented
 title: A bundle- or selection-only change leaves a connection usable; its credential stays bound to authority, profile, identity and executable
 relations:
 - implements: architecture-decision-record:provider-definitions-and-runtimes
@@ -69,10 +69,11 @@ scope:
   path: ess/domains/cli.yaml
 - confidence: cited
   path: website/docs/concepts/local-runtime.md
-revision: 7
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-18T03:30:17Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":4}}}
 - {from: "proposed", to: "active", at: "2026-10-18T03:30:17Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":4}}}
+- {from: "active", to: "implemented", at: "2026-10-18T06:48:14Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":2,"review_outcome":10}}}
 ---
 ## Problem
 
@@ -188,3 +189,14 @@ and the order is:
 
 Builds on the upgrade-in-place path of `story:connection-follows-configuration-upgrade`, whose
 revalidation is in the tree (`registry/revalidation.rs`) although that story is still `proposed`.
+
+## Contract change
+
+Coordinator decision of 2026-10-18, within D12 as approved: `operations describe`, `operations list`
+and `operations invoke` start the configured, digest-pinned adapter, reading no credential and
+asking for none, when no description is cached for the instance's configured selection and the
+instance holds a connection (the named one, for an invoke) that is current under the configured
+entry, unrevoked, not Stale and usable; this replaces "never implicit launch" in
+`contracts/cli/v1alpha1/semantics.md` ("Launching for a description"). A write after an
+executable-only change validates the connection once under the new executable, as a read does, and
+an executable-only follow keeps the connection's public revision so the write's approval stands.
