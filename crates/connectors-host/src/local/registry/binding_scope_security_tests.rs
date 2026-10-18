@@ -3,11 +3,14 @@
 //! registry: integrity conformance checks of the binding's credential side,
 //! its executable digest and their record across a full metadata replay.
 use super::*;
+#[cfg(unix)]
 use rusqlite::{Connection, OpenFlags};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
+#[cfg(unix)]
 const FLOOR: &str = "registry-clock.floor";
+#[cfg(unix)]
 const STORE: &str = "metadata.sqlite3";
 
 /// Both the provider executable and the credential side moved.
