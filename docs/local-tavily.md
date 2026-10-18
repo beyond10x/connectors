@@ -97,7 +97,9 @@ invocations are two charges.
 The instance pins the executable's SHA-256, and the host serves the bootstrap it cached at the last
 admitted launch. After rebuilding `connectors-tavily`, update `sha256`, stop the running
 incarnation exactly, then reconnect the connection, which performs the admitted launch under the same
-connection id. Until then `operations describe` answers `description_unavailable`;
+connection id. Since the configuration revision is unchanged the connection stays current, so
+`operations describe` itself starts the new executable for its description
+([CLI semantics](../contracts/cli/v1alpha1/semantics.md#launching-for-a-description));
 `connections revalidate` performs the admitted launch too:
 
 ```sh

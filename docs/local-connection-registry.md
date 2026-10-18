@@ -114,10 +114,10 @@ for a connection whose binding records no credential side: one saved before
 it was recorded, or under an entry that states none. Such a connection is bound
 to the configuration revision it was admitted under, whatever moved it, until a
 revalidation records both digests. Nothing is migrated by guess. A changed
-configuration still needs an admitted launch before `operations describe`
-answers for it (`description_unavailable` until then; [CLI
-semantics](../contracts/cli/v1alpha1/semantics.md)), and `connections
-revalidate` is that launch for a connection that needs no other step.
+configuration's description is cached by the first `operations describe`,
+`list` or `invoke`, which starts the configured adapter, reading no credential,
+when the instance holds a connection current under it ([CLI
+semantics](../contracts/cli/v1alpha1/semantics.md#launching-for-a-description)).
 
 When the configuration moves to a new revision under that rule, the connection
 reports `pending` with `stale` set, and reads, reconnect and approvals refuse it.
