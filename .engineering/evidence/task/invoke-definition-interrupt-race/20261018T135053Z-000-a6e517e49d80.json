@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-18T13:50:53Z",
+  "actor": "human:timo",
+  "artifact": "task:invoke-definition-interrupt-race",
+  "kind": "task",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "security_invoke_definition test binary, --exact security_an_interrupt_while_a_definition_is_prepared_is_exit_130, 50 runs, stand-in exiting at once (macOS timing), code before the fix",
+    "reference": "red: 36 passed, 14 failed (exit 2 refusal won the race); ~/.cache/connectors-s2-20261018/logs/race-red.log"
+  }
+}
