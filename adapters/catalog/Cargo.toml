@@ -32,6 +32,7 @@ httpdate = "1.0.3"
 
 [dev-dependencies]
 entity-core.workspace = true
+flate2.workspace = true
 entity-eventlog.workspace = true
 entity-store.workspace = true
 eventlog-core.workspace = true
