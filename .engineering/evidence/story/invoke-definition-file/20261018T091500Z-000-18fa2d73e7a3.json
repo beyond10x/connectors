@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-18T09:15:00Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-definition-file",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors --test invoke_definition; cargo test -p connectors-catalog-provider --test local_runtime -- --ignored cli_journey::invoke_definition::a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_without_asking, before the implementation",
+    "reference": "unit/invoke-definition-file working tree before de9406bb81: red, 5 of 6 CLI cases failed (cli_parse, --definition unknown to the handler) and the acceptance journey failed at its first step"
+  }
+}

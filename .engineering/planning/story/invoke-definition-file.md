@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:invoke-definition-file
 kind: story
-status: draft
+status: implemented
 title: operations invoke --definition runs an operation of a hand-written definition with no configured instance
 relations:
 - implements: architecture-decision-record:provider-definitions-and-runtimes
@@ -55,7 +55,11 @@ scope:
   path: website/docs/reference/cli.md
 - confidence: cited
   path: website/docs/reference/contracts/cli.md
-revision: 6
+revision: 10
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-18T08:55:23Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":3}}}
+- {from: "proposed", to: "active", at: "2026-10-18T08:55:23Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":3}}}
+- {from: "active", to: "implemented", at: "2026-10-18T11:25:38Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":3,"review_outcome":7}}}
 ---
 ## Problem
 
@@ -155,3 +159,27 @@ already one implementor's unit.
 | `story:configuration-change-error` (draft) | `contracts/cli/v1alpha1/semantics.md`, `apps/connectors/src/local.rs` (inferred on that story) | after `story:connection-binding-excludes-operations` like this one; different sections (selectors here, connect refusals there) |
 
 The cache and the owner-only definition entries are new code; the scope names their likely home, `crates/connectors-host/src/local/definitions.rs`, as inferred.
+
+## Delivered
+
+Implemented on branch unit/invoke-definition-file (de9406bb81, 98e0c677fa, f9e181f3fd, 9869ac07ab).
+Decisions taken inside the story, recorded in `contracts/cli/v1alpha1/semantics.md` §3 "Invoking a
+definition file":
+
+- The generated contract keeps `--schema` and `--revision` required (ESS refuses optional dynamic
+  selector fields), so the host prepares the command line before the generated runner reads it and
+  supplies them from the description.
+- The instance's alias and instance id are `<connector>.definition`; its entry pins the installed
+  catalog provider as a derived instance's does. `instances list` and `setup check` stay the
+  operator's configuration alone.
+- The collision refusal is `invalid_configuration` with the new `configuration_rule`
+  `definition_instance_configured`.
+- No terminal, or any answer but yes, is `not_found` at `admission` with `create_connection`.
+- An authority or profile change answers the read admission refusal of the recorded connection
+  (`lifecycle_conflict`, `check_configuration` for an authority change), sending nothing.
+- At most 64 connector ids are held; no command forgets one (revoke, then remove `definitions/`).
+- A definition names no trust root: the instance trusts the platform's roots, and every base URL
+  variable needs a default.
+
+The lowerer's own `valid_id` still admits `..` as a `catalog`; this command refuses non-plain names
+before lowering, and `connectors-build definition --out` remains the operator's own directory.

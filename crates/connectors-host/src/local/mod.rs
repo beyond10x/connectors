@@ -13,6 +13,7 @@ pub mod audit;
 pub mod clock;
 pub mod config;
 pub mod core_dumps;
+pub mod definitions;
 pub mod filesystem;
 pub mod keyring;
 pub mod metadata;

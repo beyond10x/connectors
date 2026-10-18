@@ -239,7 +239,8 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "oauth2_refresh::oauth_connect_refusal_does_not_say_repair"
             | "oauth2_refresh::oauth_invalid_grant_makes_the_connection_stale_until_a_reconnect"
             | "oauth2_refresh_adversary_pass2::adversary2_oauth_cached_bootstrap_round_trips_across_owner_restart"
-            | "derived_instance::a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_drafts",
+            | "derived_instance::a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_drafts"
+            | "cli_journey::invoke_definition::a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_without_asking",
         ) => Some((Disposable, vec![CUSTODY, CLI])),
         (
             "connectors-loki",
