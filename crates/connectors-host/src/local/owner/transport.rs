@@ -557,6 +557,24 @@ impl Client {
     pub fn is_same_build(&self) -> bool {
         self.same_build().is_ok()
     }
+    /// The adapter's description, cached by starting the configured adapter
+    /// when none is (`super::described`).
+    pub(super) fn launched(
+        mut self,
+        adapter: &str,
+        connection: Option<&str>,
+    ) -> Result<runtime::Bootstrap> {
+        self.same_build()?;
+        let mut answer = self.simple(
+            Request::Cached {
+                adapter: adapter.into(),
+                launch: true,
+                connection: connection.map(str::to_owned),
+            },
+            Duration::from_secs(40),
+        )?;
+        serde_json::from_value(answer["bootstrap"].take()).map_err(|_| Code::Unavailable.into())
+    }
     /// The adapter's cached description, answered from the owner's held
     /// metadata handle.
     pub(super) fn cached(mut self, adapter: &str) -> Result<runtime::Bootstrap> {
@@ -564,6 +582,8 @@ impl Client {
         let mut answer = self.simple(
             Request::Cached {
                 adapter: adapter.into(),
+                launch: false,
+                connection: None,
             },
             Duration::from_secs(30),
         )?;
@@ -1706,7 +1726,7 @@ fn action(
         | Request::Revalidate { adapter, .. }
         | Request::Invoke { adapter, .. }
         | Request::Status { adapter }
-        | Request::Cached { adapter }
+        | Request::Cached { adapter, .. }
         | Request::Launch { adapter, .. }
         | Request::Stop { adapter, .. } => adapter.clone(),
         _ => return Err(Code::InvalidInput.into()),
@@ -2027,9 +2047,39 @@ fn action(
             )
         }
         Request::Status { .. } if document.is_empty() => owner.pool.status(&alias, &adapter),
-        Request::Cached { .. } if document.is_empty() => {
-            Ok(json!({ "bootstrap": super::cached_direct(&owner.paths, &alias)? }))
-        }
+        Request::Cached {
+            launch, connection, ..
+        } if document.is_empty() => match super::cached_direct(&owner.paths, &alias) {
+            // A read command's description (`super::described`): the owner
+            // checks the same admission again and starts the configured adapter,
+            // which caches its description. No credential is read.
+            Err(error)
+                if launch
+                    && error.code == Code::DescriptionUnavailable
+                    // An operator's `instances stop` is not resumed by a read
+                    // command: it keeps answering `description_unavailable`.
+                    && !runtime::state::State::new(&owner.paths.state)
+                        .suppressed(&adapter.instance_id)?
+                    && registry::Registry::new(&owner.paths.state).launch_admits(
+                        &adapter.instance_id,
+                        &adapter.adapter_id,
+                        adapter.configured(),
+                        connection.as_deref(),
+                    )? =>
+            {
+                let Output::Bootstrap(bootstrap, _) = owner.pool.run(
+                    &alias,
+                    &adapter,
+                    Task::Ensure { resume: false },
+                    connectors_sdk::now_ms() + 30_000,
+                )?
+                else {
+                    return Err(Code::Unavailable.into());
+                };
+                Ok(json!({ "bootstrap": bootstrap }))
+            }
+            other => Ok(json!({ "bootstrap": other? })),
+        },
         Request::Stop {
             configuration_revision,
             host_incarnation,

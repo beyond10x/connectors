@@ -1121,80 +1121,37 @@ fn worker(
                         // and refuses, changing nothing, otherwise. No
                         // credential entry, no question.
                         Err(registry::Failure::ExecutableChanged) => {
-                            let revision = registry.recorded_revision(
-                                &current.instance_id,
-                                &current.adapter_id,
-                                &connection,
-                            )?;
-                            let captured = registry.capture_revalidation(
+                            super::follow_executable(
+                                &paths,
+                                &config.selection(),
+                                &registry,
                                 &binding,
                                 &connection,
-                                &revision,
-                                connectors_sdk::now_ms(),
-                                job.deadline.min(connectors_sdk::now_ms() + 30_000),
-                            )?;
-                            // The capture classifies again: only an executable-only
-                            // change is followed without the operator, never one a
-                            // concurrent publication turned into another change.
-                            if !captured.follows_executable() {
-                                registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
-                                return Err(registry::Failure::UpgradeRequired.into());
-                            }
-                            let version = captured.version();
-                            let selection = config.selection();
-                            let material =
-                                custody::Store::open_for(version.scope(), &selection, &paths.state)
-                                    .and_then(|store| store.read(version));
-                            let material = match material {
-                                Ok(value) => value,
-                                Err(error) => {
-                                    registry
-                                        .cancel_revalidation(captured, connectors_sdk::now_ms())?;
-                                    return Err(super::read_error(&selection, error));
-                                }
-                            };
-                            let guard = control.lock().map_err(|_| Code::Unavailable)?;
-                            if let Err(error) = guard.check(job.epoch).and_then(|_| {
-                                if stopped.load(Ordering::SeqCst) {
-                                    Err(Code::Unavailable.into())
-                                } else {
-                                    Ok(())
-                                }
-                            }) {
-                                registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
-                                return Err(error);
-                            }
-                            let dispatched = registry
-                                .dispatch_revalidation(captured, connectors_sdk::now_ms())?;
-                            drop(guard);
-                            let (result, attempts, cause) = revalidate_with_retries(
                                 job.deadline,
                                 || {
-                                    let result = active.validate(
-                                        &requirement.profile,
-                                        &material,
-                                        job.deadline,
-                                    );
-                                    (result, active.running().unwrap_or(false))
+                                    let guard = control.lock().map_err(|_| Code::Unavailable)?;
+                                    guard.check(job.epoch)?;
+                                    if stopped.load(Ordering::SeqCst) {
+                                        return Err(Code::Unavailable.into());
+                                    }
+                                    Ok(guard)
                                 },
-                                || stopped.load(Ordering::SeqCst),
-                                std::thread::sleep,
-                            );
-                            match result {
-                                Ok(baseline) => registry.finish_revalidation(
-                                    dispatched,
-                                    Ok(baseline.into_registry()),
-                                    connectors_sdk::now_ms(),
-                                )?,
-                                Err(error) => {
-                                    registry.finish_revalidation(
-                                        dispatched,
-                                        Err(None),
-                                        connectors_sdk::now_ms(),
-                                    )?;
-                                    return Err(retried(error, attempts, cause));
-                                }
-                            }
+                                |material| {
+                                    revalidate_with_retries(
+                                        job.deadline,
+                                        || {
+                                            let result = active.validate(
+                                                &requirement.profile,
+                                                material,
+                                                job.deadline,
+                                            );
+                                            (result, active.running().unwrap_or(false))
+                                        },
+                                        || stopped.load(Ordering::SeqCst),
+                                        std::thread::sleep,
+                                    )
+                                },
+                            )?;
                             capture()?
                         }
                         other => other?,

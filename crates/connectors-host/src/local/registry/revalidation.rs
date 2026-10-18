@@ -401,9 +401,17 @@ impl Registry {
                         tx.execute("UPDATE registry_connections SET baseline=?2,publication_fence=?3 WHERE connection_ref=?1",
                             params![row.reference,encode(&snapshot)?,new_id()]).map_err(db)?;
                         if let Some(upgrade) = upgrade {
-                            // The binding changed, so the public revision advances.
-                            tx.execute("UPDATE registry_connections SET binding=?2,semantic_revision=?3 WHERE connection_ref=?1",
-                                params![row.reference,encode(upgrade)?,new_id()]).map_err(db)?;
+                            // The binding changed, so the public revision advances, except
+                            // for an executable-only move (D12): the connection's meaning is
+                            // unchanged, and an approval already binds the executable
+                            // selection, so a write validated under it keeps its approval.
+                            if moved == Follow::Executable {
+                                tx.execute("UPDATE registry_connections SET binding=?2 WHERE connection_ref=?1",
+                                    params![row.reference,encode(upgrade)?]).map_err(db)?;
+                            } else {
+                                tx.execute("UPDATE registry_connections SET binding=?2,semantic_revision=?3 WHERE connection_ref=?1",
+                                    params![row.reference,encode(upgrade)?,new_id()]).map_err(db)?;
+                            }
                             tx.execute("UPDATE registry_instances SET configuration_revision=?3 WHERE instance_id=?1 AND adapter_id=?2",
                                 params![upgrade.instance_id,upgrade.adapter_id,upgrade.configuration_revision]).map_err(db)?;
                             follow_instance(tx,&upgrade.instance_id,&upgrade.configuration_revision)?;
