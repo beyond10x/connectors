@@ -212,7 +212,9 @@ fn invoke_args(file: &str) -> Vec<&str> {
 /// while preparation goes on (with a held connection, on to the invoke). The
 /// window is widened deterministically with an installed provider stand-in
 /// that marks its start and prints nothing for two seconds; the signal goes to
-/// the CLI alone (the provider runs in its own process group).
+/// the CLI alone (the provider runs in its own process group). `/bin/sleep` is
+/// where both Linux and macOS keep it (macOS has no `/usr/bin/sleep`, and a
+/// stand-in that exits at once lets the refusal win the race).
 #[test]
 fn security_an_interrupt_while_a_definition_is_prepared_is_exit_130() {
     let fixture = Fixture::new();
@@ -221,7 +223,7 @@ fn security_an_interrupt_while_a_definition_is_prepared_is_exit_130() {
     let provider = installation.join("connectors-catalog-provider");
     fs::write(
         &provider,
-        "#!/bin/sh\n: > \"${0%/*}/started\"\nexec /usr/bin/sleep 2\n",
+        "#!/bin/sh\n: > \"${0%/*}/started\"\nexec /bin/sleep 2\n",
     )
     .unwrap();
     fs::set_permissions(&provider, fs::Permissions::from_mode(0o700)).unwrap();
