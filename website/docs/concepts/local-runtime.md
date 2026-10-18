@@ -57,9 +57,14 @@ connection Stale. Then:
   reference and refuses a credential that names a different identity. An invoke on a Stale
   connection answers with the next action `repair_connection`, which names this command.
 - `connections revoke` ends local use. It does not revoke the token at the provider.
-- After an instance's configuration revision changes, its connection follows it on its next
-  revalidation when its provider authority, auth profile and identity are unchanged; otherwise the
-  answer names `create_connection`.
+- A connection is bound to the credential side of its instance's configuration (provider host,
+  auth profile, trust roots, admitted hosts, request prefix) and to the provider executable, when
+  the instance states the provider's `credential_revision`. A change of only the bundle or the
+  selection leaves it ready; a change of only the executable is followed after one validation
+  answers the same identity.
+- After any other change of an instance's configuration revision, its connection follows it on
+  its next revalidation when its provider authority, auth profile and identity are unchanged;
+  otherwise the answer names `create_connection`.
 - `connections launch` hands one connection's credential to a program pinned in the
   configuration, on file descriptor 3, and to nothing else.
 

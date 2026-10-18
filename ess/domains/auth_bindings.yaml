@@ -139,6 +139,8 @@ entities:
       - {name: configuration_revision, type: "Optional<String>"}
       - {name: refused_configuration_revision, type: "Optional<String>"}
       - {name: begun_at_instance_revision, type: "Optional<String>"}
+      - {name: credential_revision, type: "Optional<String>"}
+      - {name: executable_digest, type: "Optional<String>"}
     relations:
       - {name: instance, kind: references, target: connectors.declarations.ServiceConfiguration, cardinality: one, via: instance_id}
       - {name: auth_profile, kind: references, target: connectors.auth_bindings.AuthProfile, cardinality: one, via: profile_record_ref}
@@ -219,6 +221,17 @@ entities:
     # if the instance still records this revision, so a connection begun under
     # an older configuration never moves the instance back; publication
     # removes it.
+    # credential_revision and executable_digest are what the connection is
+    # bound to beside its configuration revision (architecture-decision-record:
+    # provider-definitions-and-runtimes D12): the implementation's digest of
+    # the credential side of its configuration (endpoint authority, instance
+    # id, profile declaration, trust roots, admitted hosts, request prefix;
+    # never the bundle, its source or the selection) and the SHA-256 of the
+    # provider executable. A configuration that moves neither leaves the
+    # connection current; one that moves only the executable is followed after
+    # a validation answers the recorded identity. Both are absent on a
+    # connection saved before they were recorded, which keeps the
+    # configuration-revision rule until a revalidation records them.
     # A connection begun under another revision of its instance is refused when
     # the instance holds a connection, revoked ones included, under another
     # provider authority or another authentication of the same profile
