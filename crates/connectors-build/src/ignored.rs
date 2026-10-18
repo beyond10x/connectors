@@ -243,7 +243,8 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "cli_journey::invoke_definition::a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_without_asking"
             | "cli_journey::invoke_definition::a_stored_credential_of_a_configured_instance_is_reused_without_a_token_prompt"
             | "cli_journey::invoke_definition::a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offers_connect_fresh"
-            | "cli_journey::invoke_definition::adversary_reuse_race::adversary_reuse_a_source_revoked_while_its_copy_validates_is_not_published",
+            | "cli_journey::invoke_definition::adversary_reuse_race::adversary_reuse_a_source_revoked_while_its_copy_validates_is_not_published"
+            | "cli_journey::invoke_definition::a_definition_moved_to_another_host_is_offered_no_reuse_and_answers_lifecycle_conflict",
         ) => Some((Disposable, vec![CUSTODY, CLI])),
         (
             "connectors-loki",
