@@ -37,7 +37,7 @@ impl Lowering {
         let out = self.out();
         let refusal = self.outcome.expect_err("the definition is refused");
         assert!(
-            !out.join("jira.bundle.json").exists() && !out.join("jira.operations.json").exists(),
+            !out.join("jira.bundle.json").exists() && !out.join("jira").exists(),
             "a refused definition writes nothing to the output directory"
         );
         refusal
@@ -110,7 +110,7 @@ fn the_jira_selection_carries_the_shipped_id_operation_id_and_effect() {
         .expect("the Jira definition lowers");
     assert_eq!(
         lowered.operations,
-        lowering.out().join("jira.operations.json")
+        lowering.out().join("jira/operations.json")
     );
     let selection: Value =
         serde_json::from_slice(&std::fs::read(&lowered.operations).unwrap()).unwrap();

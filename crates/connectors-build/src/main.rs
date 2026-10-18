@@ -138,8 +138,8 @@ enum Action {
         /// The definitions checkout the definition's source paths are under.
         #[arg(long = "root", required = true)]
         definitions: Option<PathBuf>,
-        /// The bundle directory to write the bundle, index, selection and
-        /// declaration into.
+        /// The bundle directory to write the bundle and index into; the
+        /// declaration and the selection it names go to `<catalog>/` under it.
         #[arg(long, required = true)]
         out: Option<PathBuf>,
     },
@@ -1073,7 +1073,7 @@ mod tests {
         );
         bundle::load(&temp.path().join("out"), "jira").expect("the index verifies");
         let selection: Value = serde_json::from_slice(
-            &std::fs::read(temp.path().join("out/jira.operations.json")).unwrap(),
+            &std::fs::read(temp.path().join("out/jira/operations.json")).unwrap(),
         )
         .unwrap();
         assert_eq!(selection["format"], "connectors-catalog-operations/1");
@@ -1124,7 +1124,7 @@ mod tests {
             "the lowered bundle is the committed one"
         );
         let lowered: Value =
-            serde_json::from_slice(&std::fs::read(out.join("slack-user.operations.json")).unwrap())
+            serde_json::from_slice(&std::fs::read(out.join("slack/user-operations.json")).unwrap())
                 .unwrap();
         let shipped: Value = serde_json::from_slice(
             &std::fs::read(

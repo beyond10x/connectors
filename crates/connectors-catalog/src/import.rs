@@ -362,6 +362,8 @@ struct DocumentedAuth {
     #[serde(default)]
     minimum_scopes: Vec<String>,
     #[serde(default)]
+    evidence_lifetime_ms: Option<u64>,
+    #[serde(default)]
     token_url: Option<String>,
     #[serde(default)]
     authorize_url: Option<String>,
@@ -492,6 +494,7 @@ fn documented_profile(block: &DocumentedAuth) -> Result<Auth, Failure> {
             path: access.path.clone(),
             query: (!access.query.is_empty()).then(|| access.query.clone()),
         }),
+        evidence_lifetime_ms: block.evidence_lifetime_ms,
         token_url: block.token_url.as_deref().map(templated),
         authorize_url: block.authorize_url.as_deref().map(templated),
     })
@@ -810,6 +813,7 @@ fn common(a: &Auth, b: &Auth) -> Auth {
         identity,
         scopes: same(&a.scopes, &b.scopes),
         access: same(&a.access, &b.access),
+        evidence_lifetime_ms: same(&a.evidence_lifetime_ms, &b.evidence_lifetime_ms),
         token_url: same(&a.token_url, &b.token_url),
         authorize_url: same(&a.authorize_url, &b.authorize_url),
     }
@@ -848,6 +852,7 @@ fn over(full: &Auth, base: &Auth) -> Auth {
         identity,
         scopes: unless_same(&full.scopes, &base.scopes),
         access: unless_same(&full.access, &base.access),
+        evidence_lifetime_ms: unless_same(&full.evidence_lifetime_ms, &base.evidence_lifetime_ms),
         token_url: unless_same(&full.token_url, &base.token_url),
         authorize_url: unless_same(&full.authorize_url, &base.authorize_url),
     }

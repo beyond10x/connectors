@@ -156,10 +156,7 @@ fn assert_lowers_to_the_shipped_files(temp: &Path, name: &str, file: &Path, root
         lowered.bundle,
         out.join(format!("{}.bundle.json", entry.catalog))
     );
-    assert_eq!(
-        lowered.operations,
-        out.join(format!("{name}.operations.json"))
-    );
+    assert_eq!(lowered.operations, out.join(entry.selection));
     let committed = std::fs::read(
         repository()
             .join("adapters/catalog/generated/bundles")
@@ -229,7 +226,7 @@ fn assert_lowers_to_the_shipped_files(temp: &Path, name: &str, file: &Path, root
     if declared {
         assert_eq!(
             lowered.connector,
-            out.join(format!("{name}.connector.json"))
+            out.join(entry.catalog).join("connector.json")
         );
         let written = std::fs::read_to_string(&lowered.connector).unwrap();
         assert!(
