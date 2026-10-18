@@ -338,6 +338,8 @@ mod json_value_tests {
             effect,
         };
         runtime::Bootstrap {
+            credential_revision: None,
+            executable: None,
             instance: "forge-local".into(),
             adapter: "catalog".into(),
             protocol: "v1alpha1".into(),

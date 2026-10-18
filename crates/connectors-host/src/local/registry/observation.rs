@@ -65,7 +65,13 @@ impl Registry {
         if row.state == "revoked" {
             return Err(Failure::Revoked);
         }
-        if row.binding != *binding {
+        // An operation-only change leaves the connection bound (D12); an
+        // executable change is followed only after a validation, which an
+        // approval target does not run.
+        if !matches!(
+            follow(&row.binding, binding),
+            Follow::Same | Follow::Operations
+        ) {
             // Whether a revalidation admits this credential is the read path's
             // readiness rule, expiry included. Only this refusal looks at
             // time, and only when the binding could otherwise follow an
@@ -116,19 +122,20 @@ impl Registry {
         Ok(row.revision)
     }
 
-    pub fn describe(
+    pub fn describe<'a>(
         &self,
         instance: &str,
         adapter: &str,
-        configuration_revision: &str,
+        configured: impl Into<Configured<'a>>,
         reference: &str,
         now: u64,
         custody_available: bool,
     ) -> Result<ObservedConnection> {
+        let configured = configured.into();
         self.transaction_observation(now, |tx, _, now| {
             let row = Self::connection(tx, reference)?;
             visible(&row, instance, adapter)?;
-            observe(tx, row, configuration_revision, now, custody_available)
+            observe(tx, row, &configured, now, custody_available)
         })
     }
 
@@ -161,15 +168,17 @@ impl Registry {
 
     /// Cursors are owner-held opaque records. A changed list epoch, selection,
     /// limit, configuration or original expiry refuses rather than shifting pages.
-    pub fn list(
+    pub fn list<'a>(
         &self,
         instance: &str,
         adapter: &str,
-        configuration_revision: &str,
+        configured: impl Into<Configured<'a>>,
         page: PageOptions<'_>,
         now: u64,
         custody_available: bool,
     ) -> Result<Page> {
+        let configured = configured.into();
+        let configuration_revision = configured.configuration_revision;
         let PageOptions { limit, cursor } = page;
         if !(1..=500).contains(&limit) {
             return Err(Failure::InvalidInput);
@@ -191,7 +200,7 @@ impl Registry {
             for reference in &refs {
                 let row = Self::connection(tx, reference)?;
                 visible(&row, instance, adapter)?;
-                connections.push(observe(tx, row, configuration_revision, now, custody_available)?);
+                connections.push(observe(tx, row, &configured, now, custody_available)?);
             }
             let next_cursor = if more {
                 let count: i64 = tx.query_row("SELECT count(*) FROM registry_cursors", [], |r| r.get(0)).map_err(db)?;
@@ -217,7 +226,7 @@ pub(super) fn visible(row: &ConnectionRow, instance: &str, adapter: &str) -> Res
 fn observe(
     tx: &Transaction<'_>,
     row: ConnectionRow,
-    configured_revision: &str,
+    configured: &Configured<'_>,
     now: u64,
     custody_available: bool,
 ) -> Result<ObservedConnection> {
@@ -229,12 +238,12 @@ fn observe(
         State::Revoked
     } else if row.kept.stale {
         State::Stale
-    } else if row.binding.configuration_revision != configured_revision {
+    } else if !configured.current(&row.binding) {
         State::Pending
     } else {
         readiness(tx, &row, now, custody_available)?
     };
-    let stale = row.state != "revoked" && row.binding.configuration_revision != configured_revision;
+    let stale = row.state != "revoked" && !configured.current(&row.binding);
     let valid_until_ms = if stale {
         now
     } else if state == State::Ready {

@@ -1756,7 +1756,7 @@ fn action(
                     let old = registry.describe(
                         &adapter.instance_id,
                         &adapter.adapter_id,
-                        &adapter.configuration_revision,
+                        adapter.configured(),
                         reference,
                         connectors_sdk::now_ms(),
                         false,
@@ -1906,7 +1906,7 @@ fn action(
                     let description = registry.describe(
                         &adapter.instance_id,
                         &adapter.adapter_id,
-                        &adapter.configuration_revision,
+                        adapter.configured(),
                         &connection,
                         connectors_sdk::now_ms(),
                         true,
@@ -1956,7 +1956,7 @@ fn action(
                 let description = registry.describe(
                     &adapter.instance_id,
                     &adapter.adapter_id,
-                    &adapter.configuration_revision,
+                    adapter.configured(),
                     &connection,
                     connectors_sdk::now_ms(),
                     true,

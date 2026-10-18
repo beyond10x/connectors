@@ -429,9 +429,19 @@ fn adversary_bootstrap_without_the_two_reads_is_the_base_pin() {
         String::from_utf8_lossy(&output.stderr)
     );
     let bootstrap: Value = serde_json::from_slice(&output.stdout).unwrap();
+    // The bytes printed before the credential-side digest was printed
+    // (story:connection-binding-excludes-operations): the one new member
+    // removed, every other member is unchanged.
+    let member = format!(
+        ",\"credential_revision\":{}",
+        bootstrap["credential_revision"]
+    );
+    let printed = std::str::from_utf8(&output.stdout).unwrap();
+    assert!(bootstrap["credential_revision"].is_string());
+    assert_eq!(printed.matches(&member).count(), 1, "{printed}");
     assert_eq!(
         (
-            hex::encode(Sha256::digest(&output.stdout)),
+            hex::encode(Sha256::digest(printed.replacen(&member, "", 1))),
             bootstrap["configuration_revision"].as_str().unwrap()
         ),
         (

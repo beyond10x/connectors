@@ -136,6 +136,8 @@ impl Child {
             _image: image,
             channel,
             bootstrap: Bootstrap {
+                credential_revision: None,
+                executable: None,
                 instance: String::new(),
                 adapter: String::new(),
                 protocol: String::new(),
@@ -181,9 +183,17 @@ impl Child {
             || bootstrap.adapter != config.adapter_id
             || bootstrap.protocol != config.protocol
             || bootstrap.configuration_revision != config.configuration_revision
+            // A credential-side digest the entry states is the implementation's,
+            // as its configuration revision is (D12).
+            || config
+                .credential_revision
+                .as_ref()
+                .is_some_and(|stated| bootstrap.credential_revision.as_ref() != Some(stated))
         {
             return Err(Failure::ReadinessMismatch);
         }
+        let mut bootstrap = bootstrap;
+        bootstrap.configure(config);
         if child
             .process
             .try_wait()
@@ -805,6 +815,8 @@ mod tests {
 
     pub(super) fn bootstrap() -> Bootstrap {
         Bootstrap {
+credential_revision: None,
+executable: None,
             instance: "fixture".into(), adapter: "fixture".into(), protocol: "v1alpha1".into(),
             configuration_revision: "fixture-config".into(), provider_authority: "fixture-authority".into(),
             descriptor: serde_json::json!({
@@ -957,6 +969,7 @@ mod tests {
         let (path, hash) = crate::local::test_executable::path_and_sha256();
         for mode in ["json", "schema", "identity"] {
             let config = Adapter {
+                credential_revision: None,
                 private_protocol: None,
                 permissions: Default::default(),
                 instance_id: "fixture".into(),
@@ -1001,6 +1014,7 @@ mod tests {
     fn a_reason_on_a_failed_validation_is_a_protocol_violation() {
         let (path, sha256) = crate::local::test_executable::path_and_sha256();
         let config = Adapter {
+            credential_revision: None,
             private_protocol: None,
             permissions: Default::default(),
             instance_id: "fixture".into(),
@@ -1038,6 +1052,7 @@ mod tests {
     fn fixture_child(mode: &str) -> Child {
         let (path, sha256) = crate::local::test_executable::path_and_sha256();
         Child::spawn(&Adapter {
+            credential_revision: None,
             private_protocol: None,
             permissions: Default::default(),
             instance_id: "fixture".into(),

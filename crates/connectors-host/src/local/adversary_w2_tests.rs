@@ -10,6 +10,7 @@ use std::{
 fn selection(root: &Path, mode: &str) -> config::Adapter {
     let (path, hash) = crate::local::test_executable::path_and_sha256();
     config::Adapter {
+        credential_revision: None,
         instance_id: "fixture".into(),
         adapter_id: "fixture".into(),
         configuration_revision: "fixture-config".into(),

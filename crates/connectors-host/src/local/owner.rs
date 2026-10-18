@@ -231,6 +231,7 @@ impl From<registry::Failure> for Error {
             F::NotFound => Code::NotFound,
             F::Conflict
             | F::UpgradeRequired
+            | F::ExecutableChanged
             | F::AuthenticationChanged
             | F::InstanceConnected
             | F::InstanceConnectionChanged => Code::LifecycleConflict,
@@ -253,7 +254,10 @@ impl From<registry::Failure> for Error {
         error.revoke = e == F::InstanceConnectionChanged;
         // Revalidation helps: it recollects expired evidence, and it follows a
         // configuration upgrade of the connection's instance.
-        error.revalidate = matches!(e, F::EvidenceExpired | F::UpgradeRequired);
+        error.revalidate = matches!(
+            e,
+            F::EvidenceExpired | F::UpgradeRequired | F::ExecutableChanged
+        );
         error
     }
 }
@@ -366,6 +370,14 @@ fn selected(paths: &Paths, alias: &str) -> Result<(Config, Adapter)> {
 /// this build answers it from its held metadata handle; without one the store
 /// is read directly, which verifies it completely (`docs/local-er-metadata.md`).
 pub fn cached(paths: &Paths, alias: &str) -> Result<runtime::Bootstrap> {
+    let mut bootstrap = cached_unbound(paths, alias)?;
+    // Bound to the configured entry it was cached under (the executable is
+    // never carried by a cached record).
+    let (_, adapter) = selected(paths, alias)?;
+    bootstrap.configure(&adapter);
+    Ok(bootstrap)
+}
+fn cached_unbound(paths: &Paths, alias: &str) -> Result<runtime::Bootstrap> {
     cached_through(paths, alias, |paths, alias| {
         if transport::in_owner() {
             return None;
@@ -425,7 +437,7 @@ pub fn admit_capture(
             let old = registry::Registry::with_system_clock(&paths.state).describe(
                 &adapter.instance_id,
                 &adapter.adapter_id,
-                &adapter.configuration_revision,
+                adapter.configured(),
                 connection,
                 connectors_sdk::now_ms(),
                 false,
@@ -621,13 +633,17 @@ pub fn admit_launch(
         return Err(Code::Forbidden.into());
     }
     // A connection saved under another configuration revision is a binding
-    // conflict here, as for any read: `connections revalidate` moves it.
+    // conflict here, as for any read: `connections revalidate` moves it,
+    // unless only its operation side moved (D12). A consumer launch starts no
+    // provider, so the provider executable is not compared.
     let binding = registry::Binding {
         instance_id: adapter.instance_id.clone(),
         adapter_id: adapter.adapter_id.clone(),
         configuration_revision: adapter.configuration_revision.clone(),
         provider_authority: recorded.provider_authority,
         profile: recorded.profile,
+        credential_revision: adapter.credential_revision.clone(),
+        executable: None,
     };
     registry
         .admit_read(
@@ -812,6 +828,8 @@ mod cached_tests {
 
     fn bootstrap(instance: &str) -> runtime::Bootstrap {
         runtime::Bootstrap {
+            credential_revision: None,
+            executable: None,
             instance: instance.into(),
             adapter: "fixture-adapter".into(),
             protocol: "v1alpha1".into(),
@@ -837,6 +855,7 @@ mod cached_tests {
         config.adapters.insert(
             "fixture".into(),
             super::super::config::Adapter {
+                credential_revision: None,
                 instance_id: "fixture-instance".into(),
                 adapter_id: "fixture-adapter".into(),
                 configuration_revision: "cfg-1".into(),
