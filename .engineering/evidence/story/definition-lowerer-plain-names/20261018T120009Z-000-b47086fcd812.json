@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-18T12:00:09Z",
+  "actor": "human:timo",
+  "artifact": "story:definition-lowerer-plain-names",
+  "kind": "story",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "definition_layout red 2 passed 2 failed (catalog '..' and stem '..' wrote outside --out) then 4/4; connectors-catalog 306 passed incl. definition_import 38 (15 round-trips byte-identical); connectors-build 273 passed; clippy -p connectors-catalog -p connectors-build --all-targets -D warnings clean; cargo fmt --check clean; connectors-build gate all checks passed (2655 passed, 133 ignored)"
+  }
+}

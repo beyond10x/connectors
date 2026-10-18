@@ -159,3 +159,69 @@ fn a_second_connector_over_a_catalog_lowers_to_the_selection_its_declaration_nam
         ],
     );
 }
+
+/// Lower `file` and say how it fell short of a `not_plain_name` refusal before
+/// anything is written: beside the definitions root only the empty scratch
+/// directory may remain, so no file landed in or outside the output directory.
+/// The declaration alone must be refused the same way.
+fn unrefused(temp: &tempfile::TempDir, file: &Path) -> Vec<String> {
+    let definitions = temp.path().join("definitions");
+    let scratch = temp.path().join("scratch");
+    std::fs::create_dir_all(&scratch).unwrap();
+    let mut faults = Vec::new();
+    match definition::lower(&Request {
+        definition: file,
+        root: &definitions,
+        out: &temp.path().join("out"),
+        scratch: &scratch,
+    }) {
+        Ok(lowered) => faults.push(format!("lowers to {}", lowered.connector.display())),
+        Err(refusal) if refusal.name() != "not_plain_name" => {
+            faults.push(format!("refused otherwise: {refusal}"));
+        }
+        Err(_) => {}
+    }
+    let mut left: Vec<String> = std::fs::read_dir(temp.path())
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    left.sort();
+    if left != ["definitions", "scratch"] || std::fs::read_dir(&scratch).unwrap().count() != 0 {
+        faults.push(format!("wrote {left:?} beside the definitions"));
+    }
+    match definition::connector(file, &definitions) {
+        Ok(_) => faults.push("declares a connector".to_owned()),
+        Err(refusal) if refusal.name() != "not_plain_name" => {
+            faults.push(format!("declaration refused otherwise: {refusal}"));
+        }
+        Err(_) => {}
+    }
+    faults
+}
+
+#[test]
+fn a_catalog_that_is_not_a_plain_name_is_refused_before_anything_is_written() {
+    let mut faults = Vec::new();
+    for catalog in ["'..'", "'.'", "a/b", "'a\\b'", "''", "\"a\\0b\""] {
+        let (temp, file) = root("widgets", &format!("catalog: {catalog}\n"));
+        for fault in unrefused(&temp, &file) {
+            faults.push(format!("catalog {catalog}: {fault}"));
+        }
+    }
+    assert!(faults.is_empty(), "{faults:#?}");
+}
+
+/// The file stem names the catalog when `catalog` is absent. A stem cannot be
+/// empty or hold `/` or NUL, so `..yaml`, `...yaml` and a backslash cover it.
+#[test]
+fn a_file_stem_that_is_not_a_plain_name_is_refused_before_anything_is_written() {
+    let mut faults = Vec::new();
+    for stem in [".", "..", "a\\b"] {
+        let (temp, file) = root(stem, "");
+        assert_eq!(file.file_stem().unwrap(), stem);
+        for fault in unrefused(&temp, &file) {
+            faults.push(format!("file stem `{stem}`: {fault}"));
+        }
+    }
+    assert!(faults.is_empty(), "{faults:#?}");
+}
