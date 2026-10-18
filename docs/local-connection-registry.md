@@ -274,6 +274,6 @@ A revocation, a Stale mark, a reconnect or a revalidation while the copy was
 validated refuses it as `Revoked` or `Conflict`, and the acquisition fails. A
 dispatch the registry refuses cancels the capture's use. Only an invoked
 definition's instance whose lowered configuration sends the credential to its
-API base's origin and nowhere else receives a copy
+HTTPS API base alone, its profile naming no URL at all, receives a copy
 (`definitions::receives_reuse`): the binding does not compare a token endpoint,
 trust roots or admitted hosts.

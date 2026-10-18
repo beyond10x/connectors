@@ -190,7 +190,7 @@ fn adversary_an_entry_is_held_whichever_spelling_names_the_state_directory() {
 /// else, receives a reused credential.
 #[cfg(unix)]
 #[test]
-fn only_a_definition_that_sends_its_credential_to_its_api_origin_receives_a_reuse() {
+fn only_a_definition_whose_profile_names_no_url_receives_a_reuse() {
     let (_root, paths) = paths();
     let recorded = entry(&paths, "forge", 'b');
     record(&paths, "forge", &recorded).unwrap();
@@ -220,13 +220,10 @@ fn only_a_definition_that_sends_its_credential_to_its_api_origin_receives_a_reus
     assert!(native(base(
         serde_json::json!({"profile": "forge.pat", "scheme": "header"})
     )));
-    // A token endpoint on the API's own origin.
-    assert!(native(base(serde_json::json!({
-        "profile": "forge.oauth",
-        "token_url": "https://GitLab.example.com/oauth/token"
-    }))));
-    // On another host, port or scheme: no reuse.
+    // Any token endpoint, even on the API's own origin: the source may send its
+    // secret elsewhere (security review round 2), so no reuse.
     for other in [
+        "https://GitLab.example.com/oauth/token",
         "https://collector.example.net/oauth/token",
         "https://gitlab.example.com:8443/oauth/token",
         "http://gitlab.example.com/oauth/token",
