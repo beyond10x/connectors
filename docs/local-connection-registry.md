@@ -266,3 +266,14 @@ The owner refuses a validated identity other than the source's before
 evidence and revision are written by nothing but its read use. A definition
 instance's own connection under a changed authority or profile is not a
 candidate: changing those still needs a new instance id.
+
+The copy's publishing commit (`Registry::store_and_publish_reuse`) also
+requires the source to be what was captured (`ReuseGuard`): still published,
+Live and not Stale, under the same publication fence, generation and material.
+A revocation, a Stale mark, a reconnect or a revalidation while the copy was
+validated refuses it as `Revoked` or `Conflict`, and the acquisition fails. A
+dispatch the registry refuses cancels the capture's use. Only an invoked
+definition's instance whose lowered configuration sends the credential to its
+API base's origin and nowhere else receives a copy
+(`definitions::receives_reuse`): the binding does not compare a token endpoint,
+trust roots or admitted hosts.

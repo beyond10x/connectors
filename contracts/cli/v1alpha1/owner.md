@@ -107,8 +107,9 @@ names the instance to connect, another instance of the same connector, the sourc
 connection with the revision it was offered under, and the profile. The owner
 answers it with the published connection, as a completed capture does, or with one
 refusal. It repeats every check of the [reuse answer](semantics.md#invoking-a-definition-file)
-itself: both entries configured, the same connector id (a legacy `[adapters]`
-entry is none), another instance and the same adapter (`forbidden`), the profile
+itself: the target an invoked definition's instance whose lowered
+configuration sends the credential to its API base's origin alone, both entries
+configured, the same connector id (a legacy `[adapters]` entry is none), another instance and the same adapter (`forbidden`), the profile
 granted (`forbidden`), custody available (`custody_unavailable`) and writable
 (`custody_read_only`), a static-entry profile (`unsupported`), the instance's
 connect admitted (`lifecycle_conflict`), the source a candidate under its own
@@ -118,7 +119,9 @@ from custody, dispatches the use, validates the bytes through the target's
 adapter, releases the use, compares the validated identity with the source's
 (`identity_mismatch`, `next_action` `create_connection`), re-reads the
 configuration, and writes and publishes the bytes as the new connection's own
-version through the guarded coordinator. Every refusal after the allocation fails
+version through the guarded coordinator, whose publishing commit also requires
+the source to be published, Live, not Stale and under the fence and version it
+read (`revoked`, `lifecycle_conflict`). A refused dispatch cancels the read use. Every refusal after the allocation fails
 that acquisition; a lost acknowledgement is `outcome_unknown` with the acquisition
 to follow. The CLI never receives, prints or logs the material, and the source
 connection's record is not written by any step but its read use.

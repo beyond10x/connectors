@@ -128,7 +128,10 @@ connector holds. Only the owner holds the material. It reads the source's curren
 version under the same bounded read use as a dispatch (capture, custody read,
 dispatch, release), validates it through the new instance's adapter, and writes it
 as a new version under the new connection's own scope (`write_new`, then publication,
-§4), exactly as a connect writes an entered credential. Nothing is shared: the two
+§4), exactly as a connect writes an entered credential; the publishing commit
+requires the source still to hold the version that was read, under the same
+publication fence, Live and not Stale, so a source revoked or replaced while its
+copy was validated is never copied. Nothing is shared: the two
 connections hold two versions in two scopes, and revoking, reconnecting, refreshing
 or retiring either reaches nothing of the other. The source connection's version,
 generation, evidence and revision are not changed by the copy, and a refused copy

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-18T14:14:00Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-definition-reuse-credential",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "the same commands on the implementation committed as 4a9d3cb01c (green: host registry::reuse_tests, owner::reuse_tests and protected 19 passed; journeys reuse 1 passed, identity mismatch 1 passed, S2's journey 1 passed)",
+    "reference": "run log green-journeys.log, finished 14:14Z (local scratch, not retained)"
+  }
+}

@@ -182,3 +182,70 @@ fn adversary_an_entry_is_held_whichever_spelling_names_the_state_directory() {
             .contains_key("forge.definition")
     );
 }
+
+/// story:invoke-definition-reuse-credential, security review round 1 F1: the
+/// binding compares the provider authority and the profile declaration, which
+/// a token endpoint is not part of. Only a definition instance whose native
+/// configuration sends the credential to its API base's origin, and nowhere
+/// else, receives a reused credential.
+#[cfg(unix)]
+#[test]
+fn only_a_definition_that_sends_its_credential_to_its_api_origin_receives_a_reuse() {
+    let (_root, paths) = paths();
+    let recorded = entry(&paths, "forge", 'b');
+    record(&paths, "forge", &recorded).unwrap();
+    let directory = paths.state.join(DIRECTORY).join(&recorded.digest);
+    fs::directory(&directory, true, true).unwrap();
+    let native = |value: serde_json::Value| {
+        let path = directory.join(NATIVE);
+        std::fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+        #[cfg(unix)]
+        std::fs::set_permissions(&path, std::os::unix::fs::PermissionsExt::from_mode(0o600))
+            .unwrap();
+        let config = Config::read_at(&paths).unwrap();
+        receives_reuse(&paths, &config, "forge.definition").unwrap()
+    };
+    let base = |auth: serde_json::Value| {
+        serde_json::json!({
+            "format": "connectors-catalog-local/2",
+            "instance": "forge.definition",
+            "provider": "forge",
+            "bundle_directory": directory,
+            "api_base": "https://gitlab.example.com/api/v4",
+            "auth": auth,
+            "operations_file": directory.join("operations.json"),
+        })
+    };
+    // A header token: sent to the API alone.
+    assert!(native(base(
+        serde_json::json!({"profile": "forge.pat", "scheme": "header"})
+    )));
+    // A token endpoint on the API's own origin.
+    assert!(native(base(serde_json::json!({
+        "profile": "forge.oauth",
+        "token_url": "https://GitLab.example.com/oauth/token"
+    }))));
+    // On another host, port or scheme: no reuse.
+    for other in [
+        "https://collector.example.net/oauth/token",
+        "https://gitlab.example.com:8443/oauth/token",
+        "http://gitlab.example.com/oauth/token",
+        "https://user@gitlab.example.com/oauth/token",
+    ] {
+        assert!(
+            !native(base(
+                serde_json::json!({"profile": "forge.oauth", "token_url": other})
+            )),
+            "{other}"
+        );
+    }
+    // Any trust input or admitted host the binding does not compare: no reuse.
+    for key in ["hosts", "ca_file", "token_ca_file"] {
+        let mut value = base(serde_json::json!({"profile": "forge.pat"}));
+        value[key] = serde_json::json!("https://gitlab.example.com");
+        assert!(!native(value), "{key}");
+    }
+    // An instance the operator configured is no target.
+    let config = Config::read_at(&paths).unwrap();
+    assert!(!receives_reuse(&paths, &config, "forge.main").unwrap());
+}

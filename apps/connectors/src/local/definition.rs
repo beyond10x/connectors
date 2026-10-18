@@ -686,6 +686,9 @@ fn native_configuration(
 
 /// The most candidates the reuse question lists.
 const LISTED: usize = 16;
+/// The most bytes of candidate listing the reuse question holds, below the
+/// 4096 bytes `protected::ask` shows, leaving room for its last line.
+const QUESTION_BYTES: usize = 3584;
 
 /// The connection the command runs on: the instance's one connection, or, when
 /// it holds none, the one made after the operator answers the one question.
@@ -717,7 +720,8 @@ fn connection(
     let fresh = || connect(paths, alias, profile, request.credential_file.as_deref());
     let refused = || failure("not_found", "admission", "create_connection", false);
     let deadline = connectors_sdk::now_ms() + QUESTION_MS;
-    let candidates = candidates(paths, alias, adapter, reported, profile)?;
+    // A listing that fails offers no reuse: the plain question is asked.
+    let candidates = candidates(paths, alias, adapter, reported, profile).unwrap_or_default();
     if candidates.is_empty() {
         let question = format!(
             "No connection for {connector}/{}. Connect now? [y/N] ",
@@ -733,19 +737,26 @@ fn connection(
         "No connection for {connector}/{}. A stored credential of {connector} can be reused:\n",
         definitions::INSTANCE
     );
-    for (number, reusable) in candidates.iter().enumerate() {
+    // Listed while the question stays within what the terminal question takes.
+    let mut listed = Vec::new();
+    for reusable in &candidates {
         let candidate = &reusable.candidate;
-        question.push_str(&format!(
+        let line = format!(
             "  {}  {}/{}  {}  {} {}\n",
-            number + 1,
+            listed.len() + 1,
             reusable.connector,
             reusable.instance,
             shown(&candidate.provider_authority),
             shown(&candidate.identity.kind),
             shown(&candidate.identity.subject),
-        ));
+        );
+        if question.len() + line.len() > QUESTION_BYTES {
+            break;
+        }
+        question.push_str(&line);
+        listed.push(reusable);
     }
-    let range = match candidates.len() {
+    let range = match listed.len() {
         1 => "1".to_owned(),
         n => format!("1-{n}"),
     };
@@ -760,7 +771,7 @@ fn connection(
         .parse::<usize>()
         .ok()
         .and_then(|number| number.checked_sub(1))
-        .and_then(|index| candidates.get(index))
+        .and_then(|index| listed.get(index).copied())
     else {
         return Err(refused());
     };

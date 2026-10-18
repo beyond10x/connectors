@@ -175,7 +175,7 @@ impl Registry {
     /// This single metadata commit couples generation, custody, evidence, the
     /// private fence and the acquisition result. Repair preserves public revision.
     pub fn publish(&self, stored: StoredCandidate, now: u64) -> Result<String> {
-        self.publish_with(stored, now, false)
+        self.publish_with(stored, now, false, None)
     }
 
     /// `exclusive` is the read-only binding's rule that one item backs one
@@ -188,9 +188,13 @@ impl Registry {
         stored: StoredCandidate,
         now: u64,
         exclusive: bool,
+        guard: Option<&super::reuse::ReuseGuard>,
     ) -> Result<String> {
         let prepared = stored.prepared;
         self.transaction(now, false, |tx, _, now| {
+            if let Some(guard) = guard {
+                super::reuse::guarded(tx, guard)?;
+            }
             let acquired = completing(tx, &prepared.acquisition, &prepared.owner, now)?;
             let row = Self::connection(tx, &prepared.connection)?;
             live(&row)?;
@@ -228,6 +232,33 @@ impl Registry {
         store: &custody::Store,
         clock: impl Fn() -> u64,
     ) -> Result<String> {
+        self.store_and_publish_guarded(prepared, material, store, clock, None)
+    }
+
+    /// `store_and_publish` of a reused credential
+    /// (story:invoke-definition-reuse-credential): the publishing commit also
+    /// requires the source to be what was captured (`reuse::guarded`), so a
+    /// source revoked, made Stale or republished while its copy was validated
+    /// publishes nothing.
+    pub fn store_and_publish_reuse(
+        &self,
+        prepared: PreparedCandidate,
+        material: &Secret,
+        store: &custody::Store,
+        clock: impl Fn() -> u64,
+        guard: &super::reuse::ReuseGuard,
+    ) -> Result<String> {
+        self.store_and_publish_guarded(prepared, material, store, clock, Some(guard))
+    }
+
+    fn store_and_publish_guarded(
+        &self,
+        prepared: PreparedCandidate,
+        material: &Secret,
+        store: &custody::Store,
+        clock: impl Fn() -> u64,
+        guard: Option<&super::reuse::ReuseGuard>,
+    ) -> Result<String> {
         if material.0.len() != prepared.byte_size {
             return Err(Failure::InvalidInput);
         }
@@ -246,7 +277,7 @@ impl Registry {
                 })
             })?;
         let stored = self.acknowledge(prepared, receipt, clock())?;
-        self.publish(stored, clock())
+        self.publish_with(stored, clock(), false, guard)
     }
 
     /// The read-only binding's composition of the same boundaries: no write.
@@ -282,7 +313,7 @@ impl Registry {
                 })
             })?;
         let stored = self.acknowledge(prepared, receipt, clock())?;
-        self.publish_with(stored, clock(), true)
+        self.publish_with(stored, clock(), true, None)
     }
 
     /// The acquisition of the instance's connect in flight, beside which

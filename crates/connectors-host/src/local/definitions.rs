@@ -177,6 +177,77 @@ pub fn record(paths: &Paths, connector: &str, entry: &Entry) -> Result<()> {
     Err(Failure::ConcurrentRevision)
 }
 
+/// The keys of a native configuration `operations invoke --definition` writes
+/// (`apps/connectors/src/local/definition.rs` `native_configuration`).
+const NATIVE_KEYS: [&str; 8] = [
+    "format",
+    "instance",
+    "provider",
+    "bundle_directory",
+    "api_base",
+    "auth",
+    "operations_file",
+    "request_prefix",
+];
+
+/// The scheme, host and port of an absolute HTTPS URL, in lower case.
+fn origin(url: &str) -> Option<String> {
+    let rest = url.strip_prefix("https://")?;
+    let host = &rest[..rest.find(['/', '?', '#']).unwrap_or(rest.len())];
+    (!host.is_empty() && !host.contains('@'))
+        .then(|| format!("https://{}", host.to_ascii_lowercase()))
+}
+
+/// Every string in `value` that names an absolute URL, at any depth.
+fn urls<'a>(value: &'a serde_json::Value, found: &mut Vec<&'a str>) {
+    match value {
+        serde_json::Value::String(text) if text.contains("://") => found.push(text),
+        serde_json::Value::Array(items) => items.iter().for_each(|item| urls(item, found)),
+        serde_json::Value::Object(fields) => fields.values().for_each(|item| urls(item, found)),
+        _ => {}
+    }
+}
+
+/// Whether the recorded definition instance `alias` may receive a reused
+/// credential (story:invoke-definition-reuse-credential): it is an invoked
+/// definition's instance, and its native configuration sends the credential
+/// to the origin of its API base and nowhere else. The binding compares the
+/// provider authority and the profile declaration, which the token endpoint,
+/// trust roots and admitted hosts are not part of, so a configuration that
+/// names any of those, or any URL on another origin, receives none.
+pub fn receives_reuse(paths: &Paths, config: &Config, alias: &str) -> Result<bool> {
+    let Some(connector) = config.definitions.get(alias) else {
+        return Ok(false);
+    };
+    let Some(entry) = entries(paths)?.remove(connector) else {
+        return Ok(false);
+    };
+    if config.adapters.get(alias).map(Adapter::selection) != Some(entry.adapter.selection()) {
+        return Ok(false);
+    }
+    let native = paths.state.join(DIRECTORY).join(&entry.digest).join(NATIVE);
+    let bytes = fs::private_file(&native).and_then(|file| fs::read_bounded(file, LIMIT))?;
+    let native: serde_json::Value =
+        serde_json::from_slice(&bytes).map_err(|_| Failure::InvalidConfiguration)?;
+    let Some(fields) = native.as_object() else {
+        return Ok(false);
+    };
+    if fields
+        .keys()
+        .any(|key| !NATIVE_KEYS.contains(&key.as_str()))
+    {
+        return Ok(false);
+    }
+    let Some(api) = native["api_base"].as_str().and_then(origin) else {
+        return Ok(false);
+    };
+    let mut found = Vec::new();
+    urls(&native["auth"], &mut found);
+    Ok(found
+        .iter()
+        .all(|url| origin(url).as_deref() == Some(api.as_str())))
+}
+
 /// Whether `config` already has the definition instance of `connector`: an
 /// instance `definition` of it, listed or pinned, an entry under its alias, or
 /// an entry whose instance id is that alias.

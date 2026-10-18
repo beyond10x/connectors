@@ -399,7 +399,8 @@ pub struct Reusable {
 /// and grants nothing: the owner decides a reuse again.
 pub fn reusable(paths: &Paths, alias: &str, target: &registry::Binding) -> Result<Vec<Reusable>> {
     let config = Config::load_at(paths)?;
-    if config.selection().read_only() {
+    if config.selection().read_only() || !super::definitions::receives_reuse(paths, &config, alias)?
+    {
         return Ok(Vec::new());
     }
     let registry = registry::Registry::with_system_clock(&paths.state);

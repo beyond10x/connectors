@@ -33,6 +33,20 @@ pub struct ReuseCandidate {
 pub struct ReuseSource {
     read: ReadUse,
     identity: ExternalIdentity,
+    guard: ReuseGuard,
+}
+
+/// What a copy's publication requires of its source, checked inside the
+/// publishing commit (`Registry::store_and_publish_reuse`): still published,
+/// Live and not Stale, under the publication fence, generation and material
+/// that were captured. A source revoked, marked Stale, reconnected or
+/// revalidated while its copy was validated publishes no copy.
+#[derive(Clone, Debug)]
+pub struct ReuseGuard {
+    reference: String,
+    fence: String,
+    generation: Option<String>,
+    material: String,
 }
 impl ReuseSource {
     pub fn version(&self) -> custody::Version {
@@ -41,6 +55,10 @@ impl ReuseSource {
     /// The source's validated identity, which the copy's validation must answer.
     pub fn identity(&self) -> &ExternalIdentity {
         &self.identity
+    }
+    /// What the copy's publication requires of the source.
+    pub fn guard(&self) -> ReuseGuard {
+        self.guard.clone()
     }
     /// The read use this capture holds: dispatched once, then released, or
     /// cancelled.
@@ -187,7 +205,46 @@ impl Registry {
                     expires,
                 },
                 identity: row.identity.clone().ok_or(Failure::MetadataUnavailable)?,
+                guard: ReuseGuard {
+                    reference: row.reference.clone(),
+                    fence: row.fence.clone(),
+                    generation: row.generation.clone(),
+                    material: version_id.clone(),
+                },
             })
         })
     }
+
+    /// Dispatch the captured read use once, as `dispatch_read` does; a
+    /// refused dispatch cancels the use, so nothing of it is left to lapse.
+    pub fn dispatch_reuse(&self, captured: ReuseSource, now: u64) -> Result<DispatchedUse> {
+        let replay = ReadUse {
+            id: captured.read.id.clone(),
+            version: captured.read.version,
+            partition: captured.read.partition.clone(),
+            expires: captured.read.expires,
+        };
+        self.dispatch_read(captured.read, now).or_else(|refused| {
+            self.cancel_read(replay, now)?;
+            Err(refused)
+        })
+    }
+}
+
+/// Inside a copy's publishing commit: the source is still what was
+/// captured. Revoked is `Revoked`; anything else that moved, `Conflict`.
+pub(super) fn guarded(tx: &Transaction<'_>, guard: &ReuseGuard) -> Result<()> {
+    let row = Registry::connection(tx, &guard.reference)?;
+    if row.state == "revoked" {
+        return Err(Failure::Revoked);
+    }
+    if !row.public
+        || row.kept.stale
+        || row.fence != guard.fence
+        || row.generation != guard.generation
+        || row.material.as_deref() != Some(guard.material.as_str())
+    {
+        return Err(Failure::Conflict);
+    }
+    Ok(())
 }
