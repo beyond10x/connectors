@@ -9,37 +9,43 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:invoke-definition-file
 scope:
-- confidence: inferred
-  path: adapters/catalog/tests/local_runtime/cli_journey.rs
-- confidence: inferred
-  path: apps/connectors/src/local/operations.rs
-- confidence: inferred
-  path: apps/connectors/src/local/session.rs
-- confidence: inferred
-  path: apps/connectors/tests/invoke_definition.rs
-- confidence: inferred
+- confidence: cited
+  path: adapters/catalog/tests/local_runtime/invoke_definition.rs
+- confidence: cited
+  path: apps/connectors/src/local/definition.rs
+- confidence: cited
   path: contracts/auth/custody/v1alpha1/semantics.md
-- confidence: inferred
+- confidence: cited
+  path: contracts/cli/v1alpha1/owner.md
+- confidence: cited
   path: contracts/cli/v1alpha1/semantics.md
-- confidence: inferred
-  path: crates/connectors-host/src/local/keyring
-- confidence: inferred
-  path: crates/connectors-host/src/local/owner/supervisor.rs
-- confidence: inferred
+- confidence: cited
+  path: crates/connectors-build/src/ignored.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/definitions.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner.rs
+- confidence: cited
   path: crates/connectors-host/src/local/owner/transport.rs
-- confidence: inferred
+- confidence: cited
   path: crates/connectors-host/src/local/protected.rs
-- confidence: inferred
+- confidence: cited
+  path: crates/connectors-host/src/local/registry.rs
+- confidence: cited
   path: crates/connectors-host/src/local/registry/lifecycle.rs
-- confidence: inferred
-  path: crates/connectors-host/src/local/registry/revalidation.rs
-- confidence: inferred
+- confidence: cited
+  path: crates/connectors-host/src/local/registry/reuse.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/registry/use_and_retirement.rs
+- confidence: cited
   path: docs/local-connection-registry.md
-- confidence: inferred
+- confidence: cited
   path: ess/domains/auth_bindings.yaml
-- confidence: inferred
-  path: website/docs/guides
-revision: 9
+- confidence: cited
+  path: ess/domains/cli.yaml
+- confidence: cited
+  path: website/docs/guides/invoke-a-definition-file.md
+revision: 12
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-18T13:57:18Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":3}}}
 - {from: "proposed", to: "active", at: "2026-10-18T13:57:18Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":3}}}
@@ -135,3 +141,19 @@ The scope is inferred throughout: no custody copy exists to cite, and the implem
 | `story:invoke-definition-file`, `story:connection-binding-excludes-operations` | `registry/lifecycle.rs`, `registry/revalidation.rs`, `contracts/cli/v1alpha1/semantics.md`, `apps/connectors/src/local/operations.rs`, `session.rs` | after both (`depends_on` chain) |
 | `story:configuration-change-error` (draft) | `registry/lifecycle.rs`, `contracts/cli/v1alpha1/semantics.md` | either order after `story:connection-binding-excludes-operations`; this story touches the reuse allocation, that one the connect refusal code |
 | `story:mcp-cli-journey-discovery-contract` (draft) | `contracts/cli/v1alpha1/semantics.md` | either order; different sections (MCP journey there, the reuse answer here) |
+
+## Delivery status
+
+Implemented on unit/invoke-definition-reuse-credential (2026-10-18): the acceptance and the first
+check beside it, both as namespace journeys. Not implemented, pending an operator decision: the
+second check (the definition's own instance holding a connection under host H, the file changed to
+H2, "reuse" copying it to H2 and revoking the old one). It sends a stored credential to a host its
+connection was never bound to, which the dispatcher's security floor for this unit ("the same
+provider authority/profile declaration") excludes. Until decided, an authority or profile change
+of the definition's own instance stays `lifecycle_conflict` as in story:invoke-definition-file, and
+the story stays active.
+
+Decisions taken inside the floor: a copy, never a shared custody entry (revoking either leaves the
+other); only static-entry profiles whose lowered definition names no URL (no token endpoint)
+receive a copy; only an invoked definition's instance is a target; a legacy `[adapters]` entry is
+no connector's instance; the copy is published only while the source is still what was read.
