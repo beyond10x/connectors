@@ -222,7 +222,7 @@ pub(super) fn select(call: &Invocation<'_>, input: &mut Value) -> Result<(), Han
     let Ok(paths) = resolved(call) else {
         return Ok(());
     };
-    let Ok(config) = Config::read(&paths.config) else {
+    let Ok(config) = Config::read_at(&paths) else {
         return Ok(());
     };
     let Some(adapter) = config.adapters.get(alias) else {
@@ -250,7 +250,7 @@ pub(super) fn select(call: &Invocation<'_>, input: &mut Value) -> Result<(), Han
 /// before any handler runs: the alias's one published non-revoked connection,
 /// refused as `select` refuses.
 pub(super) fn held_one(paths: &Paths, alias: &str) -> owner::Result<String> {
-    let config = Config::load(&paths.config)?;
+    let config = Config::load_at(paths)?;
     let adapter = config.adapters.get(alias).ok_or(owner::Code::NotFound)?;
     let held = Registry::with_system_clock(&paths.state)
         .held(&adapter.instance_id, connectors_sdk::now_ms())?;
