@@ -362,7 +362,8 @@ fn input(value: &Value, key: &str) -> Result<String> {
         .ok_or_else(|| Code::InvalidInput.into())
 }
 fn selected(paths: &Paths, alias: &str) -> Result<(Config, Adapter)> {
-    let config = Config::load(&paths.config)?;
+    // An invoked definition's instance is selected as a configured one is.
+    let config = Config::load_at(paths)?;
     let adapter = config.adapters.get(alias).cloned().ok_or(Code::NotFound)?;
     Ok((config, adapter))
 }

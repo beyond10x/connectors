@@ -411,7 +411,8 @@ inadmissible path), `config_missing` (no file at the resolved path),
 `owner_uid_mismatch` or, from `setup migrate` only, `config_too_large` (the
 rewritten file would be larger than the 1 MiB a read admits; the refusal
 carries its size in `configuration_bytes` and the bound in
-`configuration_limit`).
+`configuration_limit`). `operations invoke --definition` alone also names
+`definition_instance_configured` ([invoking a definition file](#invoking-a-definition-file)).
 
 ### Selecting an instance
 
@@ -463,6 +464,73 @@ member beside `ok` and `result` or `error`:
 A caller that reads all of standard error as one JSON failure envelope keeps
 reading its `error`. Under `--output json`, output that is no envelope (help,
 `completions`, a launched consumer's streams) is unchanged.
+
+### Invoking a definition file
+
+`operations invoke --definition <file> --operation <key>`, with the input
+sources of every `operations invoke`, runs an operation of a
+`connectors-definition/1` file that no configuration names
+(architecture-decision-record:provider-definitions-and-runtimes D12 point 3).
+`--definition` is a third selector: given beside `--adapter`, `--connector` or
+`--instance` the command is `invalid_input` at `arguments`, as are
+`--definitions-root` and `--credential-file` without it. `--definitions-root
+&lt;dir>` is the tree holding the definition's vendored source and shared auth
+files; it defaults to the parent of the directory holding the file.
+`--schema` and `--revision` may be left out: each one left out is the one the
+instance's description states, as `operations describe` reports it. The bare
+`invoke` stays the explicit compatibility command.
+
+The file is lowered with the reference lowerer into an owner-only cache under
+the state directory, `definitions/<digest>/`, keyed by the digest of the
+definition, the connector declaration it lowers to (which carries the shared
+auth files it uses), its vendored source and its amendments, and of the
+lowerer's release. A run whose inputs are unchanged reuses the entry; a
+changed one is lowered into a new entry beside it. A definition the lowerer
+refuses, or one that cannot be read, is `invalid_input` at `arguments` and
+leaves nothing behind; `connectors-build definition` names the lowerer's
+refusal. Every variable the definition's base URL names must have a default:
+the instance's endpoint is the one the lowered declaration states, and its
+trust roots are the platform's.
+
+The instance is the connector's instance `definition` (the connector id is
+the definition's `id`, else its file stem), with the alias and instance id
+`<connector>.definition`. Its entry pins the installed catalog provider on the
+lowered configuration as a derived instance's does, and is held in the
+owner-only file `definitions/instances.toml` beside the cache. Every command
+that selects an instance reads it beside the configuration, so `--connector
+<connector> --instance definition` selects it too, but `instances list` and
+`setup check` report the configuration alone. The configuration file is never
+written. A configuration that already has the connector's instance
+`definition`, or an entry under that alias or instance id, is never replaced:
+the command is `invalid_configuration` at `configuration` with
+`configuration_rule` `definition_instance_configured` and `next_action`
+`check_configuration`, and lowers nothing.
+
+Lowering and recording connect nothing: they create no connection, admit no
+operation and perform no OAuth exchange (D12 point 4). When the instance holds
+no connection the command asks once, on its controlling terminal, whether to
+connect; only a `y` or `yes` answer starts the profile's acquisition, exactly
+as `connections connect` runs it: the token prompt on the terminal, or the
+file `--credential-file` names (an OAuth client file becomes the entry by
+consent; under the read-only `mounted_secret` binding the owner reads the item
+itself and the file is refused). Any other answer, or a run without a
+controlling terminal in the foreground, is `not_found` at `admission` with
+`next_action` `create_connection`; nothing is acquired and nothing is sent to
+the provider. With one connection the operation runs on it with no question,
+and `--connection` names one explicitly; an instance that holds more than one
+is `invalid_input` at `arguments`. A change to the bundle, its source or the
+selection alone keeps the connection ([one connection per instance](#one-connection-per-instance),
+D12 point 2). A connection that is not current under the recorded entry
+because the provider authority or the profile's authentication changed is not
+asked about: the command answers what a read on that connection answers,
+`lifecycle_conflict` with the `next_action` a `connections connect` of the
+instance names, and sends nothing. Reusing a stored credential for a changed
+authority or profile is not part of this binding.
+
+From the selection on, the command is the configured instance's: the
+description, admission, approval of writes, audit and the result envelope are
+those of every `operations invoke`, and a result names connector
+`<connector>`, instance `definition` and adapter `<connector>.definition`.
 
 ### Renamed commands
 

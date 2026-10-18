@@ -645,11 +645,14 @@ types:
   # roughtime-clock/1 shape, which loads but answers no clock use until it is rewritten
   # as roughtime-quorum/1 (docs/local-clock.md). config_too_large: a configuration
   # text is larger than the most a read admits; `setup migrate` refuses a rewritten
-  # file past that bound and writes nothing. It names the rule only, never a path
+  # file past that bound and writes nothing. definition_instance_configured: an
+  # `operations invoke --definition` whose connector already has an instance named
+  # `definition` in the configuration, or whose instance id an entry there already
+  # uses; the configured one is never replaced. It names the rule only, never a path
   # or OS text.
   - name: connectors.cli.ConfigurationRule
     kind: enum
-    variants: [config_path_unresolved, config_missing, config_not_private, owner_uid_mismatch, approval_clock_format_retired, config_too_large]
+    variants: [config_path_unresolved, config_missing, config_not_private, owner_uid_mismatch, approval_clock_format_retired, config_too_large, definition_instance_configured]
   - name: connectors.cli.InitDisposition
     kind: enum
     variants: [created, state_initialized]
@@ -1280,6 +1283,18 @@ types:
       # buffer after current admission and exact-key observation; never parser JSON.
       - {name: approval_file, type: "Optional<String>"}
       - {name: idempotency_key, type: "Optional<String>"}
+      # story:invoke-definition-file: a third selector, exclusive with adapter and with
+      # connector and instance. definition is a connectors-definition/1 file the host lowers
+      # into an owner-only cache; definitions_root holds its vendored source and shared auth
+      # files and defaults to the parent of the directory holding it; credential_file is the
+      # OAuth client file the existing consent reads when the instance is connected first.
+      # All three are path metadata, given only with definition. With definition the
+      # command line may leave out schema and revision: the host states them from the
+      # lowered definition's description before this input is decoded, and ESS keeps
+      # dynamic selector fields required.
+      - {name: definition, type: "Optional<String>"}
+      - {name: definitions_root, type: "Optional<String>"}
+      - {name: credential_file, type: "Optional<String>"}
   # result is the selected provider output as a JSON value; it must pass that operation's output schema.
   - name: connectors.cli.OperationInvokeResult
     kind: struct
@@ -1433,7 +1448,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:783, docs/local-connection-registry.md:219-220;
+    # contracts/cli/v1alpha1/semantics.md:851, docs/local-connection-registry.md:219-220;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1593,7 +1608,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:787) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:855) and the host
     # removal path (er.rs:4428-4430) only expires Active cursors. The error name is
     # the decision; no source names one.
 

@@ -141,7 +141,7 @@ pub(super) fn alias_at(input: &Value, paths: &Paths) -> owner::Result<String> {
     if let Some(alias) = given(input)? {
         return Ok(alias.to_owned());
     }
-    Ok(alias(input, &Config::load(&paths.config)?)?)
+    Ok(alias(input, &Config::load_at(paths)?)?)
 }
 
 /// The input every handler reads: `adapter` holds the selected alias and the
@@ -152,7 +152,7 @@ pub(super) fn resolve(call: &Invocation<'_>) -> Result<(Value, Option<Config>), 
         return Ok((call.input.clone(), None));
     }
     let paths = resolved(call)?;
-    let config = Config::read(&paths.config).map_err(configuration_refusal)?;
+    let config = Config::read_at(&paths).map_err(configuration_refusal)?;
     let alias = alias(&call.input, &config).map_err(refusal)?;
     let mut input = call.input.clone();
     if let Some(fields) = input.as_object_mut() {
@@ -180,7 +180,7 @@ pub(super) fn name(call: &Invocation<'_>, result: &mut Value, config: Option<Con
         Some(config) => config,
         None => match resolved(call)
             .ok()
-            .and_then(|paths| Config::read(&paths.config).ok())
+            .and_then(|paths| Config::read_at(&paths).ok())
         {
             Some(config) => config,
             None => return,
