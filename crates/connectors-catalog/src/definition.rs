@@ -660,7 +660,11 @@ pub struct Operation {
     pub body_prefixes: Option<IndexMap<String, String>>,
     /// The status, 409 or 412, by which the provider answers a write whose
     /// target changed since it was read, the engine's `conflict_status`.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "status_or_beyond"
+    )]
     pub conflict_status: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub guard: Option<Guard>,
@@ -1212,9 +1216,37 @@ struct Body {
 impl Body {
     /// Whether `field` is a `string` the caller sends: declared so, not fixed.
     fn sent_string(&self, field: &str) -> bool {
-        self.types.get(field).is_some_and(|kind| kind == "string")
-            && !self.fixed.contains_key(field)
+        let Some(path) = path(field) else {
+            return false;
+        };
+        self.keys.iter().any(|declared| {
+            path_eq(declared, &path)
+                && self
+                    .types
+                    .get(declared)
+                    .is_some_and(|kind| kind == "string")
+                && !self.fixed.contains_key(declared)
+        })
     }
+}
+
+/// The segments a body key names, by the engine's rules: a plain name is one
+/// segment, a pointer its segments, none empty and none holding `~` or `.`.
+fn path(key: &str) -> Option<Vec<&str>> {
+    match key.strip_prefix('/') {
+        None => (!key.is_empty() && !key.contains('.')).then(|| vec![key]),
+        Some(rest) => {
+            let segments: Vec<&str> = rest.split('/').collect();
+            segments
+                .iter()
+                .all(|segment| !segment.is_empty() && !segment.contains(['~', '.']))
+                .then_some(segments)
+        }
+    }
+}
+
+fn path_eq(key: &str, path: &[&str]) -> bool {
+    self::path(key).is_some_and(|own| own == path)
 }
 
 /// The parent of a body key: everything before a pointer's last `/`, the top
@@ -1225,6 +1257,14 @@ fn parent(field: &str) -> &str {
 
 fn body(key: &str, operation: &Operation) -> Result<Body, Refusal> {
     let mut body = body_keys(key, operation.body.as_ref())?;
+    if let Some(field) = body.keys.iter().find(|field| path(field).is_none()) {
+        return Err(Refusal::BodyType {
+            key: key.to_owned(),
+            field: field.clone(),
+            spec: "a key the engine reads as a path: a plain name without `.`, or a pointer"
+                .to_owned(),
+        });
+    }
     for (field, values) in operation.body_enums.iter().flatten() {
         let mut seen = BTreeSet::new();
         if !body.sent_string(field)
@@ -2334,6 +2374,20 @@ pub fn select(
             });
         }
         let declared_body = body(key, operation)?;
+        if effect != Effect::Write
+            && let Some(member) = [
+                ("body", operation.body.is_some()),
+                ("body_enums", operation.body_enums.is_some()),
+                ("body_any_of", operation.body_any_of.is_some()),
+                ("body_prefixes", operation.body_prefixes.is_some()),
+            ]
+            .iter()
+            .find_map(|(member, declared)| declared.then_some(member))
+        {
+            return Err(Refusal::Malformed(format!(
+                "operation `{key}` declares {member}; only a write declares a body"
+            )));
+        }
         let guard = operation
             .guard
             .as_ref()
@@ -2664,4 +2718,13 @@ pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
         operations: operations_path,
         connector: connector_path,
     })
+}
+
+/// A `conflict_status` read wide: a number beyond a status becomes `u16::MAX`,
+/// which the lowering refuses as a `ConflictStatus` naming the operation.
+fn status_or_beyond<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<u16>, D::Error> {
+    Ok(Option::<i64>::deserialize(deserializer)?
+        .map(|status| u16::try_from(status).unwrap_or(u16::MAX)))
 }
