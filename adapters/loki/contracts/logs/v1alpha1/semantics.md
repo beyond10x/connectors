@@ -205,15 +205,15 @@ ESS boundary.
 
 LogQL range selection, direction and required selector equalities are typed in the
 [Loki-owned model](../../../spec/ess/domains/reads.yaml). Shared collection/page facts and
-decisions remain in `ess/domains/datasource_reads.yaml`; adapter predicates and
-runtime enforcement are not supplied by these private shapes.
+decisions have no shared ESS model; the proposed one is in history at commit `6498a881c`. Adapter
+predicates and runtime enforcement are not supplied by these private shapes.
 
 | Entity / value | Notes |
 |---|---|
 | `OperationDeclaration.profile = logql-range` | value |
 | Streams, lines | not entities; payload |
 
-Proposed provider-independent collection/page facts and completeness decisions belong in `ess/domains/datasource_reads.yaml`; native selections remain adapter-owned as above. Provider grammar, full context equality, occurrence preservation/order, decoding, clocks, numeric/byte bounds and atomic current publication remain explicitly UNMAPPED binding obligations. No persistent provider entity, parser, public codec or cache implementation is introduced.
+Proposed provider-independent collection/page facts and completeness decisions have no shared ESS model today; native selections remain adapter-owned as above. Provider grammar, full context equality, occurrence preservation/order, decoding, clocks, numeric/byte bounds and atomic current publication remain explicitly UNMAPPED binding obligations. No persistent provider entity, parser, public codec or cache implementation is introduced.
 
 ## 10. Open decisions
 

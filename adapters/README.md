@@ -79,9 +79,7 @@ workflow.
 A child consumes shared mediated capabilities without knowing its concrete parent.
 Parent discovery owns native provider recognition; recognition does not import the
 recognized adapter implementation. Concrete pairings and integration suites belong
-to [monitoring composition](../docs/compositions/monitoring.md).
-[Media composition](../docs/compositions/media-session.md) compares independent
-protocol bindings; it is not a fictional combined provider adapter.
+to composition.
 
 Historical design/review evidence may reference old paths and remains immutable.
 It is migration evidence, not an extracted adapter's normative dependency. Exact

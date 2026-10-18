@@ -183,13 +183,6 @@
       "status": "Specified; outside current runtime scope"
     },
     {
-      "route": "/contracts/media",
-      "title": "Media sessions",
-      "source": "contracts/media/v1alpha1/semantics.md",
-      "owner": "shared",
-      "status": "Specified; outside current runtime scope"
-    },
-    {
       "route": "/contracts/catalog",
       "title": "Optional catalog",
       "source": "contracts/catalog/v1alpha1/semantics.md",

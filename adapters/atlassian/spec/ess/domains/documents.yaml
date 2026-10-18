@@ -64,7 +64,7 @@ types:
 # predicates, current canonical identity/membership, query grammar, the 8 KiB CQL
 # bound and byte accounting. ESS 0.36 has no cross-record read in a type
 # invariant, no grammar/parser construct and no UTF-8 byte-length predicate.
-# Shared DocumentReadSelection carries an opaque representation identifier;
+# The removed shared DocumentReadSelection (commit 6498a881c) carried an opaque identifier;
 # this vocabulary does not advertise implemented codecs or new declaration fields.
 # ESS-LIMIT: the structural CQL grammar and original-span/scope rewriting in
 # the removed profile's cql.md (commit 6498a881c), provider field/function interpretation,

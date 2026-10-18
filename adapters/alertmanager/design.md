@@ -12,7 +12,7 @@ The adapter depends on shared service, datasource and auth contracts/SDK.
 Direct placement needs admitted native-origin egress. Mediated placement consumes
 an injected shared mediated-HTTP capability in a statically composed process;
 child code knows no concrete parent implementation. Concrete installation and
-integration suites belong to [composition](../../docs/compositions/monitoring.md).
+integration suites belong to composition.
 
 ## Records model
 
@@ -39,7 +39,7 @@ The route is a native adapter, as this design and parity unit U24 already say
 The catalog is smaller only for direct placement, an untyped body and a pinnable vendor
 document. Not checked: whether that document exists. The repository contradicts itself:
 `contracts/catalog/v1alpha1/semantics.md:57` and `adapters/catalog/design.md:140` call the
-v0.31.0 document (prefix `0fac1b1f`) vendor OpenAPI 3; `docs/compositions/monitoring.md:29-33`
+v0.31.0 document (prefix `0fac1b1f`) vendor OpenAPI 3; the monitoring composition (lines 29-33, in history at commit `6498a881c`)
 and Sources below call it repository-authored. Neither file is here or in a local
 checkout, and nothing was fetched. `adapters/catalog/design.md:78` also maps `alerts.list`
 to `generic-http`, this design to `datasource.records`. Both contradictions go to the owner.

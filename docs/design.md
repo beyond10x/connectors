@@ -889,10 +889,10 @@ The exact syntax is open. Do not introduce a loosely typed `extensions` map to h
 The custom kind, shared contracts, and provider code have different authority:
 
 ```text
-contracts/media defines MediaSession behavior
+contracts/datasources/logs defines log read behavior
 spec-kinds/adapter defines how an internal adapter declares an implementation of a contract
-adapters/sip/spec binds that contract to SIP implementation/configuration
-adapters/sip/src implements the remaining protocol behavior
+adapters/loki/spec binds that contract to Loki implementation/configuration
+adapters/loki/src implements the remaining protocol behavior
 ```
 
 ### 18.3 Compilation and implementation pipeline
