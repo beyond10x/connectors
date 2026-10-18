@@ -324,6 +324,17 @@ impl Registry {
         self.transaction_observation(now, |tx, _, now| in_flight(tx, instance, now))
     }
 
+    /// Whether a connection of `binding`'s instance, revoked ones included, was
+    /// admitted under another provider authority or another authentication of
+    /// `binding`'s profile: the condition on which a connect under that
+    /// instance id is refused as `AuthenticationChanged`, so only a new
+    /// instance id can hold `binding` (task:definition-moved-authority-new-instance).
+    /// Records nothing but the clock observation every observation records.
+    pub fn needs_new_instance(&self, binding: &Binding, now: u64) -> Result<bool> {
+        binding.validate()?;
+        self.transaction_observation(now, |tx, _, _| authentication_changed(tx, binding))
+    }
+
     /// The instance's published Live or Stale connections, at most two: a
     /// command that names no connection selects the one an instance holds
     /// (story:connect-refused-while-instance-holds-connection), and two say
@@ -398,7 +409,13 @@ impl Registry {
     /// id): a changed provider authority or profile authentication moves the
     /// entry to a new instance id, and the connections left under the earlier
     /// one stay revocable. A connection of an instance another entry still
-    /// configures is that entry's, and stays `NotFound` here.
+    /// configures is that entry's, and stays `NotFound` here. A connection left
+    /// under an invoked definition's instance id (`<connector>.definition`, or
+    /// a moved `<connector>.definition-<16 hex>`) is revocable only through an
+    /// instance id of the same connector, `<connector>.<name>`: every
+    /// definition's entry has the adapter `catalog`, so the adapter alone would
+    /// let another connector's instance reach it (security review of
+    /// task:definition-moved-authority-new-instance).
     pub fn revoke_left_behind(
         &self,
         instance: &str,
@@ -409,7 +426,8 @@ impl Registry {
         now: u64,
     ) -> Result<String> {
         self.revoke_admitted(adapter_id, reference, expected_revision, now, |recorded| {
-            recorded == instance || !configured.contains(recorded)
+            recorded == instance
+                || (!configured.contains(recorded) && same_definition_connector(recorded, instance))
         })
     }
 
@@ -441,6 +459,21 @@ impl Registry {
             Ok(revision)
         })
     }
+}
+
+/// Whether `instance` may reach a connection left under `recorded`: always,
+/// unless `recorded` is an invoked definition's instance id, which only an
+/// instance id of the same connector, `<connector>.<name>`, reaches.
+fn same_definition_connector(recorded: &str, instance: &str) -> bool {
+    let Some((connector, name)) = recorded.rsplit_once('.') else {
+        return true;
+    };
+    if !crate::local::definitions::is_instance(name) {
+        return true;
+    }
+    instance
+        .strip_prefix(connector)
+        .is_some_and(|rest| rest.starts_with('.'))
 }
 
 /// Whether a connection of the binding's instance, revoked ones included, was

@@ -481,7 +481,8 @@ trust roots are the platform's.
 
 The instance is the connector's instance `definition` (the connector id is
 the definition's `id`, else its file stem), with the alias and instance id
-`<connector>.definition`. Its entry pins the installed catalog provider on the
+`<connector>.definition`, or its moved instance `definition-<16 hex>` when that
+instance id cannot hold the file's provider authority or profile (below). Its entry pins the installed catalog provider on the
 lowered configuration as a derived instance's does, and is held in the
 owner-only file `definitions/instances.toml` beside the cache; a later run of a file with the
 same connector id replaces that entry, so both files are one instance and its
@@ -520,11 +521,26 @@ the provider. With one connection the operation runs on it with no question,
 and `--connection` names one explicitly; an instance that holds more than one
 is `invalid_input` at `arguments`. A change to the bundle, its source or the
 selection alone keeps the connection ([one connection per instance](#one-connection-per-instance),
-D12 point 2). A connection that is not current under the recorded entry
-because the provider authority or the profile's authentication changed is not
-asked about: the command answers what a read on that connection answers,
-`lifecycle_conflict` with the `next_action` a `connections connect` of the
-instance names, and sends nothing. Reusing a stored credential for a changed
+D12 point 2). A change of the provider authority or of the profile's
+authentication cannot be followed under the instance id `<connector>.definition`
+once a connection of it, revoked ones included, was admitted under the earlier
+one (`docs/local-connection-registry.md`, "Configuration upgrades": only a
+new instance id helps). The definition then resolves to its moved instance,
+`definition-<16 hex>`: the first 16 hexadecimal digits of a digest of the
+connector id, the provider authority and the profile's authentication (its
+declaration apart from its revision and evidence lifetime, with its id,
+purpose, subject and minimum scopes). The name is the same on every run of the
+same definition, a lifetime-only change keeps it, and a file moved back to the
+earlier authority resolves to `definition` and its connection again. The moved
+instance is prepared, cached under its own key and recorded as the connector's
+entry exactly as above, so its first run is a first invoke: the one question,
+a fresh connect, and no candidate at the earlier authority. The connector keeps
+one entry, so the instance id the file left is configured by no entry, and the
+connections left under it are not used, changed or forgotten; `connections
+revoke` of one under an instance of the same connector whose instance id is
+`<connector>.<name>`, such as the moved instance, reaches it (the moved entry);
+an instance of another connector does not. A configuration that already has the moved instance is
+refused as for `definition` below. Reusing a stored credential for another
 authority or profile is not part of this binding.
 
 When the instance holds no connection and another instance of the same
@@ -583,7 +599,8 @@ other as it was.
 From the selection on, the command is the configured instance's: the
 description, admission, approval of writes, audit and the result envelope are
 those of every `operations invoke`, and a result names connector
-`<connector>`, instance `definition` and adapter `<connector>.definition`.
+`<connector>`, instance `definition` and adapter `<connector>.definition`, or
+the moved instance and `<connector>.definition-<16 hex>`.
 
 ### Renamed commands
 

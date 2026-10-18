@@ -276,7 +276,7 @@ fn prepare_with(
         return Err(usage());
     }
     // An instance the operator configured is never replaced.
-    if definitions::collides(&config, &connector) {
+    if definitions::collides(&config, &connector, definitions::INSTANCE) {
         return Err(configuration_refusal(Refusal::Rule(
             Rule::DefinitionInstanceConfigured,
         )));
@@ -299,12 +299,54 @@ fn prepare_with(
             Ok(())
         }
     };
-    let cached = cache(&paths, &file, &root, &bytes, &parsed, &alias);
+    let cached = cache(
+        &paths,
+        &file,
+        &root,
+        &bytes,
+        &parsed,
+        &connector,
+        definitions::INSTANCE,
+    );
     interrupted()?;
     let (digest, native) = cached?;
-    let derived = definitions::derive(&connector, &native);
+    let derived = definitions::derive(&alias, &native);
     interrupted()?;
     let (adapter, reported) = derived.map_err(host_failure)?;
+    // When a connection of the instance `definition` was admitted under
+    // another provider authority or profile authentication, no connect under
+    // its id can follow the file: the definition is its moved instance, which
+    // is prepared the same way (task:definition-moved-authority-new-instance).
+    // The old instance id is then configured by no entry, so what it holds is
+    // left behind and stays revocable.
+    let moved = moved_instance(&paths, &connector, &adapter, &reported);
+    interrupted()?;
+    let (instance, alias, digest, adapter, reported) = match moved? {
+        Some(instance)
+            if connectors_core::valid_id(&definitions::alias_of(&connector, &instance)) =>
+        {
+            if definitions::collides(&config, &connector, &instance) {
+                return Err(configuration_refusal(Refusal::Rule(
+                    Rule::DefinitionInstanceConfigured,
+                )));
+            }
+            let cached = cache(&paths, &file, &root, &bytes, &parsed, &connector, &instance);
+            interrupted()?;
+            let (digest, native) = cached?;
+            let alias = definitions::alias_of(&connector, &instance);
+            let derived = definitions::derive(&alias, &native);
+            interrupted()?;
+            let (adapter, reported) = derived.map_err(host_failure)?;
+            (instance, alias, digest, adapter, reported)
+        }
+        _ => (
+            definitions::INSTANCE.to_owned(),
+            alias,
+            digest,
+            adapter,
+            reported,
+        ),
+    };
     let recorded = definitions::record(
         &paths,
         &connector,
@@ -333,7 +375,9 @@ fn prepare_with(
     interrupted()?;
     let connection = match &request.connection {
         Some(connection) => Ok(connection.clone()),
-        None => connection(&paths, &connector, &alias, &adapter, &reported, request),
+        None => connection(
+            &paths, &connector, &instance, &alias, &adapter, &reported, request,
+        ),
     };
     interrupted()?;
     let connection = connection?;
@@ -362,7 +406,7 @@ fn prepare_with(
     rewritten.extend(["operations", "invoke"].map(OsString::from));
     for (long, value) in [
         ("connector", connector.as_str()),
-        ("instance", definitions::INSTANCE),
+        ("instance", instance.as_str()),
         ("connection", connection.as_str()),
         ("operation", request.operation.as_str()),
         ("schema", schema.as_str()),
@@ -472,7 +516,7 @@ fn inputs(
 
 /// The cache key of a definition: the digest of this build's lowerer and of
 /// every file its lowering reads, by path ([`inputs`]).
-fn key(files: &BTreeMap<String, Vec<u8>>) -> String {
+fn key(files: &BTreeMap<String, Vec<u8>>, instance: &str) -> String {
     let mut hash = Sha256::new();
     let mut part = |label: &[u8], data: &[u8]| {
         hash.update((label.len() as u64).to_be_bytes());
@@ -482,6 +526,11 @@ fn key(files: &BTreeMap<String, Vec<u8>>) -> String {
     };
     part(b"format", b"connectors-definition-cache/2");
     part(b"lowerer", env!("CARGO_PKG_VERSION").as_bytes());
+    // A moved instance's native configuration names its own instance id; the
+    // instance `definition` keeps the key it always had.
+    if instance != definitions::INSTANCE {
+        part(b"instance", instance.as_bytes());
+    }
     for (path, bytes) in files {
         part(path.as_bytes(), bytes);
     }
@@ -501,10 +550,12 @@ fn cache(
     root: &Path,
     bytes: &[u8],
     parsed: &lowering::ProviderDefinition,
-    alias: &str,
+    connector: &str,
+    instance: &str,
 ) -> Result<(String, PathBuf), HandlerReply> {
+    let alias = &definitions::alias_of(connector, instance);
     let files = inputs(file, root, bytes, parsed).ok_or_else(usage)?;
-    let digest = key(&files);
+    let digest = key(&files, instance);
     let (directory, held) = definitions::directory(paths, true).map_err(host_failure)?;
     let entry = directory.join(&digest);
     let native = entry.join(NATIVE);
@@ -718,6 +769,7 @@ const QUESTION_BYTES: usize = 3584;
 fn connection(
     paths: &Paths,
     connector: &str,
+    instance: &str,
     alias: &str,
     adapter: &connectors_host::local::config::Adapter,
     reported: &connectors_host::local::runtime::Bootstrap,
@@ -741,10 +793,7 @@ fn connection(
     // A listing that fails offers no reuse: the plain question is asked.
     let candidates = candidates(paths, alias, adapter, reported, profile).unwrap_or_default();
     if candidates.is_empty() {
-        let question = format!(
-            "No connection for {connector}/{}. Connect now? [y/N] ",
-            definitions::INSTANCE
-        );
+        let question = format!("No connection for {connector}/{instance}. Connect now? [y/N] ");
         return if answered(protected::confirm(&question, deadline))? {
             fresh()
         } else {
@@ -752,8 +801,7 @@ fn connection(
         };
     }
     let mut question = format!(
-        "No connection for {connector}/{}. A stored credential of {connector} can be reused:\n",
-        definitions::INSTANCE
+        "No connection for {connector}/{instance}. A stored credential of {connector} can be reused:\n"
     );
     // Listed while the question stays within what the terminal question takes.
     let mut listed = Vec::new();
@@ -820,6 +868,33 @@ fn connection(
         }
         Err(asked) => Err(owner_failure(asked)),
     }
+}
+
+/// The moved instance of `connector` (`definitions::moved`) when its instance
+/// `definition`, prepared as `adapter`, cannot hold the binding the provider
+/// reported for its profile: a connection of that instance id, revoked ones
+/// included, was admitted under another provider authority or profile
+/// authentication (`Registry::needs_new_instance`). `None` otherwise, which
+/// keeps an unchanged definition, and its connection, where they were.
+fn moved_instance(
+    paths: &Paths,
+    connector: &str,
+    adapter: &connectors_host::local::config::Adapter,
+    reported: &connectors_host::local::runtime::Bootstrap,
+) -> Result<Option<String>, HandlerReply> {
+    let profiles: Vec<&String> = adapter.permissions.profiles.iter().collect();
+    let [profile] = profiles.as_slice() else {
+        return Ok(None);
+    };
+    let mut bootstrap = reported.clone();
+    bootstrap.configure(adapter);
+    let binding = bootstrap
+        .binding(profile)
+        .map_err(|failure| owner_failure(owner::Error::from(failure)))?;
+    let changed = Registry::with_system_clock(&paths.state)
+        .needs_new_instance(&binding, connectors_sdk::now_ms())
+        .map_err(connections::registry_failure)?;
+    Ok(changed.then(|| definitions::moved(connector, &binding)))
 }
 
 /// A listed value, cut to 128 characters so every listed candidate fits the
@@ -1040,7 +1115,10 @@ operations:
         bytes: &[u8],
         parsed: &lowering::ProviderDefinition,
     ) -> String {
-        key(&inputs(file, root, bytes, parsed).unwrap())
+        key(
+            &inputs(file, root, bytes, parsed).unwrap(),
+            definitions::INSTANCE,
+        )
     }
 
     #[test]
@@ -1071,6 +1149,36 @@ operations:
         }
         let renamed = root.path().join("connectors/other.yaml");
         assert_ne!(digest(root.path(), &renamed, &bytes, &parsed), first);
+    }
+
+    /// task:definition-moved-authority-new-instance: the instance `definition`
+    /// keeps the key it had before moved instances existed, so an unchanged
+    /// definition keeps its cache entry, its pinned entry and its connection; a
+    /// moved instance, whose native configuration names its own instance id,
+    /// has a key of its own, the same on every run.
+    #[test]
+    fn only_a_moved_instance_changes_the_key() {
+        let (root, file, bytes, parsed) = tree(DEFINITION);
+        let files = inputs(&file, root.path(), &bytes, &parsed).unwrap();
+        // The key as `connectors-definition-cache/2` computed it before.
+        let mut hash = Sha256::new();
+        let mut part = |label: &[u8], data: &[u8]| {
+            hash.update((label.len() as u64).to_be_bytes());
+            hash.update(label);
+            hash.update((data.len() as u64).to_be_bytes());
+            hash.update(data);
+        };
+        part(b"format", b"connectors-definition-cache/2");
+        part(b"lowerer", env!("CARGO_PKG_VERSION").as_bytes());
+        for (path, bytes) in &files {
+            part(path.as_bytes(), bytes);
+        }
+        let before = hex::encode(hash.finalize());
+        assert_eq!(key(&files, definitions::INSTANCE), before);
+        let moved = key(&files, "definition-0123456789abcdef");
+        assert_ne!(moved, before);
+        assert_eq!(key(&files, "definition-0123456789abcdef"), moved);
+        assert_ne!(key(&files, "definition-fedcba9876543210"), moved);
     }
 
     /// The key names each file by its components joined with `/`, whatever the
