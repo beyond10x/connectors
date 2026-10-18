@@ -119,6 +119,23 @@ The consumer learns no scope, version or reference, and the delivered copy grant
 further read. The use is released once the copy is delivered; retirement of the
 version afterwards does not reach the consumer's copy.
 
+### 4.3 Copy to another connection
+
+`operations invoke --definition`'s reuse answer ([CLI §3](../../../cli/v1alpha1/semantics.md#invoking-a-definition-file),
+story:invoke-definition-reuse-credential) makes a new connection of the definition's
+instance from the current version of a connection another instance of the same
+connector holds. Only the owner holds the material. It reads the source's current
+version under the same bounded read use as a dispatch (capture, custody read,
+dispatch, release), validates it through the new instance's adapter, and writes it
+as a new version under the new connection's own scope (`write_new`, then publication,
+§4), exactly as a connect writes an entered credential. Nothing is shared: the two
+connections hold two versions in two scopes, and revoking, reconnecting, refreshing
+or retiring either reaches nothing of the other. The source connection's version,
+generation, evidence and revision are not changed by the copy, and a refused copy
+marks nothing on it. Only a static entry is copied: a profile whose entry an OAuth
+acquisition refreshes is never copied, because one rotation would end the other's
+refresh. A read-only binding (§5.2) writes no version and is never a copy's target.
+
 ## 5. Limits
 
 | Concern | Rule |

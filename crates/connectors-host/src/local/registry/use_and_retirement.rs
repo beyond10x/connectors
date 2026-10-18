@@ -63,10 +63,10 @@ fn admitted_read(
 /// One captured generation for a bounded read. This is not write approval,
 /// permission evidence, or a resumable provider operation after process loss.
 pub struct ReadUse {
-    id: String,
-    version: custody::Version,
-    partition: String,
-    expires: u64,
+    pub(super) id: String,
+    pub(super) version: custody::Version,
+    pub(super) partition: String,
+    pub(super) expires: u64,
 }
 impl ReadUse {
     pub fn version(&self) -> custody::Version {

@@ -294,6 +294,27 @@ types:
     kind: struct
     fields:
       - {name: bootstrap, type: connectors.cli.PrivateAdapterBootstrap}
+  # Request::Reuse (story:invoke-definition-reuse-credential): the reuse answer of
+  # `operations invoke --definition` (contracts/cli/v1alpha1/semantics.md, "Invoking a
+  # definition file"; owner.md). adapter is the definition's instance to connect, source
+  # another instance of the same connector, connection the source connection and
+  # expected_revision the revision it was offered under, profile the target's profile. It
+  # carries no document and no material: the owner reads the source's current custody
+  # version under a read use, validates it through the target's adapter and publishes a new
+  # connection holding it as its own version only when the validated identity is the
+  # source's. The answer is the published connection, as a completed capture's.
+  - name: connectors.cli.LocalOwnerReuseKind
+    kind: enum
+    variants: [reuse]
+  - name: connectors.cli.LocalOwnerReuseRequest
+    kind: struct
+    fields:
+      - {name: kind, type: connectors.cli.LocalOwnerReuseKind}
+      - {name: adapter, type: String}
+      - {name: source, type: String}
+      - {name: connection, type: String}
+      - {name: expected_revision, type: String}
+      - {name: profile, type: String}
   - name: connectors.cli.LocalCaptureAdmission
     kind: struct
     fields:
@@ -1448,7 +1469,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:866, docs/local-connection-registry.md:219-220;
+    # contracts/cli/v1alpha1/semantics.md:909, docs/local-connection-registry.md:219-220;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1608,7 +1629,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:870) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:913) and the host
     # removal path (er.rs:4428-4430) only expires Active cursors. The error name is
     # the decision; no source names one.
 
