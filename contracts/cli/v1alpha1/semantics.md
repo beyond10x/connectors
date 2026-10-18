@@ -540,10 +540,12 @@ profile authentication (equal, or differing only in the evidence lifetime) as
 the definition's instance. Its profile is a static entry: a profile whose entry
 an OAuth acquisition refreshes is never copied, since one rotation would end the
 other's refresh. The definition's lowered configuration must send the
-credential to the origin of its API base and nowhere else: a profile naming a
-token endpoint or any other URL on another origin is offered nothing, since
-the binding compares the provider authority and the profile declaration, and a
-token endpoint is part of neither. Under the read-only `mounted_secret` binding
+credential to its HTTPS API base alone: a profile naming a token endpoint or
+any other URL, on any origin, is offered nothing, since the binding compares
+the provider authority and the profile declaration, a token endpoint is part of
+neither, and the source may send its secret to another place than the
+definition would. The copy is validated under the platform's trust roots, as
+every definition is, whatever trust roots the source's own entry pins. Under the read-only `mounted_secret` binding
 nothing is offered.
 A revoked, Stale, expired or moved connection, and a connection of another
 connector, is never listed. The question lists at most 16 candidates, each by

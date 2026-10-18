@@ -79,7 +79,7 @@ validate it, and saves it only when the provider answers the same account; the o
 with no token prompt. `c` connects fresh as above; anything else, or no terminal, refuses as
 above. A connection is offered only when it is ready, not stale or revoked, and bound to the same
 API base and the same auth profile; an OAuth profile whose refresh rotates is never copied,
-and a definition whose profile names a token endpoint on another host is offered nothing. When
+and a definition whose profile names a token endpoint is offered nothing. When
 the provider answers another account, nothing is saved, the configured instance's connection is
 left as it was, and the command offers to connect fresh. After a copy the two connections are
 independent: revoking one leaves the other.

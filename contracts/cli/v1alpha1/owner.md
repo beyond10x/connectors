@@ -108,7 +108,7 @@ connection with the revision it was offered under, and the profile. The owner
 answers it with the published connection, as a completed capture does, or with one
 refusal. It repeats every check of the [reuse answer](semantics.md#invoking-a-definition-file)
 itself: the target an invoked definition's instance whose lowered
-configuration sends the credential to its API base's origin alone, both entries
+configuration names no URL in its profile and sends the credential to its API base alone, both entries
 configured, the same connector id (a legacy `[adapters]` entry is none), another instance and the same adapter (`forbidden`), the profile
 granted (`forbidden`), custody available (`custody_unavailable`) and writable
 (`custody_read_only`), a static-entry profile (`unsupported`), the instance's

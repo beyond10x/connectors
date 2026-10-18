@@ -210,11 +210,12 @@ fn urls<'a>(value: &'a serde_json::Value, found: &mut Vec<&'a str>) {
 
 /// Whether the recorded definition instance `alias` may receive a reused
 /// credential (story:invoke-definition-reuse-credential): it is an invoked
-/// definition's instance, and its native configuration sends the credential
-/// to the origin of its API base and nowhere else. The binding compares the
-/// provider authority and the profile declaration, which the token endpoint,
-/// trust roots and admitted hosts are not part of, so a configuration that
-/// names any of those, or any URL on another origin, receives none.
+/// definition's instance whose native configuration sends the credential to
+/// its HTTPS API base alone: its profile names no URL (no token endpoint) and
+/// it names no trust root or admitted host. The binding compares the provider
+/// authority and the profile declaration, which a token endpoint, trust roots
+/// and admitted hosts are not part of, so a configuration naming any of them
+/// receives none (security review rounds 1 and 2).
 pub fn receives_reuse(paths: &Paths, config: &Config, alias: &str) -> Result<bool> {
     let Some(connector) = config.definitions.get(alias) else {
         return Ok(false);
@@ -238,14 +239,14 @@ pub fn receives_reuse(paths: &Paths, config: &Config, alias: &str) -> Result<boo
     {
         return Ok(false);
     }
-    let Some(api) = native["api_base"].as_str().and_then(origin) else {
+    if native["api_base"].as_str().and_then(origin).is_none() {
         return Ok(false);
-    };
+    }
+    // A profile naming any URL (a token endpoint) sends the credential to a
+    // place the source's connection may never send it, on any origin.
     let mut found = Vec::new();
     urls(&native["auth"], &mut found);
-    Ok(found
-        .iter()
-        .all(|url| origin(url).as_deref() == Some(api.as_str())))
+    Ok(found.is_empty())
 }
 
 /// Whether `config` already has the definition instance of `connector`: an
