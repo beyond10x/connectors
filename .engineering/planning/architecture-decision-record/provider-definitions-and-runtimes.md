@@ -7,7 +7,7 @@ title: Connector definitions live in their own repository and reach each runtime
 relations:
 - informed_by: architecture-decision-record:declarative-http-provider-runtime
 - serves: vision:independent-contract-adapters
-revision: 9
+revision: 10
 transitions:
 - {from: "proposed", to: "accepted", at: "2026-10-17T12:17:39Z", actor: "human:timo", revision: 8}
 ---
@@ -187,3 +187,65 @@ until then is dropped. Agreed with the session that owns the vocabulary change o
 ## Acceptance
 
 Accepted by the operator on 2026-10-17, with D1 to D11 as written; #179 and connectors-definitions #1 merge after the connector-vocabulary landing.
+
+## Decision: D12 credential binding and invoking a definition file
+
+**D12. A stored credential is bound to what it authenticates against, not to the operation list;
+an owner can invoke a definition file without installing or configuring it.** The operator approved
+this on 2026-10-18 (option "A" of the invoke-from-a-definition design). It amends D5 only as far as
+point 4 says.
+
+1. *What a connection is bound to.* A connection stays bound to the provider authority (endpoint
+   host and instance id), the auth profile declaration (scheme, scopes, subject, evidence lifetime:
+   the declaration revision the registry already keeps), the validated external identity, the
+   trust inputs that decide where the credential may be sent (CA file, token CA, allowed hosts,
+   request prefix), and the provider executable digest. It is no longer bound to the bundle, its
+   vendored source or the selection, which only say which operations exist. Today all of these are
+   folded into one `configuration_revision` (`adapters/catalog/src/local.rs` `Local::configure`)
+   and `Binding` (`crates/connectors-host/src/local/registry.rs`) holds only that digest; the
+   executable digest is in neither. The binding therefore gains a second digest over the credential
+   side and the executable digest; the operation side keeps moving `configuration_revision`.
+2. *What a change does.*
+
+   | Change | Connection | Who acts |
+   |---|---|---|
+   | bundle, source or selection only | not stale; follows the new revision automatically on its next use or revalidation, with no credential source and no question | host |
+   | provider executable digest only | not stale; follows automatically after the new executable's validation confirms the same identity | host |
+   | CA, token CA, allowed hosts or request prefix | `pending`, `stale = true`, explicit `connections revalidate` (today's rule) | operator |
+   | authority or profile authentication | `lifecycle_conflict` (today's rule), except point 3 | operator |
+
+   Rationale: operation admission is checked per call (`permissions.operations` and the admitted
+   selection). Binding the token to the operation list protects nothing, because the token can do
+   whatever the provider allows whichever operations the selection lists. Approvals keep their own
+   binding to the full configuration revision and executable selection; D12 does not change them.
+3. *Invoke from a definition file.* `connectors operations invoke --definition <file.yaml>
+   --operation <key>` (input as in every other `operations invoke`) lowers a
+   `connectors-definition/1` file with the reference lowerer (D3,
+   `crates/connectors-catalog/src/definition.rs` `lower()`) into an owner-only cache keyed by the
+   digest of the definition and its source, computes the configuration revision the instance has,
+   and invokes the operation through the host path every configured instance takes: custody,
+   admission, approval and audit unchanged (D9). The operator's configuration file is not
+   modified. The command asks the operator once, and only when no connection exists for the
+   instance or its authority or profile changed: reuse a credential already stored in connectors
+   (validated by the new profile, published only when the validated identity is the stored one), or
+   connect fresh (token prompt, or the OAuth consent the host supports for the profile). Otherwise
+   the operation runs directly. `invoke` alone stays the legacy explicit command.
+4. *How far this amends D5.* D5 says install and update grant nothing; that stays true. Installing,
+   updating or lowering a definition never creates a connection, admits an operation or performs an
+   OAuth exchange. The amendment: an explicit `operations invoke --definition` by the owner is
+   itself the request to connect and invoke, so after the one question it may connect and invoke in
+   the same command. It adds no implicit update, skips none of D5's digest checks for a definition
+   taken from an installed index, and does not let a definition name a binary, a shell command or a
+   credential (Consequences: a definition is data, never code).
+
+Not decided by D12: making the host's OAuth consent flow read a definition's authorize and token
+parameters (D6, no story yet); persisting a lowered ad-hoc definition into the installed cache of
+D5; signing.
+
+Delivered by `story:connection-binding-excludes-operations`, `story:invoke-definition-file` and
+`story:invoke-definition-reuse-credential`.
+
+## Acceptance of D12
+
+Approved by the operator on 2026-10-18 as option "A"; recorded by the planning session the same day.
+D1 to D11 are unchanged.
