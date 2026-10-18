@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-18T15:42:52Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-definition-reuse-credential",
+  "kind": "story",
+  "revision": 15,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "check 2 restated after operator decision A: cargo test -p connectors-catalog-provider --test local_runtime -- --ignored --exact cli_journey::invoke_definition::a_definition_moved_to_another_host_is_offered_no_reuse_and_answers_lifecycle_conflict, 1 passed (pinning test: the code at bce3a9d62 already offered no reuse there); changed packages connectors-catalog-provider and connectors-build: fmt --check clean, clippy --all-targets -D warnings clean, 114 suites 976 passed 0 failed 62 ignored; aep plan artifact validate: valid. No non-test code changed since the full gate at f67c23498 (all checks passed, 312 suites, 2690 passed)"
+  }
+}

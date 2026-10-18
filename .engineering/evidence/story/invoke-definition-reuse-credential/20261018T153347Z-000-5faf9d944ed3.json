@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-18T15:33:47Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-definition-reuse-credential",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:invoke-definition-reuse-adversary-round-2",
+    "reference": "approve: nothing found at 9cc91a24f",
+    "review": "review-result:invoke-definition-reuse-adversary-round-2",
+    "outcome": "no-op"
+  }
+}

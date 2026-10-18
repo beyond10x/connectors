@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-18T16:07:04Z",
+  "actor": "human:timo",
+  "artifact": "task:definition-moved-authority-new-instance",
+  "kind": "task",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "red on S3 head d123da5ed: cargo test -p connectors-catalog-provider --test local_runtime -- --ignored --exact cli_journey::invoke_definition::a_definition_moved_to_another_host_connects_fresh_under_a_new_instance_id, 0 passed 1 failed: after the move the CLI showed no prompt (answered 0 of 2: connect question, token prompt), the S3 lifecycle_conflict dead end",
+    "reference": "adapters/catalog/tests/local_runtime/invoke_definition.rs"
+  }
+}

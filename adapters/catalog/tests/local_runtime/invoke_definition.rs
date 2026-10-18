@@ -17,11 +17,14 @@
 use super::super::derived_instance::{WORK, enter, reenter};
 use super::*;
 use std::os::{fd::FromRawFd, unix::process::CommandExt};
+use std::sync::atomic::AtomicU64;
 
 /// Set in the re-executed test process that runs inside the namespaces.
 const INSIDE: &str = "CONNECTORS_TEST_INVOKE_DEFINITION_NAMESPACES";
 const NAME: &str = "cli_journey::invoke_definition::a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_without_asking";
 const HOST: &str = "gitlab.example.com";
+/// The host a definition is moved to: the same fixture answers it.
+const MOVED_HOST: &str = "gitlab-moved.example.com";
 const TOKEN: &str = "fixture-definition-token";
 /// How the connect question ends on the terminal.
 const QUESTION: &[u8] = b"[y/N] ";
@@ -84,22 +87,30 @@ struct Request {
     authenticated: bool,
 }
 
-/// A GitLab-shaped API at `gitlab.example.com` on loopback port 443.
+/// A GitLab-shaped API at `gitlab.example.com`, and at `gitlab-moved.example.com`
+/// for a definition moved there, on loopback port 443.
 struct Forge {
     stop: Option<oneshot::Sender<()>>,
     thread: Option<std::thread::JoinHandle<()>>,
     requests: Arc<Mutex<Vec<Request>>>,
+    /// The user id `/user` answers for the fixture token.
+    identity: Arc<AtomicU64>,
 }
 
 impl Forge {
     /// Points the host at loopback and makes the fixture's certificate the
     /// only trusted root, enters the private root (`enter`), and serves.
     fn new(base: &Path) -> Self {
-        let cert = rcgen::generate_simple_self_signed(vec![HOST.to_owned()]).unwrap();
+        let cert = rcgen::generate_simple_self_signed(vec![HOST.to_owned(), MOVED_HOST.to_owned()])
+            .unwrap();
         let pem = cert.cert.pem();
         let etc = base.join("etc");
         fs::create_dir_all(etc.join("ssl/certs")).unwrap();
-        fs::write(etc.join("hosts"), format!("127.0.0.1 localhost {HOST}\n")).unwrap();
+        fs::write(
+            etc.join("hosts"),
+            format!("127.0.0.1 localhost {HOST} {MOVED_HOST}\n"),
+        )
+        .unwrap();
         let nsswitch = fs::read_to_string("/etc/nsswitch.conf").unwrap_or_default();
         let nsswitch: String = nsswitch
             .lines()
@@ -138,6 +149,8 @@ impl Forge {
         .unwrap();
         let requests = Arc::new(Mutex::new(Vec::new()));
         let served = requests.clone();
+        let identity = Arc::new(AtomicU64::new(42));
+        let answered = identity.clone();
         let (ready_tx, ready_rx) = std::sync::mpsc::channel();
         let (stop, mut stopped) = oneshot::channel();
         let thread = std::thread::spawn(move || {
@@ -183,7 +196,10 @@ impl Forge {
                         (401, json!({"message": "401 Unauthorized"}))
                     } else {
                         match request.route.as_str() {
-                            "/api/v4/user" => (200, json!({"id": 42, "username": "fixture"})),
+                            "/api/v4/user" => (
+                                200,
+                                json!({"id": answered.load(Ordering::SeqCst), "username": "fixture"}),
+                            ),
                             "/api/v4/personal_access_tokens/self" => (
                                 200,
                                 json!({"id": 99, "user_id": 42, "active": true, "revoked": false,
@@ -226,11 +242,18 @@ impl Forge {
             stop: Some(stop),
             thread: Some(thread),
             requests,
+            identity,
         }
     }
 
     fn requests(&self) -> Vec<Request> {
         self.requests.lock().unwrap().clone()
+    }
+
+    /// From now on `/user` answers `id` for the fixture token: the same
+    /// token, another account.
+    fn answer_identity(&self, id: u64) {
+        self.identity.store(id, Ordering::SeqCst);
     }
 }
 
@@ -665,34 +688,477 @@ fn a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_witho
     assert_eq!(count(&shown, QUESTION), 1);
     assert_eq!(count(&shown, TOKEN_PROMPT), 0);
 
-    // An authority change to the file answers today's lifecycle conflict,
-    // with the next action a connect of the instance gives, and asks nothing.
+    // An authority change to the file resolves to a new instance id
+    // (task:definition-moved-authority-new-instance): its first invoke asks
+    // the one connect question naming it; answered no, the refusal names the
+    // connect and nothing is sent.
     let before = fixture.requests().len();
-    journey.write("forge", "gitlab-moved.example.com", None, &["project.get"]);
-    let (output, shown) = journey.on_terminal(&invoke(&forge, "project.get"), &[]);
+    journey.write("forge", MOVED_HOST, None, &["project.get"]);
+    let (output, shown) =
+        journey.on_terminal(&invoke(&forge, "project.get"), &[(QUESTION, b"n\n")]);
     let data = refused_with(&output);
-    assert_eq!(data["code"], "lifecycle_conflict", "{data}");
-    assert!(shown.is_empty(), "{}", String::from_utf8_lossy(&shown));
-    let connect = journey
-        .command(&[
+    assert_eq!(
+        (&data["code"], &data["next_action"]),
+        (&json!("not_found"), &json!("create_connection")),
+        "{data}"
+    );
+    assert_eq!(count(&shown, b"No connection for forge/definition-"), 1);
+    assert_eq!(count(&shown, TOKEN_PROMPT), 0);
+    assert_eq!(fixture.requests().len(), before, "nothing was sent");
+    assert_eq!(fs::read(&journey.config).unwrap(), configuration);
+}
+
+/// story:invoke-definition-reuse-credential: the instance `main` of the
+/// connector `forge`, which the operator configured, holds a token connection
+/// at the definition's host.
+const REUSE_NAME: &str = "cli_journey::invoke_definition::a_stored_credential_of_a_configured_instance_is_reused_without_a_token_prompt";
+const MISMATCH_NAME: &str = "cli_journey::invoke_definition::a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offers_connect_fresh";
+/// How the reuse question ends on the terminal with one candidate.
+const REUSE_QUESTION: &[u8] = b"[1/c/N] ";
+/// What the question lists for the candidate: its instance and its host.
+const CANDIDATE: &[u8] = b"forge/main";
+const API: &[u8] = b"https://gitlab.example.com/api/v4";
+
+impl Journey {
+    /// Configure the instance `main` of the connector `forge` as an operator
+    /// pins one: the catalog provider over the native configuration the
+    /// definition at `definition` lowers to, under the instance id
+    /// `forge.main`, so its endpoint and profile declaration are the
+    /// definition's. The definition is lowered by a run without a terminal,
+    /// which asks nothing and connects nothing.
+    fn configure_main(&self, definition: &str) {
+        let data = refused_with(&self.detached(&invoke(definition, "project.get")));
+        assert_eq!(data["next_action"], "create_connection", "{data}");
+        let [(digest, _, _)]: [(String, u64, i64); 1] = self.cache_entries().try_into().unwrap();
+        let native = self
+            .state
+            .join("definitions")
+            .join(digest)
+            .join("native.json");
+        let mut native: Value = serde_json::from_slice(&fs::read(native).unwrap()).unwrap();
+        native["instance"] = json!("forge.main");
+        let main = self.root.join("private/forge-main.json");
+        private(&main, &serde_json::to_vec_pretty(&native).unwrap());
+        let provider = self.root.join("bin/connectors-catalog-provider");
+        let printed = Command::new(&provider)
+            .env_clear()
+            .arg("--local-config")
+            .arg(&main)
+            .arg("--print-local-bootstrap")
+            .output()
+            .unwrap();
+        assert!(printed.status.success(), "{printed:?}");
+        let bootstrap: Value = serde_json::from_slice(&printed.stdout).unwrap();
+        let q = |value: &str| serde_json::to_string(value).unwrap();
+        let table = "connectors.forge.instances.main";
+        let text = format!(
+            "format='connectors-local/5'\nowner_uid={}\nsecret_service_socket={}\n\
+             [connectors.forge]\nenabled=true\n\
+             [{table}]\nalias='forge.main'\ninstance_id='forge.main'\nadapter_id='catalog'\n\
+             configuration_revision={}\ncredential_revision={}\nprotocol='v1alpha1'\n\
+             private_protocol='connectors-private/2'\n\
+             [{table}.executable]\npath={}\nsha256={}\nargs=['--local-config',{}]\n\
+             [{table}.permissions]\nprofiles=['forge.pat']\noperations=['project.get']\n",
+            filesystem::uid(),
+            q(self._custody.socket.to_str().unwrap()),
+            q(bootstrap["configuration_revision"].as_str().unwrap()),
+            q(bootstrap["credential_revision"].as_str().unwrap()),
+            q(provider.to_str().unwrap()),
+            q(&hex::encode(Sha256::digest(fs::read(&provider).unwrap()))),
+            q(main.to_str().unwrap()),
+        );
+        private(&self.config, text.as_bytes());
+    }
+
+    /// `connections connect` of `forge/main` with the fixture token on
+    /// standard input; answers the connection.
+    fn connect_main(&self) -> String {
+        let mut command = self.command(&[
             "connections",
             "connect",
             "--connector",
             "forge",
             "--instance",
-            "definition",
+            "main",
             "--profile",
             "forge.pat",
             "--credential-stdin",
-        ])
-        .output()
-        .unwrap();
-    let connect = refused_with(&connect);
+        ]);
+        let mut child = command.stdin(Stdio::piped()).spawn().unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(format!(r#"{{"token":"{TOKEN}"}}"#).as_bytes())
+            .unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert!(!carries_token(&output.stdout) && !carries_token(&output.stderr));
+        let connected = success(output);
+        connected["connection"]["summary"]["connection"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    }
+
+    /// `connections describe` of `connection` under `forge/<instance>`.
+    fn describe(&self, instance: &str, connection: &str) -> Value {
+        success(
+            self.command(&[
+                "connections",
+                "describe",
+                "--connector",
+                "forge",
+                "--instance",
+                instance,
+                "--connection",
+                connection,
+            ])
+            .output()
+            .unwrap(),
+        )["connection"]
+            .clone()
+    }
+
+    /// The connections `forge/<instance>` lists.
+    fn listed(&self, instance: &str) -> Vec<Value> {
+        success(
+            self.command(&[
+                "connections",
+                "list",
+                "--connector",
+                "forge",
+                "--instance",
+                instance,
+            ])
+            .output()
+            .unwrap(),
+        )["connections"]
+            .as_array()
+            .unwrap()
+            .clone()
+    }
+}
+
+/// What must not change about a source connection: its revision, state,
+/// external identity and staleness.
+fn unchanged(connection: &Value) -> Value {
+    json!([
+        connection["summary"]["revision"],
+        connection["summary"]["state"],
+        connection["external_identity"],
+        connection["stale"],
+    ])
+}
+
+/// The acceptance: with a token connection under the configured instance
+/// `forge/main` at `gitlab.example.com` and a hand-written definition of
+/// `forge` at the same host, `operations invoke --definition` asks once; the
+/// answer "reuse" yields the operation's result without a token prompt, a new
+/// connection under the definition's instance with the same validated
+/// identity, and the configured instance's connection unchanged. Without a
+/// terminal nothing is asked and nothing is copied.
+#[test]
+#[ignore = "requires built debug production CLI, qualified disposable Secret Service and unprivileged user namespaces"]
+fn a_stored_credential_of_a_configured_instance_is_reused_without_a_token_prompt() {
+    let Some(base) = std::env::var_os(INSIDE) else {
+        let output = reenter(INSIDE, REUSE_NAME);
+        assert!(!carries_token(&output.stdout) && !carries_token(&output.stderr));
+        return;
+    };
+    let fixture = Forge::new(Path::new(&base));
+    let journey = Journey::new();
+    let forge = journey.write("forge", HOST, None, &["project.get"]);
+    journey.configure_main(&forge);
+    let configuration = fs::read(&journey.config).unwrap();
+    let source = journey.connect_main();
+    let before = journey.describe("main", &source);
+    assert_eq!(before["summary"]["state"], "ready", "{before}");
+    let connects = fixture.requests().len();
+
+    // No terminal: nothing is asked, the refusal names the connect, and
+    // nothing is copied or sent.
+    let data = refused_with(&journey.detached(&invoke(&forge, "project.get")));
+    assert_eq!(data["next_action"], "create_connection", "{data}");
+    assert!(journey.listed("definition").is_empty());
+    assert_eq!(fixture.requests().len(), connects);
+
+    // Asked once, the candidate listed by its instance and host, answered
+    // with its number: the operation's result, and no token prompt.
+    let (output, shown) =
+        journey.on_terminal(&invoke(&forge, "project.get"), &[(REUSE_QUESTION, b"1\n")]);
+    let result = success(output);
+    assert_eq!(result["result"]["body"]["id"], 7, "{result}");
+    assert_eq!(result["instance"], "definition", "{result}");
+    assert_eq!(count(&shown, REUSE_QUESTION), 1);
+    assert_eq!(count(&shown, QUESTION), 0);
+    assert_eq!(count(&shown, TOKEN_PROMPT), 0);
+    assert_eq!(count(&shown, CANDIDATE), 1);
+    assert_eq!(count(&shown, API), 1);
+    assert!(!carries_token(&shown));
+
+    // A new connection under the definition's instance, with the source's
+    // validated identity; the source is as it was.
+    let listed = journey.listed("definition");
+    assert_eq!(listed.len(), 1, "{listed:?}");
+    let copy = listed[0]["connection"].as_str().unwrap().to_owned();
+    assert_ne!(copy, source);
+    let copied = journey.describe("definition", &copy);
+    assert_eq!(copied["summary"]["state"], "ready", "{copied}");
     assert_eq!(
-        (&connect["code"], &connect["next_action"]),
-        (&data["code"], &data["next_action"]),
-        "{connect} {data}"
+        copied["external_identity"], before["external_identity"],
+        "{copied}"
     );
-    assert_eq!(fixture.requests().len(), before, "nothing was sent");
+    assert_eq!(
+        unchanged(&journey.describe("main", &source)),
+        unchanged(&before)
+    );
+    assert_eq!(journey.listed("main").len(), 1);
+
+    // The copy was validated at the definition's host, then the read ran.
+    let requests = fixture.requests();
+    assert!(
+        requests[connects..]
+            .iter()
+            .all(|r| r.host == HOST && r.authenticated),
+        "{requests:?}"
+    );
+    assert!(
+        requests[connects..]
+            .iter()
+            .any(|r| r.route == "/api/v4/user"),
+        "{requests:?}"
+    );
+
+    // The next run asks nothing.
+    let (output, shown) = journey.on_terminal(&invoke(&forge, "project.get"), &[]);
+    assert_eq!(success(output)["result"]["body"]["id"], 7);
+    assert!(shown.is_empty(), "{}", String::from_utf8_lossy(&shown));
+
+    // Revoking the copy leaves the source as it was: two custody entries.
+    let revision = copied["summary"]["revision"].as_str().unwrap();
+    success(
+        journey
+            .command(&[
+                "connections",
+                "revoke",
+                "--connector",
+                "forge",
+                "--instance",
+                "definition",
+                "--connection",
+                &copy,
+                "--expected-revision",
+                revision,
+            ])
+            .output()
+            .unwrap(),
+    );
+    let after = journey.describe("main", &source);
+    assert_eq!(unchanged(&after), unchanged(&before));
     assert_eq!(fs::read(&journey.config).unwrap(), configuration);
 }
+
+/// Beside the acceptance: when the provider answers the reused credential
+/// with another identity than the source's, nothing is published, the source
+/// is unchanged, and connect fresh is offered. A revoked source is never
+/// offered.
+#[test]
+#[ignore = "requires built debug production CLI, qualified disposable Secret Service and unprivileged user namespaces"]
+fn a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offers_connect_fresh() {
+    let Some(base) = std::env::var_os(INSIDE) else {
+        let output = reenter(INSIDE, MISMATCH_NAME);
+        assert!(!carries_token(&output.stdout) && !carries_token(&output.stderr));
+        return;
+    };
+    let fixture = Forge::new(Path::new(&base));
+    let journey = Journey::new();
+    let forge = journey.write("forge", HOST, None, &["project.get"]);
+    journey.configure_main(&forge);
+    let source = journey.connect_main();
+    let before = journey.describe("main", &source);
+
+    // The same token now answers for another account.
+    fixture.answer_identity(43);
+    let (output, shown) = journey.on_terminal(
+        &invoke(&forge, "project.get"),
+        &[(REUSE_QUESTION, b"1\n"), (QUESTION, b"n\n")],
+    );
+    let data = refused_with(&output);
+    assert_eq!(data["code"], "identity_mismatch", "{data}");
+    assert_eq!(data["next_action"], "create_connection", "{data}");
+    assert_eq!(count(&shown, REUSE_QUESTION), 1);
+    // Connect fresh is offered, and declined.
+    assert_eq!(count(&shown, QUESTION), 1);
+    assert_eq!(count(&shown, TOKEN_PROMPT), 0);
+    assert!(!carries_token(&shown));
+    assert!(journey.listed("definition").is_empty());
+    assert_eq!(
+        unchanged(&journey.describe("main", &source)),
+        unchanged(&before)
+    );
+    // Not the source's state either: another identity says nothing about it.
+    assert_eq!(
+        journey.describe("main", &source)["summary"]["state"],
+        "ready"
+    );
+
+    // Revoked, the source is not offered: the question is the plain connect.
+    let revision = before["summary"]["revision"].as_str().unwrap();
+    success(
+        journey
+            .command(&[
+                "connections",
+                "revoke",
+                "--connector",
+                "forge",
+                "--instance",
+                "main",
+                "--connection",
+                &source,
+                "--expected-revision",
+                revision,
+            ])
+            .output()
+            .unwrap(),
+    );
+    let (output, shown) =
+        journey.on_terminal(&invoke(&forge, "project.get"), &[(QUESTION, b"n\n")]);
+    assert_eq!(refused_with(&output)["next_action"], "create_connection");
+    assert_eq!(count(&shown, REUSE_QUESTION), 0);
+    assert_eq!(count(&shown, CANDIDATE), 0);
+}
+
+const MOVED_NAME: &str = "cli_journey::invoke_definition::a_definition_moved_to_another_host_connects_fresh_under_a_new_instance_id";
+
+/// The second check beside the acceptance, restated by
+/// task:definition-moved-authority-new-instance. With the definition's own
+/// connection at the file's host and the file then naming another host,
+/// nothing is reused (option A, 2026-10-18; D12 point 1): no candidate is
+/// listed and nothing is copied. The definition resolves to a new instance id,
+/// `definition-<16 hex>`, because a connect under `definition` would be refused
+/// (the registry's "only a new instance id helps"), so the run is a first
+/// invoke there: one connect question, the token prompt, the result from the
+/// new host. The id is a function of the definition: a second run asks nothing
+/// on the same instance, and a file moved back resolves to `definition` and
+/// its connection again. The connection left at the old host keeps its
+/// revision and is revoked through the moved-entry path; the configured
+/// instance's connection is unchanged.
+#[test]
+#[ignore = "requires built debug production CLI, qualified disposable Secret Service and unprivileged user namespaces"]
+fn a_definition_moved_to_another_host_connects_fresh_under_a_new_instance_id() {
+    let Some(base) = std::env::var_os(INSIDE) else {
+        let output = reenter(INSIDE, MOVED_NAME);
+        assert!(!carries_token(&output.stdout) && !carries_token(&output.stderr));
+        return;
+    };
+    let fixture = Forge::new(Path::new(&base));
+    let journey = Journey::new();
+    let forge = journey.write("forge", HOST, None, &["project.get"]);
+    journey.configure_main(&forge);
+    let source = journey.connect_main();
+    // The definition's own connection at the file's host, made by reuse.
+    let (output, _) =
+        journey.on_terminal(&invoke(&forge, "project.get"), &[(REUSE_QUESTION, b"1\n")]);
+    assert_eq!(success(output)["result"]["body"]["id"], 7);
+    let own = journey.listed("definition");
+    assert_eq!(own.len(), 1, "{own:?}");
+    let left = own[0]["connection"].as_str().unwrap().to_owned();
+    let left_revision = own[0]["revision"].as_str().unwrap().to_owned();
+    let before = journey.describe("main", &source);
+    let sent = fixture.requests().len();
+
+    // The file now names another host: no reuse offered, one connect
+    // question under a new instance id, the token, the result.
+    journey.write("forge", MOVED_HOST, None, &["project.get"]);
+    let token = format!("{TOKEN}\n");
+    let (output, shown) = journey.on_terminal(
+        &invoke(&forge, "project.get"),
+        &[(QUESTION, b"y\n"), (TOKEN_PROMPT, token.as_bytes())],
+    );
+    let moved = success(output);
+    assert_eq!(moved["result"]["body"]["id"], 7, "{moved}");
+    let instance = moved["instance"].as_str().unwrap().to_owned();
+    let digest = instance.strip_prefix("definition-").unwrap_or_default();
+    assert!(
+        digest.len() == 16 && digest.bytes().all(|b| b.is_ascii_hexdigit()),
+        "{moved}"
+    );
+    assert_eq!(moved["adapter"], format!("forge.{instance}"), "{moved}");
+    assert_eq!(count(&shown, REUSE_QUESTION), 0);
+    assert_eq!(count(&shown, CANDIDATE), 0);
+    assert_eq!(count(&shown, QUESTION), 1);
+    assert_eq!(count(&shown, TOKEN_PROMPT), 1);
+    assert_eq!(
+        count(
+            &shown,
+            format!("No connection for forge/{instance}.").as_bytes()
+        ),
+        1,
+        "{}",
+        String::from_utf8_lossy(&shown)
+    );
+    // Only the new host was reached: the fresh connect's validation, then
+    // the read.
+    let requests = fixture.requests();
+    assert!(
+        requests.len() > sent
+            && requests[sent..]
+                .iter()
+                .all(|r| r.host == MOVED_HOST && r.authenticated),
+        "{requests:?}"
+    );
+    let fresh = journey.listed(&instance);
+    assert_eq!(fresh.len(), 1, "{fresh:?}");
+    assert_ne!(fresh[0]["connection"].as_str().unwrap(), left);
+
+    // Repeated runs resolve to the same instance and ask nothing.
+    let (output, shown) = journey.on_terminal(&invoke(&forge, "project.get"), &[]);
+    let again = success(output);
+    assert_eq!(again["instance"], instance.as_str(), "{again}");
+    assert!(shown.is_empty(), "{}", String::from_utf8_lossy(&shown));
+    assert_eq!(journey.listed(&instance), fresh);
+
+    // Moved back, the file is the instance `definition` again, on the
+    // connection it left behind, with nothing asked.
+    journey.write("forge", HOST, None, &["project.get"]);
+    let (output, shown) = journey.on_terminal(&invoke(&forge, "project.get"), &[]);
+    let back = success(output);
+    assert_eq!(back["instance"], "definition", "{back}");
+    assert!(shown.is_empty(), "{}", String::from_utf8_lossy(&shown));
+    assert_eq!(journey.listed("definition"), own);
+    journey.write("forge", MOVED_HOST, None, &["project.get"]);
+    let (output, _) = journey.on_terminal(&invoke(&forge, "project.get"), &[]);
+    assert_eq!(success(output)["instance"], instance.as_str());
+
+    // The connection left at the old host is unchanged and revocable
+    // through the moved-entry path: its instance id no entry configures.
+    let revoked = success(
+        journey
+            .command(&[
+                "connections",
+                "revoke",
+                "--connector",
+                "forge",
+                "--instance",
+                &instance,
+                "--connection",
+                &left,
+                "--expected-revision",
+                &left_revision,
+            ])
+            .output()
+            .unwrap(),
+    );
+    assert_eq!(revoked["local_state"], "revoked", "{revoked}");
+    // The configured instance's connection, a candidate at the old host, was
+    // not offered and is as it was; the new instance's connection is too.
+    assert_eq!(
+        unchanged(&journey.describe("main", &source)),
+        unchanged(&before)
+    );
+    assert_eq!(journey.listed(&instance), fresh);
+}
+
+#[cfg(unix)]
+#[path = "adversary_reuse_race.rs"]
+mod adversary_reuse_race;

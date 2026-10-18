@@ -100,6 +100,32 @@ validates the separately transferred document through the exact adapter, and the
 uses the existing guarded custody/publication coordinator. Lost acknowledgement
 is unknown and can be resolved only through status, without replay.
 
+A `reuse` request (`connectors.cli.LocalOwnerReuseRequest`,
+`{"kind":"reuse","adapter":…,"source":…,"connection":…,"expected_revision":…,"profile":…}`,
+story:invoke-definition-reuse-credential) carries no document and no material: it
+names the instance to connect, another instance of the same connector, the source
+connection with the revision it was offered under, and the profile. The owner
+answers it with the published connection, as a completed capture does, or with one
+refusal. It repeats every check of the [reuse answer](semantics.md#invoking-a-definition-file)
+itself: the target an invoked definition's instance whose lowered
+configuration names no URL in its profile and sends the credential to its API base alone, both entries
+configured, the same connector id (a legacy `[adapters]` entry is none), another instance and the same adapter (`forbidden`), the profile
+granted (`forbidden`), custody available (`custody_unavailable`) and writable
+(`custody_read_only`), a static-entry profile (`unsupported`), the instance's
+connect admitted (`lifecycle_conflict`), the source a candidate under its own
+configured entry (`not_found`, `revoked`, `lifecycle_conflict` for another
+revision). It then holds the source's current version under a read use, reads it
+from custody, dispatches the use, validates the bytes through the target's
+adapter, releases the use, compares the validated identity with the source's
+(`identity_mismatch`, `next_action` `create_connection`), re-reads the
+configuration, and writes and publishes the bytes as the new connection's own
+version through the guarded coordinator, whose publishing commit also requires
+the source to be published, Live, not Stale and under the fence and version it
+read (`revoked`, `lifecycle_conflict`). A refused dispatch cancels the read use. Every refusal after the allocation fails
+that acquisition; a lost acknowledgement is `outcome_unknown` with the acquisition
+to follow. The CLI never receives, prints or logs the material, and the source
+connection's record is not written by any step but its read use.
+
 A command run while an owner of its own build runs for the state directory reads
 the store through that owner instead of opening it. The owner answers a `cached`
 request (`connectors.cli.LocalOwnerCachedRequest`, `{"kind":"cached","adapter":…}`)

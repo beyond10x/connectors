@@ -3,9 +3,11 @@
 //! See docs/local-connection-registry.md for the binding and acknowledgement map.
 mod lifecycle;
 mod observation;
+mod reuse;
 mod revalidation;
 mod use_and_retirement;
 pub use observation::{ObservedAcquisition, ObservedConnection, Page, PageOptions, State};
+pub use reuse::{ReuseCandidate, ReuseGuard, ReuseSource};
 pub use revalidation::{Revalidation, RevalidationDispatch};
 pub use use_and_retirement::{DispatchedUse, InvalidCredential, ReadUse, Retirement};
 #[cfg(test)]
@@ -14,6 +16,8 @@ mod binding_scope_tests;
 mod cardinality_tests;
 #[cfg(test)]
 mod expiry_batch_tests;
+#[cfg(test)]
+mod reuse_tests;
 #[cfg(test)]
 mod stale_tests;
 #[cfg(test)]

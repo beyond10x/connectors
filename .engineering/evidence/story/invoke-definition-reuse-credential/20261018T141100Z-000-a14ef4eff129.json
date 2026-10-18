@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-18T14:11:00Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-definition-reuse-credential",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-host --lib registry::reuse_tests; cargo test -p connectors-catalog-provider --test local_runtime -- --ignored --exact cli_journey::invoke_definition::{a_stored_credential_of_a_configured_instance_is_reused_without_a_token_prompt,a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offers_connect_fresh}, before the implementation (unit/invoke-definition-reuse-credential working tree on 187ed2e193 with the tests only: red; host cases did not compile (reuse_candidates and capture_reuse missing, 10 errors); both journeys failed after their setup passed: the CLI asked the plain connect question and never the reuse question, 'the CLI did not finish' at 120 s)",
+    "reference": "run log red-journeys.log, finished 14:11Z (local scratch, not retained)"
+  }
+}

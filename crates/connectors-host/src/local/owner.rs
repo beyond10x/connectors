@@ -367,6 +367,71 @@ fn selected(paths: &Paths, alias: &str) -> Result<(Config, Adapter)> {
     let adapter = config.adapters.get(alias).cloned().ok_or(Code::NotFound)?;
     Ok((config, adapter))
 }
+/// Whether `source` is another instance of the connector `alias` is an
+/// instance of (story:invoke-definition-reuse-credential): both are instances
+/// of the configuration's `[connectors]` tables or invoked definitions, under
+/// the same connector id. A legacy `[adapters]` entry names no connector, so
+/// it is never one.
+pub(crate) fn same_connector(config: &Config, alias: &str, source: &str) -> bool {
+    let legacy = config.legacy_aliases();
+    if alias == source || legacy.contains(&alias) || legacy.contains(&source) {
+        return false;
+    }
+    matches!(
+        (config.names(alias), config.names(source)),
+        (Some((connector, _)), Some((other, _))) if connector == other
+    )
+}
+/// A stored connection a new connection of an instance may copy its
+/// credential from, with the names its instance is selected by.
+#[derive(Clone, Debug)]
+pub struct Reusable {
+    /// The source instance's alias, which a reuse request names.
+    pub alias: String,
+    pub connector: String,
+    pub instance: String,
+    pub candidate: registry::ReuseCandidate,
+}
+/// The connections other instances of `alias`'s connector hold whose
+/// credential a new connection of `alias` bound to `target` may reuse
+/// (`registry::Registry::reuse_candidates`), by instance and reference. None
+/// under a read-only custody binding, which writes no copy. Records nothing
+/// and grants nothing: the owner decides a reuse again.
+pub fn reusable(paths: &Paths, alias: &str, target: &registry::Binding) -> Result<Vec<Reusable>> {
+    let config = Config::load_at(paths)?;
+    if config.selection().read_only() || !super::definitions::receives_reuse(paths, &config, alias)?
+    {
+        return Ok(Vec::new());
+    }
+    let registry = registry::Registry::with_system_clock(&paths.state);
+    let mut found = Vec::new();
+    for (source, entry) in &config.adapters {
+        if !same_connector(&config, alias, source)
+            || entry.instance_id == target.instance_id
+            || entry.adapter_id != target.adapter_id
+        {
+            continue;
+        }
+        let Some((connector, instance)) = config.names(source) else {
+            continue;
+        };
+        for candidate in registry.reuse_candidates(
+            &entry.instance_id,
+            &entry.adapter_id,
+            entry.configured(),
+            target,
+            connectors_sdk::now_ms(),
+        )? {
+            found.push(Reusable {
+                alias: source.clone(),
+                connector: connector.to_owned(),
+                instance: instance.to_owned(),
+                candidate,
+            });
+        }
+    }
+    Ok(found)
+}
 /// The adapter's cached description. Outside the owner, a running owner of
 /// this build answers it from its held metadata handle; without one the store
 /// is read directly, which verifies it completely (`docs/local-er-metadata.md`).
@@ -858,6 +923,18 @@ enum Request {
         expected_revision: Option<String>,
     },
     Complete,
+    /// story:invoke-definition-reuse-credential: a new connection of `adapter`
+    /// holding the current credential of `connection`, a connection of
+    /// `source`, another instance of the same connector, offered under
+    /// `expected_revision` (`connectors.cli.LocalOwnerReuseRequest`). Carries
+    /// no document and no material.
+    Reuse {
+        adapter: String,
+        source: String,
+        connection: String,
+        expected_revision: String,
+        profile: String,
+    },
     Revalidate {
         adapter: String,
         connection: String,
@@ -1036,5 +1113,106 @@ mod cached_tests {
         assert!(error.reconnect);
         assert!(!error.reconfigure);
         assert!(!error.revalidate);
+    }
+}
+
+/// story:invoke-definition-reuse-credential: a reuse names another instance of
+/// the same connector id; a legacy `[adapters]` entry names no connector, and
+/// an instance is never its own source.
+#[cfg(test)]
+mod reuse_tests {
+    use super::*;
+    use crate::local::config::{Connector, Instance};
+    use std::collections::BTreeMap;
+
+    fn entry(instance: &str) -> Adapter {
+        Adapter {
+            credential_revision: None,
+            instance_id: instance.into(),
+            adapter_id: "catalog".into(),
+            configuration_revision: "cfg-1".into(),
+            protocol: "v1alpha1".into(),
+            private_protocol: Some(runtime::PrivateProtocol::V2),
+            startup: Default::default(),
+            restart: Default::default(),
+            executable: super::super::config::Executable {
+                path: PathBuf::from("absent-adapter"),
+                sha256: "a".repeat(64),
+                args: vec![],
+            },
+            permissions: Default::default(),
+        }
+    }
+
+    fn instance(alias: &str) -> Instance {
+        Instance {
+            description: None,
+            endpoint: None,
+            alias: alias.into(),
+            derived: false,
+            profile: None,
+            awaiting_profile: None,
+        }
+    }
+
+    fn config() -> Config {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Paths {
+            config: root.path().join("config/config.toml"),
+            state: root.path().join("state"),
+        };
+        Config::initialize(&paths).unwrap();
+        let mut config = Config::load(&paths.config).unwrap();
+        for alias in [
+            "forge.main",
+            "forge.other",
+            "gitlab.main",
+            "forge",
+            "forge.definition",
+        ] {
+            config.adapters.insert(alias.into(), entry(alias));
+        }
+        config.connectors = Some(BTreeMap::from([
+            (
+                "forge".to_owned(),
+                Connector {
+                    enabled: true,
+                    instances: BTreeMap::from([
+                        ("main".to_owned(), instance("forge.main")),
+                        ("other".to_owned(), instance("forge.other")),
+                    ]),
+                },
+            ),
+            (
+                "gitlab".to_owned(),
+                Connector {
+                    enabled: true,
+                    instances: BTreeMap::from([("main".to_owned(), instance("gitlab.main"))]),
+                },
+            ),
+        ]));
+        config
+            .definitions
+            .insert("forge.definition".into(), "forge".into());
+        config
+    }
+
+    #[test]
+    fn only_another_instance_of_the_same_connector_is_a_source() {
+        let config = config();
+        assert!(same_connector(&config, "forge.definition", "forge.main"));
+        assert!(same_connector(&config, "forge.definition", "forge.other"));
+        assert!(same_connector(&config, "forge.main", "forge.other"));
+        assert!(!same_connector(&config, "forge.definition", "gitlab.main"));
+        assert!(!same_connector(
+            &config,
+            "forge.definition",
+            "forge.definition"
+        ));
+        // A legacy entry: its alias is no connector, whatever it spells.
+        assert_eq!(config.legacy_aliases(), ["forge"]);
+        assert!(!same_connector(&config, "forge.definition", "forge"));
+        assert!(!same_connector(&config, "forge", "forge.main"));
+        assert!(!same_connector(&config, "forge.definition", "absent"));
     }
 }
