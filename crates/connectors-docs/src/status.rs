@@ -306,8 +306,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Jira Cloud",
-        "Issue search by JQL, one issue by key, comments, changelogs, an issue's available transitions, a project's creatable issue types, user search, an attachment's content, and running one transition by id under a guard that reads the issue before and after it, over HTTP basic authentication (one issue, issue types and user search since 0.39.0).",
-        "adapters/catalog/tests/jira.rs::shipped_jira_selections_are_the_eight_reads_and_the_transition_run",
+        "Issue search by JQL, one issue by key, comments, changelogs, an issue's available transitions, a project's creatable issue types and one issue type's create fields, user search, an attachment's content, running one transition by id under a guard that reads the issue before and after it, and creating, commenting on, editing, linking and deleting issues under approval, each guarded by a read before it (edit and delete on the caller's updated stamp, refused as conflict), over HTTP basic authentication (one issue, issue types and user search since 0.39.0); the writes are verified against fixtures, not a live site.",
+        "adapters/catalog/tests/jira.rs::shipped_jira_selections_are_the_nine_reads_and_the_six_writes",
         "/docs/reference/adapters/catalog",
     ),
     shipped(

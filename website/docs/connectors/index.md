@@ -23,7 +23,7 @@ Every connector you can configure, with its provider, how many reads and writes 
 | [Gmail](./gmail.md) `gmail` | Google | 8 | 2 | `google.oauth` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/google-gmail/connector.json) |
 | [Google Slides](./slides.md) `slides` | Google | 3 | 2 | `google.oauth` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/google-slides/connector.json) |
 | [HubSpot](./hubspot.md) `hubspot` | HubSpot | 2 | 0 | `hubspot.private-app` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/hubspot/connector.json) |
-| [Jira](./jira.md) `jira` | Atlassian | 8 | 1 | `atlassian.basic` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/jira/connector.json) |
+| [Jira](./jira.md) `jira` | Atlassian | 9 | 6 | `atlassian.basic` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/jira/connector.json) |
 | [Opsgenie](./opsgenie.md) `opsgenie` | Opsgenie | 5 | 0 | `opsgenie.api-key` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/opsgenie/connector.json) |
 | [Runpod](./runpod.md) `runpod` | Runpod | 2 | 2 | `runpod.api-key` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/runpod/connector.json) |
 | [Zendesk](./zendesk.md) `zendesk` | Zendesk | 7 | 3 | `zendesk.oauth`, `zendesk.basic` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/zendesk/connector.json) |
