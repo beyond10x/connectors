@@ -1031,3 +1031,7 @@ fn a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offe
     assert_eq!(count(&shown, REUSE_QUESTION), 0);
     assert_eq!(count(&shown, CANDIDATE), 0);
 }
+
+#[cfg(unix)]
+#[path = "adversary_reuse_race.rs"]
+mod adversary_reuse_race;

@@ -7,7 +7,7 @@ mod reuse;
 mod revalidation;
 mod use_and_retirement;
 pub use observation::{ObservedAcquisition, ObservedConnection, Page, PageOptions, State};
-pub use reuse::{ReuseCandidate, ReuseSource};
+pub use reuse::{ReuseCandidate, ReuseGuard, ReuseSource};
 pub use revalidation::{Revalidation, RevalidationDispatch};
 pub use use_and_retirement::{DispatchedUse, InvalidCredential, ReadUse, Retirement};
 #[cfg(test)]

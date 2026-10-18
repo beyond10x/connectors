@@ -339,3 +339,91 @@ fn a_cancelled_capture_is_released_and_cannot_be_dispatched() {
         State::Ready
     );
 }
+
+/// Adversary round 1 F1: the copy's publishing commit requires the source to
+/// be what was captured. A source revoked, made Stale or republished while its
+/// copy was validated publishes no copy; an unchanged one publishes it.
+#[test]
+fn a_copy_publishes_only_while_its_source_is_what_was_captured() {
+    type Move = fn(&Registry, &str, &str);
+    let revoke: Move = |registry, reference, revision| {
+        registry
+            .revoke(SOURCE, ADAPTER, reference, revision, NOW + 3)
+            .unwrap();
+    };
+    let stale: Move = |registry, reference, _| {
+        let captured = registry
+            .capture_read(&source(), reference, &BTreeSet::new(), NOW + 3, NOW + 1_000)
+            .unwrap();
+        let dispatched = registry.dispatch_read(captured, NOW + 3).unwrap();
+        registry.refuse_read(dispatched, NOW + 3).unwrap();
+    };
+    let unchanged: Move = |_, _, _| {};
+    for (moved, expected) in [
+        (revoke, Some(Failure::Revoked)),
+        (stale, Some(Failure::Conflict)),
+        (unchanged, None),
+    ] {
+        let (_root, registry) = fixture();
+        let (reference, revision) = connected(&registry, &source(), "one");
+        let captured = registry
+            .capture_reuse(
+                SOURCE,
+                ADAPTER,
+                "config-1",
+                &target(),
+                &reference,
+                &revision,
+                NOW + 1,
+                NOW + 10_000,
+            )
+            .unwrap();
+        let guard = captured.guard();
+        let dispatched = registry.dispatch_reuse(captured, NOW + 2).unwrap();
+        registry.release_read(dispatched, NOW + 2).unwrap();
+        moved(&registry, &reference, &revision);
+        let acquisition = registry.begin(&target(), NOW + 3).unwrap();
+        let claim = registry.consume(acquisition, NOW + 3).unwrap();
+        let prepared = registry
+            .prepare(&claim, validated("one", NOW + 3), 12, NOW + 3)
+            .unwrap();
+        let receipt = custody::WrittenVersion::fixture(prepared.version());
+        let stored = registry.acknowledge(prepared, receipt, NOW + 3).unwrap();
+        let published = registry.publish_with(stored, NOW + 3, false, Some(&guard));
+        assert_eq!(published.as_ref().err().copied(), expected, "{published:?}");
+        let held = registry.held("target-instance", NOW + 4).unwrap();
+        assert_eq!(held.len(), usize::from(expected.is_none()));
+    }
+}
+
+/// Security round 1 F3: a dispatch the registry refuses cancels the use.
+#[test]
+fn a_refused_dispatch_cancels_the_reuse_use() {
+    let (root, registry) = fixture();
+    let (reference, revision) = connected(&registry, &source(), "one");
+    let captured = registry
+        .capture_reuse(
+            SOURCE,
+            ADAPTER,
+            "config-1",
+            &target(),
+            &reference,
+            &revision,
+            NOW + 1,
+            NOW + 10_000,
+        )
+        .unwrap();
+    // Past the capture's deadline: the dispatch is refused and the use
+    // released, not left to lapse.
+    assert!(registry.dispatch_reuse(captured, NOW + 60_001).is_err());
+    let metadata = Metadata::inspect(root.path()).unwrap();
+    let open: i64 = metadata
+        .connection
+        .query_row(
+            "SELECT count(*) FROM registry_uses WHERE released=0",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(open, 0);
+}

@@ -2199,7 +2199,10 @@ fn reuse(
 ) -> Result<Value> {
     use supervisor::{Output, Task};
     let (_, origin) = selected(&owner.paths, source)?;
-    if !super::same_connector(config, alias, source)
+    // Only an invoked definition's instance receives a copy, and only one
+    // that sends the credential nowhere but its API base's origin.
+    if !super::super::definitions::receives_reuse(&owner.paths, config, alias)?
+        || !super::same_connector(config, alias, source)
         || origin.instance_id == adapter.instance_id
         || origin.adapter_id != adapter.adapter_id
         || !adapter.permissions.profiles.contains(profile)
@@ -2265,6 +2268,7 @@ fn reuse(
             now + 30_000,
         )?;
         let identity = captured.identity().clone();
+        let guard = captured.guard();
         let version = captured.version();
         let read = custody::Store::open_for(version.scope(), &selection, &owner.paths.state)
             .and_then(|store| store.read(version));
@@ -2280,7 +2284,7 @@ fn reuse(
                 });
             }
         };
-        let dispatched = registry.dispatch_read(captured.into_read(), connectors_sdk::now_ms())?;
+        let dispatched = registry.dispatch_reuse(captured, connectors_sdk::now_ms())?;
         let validated = owner.pool.run(
             alias,
             adapter,
@@ -2310,8 +2314,13 @@ fn reuse(
         let store =
             custody::Store::open_for(prepared.version().scope(), &selection, &owner.paths.state)
                 .map_err(|_| Code::CustodyUnavailable)?;
-        let published =
-            registry.store_and_publish(prepared, &material, &store, connectors_sdk::now_ms)?;
+        let published = registry.store_and_publish_reuse(
+            prepared,
+            &material,
+            &store,
+            connectors_sdk::now_ms,
+            &guard,
+        )?;
         let description = registry.describe(
             &adapter.instance_id,
             &adapter.adapter_id,

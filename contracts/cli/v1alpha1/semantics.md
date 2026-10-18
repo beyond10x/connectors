@@ -539,7 +539,12 @@ configured entry, and is bound to the same adapter, provider authority and
 profile authentication (equal, or differing only in the evidence lifetime) as
 the definition's instance. Its profile is a static entry: a profile whose entry
 an OAuth acquisition refreshes is never copied, since one rotation would end the
-other's refresh. Under the read-only `mounted_secret` binding nothing is offered.
+other's refresh. The definition's lowered configuration must send the
+credential to the origin of its API base and nowhere else: a profile naming a
+token endpoint or any other URL on another origin is offered nothing, since
+the binding compares the provider authority and the profile declaration, and a
+token endpoint is part of neither. Under the read-only `mounted_secret` binding
+nothing is offered.
 A revoked, Stale, expired or moved connection, and a connection of another
 connector, is never listed. The question lists at most 16 candidates, each by
 number with its `<connector>/<instance>`, its provider authority and its
@@ -557,8 +562,11 @@ connection or another connect of it is in flight), reads the candidate's
 current version under a read use of the source, has the definition's adapter
 validate it with the profile's own identity and scope probes, and publishes a
 new connection of the definition's instance holding the material as its own
-new custody version, only when the validation succeeds and the validated
-identity equals the source's. The acquisition is recorded as a connect's, and
+new custody version, only when the validation succeeds, the validated
+identity equals the source's, and the source is, inside the publishing commit,
+still published, Live, not Stale and under the publication fence and version
+that were read: a source revoked, made Stale, reconnected or revalidated while
+its copy was validated publishes nothing (`revoked`, or `lifecycle_conflict`). The acquisition is recorded as a connect's, and
 `connections status --acquisition` follows it. Otherwise nothing is published,
 the acquisition is failed, and the command offers to connect fresh with one
 `[y/N]` question; declined, the command answers the reuse's own refusal:
