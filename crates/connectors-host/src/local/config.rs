@@ -298,6 +298,14 @@ pub struct Adapter {
     pub instance_id: String,
     pub adapter_id: String,
     pub configuration_revision: String,
+    /// The credential-side digest the implementation prints beside the
+    /// configuration revision (`runtime::Bootstrap::credential_revision`),
+    /// stated so a connection is bound to it (architecture-decision-record:
+    /// provider-definitions-and-runtimes D12). A derived entry takes it from
+    /// the printed bootstrap. Absent, connections keep the configuration
+    /// revision rule. It is not part of the executable selection digest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential_revision: Option<String>,
     pub protocol: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(deserialize_with = "private_selection")]
@@ -358,6 +366,15 @@ impl Adapter {
             value["private_protocol"] = serde_json::json!(protocol);
         }
         connectors_core::digest(&value)
+    }
+    /// What this entry binds a connection to, for an observation that starts
+    /// no provider (D12).
+    pub fn configured(&self) -> super::registry::Configured<'_> {
+        super::registry::Configured {
+            configuration_revision: &self.configuration_revision,
+            credential_revision: self.credential_revision.as_deref(),
+            executable: Some(&self.executable.sha256),
+        }
     }
 }
 
@@ -426,6 +443,8 @@ struct InstanceTable {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     configuration_revision: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    credential_revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     protocol: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(deserialize_with = "private_selection")]
@@ -450,6 +469,7 @@ impl InstanceTable {
             return None;
         }
         let adapter = Adapter {
+            credential_revision: self.credential_revision,
             instance_id: self.instance_id?,
             adapter_id: self.adapter_id?,
             configuration_revision: self.configuration_revision?,
@@ -483,6 +503,7 @@ impl InstanceTable {
             instance_id: Some(adapter.instance_id),
             adapter_id: Some(adapter.adapter_id),
             configuration_revision: Some(adapter.configuration_revision),
+            credential_revision: adapter.credential_revision,
             protocol: Some(adapter.protocol),
             private_protocol: adapter.private_protocol,
             startup: Some(adapter.startup),
@@ -498,6 +519,7 @@ impl InstanceTable {
             && self.instance_id.is_none()
             && self.adapter_id.is_none()
             && self.configuration_revision.is_none()
+            && self.credential_revision.is_none()
             && self.protocol.is_none()
             && self.private_protocol.is_none()
             && self.startup.is_none()
@@ -582,6 +604,7 @@ impl InstanceTable {
             instance_id: None,
             adapter_id: None,
             configuration_revision: None,
+            credential_revision: None,
             protocol: None,
             private_protocol: None,
             startup: None,
@@ -1135,6 +1158,7 @@ impl Installation {
             return Err(Failure::InvalidConfiguration);
         }
         let mut adapter = Adapter {
+            credential_revision: printed.credential_revision,
             instance_id: printed.instance,
             adapter_id: printed.adapter,
             configuration_revision: printed.configuration_revision,
@@ -1152,6 +1176,7 @@ impl Installation {
             || reported.adapter != adapter.adapter_id
             || reported.protocol != adapter.protocol
             || reported.configuration_revision != adapter.configuration_revision
+            || reported.credential_revision != adapter.credential_revision
         {
             return Err(Failure::InvalidConfiguration);
         }
@@ -2339,6 +2364,8 @@ mod derived_instance_tests {
                 "input_schema": {"type": "object"}, "output_schema": {"type": "object"}})
         };
         Bootstrap {
+            credential_revision: None,
+            executable: None,
             instance: instance.into(),
             adapter: "catalog".into(),
             protocol: "v1alpha1".into(),

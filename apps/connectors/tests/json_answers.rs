@@ -64,6 +64,8 @@ fn bootstrap() -> runtime::Bootstrap {
         configuration_schema: json!({"type":"object"}),
     };
     runtime::Bootstrap {
+        credential_revision: None,
+        executable: None,
         instance: "forge-local".into(),
         adapter: "catalog".into(),
         protocol: "v1alpha1".into(),

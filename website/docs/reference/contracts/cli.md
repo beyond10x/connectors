@@ -109,8 +109,8 @@ management wire payload or a persistent record.
 | `connections launch` | exact existing connection's read admission and the owner's custody read | `ConnectionLaunchInput` → the consumer's exit status (consumer launch) | yes / no |
 | `connections status` | safe connection/acquisition observation | `ConnectionStatusInput` → `ConnectionStatusResult` | no / no |
 | `connections revoke` | connection metadata authority | `ConnectionRevokeInput` → `ConnectionRevokeResult` | no / no |
-| `operations list` | selected cached descriptor projection | `OperationListInput` → `OperationListResult` | no / no |
-| `operations describe` | selected cached descriptor projection | `OperationDescribeInput` → `OperationDescribeResult` | no / no |
+| `operations list` | selected cached descriptor projection | `OperationListInput` → `OperationListResult` | only to [launch for a description](#launching-for-a-description) |
+| `operations describe` | selected cached descriptor projection | `OperationDescribeInput` → `OperationDescribeResult` | only to [launch for a description](#launching-for-a-description) |
 | `operations invoke` | admitted service request | `OperationInvokeInput` → `OperationInvokeResult` | yes / yes, after admission |
 
 ### Consumer launch
@@ -155,11 +155,40 @@ local mutation binding. Proof bytes never
 enter the ordinary successful CLI result.
 
 Inventory and status commands use configured/cached descriptions and safe persisted metadata
-or query an already-running owner without provider authentication. Unavailable
+or query an already-running owner without provider authentication; `operations describe`
+and `operations list` start an owner and the adapter only to
+[launch for a description](#launching-for-a-description). Unavailable
 authoritative metadata returns `metadata_unavailable`; cached facts are labeled
 stale and cannot be used to decide fresh connection viability. Missing cached
-operation metadata returns `description_unavailable`, never implicit launch,
-download, installation or authentication. Status distinguishes unavailable owner
+operation metadata returns `description_unavailable`, never download,
+installation or authentication, and never a launch except as follows.
+
+#### Launching for a description
+
+`operations describe`, `operations list` and `operations invoke` (a read or a
+write) start the instance's configured adapter when, and only when, all of these hold: no description is
+cached for the instance's configured selection; the started executable is the
+configured one, admitted by its pinned SHA-256 as every launch is; and the
+instance holds a published connection (the named one, for a command that names
+one) that is not revoked or `stale`, whose credential is neither known invalid
+nor expired, whose upgrade the configured revision has not refused, and that is
+current under the configured entry, as `connections list` reports it with
+`stale = false` (its configuration revision is the configured one, or both
+record the same credential-side digest). The launch reads no credential, asks
+for none and sends nothing to the provider; it only caches the description, and
+an operator's `instances stop` is not resumed by it: a stopped instance answers
+`description_unavailable`. A revoked or `stale` connection, one whose credential
+is known invalid (its identity refused outside an executable-only change), and
+one whose credential-side digest moved (a changed provider authority, profile
+authentication or trust roots, for an implementation that states the digest)
+or that records no digest under another configuration revision are not
+current, so the command answers `description_unavailable` as before and starts
+nothing. An identity refused under an executable-only change records nothing
+and changes nothing, so it does not stop a launch for a description, which
+reads no credential; that connection's reads and writes keep refusing as
+`identity_mismatch`.
+
+Status distinguishes unavailable owner
 from a known stopped process. An owner need not be running to commit local revoke
 if the admitted metadata implementation supports the same serialized authority;
 otherwise revoke returns `metadata_unavailable` and starts nothing.
@@ -474,7 +503,7 @@ step the held connection's own reconnect admits:
 
 | The instance holds | `next_action` |
 |---|---|
-| one connection under the configured binding | `repair_connection`: `connections reconnect` replaces its credential and keeps its reference |
+| one connection under the configured binding, or one whose binding differs from it only on the operation side (bundle, source or selection, under an equal credential-side digest) | `repair_connection`: `connections reconnect` replaces its credential and keeps its reference |
 | one connection saved under an older configuration revision that a revalidation can follow | `revalidate_connection`, after which it is the instance's connection |
 | one connection that reconnect refuses as changed (`create_connection` on a read), or more than one | `revoke_connection`: `connections revoke` it, then connect |
 
@@ -1088,6 +1117,26 @@ credential the provider refused or is known invalid (`stale`), one whose
 credential expired (`reauthorization_required`), and a credential below the
 operation's scopes, keep `code = not_granted` with
 `next_action = repair_connection`.
+
+A connection whose binding and configured entry both record a credential-side
+digest (`credential_revision`, the implementation's digest of what decides
+where the credential is sent and how it authenticates; never the bundle, its
+source or the selection) is bound to it and to the provider executable, not to
+the configuration revision. A change that leaves the digest equal is not a
+stale configuration: when only the bundle, source or selection moved the
+connection reports `ready` with `stale = false`, and a read, a reconnect, an
+approval naming it and a consumer launch admit it with no credential source
+and no question; its next revalidation records the new revision. When only the
+provider executable changed, it also reports `ready` with `stale = false`; a
+read validates its stored credential once under the new executable and is
+served when the recorded identity answers, and a revalidation follows it the
+same way; another identity is refused as `identity_mismatch` and changes
+nothing. Every other change, and every change for a connection whose binding
+records no credential-side digest (saved before it was recorded, or under an
+entry that states none), follows the configuration-revision rule below. A
+changed configuration's description is cached by the first read command that
+[launches for it](#launching-for-a-description); a write after an
+executable-only change validates the connection once, as a read does.
 
 A connection saved under another configuration revision of its instance also
 reports `pending` (`stale = true`), and no status change is pending for it: a

@@ -11,15 +11,23 @@ pub struct Revalidation {
     /// The configured binding a configuration upgrade publishes the
     /// connection under; None when the connection already has it.
     upgrade: Option<Binding>,
+    /// What moved between the saved binding and `upgrade` (`follow`).
+    moved: Follow,
 }
 impl Revalidation {
     pub fn version(&self) -> custody::Version {
         self.version
     }
-    /// Whether this revalidation publishes the connection under a newer
-    /// configuration revision of its instance.
+    /// Whether this revalidation follows a configuration upgrade whose refusal
+    /// a repair cannot answer: not an operation-only or executable-only move
+    /// (D12), whose credential stays bound as it was.
     pub fn upgrades(&self) -> bool {
-        self.upgrade.is_some()
+        self.upgrade.is_some() && self.moved == Follow::Changed
+    }
+    /// Whether this revalidation follows only a provider executable change
+    /// (`Follow::Executable`), classified inside its own capture.
+    pub fn follows_executable(&self) -> bool {
+        self.upgrade.is_some() && self.moved == Follow::Executable
     }
 }
 #[cfg_attr(test, derive(Clone))]
@@ -99,7 +107,9 @@ pub(super) fn changed(
 
 /// The profile declaration's revision digests its scheme, capability, entry
 /// fields, scopes and evidence lifetime, so an equal declaration is unchanged
-/// authentication. Only the configuration revision may differ. A connection
+/// authentication. The configuration revision, the credential-side digest
+/// and the executable may differ (a binding saved before D12 records
+/// neither of the last two, and its revalidation records them). A connection
 /// stays bound to the declaration record it was admitted under (the metadata
 /// store projects its acquisitions' profile from it), so even a lifetime-only
 /// change is not followed in place: a new connection under the same instance
@@ -109,7 +119,7 @@ fn upgradable(admitted: &Binding, configured: &Binding) -> bool {
         && admitted.adapter_id == configured.adapter_id
         && admitted.provider_authority == configured.provider_authority
         && admitted.profile == configured.profile
-        && admitted.configuration_revision != configured.configuration_revision
+        && admitted != configured
 }
 
 /// Whether the configured binding changes the provider authority, or the
@@ -304,7 +314,7 @@ impl Registry {
             tx.execute("INSERT INTO registry_uses (use_id,connection_ref,generation_id,version_id,publication_fence,expires_at_ms) VALUES (?1,?2,?3,?4,?5,?6)",
                 params![id,reference,row.generation,version,row.fence,timestamp(expires)?]).map_err(db)?;
             Ok(Revalidation {id, version:custody_version(authority,&row.scope_id,version)?, captured:now,
-                upgrade: upgrade.then(|| binding.clone())})
+                upgrade: upgrade.then(|| binding.clone()), moved: if upgrade { follow(&row.binding, binding) } else { Follow::Same }})
         })
     }
 
@@ -358,14 +368,25 @@ impl Registry {
             let row = current(tx,authority,&dispatched.captured,true,now)?;
             let upgrade = dispatched.captured.upgrade.as_ref();
             let binding = upgrade.unwrap_or(&row.binding);
+            // What a refusal does depends on what moved (D12). Only the
+            // operation side, or nothing the saved binding records: the
+            // credential is bound as before, so a refusal invalidates it as
+            // outside an upgrade. Only the executable: nothing changes, the
+            // credential is not proved invalid by a new program. Anything
+            // else is a configuration upgrade (`refuse_upgrade`).
+            let moved = upgrade.map_or(Follow::Same, |upgrade| follow(&row.binding, upgrade));
             let decision = match result {
                 Ok(mut native) => {
                     // Reject malformed or stale adapter evidence before treating
                     // its identity as a proved mismatch in the current material.
                     native.validate(binding,dispatched.consumed,now)?;
                     if row.identity.as_ref() != Some(&native.identity) {
-                        match upgrade { None => invalidate(tx,&row,InvalidCredential::Invalid)?, Some(upgrade) => refuse_upgrade(tx,&row,upgrade)? }
-                        Err(if upgrade.is_some() { Failure::UpgradeIdentityMismatch } else { Failure::IdentityMismatch })
+                        match (moved, upgrade) {
+                            (Follow::Same | Follow::Operations, _) => { invalidate(tx,&row,InvalidCredential::Invalid)?; Err(Failure::IdentityMismatch) }
+                            (Follow::Executable, _) => Err(Failure::UpgradeIdentityMismatch),
+                            (Follow::Changed, Some(upgrade)) => { refuse_upgrade(tx,&row,upgrade)?; Err(Failure::UpgradeIdentityMismatch) }
+                            (Follow::Changed, None) => Err(Failure::MetadataUnavailable),
+                        }
                     } else {
                         // Recollection cannot erase a known expiry for these
                         // unchanged bytes, even if an upstream response omits it.
@@ -380,9 +401,17 @@ impl Registry {
                         tx.execute("UPDATE registry_connections SET baseline=?2,publication_fence=?3 WHERE connection_ref=?1",
                             params![row.reference,encode(&snapshot)?,new_id()]).map_err(db)?;
                         if let Some(upgrade) = upgrade {
-                            // The binding changed, so the public revision advances.
-                            tx.execute("UPDATE registry_connections SET binding=?2,semantic_revision=?3 WHERE connection_ref=?1",
-                                params![row.reference,encode(upgrade)?,new_id()]).map_err(db)?;
+                            // The binding changed, so the public revision advances, except
+                            // for an executable-only move (D12): the connection's meaning is
+                            // unchanged, and an approval already binds the executable
+                            // selection, so a write validated under it keeps its approval.
+                            if moved == Follow::Executable {
+                                tx.execute("UPDATE registry_connections SET binding=?2 WHERE connection_ref=?1",
+                                    params![row.reference,encode(upgrade)?]).map_err(db)?;
+                            } else {
+                                tx.execute("UPDATE registry_connections SET binding=?2,semantic_revision=?3 WHERE connection_ref=?1",
+                                    params![row.reference,encode(upgrade)?,new_id()]).map_err(db)?;
+                            }
                             tx.execute("UPDATE registry_instances SET configuration_revision=?3 WHERE instance_id=?1 AND adapter_id=?2",
                                 params![upgrade.instance_id,upgrade.adapter_id,upgrade.configuration_revision]).map_err(db)?;
                             follow_instance(tx,&upgrade.instance_id,&upgrade.configuration_revision)?;
@@ -392,10 +421,10 @@ impl Registry {
                     }
                 }
                 Err(reason) => {
-                    match (reason, upgrade) {
-                        (Some(reason), None) => invalidate(tx,&row,reason)?,
-                        (Some(_), Some(upgrade)) => refuse_upgrade(tx,&row,upgrade)?,
-                        (None, _) => {}
+                    match (reason, moved, upgrade) {
+                        (Some(reason), Follow::Same | Follow::Operations, _) => invalidate(tx,&row,reason)?,
+                        (Some(_), Follow::Changed, Some(upgrade)) => refuse_upgrade(tx,&row,upgrade)?,
+                        _ => {}
                     }
                     Ok(())
                 }

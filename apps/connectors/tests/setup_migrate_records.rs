@@ -90,6 +90,8 @@ fn bootstrap(alias: &str, adapter: &str) -> runtime::Bootstrap {
         configuration_schema: json!({"type":"object"}),
     };
     runtime::Bootstrap {
+        credential_revision: None,
+        executable: None,
         instance,
         adapter: adapter.into(),
         protocol: "v1alpha1".into(),

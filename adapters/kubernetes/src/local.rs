@@ -306,6 +306,8 @@ impl Local {
         let mut reads = full.clone();
         reads.operations.retain(|o| o.id != "pods.exec");
         let bootstrap = Bootstrap {
+            credential_revision: None,
+            executable: None,
             instance: config.instance,
             adapter: "kubernetes".into(),
             protocol: connectors_core::WIRE_VERSION.into(),

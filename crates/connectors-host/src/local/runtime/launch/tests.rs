@@ -494,6 +494,8 @@ fn publish(
     lifetime_ms: u64,
 ) -> String {
     let binding = registry::Binding {
+        credential_revision: None,
+        executable: None,
         instance_id: "fixture-instance".into(),
         adapter_id: "fixture-adapter".into(),
         configuration_revision: "cfg-1".into(),

@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-18T06:48:14Z",
+  "actor": "human:timo",
+  "artifact": "story:connection-binding-excludes-operations",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate on unit/connection-binding-excludes-operations working tree after round 2: all checks passed, 306 suites, 2653 passed, 0 failed, 133 ignored; story journeys revision_recovery and custody_journey 23 passed, 4 failing also on origin/main"
+  }
+}

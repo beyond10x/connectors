@@ -530,6 +530,16 @@ pub struct Bootstrap {
     pub adapter: String,
     pub protocol: String,
     pub configuration_revision: String,
+    /// The implementation's digest of its credential-side configuration
+    /// (`registry::Binding::credential_revision`). Omitted when the
+    /// implementation states none, so its bootstrap keeps its bytes. The host
+    /// binds the value its configured entry states (`configure`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential_revision: Option<String>,
+    /// The SHA-256 of the executable the host admitted this bootstrap under,
+    /// set by the host (`configure`); never read from an implementation.
+    #[serde(skip)]
+    pub executable: Option<String>,
     pub provider_authority: String,
     pub descriptor: String,
     pub profiles: Vec<Profile>,
@@ -555,6 +565,16 @@ impl Bootstrap {
             .find(|p| p.id == id)
             .ok_or(Failure::Unsupported)
     }
+    /// Bind this bootstrap to the configured entry it was admitted or cached
+    /// under: the entry's executable digest and the credential-side digest the
+    /// entry states, which a launch has checked against the implementation's
+    /// (`process::Child::spawn_until`). An entry that states none binds none,
+    /// whatever the implementation printed: its connections keep the
+    /// configuration-revision rule.
+    pub fn configure(&mut self, adapter: &super::config::Adapter) {
+        self.credential_revision = adapter.credential_revision.clone();
+        self.executable = Some(adapter.executable.sha256.clone());
+    }
     pub fn binding(&self, id: &str) -> Result<registry::Binding> {
         Ok(registry::Binding {
             instance_id: self.instance.clone(),
@@ -562,12 +582,18 @@ impl Bootstrap {
             configuration_revision: self.configuration_revision.clone(),
             provider_authority: self.provider_authority.clone(),
             profile: self.profile(id)?.registry_profile(),
+            credential_revision: self.credential_revision.clone(),
+            executable: self.executable.clone(),
         })
     }
     pub fn validate(&self) -> Result<()> {
         if ![&self.instance, &self.adapter, &self.configuration_revision]
             .iter()
             .all(|v| connectors_core::valid_id(v))
+            || self
+                .credential_revision
+                .as_deref()
+                .is_some_and(|v| !connectors_core::valid_id(v))
             || self.protocol != connectors_core::WIRE_VERSION
             || !bounded(&self.provider_authority, 4096)
             || self.descriptor.len() > INPUT_LIMIT

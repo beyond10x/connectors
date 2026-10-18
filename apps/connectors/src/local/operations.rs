@@ -52,7 +52,7 @@ pub(super) fn describe(
             Ok::<_, owner::Error>((family, request))
         })
         .transpose()?;
-    let bootstrap = owner::cached(paths, alias)?;
+    let bootstrap = owner::described(paths, alias, None)?;
     let descriptor = bootstrap.descriptor()?;
     if let Some((family, request)) = request {
         let operations = descriptor
@@ -338,6 +338,8 @@ mod json_value_tests {
             effect,
         };
         runtime::Bootstrap {
+            credential_revision: None,
+            executable: None,
             instance: "forge-local".into(),
             adapter: "catalog".into(),
             protocol: "v1alpha1".into(),

@@ -262,6 +262,7 @@ impl Fixture {
             .canonicalize()
             .unwrap();
         Child::spawn(&Adapter {
+            credential_revision: None,
             private_protocol: protocol,
             permissions: Default::default(),
             instance_id: "adversary-oauth".into(),

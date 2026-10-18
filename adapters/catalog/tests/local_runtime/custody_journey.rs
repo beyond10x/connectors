@@ -33,9 +33,20 @@ impl Journey {
         Self::with_custody(create_mode, CUSTODY_TABLE)
     }
 
+    /// [`Journey::new`], the writer's entry stating the bootstrap's
+    /// `credential_revision`, so its connection is bound to the credential side
+    /// and the executable (story:connection-binding-excludes-operations).
+    fn pinned(create_mode: u8) -> Self {
+        Self::build(create_mode, CUSTODY_TABLE, true)
+    }
+
     /// [`Journey::new`] with `custody_table` as the owner's custody table for
     /// the create; empty configures none.
     fn with_custody(create_mode: u8, custody_table: &str) -> Self {
+        Self::build(create_mode, custody_table, false)
+    }
+
+    fn build(create_mode: u8, custody_table: &str, pinned: bool) -> Self {
         let provider = Provider::new();
         provider.create_mode.store(create_mode, Ordering::SeqCst);
         let custody = Custody::new(provider.root.path());
@@ -56,9 +67,13 @@ impl Journey {
         let entry = |alias: &str, adapter: &Adapter, operations: &str| {
             let q = |value: &str| serde_json::to_string(value).unwrap();
             format!(
-                "[adapters.{alias}]\ninstance_id={}\nadapter_id='catalog'\nconfiguration_revision={}\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\nstartup='on-demand'\nrestart='never'\n[adapters.{alias}.permissions]\nprofiles=['gitlab.pat']\noperations={operations}\n[adapters.{alias}.executable]\npath={}\nsha256={}\nargs={}\n",
+                "[adapters.{alias}]\ninstance_id={}\nadapter_id='catalog'\nconfiguration_revision={}\n{}protocol='v1alpha1'\nprivate_protocol='connectors-private/2'\nstartup='on-demand'\nrestart='never'\n[adapters.{alias}.permissions]\nprofiles=['gitlab.pat']\noperations={operations}\n[adapters.{alias}.executable]\npath={}\nsha256={}\nargs={}\n",
                 q(&adapter.instance_id),
                 q(&adapter.configuration_revision),
+                match (&adapter.credential_revision, pinned && alias == "gitlab") {
+                    (Some(credential), true) => format!("credential_revision={}\n", q(credential)),
+                    _ => String::new(),
+                },
                 q(adapter.executable.path.to_str().unwrap()),
                 q(&adapter.executable.sha256),
                 serde_json::to_string(&adapter.executable.args).unwrap()
@@ -188,6 +203,52 @@ impl Journey {
         invocation
     }
 
+    /// Replaces the writer's provider executable with a copy one trailing byte
+    /// longer: another digest, the same program. Only the writer entry's
+    /// executable path and digest change.
+    fn replace_writer_executable(&self) {
+        let mut bytes = fs::read(env!("CARGO_BIN_EXE_connectors-catalog-provider")).unwrap();
+        bytes.push(1);
+        let copy = self.provider.root.path().join("private/writer-provider");
+        fs::write(&copy, &bytes).unwrap();
+        fs::set_permissions(&copy, fs::Permissions::from_mode(0o700)).unwrap();
+        let q = |value: &str| serde_json::to_string(value).unwrap();
+        let mut writer = false;
+        let entry: String = fs::read_to_string(&self.cli.paths.config)
+            .unwrap()
+            .lines()
+            .map(|line| {
+                if line.starts_with('[') {
+                    writer = line == "[adapters.gitlab.executable]";
+                }
+                if writer && line.starts_with("path=") {
+                    format!("path={}\n", q(copy.to_str().unwrap()))
+                } else if writer && line.starts_with("sha256=") {
+                    format!("sha256={}\n", q(&hex::encode(Sha256::digest(&bytes))))
+                } else {
+                    format!("{line}\n")
+                }
+            })
+            .collect();
+        private(&self.cli.paths.config, entry.as_bytes());
+        connectors_host::local::config::Config::load(&self.cli.paths.config).unwrap();
+    }
+
+    /// The validations of the writer's credential the fixture answered: each
+    /// asks for the account with it. The created token's own validation, as
+    /// the new connection of `minted`, carries another token.
+    fn validations(&self) -> usize {
+        self.provider
+            .tokens
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(route, token)| {
+                route == "/api/v4/user" && token.as_deref() == Some("fixture-pat-one")
+            })
+            .count()
+    }
+
     fn minted(&self) -> Vec<Value> {
         success(
             self.cli
@@ -232,6 +293,50 @@ fn failed(output: Output, code: &str) -> Value {
     let value: Value = serde_json::from_slice(&output.stderr).unwrap();
     assert_eq!(value["error"]["data"]["code"], code, "{value}");
     value["error"]["data"].clone()
+}
+
+/// story:connection-binding-excludes-operations: a write after only the
+/// writer's provider executable changed validates its connection once under
+/// the new executable and is sent, as a read is; it never answers
+/// `revalidate_connection` for a connection that lists `ready`.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn a_write_after_an_executable_only_change_is_validated_once_and_sent() {
+    let journey = Journey::pinned(0);
+    let validations = journey.validations();
+    journey.replace_writer_executable();
+    // `operations describe` starts the new executable for its description,
+    // validating nothing. The approval policy binds the executable selection,
+    // which D12 leaves as it is: it is published again for the new executable.
+    // The connection is not touched.
+    success(journey.cli.run(&[
+        "operations",
+        "describe",
+        "--adapter",
+        "gitlab",
+        "--operation",
+        "group_token.create",
+    ]));
+    assert_eq!(journey.validations(), validations);
+    let policy = journey.provider.root.path().join("private/policy.json");
+    success(journey.cli.run(&[
+        "approvals",
+        "policy-set",
+        "--adapter",
+        "gitlab",
+        "--input-file",
+        policy.to_str().unwrap(),
+        "--expected-revision",
+        "1",
+    ]));
+    let invocation = journey.approved("tenant-key");
+    let created = success(journey.run(&invocation));
+    assert_eq!(
+        created["mutation"]["classification"], "applied",
+        "{created}"
+    );
+    assert_eq!(journey.provider.create_effects.load(Ordering::SeqCst), 1);
+    assert_eq!(journey.validations(), validations + 1);
 }
 
 #[test]
@@ -374,4 +479,106 @@ fn a_create_whose_operation_has_no_custody_target_is_refused_before_it_is_sent()
     assert!(journey.minted().is_empty());
     journey.cli.shutdown();
     journey.assert_nowhere(CREATED_TOKEN);
+}
+
+// Security review, round 2 (story:connection-binding-excludes-operations): a
+// write after an executable-only change keeps its approval, policy and
+// identity bindings.
+
+/// A proof issued before only the writer's provider executable changed
+/// authorizes no write after it, even once the policy is published again for
+/// the new executable (whose subject the proof does not carry): the public
+/// connection revision the follow keeps is not the only coordinate the
+/// approval binds. Nothing is created and no validation is sent.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn security2_a_proof_issued_before_an_executable_only_change_authorizes_no_write() {
+    let journey = Journey::pinned(0);
+    let invocation = journey.approved("security2-before");
+    let validations = journey.validations();
+    journey.replace_writer_executable();
+    success(journey.cli.run(&[
+        "operations",
+        "describe",
+        "--adapter",
+        "gitlab",
+        "--operation",
+        "group_token.create",
+    ]));
+    let policy = journey.provider.root.path().join("private/policy.json");
+    success(journey.cli.run(&[
+        "approvals",
+        "policy-set",
+        "--adapter",
+        "gitlab",
+        "--input-file",
+        policy.to_str().unwrap(),
+        "--expected-revision",
+        "1",
+    ]));
+    let output = journey.run(&invocation);
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    eprintln!("security2 refusal: {stderr}");
+    assert!(
+        !output.status.success() || !stdout.contains("\"applied\""),
+        "a proof issued before the executable change authorized a write: {stdout}"
+    );
+    assert_eq!(
+        journey.provider.create_effects.load(Ordering::SeqCst),
+        0,
+        "{stderr}"
+    );
+    assert_eq!(journey.validations(), validations, "{stderr}");
+}
+
+/// A write whose new executable's validation answers another identity is
+/// refused as `identity_mismatch` after exactly one validation, creates
+/// nothing, and leaves the connection's revision and identity as they were.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn security2_a_write_whose_new_executable_answers_another_identity_sends_nothing() {
+    let journey = Journey::pinned(0);
+    let describe = || {
+        success(journey.cli.run(&[
+            "connections",
+            "describe",
+            "--adapter",
+            "gitlab",
+            "--connection",
+            &journey.connection,
+        ]))["connection"]
+            .clone()
+    };
+    let before = describe();
+    journey.replace_writer_executable();
+    success(journey.cli.run(&[
+        "operations",
+        "describe",
+        "--adapter",
+        "gitlab",
+        "--operation",
+        "group_token.create",
+    ]));
+    let policy = journey.provider.root.path().join("private/policy.json");
+    success(journey.cli.run(&[
+        "approvals",
+        "policy-set",
+        "--adapter",
+        "gitlab",
+        "--input-file",
+        policy.to_str().unwrap(),
+        "--expected-revision",
+        "1",
+    ]));
+    let invocation = journey.approved("security2-identity");
+    let validations = journey.validations();
+    journey.provider.identity_shift.store(100, Ordering::SeqCst);
+    failed(journey.run(&invocation), "identity_mismatch");
+    assert_eq!(journey.provider.create_effects.load(Ordering::SeqCst), 0);
+    assert_eq!(journey.validations(), validations + 1);
+    journey.provider.identity_shift.store(0, Ordering::SeqCst);
+    let after = describe();
+    assert_eq!(after["summary"]["revision"], before["summary"]["revision"]);
+    assert_eq!(after["external_identity"], before["external_identity"]);
 }

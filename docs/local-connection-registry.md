@@ -87,10 +87,40 @@ already be in flight; revocation cannot undo it or allow another dispatch.
 
 ## Configuration upgrades
 
-A connection is bound to the configuration revision of its instance that it was
-admitted under. When the configuration moves to a new revision (a rebuilt bundle,
-a changed selection, a new provider executable or CA file), the connection reports
-`pending` with `stale` set, and reads, reconnect and approvals refuse it.
+A connection is bound to what it authenticates against: the provider
+authority (endpoint host and instance id), the profile declaration, the
+validated external identity, the credential side of the configuration and the
+provider executable.
+The credential side is a digest the implementation prints beside the
+configuration revision, `credential_revision` in `--print-local-bootstrap`: for
+the catalog provider it covers the instance, the provider, the API base, the CA
+file's bytes, the `auth` block and its profile declaration, the token CA,
+the admitted hosts and the request prefix, and never the bundle, its vendored
+source, the selection or the feed. A pinned entry states it as
+`credential_revision`, copied from the bootstrap like `configuration_revision`;
+a derived entry takes it from the installed provider. The binding records it
+(`Connection.credential_revision`) and the executable's SHA-256
+(`Connection.executable_digest`) beside the configuration revision.
+
+| Change | Connection |
+|---|---|
+| bundle, source or selection only | not stale and `ready`; reads, reconnect and approvals admit it under the new revision, with no credential source and no question; its next revalidation records the new revision |
+| provider executable only | not stale and `ready`; it follows once a validation under the new executable answers the recorded identity, which a read runs itself when the description is cached; another identity is refused as `identity_mismatch` and changes nothing |
+| CA file, token CA, admitted hosts or request prefix | `pending` with `stale` set; reads, reconnect and approvals refuse it until `connections revalidate` |
+| provider authority or profile authentication | `lifecycle_conflict`, as below |
+
+The rest of this section is the rule for a change of the credential side, and
+for a connection whose binding records no credential side: one saved before
+it was recorded, or under an entry that states none. Such a connection is bound
+to the configuration revision it was admitted under, whatever moved it, until a
+revalidation records both digests. Nothing is migrated by guess. A changed
+configuration's description is cached by the first `operations describe`,
+`list` or `invoke`, which starts the configured adapter, reading no credential,
+when the instance holds a connection current under it ([CLI
+semantics](../contracts/cli/v1alpha1/semantics.md#launching-for-a-description)).
+
+When the configuration moves to a new revision under that rule, the connection
+reports `pending` with `stale` set, and reads, reconnect and approvals refuse it.
 
 Explicit revalidation upgrades it in place. It captures the connection's current
 custody version, never a credential entry, runs the new provider's declared
