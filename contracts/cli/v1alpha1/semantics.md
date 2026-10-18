@@ -466,10 +466,12 @@ instance's description states, as `operations describe` reports it. The bare
 `invoke` stays the explicit compatibility command.
 
 The file is lowered with the reference lowerer into an owner-only cache under
-the state directory, `definitions/<digest>/`, keyed by the digest of the
-definition, the connector declaration it lowers to (which carries the shared
-auth files it uses), its vendored source and its amendments, and of the
-lowerer's release. A run whose inputs are unchanged reuses the entry; a
+the state directory, `definitions/<digest>/`, keyed by the digest of every
+file the lowering reads (the definition, its vendored source, its amendments
+and the shared auth files its profiles use, each by its path under the
+definitions root) and of the lowerer's release. Each file is read once; the
+lowerer reads a private copy of exactly those bytes, so an entry holds the
+lowering of its key. A run whose inputs are unchanged reuses the entry; a
 changed one is lowered into a new entry beside it. A definition the lowerer
 refuses, or one that cannot be read, is `invalid_input` at `arguments` and
 leaves nothing behind; `connectors-build definition` names the lowerer's
@@ -481,7 +483,9 @@ The instance is the connector's instance `definition` (the connector id is
 the definition's `id`, else its file stem), with the alias and instance id
 `<connector>.definition`. Its entry pins the installed catalog provider on the
 lowered configuration as a derived instance's does, and is held in the
-owner-only file `definitions/instances.toml` beside the cache. Every command
+owner-only file `definitions/instances.toml` beside the cache; a later run of a file with the
+same connector id replaces that entry, so both files are one instance and its
+connection follows the rules below. Every command
 that selects an instance reads it beside the configuration, so `--connector
 <connector> --instance definition` selects it too, but `instances list` and
 `setup check` report the configuration alone. The configuration file is never

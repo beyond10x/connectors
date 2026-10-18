@@ -24,7 +24,7 @@ use connectors_host::local::{
 };
 use sha2::{Digest, Sha256};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     ffi::OsStr,
     path::{Component, Path, PathBuf},
 };
@@ -260,7 +260,7 @@ fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerRep
     // The state directory `setup init` made holds the cache.
     Metadata::inspect(&paths.state).map_err(host_failure)?;
     let _signals = protected::Signals::install().map_err(owner_failure)?;
-    let (digest, native) = cache(&paths, &file, &root, &bytes, &parsed, &stem, &alias)?;
+    let (digest, native) = cache(&paths, &file, &root, &bytes, &parsed, &alias)?;
     let (adapter, reported) = definitions::derive(&connector, &native).map_err(host_failure)?;
     definitions::record(
         &paths,
@@ -351,66 +351,116 @@ fn under_root(root: &Path, relative: &str) -> Option<Vec<u8>> {
     read_bounded(&resolved, SOURCE_LIMIT)
 }
 
-/// The cache key of a definition: the digest of this build's lowerer, the
-/// file's stem and bytes, the connector declaration it lowers to (which
-/// carries every shared auth file it uses), its vendored source and its
-/// amendments. `None` when one of them cannot be read.
-fn key(
+/// A path the definition names under the definitions root, as the lowerer
+/// admits it: plain relative components only.
+fn relative(path: &str) -> Option<PathBuf> {
+    let relative = PathBuf::from(path);
+    (!path.is_empty()
+        && relative
+            .components()
+            .all(|component| matches!(component, Component::Normal(_))))
+    .then_some(relative)
+}
+
+/// Every file a lowering of the definition reads, by its path under the
+/// definitions root, each read once: the definition itself as
+/// `connectors/<file name>`, its vendored source, its amendments and the
+/// shared auth file of each profile that uses one. `None` when one cannot be
+/// read, is not under the root, or two names would be one path.
+fn inputs(
     file: &Path,
     root: &Path,
     bytes: &[u8],
     parsed: &lowering::ProviderDefinition,
-    stem: &str,
-) -> Option<String> {
+) -> Option<BTreeMap<PathBuf, Vec<u8>>> {
+    let mut named = vec![(
+        PathBuf::from("connectors").join(file.file_name()?),
+        bytes.to_vec(),
+    )];
+    let (_, source) = parsed.source.document().ok()?;
+    let mut referenced = vec![source.to_owned()];
+    referenced.extend(parsed.source.amendments.clone());
+    referenced.extend(
+        parsed
+            .auth
+            .values()
+            .filter_map(|auth| auth.library.as_ref())
+            .map(|library| format!("auth/{library}.yaml")),
+    );
+    for path in referenced {
+        named.push((relative(&path)?, under_root(root, &path)?));
+    }
+    let mut files = BTreeMap::new();
+    for (path, bytes) in named {
+        if files
+            .insert(path, bytes.clone())
+            .is_some_and(|held| held != bytes)
+        {
+            return None;
+        }
+    }
+    Some(files)
+}
+
+/// The cache key of a definition: the digest of this build's lowerer and of
+/// every file its lowering reads, by path ([`inputs`]).
+fn key(files: &BTreeMap<PathBuf, Vec<u8>>) -> String {
     let mut hash = Sha256::new();
-    let mut part = |label: &str, data: &[u8]| {
-        hash.update(label.as_bytes());
-        hash.update([0]);
+    let mut part = |label: &[u8], data: &[u8]| {
+        hash.update((label.len() as u64).to_be_bytes());
+        hash.update(label);
         hash.update((data.len() as u64).to_be_bytes());
         hash.update(data);
     };
-    part("format", b"connectors-definition-cache/1");
-    part("lowerer", env!("CARGO_PKG_VERSION").as_bytes());
-    part("stem", stem.as_bytes());
-    part("definition", bytes);
-    part(
-        "declaration",
-        lowering::connector(file, root).ok()?.as_bytes(),
-    );
-    let (_, source) = parsed.source.document().ok()?;
-    part("source", &under_root(root, source)?);
-    if let Some(amendments) = &parsed.source.amendments {
-        part("amendments", &under_root(root, amendments)?);
+    part(b"format", b"connectors-definition-cache/2");
+    part(b"lowerer", env!("CARGO_PKG_VERSION").as_bytes());
+    for (path, bytes) in files {
+        part(path.to_string_lossy().as_bytes(), bytes);
     }
-    Some(hex::encode(hash.finalize()))
+    hex::encode(hash.finalize())
 }
 
 /// The cache entry `<state>/definitions/<digest>/` of the definition at `file`
 /// and its native configuration: reused when it exists, otherwise lowered into
 /// a private staging directory beside it and published under its digest
-/// whole. A definition the lowerer refuses leaves nothing behind.
+/// whole. The lowerer reads a private copy of exactly the files the digest was
+/// taken over, so an entry holds the lowering of its key and nothing a file
+/// changed into meanwhile. A definition the lowerer refuses leaves nothing
+/// behind.
 fn cache(
     paths: &Paths,
     file: &Path,
     root: &Path,
     bytes: &[u8],
     parsed: &lowering::ProviderDefinition,
-    stem: &str,
     alias: &str,
 ) -> Result<(String, PathBuf), HandlerReply> {
-    let digest = key(file, root, bytes, parsed, stem).ok_or_else(usage)?;
+    let files = inputs(file, root, bytes, parsed).ok_or_else(usage)?;
+    let digest = key(&files);
     let (directory, held) = definitions::directory(paths, true).map_err(host_failure)?;
     let entry = directory.join(&digest);
     let native = entry.join(NATIVE);
     if std::fs::symlink_metadata(&native).is_ok_and(|metadata| metadata.is_file()) {
         return Ok((digest, native));
     }
-    let staging = directory.join(format!(".lowering-{}", uuid::Uuid::new_v4().simple()));
-    filesystem::directory(&staging, true, true).map_err(host_failure)?;
+    let unique = uuid::Uuid::new_v4().simple();
+    let copied = directory.join(format!(".inputs-{unique}"));
+    let staging = directory.join(format!(".lowering-{unique}"));
     let lowered = (|| {
+        filesystem::directory(&copied, true, true).map_err(host_failure)?;
+        for (path, bytes) in &files {
+            let target = copied.join(path);
+            std::fs::create_dir_all(target.parent().ok_or_else(usage)?)
+                .and_then(|()| std::fs::write(&target, bytes))
+                .map_err(|_| host_failure(Failure::InvalidConfiguration))?;
+        }
+        filesystem::directory(&staging, true, true).map_err(host_failure)?;
+        let definition = copied
+            .join("connectors")
+            .join(file.file_name().ok_or_else(usage)?);
         let lowered = lowering::lower(&lowering::Request {
-            definition: file,
-            root,
+            definition: &definition,
+            root: &copied,
             out: &staging,
             scratch: &directory,
         })
@@ -429,8 +479,10 @@ fn cache(
             }
         })
     });
-    if std::fs::symlink_metadata(&staging).is_ok() {
-        let _ = std::fs::remove_dir_all(&staging);
+    for scratch in [&copied, &staging] {
+        if std::fs::symlink_metadata(scratch).is_ok() {
+            let _ = std::fs::remove_dir_all(scratch);
+        }
     }
     published?;
     filesystem::sync_directory(&held).map_err(host_failure)?;
@@ -643,5 +695,106 @@ fn described(
             Err(owner_failure(error))
         }
         Err(error) => Err(owner_failure(error)),
+    }
+}
+
+/// story:invoke-definition-file: the cache key covers every file a lowering
+/// reads, and only files under the definitions root.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const DEFINITION: &str = "schema: urn:beyond10x:connectors-definition:1
+source:
+  openapi: upstream/forge/openapi.json.gz
+  sha256: 01fcc470fbbd1a2c691d5a17c35a00b086ca5e62fdd08747f92cb350e0fc6fa1
+  amendments: upstream/forge/amendments.json
+base_url: https://gitlab.example.com/api/v4
+auth:
+  forge.pat:
+    use: forge
+operations:
+  project.get:
+    op: getApiV4ProjectsId
+";
+
+    /// A definitions root holding the definition and each file it names.
+    fn tree(
+        text: &str,
+    ) -> (
+        tempfile::TempDir,
+        PathBuf,
+        Vec<u8>,
+        lowering::ProviderDefinition,
+    ) {
+        let root = tempfile::tempdir().unwrap();
+        for (path, bytes) in [
+            ("connectors/forge.yaml", text),
+            ("upstream/forge/openapi.json.gz", "source"),
+            ("upstream/forge/amendments.json", "amendments"),
+            ("auth/forge.yaml", "library"),
+        ] {
+            let path = root.path().join(path);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, bytes).unwrap();
+        }
+        let file = root.path().join("connectors/forge.yaml");
+        let parsed = lowering::parse(text.as_bytes()).unwrap();
+        (root, file, text.as_bytes().to_vec(), parsed)
+    }
+
+    fn digest(
+        root: &Path,
+        file: &Path,
+        bytes: &[u8],
+        parsed: &lowering::ProviderDefinition,
+    ) -> String {
+        key(&inputs(file, root, bytes, parsed).unwrap())
+    }
+
+    #[test]
+    fn every_file_a_lowering_reads_is_in_the_key() {
+        let (root, file, bytes, parsed) = tree(DEFINITION);
+        let files = inputs(&file, root.path(), &bytes, &parsed).unwrap();
+        assert_eq!(
+            files
+                .keys()
+                .map(|p| p.to_str().unwrap())
+                .collect::<Vec<_>>(),
+            [
+                "auth/forge.yaml",
+                "connectors/forge.yaml",
+                "upstream/forge/amendments.json",
+                "upstream/forge/openapi.json.gz",
+            ]
+        );
+        let first = digest(root.path(), &file, &bytes, &parsed);
+        assert_eq!(digest(root.path(), &file, &bytes, &parsed), first);
+        for path in [
+            "upstream/forge/openapi.json.gz",
+            "upstream/forge/amendments.json",
+            "auth/forge.yaml",
+        ] {
+            let target = root.path().join(path);
+            let before = std::fs::read(&target).unwrap();
+            std::fs::write(&target, b"changed").unwrap();
+            assert_ne!(digest(root.path(), &file, &bytes, &parsed), first, "{path}");
+            std::fs::write(&target, before).unwrap();
+        }
+        let renamed = root.path().join("connectors/other.yaml");
+        assert_ne!(digest(root.path(), &renamed, &bytes, &parsed), first);
+    }
+
+    #[test]
+    fn a_file_outside_the_definitions_root_is_refused() {
+        let text = DEFINITION.replace(
+            "amendments: upstream/forge/amendments.json",
+            "amendments: ../outside.json",
+        );
+        let (root, file, bytes, parsed) = tree(&text);
+        assert!(inputs(&file, root.path(), &bytes, &parsed).is_none());
+        let text = DEFINITION.replace("use: forge", "use: ../forge");
+        let (root, file, bytes, parsed) = tree(&text);
+        assert!(inputs(&file, root.path(), &bytes, &parsed).is_none());
     }
 }
