@@ -53,7 +53,6 @@ Deferred families with no document yet: `execution`, `events`, `resources`,
 | Adapter document | Contracts |
 |---|---|
 | [Kubernetes](../adapters/kubernetes/design.md) | records, endpoint_discovery, host_discovery (implemented) + logs, mutation, resource_discovery, route.mediated_http, auth.connection, auth.profile, auth.acquisition (static_config), auth.capability, auth.custody, auth.evidence |
-| [Docker](../adapters/docker/design.md) | operations + mutation, records, logs, endpoint_discovery, auth.connection, auth.profile, auth.acquisition (static_config), auth.capability, auth.custody, auth.evidence |
 | Grafana, Loki, Prometheus, Alertmanager | records, logs, series, resource_discovery, route.mediated_http, auth.connection, auth.profile, auth.acquisition, auth.capability, auth.custody, auth.evidence |
 | [Catalog and pre-compiled third-party specs](../adapters/catalog/design.md) | catalog, operations `generic-http` + mutation, records `generic-http-page`, auth.profile, auth.acquisition, auth.capability (+ `http-header`, `http-query`), auth.evidence, auth.connection, auth.custody |
 
@@ -64,11 +63,8 @@ Deferred families with no document yet: `execution`, `events`, `resources`,
 | Jira | basic email+token; user OAuth2 code+refresh; service client_credentials; service bearer (`../connectors/providers/jira.toml:140-297`) | 4 | oauth2 code, client credentials, static entry | http-basic, http-bearer | scope, identity |
 | Confluence | basic email+token; service bearer (`providers/confluence.toml`) | 2 | static entry | http-basic, http-bearer | scope |
 | Kubernetes | bearer/token file, client certificate, exec plugin gated (`crates/integration-kubernetes/src/local.rs:311-315,1076-1079`) | 2 specified configured paths + 1 reserved exec flow | static_config activation; exec_plugin reserved in acquisition | http-bearer, mtls; exec plugin requires its future binding | SelfSubjectReview, exact-target budgeted SelfSubjectAccessReview |
-| Docker | none old; socket peer or TLS client certificate (to verify) | 2 | static config | socket peer, mtls | ping |
 | Grafana | service-account bearer via connect session (`providers/grafana.toml`); explicit configured first phase | 2 proposed paths | static_config/read_only first; static_entry/versioned managed later | http-bearer | credential/identity checks and declared verification |
 | Loki / Prometheus / Alertmanager | explicit anonymous, bearer, basic or parent-mediated binding + admitted tenant header (`docs/design/08:150-160` old) | 4 proposed profiles per child adapter | static_config activation/materialization, no auth.begin | http-anonymous / http-bearer / http-basic / mediated-http | applicable binding/credential checks; declared verification |
-| SIP | trunk username+password to sipx (`crates/driver-sip/src/lib.rs:104-114`) | 1 | static entry | sip-credential-lease | custody reachable |
-| RTVBP | host-issued proof-bound authority + DPoP (`docs/design/05:297-305` old) | 1 (no vendor credential) | host issued | session-authority, inbound-verifier | none; redemption is inbound-verifier capability state |
 
 ## Document template
 

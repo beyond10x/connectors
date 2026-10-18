@@ -694,8 +694,8 @@ Connectors native adapter: `adapters/kubernetes/spec/adapter.json`.
 
 Source: fluxplane inventory §2 homer.
 
-Connectors has no Homer provider and no adapter directory. `adapters/sip` covers SIP media
-sessions, not capture search.
+Connectors has no Homer provider and no adapter directory. The removed SIP design (in history
+at commit `6498a881c`) covered SIP media sessions, not capture search.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
@@ -823,7 +823,7 @@ nothing to map and no row. The nearest Connectors command is `approvals clock-ch
 
 Source: fluxplane inventory §2 docker.
 
-Connectors has no Docker runtime. `adapters/docker` holds only `design.md` and an ESS model.
+Connectors has no Docker runtime. The Docker design and ESS model are in history at commit `6498a881c`.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|

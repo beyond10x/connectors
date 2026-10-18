@@ -76,8 +76,8 @@ summary: MCP-owned nouns, the three distinct credential kinds, and the relations
 # this root is refused with `error[ESS-ENTITY-001] undeclared_reference`, reproduced
 # against these files. Cross-root edges below are therefore stated in prose with their
 # citations, never as ESS relations, and a flat `String` carrier is used where one is
-# readable — the shape adapters/docker/spec/ess/domains/mutations.yaml:12-13 already uses
-# for `instance_ref` and `connection_ref`.
+# readable — the shape the removed Docker model (mutations.yaml:12-13, commit 6498a881c)
+# used for `instance_ref` and `connection_ref`.
 types:
   # ── The three credential kinds, kept apart ───────────────────────────────────────
   #
@@ -361,7 +361,7 @@ entities:
   # universal internal contract" — so an advertised MCP capability is a PROJECTION of an
   # owned declaration and never a second record of it. `operation_ref` is that
   # projection's flat carrier, the shape
-  # adapters/docker/spec/ess/domains/mutations.yaml:12-13 already uses.
+  # the removed Docker model used (mutations.yaml:12-13, commit 6498a881c).
   #
   # Admission and advertised-name rules are specified in
   # adapters/mcp/contracts/server/v1alpha1/projection.md. Its document checks

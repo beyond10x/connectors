@@ -51,7 +51,6 @@ result envelope does not make native query/continuation semantics shared.
 | Owner | Native authority |
 |---|---|
 | Atlassian | [ESS](atlassian/spec/ess/system.yaml) of the native document vocabulary, which the catalog provider's Confluence tests read; the [authored Confluence REST v1 source](atlassian/contracts/confluence-rest-v1/README.md) the catalog provider compiles; pinned Jira and Confluence documents in atlassian/upstream/ |
-| [Docker](docker/design.md) | [Container logs](docker/contracts/logs/v1alpha1/semantics.md), lifecycle intent and [ESS](docker/spec/ess/system.yaml) |
 | [Kubernetes](kubernetes/design.md) | [Discovery](kubernetes/contracts/discovery/v1alpha1/semantics.md), [permissions](kubernetes/contracts/auth/v1alpha1/semantics.md), [routes](kubernetes/contracts/routes/v1alpha1/semantics.md), [logs](kubernetes/contracts/logs/v1alpha1/semantics.md), restart intent and [ESS](kubernetes/spec/ess/system.yaml) |
 | [Grafana](grafana/design.md) | [Datasource discovery](grafana/contracts/discovery/v1alpha1/semantics.md), [proxy route](grafana/contracts/routes/v1alpha1/semantics.md), [ESS](grafana/spec/ess/system.yaml); native runtime and tests for `datasources.list` in grafana/; see [the Grafana guide](grafana/README.md) |
 | [Loki](loki/design.md) | [LogQL profile](loki/contracts/logs/v1alpha1/semantics.md), tenant binding and [ESS](loki/spec/ess/system.yaml); native runtime and tests in loki/; see [the Loki guide](loki/README.md) |
@@ -65,8 +64,6 @@ result envelope does not make native query/continuation semantics shared.
 | SQL | [Read profiles](sql/contracts/reads/v1alpha1/semantics.md) for PostgreSQL and MySQL, [ESS](sql/spec/ess/system.yaml); declaration, native runtime and tests live in sql/ |
 | Tavily | [Websearch profile `tavily/2026-10`](tavily/contracts/websearch/v1alpha1/semantics.md), pinned OpenAPI in tavily/upstream/, [ESS](tavily/spec/ess/system.yaml); native runtime and tests in tavily/; see [the Tavily guide](../docs/local-tavily.md) |
 | [Catalog](catalog/design.md) | Optional catalog adapter design |
-| [SIP](sip/design.md) | [Dial/effect/media binding](sip/contracts/dial/v1alpha1/semantics.md), native configuration and protocol obligations |
-| [RTVBP](rtvbp/design.md) | [Session/authority transport](rtvbp/contracts/session/v1alpha1/semantics.md), native configuration and codec obligations |
 | [MCP](mcp/design.md) | [Pinned specification revisions](mcp/contracts/protocol/v1alpha1/evidence/20260912/specification-sources.md), [ESS](mcp/spec/ess/system.yaml); protocol contracts and transport/capability profile selection remain unauthored |
 
 Each authored native model lives in `spec/ess` with namespace
