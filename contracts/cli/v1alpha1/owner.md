@@ -7,7 +7,9 @@ kernel file lock in the selected private state directory. It is bound to one
 admitted absolute configuration path and the database authority UUID.
 
 Passive commands contact only an existing socket or read recognized metadata.
-Admitted connect, repair, revalidate and invoke may start the owner. Competing startups acquire
+Admitted connect, repair, revalidate and invoke may start the owner, and so may
+`operations describe` and `operations list`, only to
+[launch for a description](semantics.md#launching-for-a-description). Competing startups acquire
 the same lifetime lock before spawning; failure to acquire it never authorizes a
 replacement process. A startup socket carries a fresh challenge, owner incarnation
 and metadata authority before the parent releases startup ownership. The daemon
@@ -103,7 +105,10 @@ the store through that owner instead of opening it. The owner answers a `cached`
 request (`connectors.cli.LocalOwnerCachedRequest`, `{"kind":"cached","adapter":…}`)
 with `connectors.cli.LocalOwnerCached`, the adapter's cached bootstrap read from
 the owner's held metadata handle, and refuses with the codes a direct read gives
-(`not_found`, `description_unavailable`, `metadata_unavailable`). `operations
+(`not_found`, `description_unavailable`, `metadata_unavailable`). With
+`"launch": true` (and the named `connection`, when there is one) the owner, finding
+no description cached, checks the [launch condition](semantics.md#launching-for-a-description)
+again and starts the configured adapter, which caches it. `operations
 invoke` with such an owner running sends no admission of its own: the owner's
 admission of the `invoke` request decides it, before dispatch, from the same held
 handle. The authority a greeting names is read from the database's authority row
