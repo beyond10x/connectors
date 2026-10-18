@@ -71,3 +71,50 @@ fn security_an_entry_naming_another_executable_or_argv_is_not_held() {
         "recorded: {recorded:?}; held executable: {held:?}"
     );
 }
+
+/// The entry `operations invoke --definition` records under `paths`: the
+/// catalog provider on `--local-config` of its own cache entry.
+fn pinned(paths: &Paths) -> Entry {
+    let digest = "b".repeat(64);
+    let native = paths
+        .state
+        .join(definitions::DIRECTORY)
+        .join(&digest)
+        .join(definitions::NATIVE);
+    entry(Executable {
+        path: "/fixture/installation/connectors-catalog-provider".into(),
+        sha256: "c".repeat(64),
+        args: vec!["--local-config".into(), native.to_str().unwrap().into()],
+    })
+}
+
+/// `--state-dir` and `XDG_STATE_HOME` are taken as given, and every host
+/// command admits `/x/./state` or `/x//state` as the directory `/x/state`
+/// (`filesystem::validate_path` reads components). An entry recorded by a run
+/// under one spelling is the same state directory's entry under the other:
+/// the argv pin compares strings, so the whole entries file is refused, the
+/// instance is no longer held, and no definition can be recorded again.
+#[test]
+fn security_an_entry_is_held_under_every_spelling_of_its_state_directory() {
+    let (root, paths) = paths();
+    definitions::record(&paths, "forge", &pinned(&paths)).unwrap();
+    let respelled = Paths {
+        config: paths.config.clone(),
+        state: std::path::PathBuf::from(format!("{}/./state", root.path().to_str().unwrap())),
+    };
+    let held = Config::read_at(&respelled)
+        .unwrap()
+        .select(Selector::Instance {
+            connector: "forge",
+            instance: definitions::INSTANCE,
+        })
+        .is_some();
+    let mut other = pinned(&respelled);
+    other.adapter.instance_id = definitions::alias("other");
+    let recorded = definitions::record(&respelled, "other", &other);
+    assert!(
+        held && recorded.is_ok(),
+        "held under {:?}: {held}; recording another: {recorded:?}",
+        respelled.state
+    );
+}

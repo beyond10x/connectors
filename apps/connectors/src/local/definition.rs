@@ -240,10 +240,13 @@ fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerRep
         .to_owned();
     let connector = parsed.id.clone().unwrap_or_else(|| stem.clone());
     let alias = definitions::alias(&connector);
-    // The connector and the catalog name directories and an alias: plain names
-    // only, so neither can step out of a cache entry or another alias.
+    // The connector, the file stem and the catalog (the stem when the file
+    // names none) name an alias, the selection file and the bundle's
+    // directory: plain names only, checked before anything is written, so none
+    // can step out of a cache entry or another alias.
     if !plain(&connector)
-        || !parsed.catalog.as_deref().is_none_or(plain)
+        || !plain(&stem)
+        || !plain(parsed.catalog.as_deref().unwrap_or(&stem))
         || !connectors_core::valid_id(&alias)
     {
         return Err(usage());
@@ -281,7 +284,7 @@ fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerRep
     let derived = definitions::derive(&connector, &native);
     interrupted()?;
     let (adapter, reported) = derived.map_err(host_failure)?;
-    definitions::record(
+    let recorded = definitions::record(
         &paths,
         &connector,
         &definitions::Entry {
@@ -289,11 +292,15 @@ fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerRep
             adapter: adapter.clone(),
         },
     )
-    .map_err(host_failure)?;
+    .map_err(host_failure);
+    interrupted()?;
+    recorded?;
     // What the command selects from here on is the entry just recorded: an
     // instance the operator configured meanwhile wins, and another run that
     // recorded another file of this connector since is a conflict to retry.
-    let held = Config::read_at(&paths).map_err(configuration_refusal)?;
+    let held = Config::read_at(&paths).map_err(configuration_refusal);
+    interrupted()?;
+    let held = held?;
     if held.definitions.get(&alias) != Some(&connector) {
         return Err(configuration_refusal(Refusal::Rule(
             Rule::DefinitionInstanceConfigured,
@@ -304,21 +311,24 @@ fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerRep
     }
     interrupted()?;
     let connection = match &request.connection {
-        Some(connection) => connection.clone(),
-        None => connection(&paths, &connector, &alias, &adapter, request)?,
+        Some(connection) => Ok(connection.clone()),
+        None => connection(&paths, &connector, &alias, &adapter, request),
     };
     interrupted()?;
+    let connection = connection?;
     let (schema, revision) = match (&request.schema, &request.revision) {
         (Some(schema), Some(revision)) => (schema.clone(), revision.clone()),
         (schema, revision) => {
-            let (described_schema, described_revision) = described(
+            let described = described(
                 &paths,
                 &alias,
                 &adapter,
                 reported,
                 &connection,
                 &request.operation,
-            )?;
+            );
+            interrupted()?;
+            let (described_schema, described_revision) = described?;
             (
                 schema.clone().unwrap_or(described_schema),
                 revision.clone().unwrap_or(described_revision),
@@ -552,7 +562,13 @@ fn published(entry: &Path) -> bool {
             .and_then(|file| filesystem::read_bounded(file, 1024 * 1024))
             .ok()
             .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
-            .is_some_and(|native| native["bundle_directory"] == json!(entry))
+            .is_some_and(|native| {
+                // Compared as paths: every admitted spelling of the state
+                // directory names the same entry.
+                native["bundle_directory"]
+                    .as_str()
+                    .is_some_and(|named| Path::new(named) == entry)
+            })
 }
 
 /// Whether `path` is `directory` or under it, by its components.

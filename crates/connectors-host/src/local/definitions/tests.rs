@@ -156,3 +156,29 @@ fn an_entries_file_that_is_not_owner_only_is_not_held() {
             .contains_key("forge.definition")
     );
 }
+
+/// Adversary, round 2: `admitted` compares the recorded `--local-config` path
+/// with `paths.state` as text. The same state directory named
+/// `<root>/./state` (admitted by `validate_path`, the same directory for every
+/// other command) refuses the whole entries file, so every held definition
+/// silently disappears from `Config::read_at` and no definition can be recorded.
+#[cfg(unix)]
+#[test]
+fn adversary_an_entry_is_held_whichever_spelling_names_the_state_directory() {
+    let (root, paths) = paths();
+    record(&paths, "forge", &entry(&paths, "forge", 'b')).unwrap();
+    let dotted = Paths {
+        config: paths.config.clone(),
+        state: std::path::PathBuf::from(format!("{}/./state", root.path().display())),
+    };
+    assert_eq!(
+        entries(&dotted).map(|held| held.keys().cloned().collect::<Vec<_>>()),
+        Ok(vec!["forge".to_owned()])
+    );
+    assert!(
+        Config::read_at(&dotted)
+            .unwrap()
+            .adapters
+            .contains_key("forge.definition")
+    );
+}
