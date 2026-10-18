@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-18T01:28:43Z",
+  "actor": "human:timo",
+  "artifact": "story:definition-lowerer-trial-defects",
+  "kind": "story",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors 6d91e6312: definition_layout red 0/2 then 2/2; connectors-catalog 304 passed, connectors-build 273 passed, connectors-catalog-provider 700 passed 41 ignored, clippy -D warnings clean, connectors-build gate --msrv all checks passed (2628 tests passed); connectors-definitions 79f27e5 task check 2 schemas 18 instances valid"
+  }
+}
