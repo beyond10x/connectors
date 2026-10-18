@@ -45,7 +45,7 @@ scope:
   path: ess/domains/cli.yaml
 - confidence: cited
   path: website/docs/guides/invoke-a-definition-file.md
-revision: 16
+revision: 17
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-18T13:57:18Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":3}}}
 - {from: "proposed", to: "active", at: "2026-10-18T13:57:18Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":3}}}
@@ -151,15 +151,19 @@ The scope is inferred throughout: no custody copy exists to cite, and the implem
 Implemented on unit/invoke-definition-reuse-credential (2026-10-18). The acceptance and both
 checks beside it are namespace journeys in adapters/catalog/tests/local_runtime/invoke_definition.rs:
 `a_stored_credential_of_a_configured_instance_is_reused_without_a_token_prompt`,
-`a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offers_connect_fresh` and
-`a_definition_moved_to_another_host_is_offered_no_reuse_and_answers_lifecycle_conflict` (check 2 as
-restated after operator decision A; a pinning test, since the code never offered reuse there).
+`a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offers_connect_fresh` and,
+for check 2, `a_definition_moved_to_another_host_connects_fresh_under_a_new_instance_id`.
 
 Decisions taken inside the floor: a copy, never a shared custody entry (revoking either leaves the
 other); only static-entry profiles whose lowered definition names no URL (no token endpoint)
 receive a copy; only an invoked definition's instance is a target; a legacy `[adapters]` entry is
 no connector's instance; the copy is published only while the source is still what was read.
 
-Observed, not changed here: after an authority change, `connections connect` of the definition's
-instance is refused too (D12 point 2 keeps "only a new instance id helps", and a definition's
-instance id is fixed), so the moved definition has no connect route under that id.
+Check 2 was first pinned as `a_definition_moved_to_another_host_is_offered_no_reuse_and_answers_lifecycle_conflict`
+(after operator decision A): after an authority change `connections connect` of the definition's
+instance was refused too (D12 point 2 keeps "only a new instance id helps", and a definition's
+instance id was fixed), so the moved definition had no connect route under that file.
+`task:definition-moved-authority-new-instance` (branch fix/definition-moved-authority) removed that
+dead end: the moved file resolves to a deterministic new instance id, `definition-<16 hex>`, so no
+reuse is offered, a fresh connect works there, and the connection left at the old host is unchanged
+and revocable. The restated journey above holds it; cross-host reuse stays refused.

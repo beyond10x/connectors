@@ -23,6 +23,8 @@ use std::sync::atomic::AtomicU64;
 const INSIDE: &str = "CONNECTORS_TEST_INVOKE_DEFINITION_NAMESPACES";
 const NAME: &str = "cli_journey::invoke_definition::a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_without_asking";
 const HOST: &str = "gitlab.example.com";
+/// The host a definition is moved to: the same fixture answers it.
+const MOVED_HOST: &str = "gitlab-moved.example.com";
 const TOKEN: &str = "fixture-definition-token";
 /// How the connect question ends on the terminal.
 const QUESTION: &[u8] = b"[y/N] ";
@@ -85,7 +87,8 @@ struct Request {
     authenticated: bool,
 }
 
-/// A GitLab-shaped API at `gitlab.example.com` on loopback port 443.
+/// A GitLab-shaped API at `gitlab.example.com`, and at `gitlab-moved.example.com`
+/// for a definition moved there, on loopback port 443.
 struct Forge {
     stop: Option<oneshot::Sender<()>>,
     thread: Option<std::thread::JoinHandle<()>>,
@@ -98,11 +101,16 @@ impl Forge {
     /// Points the host at loopback and makes the fixture's certificate the
     /// only trusted root, enters the private root (`enter`), and serves.
     fn new(base: &Path) -> Self {
-        let cert = rcgen::generate_simple_self_signed(vec![HOST.to_owned()]).unwrap();
+        let cert = rcgen::generate_simple_self_signed(vec![HOST.to_owned(), MOVED_HOST.to_owned()])
+            .unwrap();
         let pem = cert.cert.pem();
         let etc = base.join("etc");
         fs::create_dir_all(etc.join("ssl/certs")).unwrap();
-        fs::write(etc.join("hosts"), format!("127.0.0.1 localhost {HOST}\n")).unwrap();
+        fs::write(
+            etc.join("hosts"),
+            format!("127.0.0.1 localhost {HOST} {MOVED_HOST}\n"),
+        )
+        .unwrap();
         let nsswitch = fs::read_to_string("/etc/nsswitch.conf").unwrap_or_default();
         let nsswitch: String = nsswitch
             .lines()
@@ -680,34 +688,22 @@ fn a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_witho
     assert_eq!(count(&shown, QUESTION), 1);
     assert_eq!(count(&shown, TOKEN_PROMPT), 0);
 
-    // An authority change to the file answers today's lifecycle conflict,
-    // with the next action a connect of the instance gives, and asks nothing.
+    // An authority change to the file resolves to a new instance id
+    // (task:definition-moved-authority-new-instance): its first invoke asks
+    // the one connect question naming it; answered no, the refusal names the
+    // connect and nothing is sent.
     let before = fixture.requests().len();
-    journey.write("forge", "gitlab-moved.example.com", None, &["project.get"]);
-    let (output, shown) = journey.on_terminal(&invoke(&forge, "project.get"), &[]);
+    journey.write("forge", MOVED_HOST, None, &["project.get"]);
+    let (output, shown) =
+        journey.on_terminal(&invoke(&forge, "project.get"), &[(QUESTION, b"n\n")]);
     let data = refused_with(&output);
-    assert_eq!(data["code"], "lifecycle_conflict", "{data}");
-    assert!(shown.is_empty(), "{}", String::from_utf8_lossy(&shown));
-    let connect = journey
-        .command(&[
-            "connections",
-            "connect",
-            "--connector",
-            "forge",
-            "--instance",
-            "definition",
-            "--profile",
-            "forge.pat",
-            "--credential-stdin",
-        ])
-        .output()
-        .unwrap();
-    let connect = refused_with(&connect);
     assert_eq!(
-        (&connect["code"], &connect["next_action"]),
         (&data["code"], &data["next_action"]),
-        "{connect} {data}"
+        (&json!("not_found"), &json!("create_connection")),
+        "{data}"
     );
+    assert_eq!(count(&shown, b"No connection for forge/definition-"), 1);
+    assert_eq!(count(&shown, TOKEN_PROMPT), 0);
     assert_eq!(fixture.requests().len(), before, "nothing was sent");
     assert_eq!(fs::read(&journey.config).unwrap(), configuration);
 }
@@ -1032,18 +1028,24 @@ fn a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offe
     assert_eq!(count(&shown, CANDIDATE), 0);
 }
 
-const MOVED_NAME: &str = "cli_journey::invoke_definition::a_definition_moved_to_another_host_is_offered_no_reuse_and_answers_lifecycle_conflict";
+const MOVED_NAME: &str = "cli_journey::invoke_definition::a_definition_moved_to_another_host_connects_fresh_under_a_new_instance_id";
 
-/// The second check beside the acceptance, as the operator decided it
-/// (option A, 2026-10-18; D12 point 1, the provider authority binding): with
-/// the definition's own instance holding a connection under the file's host and
-/// the file then naming another host, nothing is reused, asked or sent. The
-/// command answers `lifecycle_conflict` with the `next_action` a
-/// `connections connect` of the instance names, and the configured instance's
-/// connection, a candidate at the old host, is not offered and not changed.
+/// The second check beside the acceptance, restated by
+/// task:definition-moved-authority-new-instance. With the definition's own
+/// connection at the file's host and the file then naming another host,
+/// nothing is reused (option A, 2026-10-18; D12 point 1): no candidate is
+/// listed and nothing is copied. The definition resolves to a new instance id,
+/// `definition-<16 hex>`, because a connect under `definition` would be refused
+/// (the registry's "only a new instance id helps"), so the run is a first
+/// invoke there: one connect question, the token prompt, the result from the
+/// new host. The id is a function of the definition: a second run asks nothing
+/// on the same instance, and a file moved back resolves to `definition` and
+/// its connection again. The connection left at the old host keeps its
+/// revision and is revoked through the moved-entry path; the configured
+/// instance's connection is unchanged.
 #[test]
 #[ignore = "requires built debug production CLI, qualified disposable Secret Service and unprivileged user namespaces"]
-fn a_definition_moved_to_another_host_is_offered_no_reuse_and_answers_lifecycle_conflict() {
+fn a_definition_moved_to_another_host_connects_fresh_under_a_new_instance_id() {
     let Some(base) = std::env::var_os(INSIDE) else {
         let output = reenter(INSIDE, MOVED_NAME);
         assert!(!carries_token(&output.stdout) && !carries_token(&output.stderr));
@@ -1060,53 +1062,101 @@ fn a_definition_moved_to_another_host_is_offered_no_reuse_and_answers_lifecycle_
     assert_eq!(success(output)["result"]["body"]["id"], 7);
     let own = journey.listed("definition");
     assert_eq!(own.len(), 1, "{own:?}");
+    let left = own[0]["connection"].as_str().unwrap().to_owned();
+    let left_revision = own[0]["revision"].as_str().unwrap().to_owned();
     let before = journey.describe("main", &source);
     let sent = fixture.requests().len();
 
-    // The file now names another host: no question at all, no reuse.
-    journey.write("forge", "gitlab-moved.example.com", None, &["project.get"]);
-    let (output, shown) = journey.on_terminal(&invoke(&forge, "project.get"), &[]);
-    let data = refused_with(&output);
-    assert_eq!(data["code"], "lifecycle_conflict", "{data}");
-    assert!(shown.is_empty(), "{}", String::from_utf8_lossy(&shown));
+    // The file now names another host: no reuse offered, one connect
+    // question under a new instance id, the token, the result.
+    journey.write("forge", MOVED_HOST, None, &["project.get"]);
+    let token = format!("{TOKEN}\n");
+    let (output, shown) = journey.on_terminal(
+        &invoke(&forge, "project.get"),
+        &[(QUESTION, b"y\n"), (TOKEN_PROMPT, token.as_bytes())],
+    );
+    let moved = success(output);
+    assert_eq!(moved["result"]["body"]["id"], 7, "{moved}");
+    let instance = moved["instance"].as_str().unwrap().to_owned();
+    let digest = instance.strip_prefix("definition-").unwrap_or_default();
+    assert!(
+        digest.len() == 16 && digest.bytes().all(|b| b.is_ascii_hexdigit()),
+        "{moved}"
+    );
+    assert_eq!(moved["adapter"], format!("forge.{instance}"), "{moved}");
     assert_eq!(count(&shown, REUSE_QUESTION), 0);
     assert_eq!(count(&shown, CANDIDATE), 0);
-    // A connect of the instance names the same next step.
-    let connect = journey
-        .command(&[
-            "connections",
-            "connect",
-            "--connector",
-            "forge",
-            "--instance",
-            "definition",
-            "--profile",
-            "forge.pat",
-            "--credential-stdin",
-        ])
-        .output()
-        .unwrap();
-    let connect = refused_with(&connect);
+    assert_eq!(count(&shown, QUESTION), 1);
+    assert_eq!(count(&shown, TOKEN_PROMPT), 1);
     assert_eq!(
-        (&connect["code"], &connect["next_action"]),
-        (&data["code"], &data["next_action"]),
-        "{connect} {data}"
+        count(
+            &shown,
+            format!("No connection for forge/{instance}.").as_bytes()
+        ),
+        1,
+        "{}",
+        String::from_utf8_lossy(&shown)
     );
-    // Nothing was copied, sent or changed: the definition's one connection
-    // (now pending under the moved file, same reference and revision), the
-    // source as it was, no request to any host.
-    let named = |listed: &[Value]| {
-        listed
-            .iter()
-            .map(|c| (c["connection"].clone(), c["revision"].clone()))
-            .collect::<Vec<_>>()
-    };
-    assert_eq!(named(&journey.listed("definition")), named(&own));
+    // Only the new host was reached: the fresh connect's validation, then
+    // the read.
+    let requests = fixture.requests();
+    assert!(
+        requests.len() > sent
+            && requests[sent..]
+                .iter()
+                .all(|r| r.host == MOVED_HOST && r.authenticated),
+        "{requests:?}"
+    );
+    let fresh = journey.listed(&instance);
+    assert_eq!(fresh.len(), 1, "{fresh:?}");
+    assert_ne!(fresh[0]["connection"].as_str().unwrap(), left);
+
+    // Repeated runs resolve to the same instance and ask nothing.
+    let (output, shown) = journey.on_terminal(&invoke(&forge, "project.get"), &[]);
+    let again = success(output);
+    assert_eq!(again["instance"], instance.as_str(), "{again}");
+    assert!(shown.is_empty(), "{}", String::from_utf8_lossy(&shown));
+    assert_eq!(journey.listed(&instance), fresh);
+
+    // Moved back, the file is the instance `definition` again, on the
+    // connection it left behind, with nothing asked.
+    journey.write("forge", HOST, None, &["project.get"]);
+    let (output, shown) = journey.on_terminal(&invoke(&forge, "project.get"), &[]);
+    let back = success(output);
+    assert_eq!(back["instance"], "definition", "{back}");
+    assert!(shown.is_empty(), "{}", String::from_utf8_lossy(&shown));
+    assert_eq!(journey.listed("definition"), own);
+    journey.write("forge", MOVED_HOST, None, &["project.get"]);
+    let (output, _) = journey.on_terminal(&invoke(&forge, "project.get"), &[]);
+    assert_eq!(success(output)["instance"], instance.as_str());
+
+    // The connection left at the old host is unchanged and revocable
+    // through the moved-entry path: its instance id no entry configures.
+    let revoked = success(
+        journey
+            .command(&[
+                "connections",
+                "revoke",
+                "--connector",
+                "forge",
+                "--instance",
+                &instance,
+                "--connection",
+                &left,
+                "--expected-revision",
+                &left_revision,
+            ])
+            .output()
+            .unwrap(),
+    );
+    assert_eq!(revoked["local_state"], "revoked", "{revoked}");
+    // The configured instance's connection, a candidate at the old host, was
+    // not offered and is as it was; the new instance's connection is too.
     assert_eq!(
         unchanged(&journey.describe("main", &source)),
         unchanged(&before)
     );
-    assert_eq!(fixture.requests().len(), sent, "nothing was sent");
+    assert_eq!(journey.listed(&instance), fresh);
 }
 
 #[cfg(unix)]

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-18T16:58:46Z",
+  "actor": "human:timo",
+  "artifact": "task:definition-moved-authority-new-instance",
+  "kind": "task",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "green on fix/definition-moved-authority: the 5 cli_journey::invoke_definition journeys 5 passed (restated a_definition_moved_to_another_host_connects_fresh_under_a_new_instance_id included); cargo test -p connectors-host -p connectors -p connectors-catalog-provider -p connectors-build: 195 suites 1841 passed 0 failed 102 ignored; clippy --all-targets -D warnings clean; fmt --check clean; connectors-build gate: all checks passed, 312 suites 2696 passed 0 failed 138 ignored; aep plan artifact validate: valid",
+    "reference": "adapters/catalog/tests/local_runtime/invoke_definition.rs"
+  }
+}

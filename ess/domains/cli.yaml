@@ -668,8 +668,9 @@ types:
   # text is larger than the most a read admits; `setup migrate` refuses a rewritten
   # file past that bound and writes nothing. definition_instance_configured: an
   # `operations invoke --definition` whose connector already has an instance named
-  # `definition` in the configuration, or whose instance id an entry there already
-  # uses; the configured one is never replaced. It names the rule only, never a path
+  # `definition`, or the moved `definition-<16 hex>` the file resolves to, in the
+  # configuration, or whose instance id an entry there already uses; the configured
+  # one is never replaced. It names the rule only, never a path
   # or OS text.
   - name: connectors.cli.ConfigurationRule
     kind: enum
@@ -1469,7 +1470,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:919, docs/local-connection-registry.md:219-220;
+    # contracts/cli/v1alpha1/semantics.md:936, docs/local-connection-registry.md:222-223;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1486,7 +1487,7 @@ entities:
     # connection or dispatch authority and is retained after logical expiry.
     # ESS-LIMIT: a cursor is stale when its registry_epoch differs from the
     # ServiceConfiguration's, which publication, revoke and known invalidity advance
-    # (docs/local-connection-registry.md:221-222); the 300 s expiry and the 10,000
+    # (docs/local-connection-registry.md:224-225); the 300 s expiry and the 10,000
     # live-cursor cap (:188) are host rules. The guard over the related
     # configuration's field is `when_related:`, added in ESS 0.41 at source format
     # ess/18; this specification is ess/15, which refuses it
@@ -1629,7 +1630,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:923) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:940) and the host
     # removal path (er.rs:4428-4430) only expires Active cursors. The error name is
     # the decision; no source names one.
 

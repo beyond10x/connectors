@@ -146,10 +146,13 @@ admitted under the new binding and refused under the old one.
 A changed provider authority or profile authentication refuses before provider
 work as `lifecycle_conflict` with `next_action = check_configuration`, from
 revalidate, reconnect, a read and a new connect under the same instance id alike:
-only a new instance id helps. The connections left under the earlier instance
+only a new instance id helps. An invoked definition file takes one itself: its moved instance
+(`definitions::moved`; [CLI semantics](../contracts/cli/v1alpha1/semantics.md), "Invoking a
+definition file"). The connections left under the earlier instance
 id stay revocable through the moved entry: `connections revoke` reaches a
 connection of the entry's implementation (`adapter_id`) whose instance id no entry configures any
-longer. The profile's authentication is the declaration
+longer; one left under an invoked definition's instance id only through an instance id
+`<connector>.<name>` of the same connector. The profile's authentication is the declaration
 apart from its evidence lifetime: a revision that differs is the same
 authentication only when the configured declaration, given the admitted
 lifetime, digests to the admitted revision, as every shipped implementation computes
