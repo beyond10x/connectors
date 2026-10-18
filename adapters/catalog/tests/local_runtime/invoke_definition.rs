@@ -1032,6 +1032,83 @@ fn a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offe
     assert_eq!(count(&shown, CANDIDATE), 0);
 }
 
+const MOVED_NAME: &str = "cli_journey::invoke_definition::a_definition_moved_to_another_host_is_offered_no_reuse_and_answers_lifecycle_conflict";
+
+/// The second check beside the acceptance, as the operator decided it
+/// (option A, 2026-10-18; D12 point 1, the provider authority binding): with
+/// the definition's own instance holding a connection under the file's host and
+/// the file then naming another host, nothing is reused, asked or sent. The
+/// command answers `lifecycle_conflict` with the `next_action` a
+/// `connections connect` of the instance names, and the configured instance's
+/// connection, a candidate at the old host, is not offered and not changed.
+#[test]
+#[ignore = "requires built debug production CLI, qualified disposable Secret Service and unprivileged user namespaces"]
+fn a_definition_moved_to_another_host_is_offered_no_reuse_and_answers_lifecycle_conflict() {
+    let Some(base) = std::env::var_os(INSIDE) else {
+        let output = reenter(INSIDE, MOVED_NAME);
+        assert!(!carries_token(&output.stdout) && !carries_token(&output.stderr));
+        return;
+    };
+    let fixture = Forge::new(Path::new(&base));
+    let journey = Journey::new();
+    let forge = journey.write("forge", HOST, None, &["project.get"]);
+    journey.configure_main(&forge);
+    let source = journey.connect_main();
+    // The definition's own connection at the file's host, made by reuse.
+    let (output, _) =
+        journey.on_terminal(&invoke(&forge, "project.get"), &[(REUSE_QUESTION, b"1\n")]);
+    assert_eq!(success(output)["result"]["body"]["id"], 7);
+    let own = journey.listed("definition");
+    assert_eq!(own.len(), 1, "{own:?}");
+    let before = journey.describe("main", &source);
+    let sent = fixture.requests().len();
+
+    // The file now names another host: no question at all, no reuse.
+    journey.write("forge", "gitlab-moved.example.com", None, &["project.get"]);
+    let (output, shown) = journey.on_terminal(&invoke(&forge, "project.get"), &[]);
+    let data = refused_with(&output);
+    assert_eq!(data["code"], "lifecycle_conflict", "{data}");
+    assert!(shown.is_empty(), "{}", String::from_utf8_lossy(&shown));
+    assert_eq!(count(&shown, REUSE_QUESTION), 0);
+    assert_eq!(count(&shown, CANDIDATE), 0);
+    // A connect of the instance names the same next step.
+    let connect = journey
+        .command(&[
+            "connections",
+            "connect",
+            "--connector",
+            "forge",
+            "--instance",
+            "definition",
+            "--profile",
+            "forge.pat",
+            "--credential-stdin",
+        ])
+        .output()
+        .unwrap();
+    let connect = refused_with(&connect);
+    assert_eq!(
+        (&connect["code"], &connect["next_action"]),
+        (&data["code"], &data["next_action"]),
+        "{connect} {data}"
+    );
+    // Nothing was copied, sent or changed: the definition's one connection
+    // (now pending under the moved file, same reference and revision), the
+    // source as it was, no request to any host.
+    let named = |listed: &[Value]| {
+        listed
+            .iter()
+            .map(|c| (c["connection"].clone(), c["revision"].clone()))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(named(&journey.listed("definition")), named(&own));
+    assert_eq!(
+        unchanged(&journey.describe("main", &source)),
+        unchanged(&before)
+    );
+    assert_eq!(fixture.requests().len(), sent, "nothing was sent");
+}
+
 #[cfg(unix)]
 #[path = "adversary_reuse_race.rs"]
 mod adversary_reuse_race;

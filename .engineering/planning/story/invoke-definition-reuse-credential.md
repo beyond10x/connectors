@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:invoke-definition-reuse-credential
 kind: story
-status: active
+status: implemented
 title: operations invoke --definition offers once to reuse a stored credential of the same connector
 relations:
 - implements: architecture-decision-record:provider-definitions-and-runtimes
@@ -45,10 +45,11 @@ scope:
   path: ess/domains/cli.yaml
 - confidence: cited
   path: website/docs/guides/invoke-a-definition-file.md
-revision: 12
+revision: 16
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-18T13:57:18Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":3}}}
 - {from: "proposed", to: "active", at: "2026-10-18T13:57:18Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":3}}}
+- {from: "active", to: "implemented", at: "2026-10-18T15:42:53Z", actor: "human:timo", revision: 16, decided_on: {"recorded":{"test_result":4,"review_outcome":7}}}
 ---
 ## Problem
 
@@ -62,8 +63,9 @@ profile has since changed) is asked to enter it again, and an authority or profi
 ## Outcome
 
 `architecture-decision-record:provider-definitions-and-runtimes` D12 point 3, the question. When
-the definition's instance has no connection, or its authority or profile authentication changed,
-and at least one non-revoked connection of the same connector id exists, the command asks once:
+the definition's instance has no connection and at least one usable connection of the same
+connector id exists under another instance, at the same provider authority and with the same
+profile authentication, the command asks once:
 
 - reuse: lists the candidate connections (instance id, authority, validated identity; never
   material); the chosen connection's current custody version is copied inside the owner to a new
@@ -72,13 +74,9 @@ and at least one non-revoked connection of the same connector id exists, the com
   source connection's; otherwise nothing is published and the operator is offered connect fresh;
 - connect fresh: the acquisition of `story:invoke-definition-file`.
 
-A source connection under another instance is unchanged either way; when the source is the
-definition instance's own old connection, it is copied first and then revoked (see One connection
-per instance below). The question is never asked when a connection bound
-to the instance's authority and profile exists, and never without a terminal (refusal with a
-`next_action` as in the previous story). A changed authority sends the stored credential to the new
-host only after the operator chose reuse for that connection and host, and the prompt names the new
-host.
+The source connection is unchanged either way. The question is never asked when a connection
+bound to the instance's authority and profile exists, and never without a terminal (refusal with a
+`next_action` as in the previous story).
 
 Candidates (drafter's decision, 2026-10-18): D12 says "a credential already stored in connectors";
 this story narrows that to non-revoked connections of the same connector id, because only those
@@ -86,11 +84,15 @@ hold material the definition's profile can validate (a credential of another con
 declared meaning there). Credentials of other connectors are listed under Not in scope; widening
 the set is a later decision for the operator.
 
-One connection per instance: when the definition's instance still holds a connection under the old
-authority or profile, the question says that connection will be revoked, and either answer revokes
-it before publishing the new one. This is the one place where "only a new instance id helps"
-(`docs/local-connection-registry.md`, "Configuration upgrades") gives way, and only for the
-definition's own instance after the owner's explicit answer; configured instances keep the rule.
+Cross-host reuse rejected (operator decision A, 2026-10-18): a stored credential is never reused
+for another provider authority, including the definition's own instance whose file moved to
+another host. D12 point 1 binds a connection to the provider authority (endpoint host and instance
+id), and the binding table the operator approved keeps that row because it stops a token being sent
+to a different host; reusing across hosts would undo it. When the definition's own instance holds
+a connection under the old authority, the command offers no reuse, asks nothing, sends nothing and
+answers `lifecycle_conflict` with the `next_action` a `connections connect` of the instance names,
+as in `story:invoke-definition-file`. The drafted alternative (copy the old connection to the new
+host after a prompt naming it, then revoke the old one) was option B and was not taken.
 
 ## Acceptance
 
@@ -105,9 +107,11 @@ Separate tests in the same file; the story is not implemented while any fails:
 
 - the same with a provider that answers a different identity publishes nothing and offers connect
   fresh;
-- with the definition's own instance holding a connection under host H and the file changed to
-  host H2, the question names H2 and the revocation; "reuse" copies that connection's credential,
-  revokes the old connection and publishes the new one under H2 only when the identity matches.
+- with the definition's own instance holding a connection under host H, a configured instance's
+  connection at H present, and the file changed to host H2, no reuse is offered and nothing is
+  asked or sent: the command answers `lifecycle_conflict` with the `next_action` a `connections
+  connect` of the instance names, and both existing connections are unchanged (cross-host reuse
+  rejected, see Outcome).
 
 ## Scope
 
@@ -144,16 +148,18 @@ The scope is inferred throughout: no custody copy exists to cite, and the implem
 
 ## Delivery status
 
-Implemented on unit/invoke-definition-reuse-credential (2026-10-18): the acceptance and the first
-check beside it, both as namespace journeys. Not implemented, pending an operator decision: the
-second check (the definition's own instance holding a connection under host H, the file changed to
-H2, "reuse" copying it to H2 and revoking the old one). It sends a stored credential to a host its
-connection was never bound to, which the dispatcher's security floor for this unit ("the same
-provider authority/profile declaration") excludes. Until decided, an authority or profile change
-of the definition's own instance stays `lifecycle_conflict` as in story:invoke-definition-file, and
-the story stays active.
+Implemented on unit/invoke-definition-reuse-credential (2026-10-18). The acceptance and both
+checks beside it are namespace journeys in adapters/catalog/tests/local_runtime/invoke_definition.rs:
+`a_stored_credential_of_a_configured_instance_is_reused_without_a_token_prompt`,
+`a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offers_connect_fresh` and
+`a_definition_moved_to_another_host_is_offered_no_reuse_and_answers_lifecycle_conflict` (check 2 as
+restated after operator decision A; a pinning test, since the code never offered reuse there).
 
 Decisions taken inside the floor: a copy, never a shared custody entry (revoking either leaves the
 other); only static-entry profiles whose lowered definition names no URL (no token endpoint)
 receive a copy; only an invoked definition's instance is a target; a legacy `[adapters]` entry is
 no connector's instance; the copy is published only while the source is still what was read.
+
+Observed, not changed here: after an authority change, `connections connect` of the definition's
+instance is refused too (D12 point 2 keeps "only a new instance id helps", and a definition's
+instance id is fixed), so the moved definition has no connect route under that id.
