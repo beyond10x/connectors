@@ -174,7 +174,9 @@ keyring or provider. These subcommands also require `--connector C --instance I`
 launch an instance's process. Missing or unrecognized registry state returns
 `metadata_unavailable`; missing references return `not_found`. Operation discovery
 reads the exact cached bootstrap, with `description_unavailable` before the first
-admitted launch. Invocation requires the descriptor revision, schema identity,
+admitted launch, unless the instance holds a connection current under its
+configuration: then it starts the configured adapter for the description
+([CLI semantics](../contracts/cli/v1alpha1/semantics.md#launching-for-a-description)). Invocation requires the descriptor revision, schema identity,
 current operation/profile permissions and a ready connection. The host checks the
 original JSON text, pins exact material and commits the final read guard before
 dispatch. Expired evidence refuses; implicit identity probes and credential repair

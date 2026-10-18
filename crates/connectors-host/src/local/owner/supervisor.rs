@@ -974,7 +974,7 @@ fn worker(
                             let observed = registry.describe(
                                 &current.instance_id,
                                 &current.adapter_id,
-                                &current.configuration_revision,
+                                current.configured(),
                                 &connection,
                                 connectors_sdk::now_ms(),
                                 true,
@@ -1057,7 +1057,7 @@ fn worker(
                     let observed = registry.describe(
                         &current.instance_id,
                         &current.adapter_id,
-                        &current.configuration_revision,
+                        current.configured(),
                         &connection,
                         connectors_sdk::now_ms(),
                         true,
@@ -1104,13 +1104,58 @@ fn worker(
                     .map_err(|_| Code::InvalidInput)?;
                     let registry = registry::Registry::with_system_clock(&paths.state);
                     let binding = bootstrap.binding(&requirement.profile)?;
-                    let captured = registry.capture_read(
-                        &binding,
-                        &connection,
-                        &requirement.scopes,
-                        connectors_sdk::now_ms(),
-                        job.deadline,
-                    )?;
+                    let capture = || {
+                        registry.capture_read(
+                            &binding,
+                            &connection,
+                            &requirement.scopes,
+                            connectors_sdk::now_ms(),
+                            job.deadline,
+                        )
+                    };
+                    let captured = match capture() {
+                        // Only the provider executable changed since the
+                        // connection was saved (D12): its stored credential is
+                        // validated once under this executable, which the
+                        // registry follows when the recorded identity answers
+                        // and refuses, changing nothing, otherwise. No
+                        // credential entry, no question.
+                        Err(registry::Failure::ExecutableChanged) => {
+                            super::follow_executable(
+                                &paths,
+                                &config.selection(),
+                                &registry,
+                                &binding,
+                                &connection,
+                                job.deadline,
+                                || {
+                                    let guard = control.lock().map_err(|_| Code::Unavailable)?;
+                                    guard.check(job.epoch)?;
+                                    if stopped.load(Ordering::SeqCst) {
+                                        return Err(Code::Unavailable.into());
+                                    }
+                                    Ok(guard)
+                                },
+                                |material| {
+                                    revalidate_with_retries(
+                                        job.deadline,
+                                        || {
+                                            let result = active.validate(
+                                                &requirement.profile,
+                                                material,
+                                                job.deadline,
+                                            );
+                                            (result, active.running().unwrap_or(false))
+                                        },
+                                        || stopped.load(Ordering::SeqCst),
+                                        std::thread::sleep,
+                                    )
+                                },
+                            )?;
+                            capture()?
+                        }
+                        other => other?,
+                    };
                     let version = captured.version();
                     let selection = config.selection();
                     let material =
@@ -1419,6 +1464,7 @@ mod idle_tests {
         let mut config = Config::load(&paths.config).unwrap();
         let (path, sha256) = crate::local::test_executable::path_and_sha256();
         let adapter = Adapter {
+            credential_revision: None,
             instance_id: "fixture".into(),
             adapter_id: "fixture".into(),
             configuration_revision: "fixture-config".into(),
@@ -1493,6 +1539,7 @@ mod revalidate_wait_tests {
 
     fn adapter() -> Adapter {
         Adapter {
+            credential_revision: None,
             instance_id: "instance".into(),
             adapter_id: "adapter".into(),
             configuration_revision: "config".into(),
@@ -1618,6 +1665,7 @@ mod dispatch_wait_tests {
 
     fn adapter() -> Adapter {
         Adapter {
+            credential_revision: None,
             instance_id: "instance".into(),
             adapter_id: "adapter".into(),
             configuration_revision: "config".into(),

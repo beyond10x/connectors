@@ -55,7 +55,13 @@ impl Registry {
             if row.revision != expected_revision {
                 return Err(Failure::Conflict);
             }
-            if row.binding != *binding {
+            // An operation-only or executable-only change leaves the saved
+            // binding the instance's (D12): repair keeps it and replaces the
+            // credential, which the configured executable validates.
+            if !matches!(
+                super::follow(&row.binding, binding),
+                Follow::Same | Follow::Operations | Follow::Executable
+            ) {
                 // Repair keeps the binding, so it cannot move a connection
                 // saved under another one. Name the step that can, as a read
                 // does: revalidation, a new connection, or a new instance id.
@@ -522,7 +528,10 @@ fn admit_allocation(tx: &Transaction<'_>, binding: &Binding, now: u64) -> Result
         [] => {}
         [reference] => {
             let row = Registry::connection(tx, reference)?;
-            if row.binding == *binding {
+            if matches!(
+                super::follow(&row.binding, binding),
+                Follow::Same | Follow::Operations | Follow::Executable
+            ) {
                 return Err(Failure::InstanceConnected);
             }
             let usable = || {

@@ -179,6 +179,22 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     ),
 ];
 
+/// The printed bootstrap without its `credential_revision` member
+/// (story:connection-binding-excludes-operations), which it carries exactly
+/// once, right after `configuration_revision`: the bytes printed before the
+/// member existed, which every other member keeps.
+fn without_credential_revision(printed: &[u8]) -> Vec<u8> {
+    let text = std::str::from_utf8(printed).unwrap();
+    let bootstrap: Value = serde_json::from_str(text).unwrap();
+    let member = format!(
+        ",\"credential_revision\":{}",
+        bootstrap["credential_revision"]
+    );
+    assert!(bootstrap["credential_revision"].is_string());
+    assert_eq!(text.matches(&member).count(), 1, "{text}");
+    text.replacen(&member, "", 1).into_bytes()
+}
+
 #[test]
 fn a_configuration_without_a_prefix_prints_the_bootstrap_it_printed_before() {
     let mut observed = Vec::new();
@@ -192,7 +208,7 @@ fn a_configuration_without_a_prefix_prints_the_bootstrap_it_printed_before() {
         let bootstrap: Value = serde_json::from_slice(&output.stdout).unwrap();
         observed.push((
             guide,
-            hex::encode(Sha256::digest(&output.stdout)),
+            hex::encode(Sha256::digest(without_credential_revision(&output.stdout))),
             bootstrap["configuration_revision"]
                 .as_str()
                 .unwrap()
@@ -342,6 +358,7 @@ impl Fixture {
             .canonicalize()
             .unwrap();
         Adapter {
+            credential_revision: None,
             private_protocol: None,
             permissions: Default::default(),
             instance_id: bootstrap.instance.clone(),

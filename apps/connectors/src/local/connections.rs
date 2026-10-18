@@ -70,7 +70,7 @@ pub(super) fn execute(
                 .list(
                     &adapter.instance_id,
                     &adapter.adapter_id,
-                    &adapter.configuration_revision,
+                    adapter.configured(),
                     registry::PageOptions {
                         limit: limit as u16,
                         cursor: call.input.get("cursor").and_then(Value::as_str),
@@ -96,7 +96,7 @@ pub(super) fn execute(
                         .describe(
                             &adapter.instance_id,
                             &adapter.adapter_id,
-                            &adapter.configuration_revision,
+                            adapter.configured(),
                             reference,
                             connectors_sdk::now_ms(),
                             custody,
@@ -295,7 +295,7 @@ pub(super) fn registry_failure(error: registry::Failure) -> HandlerReply {
         OutcomeUnknown => ("outcome_unknown", "publication", "retry_status", false),
         NotFound => ("not_found", "observation", "check_configuration", false),
         Conflict => ("lifecycle_conflict", "admission", "retry_status", false),
-        UpgradeRequired => (
+        UpgradeRequired | ExecutableChanged => (
             "lifecycle_conflict",
             "admission",
             "revalidate_connection",

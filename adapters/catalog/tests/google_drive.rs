@@ -829,6 +829,7 @@ impl Provider {
             .canonicalize()
             .unwrap();
         Adapter {
+            credential_revision: None,
             private_protocol: self.protocol,
             permissions: Default::default(),
             instance_id: "fixture-google-drive".into(),

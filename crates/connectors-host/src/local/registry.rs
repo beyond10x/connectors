@@ -9,6 +9,8 @@ pub use observation::{ObservedAcquisition, ObservedConnection, Page, PageOptions
 pub use revalidation::{Revalidation, RevalidationDispatch};
 pub use use_and_retirement::{DispatchedUse, InvalidCredential, ReadUse, Retirement};
 #[cfg(test)]
+mod binding_scope_tests;
+#[cfg(test)]
 mod cardinality_tests;
 #[cfg(test)]
 mod expiry_batch_tests;
@@ -93,6 +95,11 @@ pub enum Failure {
     /// holds more than one from before the rule. Only a revocation clears it.
     /// Public code `lifecycle_conflict`, `next_action = revoke_connection`.
     InstanceConnectionChanged,
+    /// Only the provider executable changed since the connection was saved
+    /// (`Follow::Executable`): the owner validates it once under the new
+    /// executable, which follows it when the recorded identity answers.
+    /// Public code, should it reach a caller, as `UpgradeRequired`.
+    ExecutableChanged,
 }
 pub type Result<T> = std::result::Result<T, Failure>;
 
@@ -187,6 +194,115 @@ pub struct Binding {
     pub configuration_revision: String,
     pub provider_authority: String,
     pub profile: StaticProfile,
+    /// The digest of the configuration that decides where the credential is
+    /// sent and how it authenticates (architecture-decision-record:
+    /// provider-definitions-and-runtimes D12): endpoint authority, instance
+    /// id, profile declaration, trust roots, admitted hosts and request
+    /// prefix, as the implementation computes it. The bundle, its source and
+    /// the selection stay out of it. Absent on a binding saved before it was
+    /// recorded, and for an implementation or entry that states none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential_revision: Option<String>,
+    /// The SHA-256 of the provider executable the binding was admitted under.
+    /// Absent on a binding saved before it was recorded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub executable: Option<String>,
+}
+
+/// What a configured instance binds a connection to, as an observation knows
+/// it without starting the instance's provider: the configured entry's
+/// configuration revision, credential-side digest and executable digest.
+#[derive(Clone, Copy)]
+pub struct Configured<'a> {
+    pub configuration_revision: &'a str,
+    pub credential_revision: Option<&'a str>,
+    pub executable: Option<&'a str>,
+}
+impl<'a> From<&'a String> for Configured<'a> {
+    fn from(configuration_revision: &'a String) -> Self {
+        Self::from(configuration_revision.as_str())
+    }
+}
+impl<'a> From<&'a str> for Configured<'a> {
+    /// Only the configuration revision: the rule before D12.
+    fn from(configuration_revision: &'a str) -> Self {
+        Self {
+            configuration_revision,
+            credential_revision: None,
+            executable: None,
+        }
+    }
+}
+impl Configured<'_> {
+    /// Whether a connection saved under `saved` is current under this
+    /// configuration: the same configuration revision, or, where both record
+    /// one, the same credential side (D12 point 2: a bundle, source,
+    /// selection or executable change alone does not stale it).
+    pub(super) fn current(&self, saved: &Binding) -> bool {
+        saved.configuration_revision == self.configuration_revision
+            || matches!(
+                (saved.credential_revision.as_deref(), self.credential_revision),
+                (Some(saved), Some(configured)) if saved == configured
+            )
+    }
+}
+
+/// How a saved connection's binding stands to the configured one (D12).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Follow {
+    /// The configured binding, or one that differs from it only in what the
+    /// saved binding does not record (a binding saved before D12).
+    Same,
+    /// Only the operation side moved (bundle, source or selection): the
+    /// connection is used under the configured binding as it is, and its next
+    /// revalidation records it.
+    Operations,
+    /// The provider executable changed and the credential side did not: the
+    /// connection follows once the new executable's validation answers the
+    /// recorded identity.
+    Executable,
+    /// Anything else: the configuration-revision rule
+    /// (`revalidation::changed`).
+    Changed,
+}
+
+/// Classify `saved` against `configured`. The credential side is compared
+/// only where both record it; otherwise the configuration revision decides,
+/// as before D12, and the executable is not compared.
+pub(super) fn follow(saved: &Binding, configured: &Binding) -> Follow {
+    if saved == configured {
+        return Follow::Same;
+    }
+    if saved.instance_id != configured.instance_id
+        || saved.adapter_id != configured.adapter_id
+        || saved.provider_authority != configured.provider_authority
+        || saved.profile != configured.profile
+    {
+        return Follow::Changed;
+    }
+    let same_revision = saved.configuration_revision == configured.configuration_revision;
+    let same_credential = matches!(
+        (&saved.credential_revision, &configured.credential_revision),
+        (Some(saved), Some(configured)) if saved == configured
+    );
+    if saved.credential_revision.is_some()
+        && configured.credential_revision.is_some()
+        && !same_credential
+    {
+        return Follow::Changed;
+    }
+    if !same_credential {
+        return if same_revision {
+            Follow::Same
+        } else {
+            Follow::Changed
+        };
+    }
+    match (&saved.executable, &configured.executable) {
+        (Some(saved), Some(configured)) if saved != configured => Follow::Executable,
+        _ if same_revision => Follow::Same,
+        _ => Follow::Operations,
+    }
 }
 
 #[cfg(test)]
@@ -205,6 +321,8 @@ pub(super) fn fixture_binding(instance: &str) -> Binding {
             evidence_lifetime_ms: 60_000,
             declaration: None,
         },
+        credential_revision: None,
+        executable: None,
     }
 }
 
@@ -536,6 +654,14 @@ impl Binding {
             &self.profile.id,
             &self.profile.revision,
         ] {
+            if !connectors_core::valid_id(id) {
+                return Err(Failure::InvalidInput);
+            }
+        }
+        for id in [&self.credential_revision, &self.executable]
+            .into_iter()
+            .flatten()
+        {
             if !connectors_core::valid_id(id) {
                 return Err(Failure::InvalidInput);
             }

@@ -196,17 +196,50 @@ pub(in crate::local::owner) fn execute(
             .as_millis()
             .min(120_000) as u64;
         issuance::check(until)?;
-        let captured = registry
-            .capture_read(
-                &bootstrap
-                    .binding(&requirement.profile)
-                    .map_err(Error::from)?,
+        let binding = bootstrap
+            .binding(&requirement.profile)
+            .map_err(Error::from)?;
+        let capture = || {
+            registry.capture_read(
+                &binding,
                 request.connection,
                 &requirement.scopes,
                 connectors_sdk::now_ms(),
                 connectors_sdk::now_ms() + remaining,
             )
-            .map_err(Error::from)?;
+        };
+        let captured = match capture() {
+            // Only the provider executable changed since the connection was
+            // saved (D12): validated once under this executable before anything
+            // is sent, as a read is (`owner::follow_executable`).
+            Err(registry::Failure::ExecutableChanged) => {
+                let deadline = connectors_sdk::now_ms() + remaining;
+                crate::local::owner::follow_executable(
+                    paths,
+                    &current.config.selection(),
+                    &registry,
+                    &binding,
+                    request.connection,
+                    deadline,
+                    || {
+                        // Held until the validation's dispatch is recorded.
+                        let guard = control.lifecycle.lock().map_err(|_| Code::Unavailable)?;
+                        guard.check(control.epoch)?;
+                        if control.stopped.load(Ordering::SeqCst) {
+                            return Err(Code::Unavailable.into());
+                        }
+                        Ok(guard)
+                    },
+                    |material| {
+                        let result = child.validate(&requirement.profile, material, deadline);
+                        (result, 1, None)
+                    },
+                )?;
+                issuance::check(until)?;
+                capture().map_err(Error::from)?
+            }
+            other => other.map_err(Error::from)?,
+        };
         let connection_use = Use {
             registry,
             captured: Some(captured),
