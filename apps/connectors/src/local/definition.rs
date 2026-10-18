@@ -222,7 +222,28 @@ fn usage() -> HandlerReply {
 }
 
 /// Prepare `definition` and answer the rewritten command line.
+///
+/// The interrupt handler is installed before anything else runs: reading the
+/// configuration may start the installed provider to derive an unpinned
+/// instance, and pinning the definition's entry starts it twice, so no child
+/// is ever started before an interruption is caught. An interruption at any
+/// point of the preparation ends the command as interrupted, whatever the step
+/// it arrived in answered, refusals included.
 fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerReply> {
+    let signals = protected::Signals::install().map_err(owner_failure)?;
+    let prepared = prepare_with(request, definition, &signals);
+    if signals.interrupted() {
+        return Err(owner_failure(owner::Code::Interrupted.into()));
+    }
+    prepared
+}
+
+/// [`run`], under the interrupt handler `signals`.
+fn prepare_with(
+    request: &Request,
+    definition: &Path,
+    signals: &protected::Signals,
+) -> Result<Vec<OsString>, HandlerReply> {
     // A third selector: never beside `--adapter` or `--connector`/`--instance`.
     if request.selected {
         return Err(usage());
@@ -267,10 +288,7 @@ fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerRep
     };
     // The state directory `setup init` made holds the cache.
     Metadata::inspect(&paths.state).map_err(host_failure)?;
-    // An interruption while the definition is prepared ends the command as
-    // interrupted, whatever the step it arrived in answered; nothing after it
-    // runs (`interrupted`).
-    let signals = protected::Signals::install().map_err(owner_failure)?;
+    // Nothing after an interruption runs (`interrupted`).
     let interrupted = || {
         if signals.interrupted() {
             Err(owner_failure(owner::Code::Interrupted.into()))
