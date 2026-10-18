@@ -229,11 +229,19 @@ fn a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_
     );
 }
 
-/// Outside the namespaces: copy the production CLI and the catalog provider
-/// side by side into a private fixture directory, with a copy of the Secret
-/// Service daemon, and run this test again inside fresh user, network and
-/// mount namespaces on that directory. The directory is removed here.
+/// Outside the namespaces: run this test again inside them ([`reenter`]).
 fn outside() {
+    let output = reenter(INSIDE, NAME);
+    assert!(!carries_material(&output.stdout) && !carries_material(&output.stderr));
+}
+
+/// Copy the production CLI and the catalog provider side by side into a
+/// private fixture directory, with a copy of the Secret Service daemon, and
+/// run the test `name` of this test binary again inside fresh user, network
+/// and mount namespaces on that directory, with `inside` naming it. Asserts
+/// that the test passed there and answers its output. The directory is
+/// removed here.
+pub(super) fn reenter(inside: &str, name: &str) -> Output {
     let base = tempfile::Builder::new()
         .permissions(fs::Permissions::from_mode(0o700))
         .tempdir()
@@ -265,13 +273,13 @@ fn outside() {
         .arg(std::env::current_exe().unwrap())
         .args([
             "--exact",
-            NAME,
+            name,
             "--ignored",
             "--nocapture",
             "--test-threads",
             "1",
         ])
-        .env(INSIDE, base.path())
+        .env(inside, base.path())
         .stdin(Stdio::null())
         .output()
         .unwrap();
@@ -281,12 +289,12 @@ fn outside() {
         "{stdout}\n{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(!carries_material(&output.stdout) && !carries_material(&output.stderr));
+    output
 }
 
 const KEYRING_DAEMON: &str = "/usr/bin/gnome-keyring-daemon";
 /// The fixture directory inside the namespaces.
-const WORK: &str = "/work";
+pub(super) const WORK: &str = "/work";
 
 /// Inside the namespaces: a root of our own, so every directory the host
 /// admits on a path is owned by this namespace's root, as on a real system.
@@ -296,7 +304,7 @@ const WORK: &str = "/work";
 /// content), and `/etc/hosts`, `/etc/nsswitch.conf` and `/etc/ssl` are
 /// replaced by `base/etc`. Then loopback is raised and this process changes
 /// its root to it; every process it starts inherits that root.
-fn enter(base: &Path) {
+pub(super) fn enter(base: &Path) {
     let run = |program: &str, args: &[&std::ffi::OsStr]| {
         let status = Command::new(program).args(args).status().unwrap();
         assert!(status.success(), "{program} {args:?}");

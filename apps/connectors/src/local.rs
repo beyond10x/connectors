@@ -15,6 +15,7 @@ mod approvals;
 mod checkpoints;
 mod connections;
 mod cursor;
+mod definition;
 mod migrate;
 mod operations;
 mod owner_stop;
@@ -28,6 +29,12 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     if let Some(help) = connectors::help::render(&args) {
         return help_output(help, is_root_help(&args));
     }
+    // `operations invoke --definition` is prepared, and rewritten to select the
+    // definition's instance, before anything else reads the command line.
+    let args = match definition::prepare(args) {
+        Ok(args) => args,
+        Err(refused) => return refused,
+    };
     let deprecations = select::deprecations(&args);
     let json = select::json_output(&args);
     let mut output = run_selected(args);
@@ -504,7 +511,15 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
             json!({"disposition":initialized.disposition(), "config_path":paths.config, "state_path":paths.state, "os":std::env::consts::OS}),
         );
     }
-    let config = Config::read(&paths.config).map_err(configuration_refusal)?;
+    // The configured inventory and its prerequisites are the operator's file
+    // alone; every command that selects an instance also sees an invoked
+    // definition's (story:invoke-definition-file).
+    let config = if matches!(call.callable, "setup-check" | "adapters-list") {
+        Config::read(&paths.config)
+    } else {
+        Config::read_at(&paths)
+    }
+    .map_err(configuration_refusal)?;
     let summary = |alias: &str, adapter: &connectors_host::local::config::Adapter| json!({"adapter":alias,"instance_id":adapter.instance_id,"adapter_id":adapter.adapter_id,"startup":adapter.startup,"restart":adapter.restart});
     if call.callable == "setup-check" {
         let selection = config.selection();

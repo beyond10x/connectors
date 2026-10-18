@@ -584,3 +584,9 @@ commands:
         source: {kind: option, long: approval-file}
       - field: idempotency_key
         source: {kind: option, long: idempotency-key}
+      - field: definition
+        source: {kind: option, long: definition}
+      - field: definitions_root
+        source: {kind: option, long: definitions-root}
+      - field: credential_file
+        source: {kind: option, long: credential-file}
