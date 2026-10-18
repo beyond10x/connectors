@@ -15,9 +15,11 @@ fn paths() -> (tempfile::TempDir, Paths) {
     (root, paths)
 }
 
-fn entry(root: &std::path::Path, connector: &str, digest: char) -> Entry {
+fn entry(paths: &Paths, connector: &str, digest: char) -> Entry {
+    let digest = digest.to_string().repeat(64);
+    let native = paths.state.join(DIRECTORY).join(&digest).join(NATIVE);
     Entry {
-        digest: digest.to_string().repeat(64),
+        digest,
         adapter: Adapter {
             credential_revision: Some("credential-1".into()),
             instance_id: alias(connector),
@@ -28,9 +30,12 @@ fn entry(root: &std::path::Path, connector: &str, digest: char) -> Entry {
             startup: Default::default(),
             restart: Default::default(),
             executable: Executable {
-                path: root.join("connectors-catalog-provider"),
+                path: paths.state.join(format!(
+                    "connectors-catalog-provider{}",
+                    std::env::consts::EXE_SUFFIX
+                )),
                 sha256: "a".repeat(64),
-                args: vec!["--local-config".into(), "/fixture/native.json".into()],
+                args: vec!["--local-config".into(), native.to_str().unwrap().into()],
             },
             permissions: Permissions {
                 profiles: BTreeSet::from(["forge.pat".to_owned()]),
@@ -43,9 +48,9 @@ fn entry(root: &std::path::Path, connector: &str, digest: char) -> Entry {
 
 #[test]
 fn a_recorded_definition_is_the_instance_definition_of_its_connector() {
-    let (root, paths) = paths();
+    let (_root, paths) = paths();
     let operator = std::fs::read(&paths.config).unwrap();
-    record(&paths, "forge", &entry(root.path(), "forge", 'b')).unwrap();
+    record(&paths, "forge", &entry(&paths, "forge", 'b')).unwrap();
     let config = Config::read_at(&paths).unwrap();
     let selected = config
         .select(Selector::Instance {
@@ -63,8 +68,8 @@ fn a_recorded_definition_is_the_instance_definition_of_its_connector() {
 
 #[test]
 fn a_held_definition_is_never_written_to_the_operators_file() {
-    let (root, paths) = paths();
-    record(&paths, "forge", &entry(root.path(), "forge", 'b')).unwrap();
+    let (_root, paths) = paths();
+    record(&paths, "forge", &entry(&paths, "forge", 'b')).unwrap();
     let config = Config::read_at(&paths).unwrap();
     assert!(config.adapters.contains_key("forge.definition"));
     let text = config.to_text().unwrap();
@@ -74,10 +79,10 @@ fn a_held_definition_is_never_written_to_the_operators_file() {
 
 #[test]
 fn recording_one_definition_keeps_every_other() {
-    let (root, paths) = paths();
-    record(&paths, "forge", &entry(root.path(), "forge", 'b')).unwrap();
-    record(&paths, "other", &entry(root.path(), "other", 'c')).unwrap();
-    record(&paths, "forge", &entry(root.path(), "forge", 'd')).unwrap();
+    let (_root, paths) = paths();
+    record(&paths, "forge", &entry(&paths, "forge", 'b')).unwrap();
+    record(&paths, "other", &entry(&paths, "other", 'c')).unwrap();
+    record(&paths, "forge", &entry(&paths, "forge", 'd')).unwrap();
     let held = entries(&paths).unwrap();
     assert_eq!(held.keys().collect::<Vec<_>>(), ["forge", "other"]);
     assert_eq!(held["forge"].digest, "d".repeat(64));
@@ -86,11 +91,11 @@ fn recording_one_definition_keeps_every_other() {
 
 #[test]
 fn an_instance_the_operator_configured_is_not_replaced() {
-    let (root, paths) = paths();
+    let (_root, paths) = paths();
     // The operator's entry already uses the definition's instance id.
     let mut config = Config::load(&paths.config).unwrap();
     config.format = "connectors-local/2".into();
-    let mut operators = entry(root.path(), "forge", 'b').adapter;
+    let mut operators = entry(&paths, "forge", 'b').adapter;
     operators.configuration_revision = "operators".into();
     config.adapters.insert("mine".into(), operators);
     std::fs::write(&paths.config, toml::to_string(&config).unwrap()).unwrap();
@@ -98,7 +103,7 @@ fn an_instance_the_operator_configured_is_not_replaced() {
     assert!(collides(&operator, "forge"));
     assert!(!collides(&operator, "other"));
 
-    record(&paths, "forge", &entry(root.path(), "forge", 'c')).unwrap();
+    record(&paths, "forge", &entry(&paths, "forge", 'c')).unwrap();
     let config = Config::read_at(&paths).unwrap();
     assert!(!config.adapters.contains_key("forge.definition"));
     assert!(config.definitions.is_empty());
@@ -107,11 +112,11 @@ fn an_instance_the_operator_configured_is_not_replaced() {
 
 #[test]
 fn an_entry_of_another_shape_is_neither_recorded_nor_held() {
-    let (root, paths) = paths();
-    let mut wrong = entry(root.path(), "forge", 'b');
+    let (_root, paths) = paths();
+    let mut wrong = entry(&paths, "forge", 'b');
     wrong.adapter.instance_id = "forge.other".into();
     assert!(record(&paths, "forge", &wrong).is_err());
-    let mut wrong = entry(root.path(), "forge", 'b');
+    let mut wrong = entry(&paths, "forge", 'b');
     wrong.adapter.permissions.custody.insert(
         "project.get".into(),
         crate::local::config::CustodyTarget {
@@ -127,8 +132,8 @@ fn an_entry_of_another_shape_is_neither_recorded_nor_held() {
 #[test]
 fn an_entries_file_that_is_not_owner_only_is_not_held() {
     use std::os::unix::fs::PermissionsExt;
-    let (root, paths) = paths();
-    record(&paths, "forge", &entry(root.path(), "forge", 'b')).unwrap();
+    let (_root, paths) = paths();
+    record(&paths, "forge", &entry(&paths, "forge", 'b')).unwrap();
     let file = paths.state.join(DIRECTORY).join(ENTRIES);
     assert_eq!(
         std::fs::metadata(&file).unwrap().permissions().mode() & 0o777,

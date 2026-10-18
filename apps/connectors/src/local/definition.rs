@@ -30,7 +30,7 @@ use std::{
 };
 
 /// The native configuration file in each cache entry.
-const NATIVE: &str = "native.json";
+const NATIVE: &str = definitions::NATIVE;
 /// The most bytes a definition file may hold.
 const DEFINITION_LIMIT: u64 = 1024 * 1024;
 /// The most bytes a vendored source or amendments file is read for its digest.
@@ -240,7 +240,12 @@ fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerRep
         .to_owned();
     let connector = parsed.id.clone().unwrap_or_else(|| stem.clone());
     let alias = definitions::alias(&connector);
-    if !connectors_core::valid_id(&connector) || !connectors_core::valid_id(&alias) {
+    // The connector and the catalog name directories and an alias: plain names
+    // only, so neither can step out of a cache entry or another alias.
+    if !plain(&connector)
+        || !parsed.catalog.as_deref().is_none_or(plain)
+        || !connectors_core::valid_id(&alias)
+    {
         return Err(usage());
     }
     // An instance the operator configured is never replaced.
@@ -259,9 +264,23 @@ fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerRep
     };
     // The state directory `setup init` made holds the cache.
     Metadata::inspect(&paths.state).map_err(host_failure)?;
-    let _signals = protected::Signals::install().map_err(owner_failure)?;
-    let (digest, native) = cache(&paths, &file, &root, &bytes, &parsed, &alias)?;
-    let (adapter, reported) = definitions::derive(&connector, &native).map_err(host_failure)?;
+    // An interruption while the definition is prepared ends the command as
+    // interrupted, whatever the step it arrived in answered; nothing after it
+    // runs (`interrupted`).
+    let signals = protected::Signals::install().map_err(owner_failure)?;
+    let interrupted = || {
+        if signals.interrupted() {
+            Err(owner_failure(owner::Code::Interrupted.into()))
+        } else {
+            Ok(())
+        }
+    };
+    let cached = cache(&paths, &file, &root, &bytes, &parsed, &alias);
+    interrupted()?;
+    let (digest, native) = cached?;
+    let derived = definitions::derive(&connector, &native);
+    interrupted()?;
+    let (adapter, reported) = derived.map_err(host_failure)?;
     definitions::record(
         &paths,
         &connector,
@@ -271,19 +290,24 @@ fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerRep
         },
     )
     .map_err(host_failure)?;
-    // What the command selects from here on is the entry just recorded.
+    // What the command selects from here on is the entry just recorded: an
+    // instance the operator configured meanwhile wins, and another run that
+    // recorded another file of this connector since is a conflict to retry.
     let held = Config::read_at(&paths).map_err(configuration_refusal)?;
-    if held.definitions.get(&alias) != Some(&connector)
-        || held.adapters.get(&alias).map(|a| a.selection()) != Some(adapter.selection())
-    {
+    if held.definitions.get(&alias) != Some(&connector) {
         return Err(configuration_refusal(Refusal::Rule(
             Rule::DefinitionInstanceConfigured,
         )));
     }
+    if held.adapters.get(&alias).map(|a| a.selection()) != Some(adapter.selection()) {
+        return Err(host_failure(Failure::ConcurrentRevision));
+    }
+    interrupted()?;
     let connection = match &request.connection {
         Some(connection) => connection.clone(),
         None => connection(&paths, &connector, &alias, &adapter, request)?,
     };
+    interrupted()?;
     let (schema, revision) = match (&request.schema, &request.revision) {
         (Some(schema), Some(revision)) => (schema.clone(), revision.clone()),
         (schema, revision) => {
@@ -301,6 +325,7 @@ fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerRep
             )
         }
     };
+    interrupted()?;
     let mut rewritten = vec![request.program.clone()];
     rewritten.extend(request.globals.iter().cloned());
     rewritten.extend(["operations", "invoke"].map(OsString::from));
@@ -316,6 +341,16 @@ fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerRep
     }
     rewritten.extend(request.kept.iter().cloned());
     Ok(rewritten)
+}
+
+/// A plain name: ASCII letters, digits, `-` and `_`, as a derived instance's
+/// connector and instance are.
+fn plain(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 64
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
 /// A regular file's bytes, at most `limit` of them.
@@ -440,8 +475,16 @@ fn cache(
     let (directory, held) = definitions::directory(paths, true).map_err(host_failure)?;
     let entry = directory.join(&digest);
     let native = entry.join(NATIVE);
-    if std::fs::symlink_metadata(&native).is_ok_and(|metadata| metadata.is_file()) {
-        return Ok((digest, native));
+    if std::fs::symlink_metadata(&entry).is_ok() {
+        if published(&entry) {
+            return Ok((digest, native));
+        }
+        // Not an entry this lowering would publish (another kind of file, not
+        // owner-only, or native configuration that names another place): it is
+        // lowered again.
+        std::fs::remove_dir_all(&entry)
+            .or_else(|_| std::fs::remove_file(&entry))
+            .map_err(|_| host_failure(Failure::InvalidConfiguration))?;
     }
     let unique = uuid::Uuid::new_v4().simple();
     let copied = directory.join(format!(".inputs-{unique}"));
@@ -465,14 +508,24 @@ fn cache(
             scratch: &directory,
         })
         .map_err(|_| usage())?;
+        // Everything the lowerer wrote is inside this lowering's own staging
+        // directory.
+        if ![&lowered.bundle, &lowered.operations, &lowered.connector]
+            .iter()
+            .all(|path| inside(path, &staging))
+        {
+            return Err(usage());
+        }
         let text = native_configuration(parsed, &lowered, &staging, &entry, alias)?;
         let staged = filesystem::directory(&staging, false, true).map_err(host_failure)?;
-        filesystem::publish_new(&staged, OsStr::new(NATIVE), &text).map_err(host_failure)
+        filesystem::publish_new(&staged, OsStr::new(NATIVE), &text).map_err(host_failure)?;
+        // Durable before it is published under its digest.
+        sync_tree(&staging).map_err(|_| host_failure(Failure::OutcomeUnknown))
     })();
-    let published = lowered.and_then(|()| {
+    let renamed = lowered.and_then(|()| {
         std::fs::rename(&staging, &entry).or_else(|_| {
             // Another run published the same digest first: its entry is this one.
-            if std::fs::symlink_metadata(&native).is_ok_and(|metadata| metadata.is_file()) {
+            if published(&entry) {
                 Ok(())
             } else {
                 Err(host_failure(Failure::InvalidConfiguration))
@@ -484,9 +537,50 @@ fn cache(
             let _ = std::fs::remove_dir_all(scratch);
         }
     }
-    published?;
+    renamed?;
     filesystem::sync_directory(&held).map_err(host_failure)?;
     Ok((digest, native))
+}
+
+/// Whether `entry` is a published cache entry: an owner-only directory, no
+/// link, whose private native configuration names it as its bundle directory.
+fn published(entry: &Path) -> bool {
+    let directory = std::fs::symlink_metadata(entry).is_ok_and(|metadata| metadata.is_dir())
+        && filesystem::directory(entry, false, true).is_ok();
+    directory
+        && filesystem::private_file(&entry.join(NATIVE))
+            .and_then(|file| filesystem::read_bounded(file, 1024 * 1024))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+            .is_some_and(|native| native["bundle_directory"] == json!(entry))
+}
+
+/// Whether `path` is `directory` or under it, by its components.
+fn inside(path: &Path, directory: &Path) -> bool {
+    path.starts_with(directory)
+        && path
+            .strip_prefix(directory)
+            .is_ok_and(|rest| rest.components().all(|c| matches!(c, Component::Normal(_))))
+}
+
+/// Flush every file under `directory`, and the directories themselves.
+fn sync_tree(directory: &Path) -> std::io::Result<()> {
+    for entry in std::fs::read_dir(directory)? {
+        let entry = entry?;
+        let kind = entry.file_type()?;
+        if kind.is_dir() {
+            sync_tree(&entry.path())?;
+        } else if kind.is_file() {
+            // Opened for writing: Windows flushes only a handle that may write.
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(entry.path())?
+                .sync_all()?;
+        }
+    }
+    let held = filesystem::directory(directory, false, false)
+        .map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidData))?;
+    filesystem::sync_directory(&held).map_err(|_| std::io::Error::from(std::io::ErrorKind::Other))
 }
 
 /// The catalog provider's `connectors-catalog-local/2` configuration of the

@@ -500,7 +500,17 @@ the definition's `id`, else its file stem), with the alias and instance id
 lowered configuration as a derived instance's does, and is held in the
 owner-only file `definitions/instances.toml` beside the cache; a later run of a file with the
 same connector id replaces that entry, so both files are one instance and its
-connection follows the rules below. Every command
+connection follows the rules below; a run whose entry another run replaced
+before it was selected is `revision_conflict` at `publication` with
+`retry_explicitly`. At most 64 connector ids are held; another is
+`invalid_configuration` at `configuration`. No command forgets an entry:
+revoking its connection with `connections revoke` and then removing
+`definitions/` from the state directory while no owner runs forgets every
+entry and the cache. The connector id and a `catalog` the definition names are
+plain names (ASCII letters, digits, `-` and `_`); any other is `invalid_input`
+at `arguments`. An entry names the catalog provider started as
+`--local-config` of its own cache entry's `native.json`; an entries file
+holding any other entry is not read. Every command
 that selects an instance reads it beside the configuration, so `--connector
 <connector> --instance definition` selects it too, but `instances list` and
 `setup check` report the configuration alone. The configuration file is never
