@@ -255,3 +255,81 @@ fn security_an_interrupt_while_a_definition_is_prepared_is_exit_130() {
         "{output:?}"
     );
 }
+
+/// The connector and catalog are now plain names, but with an `id` the file
+/// stem still names the bundle when `catalog` is absent: `connectors/...yaml`
+/// has the stem `..`. The lowerer then writes its declaration and selection to
+/// `<staging>/..`, beside the cache entries. The containment check refuses the
+/// lowering only after those writes, and the cleanup removes only the staging
+/// and copy directories, so nothing may be left beside the cache entries.
+#[test]
+fn security_a_dot_dot_file_stem_leaves_nothing_beside_the_cache_entries() {
+    let fixture = Fixture::new();
+    let text = definition(None).replacen('\n', "\nid: forge\n", 1);
+    let output = fixture.invoke("..", &text);
+    let strays = fixture.strays();
+    assert!(
+        strays.is_empty(),
+        "beside the cache entries: {strays:?}; {output:?}"
+    );
+}
+
+/// The CLI as [`Fixture::run`] starts it, with `--state-dir` spelled `state`.
+fn run_in(fixture: &Fixture, state: &str, args: &[&str]) -> Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_connectors"));
+    command
+        .env(
+            "CONNECTORS_INSTALLATION",
+            fixture.root.path().join("not-installed"),
+        )
+        .args(["--output", "json", "--config"])
+        .arg(fixture.root.path().join("config/config.toml"))
+        .args(["--state-dir", state])
+        .args(args)
+        .stdin(Stdio::null());
+    // SAFETY: setsid in the child between fork and exec; no allocation.
+    unsafe {
+        command.pre_exec(|| {
+            if libc::setsid() < 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    command.output().unwrap()
+}
+
+/// "A run whose inputs are unchanged reuses the entry." `--state-dir` is taken
+/// as given and `/x/./state` is admitted as `/x/state`; a cache hit now
+/// requires the native configuration to name the entry by the same string, so
+/// a run under the other spelling removes the published entry
+/// (`remove_dir_all`) and lowers it again.
+#[test]
+fn security_an_unchanged_definition_reuses_its_entry_under_another_spelling_of_the_state_directory()
+{
+    let fixture = Fixture::new();
+    let file = fixture.write("forge", &definition(None));
+    let identity = || -> Vec<(String, u64, i64)> {
+        use std::os::unix::fs::MetadataExt;
+        fs::read_dir(fixture.definitions())
+            .unwrap()
+            .map(|name| name.unwrap())
+            .filter(|name| name.path().join("native.json").is_file())
+            .map(|name| {
+                let native = fs::metadata(name.path().join("native.json")).unwrap();
+                (
+                    name.file_name().into_string().unwrap(),
+                    native.ino(),
+                    native.mtime_nsec(),
+                )
+            })
+            .collect()
+    };
+    let state = fixture.root.path().join("state");
+    let first = run_in(&fixture, state.to_str().unwrap(), &invoke_args(&file));
+    let lowered = identity();
+    assert_eq!(lowered.len(), 1, "the fixture lowers: {first:?}");
+    let respelled = format!("{}/./state", fixture.root.path().to_str().unwrap());
+    let second = run_in(&fixture, &respelled, &invoke_args(&file));
+    assert_eq!(identity(), lowered, "{second:?}");
+}

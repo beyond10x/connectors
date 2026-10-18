@@ -491,11 +491,12 @@ before it was selected is `revision_conflict` at `publication` with
 `invalid_configuration` at `configuration`. No command forgets an entry:
 revoking its connection with `connections revoke` and then removing
 `definitions/` from the state directory while no owner runs forgets every
-entry and the cache. The connector id and a `catalog` the definition names are
-plain names (ASCII letters, digits, `-` and `_`); any other is `invalid_input`
-at `arguments`. An entry names the catalog provider started as
-`--local-config` of its own cache entry's `native.json`; an entries file
-holding any other entry is not read. Every command
+entry and the cache. The connector id, the file stem and the catalog (the stem when the
+definition names none) are plain names (ASCII letters, digits, `-` and `_`);
+any other is `invalid_input` at `arguments`, before anything is written. An entry names the catalog provider started as
+`--local-config` of its own cache entry's `native.json`, compared as paths so
+every spelling of the state directory names it; an entries file holding any
+other entry is not read. Every command
 that selects an instance reads it beside the configuration, so `--connector
 <connector> --instance definition` selects it too, but `instances list` and
 `setup check` report the configuration alone. The configuration file is never

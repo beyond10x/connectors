@@ -83,9 +83,12 @@ fn admitted(paths: &Paths, connector: &str, entry: &Entry) -> bool {
     );
     connectors_core::valid_id(connector)
         && adapter.executable.path.file_name() == Some(OsStr::new(&provider))
-        && native
-            .to_str()
-            .is_some_and(|native| adapter.executable.args == ["--local-config", native])
+        // Compared as paths, component by component: every admitted spelling
+        // of the state directory names the same entry.
+        && matches!(
+            adapter.executable.args.as_slice(),
+            [flag, path] if flag == "--local-config" && std::path::Path::new(path) == native
+        )
         && connectors_core::valid_id(&alias)
         && entry.digest.len() == 64
         && entry
