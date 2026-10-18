@@ -260,13 +260,6 @@
       "status": "Specified; runtime pending"
     },
     {
-      "route": "/adapters/atlassian/contracts/documents",
-      "title": "Atlassian documents",
-      "source": "adapters/atlassian/contracts/documents/v1alpha1/semantics.md",
-      "owner": "atlassian",
-      "status": "Specified; runtime pending"
-    },
-    {
       "route": "/adapters/docker/contracts/logs",
       "title": "Docker logs",
       "source": "adapters/docker/contracts/logs/v1alpha1/semantics.md",

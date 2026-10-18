@@ -13,10 +13,9 @@ An advertised profile must bind an exact version of this contract and supply its
 own versioned schema and conformance obligations. Framing alone is insufficient:
 [service compatibility](../../../service/compatibility.md) governs typed readers.
 
-The [Atlassian document binding](../../../../adapters/atlassian/contracts/documents/v1alpha1/semantics.md)
-owns the currently proposed native document/search profiles. Its provider traces,
-representation limits, cache predicates and query grammar travel with that adapter.
-The link is an implementation index, not a dependency of this contract on that adapter.
+No native document/search profile binds this contract today. The Atlassian document
+profiles that did were removed and are in history at commit `6498a881c`; Jira and
+Confluence reads run through the catalog provider.
 
 ## Result and representation obligations
 

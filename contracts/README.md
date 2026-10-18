@@ -53,7 +53,6 @@ Deferred families with no document yet: `execution`, `events`, `resources`,
 
 | Adapter document | Contracts |
 |---|---|
-| [Atlassian](../adapters/atlassian/design.md) | operations + mutation, records + document, auth.connection, auth.profile, auth.acquisition, auth.custody, auth.capability, auth.evidence |
 | [Kubernetes](../adapters/kubernetes/design.md) | records, endpoint_discovery, host_discovery (implemented) + logs, mutation, resource_discovery, route.mediated_http, auth.connection, auth.profile, auth.acquisition (static_config), auth.capability, auth.custody, auth.evidence |
 | [Docker](../adapters/docker/design.md) | operations + mutation, records, logs, endpoint_discovery, auth.connection, auth.profile, auth.acquisition (static_config), auth.capability, auth.custody, auth.evidence |
 | [Grafana, Loki, Prometheus, Alertmanager](../docs/compositions/monitoring.md) | records, logs, series, resource_discovery, route.mediated_http, auth.connection, auth.profile, auth.acquisition, auth.capability, auth.custody, auth.evidence |

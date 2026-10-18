@@ -11,7 +11,7 @@ retain historical coordinates as values. [Delegation](../../service/delegation.m
 now owns the selected proof/receipt semantics. The original verification claims
 and runtime limitations below are retained as evidence of that earlier unit.
 
-[Mutation §5.1](semantics.md#51-key-namespace-fingerprint-and-replay-admission) defines namespace, fingerprint, current replay admission, reservation ownership and retention. The [Atlassian adapter plan](../../../adapters/atlassian/design.md) applies these rules to its keyed writes. These remain proposed semantics; no mutation runtime, public wire schema or adapter has been added.
+[Mutation §5.1](semantics.md#51-key-namespace-fingerprint-and-replay-admission) defines namespace, fingerprint, current replay admission, reservation ownership and retention. The Atlassian adapter plan that applied these rules to its keyed writes was removed (history, commit `6498a881c`). These remain proposed semantics; no mutation runtime, public wire schema or adapter has been added.
 
 [ESS idempotency](../../../ess/domains/idempotency.yaml) gives AuthorityScope, Origin, KeyNamespace and RequestFingerprint typed homes. KeyReservation references exactly one immutable [AttemptRecord](../../../ess/domains/mutations.yaml), and its lifecycle separates Pending, Replayable, Quarantined and Expired. The attempt records the durable terminal settlement instant used by replay retention. Audit evidence outlives eviction of replay data.
 

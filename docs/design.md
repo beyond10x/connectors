@@ -281,9 +281,6 @@ adapters/atlassian/
 ├── Cargo.toml                        # Library and standalone binary
 ├── design.md                         # Design and evidence notes of the internal adapter
 ├── contracts/                        # Versioned native profiles and fixtures
-│   └── documents/v1alpha1/
-│       ├── semantics.md
-│       └── cql.md
 ├── spec/
 │   ├── ess/                          # Authored native semantic models
 │   ├── adapter.yaml                  # Document of the internal adapter kind

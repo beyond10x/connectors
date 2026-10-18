@@ -50,7 +50,7 @@ result envelope does not make native query/continuation semantics shared.
 
 | Owner | Native authority |
 |---|---|
-| [Atlassian](atlassian/design.md) | [Document/CQL profiles](atlassian/contracts/documents/v1alpha1/semantics.md), [grammar](atlassian/contracts/documents/v1alpha1/cql.md), [ESS](atlassian/spec/ess/system.yaml), the [authored Confluence REST v1 source](atlassian/contracts/confluence-rest-v1/README.md) the catalog provider compiles; Jira and Confluence remain distinct bindings within the intentionally combined adapter |
+| Atlassian | [ESS](atlassian/spec/ess/system.yaml) of the native document vocabulary, which the catalog provider's Confluence tests read; the [authored Confluence REST v1 source](atlassian/contracts/confluence-rest-v1/README.md) the catalog provider compiles; pinned Jira and Confluence documents in atlassian/upstream/ |
 | [Docker](docker/design.md) | [Container logs](docker/contracts/logs/v1alpha1/semantics.md), lifecycle intent and [ESS](docker/spec/ess/system.yaml) |
 | [Kubernetes](kubernetes/design.md) | [Discovery](kubernetes/contracts/discovery/v1alpha1/semantics.md), [permissions](kubernetes/contracts/auth/v1alpha1/semantics.md), [routes](kubernetes/contracts/routes/v1alpha1/semantics.md), [logs](kubernetes/contracts/logs/v1alpha1/semantics.md), restart intent and [ESS](kubernetes/spec/ess/system.yaml) |
 | [Grafana](grafana/design.md) | [Datasource discovery](grafana/contracts/discovery/v1alpha1/semantics.md), [proxy route](grafana/contracts/routes/v1alpha1/semantics.md), [ESS](grafana/spec/ess/system.yaml); native runtime and tests for `datasources.list` in grafana/; see [the Grafana guide](grafana/README.md) |
