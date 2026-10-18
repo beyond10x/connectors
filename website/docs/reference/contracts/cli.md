@@ -474,7 +474,7 @@ step the held connection's own reconnect admits:
 
 | The instance holds | `next_action` |
 |---|---|
-| one connection under the configured binding | `repair_connection`: `connections reconnect` replaces its credential and keeps its reference |
+| one connection under the configured binding, or one whose binding differs from it only on the operation side (bundle, source or selection, under an equal credential-side digest) | `repair_connection`: `connections reconnect` replaces its credential and keeps its reference |
 | one connection saved under an older configuration revision that a revalidation can follow | `revalidate_connection`, after which it is the instance's connection |
 | one connection that reconnect refuses as changed (`create_connection` on a read), or more than one | `revoke_connection`: `connections revoke` it, then connect |
 
@@ -1088,6 +1088,26 @@ credential the provider refused or is known invalid (`stale`), one whose
 credential expired (`reauthorization_required`), and a credential below the
 operation's scopes, keep `code = not_granted` with
 `next_action = repair_connection`.
+
+A connection whose binding and configured entry both record a credential-side
+digest (`credential_revision`, the implementation's digest of what decides
+where the credential is sent and how it authenticates; never the bundle, its
+source or the selection) is bound to it and to the provider executable, not to
+the configuration revision. A change that leaves the digest equal is not a
+stale configuration: when only the bundle, source or selection moved the
+connection reports `ready` with `stale = false`, and a read, a reconnect, an
+approval naming it and a consumer launch admit it with no credential source
+and no question; its next revalidation records the new revision. When only the
+provider executable changed, it also reports `ready` with `stale = false`; a
+read validates its stored credential once under the new executable and is
+served when the recorded identity answers, and a revalidation follows it the
+same way; another identity is refused as `identity_mismatch` and changes
+nothing. Every other change, and every change for a connection whose binding
+records no credential-side digest (saved before it was recorded, or under an
+entry that states none), follows the configuration-revision rule below. A
+changed configuration has no cached description until an admitted launch, so
+`operations describe` answers `description_unavailable` until one, whichever
+rule applies.
 
 A connection saved under another configuration revision of its instance also
 reports `pending` (`stale = true`), and no status change is pending for it: a
