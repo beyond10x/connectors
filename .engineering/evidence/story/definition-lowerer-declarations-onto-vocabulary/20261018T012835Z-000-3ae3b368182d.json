@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-18T01:28:35Z",
+  "actor": "human:timo",
+  "artifact": "story:definition-lowerer-declarations-onto-vocabulary",
+  "kind": "story",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/actions/runs/39081689581/job/117539768944 (repository gate on #179 head b04416579, pass); connectors-definitions #2 task check on 288641c, pass"
+  }
+}
