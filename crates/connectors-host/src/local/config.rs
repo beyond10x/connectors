@@ -38,6 +38,11 @@ pub struct Config {
     /// only there: that entry is what is checked, served and written back.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub connectors: Option<BTreeMap<String, Connector>>,
+    /// The instances of invoked definition files held beside this configuration
+    /// (`definitions`), by alias, each with its connector: in `adapters` like
+    /// every entry, named `<connector>/definition`, and never written to the
+    /// operator's file. Empty unless read with [`Config::read_at`].
+    pub definitions: BTreeMap<String, String>,
 }
 
 // Deserialize the closed envelope before selecting its version. Validation is
@@ -75,6 +80,7 @@ impl Config {
             adapters: input.adapters,
             consumers: input.consumers,
             connectors: None,
+            definitions: BTreeMap::new(),
         };
         config.connectors = input
             .connectors
@@ -138,6 +144,11 @@ pub enum Rule {
     /// A configuration text is larger than [`CONFIG_LIMIT`], the most a read
     /// admits: the text `setup migrate` would write, which it then does not.
     ConfigTooLarge,
+    /// An `operations invoke --definition` whose connector already has an
+    /// instance named `definition` here, or whose instance id an entry here
+    /// already uses (story:invoke-definition-file): the configured one is never
+    /// replaced.
+    DefinitionInstanceConfigured,
 }
 
 /// The most bytes a configuration read admits.
@@ -152,6 +163,7 @@ impl Rule {
             Self::OwnerUidMismatch => "owner_uid_mismatch",
             Self::ApprovalClockFormatRetired => "approval_clock_format_retired",
             Self::ConfigTooLarge => "config_too_large",
+            Self::DefinitionInstanceConfigured => "definition_instance_configured",
         }
     }
 }
@@ -643,6 +655,11 @@ struct Written {
 impl From<Config> for Written {
     fn from(config: Config) -> Self {
         let mut adapters = config.adapters;
+        // An invoked definition's instance is held beside the operator's file,
+        // never in it.
+        for alias in config.definitions.keys() {
+            adapters.remove(alias);
+        }
         let connectors = config.connectors.map(|connectors| {
             connectors
                 .into_iter()
@@ -807,6 +824,9 @@ impl Config {
     /// alias. `None` when no entry has the alias.
     pub fn names(&self, alias: &str) -> Option<(&str, &str)> {
         let (alias, adapter) = self.adapters.get_key_value(alias)?;
+        if let Some(connector) = self.definitions.get(alias) {
+            return Some((connector.as_str(), super::definitions::INSTANCE));
+        }
         let declared = self
             .connectors
             .iter()
@@ -901,6 +921,7 @@ impl Config {
             .keys()
             .map(String::as_str)
             .filter(|alias| !named.contains(alias))
+            .filter(|alias| !self.definitions.contains_key(*alias))
             .collect()
     }
 
@@ -1069,7 +1090,7 @@ pub(crate) struct Installation {
 }
 
 impl Installation {
-    fn installed() -> Option<Self> {
+    pub(crate) fn installed() -> Option<Self> {
         Some(Self {
             provider: installed_provider()?,
             handshake,
@@ -1117,7 +1138,7 @@ impl Installation {
         };
         executable.validate()?;
         let derived = match executable.print("--print-local-bootstrap") {
-            Ok(printed) => Derived::Entry(Box::new(self.entry(alias, executable, &printed)?)),
+            Ok(printed) => Derived::Entry(Box::new(self.entry(alias, executable, &printed)?.0)),
             // Only a refusal is asked about; a provider past its deadline is
             // not started again.
             Err(Unprinted::Refused) if !stated => {
@@ -1146,7 +1167,12 @@ impl Installation {
     /// instance id and revision it printed, the profiles and every operation,
     /// writes included, of the bootstrap a `connectors-private/2` child of
     /// that entry reports, which must name the same instance and revision.
-    fn entry(&self, alias: &str, executable: Executable, printed: &[u8]) -> Result<Adapter> {
+    fn entry(
+        &self,
+        alias: &str,
+        executable: Executable,
+        printed: &[u8],
+    ) -> Result<(Adapter, super::runtime::Bootstrap)> {
         use super::runtime::PrivateProtocol;
         let printed: super::runtime::Bootstrap =
             serde_json::from_slice(printed).map_err(|_| Failure::InvalidConfiguration)?;
@@ -1181,15 +1207,43 @@ impl Installation {
             return Err(Failure::InvalidConfiguration);
         }
         adapter.permissions = Permissions {
-            profiles: reported.profiles.into_iter().map(|p| p.id).collect(),
+            profiles: reported.profiles.iter().map(|p| p.id.clone()).collect(),
             operations: reported
                 .requirements
-                .into_iter()
-                .map(|r| r.operation)
+                .iter()
+                .map(|r| r.operation.clone())
                 .collect(),
             custody: Default::default(),
         };
-        Ok(adapter)
+        Ok((adapter, reported))
+    }
+
+    /// The entry of the installed provider started with `args`, under
+    /// `alias`, pinned as a derived entry is ([`Installation::entry`]), and the
+    /// bootstrap its `connectors-private/2` child reported. Nothing is
+    /// remembered: an invoked definition's entry is derived once per command
+    /// (`definitions`).
+    pub(crate) fn pinned(
+        &self,
+        alias: &str,
+        args: Vec<String>,
+    ) -> Result<(Adapter, super::runtime::Bootstrap)> {
+        fs::validate_path(&self.provider)?;
+        let selection = Executable {
+            path: self.provider.clone(),
+            sha256: String::new(),
+            args,
+        };
+        let mut source = selection.source()?;
+        let executable = Executable {
+            sha256: digest(&mut source)?,
+            ..selection
+        };
+        executable.validate()?;
+        let printed = executable
+            .print("--print-local-bootstrap")
+            .map_err(|_| Failure::InvalidConfiguration)?;
+        self.entry(alias, executable, &printed)
     }
 }
 
@@ -1589,6 +1643,7 @@ impl Config {
             adapters: BTreeMap::new(),
             consumers: BTreeMap::new(),
             connectors: None,
+            definitions: BTreeMap::new(),
         };
         let text = format!(
             "# Linux Secret Service custody is required; credentials never belong here.\n{}",
@@ -1671,7 +1726,7 @@ fn digest(file: &mut std::fs::File) -> Result<String> {
 impl Executable {
     /// The pinned selection's own form: a lowercase SHA-256 digest, a bounded
     /// argv without NUL and an admissible absolute path.
-    fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         if self.sha256.len() != 64
             || !self
                 .sha256
