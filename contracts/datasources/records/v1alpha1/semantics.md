@@ -76,8 +76,8 @@ credentials or foreign scope metadata. A profile specifies ambiguity-hiding abse
 behavior and distinguishes host denial, provider absence, timeout and unusable
 source observations. This contract grants no automatic refresh or resend.
 
-Generic body facts and completeness decisions are modeled in
-[shared ESS](../../../../ess/domains/datasource_reads.yaml). Native representations
+Generic body facts and completeness decisions have no shared ESS model; the proposed
+one is in history at commit `6498a881c`. Native representations
 and selectors live in the adapter's authored ESS. Parser correctness, scope proof,
 byte accounting, current publication fences and cache behavior remain binding
 obligations; ESS shape validation does not execute them.

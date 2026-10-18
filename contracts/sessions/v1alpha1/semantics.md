@@ -1,7 +1,7 @@
 # sessions/v1alpha1
 
 - **Status:** proposed, not implemented.
-- **Family:** sessions (kernel). Consumed by [media](../../media/v1alpha1/semantics.md); establishment authority from [auth.capability](../../auth/capability/v1alpha1/semantics.md) (`session-authority`, `inbound-verifier`).
+- **Family:** sessions (kernel). No stream contract consumes it today (the media contract is in history at commit `6498a881c`); establishment authority from [auth.capability](../../auth/capability/v1alpha1/semantics.md) (`session-authority`, `inbound-verifier`).
 - **Recorded:** 2026-09-08.
 
 ## 1. Identity

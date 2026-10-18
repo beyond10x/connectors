@@ -108,8 +108,8 @@ errors, query text, origins or credentials enter ordinary diagnostics.
 
 [Service compatibility](../../../service/compatibility.md) governs the wire binding:
 an ordinary result slot does not confer log semantics on existing typed readers.
-[Shared ESS](../../../../ess/domains/datasource_reads.yaml) models generic
-collection/page facts and decisions; native selectors belong to adapter ESS.
+Shared ESS does not model generic collection/page facts and decisions; the proposed
+model is in history at commit `6498a881c`. Native selectors belong to adapter ESS.
 Parser, ordering, full context equality, byte accounting and current publication
 remain unimplemented binding obligations. Native profiles own their adversarial
 fixtures; schema acceptance alone does not execute those obligations.
