@@ -184,6 +184,7 @@ fn selection(directory: &Path, port: u16) -> Adapter {
         .canonicalize()
         .unwrap();
     Adapter {
+        credential_revision: None,
         private_protocol: None,
         permissions: Default::default(),
         instance_id: "fixture-sql".into(),

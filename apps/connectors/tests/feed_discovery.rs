@@ -218,6 +218,8 @@ fn bootstrap(instance: &str, adapter: &str, declared: &[Declared]) -> runtime::B
         configuration_schema: json!({"type":"object"}),
     };
     runtime::Bootstrap {
+        credential_revision: None,
+        executable: None,
         instance: instance.into(),
         adapter: adapter.into(),
         protocol: "v1alpha1".into(),

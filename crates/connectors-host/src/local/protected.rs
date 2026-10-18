@@ -550,6 +550,66 @@ pub fn terminal(fields: &[EntryField], deadline: u64) -> Result<Secret> {
     check(deadline)?;
     Ok(document)
 }
+/// The longest answer [`confirm`] keeps; later bytes of a line are ignored.
+const ANSWER_LIMIT: usize = 16;
+
+/// Ask `question` on the controlling terminal and read one answer line, which
+/// the terminal shows as it is typed. `true` only for `y` or `yes`, in any
+/// case; any other line, an empty one included, is `false`. Refused as
+/// `invalid_input` when this process has no controlling terminal in the
+/// foreground (the terminal admission of [`terminal`]) or input ends, as
+/// `interrupted` on an interruption or an end-of-input character, and as
+/// `timeout` past `deadline`. Terminal settings are restored on every return.
+pub fn confirm(question: &str, deadline: u64) -> Result<bool> {
+    if question.is_empty() || question.len() > 256 || question.chars().any(char::is_control) {
+        return Err(Code::InvalidInput.into());
+    }
+    Ok(matches!(ask(question, deadline)?.as_str(), "y" | "yes"))
+}
+/// The longest question [`ask`] shows.
+const QUESTION_LIMIT: usize = 4096;
+
+/// Ask `question`, which may span lines, on the controlling terminal and
+/// answer the one line typed, trimmed and in lower case, at most
+/// [`ANSWER_LIMIT`] bytes of it; refused as [`confirm`] is refused. A
+/// question with any control character but a line feed is `invalid_input`.
+pub fn ask(question: &str, deadline: u64) -> Result<String> {
+    if question.is_empty()
+        || question.len() > QUESTION_LIMIT
+        || question.chars().any(|c| c.is_control() && c != '\n')
+    {
+        return Err(Code::InvalidInput.into());
+    }
+    let mut terminal = Terminal::open()?;
+    terminal
+        .write_all(question.as_bytes())
+        .map_err(source_error)?;
+    let mut answer = Vec::with_capacity(ANSWER_LIMIT);
+    let mut byte = [0u8];
+    loop {
+        let count = terminal.read_byte(&mut byte, deadline)?;
+        if count == 0 {
+            return Err(Code::InvalidInput.into());
+        }
+        match byte[0] {
+            b'\n' | b'\r' => break,
+            4 => return Err(Code::Interrupted.into()),
+            8 | 127 => {
+                if answer.pop().is_some() {
+                    terminal.write_all(b"\x08 \x08").map_err(source_error)?;
+                }
+            }
+            b if (0x20..0x7f).contains(&b) && answer.len() < ANSWER_LIMIT => {
+                answer.push(b);
+                terminal.write_all(&[b]).map_err(source_error)?;
+            }
+            _ => {}
+        }
+    }
+    terminal.write_all(b"\n").map_err(source_error)?;
+    check(deadline)?;
+    Ok(String::from_utf8_lossy(&answer).trim().to_ascii_lowercase())
+}
 fn append(target: &mut Secret, bytes: &[u8]) -> Result<()> {
     if target.0.len() + bytes.len() > 65536 {
         return Err(Code::InvalidInput.into());

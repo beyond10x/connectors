@@ -325,7 +325,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -816,7 +817,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -1277,7 +1279,8 @@
                             "config_not_private",
                             "owner_uid_mismatch",
                             "approval_clock_format_retired",
-                            "config_too_large"
+                            "config_too_large",
+                            "definition_instance_configured"
                           ]
                         }
                       },
@@ -1712,7 +1715,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -2182,7 +2186,8 @@
                             "config_not_private",
                             "owner_uid_mismatch",
                             "approval_clock_format_retired",
-                            "config_too_large"
+                            "config_too_large",
+                            "definition_instance_configured"
                           ]
                         }
                       },
@@ -2617,7 +2622,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -3117,7 +3123,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -3606,7 +3613,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -4109,7 +4117,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -4612,7 +4621,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -5115,7 +5125,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -5618,7 +5629,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -6121,7 +6133,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -6618,7 +6631,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -7129,7 +7143,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -7631,7 +7646,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -8314,7 +8330,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -8851,7 +8868,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -9379,7 +9397,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -9847,7 +9866,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -10374,7 +10394,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -10917,7 +10938,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -11448,7 +11470,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -11931,7 +11954,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -12533,7 +12557,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -13032,7 +13057,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -13315,6 +13341,24 @@
               }
             },
             "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "credential_file": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "definition": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "definitions_root": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -13639,7 +13683,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -14153,7 +14198,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -14645,7 +14691,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -15102,7 +15149,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -15545,7 +15593,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -16115,7 +16164,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -16553,7 +16603,8 @@
                     "config_not_private",
                     "owner_uid_mismatch",
                     "approval_clock_format_retired",
-                    "config_too_large"
+                    "config_too_large",
+                    "definition_instance_configured"
                   ]
                 }
               },
@@ -17987,6 +18038,27 @@
           "source": {
             "kind": "option",
             "long": "idempotency-key"
+          }
+        },
+        {
+          "field": "definition",
+          "source": {
+            "kind": "option",
+            "long": "definition"
+          }
+        },
+        {
+          "field": "definitions_root",
+          "source": {
+            "kind": "option",
+            "long": "definitions-root"
+          }
+        },
+        {
+          "field": "credential_file",
+          "source": {
+            "kind": "option",
+            "long": "credential-file"
           }
         }
       ]

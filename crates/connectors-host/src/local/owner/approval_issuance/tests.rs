@@ -101,6 +101,7 @@ fn setup(root: &Path, socket: Option<&Path>, clock_addresses: [&str; 2]) -> Targ
             .collect(),
     }));
     let adapter = Adapter {
+        credential_revision: None,
         instance_id: "fixture-instance".into(),
         adapter_id: "fixture-adapter".into(),
         configuration_revision: "cfg-1".into(),
@@ -136,6 +137,8 @@ fn setup(root: &Path, socket: Option<&Path>, clock_addresses: [&str; 2]) -> Targ
         configuration_schema: json!({"type":"object"}),
     };
     let bootstrap = runtime::Bootstrap {
+        credential_revision: None,
+        executable: None,
         instance: adapter.instance_id.clone(),
         adapter: adapter.adapter_id.clone(),
         protocol: adapter.protocol.clone(),

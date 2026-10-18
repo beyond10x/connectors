@@ -1067,6 +1067,9 @@ parameter. After upgrading:
    `configuration_revision` into the instance (see [Bind the provider to the local
    CLI](#bind-the-provider-to-the-local-cli)). Until then its process does not
    start: the host refuses a bootstrap whose revision differs from the instance's.
+   A rebuild moves only the bundle, so the bootstrap's `credential_revision` stays;
+   a connection saved under an instance that states it stays `ready` and is not
+   stale, and step 2 only records the new revision and caches the new description.
 2. Run `connections revalidate` on each connection of an instance that was
    already connected. It moves the connection to the new configuration revision
    with the credential already in custody, and asks for no credential, when the
@@ -1128,7 +1131,13 @@ sha256sum target/release/connectors-catalog-provider
 Add the instance to the configuration created by setup: change its `format` line to
 `format = "connectors-local/5"` and add the instance with the bootstrap's exact
 `configuration_revision`, the executable's SHA-256 and absolute paths. The operation ids are
-the selection ids; omitted permission sets deny access.
+the selection ids; omitted permission sets deny access. Copy the bootstrap's
+`credential_revision` too, as `credential_revision = "..."` beside
+`configuration_revision`: the host then binds connections to the credential side of the
+configuration, so a later change of only the bundle or the selection leaves them `ready`
+([configuration upgrades](local-connection-registry.md#configuration-upgrades)); the host
+refuses a bootstrap whose digest differs from the stated one. Without it, every revision
+change makes the connection `pending` until `connections revalidate`.
 
 ```toml
 [connectors.gitlab]

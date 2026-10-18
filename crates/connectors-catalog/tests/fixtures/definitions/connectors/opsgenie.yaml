@@ -1,0 +1,49 @@
+schema: urn:beyond10x:connectors-definition:1
+source:
+  swagger: upstream/opsgenie/swagger.json.gz
+  sha256: 60901e17d0d4ba28b8d13d3d78f6a5d329b93008c3c1710dfe6a0b6c786ef071
+  projection: opsgenie.openapi.json
+  amendments: upstream/opsgenie/opsgenie.amendments.json
+base_url: https://api.opsgenie.com
+auth:
+  opsgenie.api-key:
+    scheme: header
+    header: Authorization
+    prefix: GenieKey
+    label: Opsgenie API integration key
+    identity: {source: configuration, path: v2/alerts, kind: opsgenie.integration}
+operations:
+  alerts.list:
+    op: listAlerts
+    required: [sort, order]
+    withhold: [searchIdentifier, searchIdentifierType]
+    bounds:
+      sort: {values: [createdAt]}
+      order: {values: [asc]}
+      offset: {minimum: 0, maximum: 19899}
+      limit: {minimum: 1, maximum: 100}
+    description: List the alerts a search query matches, oldest first, one page per call; a window sends query createdAt >= <epoch ms>, sort createdAt and order asc, advances offset by limit while paging.next is present, and starts the next window at the last createdAt read
+  alert.get:
+    op: getAlert
+    bounds: {identifierType: {values: [id, alias, tiny]}}
+    description: Read one alert by identifier, an alert id unless identifierType says alias or tiny
+  incidents.list:
+    op: ListIncidents
+    required: [sort, order]
+    bounds:
+      sort: {values: [createdAt]}
+      order: {values: [asc]}
+      offset: {minimum: 0, maximum: 19899}
+      limit: {minimum: 1, maximum: 100}
+    description: List the incidents a search query matches, oldest first, one page per call; a window sends query createdAt >= <epoch ms>, sort createdAt and order asc, advances offset by limit while paging.next is present, and starts the next window at the last createdAt read
+  incident.get:
+    op: getIncident
+    bounds: {identifierType: {values: [id, tiny]}}
+    description: Read one incident by identifier, an incident id unless identifierType says tiny
+  incident.alert_ids:
+    op: getAssociatedAlertIds
+    bounds:
+      identifierType: {values: [id, tiny]}
+      limit: {minimum: 1, maximum: 25}
+      order: {values: [asc, desc]}
+    description: List the ids of the alerts associated with one incident, at most limit per call; a page with fewer ids than limit is the last

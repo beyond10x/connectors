@@ -356,7 +356,7 @@ Selected local CLI presentation values and the existing local configuration owne
 
 ### `ConfigurationRule`
 
-`connectors.cli.ConfigurationRule` is one of `config_path_unresolved`, `config_missing`, `config_not_private`, `owner_uid_mismatch`, `approval_clock_format_retired` and `config_too_large`.
+`connectors.cli.ConfigurationRule` is one of `config_path_unresolved`, `config_missing`, `config_not_private`, `owner_uid_mismatch`, `approval_clock_format_retired`, `config_too_large` and `definition_instance_configured`.
 
 ### `ConfiguredExecutable`
 
@@ -712,10 +712,12 @@ Every value satisfies `(binding == mounted_secret or not (defined(directory)))`,
 
 ### `LocalOwnerCachedRequest`
 
-`connectors.cli.LocalOwnerCachedRequest` is a record of two fields:
+`connectors.cli.LocalOwnerCachedRequest` is a record of four fields:
 
 - `kind` — `connectors.cli.LocalOwnerCachedKind`
 - `adapter` — `String`
+- `launch` — `Optional<Boolean>`, which may be absent
+- `connection` — `Optional<String>`, which may be absent
 
 ### `LocalOwnerGreeting`
 
@@ -742,6 +744,21 @@ Every value satisfies `(binding == mounted_secret or not (defined(directory)))`,
 ### `LocalOwnerHelloKind`
 
 `connectors.cli.LocalOwnerHelloKind` is one of `hello`.
+
+### `LocalOwnerReuseKind`
+
+`connectors.cli.LocalOwnerReuseKind` is one of `reuse`.
+
+### `LocalOwnerReuseRequest`
+
+`connectors.cli.LocalOwnerReuseRequest` is a record of six fields:
+
+- `kind` — `connectors.cli.LocalOwnerReuseKind`
+- `adapter` — `String`
+- `source` — `String`
+- `connection` — `String`
+- `expected_revision` — `String`
+- `profile` — `String`
 
 ### `LocalRevalidationAdmission`
 
@@ -858,7 +875,7 @@ Every value satisfies `(binding == mounted_secret or not (defined(directory)))`,
 
 ### `OperationInvokeInput`
 
-`connectors.cli.OperationInvokeInput` is a record of 10 fields:
+`connectors.cli.OperationInvokeInput` is a record of 13 fields:
 
 - `adapter` — `Optional<String>`, which may be absent
 - `connector` — `Optional<String>`, which may be absent
@@ -870,6 +887,9 @@ Every value satisfies `(binding == mounted_secret or not (defined(directory)))`,
 - `input` — `String`
 - `approval_file` — `Optional<String>`, which may be absent
 - `idempotency_key` — `Optional<String>`, which may be absent
+- `definition` — `Optional<String>`, which may be absent
+- `definitions_root` — `Optional<String>`, which may be absent
+- `credential_file` — `Optional<String>`, which may be absent
 
 ### `OperationInvokeResult`
 
@@ -955,12 +975,13 @@ Every value satisfies `(support == weaker or not (defined(weaker_form)))`, `(not
 
 ### `PrivateAdapterBootstrap`
 
-`connectors.cli.PrivateAdapterBootstrap` is a record of eight fields:
+`connectors.cli.PrivateAdapterBootstrap` is a record of nine fields:
 
 - `instance` — `String`
 - `adapter` — `String`
 - `protocol` — `String`
 - `configuration_revision` — `String`
+- `credential_revision` — `Optional<String>`, which may be absent
 - `provider_authority` — `String`
 - `descriptor` — `String`
 - `profiles` — `List<connectors.cli.PrivateStaticProfile>`
@@ -1110,7 +1131,7 @@ Every value satisfies `(support == weaker or not (defined(weaker_form)))`, `(not
 
 `connectors.cli.StartupMode` is one of `on-demand` and `automatic`.
 
-72 of the types above are reached by nothing else in this system: `connectors.cli.AdapterDescribeInput`, `connectors.cli.AdapterDescribeResult`, `connectors.cli.AdapterListInput`, `connectors.cli.AdapterListResult`, `connectors.cli.AdapterStatusInput`, `connectors.cli.AdapterStatusResult`, `connectors.cli.AdapterStopInput`, `connectors.cli.AdapterStopResult`, `connectors.cli.ApprovalClockCheckInput`, `connectors.cli.ApprovalClockCheckResult`, `connectors.cli.ApprovalIssueInput`, `connectors.cli.ApprovalIssueResult`, `connectors.cli.ApprovalKeyInitInput`, `connectors.cli.ApprovalKeyRecoverInput`, `connectors.cli.ApprovalKeyRetireInput`, `connectors.cli.ApprovalKeyRevokeInput`, `connectors.cli.ApprovalKeyRotateInput`, `connectors.cli.ApprovalKeyStatusInput`, `connectors.cli.ApprovalKeysResult`, `connectors.cli.ApprovalPolicyResult`, `connectors.cli.ApprovalPolicySetInput`, `connectors.cli.ApprovalPolicyStatusInput`, `connectors.cli.ApprovalPrepareInput`, `connectors.cli.ApprovalPrepareResult`, `connectors.cli.ConnectionConnectInput`, `connectors.cli.ConnectionConnectResult`, `connectors.cli.ConnectionCreateRequest`, `connectors.cli.ConnectionDescribeInput`, `connectors.cli.ConnectionDescribeResult`, `connectors.cli.ConnectionLaunchInput`, `connectors.cli.ConnectionLaunchResult`, `connectors.cli.ConnectionListInput`, `connectors.cli.ConnectionListResult`, `connectors.cli.ConnectionReconnectInput`, `connectors.cli.ConnectionReconnectRequest`, `connectors.cli.ConnectionReconnectResult`, `connectors.cli.ConnectionRevalidateInput`, `connectors.cli.ConnectionRevalidateResult`, `connectors.cli.ConnectionRevokeInput`, `connectors.cli.ConnectionRevokeResult`, `connectors.cli.ConnectionStatusInput`, `connectors.cli.ConnectionStatusResult`, `connectors.cli.ConsumerCredentialDeliveryStatement`, `connectors.cli.LegacyDescribeInput`, `connectors.cli.LegacyDescribeResult`, `connectors.cli.LegacyInvokeInput`, `connectors.cli.LegacyInvokeResult`, `connectors.cli.LocalCaptureAdmission`, `connectors.cli.LocalCustodyBinding`, `connectors.cli.LocalOperationPolicy`, `connectors.cli.LocalOwnerBuild`, `connectors.cli.LocalOwnerBuildRequest`, `connectors.cli.LocalOwnerCached`, `connectors.cli.LocalOwnerCachedRequest`, `connectors.cli.LocalOwnerGreeting`, `connectors.cli.LocalOwnerHello`, `connectors.cli.LocalRevalidationAdmission`, `connectors.cli.OperationDescribeInput`, `connectors.cli.OperationDescribeResult`, `connectors.cli.OperationInvokeInput`, `connectors.cli.OperationInvokeResult`, `connectors.cli.OperationListInput`, `connectors.cli.OperationListResult`, `connectors.cli.PlatformGuaranteeStatement`, `connectors.cli.PrivateBaseline`, `connectors.cli.SetupCheckResult`, `connectors.cli.SetupCheckpointsEnableInput`, `connectors.cli.SetupCheckpointsEnableResult`, `connectors.cli.SetupInitResult`, `connectors.cli.SetupMigrateInput`, `connectors.cli.SetupMigrateResult` and `connectors.cli.SetupOwnerStopResult`. No entity, view, command, event, error or crossing names them, so it is either vocabulary something outside this specification uses or a leftover — and only a person can tell which.
+73 of the types above are reached by nothing else in this system: `connectors.cli.AdapterDescribeInput`, `connectors.cli.AdapterDescribeResult`, `connectors.cli.AdapterListInput`, `connectors.cli.AdapterListResult`, `connectors.cli.AdapterStatusInput`, `connectors.cli.AdapterStatusResult`, `connectors.cli.AdapterStopInput`, `connectors.cli.AdapterStopResult`, `connectors.cli.ApprovalClockCheckInput`, `connectors.cli.ApprovalClockCheckResult`, `connectors.cli.ApprovalIssueInput`, `connectors.cli.ApprovalIssueResult`, `connectors.cli.ApprovalKeyInitInput`, `connectors.cli.ApprovalKeyRecoverInput`, `connectors.cli.ApprovalKeyRetireInput`, `connectors.cli.ApprovalKeyRevokeInput`, `connectors.cli.ApprovalKeyRotateInput`, `connectors.cli.ApprovalKeyStatusInput`, `connectors.cli.ApprovalKeysResult`, `connectors.cli.ApprovalPolicyResult`, `connectors.cli.ApprovalPolicySetInput`, `connectors.cli.ApprovalPolicyStatusInput`, `connectors.cli.ApprovalPrepareInput`, `connectors.cli.ApprovalPrepareResult`, `connectors.cli.ConnectionConnectInput`, `connectors.cli.ConnectionConnectResult`, `connectors.cli.ConnectionCreateRequest`, `connectors.cli.ConnectionDescribeInput`, `connectors.cli.ConnectionDescribeResult`, `connectors.cli.ConnectionLaunchInput`, `connectors.cli.ConnectionLaunchResult`, `connectors.cli.ConnectionListInput`, `connectors.cli.ConnectionListResult`, `connectors.cli.ConnectionReconnectInput`, `connectors.cli.ConnectionReconnectRequest`, `connectors.cli.ConnectionReconnectResult`, `connectors.cli.ConnectionRevalidateInput`, `connectors.cli.ConnectionRevalidateResult`, `connectors.cli.ConnectionRevokeInput`, `connectors.cli.ConnectionRevokeResult`, `connectors.cli.ConnectionStatusInput`, `connectors.cli.ConnectionStatusResult`, `connectors.cli.ConsumerCredentialDeliveryStatement`, `connectors.cli.LegacyDescribeInput`, `connectors.cli.LegacyDescribeResult`, `connectors.cli.LegacyInvokeInput`, `connectors.cli.LegacyInvokeResult`, `connectors.cli.LocalCaptureAdmission`, `connectors.cli.LocalCustodyBinding`, `connectors.cli.LocalOperationPolicy`, `connectors.cli.LocalOwnerBuild`, `connectors.cli.LocalOwnerBuildRequest`, `connectors.cli.LocalOwnerCached`, `connectors.cli.LocalOwnerCachedRequest`, `connectors.cli.LocalOwnerGreeting`, `connectors.cli.LocalOwnerHello`, `connectors.cli.LocalOwnerReuseRequest`, `connectors.cli.LocalRevalidationAdmission`, `connectors.cli.OperationDescribeInput`, `connectors.cli.OperationDescribeResult`, `connectors.cli.OperationInvokeInput`, `connectors.cli.OperationInvokeResult`, `connectors.cli.OperationListInput`, `connectors.cli.OperationListResult`, `connectors.cli.PlatformGuaranteeStatement`, `connectors.cli.PrivateBaseline`, `connectors.cli.SetupCheckResult`, `connectors.cli.SetupCheckpointsEnableInput`, `connectors.cli.SetupCheckpointsEnableResult`, `connectors.cli.SetupInitResult`, `connectors.cli.SetupMigrateInput`, `connectors.cli.SetupMigrateResult` and `connectors.cli.SetupOwnerStopResult`. No entity, view, command, event, error or crossing names them, so it is either vocabulary something outside this specification uses or a leftover — and only a person can tell which.
 
 ## Entities
 
@@ -1506,4 +1527,4 @@ It may invoke [`ExpireConnectionListCursor`](#expireconnectionlistcursor), [`Rai
 
 ---
 
-Generated from connectors v1 · model digest `907d4b094fd98a6565769bd0a78cf9f1322deceb8cf5117649824540d3637cb5` · contract digest `slice-sha256/2:c0d656ea532d6556f39b53389567d9aa9cb7ef675558c66d8c0c836970da2be6`. Do not edit this file; change the specification and regenerate it with `ess generate`.
+Generated from connectors v1 · model digest `52214dc4269fd643fc646605a3070fb00afeb1bd8992f76004e23d06b83ce666` · contract digest `slice-sha256/2:2d983b79e9eb22aafd7e6f52527f78435db914784472b99b0c6f3c3aec0cc6e8`. Do not edit this file; change the specification and regenerate it with `ess generate`.

@@ -767,11 +767,11 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "21 catalog-zendesk.md",
-            "822b41b8f85c1ca4b29eba823ffed0b8d7a76b1fe84be696ee5f61f83fd7fe67",
+            "60a56bb42996cb06670413c3924c75285c8fe3f09b4df0cfcedf3a923a54eae5",
         ),
         (
             "22 catalog-zendesk.md",
-            "11d48e2b051848b334c235a8915e376abab7c18ccff6406b6d552ddd31fe4171",
+            "56c177a9a9bec9ff41b937ea8c74222ee2eed53d9eb2fe576fc9938bc7d4fbf0",
         ),
         (
             "23 local-catalog-provider.md",

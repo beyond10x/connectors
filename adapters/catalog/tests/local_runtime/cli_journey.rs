@@ -10,6 +10,8 @@ use std::{
 
 #[path = "guarded_merge.rs"]
 mod guarded_merge;
+#[path = "invoke_definition.rs"]
+mod invoke_definition;
 #[path = "lifecycle.rs"]
 mod lifecycle;
 #[path = "owner_guard.rs"]

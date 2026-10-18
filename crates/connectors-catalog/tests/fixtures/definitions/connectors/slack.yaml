@@ -1,0 +1,123 @@
+schema: urn:beyond10x:connectors-definition:1
+source:
+  swagger: upstream/slack/slack_web_openapi_v2_without_examples.json.gz
+  sha256: 8b92da26a3c5b11d20042a9f36d81f1fa6fc9382c5ddc471babb68b91936bc3a
+  projection: slack-web.openapi.json
+  amendments: upstream/slack/slack-web.amendments.json
+base_url: https://slack.com/api
+auth: {slack.bot: {use: slack}}
+defaults:
+  envelope:
+    ok: /ok
+    error: /error
+    refusals:
+      - {values: [missing_scope, not_in_channel, no_permission, user_is_bot], code: forbidden}
+      - {values: [not_authed, invalid_auth, account_inactive, token_revoked], code: unauthorized}
+      - values: [channel_not_found, thread_not_found, file_not_found, file_deleted, user_not_found]
+        code: not_found
+      - {values: [ratelimited], code: rate_limited}
+      - values:
+          - invalid_cursor
+          - invalid_limit
+          - limit_required
+          - invalid_ts_latest
+          - invalid_ts_oldest
+          - invalid_arg_name
+          - invalid_array_arg
+          - unknown_type
+        code: invalid_input
+    otherwise: internal
+operations:
+  conversations.list:
+    op: conversations_list
+    withhold: [token]
+    bounds: {limit: {minimum: 1, maximum: 1000}}
+    description: List the conversations the token can see, one page per call of at most limit (1 to 1000); each later call sends the previous page's response_metadata.next_cursor as cursor, and the walk ends on a page whose next_cursor is empty. Slack's answer with ok false is refused, Slack's error named as the reason
+  conversations.history:
+    op: conversations_history
+    required: [channel]
+    withhold: [token]
+    description: Read one conversation's messages, newest first, one page per call, optionally within oldest and latest (Slack ts); each later call sends the previous page's response_metadata.next_cursor as cursor, and the walk ends on a page whose next_cursor is empty. Slack's answer with ok false is refused, Slack's error named as the reason
+  conversations.replies:
+    op: conversations_replies
+    required: [channel, ts]
+    withhold: [token]
+    description: Read one thread, the parent message identified by channel and ts followed by its replies, one page per call, optionally within oldest and latest (Slack ts); each later call sends the previous page's response_metadata.next_cursor as cursor, and the walk ends on a page whose next_cursor is empty. Slack's answer with ok false is refused, Slack's error named as the reason
+  users.list:
+    op: users_list
+    withhold: [token]
+    description: "List the workspace's users, one page per call; each later call sends the previous page's response_metadata.next_cursor as cursor, and the walk ends on a page whose next_cursor is empty. Send limit: without it Slack tries to answer the whole list at once. Slack's answer with ok false is refused, Slack's error named as the reason"
+  team.info:
+    op: team_info
+    credential: [token]
+    description: "Read the token's workspace under team: its id, name and domain; the optional team parameter names another workspace the token sees through a shared channel. Slack's answer with ok false is refused, Slack's error named as the reason"
+  emoji.list:
+    op: emoji_list
+    credential: [token]
+    description: List the workspace's custom emoji in one call, not paged. The pinned document states no member of the answer beyond ok; Slack's answer is returned as it came. Slack's answer with ok false is refused, Slack's error named as the reason
+  auth.test:
+    op: auth_test
+    credential: [token]
+    description: "Read who the connection's token is: user_id, user, team_id, team and url, plus bot_id for a bot token. Slack's answer with ok false is refused, Slack's error named as the reason"
+  files.list:
+    op: files_list
+    withhold: [token]
+    description: List the files the token can see under files, each with its id, name, filetype, mimetype, size and url_private, optionally narrowed by channel, user, types and ts_from and ts_to (Slack ts); one page per call of count files, page counting from 1, each answer with paging.page and paging.total, and paging.pages where Slack states it; the walk ends on the page numbered paging.pages, or on one that lists no file. Needs files:read. Slack's answer with ok false is refused, Slack's error named as the reason
+  files.info:
+    op: files_info
+    required: [file]
+    withhold: [token]
+    description: "Read one file by its id under file: its name, filetype, mimetype, size and url_private, which file.download reads. Needs files:read. Slack's answer with ok false is refused, Slack's error named as the reason"
+  file.download:
+    response: binary
+    binary: {max_bytes: 2097152, hosts: ["https://files.slack.com"]}
+    download: {path_prefix: /files-pri/}
+    description: "Read a file's content from its url_private or url_private_download, as files.info and files.list give it: an https URL on files.slack.com under /files-pri/, sent with the connection's token. Answers the bytes in base64 with their media_type, length and sha256, refused above 2 MiB"
+  chat.postMessage:
+    op: chat_postMessage
+    effect: write
+    credential: [token]
+    body:
+      channel: string+!
+      text: string+!
+      thread_ts: string+
+      mrkdwn: boolean
+      unfurl_links: boolean
+    guard: {before: {read: auth.test, expect: {/ok: =true}}, after: {expect: {/ok: =true}}}
+    description: "Post one message, body.text, to the conversation body.channel: a channel id, or the direct message conversations.open answers; body.thread_ts makes it a reply in that thread, body.mrkdwn false turns Slack markup off and body.unfurl_links true unfurls text links. Answers channel, ts (the message's address) and message. An empty channel, text or thread_ts is refused before anything is sent. Needs chat:write, and the bot in the channel. Nothing exists to compare before a create, so the same input approved and sent again posts a second message. The token's auth.test is read first and must answer ok true, or nothing is sent. Slack refuses a post (channel_not_found, not_in_channel, missing_scope) as status 200 with ok false; the answer must carry ok true to be applied, so such a refusal is outcome_unknown, never applied, and Slack's error string is not returned"
+  conversations.open:
+    op: conversations_open
+    effect: write
+    credential: [token]
+    body: {users: string+!, return_im: boolean}
+    guard: {before: {read: auth.test, expect: {/ok: =true}}, after: {expect: {/ok: =true}}}
+    description: "Open, or resume, the direct message with the users body.users names: one user id for a direct message, or a comma-separated list of user ids for a multi-person one; body.return_im true asks for the whole conversation. Answers channel.id, the conversation chat.postMessage then names as channel. An empty users is refused before anything is sent. Needs im:write, and mpim:write for a multi-person conversation. The token's auth.test is read first and must answer ok true, or nothing is sent. Slack refuses (user_not_found, missing_scope) as status 200 with ok false; the answer must carry ok true to be applied, so such a refusal is outcome_unknown, never applied, and Slack's error string is not returned"
+  chat.update:
+    op: chat_update
+    effect: write
+    credential: [token]
+    body: {channel: string+!, ts: string+!, text: string+!}
+    guard:
+      before: {read: auth.test, expect: {/ok: =true}}
+      after:
+        expect: {/ok: =true}
+        refusals:
+          - {pointer: /error, values: [message_not_found, channel_not_found], code: not_found}
+          - {pointer: /error, values: [cant_update_message, edit_window_closed], code: forbidden}
+          - {pointer: /error, values: [msg_too_long, no_text], code: invalid_input}
+    description: Replace the text of one message, the one body.channel (a conversation id, a channel or a direct message) and body.ts name, with body.text. Answers channel, ts and text, the message's address and its new text. Needs chat:write; a bot token edits only the messages it posted. The message's blocks and attachments are kept, and Slack resets parse and link_names to their defaults. The token's auth.test is read first and must answer ok true, or nothing is sent. Slack refuses as status 200 with ok false; the answer must carry ok true to be applied. cant_update_message and edit_window_closed are refused as forbidden, message_not_found and channel_not_found as not_found, msg_too_long and no_text as invalid_input, each with Slack's error as its reason; any other refusal is outcome_unknown, never applied
+  chat.delete:
+    op: chat_delete
+    effect: write
+    credential: [token]
+    body: {channel: string+!, ts: string+!}
+    guard:
+      before: {read: auth.test, expect: {/ok: =true}}
+      after:
+        expect: {/ok: =true}
+        refusals:
+          - {pointer: /error, values: [message_not_found, channel_not_found], code: not_found}
+          - pointer: /error
+            values: [cant_delete_message, compliance_exports_prevent_deletion]
+            code: forbidden
+    description: Delete one message, the one body.channel (a conversation id, a channel or a direct message) and body.ts name; body.ts is the string Slack gives, not a number. Answers channel and ts. Needs chat:write; a bot token deletes only the messages it posted. The token's auth.test is read first and must answer ok true, or nothing is sent. Slack refuses as status 200 with ok false; the answer must carry ok true to be applied. cant_delete_message and compliance_exports_prevent_deletion are refused as forbidden, message_not_found and channel_not_found as not_found, each with Slack's error as its reason; any other refusal is outcome_unknown, never applied

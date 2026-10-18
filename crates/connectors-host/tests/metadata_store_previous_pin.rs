@@ -35,6 +35,8 @@ fn fixture() -> PathBuf {
 
 fn binding(instance: &str) -> Binding {
     Binding {
+        credential_revision: None,
+        executable: None,
         instance_id: instance.into(),
         adapter_id: "fixture-adapter".into(),
         configuration_revision: "config-1".into(),

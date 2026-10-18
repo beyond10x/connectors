@@ -35,6 +35,31 @@ pub const GROUPS: [(&str, &str); 5] = [
 pub const ADAPTER_HELP: &str =
     "Deprecated: the alias of a configured entry; select with --connector and --instance";
 
+/// The help of the `operations invoke` arguments a definition file adds or
+/// states (`contracts/cli/v1alpha1/semantics.md` §3, "Invoking a definition file").
+pub const DEFINITION_HELP: [(&str, &str); 5] = [
+    (
+        "field:definition",
+        "A connectors-definition/1 file to invoke without configuring it; instead of --connector and --instance",
+    ),
+    (
+        "field:definitions_root",
+        "With --definition: the tree holding its vendored source and shared auth files [default: the parent of the file's directory]",
+    ),
+    (
+        "field:credential_file",
+        "With --definition: the OAuth client file to connect with when the instance has no connection",
+    ),
+    (
+        "field:schema",
+        "The operation's schema identity; with --definition, the description's when left out",
+    ),
+    (
+        "field:revision",
+        "The description's revision; with --definition, the current one when left out",
+    ),
+];
+
 /// The generated command tree as the binary presents it.
 pub fn command() -> Command {
     decorate(
@@ -100,6 +125,11 @@ fn node(
     let mut command = command.mut_args(|arg: Arg| {
         if arg.get_id() == "field:adapter" {
             arg.value_name("ALIAS").help(ADAPTER_HELP)
+        } else if let Some((_, help)) = DEFINITION_HELP
+            .iter()
+            .find(|(id, _)| path == ["operations", "invoke"] && arg.get_id() == *id)
+        {
+            arg.help(*help)
         } else {
             arg
         }

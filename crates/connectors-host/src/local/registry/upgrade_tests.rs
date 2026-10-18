@@ -326,6 +326,10 @@ fn a_new_connection_that_changes_authority_or_profile_needs_a_new_instance_id() 
             Some(Failure::AuthenticationChanged),
             "begun: {name}"
         );
+        assert!(
+            registry.needs_new_instance(&target, LATER).unwrap(),
+            "begun, a new instance id: {name}"
+        );
 
         let (_root, registry) = fixture();
         let (reference, revision, _) = connected(&registry, "one");
@@ -343,6 +347,10 @@ fn a_new_connection_that_changes_authority_or_profile_needs_a_new_instance_id() 
             Some(Failure::AuthenticationChanged),
             "revoked: {name}"
         );
+        assert!(
+            registry.needs_new_instance(&target, LATER + 1).unwrap(),
+            "revoked, a new instance id: {name}"
+        );
     }
     // The authentication check admits these; the instance's first connect is
     // still in flight, which `begin` alone refuses
@@ -358,6 +366,11 @@ fn a_new_connection_that_changes_authority_or_profile_needs_a_new_instance_id() 
     );
     registry.begin_unchecked(&other, LATER).unwrap();
     registry.begin_unchecked(&upgraded(), LATER).unwrap();
+    // Neither another profile id nor the unchanged binding needs a new
+    // instance id (task:definition-moved-authority-new-instance).
+    assert!(!registry.needs_new_instance(&other, LATER).unwrap());
+    assert!(!registry.needs_new_instance(&upgraded(), LATER).unwrap());
+    assert!(!registry.needs_new_instance(&binding(), LATER).unwrap());
 }
 
 #[test]
@@ -1033,6 +1046,8 @@ fn an_evidence_lifetime_change_is_followed_by_a_new_connection() {
     let mut unproved = configured.profile.clone();
     unproved.declaration = None;
     assert!(!admitted.profile.same_authentication(&unproved));
+    // The same instance id holds it: no new one is needed.
+    assert!(!registry.needs_new_instance(&configured, LATER + 2).unwrap());
 }
 
 /// A change to the connection's identity, the provider authority or the
@@ -1157,5 +1172,81 @@ fn a_connection_left_under_an_unconfigured_instance_id_stays_revocable() {
             LATER + 2
         ),
         Ok(revoked)
+    );
+}
+
+/// Security review of task:definition-moved-authority-new-instance,
+/// invariant 5 (nothing reaches a connection of another connector): the
+/// connection a moved definition leaves under `forge.definition` is revocable
+/// through the moved entry of `forge`, and through no instance of another
+/// connector. Every invoked definition's entry has the adapter `catalog`, and
+/// `connections revoke` passes every configured instance id
+/// (apps/connectors/src/local.rs), so the adapter scope alone spans
+/// connectors.
+#[test]
+fn a_left_behind_definition_connection_is_not_revocable_through_another_connector() {
+    let (_root, registry) = fixture();
+    let mut left = binding();
+    left.instance_id = "forge.definition".into();
+    left.adapter_id = "catalog".into();
+    let acquisition = registry.begin(&left, NOW).unwrap();
+    let claim = registry.consume(acquisition, NOW).unwrap();
+    let candidate = registry
+        .prepare(&claim, validated("one", NOW), 12, NOW)
+        .unwrap();
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let revision = registry
+        .describe(
+            "forge.definition",
+            "catalog",
+            "config-1",
+            &reference,
+            NOW,
+            true,
+        )
+        .unwrap()
+        .revision;
+    // `forge` moved to its own new instance; `other` is another connector's
+    // invoked definition. Neither configures `forge.definition` any longer.
+    let configured = BTreeSet::from([
+        "forge.definition-0123456789abcdef".to_owned(),
+        "other.definition".to_owned(),
+    ]);
+    assert_eq!(
+        registry.revoke_left_behind(
+            "other.definition",
+            "catalog",
+            &configured,
+            &reference,
+            &revision,
+            LATER
+        ),
+        Err(Failure::NotFound),
+        "a connection of `forge` was revoked through the connector `other`"
+    );
+    // A connector whose id only starts with `forge` is another connector.
+    assert_eq!(
+        registry.revoke_left_behind(
+            "forge-file.definition",
+            "catalog",
+            &configured,
+            &reference,
+            &revision,
+            LATER
+        ),
+        Err(Failure::NotFound)
+    );
+    // The moved entry of `forge` reaches it.
+    assert!(
+        registry
+            .revoke_left_behind(
+                "forge.definition-0123456789abcdef",
+                "catalog",
+                &configured,
+                &reference,
+                &revision,
+                LATER
+            )
+            .is_ok()
     );
 }

@@ -231,6 +231,7 @@ impl From<registry::Failure> for Error {
             F::NotFound => Code::NotFound,
             F::Conflict
             | F::UpgradeRequired
+            | F::ExecutableChanged
             | F::AuthenticationChanged
             | F::InstanceConnected
             | F::InstanceConnectionChanged => Code::LifecycleConflict,
@@ -253,7 +254,10 @@ impl From<registry::Failure> for Error {
         error.revoke = e == F::InstanceConnectionChanged;
         // Revalidation helps: it recollects expired evidence, and it follows a
         // configuration upgrade of the connection's instance.
-        error.revalidate = matches!(e, F::EvidenceExpired | F::UpgradeRequired);
+        error.revalidate = matches!(
+            e,
+            F::EvidenceExpired | F::UpgradeRequired | F::ExecutableChanged
+        );
         error
     }
 }
@@ -361,14 +365,123 @@ fn input(value: &Value, key: &str) -> Result<String> {
         .ok_or_else(|| Code::InvalidInput.into())
 }
 fn selected(paths: &Paths, alias: &str) -> Result<(Config, Adapter)> {
-    let config = Config::load(&paths.config)?;
+    // An invoked definition's instance is selected as a configured one is.
+    let config = Config::load_at(paths)?;
     let adapter = config.adapters.get(alias).cloned().ok_or(Code::NotFound)?;
     Ok((config, adapter))
+}
+/// Whether `source` is another instance of the connector `alias` is an
+/// instance of (story:invoke-definition-reuse-credential): both are instances
+/// of the configuration's `[connectors]` tables or invoked definitions, under
+/// the same connector id. A legacy `[adapters]` entry names no connector, so
+/// it is never one.
+pub(crate) fn same_connector(config: &Config, alias: &str, source: &str) -> bool {
+    let legacy = config.legacy_aliases();
+    if alias == source || legacy.contains(&alias) || legacy.contains(&source) {
+        return false;
+    }
+    matches!(
+        (config.names(alias), config.names(source)),
+        (Some((connector, _)), Some((other, _))) if connector == other
+    )
+}
+/// A stored connection a new connection of an instance may copy its
+/// credential from, with the names its instance is selected by.
+#[derive(Clone, Debug)]
+pub struct Reusable {
+    /// The source instance's alias, which a reuse request names.
+    pub alias: String,
+    pub connector: String,
+    pub instance: String,
+    pub candidate: registry::ReuseCandidate,
+}
+/// The connections other instances of `alias`'s connector hold whose
+/// credential a new connection of `alias` bound to `target` may reuse
+/// (`registry::Registry::reuse_candidates`), by instance and reference. None
+/// under a read-only custody binding, which writes no copy. Records nothing
+/// and grants nothing: the owner decides a reuse again.
+pub fn reusable(paths: &Paths, alias: &str, target: &registry::Binding) -> Result<Vec<Reusable>> {
+    let config = Config::load_at(paths)?;
+    if config.selection().read_only() || !super::definitions::receives_reuse(paths, &config, alias)?
+    {
+        return Ok(Vec::new());
+    }
+    let registry = registry::Registry::with_system_clock(&paths.state);
+    let mut found = Vec::new();
+    for (source, entry) in &config.adapters {
+        if !same_connector(&config, alias, source)
+            || entry.instance_id == target.instance_id
+            || entry.adapter_id != target.adapter_id
+        {
+            continue;
+        }
+        let Some((connector, instance)) = config.names(source) else {
+            continue;
+        };
+        for candidate in registry.reuse_candidates(
+            &entry.instance_id,
+            &entry.adapter_id,
+            entry.configured(),
+            target,
+            connectors_sdk::now_ms(),
+        )? {
+            found.push(Reusable {
+                alias: source.clone(),
+                connector: connector.to_owned(),
+                instance: instance.to_owned(),
+                candidate,
+            });
+        }
+    }
+    Ok(found)
 }
 /// The adapter's cached description. Outside the owner, a running owner of
 /// this build answers it from its held metadata handle; without one the store
 /// is read directly, which verifies it completely (`docs/local-er-metadata.md`).
 pub fn cached(paths: &Paths, alias: &str) -> Result<runtime::Bootstrap> {
+    let mut bootstrap = cached_unbound(paths, alias)?;
+    // Bound to the configured entry it was cached under (the executable is
+    // never carried by a cached record).
+    let (_, adapter) = selected(paths, alias)?;
+    bootstrap.configure(&adapter);
+    Ok(bootstrap)
+}
+/// The description a read command (`operations describe`, `operations list`,
+/// `operations invoke`) works from: the cached one, or, when none is cached for
+/// the instance's configured selection, the one the owner caches by starting
+/// the configured, digest-pinned adapter, without reading or asking for any
+/// credential. It starts it only when the instance holds a connection, the
+/// named `connection` when there is one, that is current under the configured
+/// entry and usable (`registry::Registry::launch_admits`); otherwise the
+/// command answers `description_unavailable` as before
+/// (contracts/cli/v1alpha1/semantics.md, "Launching for a description").
+pub fn described(
+    paths: &Paths,
+    alias: &str,
+    connection: Option<&str>,
+) -> Result<runtime::Bootstrap> {
+    match cached(paths, alias) {
+        Err(error) if error.code == Code::DescriptionUnavailable => {
+            let (_, adapter) = selected(paths, alias)?;
+            if transport::in_owner()
+                || runtime::state::State::new(&paths.state).suppressed(&adapter.instance_id)?
+                || !registry::Registry::new(&paths.state).launch_admits(
+                    &adapter.instance_id,
+                    &adapter.adapter_id,
+                    adapter.configured(),
+                    connection,
+                )?
+            {
+                return Err(error);
+            }
+            let mut bootstrap = Client::connect(paths, true)?.launched(alias, connection)?;
+            bootstrap.configure(&adapter);
+            Ok(bootstrap)
+        }
+        other => other,
+    }
+}
+fn cached_unbound(paths: &Paths, alias: &str) -> Result<runtime::Bootstrap> {
     cached_through(paths, alias, |paths, alias| {
         if transport::in_owner() {
             return None;
@@ -428,7 +541,7 @@ pub fn admit_capture(
             let old = registry::Registry::with_system_clock(&paths.state).describe(
                 &adapter.instance_id,
                 &adapter.adapter_id,
-                &adapter.configuration_revision,
+                adapter.configured(),
                 connection,
                 connectors_sdk::now_ms(),
                 false,
@@ -480,7 +593,7 @@ pub fn admit_operation<'a>(
 }
 pub fn operation_snapshot(paths: &Paths, alias: &str, call: &Value) -> Result<runtime::Bootstrap> {
     let (_, adapter) = selected(paths, alias)?;
-    let bootstrap = cached(paths, alias)?;
+    let bootstrap = described(paths, alias, call.get("connection").and_then(Value::as_str))?;
     let operation = input(call, "operation")?;
     admit_operation(&adapter, &bootstrap, &operation)?;
     if bootstrap.descriptor()?.revision != input(call, "revision")?
@@ -631,13 +744,17 @@ pub fn admit_launch(
         return Err(Code::Forbidden.into());
     }
     // A connection saved under another configuration revision is a binding
-    // conflict here, as for any read: `connections revalidate` moves it.
+    // conflict here, as for any read: `connections revalidate` moves it,
+    // unless only its operation side moved (D12). A consumer launch starts no
+    // provider, so the provider executable is not compared.
     let binding = registry::Binding {
         instance_id: adapter.instance_id.clone(),
         adapter_id: adapter.adapter_id.clone(),
         configuration_revision: adapter.configuration_revision.clone(),
         provider_authority: recorded.provider_authority,
         profile: recorded.profile,
+        credential_revision: adapter.credential_revision.clone(),
+        executable: None,
     };
     registry
         .admit_read(
@@ -654,6 +771,80 @@ pub fn admit_launch(
         consumer: entry,
         binding,
     })
+}
+/// A connection whose provider executable alone changed since it was saved
+/// (`registry::Failure::ExecutableChanged`, architecture-decision-record D12):
+/// its stored credential is validated once under the configured executable,
+/// which the registry follows when the recorded identity answers and refuses,
+/// changing nothing, otherwise. No credential entry, no question. `admit`
+/// rechecks the caller's own fences before dispatch; `validate` sends the
+/// validation and answers its result, attempts and transient cause. Only a
+/// change the capture itself classifies as executable-only is followed.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn follow_executable<G>(
+    paths: &Paths,
+    selection: &super::config::Selection,
+    registry: &registry::Registry,
+    binding: &registry::Binding,
+    connection: &str,
+    deadline: u64,
+    admit: impl FnOnce() -> Result<G>,
+    validate: impl FnOnce(
+        &connectors_sdk::Secret,
+    ) -> (runtime::Result<runtime::Baseline>, u32, Option<Cause>),
+) -> Result<()> {
+    let revision =
+        registry.recorded_revision(&binding.instance_id, &binding.adapter_id, connection)?;
+    let now = connectors_sdk::now_ms();
+    let captured = registry.capture_revalidation(
+        binding,
+        connection,
+        &revision,
+        now,
+        deadline.min(now + 30_000),
+    )?;
+    if !captured.follows_executable() {
+        registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+        return Err(registry::Failure::UpgradeRequired.into());
+    }
+    let version = captured.version();
+    let material = custody::Store::open_for(version.scope(), selection, &paths.state)
+        .and_then(|s| s.read(version));
+    let material = match material {
+        Ok(value) => value,
+        Err(error) => {
+            registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+            return Err(read_error(selection, error));
+        }
+    };
+    // Whatever `admit` holds (the owner's control lock) is held until the
+    // dispatch is recorded, as for a read.
+    let held = match admit() {
+        Ok(held) => held,
+        Err(error) => {
+            registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+            return Err(error);
+        }
+    };
+    let dispatched = registry.dispatch_revalidation(captured, connectors_sdk::now_ms())?;
+    drop(held);
+    let (result, attempts, cause) = validate(&material);
+    match result {
+        Ok(baseline) => Ok(registry.finish_revalidation(
+            dispatched,
+            Ok(baseline.into_registry()),
+            connectors_sdk::now_ms(),
+        )?),
+        Err(failure) => {
+            registry.finish_revalidation(dispatched, Err(None), connectors_sdk::now_ms())?;
+            let mut error = Error::from(failure);
+            if cause.is_some() {
+                error.cause = cause;
+                error.attempts = Some(attempts);
+            }
+            Err(error)
+        }
+    }
 }
 /// Whether a failed custody read proves the version's bytes gone for good, so
 /// the version is invalidated. Under the read-only binding `Missing` means the
@@ -742,6 +933,18 @@ enum Request {
         expected_revision: Option<String>,
     },
     Complete,
+    /// story:invoke-definition-reuse-credential: a new connection of `adapter`
+    /// holding the current credential of `connection`, a connection of
+    /// `source`, another instance of the same connector, offered under
+    /// `expected_revision` (`connectors.cli.LocalOwnerReuseRequest`). Carries
+    /// no document and no material.
+    Reuse {
+        adapter: String,
+        source: String,
+        connection: String,
+        expected_revision: String,
+        profile: String,
+    },
     Revalidate {
         adapter: String,
         connection: String,
@@ -763,6 +966,14 @@ enum Request {
     /// owner's held metadata handle (`connectors.cli.LocalOwnerCachedRequest`).
     Cached {
         adapter: String,
+        /// When nothing is cached for the configured selection, start the
+        /// configured adapter to cache it, if the instance holds a connection
+        /// (`connection`, when named) current under the configured entry
+        /// (`registry::Registry::launch_admits`). Omitted when false.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        launch: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        connection: Option<String>,
     },
     /// A consumer launch. Answered by `Reply::Launch`, then the consumer image
     /// and the sealed credential as descriptors, then the final answer.
@@ -822,6 +1033,8 @@ mod cached_tests {
 
     fn bootstrap(instance: &str) -> runtime::Bootstrap {
         runtime::Bootstrap {
+            credential_revision: None,
+            executable: None,
             instance: instance.into(),
             adapter: "fixture-adapter".into(),
             protocol: "v1alpha1".into(),
@@ -847,6 +1060,7 @@ mod cached_tests {
         config.adapters.insert(
             "fixture".into(),
             super::super::config::Adapter {
+                credential_revision: None,
                 instance_id: "fixture-instance".into(),
                 adapter_id: "fixture-adapter".into(),
                 configuration_revision: "cfg-1".into(),
@@ -909,5 +1123,106 @@ mod cached_tests {
         assert!(error.reconnect);
         assert!(!error.reconfigure);
         assert!(!error.revalidate);
+    }
+}
+
+/// story:invoke-definition-reuse-credential: a reuse names another instance of
+/// the same connector id; a legacy `[adapters]` entry names no connector, and
+/// an instance is never its own source.
+#[cfg(test)]
+mod reuse_tests {
+    use super::*;
+    use crate::local::config::{Connector, Instance};
+    use std::collections::BTreeMap;
+
+    fn entry(instance: &str) -> Adapter {
+        Adapter {
+            credential_revision: None,
+            instance_id: instance.into(),
+            adapter_id: "catalog".into(),
+            configuration_revision: "cfg-1".into(),
+            protocol: "v1alpha1".into(),
+            private_protocol: Some(runtime::PrivateProtocol::V2),
+            startup: Default::default(),
+            restart: Default::default(),
+            executable: super::super::config::Executable {
+                path: PathBuf::from("absent-adapter"),
+                sha256: "a".repeat(64),
+                args: vec![],
+            },
+            permissions: Default::default(),
+        }
+    }
+
+    fn instance(alias: &str) -> Instance {
+        Instance {
+            description: None,
+            endpoint: None,
+            alias: alias.into(),
+            derived: false,
+            profile: None,
+            awaiting_profile: None,
+        }
+    }
+
+    fn config() -> Config {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Paths {
+            config: root.path().join("config/config.toml"),
+            state: root.path().join("state"),
+        };
+        Config::initialize(&paths).unwrap();
+        let mut config = Config::load(&paths.config).unwrap();
+        for alias in [
+            "forge.main",
+            "forge.other",
+            "gitlab.main",
+            "forge",
+            "forge.definition",
+        ] {
+            config.adapters.insert(alias.into(), entry(alias));
+        }
+        config.connectors = Some(BTreeMap::from([
+            (
+                "forge".to_owned(),
+                Connector {
+                    enabled: true,
+                    instances: BTreeMap::from([
+                        ("main".to_owned(), instance("forge.main")),
+                        ("other".to_owned(), instance("forge.other")),
+                    ]),
+                },
+            ),
+            (
+                "gitlab".to_owned(),
+                Connector {
+                    enabled: true,
+                    instances: BTreeMap::from([("main".to_owned(), instance("gitlab.main"))]),
+                },
+            ),
+        ]));
+        config
+            .definitions
+            .insert("forge.definition".into(), "forge".into());
+        config
+    }
+
+    #[test]
+    fn only_another_instance_of_the_same_connector_is_a_source() {
+        let config = config();
+        assert!(same_connector(&config, "forge.definition", "forge.main"));
+        assert!(same_connector(&config, "forge.definition", "forge.other"));
+        assert!(same_connector(&config, "forge.main", "forge.other"));
+        assert!(!same_connector(&config, "forge.definition", "gitlab.main"));
+        assert!(!same_connector(
+            &config,
+            "forge.definition",
+            "forge.definition"
+        ));
+        // A legacy entry: its alias is no connector, whatever it spells.
+        assert_eq!(config.legacy_aliases(), ["forge"]);
+        assert!(!same_connector(&config, "forge.definition", "forge"));
+        assert!(!same_connector(&config, "forge", "forge.main"));
+        assert!(!same_connector(&config, "forge.definition", "absent"));
     }
 }

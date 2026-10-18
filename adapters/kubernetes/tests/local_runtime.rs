@@ -510,6 +510,7 @@ impl Cluster {
             .canonicalize()
             .unwrap();
         Adapter {
+            credential_revision: None,
             private_protocol: None,
             permissions: Default::default(),
             instance_id: "fixture-kubernetes".into(),

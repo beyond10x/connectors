@@ -84,7 +84,7 @@ pub(super) fn execute(
                 .list(
                     &adapter.instance_id,
                     &adapter.adapter_id,
-                    &adapter.configuration_revision,
+                    adapter.configured(),
                     registry::PageOptions {
                         limit: limit as u16,
                         cursor: call.input.get("cursor").and_then(Value::as_str),
@@ -110,7 +110,7 @@ pub(super) fn execute(
                         .describe(
                             &adapter.instance_id,
                             &adapter.adapter_id,
-                            &adapter.configuration_revision,
+                            adapter.configured(),
                             reference,
                             connectors_sdk::now_ms(),
                             custody,
@@ -236,7 +236,7 @@ pub(super) fn select(call: &Invocation<'_>, input: &mut Value) -> Result<(), Han
     let Ok(paths) = resolved(call) else {
         return Ok(());
     };
-    let Ok(config) = Config::read(&paths.config) else {
+    let Ok(config) = Config::read_at(&paths) else {
         return Ok(());
     };
     let Some(adapter) = config.adapters.get(alias) else {
@@ -264,7 +264,7 @@ pub(super) fn select(call: &Invocation<'_>, input: &mut Value) -> Result<(), Han
 /// before any handler runs: the alias's one published non-revoked connection,
 /// refused as `select` refuses.
 pub(super) fn held_one(paths: &Paths, alias: &str) -> owner::Result<String> {
-    let config = Config::load(&paths.config)?;
+    let config = Config::load_at(paths)?;
     let adapter = config.adapters.get(alias).ok_or(owner::Code::NotFound)?;
     let held = Registry::with_system_clock(&paths.state)
         .held(&adapter.instance_id, connectors_sdk::now_ms())?;
@@ -309,7 +309,7 @@ pub(super) fn registry_failure(error: registry::Failure) -> HandlerReply {
         OutcomeUnknown => ("outcome_unknown", "publication", "retry_status", false),
         NotFound => ("not_found", "observation", "check_configuration", false),
         Conflict => ("lifecycle_conflict", "admission", "retry_status", false),
-        UpgradeRequired => (
+        UpgradeRequired | ExecutableChanged => (
             "lifecycle_conflict",
             "admission",
             "revalidate_connection",

@@ -172,6 +172,8 @@ impl Local {
             .map_err(|_| Failure::InvalidConfiguration)?;
         let descriptor = adapter.descriptor();
         let bootstrap = Bootstrap {
+            credential_revision: None,
+            executable: None,
             instance: config.instance,
             adapter: "grafana".into(),
             protocol: connectors_core::WIRE_VERSION.into(),
