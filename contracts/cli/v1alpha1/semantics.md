@@ -481,7 +481,8 @@ trust roots are the platform's.
 
 The instance is the connector's instance `definition` (the connector id is
 the definition's `id`, else its file stem), with the alias and instance id
-`<connector>.definition`. Its entry pins the installed catalog provider on the
+`<connector>.definition`, or its moved instance `definition-<16 hex>` when that
+instance id cannot hold the file's provider authority or profile (below). Its entry pins the installed catalog provider on the
 lowered configuration as a derived instance's does, and is held in the
 owner-only file `definitions/instances.toml` beside the cache; a later run of a file with the
 same connector id replaces that entry, so both files are one instance and its
@@ -520,17 +521,86 @@ the provider. With one connection the operation runs on it with no question,
 and `--connection` names one explicitly; an instance that holds more than one
 is `invalid_input` at `arguments`. A change to the bundle, its source or the
 selection alone keeps the connection ([one connection per instance](#one-connection-per-instance),
-D12 point 2). A connection that is not current under the recorded entry
-because the provider authority or the profile's authentication changed is not
-asked about: the command answers what a read on that connection answers,
-`lifecycle_conflict` with the `next_action` a `connections connect` of the
-instance names, and sends nothing. Reusing a stored credential for a changed
+D12 point 2). A change of the provider authority or of the profile's
+authentication cannot be followed under the instance id `<connector>.definition`
+once a connection of it, revoked ones included, was admitted under the earlier
+one (`docs/local-connection-registry.md`, "Configuration upgrades": only a
+new instance id helps). The definition then resolves to its moved instance,
+`definition-<16 hex>`: the first 16 hexadecimal digits of a digest of the
+connector id, the provider authority and the profile's authentication (its
+declaration apart from its revision and evidence lifetime, with its id,
+purpose, subject and minimum scopes). The name is the same on every run of the
+same definition, a lifetime-only change keeps it, and a file moved back to the
+earlier authority resolves to `definition` and its connection again. The moved
+instance is prepared, cached under its own key and recorded as the connector's
+entry exactly as above, so its first run is a first invoke: the one question,
+a fresh connect, and no candidate at the earlier authority. The connector keeps
+one entry, so the instance id the file left is configured by no entry, and the
+connections left under it are not used, changed or forgotten; `connections
+revoke` of one under an instance of the same connector whose instance id is
+`<connector>.<name>`, such as the moved instance, reaches it (the moved entry);
+an instance of another connector does not. A configuration that already has the moved instance is
+refused as for `definition` below. Reusing a stored credential for another
 authority or profile is not part of this binding.
+
+When the instance holds no connection and another instance of the same
+connector holds a connection whose credential a new connection of the
+definition's instance can use, the one question lists those connections and
+offers to reuse one instead (D12 point 3, story:invoke-definition-reuse-credential).
+A candidate is a published connection of another instance of the definition's
+connector id, an instance of `[connectors.<connector>]` (a legacy `[adapters]`
+entry is no instance of a connector), that is Live and not Stale, holds its
+credential, has current validation evidence and is current under its own
+configured entry, and is bound to the same adapter, provider authority and
+profile authentication (equal, or differing only in the evidence lifetime) as
+the definition's instance. Its profile is a static entry: a profile whose entry
+an OAuth acquisition refreshes is never copied, since one rotation would end the
+other's refresh. The definition's lowered configuration must send the
+credential to its HTTPS API base alone: a profile naming a token endpoint or
+any other URL, on any origin, is offered nothing, since the binding compares
+the provider authority and the profile declaration, a token endpoint is part of
+neither, and the source may send its secret to another place than the
+definition would. The copy is validated under the platform's trust roots, as
+every definition is, whatever trust roots the source's own entry pins. Under the read-only `mounted_secret` binding
+nothing is offered.
+A revoked, Stale, expired or moved connection, and a connection of another
+connector, is never listed. The question lists at most 16 candidates, each by
+number with its `<connector>/<instance>`, its provider authority and its
+validated external identity (kind and subject), never material, and ends
+`[1/c/N]` (`[1-<n>/c/N]` for n candidates). A number reuses that candidate; `c`
+or `connect` connects fresh as above; any other answer, or a run without a
+controlling terminal in the foreground, is `not_found` at `admission` with
+`next_action` `create_connection`, and nothing is read, copied or sent.
+
+On reuse the owner, never the CLI, copies the credential
+([custody §4.3](../../auth/custody/v1alpha1/semantics.md#43-copy-to-another-connection)).
+It repeats every check above against the current configuration and store,
+admits the definition's instance as a connect does (refused while it holds a
+connection or another connect of it is in flight), reads the candidate's
+current version under a read use of the source, has the definition's adapter
+validate it with the profile's own identity and scope probes, and publishes a
+new connection of the definition's instance holding the material as its own
+new custody version, only when the validation succeeds, the validated
+identity equals the source's, and the source is, inside the publishing commit,
+still published, Live, not Stale and under the publication fence and version
+that were read: a source revoked, made Stale, reconnected or revalidated while
+its copy was validated publishes nothing (`revoked`, or `lifecycle_conflict`). The acquisition is recorded as a connect's, and
+`connections status --acquisition` follows it. Otherwise nothing is published,
+the acquisition is failed, and the command offers to connect fresh with one
+`[y/N]` question; declined, the command answers the reuse's own refusal:
+`identity_mismatch` at `admission` with `next_action` `create_connection` when
+the provider answered another identity, otherwise the validation's or the
+owner's failure. A run that cannot know whether the copy published
+(`outcome_unknown`, `interrupted`) offers nothing. Either way the source
+connection is unchanged (its revision, state, evidence and identity), and
+after a copy the two share nothing: revoking or reconnecting either leaves the
+other as it was.
 
 From the selection on, the command is the configured instance's: the
 description, admission, approval of writes, audit and the result envelope are
 those of every `operations invoke`, and a result names connector
-`<connector>`, instance `definition` and adapter `<connector>.definition`.
+`<connector>`, instance `definition` and adapter `<connector>.definition`, or
+the moved instance and `<connector>.definition-<16 hex>`.
 
 ### Renamed commands
 

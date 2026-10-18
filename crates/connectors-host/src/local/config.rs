@@ -40,7 +40,8 @@ pub struct Config {
     pub connectors: Option<BTreeMap<String, Connector>>,
     /// The instances of invoked definition files held beside this configuration
     /// (`definitions`), by alias, each with its connector: in `adapters` like
-    /// every entry, named `<connector>/definition`, and never written to the
+    /// every entry, named `<connector>/definition` or, moved, `<connector>/definition-<16 hex>`
+    /// (`definitions::moved`), and never written to the
     /// operator's file. Empty unless read with [`Config::read_at`].
     pub definitions: BTreeMap<String, String>,
 }
@@ -825,7 +826,9 @@ impl Config {
     pub fn names(&self, alias: &str) -> Option<(&str, &str)> {
         let (alias, adapter) = self.adapters.get_key_value(alias)?;
         if let Some(connector) = self.definitions.get(alias) {
-            return Some((connector.as_str(), super::definitions::INSTANCE));
+            let instance = super::definitions::instance_of(connector, alias)
+                .unwrap_or(super::definitions::INSTANCE);
+            return Some((connector.as_str(), instance));
         }
         let declared = self
             .connectors
