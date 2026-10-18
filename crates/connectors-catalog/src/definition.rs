@@ -19,7 +19,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read as _;
 use std::path::{Component, Path, PathBuf};
 
@@ -281,11 +281,22 @@ pub struct PagingStyle {
     pub last: Option<String>,
 }
 
+/// `connectors_definitions.definition.MismatchCode`, the engine's
+/// `connectors_catalog.guard.MismatchCode`: what a differing `expect` of a
+/// read before the write refuses as, instead of `forbidden`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MismatchCode {
+    /// The target changed since the caller read it.
+    Conflict,
+}
+
 /// `connectors_definitions.definition.GuardBefore`: a read before a write.
 /// `read` is an operation key of the definition, else an `operationId` of the
 /// source; its path parameters take the input of the same name unless `with`
 /// binds them. `expect` maps a JSON pointer to an input reference (`sha`,
-/// `body.sha`), a literal (`=opened`) or a boolean (`=true`), in file order.
+/// `body.sha`), a literal (`=opened`) or a boolean (`=true`), in file order;
+/// `mismatch` names what a differing one refuses as.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GuardBefore {
@@ -294,6 +305,8 @@ pub struct GuardBefore {
     pub with: Option<IndexMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expect: Option<IndexMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mismatch: Option<MismatchCode>,
 }
 
 /// `connectors_definitions.definition.GuardRead`: a read after the write, its
@@ -627,11 +640,28 @@ pub struct Operation {
     pub refusal_texts: Option<Vec<TextRefusal>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custody: Option<Custody>,
-    /// The closed body of a write, by key: `string`, `integer`, `boolean` or
-    /// `any`; a `string` followed by `+` must not be empty, and a trailing `!`
-    /// requires the key; or `=<value>`, sent fixed.
+    /// The closed body of a write, by key, a top-level name or a JSON
+    /// pointer: `string`, `integer`, `boolean`, `string_list` or `any`; a
+    /// `string` followed by `+` must not be empty, and a trailing `!` requires
+    /// the key; or `=<value>`, sent fixed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub body: Option<IndexMap<String, String>>,
+    /// The values a `string` key of `body` is held to, the engine's
+    /// `body_enums`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body_enums: Option<IndexMap<String, Vec<String>>>,
+    /// Keys of `body` under one parent of which the caller sends at least
+    /// one, the engine's `body_any_of`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body_any_of: Option<Vec<String>>,
+    /// The text sent before the caller's value of a `string` key of `body`,
+    /// the engine's `body_prefixes`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body_prefixes: Option<IndexMap<String, String>>,
+    /// The status, 409 or 412, by which the provider answers a write whose
+    /// target changed since it was read, the engine's `conflict_status`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conflict_status: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub guard: Option<Guard>,
     /// Written only where it differs from the source operation's summary,
@@ -791,14 +821,25 @@ pub enum Refusal {
     UnknownGuardRead { key: String, read: String },
     /// A guard binds, with `with`, a parameter its read does not have.
     GuardParameter { key: String, parameter: String },
-    /// A body key whose spec is not `string`, `integer`, `boolean` or `any`
-    /// (a `string` optionally followed by `+`, each optionally ending in `!`),
-    /// nor `=<value>`.
+    /// A body key whose spec is not `string`, `integer`, `boolean`,
+    /// `string_list` or `any` (a `string` optionally followed by `+`, each
+    /// optionally ending in `!`), nor `=<value>`.
     BodyType {
         key: String,
         field: String,
         spec: String,
     },
+    /// A `body_enums` entry other than distinct non-empty values of a key
+    /// `body` declares as a `string` the caller sends.
+    BodyEnum { key: String, field: String },
+    /// A `body_any_of` other than at least two distinct keys under one parent
+    /// that `body` declares and the caller sends.
+    BodyAnyOf { key: String, detail: String },
+    /// A `body_prefixes` entry other than a non-empty prefix of a key `body`
+    /// declares as a `string` the caller sends.
+    BodyPrefix { key: String, field: String },
+    /// A `conflict_status` on a read, or other than 409 or 412.
+    ConflictStatus { key: String, status: u16 },
     /// A datasource names an operation key the definition does not declare.
     UnknownDatasourceOperation { datasource: String, key: String },
     /// A datasource operation lacks what the feed derives from it: a single
@@ -859,6 +900,10 @@ impl Refusal {
             Self::UnknownGuardRead { .. } => "unknown_guard_read",
             Self::GuardParameter { .. } => "guard_parameter",
             Self::BodyType { .. } => "body_type",
+            Self::BodyEnum { .. } => "body_enum",
+            Self::BodyAnyOf { .. } => "body_any_of",
+            Self::BodyPrefix { .. } => "body_prefix",
+            Self::ConflictStatus { .. } => "conflict_status",
             Self::UnknownDatasourceOperation { .. } => "unknown_datasource_operation",
             Self::DatasourceOperation { .. } => "datasource_operation",
             Self::FeedCount(_) => "feed_count",
@@ -957,7 +1002,23 @@ impl std::fmt::Display for Refusal {
             ),
             Self::BodyType { key, field, spec } => write!(
                 f,
-                "{name}: operation `{key}` body `{field}` is `{spec}`; expected string, integer, boolean or any, a string optionally with `+`, each optionally with `!`, or `=<value>`"
+                "{name}: operation `{key}` body `{field}` is `{spec}`; expected string, integer, boolean, string_list or any, a string optionally with `+`, each optionally with `!`, or `=<value>`"
+            ),
+            Self::BodyEnum { key, field } => write!(
+                f,
+                "{name}: operation `{key}` body_enums `{field}` is not distinct non-empty values of a string key its body declares and the caller sends"
+            ),
+            Self::BodyAnyOf { key, detail } => write!(
+                f,
+                "{name}: operation `{key}` body_any_of {detail}; expected at least two distinct keys under one parent that its body declares and the caller sends"
+            ),
+            Self::BodyPrefix { key, field } => write!(
+                f,
+                "{name}: operation `{key}` body_prefixes `{field}` is not a non-empty prefix of a string key its body declares and the caller sends"
+            ),
+            Self::ConflictStatus { key, status } => write!(
+                f,
+                "{name}: operation `{key}` declares conflict_status {status}; a write declares 409 or 412, a read none"
             ),
             Self::UnknownDatasourceOperation { datasource, key } => write!(
                 f,
@@ -1111,6 +1172,14 @@ pub struct SelectionEntry {
     pub body_nonempty: Vec<String>,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub body_fixed: BTreeMap<String, Value>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub body_enums: BTreeMap<String, Vec<String>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub body_any_of: Vec<String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub body_prefixes: BTreeMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conflict_status: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub guard: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1135,9 +1204,84 @@ struct Body {
     required: Vec<String>,
     nonempty: Vec<String>,
     fixed: BTreeMap<String, Value>,
+    enums: BTreeMap<String, Vec<String>>,
+    any_of: Vec<String>,
+    prefixes: BTreeMap<String, String>,
 }
 
-fn body(key: &str, declared: Option<&IndexMap<String, String>>) -> Result<Body, Refusal> {
+impl Body {
+    /// Whether `field` is a `string` the caller sends: declared so, not fixed.
+    fn sent_string(&self, field: &str) -> bool {
+        self.types.get(field).is_some_and(|kind| kind == "string")
+            && !self.fixed.contains_key(field)
+    }
+}
+
+/// The parent of a body key: everything before a pointer's last `/`, the top
+/// level for a plain name.
+fn parent(field: &str) -> &str {
+    field.rfind('/').map_or("", |at| &field[..at])
+}
+
+fn body(key: &str, operation: &Operation) -> Result<Body, Refusal> {
+    let mut body = body_keys(key, operation.body.as_ref())?;
+    for (field, values) in operation.body_enums.iter().flatten() {
+        let mut seen = BTreeSet::new();
+        if !body.sent_string(field)
+            || values.is_empty()
+            || !values
+                .iter()
+                .all(|value| !value.is_empty() && seen.insert(value))
+        {
+            return Err(Refusal::BodyEnum {
+                key: key.to_owned(),
+                field: field.clone(),
+            });
+        }
+        body.enums.insert(field.clone(), values.clone());
+    }
+    if let Some(any_of) = &operation.body_any_of {
+        let refuse = |detail: String| Refusal::BodyAnyOf {
+            key: key.to_owned(),
+            detail,
+        };
+        let mut seen = BTreeSet::new();
+        for field in any_of {
+            if !body.keys.contains(field) || body.fixed.contains_key(field) {
+                return Err(refuse(format!(
+                    "names `{field}`, which body does not declare for the caller"
+                )));
+            }
+            if !seen.insert(field) {
+                return Err(refuse(format!("names `{field}` twice")));
+            }
+        }
+        match any_of.len() {
+            0 => return Err(refuse("names no key".to_owned())),
+            1 => return Err(refuse("names one key".to_owned())),
+            _ => {}
+        }
+        if any_of
+            .iter()
+            .any(|field| parent(field) != parent(&any_of[0]))
+        {
+            return Err(refuse("names keys under more than one parent".to_owned()));
+        }
+        body.any_of = any_of.clone();
+    }
+    for (field, prefix) in operation.body_prefixes.iter().flatten() {
+        if !body.sent_string(field) || prefix.is_empty() {
+            return Err(Refusal::BodyPrefix {
+                key: key.to_owned(),
+                field: field.clone(),
+            });
+        }
+        body.prefixes.insert(field.clone(), prefix.clone());
+    }
+    Ok(body)
+}
+
+fn body_keys(key: &str, declared: Option<&IndexMap<String, String>>) -> Result<Body, Refusal> {
     let mut body = Body::default();
     for (field, spec) in declared.into_iter().flatten() {
         body.keys.push(field.clone());
@@ -1166,7 +1310,7 @@ fn body(key: &str, declared: Option<&IndexMap<String, String>>) -> Result<Body, 
             None => (rest, false),
         };
         match kind {
-            "string" | "integer" | "boolean" => {
+            "string" | "integer" | "boolean" | "string_list" => {
                 body.types.insert(field.clone(), kind.to_owned());
             }
             "any" => {}
@@ -2079,11 +2223,15 @@ fn guard(
     };
     let preflight = |before: &GuardBefore| -> Result<Value, Refusal> {
         let (operation_id, found) = probe(&before.read)?;
-        Ok(serde_json::json!({
+        let mut preflight = serde_json::json!({
             "operation_id": operation_id,
             "values": bound_values(key, found, before.with.as_ref())?,
             "checks": checks(before.expect.as_ref()),
-        }))
+        });
+        if let Some(mismatch) = before.mismatch {
+            preflight["mismatch"] = serde_json::json!(mismatch);
+        }
+        Ok(preflight)
     };
     let mut value = serde_json::json!({"preflight": preflight(&guard.before)?});
     if let Some(also) = &guard.also {
@@ -2177,7 +2325,15 @@ pub fn select(
         for (parameter, bound) in carried.bounds.iter().flatten() {
             bounds.insert(parameter.clone(), bound.clone());
         }
-        let declared_body = body(key, operation.body.as_ref())?;
+        if let Some(status) = operation.conflict_status
+            && !(effect == Effect::Write && matches!(status, 409 | 412))
+        {
+            return Err(Refusal::ConflictStatus {
+                key: key.clone(),
+                status,
+            });
+        }
+        let declared_body = body(key, operation)?;
         let guard = operation
             .guard
             .as_ref()
@@ -2206,6 +2362,10 @@ pub fn select(
             body_required: declared_body.required,
             body_nonempty: declared_body.nonempty,
             body_fixed: declared_body.fixed,
+            body_enums: declared_body.enums,
+            body_any_of: declared_body.any_of,
+            body_prefixes: declared_body.prefixes,
+            conflict_status: operation.conflict_status,
             guard,
             custody: carried.custody,
         });
