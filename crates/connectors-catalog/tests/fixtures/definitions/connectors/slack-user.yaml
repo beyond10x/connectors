@@ -1,0 +1,60 @@
+schema: urn:beyond10x:connectors-definition:1
+catalog: slack
+source:
+  swagger: upstream/slack-user/slack_web_openapi_v2_without_examples.json.gz
+  sha256: 8b92da26a3c5b11d20042a9f36d81f1fa6fc9382c5ddc471babb68b91936bc3a
+  projection: slack-web.openapi.json
+  amendments: upstream/slack-user/slack-web.amendments.json
+base_url: https://slack.com/api
+auth:
+  slack.user:
+    scheme: bearer
+    label: Slack user token
+    identity: {path: auth.test, kind: slack.user, subject: /user_id}
+  slack.bot: {use: slack, default: true}
+defaults:
+  envelope:
+    ok: /ok
+    error: /error
+    refusals:
+      - {values: [missing_scope, not_in_channel, no_permission, user_is_bot], code: forbidden}
+      - {values: [not_authed, invalid_auth, account_inactive, token_revoked], code: unauthorized}
+      - values: [channel_not_found, thread_not_found, file_not_found, file_deleted, user_not_found]
+        code: not_found
+      - {values: [ratelimited], code: rate_limited}
+      - values:
+          - invalid_cursor
+          - invalid_limit
+          - limit_required
+          - invalid_ts_latest
+          - invalid_ts_oldest
+          - invalid_arg_name
+          - invalid_array_arg
+          - unknown_type
+        code: invalid_input
+    otherwise: internal
+operations:
+  search.messages:
+    op: search_messages
+    credential: [token]
+    bounds: {count: {minimum: 1, maximum: 100}}
+    description: Search the workspace's messages that the user token can see for query, one page per call of at most count (1 to 100) results, page selecting which page; sort by score or timestamp, sort_dir asc or desc. Needs a user token with search:read, not a bot token. Slack's answer with ok false is refused, Slack's error named as the reason
+  conversations.list:
+    op: conversations_list
+    withhold: [token]
+    bounds: {limit: {minimum: 1, maximum: 1000}}
+    description: List the conversations the user token can see, the private channels and direct messages that user is in included, one page per call of at most limit (1 to 1000); each later call sends the previous page's response_metadata.next_cursor as cursor, and the walk ends on a page whose next_cursor is empty. Needs the user scopes channels:read and groups:read, and im:read and mpim:read for those types. Slack's answer with ok false is refused, Slack's error named as the reason
+  conversations.history:
+    op: conversations_history
+    required: [channel]
+    withhold: [token]
+    description: Read the messages of one conversation the user can read, whether or not a bot is in it, newest first, one page per call, optionally within oldest and latest (Slack ts); each later call sends the previous page's response_metadata.next_cursor as cursor, and the walk ends on a page whose next_cursor is empty. Needs the user scope channels:history, groups:history, im:history or mpim:history for the conversation's type. Slack's answer with ok false is refused, Slack's error named as the reason
+  conversations.replies:
+    op: conversations_replies
+    required: [channel, ts]
+    withhold: [token]
+    description: Read one thread of a conversation the user can read, the parent message identified by channel and ts followed by its replies, one page per call, optionally within oldest and latest (Slack ts); each later call sends the previous page's response_metadata.next_cursor as cursor, and the walk ends on a page whose next_cursor is empty. Needs the user scope channels:history, groups:history, im:history or mpim:history for the conversation's type. Slack's answer with ok false is refused, Slack's error named as the reason
+  users.list:
+    op: users_list
+    withhold: [token]
+    description: "List the workspace's users, one page per call; each later call sends the previous page's response_metadata.next_cursor as cursor, and the walk ends on a page whose next_cursor is empty. Send limit: without it Slack tries to answer the whole list at once. Needs the user scope users:read. Slack's answer with ok false is refused, Slack's error named as the reason"

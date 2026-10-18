@@ -122,6 +122,27 @@ enum Action {
         #[arg(long)]
         amendments: Option<PathBuf>,
     },
+    /// Lower one `connectors-definition/1` file into a provider bundle, its index
+    /// entry, its `connectors-catalog-operations/1` selection and its
+    /// `connectors-catalog-connector/1` declaration in `--out`; or, with
+    /// `import`, write a definition from a shipped selection.
+    /// Deterministic; never touches the network.
+    #[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
+    Definition {
+        #[command(subcommand)]
+        action: Option<DefinitionAction>,
+        /// The definition, `connectors/<id>.yaml`; the file stem names the
+        /// selection, and the catalog provider unless the file names another.
+        #[arg(long, required = true)]
+        file: Option<PathBuf>,
+        /// The definitions checkout the definition's source paths are under.
+        #[arg(long = "root", required = true)]
+        definitions: Option<PathBuf>,
+        /// The bundle directory to write the bundle and index into; the
+        /// declaration and the selection it names go to `<catalog>/` under it.
+        #[arg(long, required = true)]
+        out: Option<PathBuf>,
+    },
     /// Project a pinned Google Discovery document into OpenAPI 3.0.3, and write
     /// its projection record beside it as `<name>.projection.json`.
     /// Deterministic; never touches the network.
@@ -157,6 +178,29 @@ enum Action {
         image: String,
         #[arg(long, default_value_t = 2)]
         jobs: usize,
+    },
+}
+#[derive(Subcommand)]
+enum DefinitionAction {
+    /// Write `connectors/<name>.yaml`, the shared auth files it uses and
+    /// `upstream/<name>/` into a definitions checkout from one shipped selection,
+    /// its bundle and the pinned source in this repository. Refused, writing
+    /// nothing, when the definition would not lower back to the selection.
+    Import {
+        /// The catalog provider, the bundle's name.
+        #[arg(long)]
+        catalog: String,
+        /// The selection file, repository-relative; default
+        /// `adapters/catalog/providers/<catalog>/operations.json`.
+        #[arg(long)]
+        selection: Option<PathBuf>,
+        /// The definitions checkout to write into.
+        #[arg(long)]
+        definitions: PathBuf,
+        /// The definition's file stem; default `<catalog>`, or
+        /// `<catalog>-<x>` for a selection named `<x>-operations.json`.
+        #[arg(long)]
+        name: Option<String>,
     },
 }
 #[derive(Subcommand)]
@@ -264,6 +308,52 @@ fn execute(args: Args) -> Result<()> {
         }
         .map_err(|failure| failure.to_string())?;
         println!("{}", serde_json::to_string_pretty(&run.coverage)?);
+        return Ok(());
+    }
+    if let Action::Definition {
+        action:
+            Some(DefinitionAction::Import {
+                catalog,
+                selection,
+                definitions,
+                name,
+            }),
+        ..
+    } = &args.command
+    {
+        let selection = selection
+            .as_ref()
+            .map(|path| inside(&root, path))
+            .transpose()?;
+        let imported = connectors_catalog::import::import(&connectors_catalog::import::Request {
+            connectors: &root,
+            catalog,
+            selection: selection.as_deref(),
+            definitions,
+            name: name.as_deref(),
+        })?;
+        for path in &imported.written {
+            println!("{}", path.display());
+        }
+        return Ok(());
+    }
+    if let Action::Definition {
+        action: None,
+        file: Some(file),
+        definitions: Some(definitions),
+        out: Some(out),
+    } = &args.command
+    {
+        let scratch = root.join(".local/tmp");
+        std::fs::create_dir_all(&scratch)?;
+        let lowered =
+            connectors_catalog::definition::lower(&connectors_catalog::definition::Request {
+                definition: file,
+                root: definitions,
+                out,
+                scratch: &scratch,
+            })?;
+        println!("{}", serde_json::to_string_pretty(&lowered.entry)?);
         return Ok(());
     }
     if let Action::Discovery { source, out } = &args.command {
@@ -939,5 +1029,150 @@ mod tests {
         assert_eq!(bundle.source.derivation, None);
         let bytes = std::fs::read(temp.path().join("bundles/google-drive.bundle.json")).unwrap();
         assert!(!String::from_utf8(bytes).unwrap().contains("derivation"));
+    }
+
+    fn repository() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .unwrap()
+    }
+
+    /// `definition` against the Jira fixture, its vendored source resolved
+    /// against `--root`, into `out` under a throwaway repository root.
+    fn definition(temp: &Path, file: &Path) -> Result<()> {
+        let repository = repository();
+        let out = temp.join("out");
+        cli(
+            temp,
+            &[
+                "definition",
+                "--file",
+                file.to_str().unwrap(),
+                "--root",
+                repository.to_str().unwrap(),
+                "--out",
+                out.to_str().unwrap(),
+            ],
+        )
+    }
+
+    #[test]
+    fn definition_lowers_the_jira_definition_to_the_committed_bundle_and_a_selection() {
+        let temp = tempfile::tempdir().unwrap();
+        let file = repository()
+            .join("crates/connectors-catalog/tests/fixtures/definition/providers/jira.yaml");
+        definition(temp.path(), &file).expect("definition run");
+        let written = std::fs::read(temp.path().join("out/jira.bundle.json")).unwrap();
+        let committed =
+            std::fs::read(repository().join("adapters/catalog/generated/bundles/jira.bundle.json"))
+                .unwrap();
+        assert!(
+            written == committed,
+            "the lowered bundle is the committed one"
+        );
+        bundle::load(&temp.path().join("out"), "jira").expect("the index verifies");
+        let selection: Value = serde_json::from_slice(
+            &std::fs::read(temp.path().join("out/jira/operations.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(selection["format"], "connectors-catalog-operations/1");
+        assert_eq!(selection["operations"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn definition_import_writes_the_slack_user_definition_and_it_lowers_to_the_shipped_files() {
+        let temp = tempfile::tempdir().unwrap();
+        let definitions = temp.path().join("definitions");
+        cli(
+            &repository(),
+            &[
+                "definition",
+                "import",
+                "--catalog",
+                "slack",
+                "--selection",
+                "adapters/catalog/providers/slack/user-operations.json",
+                "--definitions",
+                definitions.to_str().unwrap(),
+            ],
+        )
+        .expect("import run");
+        let file = definitions.join("connectors/slack-user.yaml");
+        let text = std::fs::read_to_string(&file).unwrap();
+        assert!(text.contains("\ncatalog: slack\n"), "{text}");
+        let out = temp.path().join("out");
+        cli(
+            temp.path(),
+            &[
+                "definition",
+                "--file",
+                file.to_str().unwrap(),
+                "--root",
+                definitions.to_str().unwrap(),
+                "--out",
+                out.to_str().unwrap(),
+            ],
+        )
+        .expect("definition run");
+        assert!(
+            std::fs::read(out.join("slack.bundle.json")).unwrap()
+                == std::fs::read(
+                    repository().join("adapters/catalog/generated/bundles/slack.bundle.json")
+                )
+                .unwrap(),
+            "the lowered bundle is the committed one"
+        );
+        let lowered: Value =
+            serde_json::from_slice(&std::fs::read(out.join("slack/user-operations.json")).unwrap())
+                .unwrap();
+        let shipped: Value = serde_json::from_slice(
+            &std::fs::read(
+                repository().join("adapters/catalog/providers/slack/user-operations.json"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(lowered, shipped);
+    }
+
+    #[test]
+    fn definition_import_refuses_a_selection_name_it_cannot_derive() {
+        let temp = tempfile::tempdir().unwrap();
+        let refused = cli(
+            &repository(),
+            &[
+                "definition",
+                "import",
+                "--catalog",
+                "slack",
+                "--selection",
+                "adapters/catalog/tests/feed/time.operations.json",
+                "--definitions",
+                temp.path().to_str().unwrap(),
+            ],
+        )
+        .expect_err("a selection named neither operations.json nor <x>-operations.json");
+        assert!(refused.to_string().starts_with("malformed: "), "{refused}");
+        assert!(std::fs::read_dir(temp.path()).unwrap().next().is_none());
+    }
+
+    #[test]
+    fn definition_refusal_is_reported_by_name_and_writes_nothing() {
+        let temp = tempfile::tempdir().unwrap();
+        let text = std::fs::read_to_string(
+            repository()
+                .join("crates/connectors-catalog/tests/fixtures/definition/providers/jira.yaml"),
+        )
+        .unwrap()
+        .replace("{op: getIssue}", "{op: getIssueThatIsNotThere}");
+        let file = temp.path().join("jira.yaml");
+        std::fs::write(&file, text).unwrap();
+        let refused = definition(temp.path(), &file).expect_err("an unknown op is refused");
+        assert!(
+            refused.to_string().starts_with("unknown_operation: "),
+            "{refused}"
+        );
+        assert!(!temp.path().join("out").exists());
     }
 }

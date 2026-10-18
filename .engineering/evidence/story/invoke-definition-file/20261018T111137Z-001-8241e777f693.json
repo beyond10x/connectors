@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-18T11:11:37Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-definition-file",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:invoke-definition-security-round-2",
+    "reference": "9869ac07ab: 1 fixed (stem and catalog-or-stem plain before any write); 2 fixed (path equality); three security cases green",
+    "review": "review-result:invoke-definition-security-round-2",
+    "outcome": "fixed"
+  }
+}

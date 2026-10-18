@@ -635,7 +635,12 @@ revision, protocol two, and the two write ids. As a diff of the configuration us
 +operations = ["conversations.list", "conversations.history", "conversations.replies", "users.list", "team.info", "emoji.list", "auth.test", "files.list", "files.info", "file.download", "chat.postMessage", "conversations.open"]
 ```
 
-When the revision moved, the existing connection is `pending` and the page is `stale`:
+When the revision moved, the existing connection is `pending` and the page is `stale`. That is
+the rule for an entry that states no `credential_revision`, as the one recorded here. An entry
+that states the bootstrap's `credential_revision` (unchanged by a selection change) keeps the
+connection `ready` and the page not stale; the revalidation below then records the new revision
+and caches the new description
+([configuration upgrades](local-connection-registry.md#configuration-upgrades)):
 
 ```console
 $ connectors connections list --connector slack --instance bot | jq -c '{stale: .result.stale, connections: [.result.connections[]|{connection,revision,state}]}'

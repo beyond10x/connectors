@@ -1,0 +1,52 @@
+schema: urn:beyond10x:connectors-definition:1
+id: gmail
+source:
+  discovery: upstream/google-gmail/gmail-api.json.gz
+  sha256: 7591d33ec87e4ef83551f71630213a89ac349becebe9bd9b3e4ce3851dede0fe
+  projection: gmail.openapi.json
+base_url: https://gmail.googleapis.com
+auth:
+  google.oauth:
+    use: google
+    scopes:
+      minimum: ["https://www.googleapis.com/auth/gmail.compose", "https://www.googleapis.com/auth/gmail.readonly"]
+      requested: [openid, "https://www.googleapis.com/auth/gmail.compose", "https://www.googleapis.com/auth/gmail.readonly"]
+paging: {maxResults: {limit: maxResults, max: 500}}
+defaults: {rate_limit_reasons: [rateLimitExceeded, userRateLimitExceeded, dailyLimitExceeded]}
+operations:
+  users.getProfile:
+    op: gmail.users.getProfile
+    description: "Read the mailbox profile of userId (me for the signed-in user): its address, message and thread totals, and historyId, the baseline from which users.history.list reports later changes; read it before the first full walk of users.messages.list or users.threads.list, so a change made during that walk is replayed by the first delta"
+  users.messages.list:
+    op: gmail.users.messages.list
+    description: List message ids and thread ids of userId (me) matching the Gmail search query q and every label in labelIds (an array), one page per call; the walk follows nextPageToken as pageToken and ends on a page without it; that end condition holds only if fields, when given, includes nextPageToken, so include it (for example nextPageToken,messages(id,threadId)); read each message with users.messages.get
+  users.messages.get:
+    op: gmail.users.messages.get
+    description: Read one message of userId (me) by id; format is full (the default), metadata (ids, labels and headers, narrowed by metadataHeaders), minimal (ids and labels) or raw (the full message as one base64url string in raw, which nothing narrows); at most the engine's 4 MiB response limit, which a raw message reaches at about 3 MiB (its base64url string is a third larger), so read a large message with format full and each part whose body names an attachmentId with users.messages.attachments.get; a part whose size is over about 3 MiB cannot be read either
+  users.messages.attachments.get:
+    op: gmail.users.messages.attachments.get
+    description: "Read one message part body of userId (me) by messageId and the attachmentId a full message names in the part's body (sent as id): its size and its data as one base64url string; at most the engine's 4 MiB response limit, and data is a third larger than size (the bytes before encoding), so a part whose size is over about 3 MiB is refused as capacity and cannot be read"
+  users.threads.list:
+    op: gmail.users.threads.list
+    description: List thread ids of userId (me) matching the Gmail search query q and every label in labelIds (an array), one page per call; the walk follows nextPageToken as pageToken and ends on a page without it; that end condition holds only if fields, when given, includes nextPageToken, so include it (for example nextPageToken,threads(id,historyId)); read each thread with users.threads.get
+  users.threads.get:
+    op: gmail.users.threads.get
+    description: Read one thread of userId (me) by id with its messages; format is full (the default), metadata (ids, labels and headers, narrowed by metadataHeaders) or minimal; at most the engine's 4 MiB response limit
+  users.history.list:
+    op: gmail.users.history.list
+    required: [startHistoryId]
+    description: "List the mailbox changes of userId (me) after startHistoryId (required), one page per call; the walk follows nextPageToken as pageToken and ends on a page without it, whose historyId is the next baseline; that end condition holds only if fields, when given, includes nextPageToken and historyId, so include both (for example nextPageToken,historyId,history); a 404 (not_found) means startHistoryId is out of date: first read a new baseline historyId from users.getProfile, then do a full sync, and continue from that baseline"
+  users.labels.list:
+    op: gmail.users.labels.list
+    description: List every label of userId (me), system and user labels, in one answer; the label ids are what labelIds takes
+  users.drafts.create:
+    op: gmail.users.drafts.create
+    effect: write
+    description: "Create a draft of userId (me) from body.message.raw, the whole message as RFC 5322 text (RFC 2822 in the pinned document) encoded base64url; it sends nothing, but its To, Cc and Bcc headers are who a later users.drafts.send reaches and its Subject and From what they see; body.message.threadId files it in that thread only with matching References, In-Reply-To and Subject headers; the same input twice makes a second draft; the answer's id and message.id are what users.drafts.send pins. Unguarded: nothing exists to compare before a create; the approval binds the whole input by digest, so the issuer reads the decoded message before approving"
+  users.drafts.send:
+    op: gmail.users.drafts.send
+    effect: write
+    body: {id: any}
+    guard:
+      before: {read: gmail.users.drafts.get, with: {id: body.id}, expect: {/message/id: messageId}}
+    description: "Send the existing draft body.id of userId (me) to every recipient in its To, Cc and Bcc headers; a sent message cannot be recalled. messageId pins the draft's message.id the issuer read and is not sent: the preflight reads the draft with users.drafts.get and refuses with nothing sent unless its message.id still equals messageId, so a changed draft sends nothing. The body carries id and nothing else: a body.message, which Google would send in place of the stored draft, or any other body key is refused as invalid_input before any request; the approval binds the whole input by digest, so the issuer reads the message first (users.messages.get of messageId with format raw, decoded) before approving"

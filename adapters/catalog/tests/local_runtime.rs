@@ -106,6 +106,9 @@ struct Provider {
     create_effects: Arc<AtomicUsize>,
     /// The route and `PRIVATE-TOKEN` header of every request; only compared.
     tokens: Authorizations,
+    /// Added to the user id `/api/v4/user` answers, so a credential can
+    /// answer another identity without changing.
+    identity_shift: Arc<AtomicUsize>,
 }
 impl Provider {
     fn new() -> Self {
@@ -165,6 +168,8 @@ impl Provider {
         let created = create_effects.clone();
         let tokens = Arc::new(Mutex::new(Vec::new()));
         let observed_tokens = tokens.clone();
+        let identity_shift = Arc::new(AtomicUsize::new(0));
+        let shifted = identity_shift.clone();
         let thread = std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -227,7 +232,7 @@ impl Provider {
                         43
                     } else {
                         42
-                    };
+                    } + shifted.load(Ordering::SeqCst);
                     observed.lock().unwrap().push(path.clone());
                     observed_authorizations
                         .lock()
@@ -511,6 +516,7 @@ impl Provider {
             create_mode,
             create_effects,
             tokens,
+            identity_shift,
         }
     }
     fn selection(&self) -> Adapter {
@@ -542,6 +548,7 @@ impl Provider {
             instance_id: instance.into(),
             adapter_id: "catalog".into(),
             configuration_revision: bootstrap.configuration_revision,
+            credential_revision: bootstrap.credential_revision,
             protocol: "v1alpha1".into(),
             startup: Startup::OnDemand,
             restart: Restart::Never,

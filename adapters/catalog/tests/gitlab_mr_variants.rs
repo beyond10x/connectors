@@ -332,6 +332,7 @@ impl Provider {
             .canonicalize()
             .unwrap();
         Adapter {
+            credential_revision: None,
             private_protocol: Some(PrivateProtocol::V2),
             permissions: Default::default(),
             instance_id: INSTANCE.into(),

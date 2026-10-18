@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-18T05:06:36Z",
+  "actor": "human:timo",
+  "artifact": "story:connection-binding-excludes-operations",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "implementor: finding 3 fixed (supervisor re-checks the captured classification); finding 1 escalated with the adversary's A; finding 2 accepted as D12 operation side",
+    "review": "review-result:connection-binding-security-r1",
+    "outcome": "escalated"
+  }
+}

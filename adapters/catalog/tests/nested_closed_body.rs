@@ -639,7 +639,7 @@ fn malformed_nested_members_are_refused_when_the_selection_loads() {
         ),
     ];
     for (name, selection) in cases {
-        let outcome = engine(&[selection.clone()]);
+        let outcome = engine(std::slice::from_ref(&selection));
         assert!(outcome.is_err(), "{name}: {selection}");
         assert_eq!(
             outcome.err().unwrap().code,

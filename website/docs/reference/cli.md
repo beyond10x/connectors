@@ -547,13 +547,16 @@ connectors operations invoke [OPTIONS] --operation <field:operation> --schema <f
 | `--instance <field:instance>` | no | none | any |  |
 | `--connection <field:connection>` | no | none | any |  |
 | `--operation <field:operation>` | yes | none | any |  |
-| `--schema <field:schema>` | yes | none | any |  |
-| `--revision <field:revision>` | yes | none | any |  |
+| `--schema <field:schema>` | yes | none | any | The operation's schema identity; with --definition, the description's when left out |
+| `--revision <field:revision>` | yes | none | any | The description's revision; with --definition, the current one when left out |
 | `--input-json <source:input:inline>` | no | none | any |  |
 | `--input-file <source:input:file>` | no | none | any |  |
 | `--input-stdin` | no | `false` | any |  |
 | `--approval-file <field:approval_file>` | no | none | any |  |
 | `--idempotency-key <field:idempotency_key>` | no | none | any |  |
+| `--definition <field:definition>` | no | none | any | A connectors-definition/1 file to invoke without configuring it; instead of --connector and --instance |
+| `--definitions-root <field:definitions_root>` | no | none | any | With --definition: the tree holding its vendored source and shared auth files [default: the parent of the file's directory] |
+| `--credential-file <field:credential_file>` | no | none | any | With --definition: the OAuth client file to connect with when the instance has no connection |
 
 ## `connectors operations list`
 

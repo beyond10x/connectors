@@ -569,6 +569,7 @@ dependencies = [
  "base64 0.23.1",
  "clap",
  "clap_complete",
+ "connectors-catalog",
  "connectors-cli-contract",
  "connectors-client",
  "connectors-core",
@@ -621,8 +622,11 @@ name = "connectors-catalog"
 version = "0.54.0"
 dependencies = [
  "connectors-core",
+ "flate2",
  "hex",
+ "indexmap",
  "openapiv3",
+ "regex",
  "serde",
  "serde_json",
  "serde_yaml_ng",
@@ -646,6 +650,7 @@ dependencies = [
  "entity-eventlog",
  "entity-store",
  "eventlog-core",
+ "flate2",
  "hex",
  "httpdate",
  "libc",

@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-18T06:48:14Z",
+  "actor": "human:timo",
+  "artifact": "story:connection-binding-excludes-operations",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "implementor: finding 1 (acceptance read) fixed by launching for a description; acceptance journey green",
+    "review": "review-result:connection-binding-security-r1",
+    "outcome": "fixed"
+  }
+}

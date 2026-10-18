@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-18T11:25:37Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-definition-file",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate on unit/invoke-definition-file at 9869ac07ab",
+    "reference": "all checks passed, 311 suites, 2677 passed, 0 failed, 134 ignored; acceptance journey cli_journey::invoke_definition (ignored lane, run separately) 1 passed; every adversary_ and security_ case of both rounds green"
+  }
+}

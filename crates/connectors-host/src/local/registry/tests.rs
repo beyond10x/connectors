@@ -868,6 +868,8 @@ pub(super) fn fixture() -> (tempfile::TempDir, Registry) {
 }
 pub(super) fn binding() -> Binding {
     Binding {
+        credential_revision: None,
+        executable: None,
         instance_id: "fixture-instance".into(),
         adapter_id: "fixture-adapter".into(),
         configuration_revision: "config-1".into(),
@@ -984,9 +986,9 @@ fn exclusive_publication_admits_one_connection_per_profile() {
     let first = registry.acknowledge(first, receipt, NOW).unwrap();
     let receipt = custody::WrittenVersion::fixture(second.version());
     let second = registry.acknowledge(second, receipt, NOW).unwrap();
-    registry.publish_with(first, NOW, true).unwrap();
+    registry.publish_with(first, NOW, true, None).unwrap();
     assert_eq!(
-        registry.publish_with(second, NOW, true),
+        registry.publish_with(second, NOW, true, None),
         Err(Failure::CustodyReadOnly)
     );
 

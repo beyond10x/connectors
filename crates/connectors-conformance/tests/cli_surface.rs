@@ -659,6 +659,63 @@ fn dynamic_business_sources_are_acquired_once_and_validate_both_directions() {
     }
 }
 
+/// story:invoke-definition-file: `--definition`, `--definitions-root` and
+/// `--credential-file` are optional path fields of `operations invoke`, handed
+/// to the handler as given. The generated contract keeps `--schema` and
+/// `--revision` required: the host states them for a definition before this
+/// runner reads the command line (`contracts/cli/v1alpha1/semantics.md` §3,
+/// "Invoking a definition file").
+#[test]
+fn invoke_carries_the_definition_selector_as_optional_path_fields() {
+    let definition = [
+        "--definition",
+        "/fixture/defs/connectors/forge.yaml",
+        "--definitions-root",
+        "/fixture/defs",
+        "--credential-file",
+        "/fixture/client.json",
+    ];
+    let mut handler = Recorder::new(invocation_result(json!({"count":1})));
+    let output = run(
+        &[
+            INVOKE,
+            &definition,
+            &["--input-json", r#"{"selector":"fixture"}"#],
+        ]
+        .concat(),
+        &mut InputSources::default(),
+        &mut handler,
+        Some(&mut FixtureSchemas::default()),
+    );
+    assert_eq!(output.exit_code, 0, "{output:?}");
+    let input = &handler.last.as_ref().unwrap().1;
+    assert_eq!(input["definition"], "/fixture/defs/connectors/forge.yaml");
+    assert_eq!(input["definitions_root"], "/fixture/defs");
+    assert_eq!(input["credential_file"], "/fixture/client.json");
+
+    let mut handler = Recorder::new(invocation_result(json!({"count":1})));
+    let output = run(
+        &[
+            &[
+                "operations",
+                "invoke",
+                "--operation",
+                "read",
+                "--output",
+                "json",
+            ][..],
+            &definition,
+            &["--input-json", r#"{"selector":"fixture"}"#],
+        ]
+        .concat(),
+        &mut InputSources::default(),
+        &mut handler,
+        Some(&mut FixtureSchemas::default()),
+    );
+    assert_eq!(refusal(&output, 2)["error"]["code"], "cli_parse");
+    assert_eq!(handler.calls, 0);
+}
+
 /// beyond10x/connectors#105: schemas and the provider result are JSON values in
 /// the answer, so a caller decodes the output once.
 #[test]

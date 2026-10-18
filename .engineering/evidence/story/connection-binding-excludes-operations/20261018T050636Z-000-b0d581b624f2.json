@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-18T05:06:36Z",
+  "actor": "human:timo",
+  "artifact": "story:connection-binding-excludes-operations",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "implementor: B, C, D fixed in registry/lifecycle.rs with the adversary's cases green; A escalated as an open decision (description cache needs an admitted launch); E noted",
+    "review": "review-result:connection-binding-adversary-r1",
+    "outcome": "escalated"
+  }
+}

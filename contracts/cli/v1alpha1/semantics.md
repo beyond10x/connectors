@@ -94,8 +94,8 @@ management wire payload or a persistent record.
 | `connections launch` | exact existing connection's read admission and the owner's custody read | `ConnectionLaunchInput` → the consumer's exit status ([consumer launch](consumer-launch.md)) | yes / no |
 | `connections status` | safe connection/acquisition observation | `ConnectionStatusInput` → `ConnectionStatusResult` | no / no |
 | `connections revoke` | connection metadata authority | `ConnectionRevokeInput` → `ConnectionRevokeResult` | no / no |
-| `operations list` | selected cached descriptor projection | `OperationListInput` → `OperationListResult` | no / no |
-| `operations describe` | selected cached descriptor projection | `OperationDescribeInput` → `OperationDescribeResult` | no / no |
+| `operations list` | selected cached descriptor projection | `OperationListInput` → `OperationListResult` | only to [launch for a description](#launching-for-a-description) |
+| `operations describe` | selected cached descriptor projection | `OperationDescribeInput` → `OperationDescribeResult` | only to [launch for a description](#launching-for-a-description) |
 | `operations invoke` | admitted service request | `OperationInvokeInput` → `OperationInvokeResult` | yes / yes, after admission |
 
 ### Consumer launch
@@ -140,11 +140,40 @@ authority, publication boundaries and helper limits belong to the
 enter the ordinary successful CLI result.
 
 Inventory and status commands use configured/cached descriptions and safe persisted metadata
-or query an already-running owner without provider authentication. Unavailable
+or query an already-running owner without provider authentication; `operations describe`
+and `operations list` start an owner and the adapter only to
+[launch for a description](#launching-for-a-description). Unavailable
 authoritative metadata returns `metadata_unavailable`; cached facts are labeled
 stale and cannot be used to decide fresh connection viability. Missing cached
-operation metadata returns `description_unavailable`, never implicit launch,
-download, installation or authentication. Status distinguishes unavailable owner
+operation metadata returns `description_unavailable`, never download,
+installation or authentication, and never a launch except as follows.
+
+#### Launching for a description
+
+`operations describe`, `operations list` and `operations invoke` (a read or a
+write) start the instance's configured adapter when, and only when, all of these hold: no description is
+cached for the instance's configured selection; the started executable is the
+configured one, admitted by its pinned SHA-256 as every launch is; and the
+instance holds a published connection (the named one, for a command that names
+one) that is not revoked or `stale`, whose credential is neither known invalid
+nor expired, whose upgrade the configured revision has not refused, and that is
+current under the configured entry, as `connections list` reports it with
+`stale = false` (its configuration revision is the configured one, or both
+record the same credential-side digest). The launch reads no credential, asks
+for none and sends nothing to the provider; it only caches the description, and
+an operator's `instances stop` is not resumed by it: a stopped instance answers
+`description_unavailable`. A revoked or `stale` connection, one whose credential
+is known invalid (its identity refused outside an executable-only change), and
+one whose credential-side digest moved (a changed provider authority, profile
+authentication or trust roots, for an implementation that states the digest)
+or that records no digest under another configuration revision are not
+current, so the command answers `description_unavailable` as before and starts
+nothing. An identity refused under an executable-only change records nothing
+and changes nothing, so it does not stop a launch for a description, which
+reads no credential; that connection's reads and writes keep refusing as
+`identity_mismatch`.
+
+Status distinguishes unavailable owner
 from a known stopped process. An owner need not be running to commit local revoke
 if the admitted metadata implementation supports the same serialized authority;
 otherwise revoke returns `metadata_unavailable` and starts nothing.
@@ -367,7 +396,8 @@ inadmissible path), `config_missing` (no file at the resolved path),
 `owner_uid_mismatch` or, from `setup migrate` only, `config_too_large` (the
 rewritten file would be larger than the 1 MiB a read admits; the refusal
 carries its size in `configuration_bytes` and the bound in
-`configuration_limit`).
+`configuration_limit`). `operations invoke --definition` alone also names
+`definition_instance_configured` ([invoking a definition file](#invoking-a-definition-file)).
 
 ### Selecting an instance
 
@@ -420,6 +450,158 @@ A caller that reads all of standard error as one JSON failure envelope keeps
 reading its `error`. Under `--output json`, output that is no envelope (help,
 `completions`, a launched consumer's streams) is unchanged.
 
+### Invoking a definition file
+
+`operations invoke --definition <file> --operation <key>`, with the input
+sources of every `operations invoke`, runs an operation of a
+`connectors-definition/1` file that no configuration names
+(architecture-decision-record:provider-definitions-and-runtimes D12 point 3).
+`--definition` is a third selector: given beside `--adapter`, `--connector` or
+`--instance` the command is `invalid_input` at `arguments`, as are
+`--definitions-root` and `--credential-file` without it. `--definitions-root
+<dir>` is the tree holding the definition's vendored source and shared auth
+files; it defaults to the parent of the directory holding the file.
+`--schema` and `--revision` may be left out: each one left out is the one the
+instance's description states, as `operations describe` reports it. The bare
+`invoke` stays the explicit compatibility command.
+
+The file is lowered with the reference lowerer into an owner-only cache under
+the state directory, `definitions/<digest>/`, keyed by the digest of every
+file the lowering reads (the definition, its vendored source, its amendments
+and the shared auth files its profiles use, each by its path under the
+definitions root) and of the lowerer's release. Each file is read once; the
+lowerer reads a private copy of exactly those bytes, so an entry holds the
+lowering of its key. A run whose inputs are unchanged reuses the entry; a
+changed one is lowered into a new entry beside it. A definition the lowerer
+refuses, or one that cannot be read, is `invalid_input` at `arguments` and
+leaves nothing behind; `connectors-build definition` names the lowerer's
+refusal. Every variable the definition's base URL names must have a default:
+the instance's endpoint is the one the lowered declaration states, and its
+trust roots are the platform's.
+
+The instance is the connector's instance `definition` (the connector id is
+the definition's `id`, else its file stem), with the alias and instance id
+`<connector>.definition`, or its moved instance `definition-<16 hex>` when that
+instance id cannot hold the file's provider authority or profile (below). Its entry pins the installed catalog provider on the
+lowered configuration as a derived instance's does, and is held in the
+owner-only file `definitions/instances.toml` beside the cache; a later run of a file with the
+same connector id replaces that entry, so both files are one instance and its
+connection follows the rules below; a run whose entry another run replaced
+before it was selected is `revision_conflict` at `publication` with
+`retry_explicitly`. At most 64 connector ids are held; another is
+`invalid_configuration` at `configuration`. No command forgets an entry:
+revoking its connection with `connections revoke` and then removing
+`definitions/` from the state directory while no owner runs forgets every
+entry and the cache. The connector id, the file stem and the catalog (the stem when the
+definition names none) are plain names (ASCII letters, digits, `-` and `_`);
+any other is `invalid_input` at `arguments`, before anything is written. An entry names the catalog provider started as
+`--local-config` of its own cache entry's `native.json`, compared as paths so
+every spelling of the state directory names it; an entries file holding any
+other entry is not read. Every command
+that selects an instance reads it beside the configuration, so `--connector
+<connector> --instance definition` selects it too, but `instances list` and
+`setup check` report the configuration alone. The configuration file is never
+written. A configuration that already has the connector's instance
+`definition`, or an entry under that alias or instance id, is never replaced:
+the command is `invalid_configuration` at `configuration` with
+`configuration_rule` `definition_instance_configured` and `next_action`
+`check_configuration`, and lowers nothing.
+
+Lowering and recording connect nothing: they create no connection, admit no
+operation and perform no OAuth exchange (D12 point 4). When the instance holds
+no connection the command asks once, on its controlling terminal, whether to
+connect; only a `y` or `yes` answer starts the profile's acquisition, exactly
+as `connections connect` runs it: the token prompt on the terminal, or the
+file `--credential-file` names (an OAuth client file becomes the entry by
+consent; under the read-only `mounted_secret` binding the owner reads the item
+itself and the file is refused). Any other answer, or a run without a
+controlling terminal in the foreground, is `not_found` at `admission` with
+`next_action` `create_connection`; nothing is acquired and nothing is sent to
+the provider. With one connection the operation runs on it with no question,
+and `--connection` names one explicitly; an instance that holds more than one
+is `invalid_input` at `arguments`. A change to the bundle, its source or the
+selection alone keeps the connection ([one connection per instance](#one-connection-per-instance),
+D12 point 2). A change of the provider authority or of the profile's
+authentication cannot be followed under the instance id `<connector>.definition`
+once a connection of it, revoked ones included, was admitted under the earlier
+one (`docs/local-connection-registry.md`, "Configuration upgrades": only a
+new instance id helps). The definition then resolves to its moved instance,
+`definition-<16 hex>`: the first 16 hexadecimal digits of a digest of the
+connector id, the provider authority and the profile's authentication (its
+declaration apart from its revision and evidence lifetime, with its id,
+purpose, subject and minimum scopes). The name is the same on every run of the
+same definition, a lifetime-only change keeps it, and a file moved back to the
+earlier authority resolves to `definition` and its connection again. The moved
+instance is prepared, cached under its own key and recorded as the connector's
+entry exactly as above, so its first run is a first invoke: the one question,
+a fresh connect, and no candidate at the earlier authority. The connector keeps
+one entry, so the instance id the file left is configured by no entry, and the
+connections left under it are not used, changed or forgotten; `connections
+revoke` of one under an instance of the same connector whose instance id is
+`<connector>.<name>`, such as the moved instance, reaches it (the moved entry);
+an instance of another connector does not. A configuration that already has the moved instance is
+refused as for `definition` below. Reusing a stored credential for another
+authority or profile is not part of this binding.
+
+When the instance holds no connection and another instance of the same
+connector holds a connection whose credential a new connection of the
+definition's instance can use, the one question lists those connections and
+offers to reuse one instead (D12 point 3, story:invoke-definition-reuse-credential).
+A candidate is a published connection of another instance of the definition's
+connector id, an instance of `[connectors.<connector>]` (a legacy `[adapters]`
+entry is no instance of a connector), that is Live and not Stale, holds its
+credential, has current validation evidence and is current under its own
+configured entry, and is bound to the same adapter, provider authority and
+profile authentication (equal, or differing only in the evidence lifetime) as
+the definition's instance. Its profile is a static entry: a profile whose entry
+an OAuth acquisition refreshes is never copied, since one rotation would end the
+other's refresh. The definition's lowered configuration must send the
+credential to its HTTPS API base alone: a profile naming a token endpoint or
+any other URL, on any origin, is offered nothing, since the binding compares
+the provider authority and the profile declaration, a token endpoint is part of
+neither, and the source may send its secret to another place than the
+definition would. The copy is validated under the platform's trust roots, as
+every definition is, whatever trust roots the source's own entry pins. Under the read-only `mounted_secret` binding
+nothing is offered.
+A revoked, Stale, expired or moved connection, and a connection of another
+connector, is never listed. The question lists at most 16 candidates, each by
+number with its `<connector>/<instance>`, its provider authority and its
+validated external identity (kind and subject), never material, and ends
+`[1/c/N]` (`[1-<n>/c/N]` for n candidates). A number reuses that candidate; `c`
+or `connect` connects fresh as above; any other answer, or a run without a
+controlling terminal in the foreground, is `not_found` at `admission` with
+`next_action` `create_connection`, and nothing is read, copied or sent.
+
+On reuse the owner, never the CLI, copies the credential
+([custody §4.3](../../auth/custody/v1alpha1/semantics.md#43-copy-to-another-connection)).
+It repeats every check above against the current configuration and store,
+admits the definition's instance as a connect does (refused while it holds a
+connection or another connect of it is in flight), reads the candidate's
+current version under a read use of the source, has the definition's adapter
+validate it with the profile's own identity and scope probes, and publishes a
+new connection of the definition's instance holding the material as its own
+new custody version, only when the validation succeeds, the validated
+identity equals the source's, and the source is, inside the publishing commit,
+still published, Live, not Stale and under the publication fence and version
+that were read: a source revoked, made Stale, reconnected or revalidated while
+its copy was validated publishes nothing (`revoked`, or `lifecycle_conflict`). The acquisition is recorded as a connect's, and
+`connections status --acquisition` follows it. Otherwise nothing is published,
+the acquisition is failed, and the command offers to connect fresh with one
+`[y/N]` question; declined, the command answers the reuse's own refusal:
+`identity_mismatch` at `admission` with `next_action` `create_connection` when
+the provider answered another identity, otherwise the validation's or the
+owner's failure. A run that cannot know whether the copy published
+(`outcome_unknown`, `interrupted`) offers nothing. Either way the source
+connection is unchanged (its revision, state, evidence and identity), and
+after a copy the two share nothing: revoking or reconnecting either leaves the
+other as it was.
+
+From the selection on, the command is the configured instance's: the
+description, admission, approval of writes, audit and the result envelope are
+those of every `operations invoke`, and a result names connector
+`<connector>`, instance `definition` and adapter `<connector>.definition`, or
+the moved instance and `<connector>.definition-<16 hex>`.
+
 ### Renamed commands
 
 `connections reconnect` replaces `connections repair`, and the `instances` group
@@ -459,7 +641,7 @@ step the held connection's own reconnect admits:
 
 | The instance holds | `next_action` |
 |---|---|
-| one connection under the configured binding | `repair_connection`: `connections reconnect` replaces its credential and keeps its reference |
+| one connection under the configured binding, or one whose binding differs from it only on the operation side (bundle, source or selection, under an equal credential-side digest) | `repair_connection`: `connections reconnect` replaces its credential and keeps its reference |
 | one connection saved under an older configuration revision that a revalidation can follow | `revalidate_connection`, after which it is the instance's connection |
 | one connection that reconnect refuses as changed (`create_connection` on a read), or more than one | `revoke_connection`: `connections revoke` it, then connect |
 
@@ -1104,6 +1286,26 @@ or is known invalid (`stale`), one whose credential expired
 (`reauthorization_required`), and a credential below the operation's scopes,
 keep `code = not_granted` with `next_action = repair_connection` and recollect
 nothing.
+
+A connection whose binding and configured entry both record a credential-side
+digest (`credential_revision`, the implementation's digest of what decides
+where the credential is sent and how it authenticates; never the bundle, its
+source or the selection) is bound to it and to the provider executable, not to
+the configuration revision. A change that leaves the digest equal is not a
+stale configuration: when only the bundle, source or selection moved the
+connection reports `ready` with `stale = false`, and a read, a reconnect, an
+approval naming it and a consumer launch admit it with no credential source
+and no question; its next revalidation records the new revision. When only the
+provider executable changed, it also reports `ready` with `stale = false`; a
+read validates its stored credential once under the new executable and is
+served when the recorded identity answers, and a revalidation follows it the
+same way; another identity is refused as `identity_mismatch` and changes
+nothing. Every other change, and every change for a connection whose binding
+records no credential-side digest (saved before it was recorded, or under an
+entry that states none), follows the configuration-revision rule below. A
+changed configuration's description is cached by the first read command that
+[launches for it](#launching-for-a-description); a write after an
+executable-only change validates the connection once, as a read does.
 
 A connection saved under another configuration revision of its instance also
 reports `pending` (`stale = true`), and no status change is pending for it: a

@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-18T15:33:47Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-definition-reuse-credential",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate on unit/invoke-definition-reuse-credential at f67c23498 (merge of origin/main 7e1fa1a5a): all checks passed, 312 suites, 2690 passed, 0 failed, 137 ignored, clippy --all-targets -D warnings and fmt clean; ignored lane run separately: reuse journey, identity-mismatch journey, adversary race journey and S2's journey 1 passed each"
+  }
+}

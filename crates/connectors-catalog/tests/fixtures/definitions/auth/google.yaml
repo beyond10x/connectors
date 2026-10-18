@@ -1,0 +1,8 @@
+schema: urn:beyond10x:connectors-auth:1
+profiles:
+  google.oauth:
+    scheme: oauth2_refresh
+    label: Google refresh token
+    identity: {source: id_token, kind: google.user}
+    token_url: https://oauth2.googleapis.com/token
+    authorize_url: https://accounts.google.com/o/oauth2/auth

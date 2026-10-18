@@ -482,6 +482,41 @@ impl Client {
             Err(error) => Err(lost(error)),
         }
     }
+    /// story:invoke-definition-reuse-credential: ask the owner for a new
+    /// connection of `adapter` holding the current credential of `connection`,
+    /// a connection of the instance `source`, offered under `revision`. No
+    /// material crosses this stream; the answer is the published connection.
+    /// A request without a well-formed reply is `outcome_unknown`.
+    pub fn reuse(
+        mut self,
+        adapter: &str,
+        source: &str,
+        connection: &str,
+        revision: &str,
+        profile: &str,
+    ) -> Result<Value> {
+        self.same_build()?;
+        crate::local::protected::cancellation()?;
+        // The owner's own bounds: a startup and a validation of 30 s each.
+        let deadline = Instant::now() + Duration::from_secs(75);
+        let answer = (|| {
+            channel::write(
+                &mut self.stream,
+                &Request::Reuse {
+                    adapter: adapter.into(),
+                    source: source.into(),
+                    connection: connection.into(),
+                    expected_revision: revision.into(),
+                    profile: profile.into(),
+                },
+                None,
+                &[],
+                deadline,
+            )?;
+            self.answer(deadline)
+        })();
+        answer.unwrap_or_else(|error| Err(lost(error)))
+    }
     pub fn revalidate(
         mut self,
         adapter: &str,
@@ -557,6 +592,24 @@ impl Client {
     pub fn is_same_build(&self) -> bool {
         self.same_build().is_ok()
     }
+    /// The adapter's description, cached by starting the configured adapter
+    /// when none is (`super::described`).
+    pub(super) fn launched(
+        mut self,
+        adapter: &str,
+        connection: Option<&str>,
+    ) -> Result<runtime::Bootstrap> {
+        self.same_build()?;
+        let mut answer = self.simple(
+            Request::Cached {
+                adapter: adapter.into(),
+                launch: true,
+                connection: connection.map(str::to_owned),
+            },
+            Duration::from_secs(40),
+        )?;
+        serde_json::from_value(answer["bootstrap"].take()).map_err(|_| Code::Unavailable.into())
+    }
     /// The adapter's cached description, answered from the owner's held
     /// metadata handle.
     pub(super) fn cached(mut self, adapter: &str) -> Result<runtime::Bootstrap> {
@@ -564,6 +617,8 @@ impl Client {
         let mut answer = self.simple(
             Request::Cached {
                 adapter: adapter.into(),
+                launch: false,
+                connection: None,
             },
             Duration::from_secs(30),
         )?;
@@ -1703,16 +1758,38 @@ fn action(
     }
     let alias = match &request {
         Request::Begin { adapter, .. }
+        | Request::Reuse { adapter, .. }
         | Request::Revalidate { adapter, .. }
         | Request::Invoke { adapter, .. }
         | Request::Status { adapter }
-        | Request::Cached { adapter }
+        | Request::Cached { adapter, .. }
         | Request::Launch { adapter, .. }
         | Request::Stop { adapter, .. } => adapter.clone(),
         _ => return Err(Code::InvalidInput.into()),
     };
     let (config, adapter) = selected(&owner.paths, &alias)?;
     match request {
+        Request::Reuse {
+            source,
+            connection,
+            expected_revision,
+            profile,
+            ..
+        } => {
+            if !document.is_empty() {
+                return Err(Code::InvalidInput.into());
+            }
+            reuse(
+                owner,
+                &alias,
+                &config,
+                &adapter,
+                &source,
+                &connection,
+                &expected_revision,
+                &profile,
+            )
+        }
         Request::Revalidate {
             connection,
             expected_revision,
@@ -1756,7 +1833,7 @@ fn action(
                     let old = registry.describe(
                         &adapter.instance_id,
                         &adapter.adapter_id,
-                        &adapter.configuration_revision,
+                        adapter.configured(),
                         reference,
                         connectors_sdk::now_ms(),
                         false,
@@ -1906,7 +1983,7 @@ fn action(
                     let description = registry.describe(
                         &adapter.instance_id,
                         &adapter.adapter_id,
-                        &adapter.configuration_revision,
+                        adapter.configured(),
                         &connection,
                         connectors_sdk::now_ms(),
                         true,
@@ -1956,7 +2033,7 @@ fn action(
                 let description = registry.describe(
                     &adapter.instance_id,
                     &adapter.adapter_id,
-                    &adapter.configuration_revision,
+                    adapter.configured(),
                     &connection,
                     connectors_sdk::now_ms(),
                     true,
@@ -2027,9 +2104,39 @@ fn action(
             )
         }
         Request::Status { .. } if document.is_empty() => owner.pool.status(&alias, &adapter),
-        Request::Cached { .. } if document.is_empty() => {
-            Ok(json!({ "bootstrap": super::cached_direct(&owner.paths, &alias)? }))
-        }
+        Request::Cached {
+            launch, connection, ..
+        } if document.is_empty() => match super::cached_direct(&owner.paths, &alias) {
+            // A read command's description (`super::described`): the owner
+            // checks the same admission again and starts the configured adapter,
+            // which caches its description. No credential is read.
+            Err(error)
+                if launch
+                    && error.code == Code::DescriptionUnavailable
+                    // An operator's `instances stop` is not resumed by a read
+                    // command: it keeps answering `description_unavailable`.
+                    && !runtime::state::State::new(&owner.paths.state)
+                        .suppressed(&adapter.instance_id)?
+                    && registry::Registry::new(&owner.paths.state).launch_admits(
+                        &adapter.instance_id,
+                        &adapter.adapter_id,
+                        adapter.configured(),
+                        connection.as_deref(),
+                    )? =>
+            {
+                let Output::Bootstrap(bootstrap, _) = owner.pool.run(
+                    &alias,
+                    &adapter,
+                    Task::Ensure { resume: false },
+                    connectors_sdk::now_ms() + 30_000,
+                )?
+                else {
+                    return Err(Code::Unavailable.into());
+                };
+                Ok(json!({ "bootstrap": bootstrap }))
+            }
+            other => Ok(json!({ "bootstrap": other? })),
+        },
         Request::Stop {
             configuration_revision,
             host_incarnation,
@@ -2065,6 +2172,172 @@ fn begin_connect(
         if failure == registry::Failure::Conflict {
             error.acquisition = registry.in_flight(&binding.instance_id, now).ok().flatten();
         }
+        error
+    })
+}
+
+/// story:invoke-definition-reuse-credential: a new connection of `alias`
+/// holding the current credential of `connection`, a connection of `source`,
+/// offered under `expected_revision` (contracts/cli/v1alpha1/owner.md,
+/// `reuse`). Every check the CLI made when it offered the candidate is made
+/// again here. The connection is allocated as a connect's; the source's
+/// current version is held as a read use of the source while it is read,
+/// sent to the target's adapter for the profile's validation and released;
+/// the copy is published as the new connection's own custody version only
+/// when the validated identity is the source's. The source's record is
+/// written by nothing but that read use, and no material leaves the owner.
+#[allow(clippy::too_many_arguments)]
+fn reuse(
+    owner: &Owner,
+    alias: &str,
+    config: &Config,
+    adapter: &Adapter,
+    source: &str,
+    connection: &str,
+    expected_revision: &str,
+    profile: &str,
+) -> Result<Value> {
+    use supervisor::{Output, Task};
+    let (_, origin) = selected(&owner.paths, source)?;
+    // Only an invoked definition's instance receives a copy, and only one
+    // that sends the credential nowhere but its API base's origin.
+    if !super::super::definitions::receives_reuse(&owner.paths, config, alias)?
+        || !super::same_connector(config, alias, source)
+        || origin.instance_id == adapter.instance_id
+        || origin.adapter_id != adapter.adapter_id
+        || !adapter.permissions.profiles.contains(profile)
+    {
+        return Err(Code::Forbidden.into());
+    }
+    let selection = config.selection();
+    if !custody::available_for(&selection) {
+        return Err(Code::CustodyUnavailable.into());
+    }
+    // A read-only binding writes no version, so it holds no copy.
+    if selection.read_only() {
+        return Err(Code::CustodyReadOnly.into());
+    }
+    let Output::Bootstrap(bootstrap, capture_epoch) = owner.pool.run(
+        alias,
+        adapter,
+        Task::Ensure { resume: true },
+        connectors_sdk::now_ms() + 30_000,
+    )?
+    else {
+        return Err(Code::Unavailable.into());
+    };
+    // Startup is not authority: the configuration is read again before the
+    // source is read, before its bytes are sent, and before publication.
+    let current = || -> Result<()> {
+        let (latest, target) = selected(&owner.paths, alias)?;
+        let (_, from) = selected(&owner.paths, source)?;
+        if latest.selection() != selection
+            || target.selection() != adapter.selection()
+            || from.selection() != origin.selection()
+            || !super::same_connector(&latest, alias, source)
+        {
+            return Err(Code::LifecycleConflict.into());
+        }
+        if !target.permissions.profiles.contains(profile) {
+            return Err(Code::Forbidden.into());
+        }
+        Ok(())
+    };
+    current()?;
+    admit_capture(&owner.paths, alias, Some(profile), None, None)?;
+    // Only a static entry is copied: an entry an OAuth acquisition refreshes
+    // rotates, and one connection's rotation would end the other's refresh.
+    if bootstrap.profile(profile)?.acquisition.is_some() {
+        return Err(Code::Unsupported.into());
+    }
+    let binding = bootstrap.binding(profile)?;
+    let registry = registry::Registry::with_system_clock(&owner.paths.state);
+    let acquired = begin_connect(&registry, &binding, connectors_sdk::now_ms())?;
+    let reference = acquired.reference().to_owned();
+    let claim = registry.consume(acquired, connectors_sdk::now_ms())?;
+    let result = (|| {
+        let now = connectors_sdk::now_ms();
+        let captured = registry.capture_reuse(
+            &origin.instance_id,
+            &origin.adapter_id,
+            origin.configured(),
+            &binding,
+            connection,
+            expected_revision,
+            now,
+            now + 30_000,
+        )?;
+        let identity = captured.identity().clone();
+        let guard = captured.guard();
+        let version = captured.version();
+        let read = custody::Store::open_for(version.scope(), &selection, &owner.paths.state)
+            .and_then(|store| store.read(version));
+        let checked = current();
+        let material = match (read, checked) {
+            (Ok(material), Ok(())) => material,
+            (read, checked) => {
+                registry.cancel_read(captured.into_read(), connectors_sdk::now_ms())?;
+                checked?;
+                return Err(match read {
+                    Err(_) => Code::CustodyUnavailable.into(),
+                    Ok(_) => Code::Unavailable.into(),
+                });
+            }
+        };
+        let dispatched = registry.dispatch_reuse(captured, connectors_sdk::now_ms())?;
+        let validated = owner.pool.run(
+            alias,
+            adapter,
+            Task::Validate {
+                profile: profile.to_owned(),
+                secret: Secret(material.0.clone()),
+                capture_epoch,
+            },
+            connectors_sdk::now_ms() + 30_000,
+        );
+        let released = registry.release_read(dispatched, connectors_sdk::now_ms());
+        let Output::Baseline(baseline) = validated? else {
+            return Err(Code::Unavailable.into());
+        };
+        released?;
+        let baseline = baseline.into_registry();
+        if baseline.identity != identity {
+            // Another account: nothing is published, and only a fresh
+            // connect helps (`create_connection`).
+            let mut error = Error::from(Code::IdentityMismatch);
+            error.reconnect = true;
+            return Err(error);
+        }
+        current()?;
+        let prepared =
+            registry.prepare(&claim, baseline, material.0.len(), connectors_sdk::now_ms())?;
+        let store =
+            custody::Store::open_for(prepared.version().scope(), &selection, &owner.paths.state)
+                .map_err(|_| Code::CustodyUnavailable)?;
+        let published = registry.store_and_publish_reuse(
+            prepared,
+            &material,
+            &store,
+            connectors_sdk::now_ms,
+            &guard,
+        )?;
+        let description = registry.describe(
+            &adapter.instance_id,
+            &adapter.adapter_id,
+            adapter.configured(),
+            &published,
+            connectors_sdk::now_ms(),
+            true,
+        )?;
+        Ok(json!({"connection":connection_value(alias,description)}))
+    })();
+    result.map_err(|mut error: Error| {
+        if error.code != Code::OutcomeUnknown
+            && let Err(failure) = registry.fail(&claim, connectors_sdk::now_ms())
+        {
+            error = failure.into();
+        }
+        error.acquisition = Some(reference);
         error
     })
 }

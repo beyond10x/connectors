@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-18T14:59:51Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-definition-reuse-credential",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:invoke-definition-reuse-adversary-round-1",
+    "reference": "9cc91a24f: 1 fixed (ReuseGuard checked in the publishing commit; adversary race journey green); 2 fixed (listing bounded by bytes; a failed listing asks the plain question)",
+    "review": "review-result:invoke-definition-reuse-adversary-round-1",
+    "outcome": "fixed"
+  }
+}

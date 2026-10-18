@@ -1828,6 +1828,16 @@ fn connection_row(
     ] {
         copy_optional_json_field(binding, fields, kept, kept)?;
     }
+    // What the binding records beside the configuration revision (D12): the
+    // credential-side digest and the provider executable digest, each only
+    // when recorded; a binding saved before D12 records neither.
+    copy_optional_json_field(
+        binding,
+        fields,
+        "credential_revision",
+        "credential_revision",
+    )?;
+    copy_optional_json_field(binding, fields, "executable", "executable_digest")?;
     // The binding column keeps `"lifecycle": "stale"` beside the binding while
     // the connection is Stale (registry.rs `Kept`); its `state` reads `live`.
     Ok((
@@ -3197,6 +3207,17 @@ fn connection_projection(
                 .as_object_mut()
                 .ok_or(Failure::MetadataUnavailable)?
                 .insert(kept.into(), value.clone());
+        }
+    }
+    for (field, key) in [
+        ("credential_revision", "credential_revision"),
+        ("executable_digest", "executable"),
+    ] {
+        if let Some(value) = row.fields.get(field) {
+            binding
+                .as_object_mut()
+                .ok_or(Failure::MetadataUnavailable)?
+                .insert(key.into(), value.clone());
         }
     }
     let state = match row.lifecycle_state.as_str() {

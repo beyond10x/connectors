@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-18T14:06:47Z",
+  "actor": "human:timo",
+  "artifact": "task:invoke-definition-interrupt-race",
+  "kind": "task",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "security_invoke_definition test binary, --exact security_an_interrupt_while_a_definition_is_prepared_is_exit_130, 4 concurrent loops of 50 beside 4 CPU burners, after the fix",
+    "reference": "green: 200 of 200 passed; ~/.cache/connectors-s2-20261018/logs/race-green-200.log; cargo test -p connectors: 239 passed, 0 failed, 7 ignored; clippy -D warnings and fmt --check clean"
+  }
+}

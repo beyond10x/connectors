@@ -8,6 +8,7 @@ license.workspace = true
 
 [dependencies]
 base64.workspace = true
+connectors-catalog = { path = "../../crates/connectors-catalog" }
 connectors-core.workspace = true
 connectors-sdk.workspace = true
 connectors-client.workspace = true
@@ -15,7 +16,9 @@ connectors-host.workspace = true
 connectors_cli_contract.workspace = true
 clap.workspace = true
 clap_complete = "4"
+hex.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 tokio.workspace = true
 uuid.workspace = true
 

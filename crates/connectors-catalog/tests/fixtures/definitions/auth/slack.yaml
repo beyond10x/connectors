@@ -1,0 +1,6 @@
+schema: urn:beyond10x:connectors-auth:1
+profiles:
+  slack.bot:
+    scheme: bearer
+    label: Slack bot token
+    identity: {path: auth.test, kind: slack.user, subject: /user_id}

@@ -1117,7 +1117,7 @@ fn worker(
                     let observed = registry.describe(
                         &current.instance_id,
                         &current.adapter_id,
-                        &current.configuration_revision,
+                        current.configured(),
                         &connection,
                         connectors_sdk::now_ms(),
                         true,
@@ -1187,6 +1187,48 @@ fn worker(
                     };
                     let captured = match capture() {
                         Ok(captured) if !lapses_early(&captured) => captured,
+                        // Only the provider executable changed since the
+                        // connection was saved (D12): its stored credential is
+                        // validated once under this executable, which the
+                        // registry follows when the recorded identity answers
+                        // and refuses, changing nothing, otherwise. No
+                        // credential entry, no question. The evidence that
+                        // validation records is fresh, so the read it admits
+                        // recollects nothing.
+                        Err(registry::Failure::ExecutableChanged) => {
+                            super::follow_executable(
+                                &paths,
+                                &config.selection(),
+                                &registry,
+                                &binding,
+                                &connection,
+                                job.deadline,
+                                || {
+                                    let guard = control.lock().map_err(|_| Code::Unavailable)?;
+                                    guard.check(job.epoch)?;
+                                    if stopped.load(Ordering::SeqCst) {
+                                        return Err(Code::Unavailable.into());
+                                    }
+                                    Ok(guard)
+                                },
+                                |material| {
+                                    revalidate_with_retries(
+                                        job.deadline,
+                                        || {
+                                            let result = active.validate(
+                                                &requirement.profile,
+                                                material,
+                                                job.deadline,
+                                            );
+                                            (result, active.running().unwrap_or(false))
+                                        },
+                                        || stopped.load(Ordering::SeqCst),
+                                        std::thread::sleep,
+                                    )
+                                },
+                            )?;
+                            capture()?
+                        }
                         // Only the evidence lapsed, or is about to, for an
                         // intact credential: recollect it once from the
                         // retained custody version, as `connections
@@ -1282,7 +1324,7 @@ fn worker(
                                 if let Ok(observed) = registry.describe(
                                     &current.instance_id,
                                     &current.adapter_id,
-                                    &current.configuration_revision,
+                                    current.configured(),
                                     &connection,
                                     connectors_sdk::now_ms(),
                                     true,
@@ -1934,6 +1976,7 @@ mod idle_tests {
         let mut config = Config::load(&paths.config).unwrap();
         let (path, sha256) = crate::local::test_executable::path_and_sha256();
         let adapter = Adapter {
+            credential_revision: None,
             instance_id: "fixture".into(),
             adapter_id: "fixture".into(),
             configuration_revision: "fixture-config".into(),
@@ -2008,6 +2051,7 @@ mod revalidate_wait_tests {
 
     fn adapter() -> Adapter {
         Adapter {
+            credential_revision: None,
             instance_id: "instance".into(),
             adapter_id: "adapter".into(),
             configuration_revision: "config".into(),
@@ -2320,6 +2364,7 @@ mod dispatch_wait_tests {
 
     fn adapter() -> Adapter {
         Adapter {
+            credential_revision: None,
             instance_id: "instance".into(),
             adapter_id: "adapter".into(),
             configuration_revision: "config".into(),

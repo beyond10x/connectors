@@ -55,7 +55,13 @@ impl Registry {
             if row.revision != expected_revision {
                 return Err(Failure::Conflict);
             }
-            if row.binding != *binding {
+            // An operation-only or executable-only change leaves the saved
+            // binding the instance's (D12): repair keeps it and replaces the
+            // credential, which the configured executable validates.
+            if !matches!(
+                super::follow(&row.binding, binding),
+                Follow::Same | Follow::Operations | Follow::Executable
+            ) {
                 // Repair keeps the binding, so it cannot move a connection
                 // saved under another one. Name the step that can, as a read
                 // does: revalidation, a new connection, or a new instance id.
@@ -169,7 +175,7 @@ impl Registry {
     /// This single metadata commit couples generation, custody, evidence, the
     /// private fence and the acquisition result. Repair preserves public revision.
     pub fn publish(&self, stored: StoredCandidate, now: u64) -> Result<String> {
-        self.publish_with(stored, now, false)
+        self.publish_with(stored, now, false, None)
     }
 
     /// `exclusive` is the read-only binding's rule that one item backs one
@@ -182,9 +188,13 @@ impl Registry {
         stored: StoredCandidate,
         now: u64,
         exclusive: bool,
+        guard: Option<&super::reuse::ReuseGuard>,
     ) -> Result<String> {
         let prepared = stored.prepared;
         self.transaction(now, false, |tx, _, now| {
+            if let Some(guard) = guard {
+                super::reuse::guarded(tx, guard)?;
+            }
             let acquired = completing(tx, &prepared.acquisition, &prepared.owner, now)?;
             let row = Self::connection(tx, &prepared.connection)?;
             live(&row)?;
@@ -222,6 +232,33 @@ impl Registry {
         store: &custody::Store,
         clock: impl Fn() -> u64,
     ) -> Result<String> {
+        self.store_and_publish_guarded(prepared, material, store, clock, None)
+    }
+
+    /// `store_and_publish` of a reused credential
+    /// (story:invoke-definition-reuse-credential): the publishing commit also
+    /// requires the source to be what was captured (`reuse::guarded`), so a
+    /// source revoked, made Stale or republished while its copy was validated
+    /// publishes nothing.
+    pub fn store_and_publish_reuse(
+        &self,
+        prepared: PreparedCandidate,
+        material: &Secret,
+        store: &custody::Store,
+        clock: impl Fn() -> u64,
+        guard: &super::reuse::ReuseGuard,
+    ) -> Result<String> {
+        self.store_and_publish_guarded(prepared, material, store, clock, Some(guard))
+    }
+
+    fn store_and_publish_guarded(
+        &self,
+        prepared: PreparedCandidate,
+        material: &Secret,
+        store: &custody::Store,
+        clock: impl Fn() -> u64,
+        guard: Option<&super::reuse::ReuseGuard>,
+    ) -> Result<String> {
         if material.0.len() != prepared.byte_size {
             return Err(Failure::InvalidInput);
         }
@@ -240,7 +277,7 @@ impl Registry {
                 })
             })?;
         let stored = self.acknowledge(prepared, receipt, clock())?;
-        self.publish(stored, clock())
+        self.publish_with(stored, clock(), false, guard)
     }
 
     /// The read-only binding's composition of the same boundaries: no write.
@@ -276,7 +313,7 @@ impl Registry {
                 })
             })?;
         let stored = self.acknowledge(prepared, receipt, clock())?;
-        self.publish_with(stored, clock(), true)
+        self.publish_with(stored, clock(), true, None)
     }
 
     /// The acquisition of the instance's connect in flight, beside which
@@ -285,6 +322,17 @@ impl Registry {
     /// or passed its deadline.
     pub fn in_flight(&self, instance: &str, now: u64) -> Result<Option<String>> {
         self.transaction_observation(now, |tx, _, now| in_flight(tx, instance, now))
+    }
+
+    /// Whether a connection of `binding`'s instance, revoked ones included, was
+    /// admitted under another provider authority or another authentication of
+    /// `binding`'s profile: the condition on which a connect under that
+    /// instance id is refused as `AuthenticationChanged`, so only a new
+    /// instance id can hold `binding` (task:definition-moved-authority-new-instance).
+    /// Records nothing but the clock observation every observation records.
+    pub fn needs_new_instance(&self, binding: &Binding, now: u64) -> Result<bool> {
+        binding.validate()?;
+        self.transaction_observation(now, |tx, _, _| authentication_changed(tx, binding))
     }
 
     /// The instance's published Live or Stale connections, at most two: a
@@ -361,7 +409,13 @@ impl Registry {
     /// id): a changed provider authority or profile authentication moves the
     /// entry to a new instance id, and the connections left under the earlier
     /// one stay revocable. A connection of an instance another entry still
-    /// configures is that entry's, and stays `NotFound` here.
+    /// configures is that entry's, and stays `NotFound` here. A connection left
+    /// under an invoked definition's instance id (`<connector>.definition`, or
+    /// a moved `<connector>.definition-<16 hex>`) is revocable only through an
+    /// instance id of the same connector, `<connector>.<name>`: every
+    /// definition's entry has the adapter `catalog`, so the adapter alone would
+    /// let another connector's instance reach it (security review of
+    /// task:definition-moved-authority-new-instance).
     pub fn revoke_left_behind(
         &self,
         instance: &str,
@@ -372,7 +426,8 @@ impl Registry {
         now: u64,
     ) -> Result<String> {
         self.revoke_admitted(adapter_id, reference, expected_revision, now, |recorded| {
-            recorded == instance || !configured.contains(recorded)
+            recorded == instance
+                || (!configured.contains(recorded) && same_definition_connector(recorded, instance))
         })
     }
 
@@ -404,6 +459,21 @@ impl Registry {
             Ok(revision)
         })
     }
+}
+
+/// Whether `instance` may reach a connection left under `recorded`: always,
+/// unless `recorded` is an invoked definition's instance id, which only an
+/// instance id of the same connector, `<connector>.<name>`, reaches.
+fn same_definition_connector(recorded: &str, instance: &str) -> bool {
+    let Some((connector, name)) = recorded.rsplit_once('.') else {
+        return true;
+    };
+    if !crate::local::definitions::is_instance(name) {
+        return true;
+    }
+    instance
+        .strip_prefix(connector)
+        .is_some_and(|rest| rest.starts_with('.'))
 }
 
 /// Whether a connection of the binding's instance, revoked ones included, was
@@ -522,7 +592,10 @@ fn admit_allocation(tx: &Transaction<'_>, binding: &Binding, now: u64) -> Result
         [] => {}
         [reference] => {
             let row = Registry::connection(tx, reference)?;
-            if row.binding == *binding {
+            if matches!(
+                super::follow(&row.binding, binding),
+                Follow::Same | Follow::Operations | Follow::Executable
+            ) {
                 return Err(Failure::InstanceConnected);
             }
             let usable = || {

@@ -239,7 +239,12 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "oauth2_refresh::oauth_connect_refusal_does_not_say_repair"
             | "oauth2_refresh::oauth_invalid_grant_makes_the_connection_stale_until_a_reconnect"
             | "oauth2_refresh_adversary_pass2::adversary2_oauth_cached_bootstrap_round_trips_across_owner_restart"
-            | "derived_instance::a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_drafts",
+            | "derived_instance::a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_drafts"
+            | "cli_journey::invoke_definition::a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_without_asking"
+            | "cli_journey::invoke_definition::a_stored_credential_of_a_configured_instance_is_reused_without_a_token_prompt"
+            | "cli_journey::invoke_definition::a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offers_connect_fresh"
+            | "cli_journey::invoke_definition::adversary_reuse_race::adversary_reuse_a_source_revoked_while_its_copy_validates_is_not_published"
+            | "cli_journey::invoke_definition::a_definition_moved_to_another_host_connects_fresh_under_a_new_instance_id",
         ) => Some((Disposable, vec![CUSTODY, CLI])),
         (
             "connectors-loki",

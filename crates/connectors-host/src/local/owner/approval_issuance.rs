@@ -59,7 +59,7 @@ pub fn policy_status(paths: &Paths, alias: &str) -> Result<Option<approval_polic
 }
 
 fn snapshot(paths: &Paths, adapter: &Adapter) -> Result<runtime::Bootstrap> {
-    let bootstrap = runtime::state::State::new(&paths.state)
+    let mut bootstrap = runtime::state::State::new(&paths.state)
         .cached(&adapter.instance_id, &adapter.selection())?
         .ok_or(Code::DescriptionUnavailable)?;
     bootstrap.validate_for(adapter.private_protocol())?;
@@ -70,6 +70,7 @@ fn snapshot(paths: &Paths, adapter: &Adapter) -> Result<runtime::Bootstrap> {
     {
         return Err(Code::ReadinessMismatch.into());
     }
+    bootstrap.configure(adapter);
     Ok(bootstrap)
 }
 fn selection(

@@ -27,6 +27,8 @@ const ROUNDS: usize = 12;
 
 fn binding() -> Binding {
     Binding {
+        credential_revision: None,
+        executable: None,
         instance_id: "mail.personal".into(),
         adapter_id: "fixture-adapter".into(),
         configuration_revision: "config-1".into(),
