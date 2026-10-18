@@ -141,7 +141,7 @@ None.
 
 ## 8. Specification profile
 
-`connectors.adapter/v2` is the intended GET-operation frontend; handwritten `/v1`-style obligations remain for mutations until that frontend supports their methods and bodies. The old repository-authored OpenAPI 3.1 sources (`specs/jira/incremental-reads.openapi.yaml`, `specs/confluence/incremental-reads.openapi.yaml`) do not establish the new scoped document binding. Author its selected GET sources and public/native payload schemas against the [captured current official evidence](../../docs/evidence/datasource-semantics-20260908/provider-evidence.md), including Confluence v2 PageBulk and Jira reconciled full-field search. No existing adapter schema, mapping or generated source is claimed to implement them. Full vendor-platform ingestion is unnecessary for this selected surface.
+`connectors.adapter/v2` is the intended GET-operation frontend; handwritten `/v1`-style obligations remain for mutations until that frontend supports their methods and bodies. The old repository-authored OpenAPI 3.1 sources (`specs/jira/incremental-reads.openapi.yaml`, `specs/confluence/incremental-reads.openapi.yaml`) do not establish the new scoped document binding. Author its selected GET sources and public/native payload schemas against the [captured current official evidence](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/datasource-semantics-20260908/provider-evidence.md), including Confluence v2 PageBulk and Jira reconciled full-field search. No existing adapter schema, mapping or generated source is claimed to implement them. Full vendor-platform ingestion is unnecessary for this selected surface.
 
 ## 9. Deferred
 
