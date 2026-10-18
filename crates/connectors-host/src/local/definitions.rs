@@ -25,6 +25,8 @@ pub const INSTANCE: &str = "definition";
 pub const DIRECTORY: &str = "definitions";
 /// The owner-only file of entries in [`DIRECTORY`].
 pub const ENTRIES: &str = "instances.toml";
+/// The catalog provider's native configuration in each cache entry.
+pub const NATIVE: &str = "native.json";
 const FORMAT: &str = "connectors-definitions/1";
 /// The most bytes the entries file may hold.
 const LIMIT: usize = 1024 * 1024;
@@ -68,11 +70,22 @@ pub fn directory(paths: &Paths, create: bool) -> Result<(PathBuf, std::fs::File)
 
 /// Whether `entry`, held for `connector`, has the shape every recorded entry
 /// has: the catalog adapter under the connector's definition alias, on the
-/// current protocols, with an admissible executable selection.
-fn admitted(connector: &str, entry: &Entry) -> bool {
+/// current protocols, the catalog provider started as `--local-config` of the
+/// native configuration in its own cache entry under `paths.state`, with an
+/// admissible executable selection.
+fn admitted(paths: &Paths, connector: &str, entry: &Entry) -> bool {
     let alias = alias(connector);
     let adapter = &entry.adapter;
+    let native = paths.state.join(DIRECTORY).join(&entry.digest).join(NATIVE);
+    let provider = format!(
+        "connectors-catalog-provider{}",
+        std::env::consts::EXE_SUFFIX
+    );
     connectors_core::valid_id(connector)
+        && adapter.executable.path.file_name() == Some(OsStr::new(&provider))
+        && native
+            .to_str()
+            .is_some_and(|native| adapter.executable.args == ["--local-config", native])
         && connectors_core::valid_id(&alias)
         && entry.digest.len() == 64
         && entry
@@ -123,7 +136,7 @@ pub fn entries(paths: &Paths) -> Result<BTreeMap<String, Entry>> {
         || !entries
             .instances
             .iter()
-            .all(|(connector, entry)| admitted(connector, entry))
+            .all(|(connector, entry)| admitted(paths, connector, entry))
     {
         return Err(Failure::InvalidConfiguration);
     }
@@ -135,7 +148,7 @@ pub fn entries(paths: &Paths) -> Result<BTreeMap<String, Entry>> {
 /// concurrent record of another connector that replaced it in between is
 /// followed by another attempt, so neither is lost.
 pub fn record(paths: &Paths, connector: &str, entry: &Entry) -> Result<()> {
-    if !admitted(connector, entry) {
+    if !admitted(paths, connector, entry) {
         return Err(Failure::InvalidConfiguration);
     }
     let (_, directory) = directory(paths, true)?;

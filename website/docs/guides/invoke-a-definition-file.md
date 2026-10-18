@@ -97,7 +97,7 @@ ls target/try/cli/state/definitions
 ```
 
 ```text
-085ed18a69af62d8e884a4b55599460b107a78a1f90a7cedf437863ebfd153d2
+69e791a136bb2addfbf06c965b06e8fd3c335f5bb448cbd7e1eda97d7a2a342d
 instances.toml
 ```
 
@@ -105,5 +105,7 @@ The configuration file is never written. If it already configures the connector'
 `definition`, that instance is kept and the command is refused with `configuration_rule`
 `definition_instance_configured`. A change to the file's provider authority or auth profile is
 refused as `lifecycle_conflict`, as a read on that connection is; reusing the stored credential
-for it is not part of this release. The full rules are in the
+for it is not part of this release. At most 64 connector ids are held, and no command forgets
+one: revoke its connection with `connections revoke`, then remove `definitions/` from the state
+directory while no owner runs. The full rules are in the
 [CLI contract](../reference/contracts/cli.md).
