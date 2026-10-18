@@ -261,6 +261,8 @@ fn an_executable_only_change_follows_after_validation_confirms_the_identity() {
     );
     revalidate(&registry, &executable(), &reference, &revision, "one").unwrap();
     assert_eq!(recorded(root.path(), &reference).0, executable());
+    // An executable-only follow keeps the public revision an approval binds.
+    assert_eq!(recorded(root.path(), &reference).2, revision);
     read(&registry, &executable(), &reference).unwrap();
 }
 
@@ -431,3 +433,154 @@ fn adv_an_executable_identity_mismatch_does_not_send_connect_back_to_revalidatio
 
 #[path = "binding_scope_security_tests.rs"]
 mod security;
+
+// Adversary pass 2 (story:connection-binding-excludes-operations, the launch
+// for a description: contracts/cli/v1alpha1/semantics.md, "Launching for a
+// description").
+
+fn adv2_admits(
+    registry: &Registry,
+    instance: &str,
+    configured_binding: &Binding,
+    reference: Option<&str>,
+) -> Result<bool> {
+    registry.launch_admits(
+        instance,
+        "fixture-adapter",
+        configured(configured_binding),
+        reference,
+    )
+}
+
+/// `connect`, with a credential that states no expiry: `launch_admits` reads
+/// the wall clock (as `approval_target` does), which is past the fixture's
+/// `NOW` plus the one-hour expiry `validated` states. Its evidence is expired,
+/// which the contract still admits (`pending`).
+fn adv2_connect(registry: &Registry, binding: &Binding, subject: &str) -> (String, String) {
+    let acquisition = registry.begin(binding, NOW).unwrap();
+    let claim = registry.consume(acquisition, NOW).unwrap();
+    let baseline = ValidatedBaseline {
+        credential_expires_at_ms: None,
+        ..validated(subject, NOW)
+    };
+    let candidate = registry.prepare(&claim, baseline, 12, NOW).unwrap();
+    let reference = publish_fixture(registry, candidate, NOW);
+    let revision = observe(registry, binding, &reference).revision;
+    (reference, revision)
+}
+
+/// Each class the contract names, one fixture each: a current usable
+/// connection admits the launch under the saved, an operation-only and an
+/// executable-only entry; a changed credential side, a connection saved
+/// without the digest under another revision, a Stale one, a revoked one, an
+/// unknown name and a connection of another instance admit none.
+#[test]
+fn adv2_launch_admits_only_a_current_usable_connection_of_the_instance() {
+    let (_root, registry) = fixture();
+    let (reference, _) = adv2_connect(&registry, &saved(), "one");
+    for entry in [saved(), operations(), executable()] {
+        assert_eq!(
+            adv2_admits(&registry, "fixture-instance", &entry, Some(&reference)),
+            Ok(true),
+            "{}",
+            entry.configuration_revision
+        );
+        assert_eq!(
+            adv2_admits(&registry, "fixture-instance", &entry, None),
+            Ok(true)
+        );
+    }
+    assert_eq!(
+        adv2_admits(&registry, "fixture-instance", &trust(), None),
+        Ok(false),
+        "a changed credential side is not current"
+    );
+    assert_eq!(
+        adv2_admits(&registry, "other-instance", &saved(), Some(&reference)),
+        Ok(false),
+        "a connection named under another instance"
+    );
+    assert_eq!(
+        adv2_admits(&registry, "fixture-instance", &saved(), Some("missing")),
+        Ok(false)
+    );
+
+    let (_root, registry) = fixture();
+    adv2_connect(&registry, &binding(), "one");
+    let legacy_next = Binding {
+        configuration_revision: "config-2".into(),
+        ..binding()
+    };
+    assert_eq!(
+        adv2_admits(&registry, "fixture-instance", &legacy_next, None),
+        Ok(false),
+        "no digest recorded, another configuration revision"
+    );
+
+    let (_root, registry) = fixture();
+    let (reference, revision) = adv2_connect(&registry, &saved(), "one");
+    refuse(&registry, &saved(), &reference, &revision);
+    assert_eq!(observe(&registry, &saved(), &reference).state, State::Stale);
+    assert_eq!(
+        adv2_admits(&registry, "fixture-instance", &operations(), None),
+        Ok(false),
+        "a Stale connection"
+    );
+
+    let (_root, registry) = fixture();
+    let (reference, revision) = adv2_connect(&registry, &saved(), "one");
+    registry
+        .revoke(
+            "fixture-instance",
+            "fixture-adapter",
+            &reference,
+            &revision,
+            LATER,
+        )
+        .unwrap();
+    assert_eq!(
+        adv2_admits(
+            &registry,
+            "fixture-instance",
+            &operations(),
+            Some(&reference)
+        ),
+        Ok(false),
+        "a revoked connection"
+    );
+}
+
+/// Restated after review (round 2, finding F2) for the contract as narrowed:
+/// an identity refused under an executable-only change records nothing and
+/// changes nothing, so it does not stop a credential-free launch for a
+/// description, while the connection's reads keep refusing until a validation
+/// answers the recorded identity.
+#[test]
+fn adv2_an_identity_refused_under_a_new_executable_admits_a_launch_but_no_read() {
+    let (_root, registry) = fixture();
+    let (reference, revision) = adv2_connect(&registry, &saved(), "one");
+    assert_eq!(
+        revalidate(&registry, &executable(), &reference, &revision, "other"),
+        Err(Failure::UpgradeIdentityMismatch)
+    );
+    let selection_too = Binding {
+        configuration_revision: "config-2".into(),
+        ..executable()
+    };
+    assert_eq!(
+        adv2_admits(
+            &registry,
+            "fixture-instance",
+            &selection_too,
+            Some(&reference)
+        ),
+        Ok(true)
+    );
+    let scopes = BTreeSet::from(["read".to_owned()]);
+    assert_eq!(
+        registry
+            .capture_read(&selection_too, &reference, &scopes, LATER, LATER + 1000)
+            .err(),
+        Some(Failure::ExecutableChanged)
+    );
+}

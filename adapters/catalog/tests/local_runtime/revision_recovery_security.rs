@@ -82,3 +82,91 @@ fn security_a_read_follows_an_executable_only_change_only_after_the_identity_ans
     assert_eq!(read["result"]["body"]["id"], 7, "{read}");
     assert_eq!(scenario.validations(), validations + 1);
 }
+
+// Security review, round 2: the launch for a description
+// (contracts/cli/v1alpha1/semantics.md, "Launching for a description").
+
+fn security2_cached_source(scenario: &Scenario) -> Value {
+    success(
+        scenario
+            .cli
+            .run(&["adapters", "describe", "--adapter", "gitlab"]),
+    )["source"]
+        .clone()
+}
+
+/// A revoked connection admits no launch: after a selection-only change,
+/// `operations describe` answers `description_unavailable` and caches nothing.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn security2_a_revoked_connection_starts_nothing_for_a_description() {
+    let scenario = Scenario::connected_under(Some(&S1), true);
+    let revision = scenario.revision.borrow().clone();
+    success(scenario.cli.run(&[
+        "connections",
+        "revoke",
+        "--adapter",
+        "gitlab",
+        "--connection",
+        &scenario.reference,
+        "--expected-revision",
+        &revision,
+    ]));
+    scenario.select(&S2);
+    refusal(
+        describe_operation(&scenario, "project.languages"),
+        "description_unavailable",
+    );
+    assert_eq!(security2_cached_source(&scenario), "configuration");
+}
+
+/// An operator's `adapters stop` is not resumed by a read command's launch:
+/// after a selection-only change the instance stays suppressed and no
+/// description is cached.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn security2_a_description_launch_does_not_resume_a_stopped_instance() {
+    let scenario = Scenario::connected_under(Some(&S1), true);
+    let coordinates = scenario.cli.status();
+    success(scenario.cli.run(&[
+        "adapters",
+        "stop",
+        "--adapter",
+        "gitlab",
+        "--expected-revision",
+        coordinates["configuration_revision"].as_str().unwrap(),
+        "--host-incarnation",
+        coordinates["host_incarnation"].as_str().unwrap(),
+        "--child-incarnation",
+        coordinates["child_incarnation"].as_str().unwrap(),
+    ]));
+    assert_eq!(scenario.cli.status()["state"], "suppressed");
+    scenario.select(&S2);
+    let described = describe_operation(&scenario, "project.languages");
+    assert!(
+        !described.status.success(),
+        "a stopped instance served a launched description"
+    );
+    assert_eq!(scenario.cli.status()["state"], "suppressed");
+    assert_eq!(security2_cached_source(&scenario), "configuration");
+}
+
+/// contracts/cli/v1alpha1/owner.md, restated after review (round 2): passive
+/// commands contact only an existing socket, and `operations describe` starts
+/// the owner only to launch for a description. With no owner running and a
+/// connection that is not current (its trust roots changed), it starts none.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn security2_operations_describe_starts_no_owner_without_a_current_connection() {
+    let scenario = Scenario::connected_under(Some(&S1), true);
+    scenario.cli.shutdown();
+    assert!(!scenario.cli.paths.state.join("owner.sock").exists());
+    scenario.trust_another_root();
+    let described = describe_operation(&scenario, "project.get");
+    assert!(!described.status.success());
+    assert!(
+        !scenario.cli.paths.state.join("owner.sock").exists(),
+        "operations describe started the owner (answered success = {})",
+        described.status.success()
+    );
+}

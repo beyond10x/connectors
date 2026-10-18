@@ -52,7 +52,7 @@ pub(super) fn describe(
             Ok::<_, owner::Error>((family, request))
         })
         .transpose()?;
-    let bootstrap = owner::cached(paths, alias)?;
+    let bootstrap = owner::described(paths, alias, None)?;
     let descriptor = bootstrap.descriptor()?;
     if let Some((family, request)) = request {
         let operations = descriptor

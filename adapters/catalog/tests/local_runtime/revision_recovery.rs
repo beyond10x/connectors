@@ -499,17 +499,15 @@ fn the_printed_credential_revision_moves_with_the_credential_side_only() {
     assert_ne!(selected.credential_revision, trusted.credential_revision);
 }
 
-/// story:connection-binding-excludes-operations, acceptance through the CLI: a
-/// connection saved under selection S1 lists `ready`, not stale, after only
-/// its selection changes to S2, with no revalidation, no credential source, no
-/// prompt and no validation answered by the provider; its public revision is
-/// unchanged. The read itself is admitted by the registry
-/// (`registry/binding_scope_tests.rs`); through the CLI it first needs S2's
-/// description, which only an admitted launch caches (contracts/cli/v1alpha1/
-/// semantics.md, "never implicit launch").
+/// story:connection-binding-excludes-operations, acceptance: a connection
+/// saved under selection S1 lists `ready`, not stale, after only its selection
+/// changes to S2, and S2's added read succeeds with no revalidation, no
+/// credential source and no prompt: `operations describe` starts the
+/// configured adapter for S2's description, and the provider answers no
+/// validation; the public revision is unchanged.
 #[test]
 #[ignore = "requires built production CLI and qualified disposable Secret Service"]
-fn a_selection_only_change_lists_the_connection_ready_without_a_validation() {
+fn a_selection_only_change_leaves_the_connection_ready_and_serves_the_added_read() {
     let scenario = Scenario::connected_under(Some(&S1), true);
     let validations = scenario.validations();
     let revision = scenario.revision.borrow().clone();
@@ -521,6 +519,8 @@ fn a_selection_only_change_lists_the_connection_ready_without_a_validation() {
     assert_eq!(described["summary"]["state"], "ready", "{described}");
     assert_eq!(described["summary"]["revision"], revision, "{described}");
     assert_eq!(described["stale"], false, "{described}");
+    let read = success(scenario.invoke("project.languages", json!({"id": "org/project"})));
+    assert_eq!(read["result"]["body"]["Rust"], json!(71.42), "{read}");
     assert_eq!(scenario.validations(), validations);
 }
 
@@ -770,3 +770,45 @@ fn adv_a_read_under_a_replaced_executable_validates_once_and_is_served() {
 
 #[path = "revision_recovery_security.rs"]
 mod revision_recovery_security;
+
+/// Adversary pass 2. contracts/cli/v1alpha1/semantics.md: "Missing cached
+/// operation metadata returns `description_unavailable`, ... never a launch
+/// except as follows", and the launch for a description does not resume an
+/// operator's `instances stop`. With the stop in place no launch happens, so
+/// the command answers as it did before: `description_unavailable`, not an
+/// `unavailable` whose `retry_status` no status change will ever clear (the
+/// suppression stays until an explicit resume action).
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn adv2_a_stopped_instance_answers_description_unavailable_for_a_new_selection() {
+    let scenario = Scenario::connected_under(Some(&S1), true);
+    let coordinates = scenario.cli.status();
+    success(scenario.cli.run(&[
+        "instances",
+        "stop",
+        "--adapter",
+        "gitlab",
+        "--expected-revision",
+        coordinates["configuration_revision"].as_str().unwrap(),
+        "--host-incarnation",
+        coordinates["host_incarnation"].as_str().unwrap(),
+        "--child-incarnation",
+        coordinates["child_incarnation"].as_str().unwrap(),
+    ]));
+    scenario.select(&S2);
+    let validations = scenario.validations();
+    let refused = refusal(
+        scenario.cli.run(&[
+            "operations",
+            "describe",
+            "--adapter",
+            "gitlab",
+            "--operation",
+            "project.languages",
+        ]),
+        "description_unavailable",
+    );
+    assert_ne!(refused["next_action"], "retry_status", "{refused}");
+    assert_eq!(scenario.cli.status()["state"], "suppressed");
+    assert_eq!(scenario.validations(), validations);
+}

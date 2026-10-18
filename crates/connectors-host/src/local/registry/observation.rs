@@ -65,12 +65,13 @@ impl Registry {
         if row.state == "revoked" {
             return Err(Failure::Revoked);
         }
-        // An operation-only change leaves the connection bound (D12); an
-        // executable change is followed only after a validation, which an
-        // approval target does not run.
+        // An operation-only change leaves the connection bound (D12). An
+        // executable-only change names it too: the approval binds the configured
+        // executable selection, and the write it admits validates the credential
+        // under that executable before anything is sent (`ExecutableChanged`).
         if !matches!(
             follow(&row.binding, binding),
-            Follow::Same | Follow::Operations
+            Follow::Same | Follow::Operations | Follow::Executable
         ) {
             // Whether a revalidation admits this credential is the read path's
             // readiness rule, expiry included. Only this refusal looks at
@@ -120,6 +121,70 @@ impl Registry {
             return Err(Failure::InsufficientScope);
         }
         Ok(row.revision)
+    }
+
+    /// Whether a read command may start the configured adapter to cache the
+    /// description of the configuration it names (contracts/cli/v1alpha1/
+    /// semantics.md, "Launching for a description"): the instance holds a
+    /// published connection, `reference` when one is named, that is not revoked
+    /// or Stale, whose credential a read could use (neither known invalid nor
+    /// expired), whose upgrade the configured revision has not refused, and
+    /// that is current under `configured`, as `connections list` reports it
+    /// not stale. A connection under a changed provider authority or profile
+    /// authentication, or with no credential-side digest under another
+    /// configuration revision, is not current. Records nothing and grants
+    /// nothing; the clock is read as `approval_target` reads it.
+    pub fn launch_admits<'a>(
+        &self,
+        instance: &str,
+        adapter: &str,
+        configured: impl Into<Configured<'a>>,
+        reference: Option<&str>,
+    ) -> Result<bool> {
+        let configured = configured.into();
+        let mut metadata = Metadata::inspect(&self.path).map_err(super::host_failure)?;
+        let tx = metadata.connection.transaction().map_err(db)?;
+        let references = match reference {
+            Some(reference) => vec![reference.to_owned()],
+            None => tx
+                .prepare("SELECT connection_ref FROM registry_connections WHERE instance_id=?1 AND public=1 AND state!='revoked' ORDER BY connection_ref LIMIT 64")
+                .map_err(db)?
+                .query_map([instance], |r| r.get::<_, String>(0))
+                .map_err(db)?
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(db)?,
+        };
+        let floor: i64 = tx
+            .query_row(
+                "SELECT last_seen_ms FROM registry_clock WHERE singleton=1",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(db)?;
+        let now = connectors_sdk::now_ms().max(u64::try_from(floor).unwrap_or(0));
+        for reference in references {
+            let row = match Self::connection(&tx, &reference) {
+                Ok(row) => row,
+                Err(Failure::NotFound | Failure::InvalidInput) => continue,
+                Err(other) => return Err(other),
+            };
+            if visible(&row, instance, adapter).is_err()
+                || row.state == "revoked"
+                || row.kept.stale
+                || row.material.is_none()
+                || row.kept.refused.as_deref() == Some(configured.configuration_revision)
+                || !configured.current(&row.binding)
+            {
+                continue;
+            }
+            if matches!(
+                readiness(&tx, &row, now, true)?,
+                State::Ready | State::Pending
+            ) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     pub fn describe<'a>(
