@@ -1,12 +1,17 @@
 use super::lifecycle::{bump, custody_version, mark_stale};
 use super::*;
 
+/// `preflight` admits a connection whose provider executable alone changed
+/// (`Follow::Executable`) on its readiness, since the owner validates it
+/// before its capture; the capture refuses it as `ExecutableChanged` until
+/// that validation recorded the executable.
 fn admitted_read(
     tx: &Transaction<'_>,
     binding: &Binding,
     reference: &str,
     required_scopes: &BTreeSet<String>,
     now: u64,
+    preflight: bool,
 ) -> Result<ConnectionRow> {
     let row = Registry::connection(tx, reference)?;
     if !row.public
@@ -18,16 +23,21 @@ fn admitted_read(
     if row.state == "revoked" {
         return Err(Failure::Revoked);
     }
-    if row.binding != *binding {
-        // Revalidation admits only material whose readiness it can recollect.
-        let usable = || {
-            Ok(row.material.is_some()
-                && matches!(
-                    observation::readiness(tx, &row, now, true)?,
-                    State::Ready | State::Pending
-                ))
-        };
-        return Err(super::revalidation::changed(&row, binding, usable)?);
+    // Revalidation admits only material whose readiness it can recollect.
+    let usable = || {
+        Ok(row.material.is_some()
+            && matches!(
+                observation::readiness(tx, &row, now, true)?,
+                State::Ready | State::Pending
+            ))
+    };
+    match follow(&row.binding, binding) {
+        // A bundle, source or selection change alone leaves the connection
+        // bound (D12): the read is admitted under the configured binding.
+        Follow::Same | Follow::Operations => {}
+        Follow::Executable if preflight => {}
+        Follow::Executable if usable()? => return Err(Failure::ExecutableChanged),
+        _ => return Err(super::revalidation::changed(&row, binding, usable)?),
     }
     // Custody is only a bounded observation here. The captured material and
     // current fence are checked separately at the final dispatch boundary.
@@ -138,6 +148,24 @@ impl Registry {
         Ok(row.binding)
     }
 
+    /// The public revision of a visible, unrevoked connection: what the owner's
+    /// own revalidation of it names (`ExecutableChanged`). Grants nothing.
+    pub fn recorded_revision(
+        &self,
+        instance: &str,
+        adapter: &str,
+        reference: &str,
+    ) -> Result<String> {
+        let mut metadata = Metadata::inspect(&self.path).map_err(super::host_failure)?;
+        let tx = metadata.connection.transaction().map_err(db)?;
+        let row = Self::connection(&tx, reference)?;
+        observation::visible(&row, instance, adapter)?;
+        if row.state == "revoked" {
+            return Err(Failure::Revoked);
+        }
+        Ok(row.revision)
+    }
+
     /// Preflight without reserving a use or resolving material. Dispatch still
     /// requires a fresh capture and the final generation/fence checks.
     pub fn admit_read(
@@ -152,7 +180,7 @@ impl Registry {
             return Err(Failure::InvalidInput);
         }
         self.transaction_observation(now, |tx, _, now| {
-            admitted_read(tx, binding, reference, scopes, now).map(|_| ())
+            admitted_read(tx, binding, reference, scopes, now, true).map(|_| ())
         })
     }
     pub fn capture_read(
@@ -173,7 +201,7 @@ impl Registry {
         self.transaction_admission(now, false, |tx, authority, now| {
             if expires_at <= now { return Err(Failure::Expired); }
             tx.execute("DELETE FROM registry_uses WHERE expires_at_ms<=?1", [timestamp(now)?]).map_err(db)?;
-            let row = admitted_read(tx, binding, reference, required_scopes, now)?;
+            let row = admitted_read(tx, binding, reference, required_scopes, now, false)?;
             let baseline = row.baseline.as_ref().ok_or(Failure::MetadataUnavailable)?;
             let count: i64 = tx.query_row("SELECT count(*) FROM registry_uses", [], |r| r.get(0)).map_err(db)?;
             if count>=1000 { return Err(Failure::Capacity); }

@@ -299,6 +299,7 @@ impl Fixture {
             .canonicalize()
             .unwrap();
         Adapter {
+            credential_revision: None,
             private_protocol: protocol,
             permissions: Default::default(),
             instance_id: "adversary2-oauth".into(),

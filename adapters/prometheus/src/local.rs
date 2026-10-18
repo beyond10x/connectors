@@ -130,6 +130,8 @@ impl Local {
         );
         let descriptor = adapter.descriptor();
         let bootstrap = Bootstrap {
+            credential_revision: None,
+            executable: None,
             instance: config.instance,
             adapter: "prometheus".into(),
             protocol: connectors_core::WIRE_VERSION.into(),

@@ -828,6 +828,8 @@ pub(super) fn fixture() -> (tempfile::TempDir, Registry) {
 }
 pub(super) fn binding() -> Binding {
     Binding {
+        credential_revision: None,
+        executable: None,
         instance_id: "fixture-instance".into(),
         adapter_id: "fixture-adapter".into(),
         configuration_revision: "config-1".into(),

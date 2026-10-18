@@ -1271,6 +1271,26 @@ impl Local {
         profile.revision = connectors_core::digest(
             &serde_json::to_value(&profile).map_err(|_| Failure::Protocol)?,
         );
+        // The credential side of the configuration (architecture-decision-record:
+        // provider-definitions-and-runtimes D12): what decides where the
+        // credential is sent and how it authenticates. The bundle, its source,
+        // the selection and the feed stay out of it, so a change limited to them
+        // leaves a saved connection bound. Each key has the form it has in the
+        // configuration revision, which keeps its inputs and values.
+        let mut credential_side = json!({
+            "instance": effective["instance"],
+            "provider": effective["provider"],
+            "api_base": effective["api_base"],
+            "ca_digest": effective["ca_digest"],
+            "auth": effective["auth"],
+            "profile_revision": profile.revision,
+        });
+        for key in ["token_ca_digest", "request_prefix", "hosts"] {
+            if let Some(value) = effective.get(key) {
+                credential_side[key] = value.clone();
+            }
+        }
+        let credential_revision = connectors_core::digest(&credential_side);
         let descriptor = |operations: Vec<connectors_core::Operation>| -> Result<String> {
             let descriptor = connectors_core::Descriptor {
                 version: connectors_core::WIRE_VERSION.into(),
@@ -1299,6 +1319,8 @@ impl Local {
         let reads = engine.declarations(&[Effect::Read]);
         let all = engine.declarations(&[Effect::Read, Effect::Write]);
         let bootstrap = Bootstrap {
+            credential_revision: Some(credential_revision),
+            executable: None,
             instance: config.instance.clone(),
             adapter: "catalog".into(),
             protocol: connectors_core::WIRE_VERSION.into(),
