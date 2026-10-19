@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:slack-single-user-lookups
 kind: story
-status: active
+status: implemented
 title: Slack single-user reads by id and e-mail
 relations:
 - decomposes: epic:fluxplane-plugin-parity
@@ -24,10 +24,11 @@ scope:
   path: docs/catalog-slack.md
 - confidence: cited
   path: website/docs/connectors/slack.md
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-18T22:42:36Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-18T22:42:36Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-19T05:54:50Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":2,"review_outcome":1}}}
 ---
 ## Outcome
 

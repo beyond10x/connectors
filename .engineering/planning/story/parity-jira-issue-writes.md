@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:parity-jira-issue-writes
 kind: story
-status: active
+status: implemented
 title: Jira issue create, edit, comment, link and delete
 relations:
 - decomposes: epic:fluxplane-plugin-parity
@@ -27,10 +27,11 @@ scope:
   path: docs/catalog-jira.md
 - confidence: cited
   path: website/docs/connectors/jira.md
-revision: 7
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-18T22:42:35Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-10-18T22:42:35Z", actor: "human:timo", revision: 6}
+- {from: "active", to: "implemented", at: "2026-10-19T05:54:47Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":2,"review_outcome":1}}}
 ---
 ## Outcome
 

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:parity-page-recount-20261019
 kind: story
-status: active
+status: implemented
 title: The parity page carries the recount of 2026-10-18
 relations:
 - decomposes: epic:fluxplane-plugin-parity
@@ -10,10 +10,11 @@ relations:
 scope:
 - confidence: cited
   path: docs/fluxplane-plugin-parity.md
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-18T22:42:38Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-18T22:42:39Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-19T05:54:48Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

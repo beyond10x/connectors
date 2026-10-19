@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:definition-authoring-guide
 kind: story
-status: active
+status: implemented
 title: A guide to authoring a definition for an API with no catalog
 relations:
 - serves: vision:independent-contract-adapters
@@ -10,10 +10,11 @@ relations:
 scope:
 - confidence: cited
   path: website/docs/guides/author-a-definition.md
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-18T22:42:39Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-18T22:42:40Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-19T05:54:42Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

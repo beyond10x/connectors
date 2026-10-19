@@ -4,7 +4,7 @@ id: approval-record:wave-20261019-night
 kind: approval-record
 status: draft
 title: 'Wave 20261019-night: the operator''s approval of the night plan'
-revision: 3
+revision: 4
 ---
 ## Stop
 
@@ -71,3 +71,7 @@ in this record's "Stage" section at each unit change.
 - 00:45: B0 base commit `6498a881c`; N1, N2, N3 green and committed; B1 in flight (lowerer step).
 - 00:50: B1 green (catalog suite, clippy, fmt EXIT=0); committed by the bot as `7af6211` (definitions, branch `night/20261019`) and `04da73c29` (connectors, branch `wave/20261019-night`). Its implementor stopped before committing; the coordinator committed its drafted messages.
 - 00:52: B3 dispatched (opus implementor); B1 adversary dispatched (opus, new test file only).
+- 01:00-03:30: B1b, B3, B4, B5, B6 committed; adversary passes on B1, B3, B4 recorded as review results (52 cases, 7 red: 5 fixed, 2 recorded as stories `required-body-key-refuses-null`, `required-parameter-refuses-empty`).
+- 03:30-04:20: definitions PR merged; connectors PR #190 opened; gate runs 1 and 2 each stopped on one stale test, both fixed (`f651afcbf`, `ad8a3ce84`); gate run 3 exit 0 (2,805 passed).
+- 04:20-08:00: two release review runs of ten reviewers each, every finding verified by a second agent against the known-defect register (open stories, story-tagged ignored tests, CHANGELOG limitations, parity open rows). Run 1: 47 findings, 13 fixed, 3 stories, 11 known, 19 refuted, 1 untested. Run 2: 39 findings, 25 fixed, 4 stories, 3 known, 6 refuted, 1 untested. Fix commits `2491bd191` (macOS lint, found by CI), `ed06b18d3`, `00fd6e879`, `f19fbf9b4`, run-2 docs, lowerer and engine commits, `439ed1a07` (definition connect names its host, refuses a replaced entry, skips pipes).
+- 08:00: gate run 6 at `439ed1a07` exit 0 (318 binaries, 2,825 passed, 0 failed, 144 ignored); gate run 5 had failed 4 registry tests with `OutcomeUnknown` during a 148 s build pause, which passed 115 of 115 alone. CI on #190: 8 of 8 green. Nine wave stories implemented; `parity-confluence-cql-search-v1-held` archived.

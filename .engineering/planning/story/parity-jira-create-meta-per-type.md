@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:parity-jira-create-meta-per-type
 kind: story
-status: active
+status: implemented
 title: The create-metadata fields of one Jira issue type
 relations:
 - decomposes: epic:fluxplane-plugin-parity
@@ -27,10 +27,11 @@ scope:
   path: docs/catalog-jira.md
 - confidence: cited
   path: website/docs/connectors/jira.md
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-18T22:42:35Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-18T22:42:36Z", actor: "human:timo", revision: 5}
+- {from: "active", to: "implemented", at: "2026-10-19T05:54:45Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":2,"review_outcome":1}}}
 ---
 ## Outcome
 

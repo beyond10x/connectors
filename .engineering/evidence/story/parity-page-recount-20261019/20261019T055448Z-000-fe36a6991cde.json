@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T05:54:48Z",
+  "actor": "human:timo",
+  "artifact": "story:parity-page-recount-20261019",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate (full repository gate at 439ed1a07: 318 test binaries, 2825 passed, 0 failed, 144 ignored, EXIT=0)",
+    "reference": "~/.cache/connectors-night-20261019/b7/gate-6.log"
+  }
+}

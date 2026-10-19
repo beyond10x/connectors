@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:remove-unshipped-material-20261019
 kind: story
-status: active
+status: implemented
 title: Material nothing ships, runs or reads is removed
 relations:
 - serves: vision:independent-contract-adapters
@@ -33,10 +33,11 @@ scope:
   path: docs/evidence
 - confidence: cited
   path: ess/system.yaml
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-18T22:42:38Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-18T22:42:38Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-19T05:54:49Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":2}}}
 ---
 ## Outcome
 

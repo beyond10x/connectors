@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:definition-format-write-members
 kind: story
-status: active
+status: implemented
 title: The definition format carries the write members of the 0.54.0 engine
 relations:
 - serves: vision:independent-contract-adapters
@@ -16,10 +16,11 @@ scope:
   path: crates/connectors-catalog/tests/definition_writes.rs
 - confidence: cited
   path: crates/connectors-catalog/tests/fixtures/definitions/connectors/zendesk.yaml
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-18T22:42:33Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-18T22:42:33Z", actor: "human:timo", revision: 5}
+- {from: "active", to: "implemented", at: "2026-10-19T05:54:43Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":2,"review_outcome":1}}}
 ---
 ## Outcome
 
