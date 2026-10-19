@@ -481,6 +481,13 @@ mod tests {
     #[test]
     fn protocol_adapter_does_not_ban_shared_protocol_or_suppress_native_leaks() {
         let temp = fixture();
+        let policy_path = temp
+            .path()
+            .join("crates/connectors-build/ess-boundary.json");
+        let mut policy: serde_json::Value =
+            serde_json::from_slice(&fs::read(&policy_path).unwrap()).unwrap();
+        policy["shared_protocol_names"] = serde_json::json!(["sip"]);
+        fs::write(&policy_path, serde_json::to_vec(&policy).unwrap()).unwrap();
         fs::create_dir_all(temp.path().join("adapters/sip/spec")).unwrap();
         fs::write(
             temp.path().join("adapters/sip/spec/adapter.json"),
@@ -494,11 +501,6 @@ mod tests {
         )
         .unwrap();
         assert!(check(temp.path()).is_err());
-        let policy_path = temp
-            .path()
-            .join("crates/connectors-build/ess-boundary.json");
-        let mut policy: serde_json::Value =
-            serde_json::from_slice(&fs::read(&policy_path).unwrap()).unwrap();
         policy["shared_protocol_names"] = serde_json::json!(["gitlab"]);
         fs::write(policy_path, serde_json::to_vec(&policy).unwrap()).unwrap();
         assert!(check(temp.path()).is_err());

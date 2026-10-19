@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "shared_protocol_names": ["sip"],
+  "shared_protocol_names": [],
   "forbidden_terms": [
     "atlassian", "confluence", "jira", "jql", "cql", "adf",
     "gitlab", "github", "bitbucket", "slack",
