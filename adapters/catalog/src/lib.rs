@@ -874,11 +874,14 @@ enum Pinned {
 
 impl Pinned {
     /// Whether an observed value is present in the form this comparison
-    /// reads: a scalar for text, any JSON value for a boolean or a presence.
+    /// reads: a scalar for text, any JSON value for a boolean. A presence
+    /// always reads: an absent member is its comparison failing, as a `null`
+    /// one is, so both refuse the same way.
     fn present(&self, observed: Option<&Value>) -> bool {
         match self {
             Pinned::Text(_) => observed.and_then(scalar).is_some(),
-            Pinned::Boolean(_) | Pinned::Present => observed.is_some(),
+            Pinned::Boolean(_) => observed.is_some(),
+            Pinned::Present => true,
         }
     }
 
