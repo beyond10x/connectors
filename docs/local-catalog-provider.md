@@ -949,9 +949,13 @@ The complete configuration used against the sandbox is
   `body.<key>`) or `{"literal": "<value>"}`, both as text, so a literal `"7"`
   holds for the number `7` and the string `"7"` alike; or with
   `{"boolean": true}` (or `false`), by JSON type, which holds only for that
-  JSON boolean, never a string, a number or `null`, as for Slack's `ok`. The
-  model's `connectors_catalog.guard.Expectation` holds exactly one of the
-  three. A `literal` of `"true"` or `"false"` is refused when the selection
+  JSON boolean, never a string, a number or `null`, as for Slack's `ok`; or
+  with `{"present": true}`, which holds when the member exists and is not
+  `null`, whatever its value, for an answer that names what the write made and
+  whose value is not known before it, such as the `id` and `key` Jira's
+  `issue.create` answers. `present` is only `true`; `false` is refused when
+  the selection loads. The model's `connectors_catalog.guard.Expectation`
+  holds exactly one of the four. A `literal` of `"true"` or `"false"` is refused when the selection
   loads, on every check: the bundle does not record an answer member's type,
   and as text it would hold for a look-alike string where a boolean is meant.
   GitLab's `/resolvable` and `/merge_when_pipeline_succeeds` and Jira's
@@ -1013,7 +1017,7 @@ The complete configuration used against the sandbox is
     in all, a further preflight without checks, more than three of them, a
     postflight read without checks and without `absent`, an `absent` that is
     not `true`, lacks a read or sits beside a check, an `any_of` of one
-    check, and `refusals` beside a postflight read or without a check, with an
+    check, a `present` expectation that is not `true`, and `refusals` beside a postflight read or without a check, with an
     empty, repeated or empty-string value, a value two refusals name, a pointer
     without a leading `/`, or more than sixteen of them are refused
     when the selection loads, as is a credential parameter bound by any read's
@@ -1255,7 +1259,9 @@ provider refuses is an error with a safe code; a write is classified
 `not_attempted` when the guard refuses in preflight, `refused` on a documented
 definite refusal (400, 401, 403, 404, 405, 409, 410, 412, 415, 422) or on a 2xx
 answer carrying a refusal the guard declares (`postflight.refusals`), `applied` on
-a 2xx whose postflight holds, and `unknown` for everything else.
+a 2xx whose postflight holds, and `unknown` for everything else. A postflight
+without checks holds for any 2xx; a create whose answer must name what it made
+says so with `{"present": true}` checks, so a 2xx without them is `unknown`.
 
 ## What the sandbox showed
 

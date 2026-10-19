@@ -268,6 +268,7 @@ enum ShippedExpectation {
     Input(String),
     Literal(String),
     Boolean(bool),
+    Present(bool),
 }
 
 #[derive(Clone, Deserialize)]
@@ -1048,6 +1049,11 @@ fn readme(name: &str, connectors: &Path, vendored: &[Vendored], notes: Option<&P
 /// A shipped check as a guard `expect` value.
 fn expectation(operation: &str, check: &ShippedCheck) -> Result<String, Failure> {
     match &check.expect {
+        ShippedExpectation::Input(input) if input == "?" => Err(unexpressible(
+            operation,
+            "guard",
+            "the input reference `?` marks a presence".to_owned(),
+        )),
         ShippedExpectation::Input(input) if !input.starts_with('=') => Ok(input.clone()),
         ShippedExpectation::Input(input) => Err(unexpressible(
             operation,
@@ -1063,6 +1069,12 @@ fn expectation(operation: &str, check: &ShippedCheck) -> Result<String, Failure>
         }
         ShippedExpectation::Literal(literal) => Ok(format!("={literal}")),
         ShippedExpectation::Boolean(flag) => Ok(format!("={flag}")),
+        ShippedExpectation::Present(true) => Ok("?".to_owned()),
+        ShippedExpectation::Present(false) => Err(unexpressible(
+            operation,
+            "guard",
+            "a presence other than true".to_owned(),
+        )),
     }
 }
 

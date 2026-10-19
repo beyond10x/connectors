@@ -677,7 +677,9 @@ fn a_derived_configuration_refuses_what_it_cannot_derive() {
 
 /// Every configuration the guides document keeps the revision it computed
 /// before declarations existed (measured on `06339356e3`). A regenerated
-/// bundle or selection moves these legitimately, in the same change.
+/// bundle or selection moves these legitimately, in the same change: the three
+/// Jira pins moved when `issue.create` and `issue.comment.add` required their
+/// new `id` present after the write.
 #[test]
 fn documented_native_configurations_keep_their_revisions() {
     let pinned: BTreeMap<String, &str> = [
@@ -731,15 +733,15 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "12 catalog-jira.md",
-            "717881d0e9f55a316cf22029aa4cfff2803ceecd29e9b31d3edfa55e839f508c",
+            "dfa6ec1812374e7b897b85ac58f52c2eb253463a9fa14d1bcd60cb5ef525051b",
         ),
         (
             "13 catalog-jira.md",
-            "5ac4de0707cd592352a5bee8f88e33b1714c947d55a2e885f74ff14fd551fc59",
+            "e1e3411e96498a6e7b831660e7ef0713c1bc9364b8fd48b378ec38f118e4a55f",
         ),
         (
             "14 catalog-jira.md",
-            "0ebc9ab5cbde840d682a13cc6d4deda057f0d26e4d628d042b11f35618abb248",
+            "e9b6b3e70cc9e1cf49985e16261d789bb23f241a67b55173f69b54bd4e74e10d",
         ),
         (
             "15 catalog-openrouter.md",
