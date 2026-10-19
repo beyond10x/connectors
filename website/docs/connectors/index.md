@@ -27,7 +27,7 @@ Every connector you can configure, with its provider, how many reads and writes 
 | [Opsgenie](./opsgenie.md) `opsgenie` | Opsgenie | 5 | 0 | `opsgenie.api-key` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/opsgenie/connector.json) |
 | [Runpod](./runpod.md) `runpod` | Runpod | 2 | 2 | `runpod.api-key` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/runpod/connector.json) |
 | [Zendesk](./zendesk.md) `zendesk` | Zendesk | 7 | 3 | `zendesk.oauth`, `zendesk.basic` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/zendesk/connector.json) |
-| [Slack](./slack.md) `slack` | Slack | 11 | 4 | `slack.bot`, `slack.user` | pinned | hand-written |
+| [Slack](./slack.md) `slack` | Slack | 13 | 5 | `slack.bot`, `slack.user` | pinned | hand-written |
 | [OpenRouter](./openrouter.md) `openrouter` | OpenRouter | 3 | 1 | `openrouter.api-key` | pinned | hand-written |
 | [Kubernetes](./kubernetes.md) `kubernetes` | Kubernetes | 14 | 1 | `kubernetes.token` | pinned | hand-written |
 | [PostgreSQL](./postgres.md) `postgres` | PostgreSQL | 7 | 0 | `postgres.password` | pinned | hand-written |
