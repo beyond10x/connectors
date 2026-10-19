@@ -1,3 +1,0 @@
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s
-     Running `target/debug/connectors-spec --generate --specification adapters/gitlab/spec/adapter.json --output adapters/gitlab/generated`
-adapter bundle generated

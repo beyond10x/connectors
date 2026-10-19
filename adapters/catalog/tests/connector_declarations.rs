@@ -731,15 +731,15 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "12 catalog-jira.md",
-            "6794558b21b53fe9995de5028325b88e8338b17754c641bd1c7a5b80c3299b59",
+            "717881d0e9f55a316cf22029aa4cfff2803ceecd29e9b31d3edfa55e839f508c",
         ),
         (
             "13 catalog-jira.md",
-            "69b065c3e48c24ca541bfb9d3a8b8bcb3486b770b11acd4dfd739dcb42426812",
+            "5ac4de0707cd592352a5bee8f88e33b1714c947d55a2e885f74ff14fd551fc59",
         ),
         (
             "14 catalog-jira.md",
-            "402975480d4f1d1bc4721b82216b23a4598298838d1bf38056ca3ae136d733dd",
+            "0ebc9ab5cbde840d682a13cc6d4deda057f0d26e4d628d042b11f35618abb248",
         ),
         (
             "15 catalog-openrouter.md",
@@ -759,19 +759,19 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "19 catalog-slack.md",
-            "6fbe53578644a8eeb333f757574665382e333d1a8089ff2f16f3bea056851e40",
+            "23e877ed8e54ad38b319d0ffd0c482203719b26ecd094e7e65bc8d976a6af6ca",
         ),
         (
             "20 catalog-slack.md",
-            "3d1e919d77a8426f713915b02bd72df03c0f01f5fb1a2b5850bf7eb1467e6a8c",
+            "1dc8109ddc54339d4cbcabbedc13c427fa4a180d2a74213bc4505a7e44fa8404",
         ),
         (
             "21 catalog-zendesk.md",
-            "822b41b8f85c1ca4b29eba823ffed0b8d7a76b1fe84be696ee5f61f83fd7fe67",
+            "60a56bb42996cb06670413c3924c75285c8fe3f09b4df0cfcedf3a923a54eae5",
         ),
         (
             "22 catalog-zendesk.md",
-            "11d48e2b051848b334c235a8915e376abab7c18ccff6406b6d552ddd31fe4171",
+            "56c177a9a9bec9ff41b937ea8c74222ee2eed53d9eb2fe576fc9938bc7d4fbf0",
         ),
         (
             "23 local-catalog-provider.md",

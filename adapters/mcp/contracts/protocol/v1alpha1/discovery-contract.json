@@ -476,7 +476,8 @@
         "offer_expired",
         "offer_rejected",
         "lease_expired",
-        "revoked"
+        "revoked",
+        "conflict"
       ],
       "sources": [
         "ess/domains/service_wire.yaml",

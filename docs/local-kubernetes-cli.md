@@ -638,7 +638,7 @@ specifies a SelfSubjectAccessReview target set, fan-out budget and an
 implemented and no result claims coverage. A read is dispatched and the cluster's
 own RBAC decision is reported.
 
-The [recorded provider restart checks](evidence/provider-restarts-20261002/README.md)
+The [recorded provider restart checks](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/provider-restarts-20261002/README.md)
 include a task-owned Kubernetes sandbox. Real-provider acceptance is separate from
 the deterministic TLS fixture checks and requires explicit disposable resources.
 

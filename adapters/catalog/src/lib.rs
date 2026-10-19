@@ -10,6 +10,7 @@
 //!
 //! A provider may also declare a `datasource.feed/v1alpha1` binding as data; [`feed`] realizes
 //! it over the same bundle, and the engine answers `feed.containers` and `feed.items` from it.
+mod closed;
 pub mod feed;
 
 use connectors_catalog::{
@@ -65,6 +66,25 @@ pub struct Preflight {
     pub operation_id: String,
     pub values: BTreeMap<String, String>,
     pub checks: Vec<Check>,
+    /// The code a differing check refuses with instead of `forbidden`
+    /// (`connectors_catalog.guard.MismatchCode`). Omitted when absent, so a
+    /// preflight without it keeps its bytes; an explicit `null` is refused,
+    /// as the model refuses it.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_mismatch"
+    )]
+    pub mismatch: Option<MismatchCode>,
+}
+
+/// The code a preflight refuses with when a check differs
+/// (`connectors_catalog.guard.MismatchCode`): `conflict`, the target changed
+/// since the caller read it, as the provider's own answer shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MismatchCode {
+    Conflict,
 }
 
 /// A read a guard issues after the write: a GET of the bundle, its parameter
@@ -624,7 +644,7 @@ pub struct Selection {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub body_keys: Vec<String>,
     /// The JSON type of closed body keys, keyed by a name `body_keys` admits:
-    /// `string`, `integer` or `boolean`, as the provider's request body schema
+    /// `string`, `integer`, `boolean` or `string_list`, as the provider's request body schema
     /// types it, which the bundle does not record. A typed key present in a
     /// body must be a JSON value of exactly that type (no string spelling of
     /// a boolean or an integer, and no `null`), or the write is refused before
@@ -632,7 +652,7 @@ pub struct Selection {
     /// `integer` key admits only an integer literal in the i64 or u64 range,
     /// where JSON Schema also counts `3.0` or `1e2`. Omitted when empty.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub body_types: BTreeMap<String, ValueType>,
+    pub body_types: BTreeMap<String, BodyType>,
     /// Closed body keys the provider's request body schema requires, each
     /// admitted by `body_keys`: a body without one is refused before any
     /// request, and the declaration requires it. Keys a guard reads are
@@ -657,12 +677,142 @@ pub struct Selection {
     /// Omitted when empty.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub body_fixed: BTreeMap<String, Value>,
+    /// String keys held to the values the provider enumerates, keyed by a
+    /// name `body_keys` admits (`connectors_catalog.selection.ClosedBody`): a
+    /// value outside its set is refused naming the key before any request, and
+    /// the declaration gives the key that `enum`. Omitted when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub body_enums: BTreeMap<String, Vec<String>>,
+    /// Keys under one parent of which a body must carry at least one, for a
+    /// write that changes whichever the caller sends. Omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub body_any_of: Vec<String>,
+    /// String keys whose sent value is the prefix followed by the caller's
+    /// value, such as a draft reply's marker line. Omitted when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub body_prefixes: BTreeMap<String, String>,
+    /// The status (409 or 412) by which the provider answers a write that its
+    /// target changed since it was read: refused as `conflict`, never retried
+    /// (`connectors_catalog.selection.ConflictStatus`). Omitted when absent;
+    /// an explicit `null` is refused, as the model refuses it.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_status"
+    )]
+    pub conflict_status: Option<u16>,
     /// The credential a write's answer carries that the write created, shown
     /// once, and the public members the caller receives in its place
     /// ([`Custody`]). Omitted when absent, so a selection without it keeps its
     /// bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custody: Option<Custody>,
+    /// Query parameters of a read fixed to one value each
+    /// (`connectors_catalog.selection.FixedQuery`): sent on every request,
+    /// never declared, and refused from caller input. Omitted when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub query_fixed: BTreeMap<String, String>,
+    /// Caller inputs folded into a fixed query value, keyed by the input's
+    /// declared name ([`QueryFold`]). Omitted when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub query_folds: BTreeMap<String, QueryFold>,
+    /// A read whose JSON answer carries a file as base64, answered as its
+    /// text ([`EmbeddedText`]). Omitted when absent; an explicit `null` is refused.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_embedded_text"
+    )]
+    pub embedded_text: Option<EmbeddedText>,
+    /// The headers by which the provider says its rate limit is spent
+    /// ([`RateLimitHeaders`]). Omitted when absent; an explicit `null` is refused.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_rate_limit_headers"
+    )]
+    pub rate_limit_headers: Option<RateLimitHeaders>,
+}
+
+/// The JSON type of a closed body key (`connectors_catalog.selection.BodyType`),
+/// as the provider's request body schema types it: `string_list` is an array
+/// whose every element is a string.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BodyType {
+    String,
+    Integer,
+    Boolean,
+    StringList,
+}
+
+/// The form a folded caller value takes (`connectors_catalog.selection.FoldFormat`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FoldFormat {
+    /// An ISO 8601 date `YYYY-MM-DD`, or a date-time `YYYY-MM-DDTHH:MM:SS`
+    /// followed by `Z` or `+HH:MM`/`-HH:MM`.
+    Timestamp,
+}
+
+/// The input schema pattern of a `timestamp` fold; [`timestamp`] checks the same.
+const TIMESTAMP_PATTERN: &str =
+    "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2}))?$";
+
+/// Whether a text is a `timestamp`: exactly the shape [`TIMESTAMP_PATTERN`] states.
+fn timestamp(text: &str) -> bool {
+    let shape = |text: &str, form: &str| {
+        text.len() == form.len()
+            && text
+                .bytes()
+                .zip(form.bytes())
+                .all(|(byte, slot)| match slot {
+                    b'9' => byte.is_ascii_digit(),
+                    b'S' => byte == b'+' || byte == b'-',
+                    other => byte == other,
+                })
+    };
+    shape(text, "9999-99-99")
+        || shape(text, "9999-99-99T99:99:99Z")
+        || shape(text, "9999-99-99T99:99:99S99:99")
+}
+
+/// One caller input folded into a fixed query value
+/// (`connectors_catalog.selection.QueryFold`): when sent, one space, `prefix`
+/// and the value are appended to the fixed value of `into`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QueryFold {
+    pub into: String,
+    pub prefix: String,
+    pub format: FoldFormat,
+}
+/// The most query values one selection fixes.
+pub const QUERY_FIXED: usize = 8;
+
+/// A file a read's 2xx JSON answer carries as base64
+/// (`connectors_catalog.selection.EmbeddedText`), answered as its text. Each
+/// member but `max_bytes` is an RFC 6901 pointer into the answer.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EmbeddedText {
+    pub content: String,
+    pub encoding: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<String>,
+    pub max_bytes: u64,
+}
+
+/// The headers by which a provider says its rate limit is spent
+/// (`connectors_catalog.selection.RateLimitHeaders`): a `403` or `429` whose
+/// `remaining` header is exactly `0` is `rate_limited`, waiting until the Unix
+/// time `reset` names unless `Retry-After` says otherwise. A write answered
+/// `429` stays unconfirmed: only its `403` is a definite refusal.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RateLimitHeaders {
+    pub remaining: String,
+    pub reset: String,
 }
 
 /// The member of a write selection whose 2xx JSON answer carries a credential
@@ -692,60 +842,15 @@ pub struct Held {
     pub secret: Option<Secret>,
 }
 
-impl Selection {
-    /// Whether the caller's `body` may be omitted: every key the closed body
-    /// admits is fixed, so a caller has nothing to send in it.
-    fn body_fixed_whole(&self) -> bool {
-        !self.body_fixed.is_empty()
-            && self
-                .body_keys
-                .iter()
-                .all(|key| self.body_fixed.contains_key(key))
-    }
-}
-
-/// The declared schema of a body key typed by `body_types`: exactly that JSON
-/// type, since the body is sent as given.
-fn body_type_schema(value_type: ValueType) -> Value {
-    match value_type {
-        ValueType::String => json!({"type": "string"}),
-        ValueType::Integer => json!({"type": "integer"}),
-        ValueType::Boolean => json!({"type": "boolean"}),
-    }
-}
-
-/// Whether a body value is a JSON value of exactly the declared type.
-fn fits_body_type(value_type: ValueType, value: &Value) -> bool {
-    match value_type {
-        ValueType::String => value.is_string(),
-        ValueType::Integer => value.is_i64() || value.is_u64(),
-        ValueType::Boolean => value.is_boolean(),
-    }
-}
-
 /// The body paths a guard reads, each the part after `body.` of a reference.
-fn guarded_body_paths(guard: &Guard) -> impl Iterator<Item = &str> {
+pub(crate) fn guarded_body_paths(guard: &Guard) -> impl Iterator<Item = &str> {
     guard
         .references()
         .filter_map(|path| path.strip_prefix("body."))
 }
 
-/// The top-level body keys a guard reads through `body.<key>` references.
-fn guarded_body_keys(guard: &Guard) -> std::collections::BTreeSet<&str> {
-    guarded_body_paths(guard)
-        .map(|rest| rest.split('.').next().unwrap_or(rest))
-        .collect()
-}
-
-/// The top-level body keys a guard reads as scalars: referenced as
-/// `body.<key>` itself, not only through a path nested under it.
-fn scalar_body_keys(guard: &Guard) -> std::collections::BTreeSet<&str> {
-    guarded_body_paths(guard)
-        .filter(|rest| !rest.contains('.'))
-        .collect()
-}
-
-/// An input reference: a top-level key, or `body.<key>` one level into the body.
+/// An input reference: a top-level key, or `body.` followed by dotted keys into
+/// the body, to any depth.
 fn reference<'a>(input: &'a Value, path: &str) -> Option<&'a Value> {
     let mut current = input;
     for key in path.split('.') {
@@ -806,6 +911,38 @@ where
     Vec::<String>::deserialize(deserializer).map(Some)
 }
 
+fn present_status<'de, D>(deserializer: D) -> std::result::Result<Option<u16>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    u16::deserialize(deserializer).map(Some)
+}
+
+fn present_embedded_text<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<EmbeddedText>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    EmbeddedText::deserialize(deserializer).map(Some)
+}
+
+fn present_rate_limit_headers<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<RateLimitHeaders>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    RateLimitHeaders::deserialize(deserializer).map(Some)
+}
+
+fn present_mismatch<'de, D>(deserializer: D) -> std::result::Result<Option<MismatchCode>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    MismatchCode::deserialize(deserializer).map(Some)
+}
+
 fn present_flag<'de, D>(deserializer: D) -> std::result::Result<Option<bool>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -813,7 +950,7 @@ where
     bool::deserialize(deserializer).map(Some)
 }
 
-fn refuse(message: impl Into<String>) -> Error {
+pub(crate) fn refuse(message: impl Into<String>) -> Error {
     Error::invalid(message)
 }
 
@@ -871,6 +1008,7 @@ type Request = (Vec<String>, Vec<(String, String)>);
 
 struct Exposed {
     selection: Selection,
+    closed: closed::Closed,
     operation: Operation,
     template: Template,
     declaration: connectors_core::Operation,
@@ -923,10 +1061,14 @@ pub struct Prepared {
     instance: String,
     source_revision: String,
     rate_limit_reasons: Vec<String>,
+    /// The selection's rate-limit headers, read from a definite refusal.
+    rate_limit_headers: Option<RateLimitHeaders>,
     /// The selection's refusal texts, read from a definite refusal's body.
     refusal_texts: Vec<TextRefusal>,
     /// The created credential the answer carries, when the selection declares it.
     custody: Option<Custody>,
+    /// The status by which the provider says the target changed since it was read.
+    conflict_status: Option<u16>,
 }
 
 impl Engine {
@@ -994,6 +1136,7 @@ impl Engine {
             check_envelope(selection)?;
             check_refusal_texts(selection)?;
             check_custody(selection)?;
+            check_conflict_status(selection)?;
             if let Some(download) = &selection.download {
                 check_download(selection, download)?;
                 downloads.push(Downloaded {
@@ -1054,7 +1197,7 @@ impl Engine {
                 } else if selection
                     .body_keys
                     .iter()
-                    .any(|key| key.eq_ignore_ascii_case(name))
+                    .any(|key| key.trim_start_matches('/').eq_ignore_ascii_case(name))
                 {
                     Some("which its body_keys admit")
                 } else if selection.guard.as_ref().is_some_and(|guard| {
@@ -1194,6 +1337,14 @@ impl Engine {
                     selection.id
                 )));
             }
+            check_rate_limit_headers(selection)?;
+            check_embedded_text(selection)?;
+            check_fixed_query(selection, find(&selection.operation_id)?, &operation)?;
+            // A fixed parameter leaves the operation as a withheld one does:
+            // undeclared and never bound from input. The engine adds its value.
+            operation
+                .parameters
+                .retain(|p| !selection.query_fixed.contains_key(&p.name));
             let template =
                 Template::from_operation(&operation).map_err(|refusal| refuse(refusal.reason()))?;
             if let Some(guard) = &selection.guard {
@@ -1328,127 +1479,30 @@ impl Engine {
                     },
                 );
             }
-            if !selection.body_keys.is_empty() {
-                let mut names = std::collections::BTreeSet::new();
-                if selection.effect != Effect::Write
-                    || operation.request_media_types.is_empty()
-                    || selection
-                        .body_keys
-                        .iter()
-                        .any(|key| key.is_empty() || key.contains('.') || !names.insert(key))
-                {
-                    return Err(refuse(format!(
-                        "selection `{}` declares body_keys that do not close a write's body with distinct plain names",
-                        selection.id
-                    )));
-                }
-                // A guard reading a key the closed body cannot carry could
-                // never be satisfied: refused here, not at every write.
-                if let Some(key) = selection.guard.as_ref().and_then(|guard| {
-                    guarded_body_keys(guard)
-                        .into_iter()
-                        .find(|key| !selection.body_keys.iter().any(|k| k == key))
-                }) {
-                    return Err(refuse(format!(
-                        "guard of `{}` reads `body.{key}`, which its body_keys do not admit",
-                        selection.id
-                    )));
-                }
-            }
-            // Types and requirements name keys of a closed body: a key the
-            // set does not admit could never be sent, and a requirement named
-            // twice is a mistake in the selection.
-            let admitted = |key: &String| selection.body_keys.contains(key);
-            let mut required = std::collections::BTreeSet::new();
-            if !selection.body_types.keys().all(admitted) {
-                return Err(refuse(format!(
-                    "selection `{}` declares body_types for a key its body_keys do not admit",
-                    selection.id
-                )));
-            }
-            if !selection
-                .body_required
-                .iter()
-                .all(|key| admitted(key) && required.insert(key))
-            {
-                return Err(refuse(format!(
-                    "selection `{}` declares body_required that do not name distinct keys its body_keys admit",
-                    selection.id
-                )));
-            }
-            // A non-empty key is a caller's string: admitted, typed as a
-            // string, not fixed, and named once.
-            let mut nonempty = std::collections::BTreeSet::new();
-            if !selection.body_nonempty.iter().all(|key| {
-                admitted(key)
-                    && selection.body_types.get(key) == Some(&ValueType::String)
-                    && !selection.body_fixed.contains_key(key)
-                    && nonempty.insert(key)
-            }) {
-                return Err(refuse(format!(
-                    "selection `{}` declares body_nonempty that do not name distinct string keys its body_keys admit and the caller sends",
-                    selection.id
-                )));
-            }
-            // A fixed key is a closed body key the caller never sends: its value
-            // is a scalar of the key's type, and nothing may also require it
-            // from the caller or compare it as caller input.
-            for (key, value) in &selection.body_fixed {
-                let scalar_value =
-                    value.is_string() || value.is_boolean() || value.is_i64() || value.is_u64();
-                let reason = if !admitted(key) {
-                    Some("which its body_keys do not admit")
-                } else if !scalar_value {
-                    Some("to a value that is not a string, an integer or a boolean")
-                } else if selection
-                    .body_types
-                    .get(key)
-                    .is_some_and(|value_type| !fits_body_type(*value_type, value))
-                {
-                    Some("to a value that is not of its declared type")
-                } else if selection.body_required.contains(key) {
-                    Some("which its body_required also names")
-                } else if selection
-                    .guard
-                    .as_ref()
-                    .is_some_and(|guard| guarded_body_keys(guard).contains(key.as_str()))
-                {
-                    Some("which its guard reads as an input")
-                } else {
-                    None
-                };
-                if let Some(reason) = reason {
-                    return Err(refuse(format!(
-                        "selection `{}` fixes body key `{key}`, {reason}",
-                        selection.id
-                    )));
-                }
-            }
-            // A guard path nested under a key typed as a scalar could never
-            // resolve: refused here, not at every write.
-            if let Some(path) = selection.guard.as_ref().and_then(|guard| {
-                guarded_body_paths(guard).find(|rest| {
-                    rest.split_once('.')
-                        .is_some_and(|(key, _)| selection.body_types.contains_key(key))
-                })
-            }) {
-                return Err(refuse(format!(
-                    "guard of `{}` reads `body.{path}` under a key its body_types type as a scalar",
-                    selection.id
-                )));
-            }
+            // The closed body, its members resolved to paths and checked
+            // against what each may name (`closed::Closed`).
+            let closed = closed::Closed::new(selection, !operation.request_media_types.is_empty())?;
             if selection.response == Some(ResponseKind::Text) && selection.effect != Effect::Read {
                 return Err(refuse(format!(
                     "selection `{}` declares a text response for a write",
                     selection.id
                 )));
             }
-            let mut declaration = declare(selection, &operation);
+            let mut declaration = declare(selection, &operation, &closed);
             if let Some(custody) = &selection.custody {
                 declaration.output_schema = custody_schema(custody);
             }
             if selection.binary.is_some() {
                 declaration.output_schema["properties"]["body"] = binary_body_schema();
+            }
+            if selection.embedded_text.is_some() {
+                declaration.output_schema["properties"]["body"] = json!({"type": "string"});
+            }
+            // A folded input is declared under its own name, optional, in the
+            // fold's format; it is no parameter of the operation.
+            for name in selection.query_folds.keys() {
+                declaration.input_schema["properties"][name.as_str()] =
+                    json!({"type": "string", "pattern": TIMESTAMP_PATTERN});
             }
             let text = expects_text(selection, &operation);
             if text && selection.envelope.is_some() {
@@ -1459,6 +1513,7 @@ impl Engine {
             }
             exposed.push(Exposed {
                 selection: selection.clone(),
+                closed,
                 operation,
                 template,
                 declaration,
@@ -1662,11 +1717,15 @@ impl Engine {
         connectors_sdk::validate(&exposed.declaration.input_schema, &input)?;
         let values = Self::parameter_values(&exposed.operation, &input)?;
         check_bounds(&exposed.selection, &values)?;
-        let (segments, query) = self.resolve(&exposed.template, values)?;
+        let (segments, mut query) = self.resolve(&exposed.template, values)?;
+        query.extend(fixed_query(&exposed.selection, &input)?);
         let borrowed: Vec<&str> = segments.iter().map(String::as_str).collect();
         let query: Vec<(&str, String)> =
             query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
         let response = http.get(&borrowed, &query).await?;
+        if let Some(error) = spent(&response, exposed.selection.rate_limit_headers.as_ref()) {
+            return Err(error);
+        }
         if let Some(binary) = &exposed.selection.binary {
             let (status, body) =
                 read_binary(response, None, binary, hosts, &exposed.selection).await?;
@@ -1691,6 +1750,10 @@ impl Engine {
         {
             return Err(refusal);
         }
+        let body = match &exposed.selection.embedded_text {
+            Some(embedded) => embedded_text(embedded, &body)?,
+            None => body,
+        };
         Ok(json!({
             "status": response.status,
             "body": body,
@@ -1792,66 +1855,15 @@ impl Engine {
             (Effect::Write, Some(method)) => method,
             _ => return Err(Error::new(ErrorCode::Forbidden, "operation is a read")),
         };
-        connectors_sdk::validate(&exposed.declaration.input_schema, &input)?;
         // The closed body is held here as well as in the declaration, so it
-        // does not rest on the schema validator alone.
-        let body_keys = &exposed.selection.body_keys;
-        let omitted = input.get("body").is_none() && exposed.selection.body_fixed_whole();
-        if !body_keys.is_empty()
-            && !omitted
-            && !input
-                .get("body")
-                .and_then(Value::as_object)
-                .is_some_and(|body| body.keys().all(|key| body_keys.contains(key)))
-        {
-            return Err(refuse("body carries a key its selection does not admit"));
+        // does not rest on the schema validator alone. It is checked first:
+        // its refusals name the key, the schema validator's do not.
+        let closed = &exposed.closed;
+        let omitted = input.get("body").is_none() && closed.fixed_whole();
+        if !closed.is_empty() && !omitted {
+            closed.check(input.get("body").unwrap_or(&Value::Null))?;
         }
-        // A fixed key is never the caller's, whatever value it carries.
-        if let Some(key) = input
-            .get("body")
-            .and_then(Value::as_object)
-            .and_then(|body| {
-                body.keys()
-                    .find(|key| exposed.selection.body_fixed.contains_key(key.as_str()))
-            })
-        {
-            return Err(refuse(format!(
-                "body key `{key}` is fixed by its selection and is not caller input"
-            )));
-        }
-        // So are the closed body's requirements and types.
-        if let Some(body) = input.get("body").and_then(Value::as_object) {
-            if let Some(key) = exposed
-                .selection
-                .body_required
-                .iter()
-                .find(|key| !body.contains_key(key.as_str()))
-            {
-                return Err(refuse(format!("body lacks the required key `{key}`")));
-            }
-            if let Some((key, _)) = exposed
-                .selection
-                .body_types
-                .iter()
-                .find(|(key, value_type)| {
-                    body.get(key.as_str())
-                        .is_some_and(|value| !fits_body_type(**value_type, value))
-                })
-            {
-                return Err(refuse(format!(
-                    "body key `{key}` is not of its declared type"
-                )));
-            }
-            if let Some(key) = exposed.selection.body_nonempty.iter().find(|key| {
-                body.get(key.as_str())
-                    .and_then(Value::as_str)
-                    .is_some_and(str::is_empty)
-            }) {
-                return Err(refuse(format!(
-                    "body key `{key}` is empty, which its selection does not admit"
-                )));
-            }
-        }
+        connectors_sdk::validate(&exposed.declaration.input_schema, &input)?;
         // The credential is never sent from caller input, so a body naming
         // it under any ASCII case is refused here as well as in the
         // declaration.
@@ -1874,11 +1886,10 @@ impl Engine {
         } else {
             input.get("body").cloned().unwrap_or(Value::Null)
         };
-        // The fixed values are always sent, into a body the caller may omit.
-        if !exposed.selection.body_fixed.is_empty() {
-            let mut members = body.as_object().cloned().unwrap_or_default();
-            members.extend(exposed.selection.body_fixed.clone());
-            body = Value::Object(members);
+        // The fixed values are always sent, into a body the caller may omit,
+        // and each prefix leads the caller's text.
+        if !exposed.closed.is_empty() {
+            body = exposed.closed.complete(body);
         }
         let mut postflight = Vec::new();
         let mut alternatives = Vec::new();
@@ -1905,7 +1916,7 @@ impl Engine {
             };
             let preflights = guard
                 .preflights()
-                .map(|preflight| expected(&preflight.checks))
+                .map(|preflight| Ok((expected(&preflight.checks)?, preflight.mismatch)))
                 .collect::<Result<Vec<_>>>()?;
             postflight = expected(&guard.postflight.checks)?;
             alternatives = expected(&guard.postflight.any_of)?;
@@ -1935,7 +1946,7 @@ impl Engine {
                 (None, None) => None,
                 _ => return Err(Error::internal()),
             };
-            for ((segments, query), preflight) in requests.iter().zip(&preflights) {
+            for ((segments, query), (preflight, mismatch)) in requests.iter().zip(&preflights) {
                 let borrowed: Vec<&str> = segments.iter().map(String::as_str).collect();
                 let query: Vec<(&str, String)> =
                     query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
@@ -1960,12 +1971,17 @@ impl Engine {
                     // The only point at which a difference is definite. After
                     // dispatch the same difference is uncertainty, not a refusal.
                     if !expected.holds(current) {
-                        return Err(Error::new(
-                            ErrorCode::Forbidden,
-                            format!(
-                                "value at `{pointer}` differs from the pinned one before dispatch"
-                            ),
-                        ));
+                        let message = format!(
+                            "value at `{pointer}` differs from the pinned one before dispatch"
+                        );
+                        return Err(match mismatch {
+                            None => Error::new(ErrorCode::Forbidden, message),
+                            // The provider's own answer shows the target changed
+                            // since the caller read it.
+                            Some(MismatchCode::Conflict) => {
+                                Error::new(ErrorCode::Conflict, message).answered()
+                            }
+                        });
                     }
                 }
             }
@@ -1993,8 +2009,10 @@ impl Engine {
             instance: instance.to_owned(),
             source_revision: self.source_revision.clone(),
             rate_limit_reasons: exposed.selection.rate_limit_reasons.clone(),
+            rate_limit_headers: exposed.selection.rate_limit_headers.clone(),
             refusal_texts: exposed.selection.refusal_texts.clone(),
             custody: exposed.selection.custody.clone(),
+            conflict_status: exposed.selection.conflict_status,
         })
     }
 }
@@ -2112,6 +2130,25 @@ impl Prepared {
             Ok(response) => response,
             Err(_) => return WriteOutcome::Unknown(Error::unavailable()),
         };
+        // A spent rate limit is a definite refusal only as a `403`: a `429`
+        // stays the unconfirmed outcome below, as it is without the headers.
+        if response.status == 403
+            && let Some(error) = spent(&response, self.rate_limit_headers.as_ref())
+        {
+            return WriteOutcome::Refused(error);
+        }
+        // The provider's own answer that the target changed since it was read:
+        // nothing was applied, and the write is never sent again.
+        if self.conflict_status == Some(response.status) {
+            return WriteOutcome::Refused(
+                Error::new(
+                    ErrorCode::Conflict,
+                    "provider answered that the target changed since it was read",
+                )
+                .answered()
+                .with_upstream_reason(connectors_core::reason::from_body(&response.body)),
+            );
+        }
         if matches!(
             response.status,
             400 | 401 | 403 | 404 | 405 | 409 | 410 | 412 | 415 | 422
@@ -2481,7 +2518,7 @@ fn repeated_schema(value_type: Option<ValueType>, required: bool) -> Value {
 /// the forms callers already send and the engine sends on unchanged. A JSON
 /// number that is not an integer literal is refused by `parameter_values`. A
 /// parameter the bundle records no type for takes any scalar.
-fn declared_type(value_type: Option<ValueType>) -> Value {
+pub(crate) fn declared_type(value_type: Option<ValueType>) -> Value {
     match value_type {
         Some(ValueType::String) => json!({"type": ["string", "integer"]}),
         Some(ValueType::Integer) => json!({"anyOf": [
@@ -2544,7 +2581,11 @@ fn caseless_pattern(names: &[String]) -> String {
 /// The descriptor operation for a selection: one property per declared path or
 /// query parameter, a `body` object when the operation takes one, and one string
 /// property per input reference a guard reads that no parameter covers.
-fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Operation {
+fn declare(
+    selection: &Selection,
+    operation: &Operation,
+    closed: &closed::Closed,
+) -> connectors_core::Operation {
     let mut properties = serde_json::Map::new();
     let mut required = Vec::new();
     for parameter in &operation.parameters {
@@ -2598,54 +2639,12 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
             }
             body
         } else {
-            // A closed body: exactly these keys. A key `body_types` types is
-            // declared as exactly that JSON type; otherwise a key a guard reads
-            // directly is declared as the scalar the guard compares, and any
-            // other key takes any JSON value. Every key a guard reads, and
-            // every key `body_required` names, is required.
-            let scalars = selection
-                .guard
-                .as_ref()
-                .map(scalar_body_keys)
-                .unwrap_or_default();
-            // A fixed key is the selection's, never the caller's: undeclared.
-            let keys: serde_json::Map<String, Value> = selection
-                .body_keys
-                .iter()
-                .filter(|key| !selection.body_fixed.contains_key(*key))
-                .map(|key| {
-                    let schema = if let Some(value_type) = selection.body_types.get(key) {
-                        let mut schema = body_type_schema(*value_type);
-                        if selection.body_nonempty.contains(key) {
-                            schema["minLength"] = json!(1);
-                        }
-                        schema
-                    } else if scalars.contains(key.as_str()) {
-                        declared_type(None)
-                    } else {
-                        json!({})
-                    };
-                    (key.clone(), schema)
-                })
-                .collect();
-            let mut body = json!({
-                "type": "object",
-                "properties": keys,
-                "additionalProperties": false,
-            });
-            let mut required: std::collections::BTreeSet<&str> = selection
-                .guard
-                .as_ref()
-                .map(guarded_body_keys)
-                .unwrap_or_default();
-            required.extend(selection.body_required.iter().map(String::as_str));
-            if !required.is_empty() {
-                body["required"] = json!(required);
-            }
-            body
+            // A closed body: exactly these keys, nested objects closed in
+            // turn, the fixed keys left out (`closed::Closed::schema`).
+            closed.schema()
         };
         properties.insert("body".into(), body);
-        if !selection.body_fixed_whole() {
+        if !closed.fixed_whole() {
             required.push("body".into());
         }
     }
@@ -2844,6 +2843,18 @@ fn check_refusal_texts(selection: &Selection) -> Result<()> {
     }
 }
 
+/// A conflict status is `409` or `412`, and only on a write.
+fn check_conflict_status(selection: &Selection) -> Result<()> {
+    match selection.conflict_status {
+        None => Ok(()),
+        Some(409 | 412) if selection.effect == Effect::Write => Ok(()),
+        Some(_) => Err(refuse(format!(
+            "selection `{}` declares a conflict_status other than 409 or 412 on a write",
+            selection.id
+        ))),
+    }
+}
+
 /// What a selection's [`Custody`] must be, refused when it loads.
 fn check_custody(selection: &Selection) -> Result<()> {
     let Some(custody) = &selection.custody else {
@@ -2959,6 +2970,245 @@ fn hold(custody: &Custody, result: &mut Value) -> Result<Held> {
     })
 }
 
+/// Whether a header name is an HTTP token (RFC 9110 §5.6.2).
+fn header_token(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b))
+}
+
+/// A selection's rate-limit headers: two distinct HTTP tokens.
+fn check_rate_limit_headers(selection: &Selection) -> Result<()> {
+    let Some(headers) = &selection.rate_limit_headers else {
+        return Ok(());
+    };
+    if !header_token(&headers.remaining)
+        || !header_token(&headers.reset)
+        || headers.remaining.eq_ignore_ascii_case(&headers.reset)
+    {
+        return Err(refuse(format!(
+            "selection `{}` declares rate-limit headers that are not two distinct header names",
+            selection.id
+        )));
+    }
+    Ok(())
+}
+
+/// The one value of a header without surrounding blanks, by name in any
+/// ASCII case; none when it is absent.
+fn trimmed_header<'a>(response: &'a HttpResponse, name: &str) -> Option<&'a str> {
+    header(response, name).map(|value| value.trim_matches([' ', '\t']))
+}
+
+/// A `403` or `429` whose declared `remaining` header is exactly `0`, as the
+/// `rate_limited` refusal it is: its wait from `Retry-After` when the answer
+/// carries one, else the seconds until the Unix time `reset` names.
+fn spent(response: &HttpResponse, headers: Option<&RateLimitHeaders>) -> Option<Error> {
+    let headers = headers?;
+    if !matches!(response.status, 403 | 429) || trimmed_header(response, &headers.remaining)? != "0"
+    {
+        return None;
+    }
+    let reset = || {
+        let reset = trimmed_header(response, &headers.reset)?;
+        if reset.is_empty() || !reset.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        let reset = reset.parse::<u64>().ok()?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()?
+            .as_secs();
+        let wait = reset.checked_sub(now).filter(|wait| *wait > 0)?;
+        u32::try_from(wait).ok().map(u64::from)
+    };
+    let mut error = Error::new(ErrorCode::RateLimited, "provider refused the request")
+        .answered()
+        .with_upstream_reason(connectors_core::reason::from_body(&response.body));
+    error.retry_after_seconds = match header(response, "retry-after") {
+        Some(_) => retry_after_header(response),
+        None => reset(),
+    };
+    Some(error)
+}
+
+/// An embedded text belongs to a read that answers JSON and reads it no other
+/// way: no `response`, `envelope`, `binary` or `download` beside it, pointers
+/// with a leading `/`, and a `max_bytes` within [`BINARY_LIMIT`].
+fn check_embedded_text(selection: &Selection) -> Result<()> {
+    let Some(embedded) = &selection.embedded_text else {
+        return Ok(());
+    };
+    let pointers = [
+        Some(&embedded.content),
+        Some(&embedded.encoding),
+        embedded.size.as_ref(),
+    ];
+    if selection.effect != Effect::Read
+        || selection.response.is_some()
+        || selection.envelope.is_some()
+        || selection.binary.is_some()
+        || selection.download.is_some()
+        || pointers
+            .into_iter()
+            .flatten()
+            .any(|pointer| !pointer.starts_with('/'))
+        || !(1..=BINARY_LIMIT).contains(&embedded.max_bytes)
+    {
+        return Err(refuse(format!(
+            "selection `{}` declares embedded text other than on a JSON read with pointers and a max_bytes from 1 to {BINARY_LIMIT}",
+            selection.id
+        )));
+    }
+    Ok(())
+}
+
+/// The text of the file a 2xx JSON answer carries as base64.
+fn embedded_text(embedded: &EmbeddedText, body: &Value) -> Result<Value> {
+    let unreadable = |message: &str| Error::new(ErrorCode::UpstreamProtocol, message);
+    let too_long = |length: u64| {
+        Error::new(
+            ErrorCode::Capacity,
+            format!(
+                "file of {length} bytes exceeds the read's bound of {} bytes",
+                embedded.max_bytes
+            ),
+        )
+    };
+    if !body.is_object() {
+        return Err(unreadable("provider answered with no embedded file"));
+    }
+    if let Some(size) = embedded
+        .size
+        .as_deref()
+        .and_then(|pointer| body.pointer(pointer))
+        .and_then(Value::as_u64)
+        && size > embedded.max_bytes
+    {
+        return Err(too_long(size));
+    }
+    if body.pointer(&embedded.encoding).and_then(Value::as_str) != Some("base64") {
+        return Err(unreadable(
+            "provider answered with a file not encoded as base64",
+        ));
+    }
+    let content: Vec<u8> = body
+        .pointer(&embedded.content)
+        .and_then(Value::as_str)
+        .ok_or_else(|| unreadable("provider answered with no embedded file content"))?
+        .bytes()
+        .filter(|b| !b.is_ascii_whitespace())
+        .collect();
+    // Bounded before decoding: base64 carries three bytes in every four.
+    if (content.len() as u64) / 4 * 3 > embedded.max_bytes + 2 {
+        return Err(too_long((content.len() as u64) / 4 * 3));
+    }
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&content)
+        .map_err(|_| unreadable("provider answered with file content that is not base64"))?;
+    if bytes.len() as u64 > embedded.max_bytes {
+        return Err(too_long(bytes.len() as u64));
+    }
+    if bytes.contains(&0) {
+        return Err(Error::new(ErrorCode::Unsupported, "the file is not text"));
+    }
+    String::from_utf8(bytes)
+        .map(Value::String)
+        .map_err(|_| Error::new(ErrorCode::Unsupported, "the file is not text"))
+}
+
+/// A selection's fixed query values and folds, against `source`, its
+/// operation as the bundle declares it, and `operation`, what remains of it
+/// after the selection's credential and withheld parameters left.
+fn check_fixed_query(
+    selection: &Selection,
+    source: &Operation,
+    operation: &Operation,
+) -> Result<()> {
+    if selection.query_fixed.is_empty() && selection.query_folds.is_empty() {
+        return Ok(());
+    }
+    let refused = |reason: String| Err(refuse(format!("selection `{}` {reason}", selection.id)));
+    if selection.effect != Effect::Read || selection.query_fixed.len() > QUERY_FIXED {
+        return refused(format!(
+            "fixes query values other than up to {QUERY_FIXED} on a read"
+        ));
+    }
+    for (name, value) in &selection.query_fixed {
+        let reason = if value.is_empty() {
+            Some("to the empty value")
+        } else if !operation
+            .parameters
+            .iter()
+            .any(|p| &p.name == name && p.location == Location::Query)
+        {
+            Some("which is not a query parameter of its operation")
+        } else if selection.bounds.contains_key(name) {
+            Some("which it also bounds")
+        } else if selection.required.contains(name)
+            || selection.withhold.contains(name)
+            || selection.credential.contains(name)
+        {
+            Some("which it also marks required, withholds or passes as the credential")
+        } else {
+            None
+        };
+        if let Some(reason) = reason {
+            return refused(format!("fixes `{name}` {reason}"));
+        }
+    }
+    let mut joined = BTreeSet::new();
+    for (name, fold) in &selection.query_folds {
+        let reason = if !connectors_core::valid_id(name)
+            || source.parameters.iter().any(|p| &p.name == name)
+        {
+            Some("under a name that is not an id or is a parameter of its operation")
+        } else if !selection.query_fixed.contains_key(&fold.into) {
+            Some("into a value it does not fix")
+        } else if !joined.insert(&fold.into) {
+            Some("into a value another fold joins")
+        } else if fold.prefix.is_empty() || fold.prefix.chars().any(char::is_whitespace) {
+            Some("with an empty prefix or one holding whitespace")
+        } else {
+            None
+        };
+        if let Some(reason) = reason {
+            return refused(format!("folds `{name}` {reason}"));
+        }
+    }
+    Ok(())
+}
+
+/// The fixed query pairs of a read, each with its folded caller value
+/// appended when the caller sent one.
+fn fixed_query(selection: &Selection, input: &Value) -> Result<Vec<(String, String)>> {
+    let mut pairs = Vec::with_capacity(selection.query_fixed.len());
+    for (name, fixed) in &selection.query_fixed {
+        let mut value = fixed.clone();
+        for (input_name, fold) in &selection.query_folds {
+            if &fold.into != name {
+                continue;
+            }
+            let Some(supplied) = input.get(input_name) else {
+                continue;
+            };
+            let text = supplied
+                .as_str()
+                .filter(|text| match fold.format {
+                    FoldFormat::Timestamp => timestamp(text),
+                })
+                .ok_or_else(|| refuse(format!("parameter `{input_name}` is not a timestamp")))?;
+            value.push(' ');
+            value.push_str(&fold.prefix);
+            value.push_str(text);
+        }
+        pairs.push((name.clone(), value));
+    }
+    Ok(pairs)
+}
+
 /// What a selection's binary members must be, whatever it reads: `binary`
 /// exactly when `response` is `binary`, on a read, with `max_bytes` from one
 /// to [`BINARY_LIMIT`] and, when `hosts` is given, one to four distinct
@@ -3031,6 +3281,9 @@ fn check_download(selection: &Selection, download: &Download) -> Result<()> {
         || !selection.body_required.is_empty()
         || !selection.body_nonempty.is_empty()
         || !selection.body_fixed.is_empty()
+        || !selection.body_enums.is_empty()
+        || !selection.body_any_of.is_empty()
+        || !selection.body_prefixes.is_empty()
     {
         Some("beside members that bind a bundle operation")
     } else {

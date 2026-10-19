@@ -778,6 +778,13 @@ impl EvidenceSnapshot {
     fn valid_until(&self) -> u64 {
         self.checks.iter().map(|c| c.valid_until).min().unwrap_or(0)
     }
+    /// The evidence's own lifetime: from its latest collection to the earliest
+    /// `valid_until` of its checks.
+    fn lifetime(&self) -> u64 {
+        let collected = self.checks.iter().map(|c| c.collected_at).max();
+        self.valid_until()
+            .saturating_sub(collected.unwrap_or(u64::MAX))
+    }
     fn current(&self, now: u64) -> bool {
         self.checks
             .iter()

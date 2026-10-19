@@ -5,7 +5,8 @@ domain `connectors_homer.capture`. No contract, upstream pin, fixture or runtime
 
 Homer is a SIP capture server (homer-ref:3) that serves searches over captured SIP
 messages and RTCP reports (homer-ref:43,58). Connectors would only read Homer's API. This
-is distinct from [SIP](../sip/design.md), which places calls and lists the sessions it owns.
+is distinct from the SIP design (in history at commit `6498a881c`), which placed calls and
+listed the sessions it owned.
 
 Sources: the fluxplane-plugin skill reference `references/homer.md` (plugin homer 0.4.1,
 cited `homer-ref:<line>`, not in this repository) and
@@ -49,7 +50,7 @@ engine gains the login exchange.
 
 | Proposed profile | Fields | Acquisition | Presented as | Evidence |
 |---|---|---|---|---|
-| `homer.login` | `username`, `password` (sensitive), both required (homer-ref:15-18) | `static_entry` of two fields, as `sip.trunk` does (`adapters/sip/design.md:21`) | an API JWT obtained with them (homer-ref:14) | `connections revalidate` re-running a reachability and login probe (homer-ref:63) |
+| `homer.login` | `username`, `password` (sensitive), both required (homer-ref:15-18) | `static_entry` of two fields, as the removed `sip.trunk` did (SIP design line 21, commit `6498a881c`) | an API JWT obtained with them (homer-ref:14) | `connections revalidate` re-running a reachability and login probe (homer-ref:63) |
 
 Not expressible today: the `auth.profile` vocabulary has no credential-exchange flow
 (`contracts/auth/profile/v1alpha1/semantics.md:65-66`), and `oauth2_password` is reserved

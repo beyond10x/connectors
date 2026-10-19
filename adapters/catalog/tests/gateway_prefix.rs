@@ -166,8 +166,8 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "catalog-jira.md",
         "jira",
-        "fc1371482f23629fd8fec4b2dd8eeba8e5f450a77e17ee22b5dc9a6888348654",
-        "6794558b21b53fe9995de5028325b88e8338b17754c641bd1c7a5b80c3299b59",
+        "dd5513f0cc43a0407b0a7c3471f05c8e64d1809b6ef78439652b23f77d6d577e",
+        "717881d0e9f55a316cf22029aa4cfff2803ceecd29e9b31d3edfa55e839f508c",
     ),
     // The Confluence guide declares an `access` probe since #102, which is part of
     // its configuration and so of its revision.

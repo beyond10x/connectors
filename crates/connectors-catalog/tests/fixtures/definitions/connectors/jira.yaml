@@ -33,6 +33,10 @@ operations:
     op: getCreateIssueMetaIssueTypes
     paging: offset
     description: List the issue types the account can create in one project, by id or key, one page per call; the walk ends when startAt plus the page's issueTypes reaches total
+  issue.create_meta.fields:
+    op: getCreateIssueMetaIssueTypeId
+    paging: offset
+    description: List the fields one issue type takes when an issue is created in one project, by project id or key and the issue type's id from issue.create_meta, one page per call of at most 200; each field carries fieldId, name, required, schema and allowedValues, and the walk ends when startAt plus the page's fields reaches total
   users.search:
     op: findUsers
     paging: offset-empty
@@ -57,6 +61,77 @@ operations:
             /transitions/0/to/id: target_status
       after: {expect: {/fields/status/id: target_status}, read: {read: issue.get}}
     description: "Run one transition on one issue by id or key: body.transition.id names it, and fields and update set the transition screen's fields. Refused before the write unless the issue's status id is current_status and the transition is open on it with target status id target_status; Jira answers 204, and the issue read again after the write must be in target_status"
+  issue.create:
+    op: createIssue
+    effect: write
+    body:
+      /fields/project/key: string+
+      /fields/issuetype/id: string+!
+      /fields/summary: string+!
+      /fields/description: any
+      /fields/labels: string_list
+      /fields/priority/id: string
+      /fields/assignee/accountId: string
+      /fields/parent/key: string+
+    guard:
+      before: {read: getProject, with: {projectIdOrKey: body.fields.project.key}, expect: {/key: body.fields.project.key}}
+    description: "Create one issue in the project body.fields.project.key, of the issue type body.fields.issuetype.id, with body.fields.summary; body.fields.description is an Atlassian Document Format document sent as given, and body.fields.labels, body.fields.priority.id, body.fields.assignee.accountId and body.fields.parent.key are optional (issue.create_meta.fields lists what an issue type takes). The provider reads the project first and refuses before any write when it is absent or has another key. Nothing is compared before a create: the same input approved and sent twice creates two issues. Jira answers 201 with the new issue's id, key and self"
+  issue.comment.add:
+    op: addComment
+    effect: write
+    body:
+      /body/type: =doc
+      /body/version: =1
+      /body/content: any!
+      /visibility/type: string
+      /visibility/value: string
+    body_enums: {/visibility/type: [group, role]}
+    guard:
+      before: {read: issue.get, expect: {/key: issueIdOrKey}}
+      after: {expect: {/body/type: =doc}}
+    description: "Add one comment to one issue by key: body.body.content is the content of an Atlassian Document Format document, sent as given, whose type doc and version 1 are fixed; body.visibility.type (group or role) and body.visibility.value restrict who sees it. The provider reads the issue first and refuses before any write when it is absent or its key is not issueIdOrKey. A comment sent twice is two comments. Jira answers 201 with the comment, its id among it, whose body must be a doc"
+  issue.edit:
+    op: editIssue
+    effect: write
+    withhold: [overrideScreenSecurity, overrideEditableFlag, returnIssue, expand]
+    body:
+      /fields/summary: string+
+      /fields/description: any
+      /fields/labels: string_list
+      /fields/priority: any
+      /fields/assignee: any
+    body_any_of: [/fields/summary, /fields/description, /fields/labels, /fields/priority, /fields/assignee]
+    conflict_status: 409
+    guard:
+      before:
+        read: issue.get
+        expect: {/key: issueIdOrKey, /fields/updated: updated_stamp}
+        mismatch: conflict
+      after: {expect: {/key: issueIdOrKey}, read: {read: issue.get}}
+    description: "Change one issue by key: body.fields.summary, body.fields.description (an Atlassian Document Format document sent as given), body.fields.labels (replacing the issue's labels), body.fields.priority and body.fields.assignee, at least one of them. Send the issue's fields.updated from issue.get as updated_stamp: the edit is refused as conflict before it is sent when the issue changed since, and Jira's 409 is conflict. Jira answers 204, and the issue read again after the write must have the same key; the changed fields are not compared"
+  issue.link.add:
+    op: linkIssues
+    effect: write
+    body:
+      /type/name: string+!
+      /inwardIssue/key: string+
+      /outwardIssue/key: string+
+    guard:
+      before: {read: issue.get, with: {issueIdOrKey: body.inwardIssue.key}, expect: {/key: body.inwardIssue.key}}
+      also:
+        - {read: issue.get, with: {issueIdOrKey: body.outwardIssue.key}, expect: {/key: body.outwardIssue.key}}
+    description: "Link two issues by key with the link type named body.type.name, such as Blocks: body.inwardIssue.key and body.outwardIssue.key. The provider reads both issues first and refuses before any write when either is absent or has another key. Jira answers 201 with no body, also for a link that already exists, and the link is not read after the write: issue.get with fields issuelinks shows it"
+  issue.delete:
+    op: deleteIssue
+    effect: write
+    withhold: [deleteSubtasks]
+    guard:
+      before:
+        read: issue.get
+        expect: {/key: issueIdOrKey, /fields/updated: updated_stamp}
+        mismatch: conflict
+      after: {read: {read: issue.get}, absent: true}
+    description: "Delete one issue by key while its fields.updated is updated_stamp, read from issue.get. The provider reads the issue first and refuses before any write when it is absent, and as conflict when its key or fields.updated differs; it reads the issue again after Jira's 204: only a 404 there proves it gone, so an issue still found or a read that fails leaves the effect unknown. deleteSubtasks is withheld, so Jira refuses an issue with subtasks (400)"
 references:
   issue:
     match:

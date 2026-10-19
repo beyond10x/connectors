@@ -86,6 +86,14 @@ const REVALIDATION_PAUSES: [Duration; 2] = [Duration::from_millis(200), Duration
 /// What must remain before the deadline after a pause and an attempt as long as
 /// the last one.
 const REVALIDATION_MARGIN: Duration = Duration::from_millis(500);
+/// The least a read whose current evidence would lapse early keeps of that
+/// evidence for itself. It keeps half of what is left: its recollection ends
+/// halfway to the evidence's expiry, so that a recollection that fails or
+/// hangs leaves the read time to relaunch its adapter and be served on the
+/// evidence it was admitted on (contracts/cli/v1alpha1/semantics.md). Evidence
+/// with no more than twice this left is too short for that, and is recollected
+/// within the read's own deadline, never skipped.
+const EARLY_READ_MARGIN_MS: u64 = 2_000;
 
 /// The transient class of a failed validation, which a revalidation sends
 /// again; `None` for every other failure, a credential (401), permission (403),
@@ -176,7 +184,7 @@ struct Job {
     adapter: Adapter,
     task: Task,
     deadline: u64,
-    reply: mpsc::Sender<Result<Output>>,
+    reply: Reply,
     epoch: u64,
     queued: Option<JobQueued>,
     dispatch: Dispatch,
@@ -312,6 +320,158 @@ pub(super) struct Pool {
     /// custody target's worker. Weak, so a worker never keeps its pool alive;
     /// empty for a pool not built by [`Pool::shared`].
     this: Weak<Pool>,
+    /// The revalidations queued or running, explicit ones and reads'
+    /// recollections alike: a revalidation of the same key joins the one in
+    /// flight instead of queueing behind it (contracts/cli/v1alpha1/owner.md).
+    revalidations: Flights,
+}
+/// The revalidations in flight, by instance, connection and semantic
+/// revision. Shared with the workers, whose jobs keep their entries listed.
+type Flights = Arc<Mutex<BTreeMap<JoinKey, Arc<Joined>>>>;
+/// A revalidation's instance, connection and expected semantic revision.
+type JoinKey = (String, String, String);
+/// What a revalidation in flight answers the revalidations that joined it.
+#[derive(Clone)]
+enum Answer {
+    /// Its own answer: the connection summary, or its refusal.
+    Joined(Result<Value>),
+    /// A read's recollection that ended with no answer a revalidation would
+    /// give: changed mounted material, which a read never re-pins and an
+    /// explicit revalidation does, or a recollection that ended before it
+    /// answered. Its joiners then coalesce onto one fresh revalidation.
+    Rerun,
+}
+/// The answer of one revalidation in flight. The first one published is the
+/// one every joiner reads.
+#[derive(Default)]
+struct Joined {
+    answer: Mutex<Option<Answer>>,
+    wake: Condvar,
+}
+impl Joined {
+    fn publish(&self, answer: Answer) {
+        if let Ok(mut slot) = self.answer.lock()
+            && slot.is_none()
+        {
+            *slot = Some(answer);
+        }
+        self.wake.notify_all();
+    }
+    fn answered(&self) -> Option<Answer> {
+        self.answer.lock().ok().and_then(|slot| slot.clone())
+    }
+    /// The joined revalidation's answer, or `outcome_unknown` once this
+    /// waiter's own deadline passes first, as for an unanswered revalidation.
+    fn wait(&self, deadline: u64) -> Result<Answer> {
+        let mut slot = self.answer.lock().map_err(|_| Code::Unavailable)?;
+        loop {
+            if let Some(answer) = slot.as_ref() {
+                return Ok(answer.clone());
+            }
+            let left = until(deadline)
+                .map_err(|_| Error::from(Code::OutcomeUnknown))?
+                .saturating_duration_since(Instant::now());
+            slot = self
+                .wake
+                .wait_timeout(slot, left)
+                .map_err(|_| Code::Unavailable)?
+                .0;
+        }
+    }
+}
+/// One revalidation in flight. It stays listed for as long as its work can
+/// still run: an explicit revalidation's for as long as its worker holds its
+/// job (not as long as its caller waits), a read's recollection until it
+/// ends. Answered, it leaves the list first, so a revalidation arriving after
+/// the answer runs its own; dropped unanswered, it leaves and answers
+/// `fallback`.
+struct Flight {
+    flights: Flights,
+    key: JoinKey,
+    joined: Arc<Joined>,
+    fallback: Answer,
+}
+/// What finding a key in flight makes of a revalidation.
+enum Member {
+    Leading(Flight),
+    Joined(Arc<Joined>),
+}
+impl Member {
+    /// A read's recollection answers the flight it leads, or the queued
+    /// revalidation's flight it found listed under its key.
+    fn answer(&self, answer: Answer) {
+        match self {
+            Member::Leading(flight) => flight.answer(answer),
+            Member::Joined(joined) => joined.publish(answer),
+        }
+    }
+}
+impl Flight {
+    /// Joins the revalidation listed under `key`, or lists a new one.
+    fn lead_or_join(flights: &Flights, key: JoinKey, fallback: Answer) -> Result<Member> {
+        let mut listed = flights.lock().map_err(|_| Code::Unavailable)?;
+        if let Some(joined) = listed.get(&key) {
+            return Ok(Member::Joined(joined.clone()));
+        }
+        let joined = Arc::new(Joined::default());
+        listed.insert(key.clone(), joined.clone());
+        Ok(Member::Leading(Flight {
+            flights: flights.clone(),
+            key,
+            joined,
+            fallback,
+        }))
+    }
+    fn leave(&self) {
+        if let Ok(mut listed) = self.flights.lock()
+            && listed
+                .get(&self.key)
+                .is_some_and(|joined| Arc::ptr_eq(joined, &self.joined))
+        {
+            listed.remove(&self.key);
+        }
+    }
+    /// Its work's answer: it leaves the list, then answers its joiners.
+    fn answer(&self, answer: Answer) {
+        self.leave();
+        self.joined.publish(answer);
+    }
+}
+impl Drop for Flight {
+    fn drop(&mut self) {
+        self.leave();
+        self.joined.publish(self.fallback.clone());
+    }
+}
+/// A job's reply channel. An explicit revalidation's job also holds its
+/// flight, so that the flight stays listed while the worker holds the job,
+/// and the reply answers its joiners as it answers its caller.
+struct Reply {
+    sender: mpsc::Sender<Result<Output>>,
+    flight: Option<Arc<Flight>>,
+}
+impl Reply {
+    /// Answers the job's flight, then its caller. A caller that stopped
+    /// waiting has dropped its receiver; the answer then reaches only the
+    /// flight's joiners.
+    fn send(self, result: Result<Output>) {
+        if let Some(flight) = &self.flight {
+            flight.answer(Answer::Joined(match &result {
+                Ok(Output::Value(value)) => Ok(value.clone()),
+                Ok(_) => Err(Code::Unavailable.into()),
+                Err(error) => Err(error.clone()),
+            }));
+        }
+        let _ = self.sender.send(result);
+    }
+    /// The answer a read's recollection gave this job's flight before the
+    /// worker reached the job: the job runs no probe of its own.
+    fn answered(&self) -> Option<Result<Value>> {
+        match self.flight.as_ref()?.joined.answered()? {
+            Answer::Joined(answer) => Some(answer),
+            Answer::Rerun => None,
+        }
+    }
 }
 impl Pool {
     /// A pool whose workers hold no handle to it: its custody step finds none.
@@ -333,6 +493,7 @@ impl Pool {
             shutdown_lock: Mutex::new(()),
             settled: Arc::new(AtomicU64::new(0)),
             this,
+            revalidations: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
     fn send(
@@ -341,6 +502,7 @@ impl Pool {
         adapter: &Adapter,
         task: Task,
         deadline: u64,
+        flight: Option<Arc<Flight>>,
     ) -> Result<(mpsc::Receiver<Result<Output>>, Dispatch)> {
         until(deadline)?;
         let mut workers = self.workers.lock().map_err(|_| Code::Unavailable)?;
@@ -366,11 +528,13 @@ impl Pool {
             let recovery_pending = Arc::new(AtomicBool::new(false));
             let instance = adapter.instance_id.clone();
             let pool = self.this.clone();
+            let flights = self.revalidations.clone();
             let thread = std::thread::Builder::new()
                 .name("connectors-adapter-owner".into())
                 .spawn(move || {
                     worker(
                         paths, launches, shared, stopped, activity, instance, receiver, pool,
+                        flights,
                     )
                 })
                 .map_err(|_| Code::Unavailable)?;
@@ -409,7 +573,10 @@ impl Pool {
                 adapter: adapter.clone(),
                 task,
                 deadline,
-                reply,
+                reply: Reply {
+                    sender: reply,
+                    flight,
+                },
                 epoch: control.epoch,
                 queued: Some(JobQueued::new(&worker.queued)),
                 dispatch: dispatch.clone(),
@@ -420,14 +587,62 @@ impl Pool {
             })?;
         Ok((receiver, dispatch))
     }
+    /// Runs a job on its instance's worker. A revalidation that finds one of
+    /// the same connection at the same expected revision queued or running,
+    /// an explicit one or a read's recollection, joins it: it sends no job,
+    /// runs no identity probe and answers that revalidation's own answer
+    /// (contracts/cli/v1alpha1/owner.md). A read's recollection that ends on
+    /// changed mounted material, or without an answer, answers
+    /// `Answer::Rerun`: its joiners then coalesce onto one fresh revalidation,
+    /// the first to wake leading it and the rest joining it.
     pub fn run(&self, alias: &str, adapter: &Adapter, task: Task, deadline: u64) -> Result<Output> {
-        // The worker may still commit a revalidation after this wait ends.
-        let committing = matches!(task, Task::Revalidate { .. });
-        let (receiver, dispatch) = self.send(alias, adapter, task, deadline)?;
+        let Task::Revalidate {
+            connection,
+            revision,
+            ..
+        } = &task
+        else {
+            return self.run_job(alias, adapter, task, deadline);
+        };
+        let key = (
+            adapter.instance_id.clone(),
+            connection.clone(),
+            revision.clone(),
+        );
+        let flight = loop {
+            let fallback = Answer::Joined(Err(Code::OutcomeUnknown.into()));
+            match Flight::lead_or_join(&self.revalidations, key.clone(), fallback)? {
+                Member::Leading(flight) => break Arc::new(flight),
+                Member::Joined(joined) => match joined.wait(deadline)? {
+                    Answer::Joined(answer) => return answer.map(Output::Value),
+                    // A read's recollection that ended without new evidence.
+                    Answer::Rerun => continue,
+                },
+            }
+        };
+        let joined = flight.joined.clone();
+        if let Err(error) = self.send(alias, adapter, task, deadline, Some(flight.clone())) {
+            joined.publish(Answer::Joined(Err(error.clone())));
+            return Err(error);
+        }
+        // The job now holds the flight; it stays listed until the worker lets
+        // the job go, whether or not this wait outlasts it.
+        drop(flight);
+        match joined.wait(deadline) {
+            Ok(Answer::Joined(answer)) => answer.map(Output::Value),
+            // The worker may still commit this revalidation after the wait
+            // ends; its joiners answer the same `outcome_unknown`.
+            Ok(Answer::Rerun) | Err(_) => {
+                joined.publish(Answer::Joined(Err(Code::OutcomeUnknown.into())));
+                Err(Code::OutcomeUnknown.into())
+            }
+        }
+    }
+    fn run_job(&self, alias: &str, adapter: &Adapter, task: Task, deadline: u64) -> Result<Output> {
+        let (receiver, dispatch) = self.send(alias, adapter, task, deadline, None)?;
         receiver
             .recv_timeout(until(deadline)?.saturating_duration_since(Instant::now()))
             .map_err(|e| match e {
-                _ if committing => Code::OutcomeUnknown.into(),
                 // A read its worker already dispatched: the request may have
                 // reached the provider, so its deadline is the provider's.
                 mpsc::RecvTimeoutError::Timeout if dispatch.abandon() => Error {
@@ -540,6 +755,7 @@ impl Pool {
                     adapter,
                     Task::Ensure { resume: false },
                     connectors_sdk::now_ms() + 120_000,
+                    None,
                 );
             }
         }
@@ -636,6 +852,7 @@ fn worker(
     instance: String,
     receiver: mpsc::Receiver<Work>,
     pool: Weak<Pool>,
+    flights: Flights,
 ) {
     let Activity {
         busy,
@@ -672,6 +889,11 @@ fn worker(
         // `busy` now covers this job; it is no longer queued.
         drop(job.queued.take());
         let result = (|| {
+            // A read's recollection of the same connection and revision ran
+            // while this revalidation was queued, and this one joined it.
+            if let Some(answer) = job.reply.answered() {
+                return answer.map(Output::Value);
+            }
             until(job.deadline)?;
             if stopped.load(Ordering::SeqCst) {
                 return Err(Code::Unavailable.into());
@@ -800,29 +1022,17 @@ fn worker(
                 state.suppress(&current.instance_id, false)?;
             }
             drop(guard);
+            let launch = Launch {
+                control: &control,
+                launches: &launches,
+                state: &state,
+                stopped: &stopped,
+                current: &current,
+                epoch: job.epoch,
+            };
             if child.is_none() {
-                {
-                    let mut guard = control.lock().map_err(|_| Code::Unavailable)?;
-                    guard.check(job.epoch)?;
-                    guard.starting = true;
-                }
-                let _permit = launches.acquire(job.deadline)?;
-                let new = runtime::Child::spawn_until(&current, until(job.deadline)?)?;
-                let mut guard = control.lock().map_err(|_| Code::Unavailable)?;
-                guard.check(job.epoch)?;
-                if stopped.load(Ordering::SeqCst) {
-                    return Err(Code::Unavailable.into());
-                }
-                state.remember(&current.selection(), new.bootstrap())?;
+                child = Some(launch.run(job.deadline)?);
                 selection = current.selection();
-                guard.child = Some(lifecycle::Owned {
-                    handle: new.termination_handle()?,
-                    incarnation: new.incarnation().into(),
-                    revision: new.bootstrap().configuration_revision.clone(),
-                });
-                guard.failed = false;
-                guard.starting = false;
-                child = Some(new);
             }
             until(job.deadline)?;
             let active = child.as_mut().ok_or(Code::Unavailable)?;
@@ -886,174 +1096,27 @@ fn worker(
                         connectors_sdk::now_ms(),
                         job.deadline,
                     )?;
-                    let version = captured.version();
-                    let selection = config.selection();
-                    let read = custody::Store::open_for(version.scope(), &selection, &paths.state)
-                        .and_then(|store| store.read(version));
-                    let check = || -> Result<()> {
-                        let (latest_config, latest) = selected(&paths, &job.alias)?;
-                        if latest.selection() != current.selection()
-                            || latest_config.selection() != config.selection()
-                        {
-                            return Err(Code::LifecycleConflict.into());
-                        }
-                        if !latest.permissions.profiles.contains(&profile) {
-                            return Err(Code::Forbidden.into());
-                        }
-                        if stopped.load(Ordering::SeqCst) {
-                            return Err(Error {
-                                cause: Some(Cause::OwnerStopping),
-                                ..Error::from(Code::Unavailable)
-                            });
-                        }
-                        Ok(())
-                    };
-                    let material = match read {
-                        Ok(value) => value,
-                        // The mounted item's bytes are no longer the pinned
-                        // ones: re-read it, validate the new bytes with the
-                        // provider and publish them as a new version, without
-                        // re-entry. The old bytes' version is retired.
-                        #[cfg(target_os = "linux")]
-                        Err(custody::Failure::Missing) if selection.read_only() => {
-                            registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
-                            let acquired = registry.begin_repair(
-                                &binding,
-                                &connection,
-                                &revision,
-                                connectors_sdk::now_ms(),
-                            )?;
-                            let claim = registry.consume(acquired, connectors_sdk::now_ms())?;
-                            let sent = std::cell::Cell::new(0u32);
-                            let published = super::publish_mounted(
-                                &paths,
-                                &selection,
-                                &registry,
-                                &claim,
-                                &job.alias,
-                                &profile,
-                                |secret| {
-                                    control
-                                        .lock()
-                                        .map_err(|_| Code::Unavailable)?
-                                        .check(job.epoch)
-                                        .and_then(|_| check())?;
-                                    let (result, attempts, cause) = revalidate_with_retries(
-                                        job.deadline,
-                                        || {
-                                            let result =
-                                                active.validate(&profile, &secret, job.deadline);
-                                            (result, active.running().unwrap_or(false))
-                                        },
-                                        || stopped.load(Ordering::SeqCst),
-                                        std::thread::sleep,
-                                    );
-                                    sent.set(attempts);
-                                    result
-                                        .map(runtime::Baseline::into_registry)
-                                        .map_err(|failure| retried(failure, attempts, cause))
-                                },
-                                || {
-                                    control
-                                        .lock()
-                                        .map_err(|_| Code::Unavailable)?
-                                        .check(job.epoch)
-                                        .and_then(|_| check())
-                                },
-                            );
-                            if let Err(error) = published {
-                                let mut error = error;
-                                if sent.get() > 0 && error.attempts.is_none() {
-                                    error.attempts = Some(sent.get());
-                                }
-                                if error.code != Code::OutcomeUnknown {
-                                    registry.fail(&claim, connectors_sdk::now_ms())?;
-                                }
-                                return Err(error);
-                            }
-                            let observed = registry.describe(
-                                &current.instance_id,
-                                &current.adapter_id,
-                                current.configured(),
-                                &connection,
-                                connectors_sdk::now_ms(),
-                                true,
-                            )?;
-                            return Ok(Output::Value(
-                                json!({"connection":connection_value(&job.alias,observed)}),
-                            ));
-                        }
-                        Err(error) => {
-                            if super::read_invalidates(&selection, error) {
-                                registry
-                                    .missing_revalidation(captured, connectors_sdk::now_ms())?;
-                            } else {
-                                registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
-                            }
-                            return Err(Code::CustodyUnavailable.into());
-                        }
-                    };
-                    let guard = control.lock().map_err(|_| Code::Unavailable)?;
-                    if let Err(error) = guard.check(job.epoch).and_then(|_| check()) {
-                        registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
-                        return Err(error);
-                    }
-                    let upgrade = captured.upgrades();
-                    let dispatched =
-                        registry.dispatch_revalidation(captured, connectors_sdk::now_ms())?;
-                    drop(guard);
-                    let (result, attempts, cause) = revalidate_with_retries(
-                        job.deadline,
-                        || {
-                            let result = active.validate(&profile, &material, job.deadline);
-                            (result, active.running().unwrap_or(false))
+                    revalidate(
+                        &Scope {
+                            paths: &paths,
+                            alias: &job.alias,
+                            config: &config,
+                            current: &current,
+                            control: &control,
+                            stopped: &stopped,
+                            epoch: job.epoch,
+                            deadline: job.deadline,
+                            profile: &profile,
                         },
-                        || stopped.load(Ordering::SeqCst),
-                        std::thread::sleep,
-                    );
-                    let guard = control.lock().map_err(|_| Code::Unavailable)?;
-                    if let Err(error) = guard.check(job.epoch).and_then(|_| check()) {
-                        registry.finish_revalidation(
-                            dispatched,
-                            Err(None),
-                            connectors_sdk::now_ms(),
-                        )?;
-                        let mut error = error;
-                        if attempts > 0 {
-                            error.attempts = Some(attempts);
-                        }
-                        return Err(error);
-                    }
-                    match result {
-                        Ok(baseline) => registry.finish_revalidation(
-                            dispatched,
-                            Ok(baseline.into_registry()),
-                            connectors_sdk::now_ms(),
-                        )?,
-                        Err(error) => {
-                            let reason = match error {
-                                runtime::Failure::InvalidCredential
-                                | runtime::Failure::IdentityMismatch => {
-                                    Some(registry::InvalidCredential::Invalid)
-                                }
-                                runtime::Failure::InsufficientScope => {
-                                    Some(registry::InvalidCredential::Insufficient)
-                                }
-                                _ => None,
-                            };
-                            registry.finish_revalidation(
-                                dispatched,
-                                Err(reason),
-                                connectors_sdk::now_ms(),
-                            )?;
-                            // Repair refuses the changed binding of an upgrade, so a
-                            // credential the new provider refuses needs a new connection.
-                            let mut error = retried(error, attempts, cause);
-                            error.reconnect = upgrade && reason.is_some();
-                            return Err(error);
-                        }
-                    }
-                    drop(guard);
+                        active,
+                        &registry,
+                        &binding,
+                        captured,
+                        Admission::Explicit {
+                            connection: &connection,
+                            revision: &revision,
+                        },
+                    )?;
                     let observed = registry.describe(
                         &current.instance_id,
                         &current.adapter_id,
@@ -1113,13 +1176,28 @@ fn worker(
                             job.deadline,
                         )
                     };
+                    // Evidence still current that would lapse before this read
+                    // could use it: under half its own lifetime (not the
+                    // profile's bound, which the provider's probe may undercut)
+                    // and under the read's own remaining deadline left. The
+                    // use, and so the provider deadline, never outlasts the
+                    // evidence; fresh evidence admits its read at once.
+                    let lapses_early = |captured: &registry::ReadUse| {
+                        let now = connectors_sdk::now_ms();
+                        let window = (captured.evidence_lifetime_ms() / 2)
+                            .min(job.deadline.saturating_sub(now));
+                        captured.expires_at_ms() < now.saturating_add(window)
+                    };
                     let captured = match capture() {
+                        Ok(captured) if !lapses_early(&captured) => captured,
                         // Only the provider executable changed since the
                         // connection was saved (D12): its stored credential is
                         // validated once under this executable, which the
                         // registry follows when the recorded identity answers
                         // and refuses, changing nothing, otherwise. No
-                        // credential entry, no question.
+                        // credential entry, no question. The evidence that
+                        // validation records is fresh, so the read it admits
+                        // recollects nothing.
                         Err(registry::Failure::ExecutableChanged) => {
                             super::follow_executable(
                                 &paths,
@@ -1153,6 +1231,154 @@ fn worker(
                                 },
                             )?;
                             capture()?
+                        }
+                        // Only the evidence lapsed, or is about to, for an
+                        // intact credential: recollect it once from the
+                        // retained custody version, as `connections
+                        // revalidate` would, within this read's deadline, then
+                        // capture the read against it. Still not current after
+                        // that is the read's refusal.
+                        //
+                        // A recollection run only because current evidence
+                        // would lapse early keeps the read use captured on it:
+                        // a failure that records no credential refusal leaves
+                        // that evidence current, and the read is served on it.
+                        result @ (Ok(_) | Err(registry::Failure::EvidenceExpired)) => {
+                            let early = result.ok();
+                            let recollected = (|| -> Result<()> {
+                                let now = connectors_sdk::now_ms();
+                                // Early, it is bounded by the evidence the read
+                                // was admitted on, less the half the read keeps
+                                // for itself, never by the read's own deadline: a
+                                // hanging probe then still leaves the read
+                                // served on that evidence. Evidence too short
+                                // to leave the recollection as long as the read
+                                // keeps is too short to serve the read on
+                                // after a failed one: the recollection then
+                                // runs as for lapsed evidence, within the
+                                // read's deadline, and is never skipped
+                                // (contracts/cli/v1alpha1/semantics.md: the
+                                // read "recollects it first").
+                                let bound = match &early {
+                                    Some(early)
+                                        if early.expires_at_ms().saturating_sub(now)
+                                            > 2 * EARLY_READ_MARGIN_MS =>
+                                    {
+                                        now + (early.expires_at_ms() - now) / 2
+                                    }
+                                    _ => job.deadline,
+                                };
+                                let expires = bound.min(now.saturating_add(30_000));
+                                let recollection = registry.capture_recollection(
+                                    &binding,
+                                    &connection,
+                                    now,
+                                    expires,
+                                )?;
+                                // This is the same recollection a revalidation
+                                // runs: a revalidation of this connection at
+                                // this revision joins it, and one already
+                                // queued behind this job takes its answer
+                                // (contracts/cli/v1alpha1/owner.md).
+                                let member = Flight::lead_or_join(
+                                    &flights,
+                                    (
+                                        job.adapter.instance_id.clone(),
+                                        connection.clone(),
+                                        recollection.revision().to_owned(),
+                                    ),
+                                    Answer::Rerun,
+                                )?;
+                                let joiners = std::cell::Cell::new(None);
+                                let revalidated = revalidate(
+                                    &Scope {
+                                        paths: &paths,
+                                        alias: &job.alias,
+                                        config: &config,
+                                        current: &current,
+                                        control: &control,
+                                        stopped: &stopped,
+                                        epoch: job.epoch,
+                                        deadline: expires,
+                                        profile: &requirement.profile,
+                                    },
+                                    active,
+                                    &registry,
+                                    &binding,
+                                    recollection,
+                                    Admission::ReadRecollection { joiners: &joiners },
+                                );
+                                // Its joiners answer what an explicit
+                                // revalidation answers: its refusal, a
+                                // transient one included, so that none runs a
+                                // probe of its own. Only a refusal an explicit
+                                // revalidation goes on past (changed mounted
+                                // material, which it re-pins) answers them
+                                // nothing, and each runs its own: a flight this
+                                // recollection leads answers them that as it
+                                // is dropped, and a queued revalidation whose
+                                // flight it joined runs its own job.
+                                if let Err(error) = revalidated {
+                                    if let Some(answer @ Answer::Joined(_)) = joiners.take() {
+                                        member.answer(answer);
+                                    }
+                                    return Err(error);
+                                }
+                                if let Ok(observed) = registry.describe(
+                                    &current.instance_id,
+                                    &current.adapter_id,
+                                    current.configured(),
+                                    &connection,
+                                    connectors_sdk::now_ms(),
+                                    true,
+                                ) {
+                                    member.answer(Answer::Joined(Ok(json!({
+                                        "connection": connection_value(&job.alias, observed)
+                                    }))));
+                                }
+                                Ok(())
+                            })();
+                            match (recollected, early) {
+                                (Ok(()), early) => {
+                                    // The recollection's publication moved
+                                    // the fence past the early use.
+                                    if let Some(early) = early {
+                                        registry.cancel_read(early, connectors_sdk::now_ms())?;
+                                    }
+                                    capture()?
+                                }
+                                (Err(error), None) => return Err(error),
+                                (Err(error), Some(early)) => {
+                                    // A credential refusal cut the material
+                                    // off: the connection admits no read.
+                                    // Anything else left the evidence the
+                                    // read was captured on current.
+                                    let admitted = registry.admit_read(
+                                        &binding,
+                                        &connection,
+                                        &requirement.scopes,
+                                        connectors_sdk::now_ms(),
+                                    );
+                                    if admitted.is_err() {
+                                        registry.cancel_read(early, connectors_sdk::now_ms())?;
+                                        return Err(error);
+                                    }
+                                    // A probe that timed out ended the adapter
+                                    // process; the read is served by a new one,
+                                    // launched within that evidence.
+                                    if !active.running()? {
+                                        match launch.run(early.expires_at_ms()) {
+                                            Ok(new) => *active = new,
+                                            Err(error) => {
+                                                registry
+                                                    .cancel_read(early, connectors_sdk::now_ms())?;
+                                                return Err(error);
+                                            }
+                                        }
+                                    }
+                                    early
+                                }
+                            }
                         }
                         other => other?,
                     };
@@ -1244,8 +1470,298 @@ fn worker(
             guard.failed = true;
         }
         busy.store(false, Ordering::SeqCst);
-        let _ = job.reply.send(result);
+        job.reply.send(result);
     }
+}
+
+/// What a job launches its instance's adapter process under.
+struct Launch<'a> {
+    control: &'a Mutex<lifecycle::Control>,
+    launches: &'a Launches,
+    state: &'a runtime::state::State,
+    stopped: &'a AtomicBool,
+    current: &'a Adapter,
+    epoch: u64,
+}
+impl Launch<'_> {
+    /// Launches the configured adapter process by `deadline` and records it
+    /// as the instance's child, under this job's epoch.
+    fn run(&self, deadline: u64) -> Result<runtime::Child> {
+        {
+            let mut guard = self.control.lock().map_err(|_| Code::Unavailable)?;
+            guard.check(self.epoch)?;
+            guard.starting = true;
+        }
+        let _permit = self.launches.acquire(deadline)?;
+        let new = runtime::Child::spawn_until(self.current, until(deadline)?)?;
+        let mut guard = self.control.lock().map_err(|_| Code::Unavailable)?;
+        guard.check(self.epoch)?;
+        if self.stopped.load(Ordering::SeqCst) {
+            return Err(Code::Unavailable.into());
+        }
+        self.state
+            .remember(&self.current.selection(), new.bootstrap())?;
+        guard.child = Some(lifecycle::Owned {
+            handle: new.termination_handle()?,
+            incarnation: new.incarnation().into(),
+            revision: new.bootstrap().configuration_revision.clone(),
+        });
+        guard.failed = false;
+        guard.starting = false;
+        Ok(new)
+    }
+}
+
+/// What admitted a revalidation (`connectors.cli.LocalRevalidationCause`,
+/// ess/domains/cli.yaml).
+#[derive(Clone, Copy)]
+enum Admission<'a> {
+    /// `connections revalidate`: the only cause that re-pins changed mounted
+    /// material or follows a configuration upgrade.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    Explicit {
+        connection: &'a str,
+        revision: &'a str,
+    },
+    /// The one recollection a read runs, first in its own job, when only its
+    /// connection's evidence lapsed (contracts/cli/v1alpha1/semantics.md).
+    /// A failed one leaves in `joiners` what the revalidations that joined it
+    /// answer: the refusal an explicit revalidation gives (owner.md), or
+    /// [`Answer::Rerun`] where only an explicit one goes on, re-pinning changed
+    /// mounted material.
+    ReadRecollection {
+        joiners: &'a std::cell::Cell<Option<Answer>>,
+    },
+}
+
+/// The job a revalidation runs in, on the instance's serialized worker.
+#[derive(Clone, Copy)]
+struct Scope<'a> {
+    paths: &'a Paths,
+    alias: &'a str,
+    config: &'a Config,
+    current: &'a Adapter,
+    control: &'a Mutex<lifecycle::Control>,
+    stopped: &'a AtomicBool,
+    epoch: u64,
+    /// The validation's deadline, at most the captured use's expiry.
+    deadline: u64,
+    profile: &'a str,
+}
+
+/// Validates the captured custody version's bytes with the provider and
+/// publishes the recollected baseline under the unchanged generation, or
+/// records the provider's refusal (`connections revalidate`, owner.md). Under
+/// the read-only binding, bytes no longer the pinned ones are re-pinned only
+/// for an explicit revalidation; a read's recollection refuses them as its
+/// read would.
+fn revalidate(
+    scope: &Scope<'_>,
+    active: &mut runtime::Child,
+    registry: &registry::Registry,
+    binding: &registry::Binding,
+    captured: registry::Revalidation,
+    admission: Admission<'_>,
+) -> Result<()> {
+    // Only `connections revalidate` carries `cause` and `attempts`
+    // (contracts/cli/v1alpha1/semantics.md, "Revalidation retries"); a read's
+    // recollection answers the read's own failure without them, and its
+    // joiners, revalidations themselves, the failure with them.
+    let answer = |mut error: Error| -> Error {
+        if let Admission::ReadRecollection { joiners } = admission {
+            let joined = joiners
+                .take()
+                .unwrap_or_else(|| Answer::Joined(Err(error.clone())));
+            joiners.set(Some(joined));
+            error.cause = None;
+            error.attempts = None;
+        }
+        error
+    };
+    revalidate_inner(scope, active, registry, binding, captured, admission).map_err(answer)
+}
+
+fn revalidate_inner(
+    scope: &Scope<'_>,
+    active: &mut runtime::Child,
+    registry: &registry::Registry,
+    #[cfg_attr(not(target_os = "linux"), allow(unused_variables))] binding: &registry::Binding,
+    captured: registry::Revalidation,
+    admission: Admission<'_>,
+) -> Result<()> {
+    let Scope {
+        paths,
+        alias,
+        config,
+        current,
+        control,
+        stopped,
+        epoch,
+        deadline,
+        profile,
+    } = *scope;
+    let version = captured.version();
+    let selection = config.selection();
+    let read = custody::Store::open_for(version.scope(), &selection, &paths.state)
+        .and_then(|store| store.read(version));
+    let check = || -> Result<()> {
+        let (latest_config, latest) = selected(paths, alias)?;
+        if latest.selection() != current.selection()
+            || latest_config.selection() != config.selection()
+        {
+            return Err(Code::LifecycleConflict.into());
+        }
+        if !latest.permissions.profiles.iter().any(|p| p == profile) {
+            return Err(Code::Forbidden.into());
+        }
+        if stopped.load(Ordering::SeqCst) {
+            return Err(Error {
+                cause: Some(Cause::OwnerStopping),
+                ..Error::from(Code::Unavailable)
+            });
+        }
+        Ok(())
+    };
+    let material = match read {
+        Ok(value) => value,
+        // The mounted item's bytes are no longer the pinned ones: re-read it,
+        // validate the new bytes with the provider and publish them as a new
+        // version, without re-entry. The old bytes' version is retired.
+        #[cfg(target_os = "linux")]
+        Err(custody::Failure::Missing) if selection.read_only() => {
+            registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+            let Admission::Explicit {
+                connection,
+                revision,
+            } = admission
+            else {
+                // A read never re-pins changed material; each revalidation
+                // that joined its recollection goes on to re-pin it.
+                if let Admission::ReadRecollection { joiners } = admission {
+                    joiners.set(Some(Answer::Rerun));
+                }
+                return Err(super::read_error(&selection, custody::Failure::Missing));
+            };
+            let acquired =
+                registry.begin_repair(binding, connection, revision, connectors_sdk::now_ms())?;
+            let claim = registry.consume(acquired, connectors_sdk::now_ms())?;
+            let sent = std::cell::Cell::new(0u32);
+            let published = super::publish_mounted(
+                paths,
+                &selection,
+                registry,
+                &claim,
+                alias,
+                profile,
+                |secret| {
+                    control
+                        .lock()
+                        .map_err(|_| Code::Unavailable)?
+                        .check(epoch)
+                        .and_then(|_| check())?;
+                    let (result, attempts, cause) = revalidate_with_retries(
+                        deadline,
+                        || {
+                            let result = active.validate(profile, &secret, deadline);
+                            (result, active.running().unwrap_or(false))
+                        },
+                        || stopped.load(Ordering::SeqCst),
+                        std::thread::sleep,
+                    );
+                    sent.set(attempts);
+                    result
+                        .map(runtime::Baseline::into_registry)
+                        .map_err(|failure| retried(failure, attempts, cause))
+                },
+                || {
+                    control
+                        .lock()
+                        .map_err(|_| Code::Unavailable)?
+                        .check(epoch)
+                        .and_then(|_| check())
+                },
+            );
+            if let Err(error) = published {
+                let mut error = error;
+                if sent.get() > 0 && error.attempts.is_none() {
+                    error.attempts = Some(sent.get());
+                }
+                if error.code != Code::OutcomeUnknown {
+                    registry.fail(&claim, connectors_sdk::now_ms())?;
+                }
+                return Err(error);
+            }
+            return Ok(());
+        }
+        Err(error) => {
+            if super::read_invalidates(&selection, error) {
+                registry.missing_revalidation(captured, connectors_sdk::now_ms())?;
+            } else {
+                registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+            }
+            return Err(match admission {
+                Admission::Explicit { .. } => Code::CustodyUnavailable.into(),
+                Admission::ReadRecollection { joiners } => {
+                    joiners.set(Some(Answer::Joined(Err(Code::CustodyUnavailable.into()))));
+                    super::read_error(&selection, error)
+                }
+            });
+        }
+    };
+    let guard = control.lock().map_err(|_| Code::Unavailable)?;
+    if let Err(error) = guard.check(epoch).and_then(|_| check()) {
+        registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+        return Err(error);
+    }
+    // Only an explicit revalidation follows a configuration upgrade; a read's
+    // recollection is captured against the connection's own binding.
+    let upgrade = captured.upgrades();
+    let dispatched = registry.dispatch_revalidation(captured, connectors_sdk::now_ms())?;
+    drop(guard);
+    let (result, attempts, cause) = revalidate_with_retries(
+        deadline,
+        || {
+            let result = active.validate(profile, &material, deadline);
+            (result, active.running().unwrap_or(false))
+        },
+        || stopped.load(Ordering::SeqCst),
+        std::thread::sleep,
+    );
+    let guard = control.lock().map_err(|_| Code::Unavailable)?;
+    if let Err(error) = guard.check(epoch).and_then(|_| check()) {
+        registry.finish_revalidation(dispatched, Err(None), connectors_sdk::now_ms())?;
+        let mut error = error;
+        if attempts > 0 {
+            error.attempts = Some(attempts);
+        }
+        return Err(error);
+    }
+    match result {
+        Ok(baseline) => registry.finish_revalidation(
+            dispatched,
+            Ok(baseline.into_registry()),
+            connectors_sdk::now_ms(),
+        )?,
+        Err(error) => {
+            let reason = match error {
+                runtime::Failure::InvalidCredential | runtime::Failure::IdentityMismatch => {
+                    Some(registry::InvalidCredential::Invalid)
+                }
+                runtime::Failure::InsufficientScope => {
+                    Some(registry::InvalidCredential::Insufficient)
+                }
+                _ => None,
+            };
+            registry.finish_revalidation(dispatched, Err(reason), connectors_sdk::now_ms())?;
+            // Repair refuses the changed binding of an upgrade, so a
+            // credential the new provider refuses needs a new connection.
+            let mut error = retried(error, attempts, cause);
+            error.reconnect = upgrade && reason.is_some();
+            return Err(error);
+        }
+    }
+    drop(guard);
+    Ok(())
 }
 
 /// The answer to a read: the provider result as the JSON value the adapter
@@ -1614,6 +2130,193 @@ mod revalidate_wait_tests {
             assert_eq!(code(&pool, Task::Ensure { resume: false }), other);
             pool.shutdown().unwrap();
         }
+    }
+
+    /// A pool whose one worker answers each job after `delay` with the number
+    /// of jobs it has taken up, counting them in the returned counter.
+    fn answering(delay: Duration) -> (Pool, Arc<AtomicUsize>) {
+        let pool = pool(true);
+        let jobs = Arc::new(AtomicUsize::new(0));
+        let taken = jobs.clone();
+        let (sender, receiver) = mpsc::sync_channel::<Work>(16);
+        let thread = std::thread::spawn(move || {
+            while let Ok(work) = receiver.recv() {
+                if let Work::Invoke(job) = work {
+                    let n = taken.fetch_add(1, Ordering::SeqCst) + 1;
+                    std::thread::sleep(delay);
+                    job.reply.send(Ok(Output::Value(json!(n))));
+                }
+            }
+        });
+        let mut workers = pool.workers.lock().unwrap();
+        let worker = workers.get_mut("instance").unwrap();
+        worker.sender = sender;
+        let _ = std::mem::replace(&mut worker.thread, thread);
+        drop(workers);
+        (pool, jobs)
+    }
+
+    fn task(revision: &str) -> Task {
+        Task::Revalidate {
+            connection: "connection".into(),
+            revision: revision.into(),
+            profile: "profile".into(),
+        }
+    }
+
+    /// story:connection-lease-holds-unattended, contracts/cli/v1alpha1/owner.md:
+    /// a revalidation arriving while one of the same connection and expected
+    /// revision is in flight joins it and answers its answer, sending no job of
+    /// its own; one at another revision, or arriving after the answer, runs its
+    /// own.
+    #[test]
+    fn a_revalidation_in_flight_is_joined_not_queued_behind() {
+        let (pool, jobs) = answering(Duration::from_millis(600));
+        let run = |revision: &str| {
+            pool.run(
+                "alias",
+                &adapter(),
+                task(revision),
+                connectors_sdk::now_ms() + 5_000,
+            )
+        };
+        let value = |output: Result<Output>| match output {
+            Ok(Output::Value(value)) => value,
+            _ => panic!("the stand-in worker answers a value"),
+        };
+        let started = Instant::now();
+        let [first, second, other] = std::thread::scope(|scope| {
+            let first = scope.spawn(|| value(run("revision")));
+            std::thread::sleep(Duration::from_millis(100));
+            let second = scope.spawn(|| value(run("revision")));
+            let other = scope.spawn(|| value(run("other")));
+            [first, second, other].map(|t| t.join().unwrap())
+        });
+        assert_eq!(first, second, "the joiner answers the joined answer");
+        assert_ne!(first, other, "another revision never joins");
+        assert_eq!(jobs.load(Ordering::SeqCst), 2);
+        // The joiner did not wait for a second probe behind the first.
+        assert!(started.elapsed() < Duration::from_millis(1_800));
+        assert!(pool.revalidations.lock().unwrap().is_empty());
+        let later = value(run("revision"));
+        assert_ne!(later, first, "a revalidation after the answer runs its own");
+        assert_eq!(jobs.load(Ordering::SeqCst), 3);
+        pool.shutdown().unwrap();
+    }
+
+    /// A joiner whose own deadline passes before the joined answer is
+    /// `outcome_unknown`, as an unanswered revalidation is.
+    #[test]
+    fn a_joiner_past_its_own_deadline_is_outcome_unknown() {
+        let (pool, _) = answering(Duration::from_millis(1_000));
+        std::thread::scope(|scope| {
+            let leader = scope.spawn(|| {
+                pool.run(
+                    "alias",
+                    &adapter(),
+                    task("revision"),
+                    connectors_sdk::now_ms() + 5_000,
+                )
+            });
+            std::thread::sleep(Duration::from_millis(100));
+            match pool.run(
+                "alias",
+                &adapter(),
+                task("revision"),
+                connectors_sdk::now_ms() + 200,
+            ) {
+                Err(error) => assert_eq!(error.code, Code::OutcomeUnknown),
+                Ok(_) => panic!("the joiner's deadline passes first"),
+            }
+            assert!(leader.join().unwrap().is_ok());
+        });
+        pool.shutdown().unwrap();
+    }
+
+    /// A revalidation whose own wait ended `outcome_unknown` stays in flight
+    /// while its worker still holds its job: a revalidation arriving then
+    /// joins it and answers the same `outcome_unknown` (owner.md), sending no
+    /// second job. Once the worker lets the job go, the next one runs its own.
+    #[test]
+    fn a_revalidation_stays_in_flight_while_its_worker_holds_the_job() {
+        let (pool, jobs) = answering(Duration::from_millis(1_000));
+        let run = |ms: u64| {
+            pool.run(
+                "alias",
+                &adapter(),
+                task("revision"),
+                connectors_sdk::now_ms() + ms,
+            )
+        };
+        let unknown = |output: Result<Output>| match output {
+            Err(error) => assert_eq!(error.code, Code::OutcomeUnknown),
+            Ok(_) => panic!("the in-flight revalidation's wait ended outcome_unknown"),
+        };
+        unknown(run(300));
+        // The leader stopped waiting; its job still runs on the worker.
+        assert_eq!(pool.revalidations.lock().unwrap().len(), 1);
+        let started = Instant::now();
+        unknown(run(5_000));
+        assert!(started.elapsed() < Duration::from_millis(300));
+        std::thread::sleep(Duration::from_millis(1_000));
+        assert_eq!(jobs.load(Ordering::SeqCst), 1, "a second job was sent");
+        assert!(pool.revalidations.lock().unwrap().is_empty());
+        assert!(
+            run(5_000).is_ok(),
+            "a revalidation after the job ran its own"
+        );
+        assert_eq!(jobs.load(Ordering::SeqCst), 2);
+        pool.shutdown().unwrap();
+    }
+
+    fn key() -> JoinKey {
+        ("instance".into(), "connection".into(), "revision".into())
+    }
+
+    /// A read's recollection that finds an explicit revalidation of its key
+    /// queued behind its own job answers that revalidation's flight, so the
+    /// queued job runs no probe of its own.
+    #[test]
+    fn a_reads_recollection_answers_a_queued_revalidation_of_its_key() {
+        let flights: Flights = Arc::default();
+        let fallback = || Answer::Joined(Err(Code::OutcomeUnknown.into()));
+        let Member::Leading(flight) = Flight::lead_or_join(&flights, key(), fallback()).unwrap()
+        else {
+            panic!("nothing was in flight");
+        };
+        let (sender, _receiver) = mpsc::channel();
+        let reply = Reply {
+            sender,
+            flight: Some(Arc::new(flight)),
+        };
+        assert!(reply.answered().is_none());
+        let read = Flight::lead_or_join(&flights, key(), Answer::Rerun).unwrap();
+        assert!(matches!(read, Member::Joined(_)));
+        read.answer(Answer::Joined(Ok(json!("summary"))));
+        drop(read);
+        assert_eq!(reply.answered().unwrap().unwrap(), json!("summary"));
+        // Listed until the worker lets the job go.
+        assert_eq!(flights.lock().unwrap().len(), 1);
+        drop(reply);
+        assert!(flights.lock().unwrap().is_empty());
+    }
+
+    /// A read's recollection that ends without new evidence answers its
+    /// joiners nothing of its own: they coalesce onto one fresh revalidation.
+    #[test]
+    fn a_reads_recollection_without_new_evidence_has_its_joiners_rerun() {
+        let flights: Flights = Arc::default();
+        let read = Flight::lead_or_join(&flights, key(), Answer::Rerun).unwrap();
+        let Member::Joined(joined) = Flight::lead_or_join(&flights, key(), Answer::Rerun).unwrap()
+        else {
+            panic!("the read's recollection was in flight");
+        };
+        drop(read);
+        assert!(flights.lock().unwrap().is_empty());
+        assert!(matches!(
+            joined.wait(connectors_sdk::now_ms() + 1_000).unwrap(),
+            Answer::Rerun
+        ));
     }
 }
 

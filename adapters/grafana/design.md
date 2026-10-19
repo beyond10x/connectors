@@ -134,5 +134,5 @@ unselected. Read-only selection does not make the entire source GET-only.
 Dashboard/list schemas, coherent enumeration and the exact proxy-target verifier
 remain native authoring obligations. An unchanged UID/type cannot prove hidden
 target equality. Shared publication/continuity are host-port obligations.
-[Composition](../../docs/compositions/monitoring.md) owns concrete pairing and
+Composition owns concrete pairing and
 direct/mediated equivalence suites; neither parent nor child imports the other.

@@ -323,10 +323,10 @@ fn bounds_round_trip_and_unbounded_selections_serialise_as_before() {
         }
         assert!(serde_json::from_value::<Selection>(value).is_err(), "{bad}");
     }
-    // Jira carries no bound: every selection serialises exactly the six fields
-    // a selection had at the base commit, so its configuration digest is the
-    // same bytes as before. The one write, `issue.transition.run`, adds only
-    // the `body_keys` that close its body, and no `bounds`. The binary read
+    // Jira carries no bound: every read serialises exactly the six fields a
+    // selection had at the base commit, so its configuration digest is the
+    // same bytes as before. Each write adds only the members that close its
+    // body or withhold a parameter, and no `bounds`. The binary read
     // `attachment.content` adds only its `binary` bound and reach; its
     // `response` was among the six already.
     let before: BTreeSet<&str> = [
@@ -348,12 +348,31 @@ fn bounds_round_trip_and_unbounded_selections_serialise_as_before() {
             .map(String::as_str)
             .collect();
         let mut expected = before.clone();
-        if selection.id == "issue.transition.run" {
-            expected.insert("body_keys");
-        }
-        if selection.id == "attachment.content" {
-            expected.insert("binary");
-        }
+        let added: &[&str] = match selection.id.as_str() {
+            "issue.transition.run" => &["body_keys"],
+            "attachment.content" => &["binary"],
+            "issue.create" | "issue.link.add" => {
+                &["body_keys", "body_nonempty", "body_required", "body_types"]
+            }
+            "issue.comment.add" => &[
+                "body_enums",
+                "body_fixed",
+                "body_keys",
+                "body_required",
+                "body_types",
+            ],
+            "issue.edit" => &[
+                "body_any_of",
+                "body_keys",
+                "body_nonempty",
+                "body_types",
+                "conflict_status",
+                "withhold",
+            ],
+            "issue.delete" => &["withhold"],
+            _ => &[],
+        };
+        expected.extend(added.iter().copied());
         assert_eq!(keys, expected, "{}", selection.id);
     }
     let _ = BTreeMap::<String, Bound>::new();

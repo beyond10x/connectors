@@ -1,5 +1,0 @@
-format: ess/14
-system: connectors_docker
-version: v1
-domains:
-  - connectors_docker.mutations

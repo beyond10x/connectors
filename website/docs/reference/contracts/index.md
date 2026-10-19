@@ -62,7 +62,6 @@ Each page below renders its owner's contract source unchanged in meaning: shared
 | Contract | Status |
 |---|---|
 | [Bidirectional sessions](./sessions.md) | Specified; outside current runtime scope |
-| [Media sessions](./media.md) | Specified; outside current runtime scope |
 
 ## Adapter-owned native contracts
 
@@ -77,15 +76,10 @@ Each page below renders its owner's contract source unchanged in meaning: shared
 | kubernetes | [Kubernetes Helm release reads](../adapters/kubernetes/contracts/helm.md) | Read-only observation; dedicated sandbox acceptance open |
 | kubernetes | [Kubernetes mutations](../adapters/kubernetes/contracts/mutations.md) | Pod exec implemented, local CLI only; rollout restart specified |
 | kubernetes | [Kubernetes mediated routes](../adapters/kubernetes/contracts/routes.md) | Specified; runtime pending |
-| atlassian | [Atlassian documents](../adapters/atlassian/contracts/documents.md) | Specified; runtime pending |
-| docker | [Docker logs](../adapters/docker/contracts/logs.md) | Specified; runtime pending |
-| docker | [Docker mutations](../adapters/docker/contracts/mutations.md) | Specified; runtime pending |
 | grafana | [Grafana datasource discovery](../adapters/grafana/contracts/discovery.md) | Specified; runtime pending |
 | grafana | [Grafana mediated routes](../adapters/grafana/contracts/routes.md) | Specified; runtime pending |
 | loki | [Loki LogQL](../adapters/loki/contracts/logs.md) | Implemented by the loki adapter since 0.38.0: range, metric and label reads |
 | prometheus | [Prometheus PromQL](../adapters/prometheus/contracts/series.md) | Implemented by the prometheus adapter: instant, range and rules reads |
-| sip | [SIP dial](../adapters/sip/contracts/dial.md) | Specified; runtime pending |
-| rtvbp | [RTVBP sessions](../adapters/rtvbp/contracts/session.md) | Specified; runtime pending |
 | catalog | [GitLab merge-request feed](../adapters/catalog/contracts/feed.md) | Implemented by the catalog provider; checked against recorded GitLab answers |
 
 ## ESS models
@@ -94,7 +88,6 @@ Each page below renders its owner's contract source unchanged in meaning: shared
 |---|---|
 | shared | [Model overview](./model/index.md) |
 | atlassian | [Model overview](../adapters/atlassian/model/index.md) |
-| docker | [Model overview](../adapters/docker/model/index.md) |
 | grafana | [Model overview](../adapters/grafana/model/index.md) |
 | kubernetes | [Model overview](../adapters/kubernetes/model/index.md) |
 | loki | [Model overview](../adapters/loki/model/index.md) |

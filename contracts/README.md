@@ -36,7 +36,6 @@ See [CHANGELOG.md](../CHANGELOG.md) for the baseline's implementation boundary.
 | `auth.capability/v1alpha1` | [auth/capability/v1alpha1](auth/capability/v1alpha1/semantics.md) | proposed (extends `AuthenticatedHttp`) | connection-bound runtime capabilities: HTTP bearer/basic, mTLS, socket peer, exec plugin, SIP lease, session authority, inbound verifier, mediated HTTP; signing remains reserved/refused; [read refresh retry](auth/capability/v1alpha1/read-refresh-once.md) requires its separately selected native profile |
 | `auth.evidence/v1alpha1` | [auth/evidence/v1alpha1](auth/evidence/v1alpha1/semantics.md) | proposed | value-free readiness and provider-side authorization checks |
 | `sessions/v1alpha1` | [sessions/v1alpha1](sessions/v1alpha1/semantics.md) | proposed | bidirectional sessions: offer, establishment, correlation, lease, revocation, terminal races, duplex transport |
-| `media/v1alpha1` | [media/v1alpha1](media/v1alpha1/semantics.md) | proposed | negotiated tracks, duplex frames, readiness, loss, overload, DTMF, interrupt |
 | `catalog/v1alpha1` | [catalog/v1alpha1](catalog/v1alpha1/semantics.md) | proposed | list/describe/locate pre-compiled adapter bundles with provenance and coverage; optional; grants nothing |
 | `operations/v1alpha1` `generic-http` profile (and `datasource.records` `generic-http-page`) | [catalog/v1alpha1](catalog/v1alpha1/semantics.md) §3.2 | proposed | an operation realized from a bundle's request mapping by one generic engine: status, JSON passthrough, provenance, status-to-code table |
 
@@ -53,11 +52,8 @@ Deferred families with no document yet: `execution`, `events`, `resources`,
 
 | Adapter document | Contracts |
 |---|---|
-| [Atlassian](../adapters/atlassian/design.md) | operations + mutation, records + document, auth.connection, auth.profile, auth.acquisition, auth.custody, auth.capability, auth.evidence |
 | [Kubernetes](../adapters/kubernetes/design.md) | records, endpoint_discovery, host_discovery (implemented) + logs, mutation, resource_discovery, route.mediated_http, auth.connection, auth.profile, auth.acquisition (static_config), auth.capability, auth.custody, auth.evidence |
-| [Docker](../adapters/docker/design.md) | operations + mutation, records, logs, endpoint_discovery, auth.connection, auth.profile, auth.acquisition (static_config), auth.capability, auth.custody, auth.evidence |
-| [Grafana, Loki, Prometheus, Alertmanager](../docs/compositions/monitoring.md) | records, logs, series, resource_discovery, route.mediated_http, auth.connection, auth.profile, auth.acquisition, auth.capability, auth.custody, auth.evidence |
-| [Media session: SIP, RTVBP, bridge, local audio](../docs/compositions/media-session.md) | operations + mutation, records, sessions, media, auth.connection, auth.profile, auth.acquisition, auth.capability, auth.custody, auth.evidence |
+| Grafana, Loki, Prometheus, Alertmanager | records, logs, series, resource_discovery, route.mediated_http, auth.connection, auth.profile, auth.acquisition, auth.capability, auth.custody, auth.evidence |
 | [Catalog and pre-compiled third-party specs](../adapters/catalog/design.md) | catalog, operations `generic-http` + mutation, records `generic-http-page`, auth.profile, auth.acquisition, auth.capability (+ `http-header`, `http-query`), auth.evidence, auth.connection, auth.custody |
 
 ## Provider authentication at a glance
@@ -67,11 +63,8 @@ Deferred families with no document yet: `execution`, `events`, `resources`,
 | Jira | basic email+token; user OAuth2 code+refresh; service client_credentials; service bearer (`../connectors/providers/jira.toml:140-297`) | 4 | oauth2 code, client credentials, static entry | http-basic, http-bearer | scope, identity |
 | Confluence | basic email+token; service bearer (`providers/confluence.toml`) | 2 | static entry | http-basic, http-bearer | scope |
 | Kubernetes | bearer/token file, client certificate, exec plugin gated (`crates/integration-kubernetes/src/local.rs:311-315,1076-1079`) | 2 specified configured paths + 1 reserved exec flow | static_config activation; exec_plugin reserved in acquisition | http-bearer, mtls; exec plugin requires its future binding | SelfSubjectReview, exact-target budgeted SelfSubjectAccessReview |
-| Docker | none old; socket peer or TLS client certificate (to verify) | 2 | static config | socket peer, mtls | ping |
 | Grafana | service-account bearer via connect session (`providers/grafana.toml`); explicit configured first phase | 2 proposed paths | static_config/read_only first; static_entry/versioned managed later | http-bearer | credential/identity checks and declared verification |
 | Loki / Prometheus / Alertmanager | explicit anonymous, bearer, basic or parent-mediated binding + admitted tenant header (`docs/design/08:150-160` old) | 4 proposed profiles per child adapter | static_config activation/materialization, no auth.begin | http-anonymous / http-bearer / http-basic / mediated-http | applicable binding/credential checks; declared verification |
-| SIP | trunk username+password to sipx (`crates/driver-sip/src/lib.rs:104-114`) | 1 | static entry | sip-credential-lease | custody reachable |
-| RTVBP | host-issued proof-bound authority + DPoP (`docs/design/05:297-305` old) | 1 (no vendor credential) | host issued | session-authority, inbound-verifier | none; redemption is inbound-verifier capability state |
 
 ## Document template
 

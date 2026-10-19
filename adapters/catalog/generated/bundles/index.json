@@ -99,7 +99,7 @@
     {
       "provider": "slack",
       "file_name": "slack.bundle.json",
-      "bundle_sha256": "d4c3f8f813fcf8a84ed2068f71978ae575a93088c5eab59a9fa160d810282dfe",
+      "bundle_sha256": "c2537ba293bb7346f7e806fae42b0b9044639e75464f98778c4fc1fd178977e5",
       "source_sha256": "f010337d9d8aa99ae1dc905cd46f68fecc66e42ce6868379f040b9149789128b",
       "operations": 174,
       "unsupported": 0

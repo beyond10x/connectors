@@ -132,6 +132,7 @@ async fn invoke(
     let started = Instant::now();
     let result = execute(&service, &invocation).await;
     tracing::info!(request_id = ?invocation.request_id, operation = ?invocation.operation, elapsed_ms = started.elapsed().as_millis(), success = result.is_ok(), "operation completed");
+    let result = result.map_err(legacy);
     let status = result.as_ref().err().map(status).unwrap_or(StatusCode::OK);
     let response = Response {
         version: WIRE_VERSION.into(),
@@ -195,7 +196,7 @@ async fn execute(service: &Service, request: &Invocation) -> Result<serde_json::
 
 fn status(error: &Error) -> StatusCode {
     match error.code {
-        ErrorCode::InvalidInput => StatusCode::BAD_REQUEST,
+        ErrorCode::InvalidInput | ErrorCode::Conflict => StatusCode::BAD_REQUEST,
         ErrorCode::Unauthorized => StatusCode::UNAUTHORIZED,
         ErrorCode::Forbidden => StatusCode::FORBIDDEN,
         ErrorCode::NotFound => StatusCode::NOT_FOUND,
@@ -209,7 +210,17 @@ fn status(error: &Error) -> StatusCode {
     }
 }
 fn error_http(error: Error) -> HttpResponse {
+    let error = legacy(error);
     (status(&error), Json(error)).into_response()
+}
+
+fn legacy(mut error: Error) -> Error {
+    // The legacy binding emits no new code (compatibility.md §5): a provider
+    // conflict keeps the `invalid_input` it was.
+    if error.code == ErrorCode::Conflict {
+        error.code = ErrorCode::InvalidInput;
+    }
+    error
 }
 
 pub async fn serve(config: ServiceConfig, adapter: Arc<dyn Adapter>) -> Result<()> {

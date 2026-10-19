@@ -9,7 +9,8 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:catalog-slack-reads
 - depends_on: story:parity-slack-file-reads
-revision: 3
+- depends_on: story:catalog-composed-write
+revision: 4
 ---
 ## Outcome
 
@@ -38,3 +39,13 @@ Drafted 2026-10-07 with `adapters/slack/spec/ess`; the file record (name, type, 
 ## Split
 
 The reads (`slack.file.list`, `slack.file.info`, `slack.file.download`, 21 calls) moved to story:parity-slack-file-reads on 2026-10-10. Upload and delete (31 calls) stay here, held with the Slack message writes.
+
+## Plan
+
+Scheduled in phase P3 of the epic's plan of 2026-10-19. The delete half of this unit
+(`files.delete`, 7 calls) moved to story:parity-slack-file-delete on 2026-10-19 (decision D2 of the
+plan: a plain selection, shipped with the Slack single-user reads). What stays here is the upload
+(`slack.file.upload`, 24 calls): `files.getUploadURLExternal`, the bytes to the answered URL, then
+`files.completeUploadExternal` with channel and thread as caller inputs, after
+story:catalog-composed-write (depends_on). The reads of the unit are implemented
+(story:parity-slack-file-reads).

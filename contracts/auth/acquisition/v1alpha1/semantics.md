@@ -177,7 +177,7 @@ by admitted completion/recovery and is erased when terminal with no remaining us
 It is never a replay credential. Finite capacity refuses new acquisitions rather
 than evicting consumed/terminal safety facts. Protected-ingress codecs remain a
 separate binding obligation. [auth_bindings.yaml](../../../../ess/domains/auth_bindings.yaml)
-models causal lifecycle/references; [verification](../../../../docs/evidence/model-auth-closure-20260909/verification.md)
+models causal lifecycle/references; [verification](../../../../docs/evidence/README.md "git show history/evidence-2026-10:docs/evidence/model-auth-closure-20260909/verification.md")
 separates model checks from actual atomic correlation/publication execution.
 
 ## 5. Ordering, limits

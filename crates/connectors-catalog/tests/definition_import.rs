@@ -486,3 +486,31 @@ fn a_view_of_an_undeclared_reference_is_refused() {
         other => panic!("refused as {other:?}"),
     }
 }
+
+#[test]
+fn an_import_refuses_a_name_its_selection_does_not_derive() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("definitions");
+    std::fs::create_dir_all(&root).unwrap();
+    let selection = repository().join("adapters/catalog/providers/jira/operations.json");
+    let failure = import::import(&import::Request {
+        connectors: &repository(),
+        catalog: "jira",
+        selection: Some(&selection),
+        definitions: &root,
+        name: Some("zendesk"),
+    })
+    .expect_err("a name the selection does not derive is refused");
+    let message = failure.to_string();
+    assert!(
+        message.contains("zendesk") && message.contains("jira"),
+        "{message}"
+    );
+    assert!(!root.join("connectors/zendesk.yaml").exists());
+}
+
+#[test]
+fn an_import_accepts_the_name_its_selection_derives() {
+    let temp = tempfile::tempdir().unwrap();
+    imported(temp.path(), "jira");
+}

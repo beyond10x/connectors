@@ -191,7 +191,7 @@ fn classify(suite: &Suite, name: &str) -> Entry {
         (
             "connectors-catalog-provider",
             "local_runtime",
-            "cli_journey::lifecycle::catalog_cli_explicit_revalidation_after_real_expiry_without_reentry",
+            "cli_journey::lifecycle::catalog_cli_read_recollects_expired_evidence_without_reentry",
         ) => Some((Timing, vec![CUSTODY, CLI])),
         (
             "connectors-catalog-provider",
@@ -339,6 +339,13 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "an_adapter_identity_mismatch_during_an_upgrade_names_a_new_connection"
             | "an_adapter_identity_mismatch_outside_an_upgrade_names_a_repair",
         ) => Some((Disposable, vec![CUSTODY])),
+        (
+            "connectors",
+            "definition_connect_question",
+            "the_connect_question_names_the_host_the_token_is_sent_to"
+            | "the_connect_question_of_an_oauth_profile_names_its_token_host_too"
+            | "an_entry_another_run_recorded_while_the_question_waits_is_not_connected",
+        ) => Some((Disposable, vec![PROVIDER])),
         (
             "connectors",
             "setup_migrate_records",

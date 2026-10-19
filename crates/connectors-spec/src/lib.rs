@@ -23,9 +23,6 @@ pub fn compile(bytes: &[u8]) -> Result<Descriptor> {
         return Err(Error::invalid("adapter specification exceeds byte limit"));
     }
     let value: Value = connectors_core::read_json(bytes)?;
-    if value["kind"] == "connectors.adapter/v2" {
-        return v2::Spec::parse(bytes)?.descriptor();
-    }
     let schema: Value =
         serde_json::from_str(include_str!("../../../spec-kinds/adapter/v1/schema.json"))
             .map_err(|_| Error::internal())?;
@@ -85,24 +82,4 @@ pub fn descriptor_bytes(descriptor: &Descriptor) -> Result<Vec<u8>> {
     let mut bytes = connectors_core::canonical(&value);
     bytes.push(b'\n');
     Ok(bytes)
-}
-
-/// Generate only explicitly selected supported bundle formats. Legacy entry
-/// points remain closed to newer formats.
-pub fn generate(
-    specification: &std::path::Path,
-    out: &std::path::Path,
-    ess: &std::path::Path,
-    check: bool,
-) -> Result<()> {
-    let bytes =
-        std::fs::read(specification).map_err(|_| Error::invalid("cannot read specification"))?;
-    if bytes.len() > 1024 * 1024 {
-        return Err(Error::invalid("specification exceeds byte limit"));
-    }
-    let value: Value = connectors_core::read_json(&bytes)?;
-    match value["kind"].as_str() {
-        Some("connectors.adapter/v2") => v2::generate(specification, out, ess, check),
-        _ => Err(Error::invalid("unsupported generated bundle specification")),
-    }
 }

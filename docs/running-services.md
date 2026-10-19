@@ -70,8 +70,7 @@ SQL keeps its execution deadline independent of caller-controlled database setti
 Timeouts and dropped invocations trigger a bounded cancellation/cleanup attempt;
 the request budget includes cleanup. Remote termination cannot be guaranteed after
 a network partition or process loss. See the [service contract](../contracts/service/v1alpha1/semantics.md)
-for the exact budgets and the [SQL regression harness](../adapters/sql/examples/live_deadlines.rs)
-for live timeout, caller-drop and TLS checks.
+for the exact budgets. Live timeout, caller-drop and TLS checks run in the SQL adapter's ignored tests.
 
 No service in this slice advertises OAuth acquisition, writes, durable events, process
 execution, or media sessions. Those remain separate contracts in the full design.

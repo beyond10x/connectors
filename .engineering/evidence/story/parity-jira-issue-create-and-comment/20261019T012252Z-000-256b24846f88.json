@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-19T01:22:52Z",
+  "actor": "human:timo",
+  "artifact": "story:parity-jira-issue-create-and-comment",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-20261019-night-b3-adversary",
+    "reference": "ce86a36bb",
+    "review": "review-result:wave-20261019-night-b3-adversary",
+    "outcome": "no-op"
+  }
+}

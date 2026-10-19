@@ -128,6 +128,15 @@ fn record(name: &str, secret: &[u8]) {
     writeln!(log, "{}", digest(secret)).unwrap();
 }
 
+/// A number a test wrote to `/work/<name>` for the adapter child to read.
+fn knob(name: &str) -> Option<u64> {
+    fs::read_to_string(Path::new("/work").join(name))
+        .ok()?
+        .trim()
+        .parse()
+        .ok()
+}
+
 #[async_trait::async_trait]
 impl runtime::Adapter for Fixture {
     fn bootstrap(&self) -> runtime::Bootstrap {
@@ -139,8 +148,27 @@ impl runtime::Adapter for Fixture {
         document: connectors_sdk::Secret,
     ) -> runtime::Result<runtime::Baseline> {
         record("validations", &document.0);
-        if document.0 == b"refused" {
+        // `/work/refuse`, when a test writes 1 there, refuses every credential
+        // from then on, as a provider refuses a revoked one.
+        if document.0 == b"refused" || knob("refuse") == Some(1) {
             return Err(runtime::Failure::InvalidCredential);
+        }
+        // `/work/unavailable`, when a test writes 1 there, fails every
+        // validation transiently, as a provider outage does.
+        if knob("unavailable") == Some(1) {
+            return Err(runtime::Failure::Unavailable);
+        }
+        // `/work/unavailable_after_ms`, when a test writes it, holds each
+        // validation that long and then fails it transiently, as a provider
+        // whose gateway times out does.
+        if let Some(after) = knob("unavailable_after_ms") {
+            std::thread::sleep(std::time::Duration::from_millis(after));
+            return Err(runtime::Failure::Unavailable);
+        }
+        // A live provider's identity probe takes time: `/work/probe_ms`, when
+        // a test writes it, holds each validation that long.
+        if let Some(probe) = knob("probe_ms") {
+            std::thread::sleep(std::time::Duration::from_millis(probe));
         }
         let now = connectors_sdk::now_ms();
         Ok(runtime::Baseline {
@@ -151,7 +179,9 @@ impl runtime::Adapter for Fixture {
             granted_scopes: None,
             credential_expires_at_ms: None,
             collected_at_ms: now,
-            valid_until_ms: now + 50_000,
+            // `/work/evidence_ms`, when a test writes it, is how long the
+            // validation evidence stays current (at most the profile's 60 s).
+            valid_until_ms: now + knob("evidence_ms").unwrap_or(50_000),
         })
     }
     async fn invoke(
@@ -162,6 +192,11 @@ impl runtime::Adapter for Fixture {
         _: Value,
     ) -> runtime::Result<Value> {
         record("invocations", &document.0);
+        // `/work/invoke_ms`, when a test writes it, is how long the provider
+        // takes to answer a read.
+        if let Some(took) = knob("invoke_ms") {
+            std::thread::sleep(std::time::Duration::from_millis(took));
+        }
         Ok(json!({"credential": digest(&document.0)}))
     }
 }
@@ -273,6 +308,25 @@ impl Container {
                 .env_clear()
                 .stdin(Stdio::null()),
         )
+    }
+
+    /// Set a number the adapter child reads from `/work/<name>` (see `knob`).
+    pub fn set_knob(&self, name: &str, value: u64) {
+        fs::write(self.path("/work").join(name), value.to_string()).unwrap();
+    }
+
+    /// `connections revalidate` of `connection` at `revision`.
+    pub fn revalidate(&self, connection: &str, revision: &str) -> Output {
+        self.run(&[
+            "connections",
+            "revalidate",
+            "--adapter",
+            ALIAS,
+            "--connection",
+            connection,
+            "--expected-revision",
+            revision,
+        ])
     }
 
     /// The digests the adapter child recorded in one of its logs.

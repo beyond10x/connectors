@@ -297,6 +297,9 @@ pub struct Metadata {
     /// physical page scan (`quick_check`, foreign keys) its fresh open ran is
     /// not repeated; a fresh open of the file scans it.
     pooled: bool,
+    /// A passive inspection: it reads the store and writes nothing to it, so
+    /// returning its verified handle persists no open checkpoint.
+    inspection: bool,
 }
 
 impl Drop for Metadata {
@@ -304,7 +307,7 @@ impl Drop for Metadata {
         // Reuse verified baselines; a failed batch retains lifecycle ownership
         // until its dispatched work can no longer commit.
         if let Some(er) = self.er.take() {
-            er::release_handle(er, &mut self._lifecycle_lock);
+            er::release_handle(er, &mut self._lifecycle_lock, !self.inspection);
         }
     }
 }
@@ -570,12 +573,14 @@ impl Metadata {
         self.er.as_ref().is_some_and(er::opened_from_checkpoint)
     }
 
-    /// Inspection never creates a database, migrates it, or interprets absence
-    /// as an empty authoritative registry.
+    /// Inspection never creates a database, migrates it, writes to it (not even
+    /// an open checkpoint), or interprets absence as an empty authoritative
+    /// registry.
     pub fn inspect(path: &Path) -> Result<Self> {
         let dir = fs::directory(path, false, true).map_err(|_| Failure::MetadataUnavailable)?;
         let lock = lifecycle_lock(&dir)?;
         let mut metadata = Self::open_connection(path, dir, lock, true)?;
+        metadata.inspection = true;
         metadata.validate()?;
         let version: i64 = metadata
             .connection
@@ -1031,6 +1036,7 @@ impl Metadata {
             concurrent_observation: false,
             lock_released: false,
             pooled: er::holds(&path.join(NAME)),
+            inspection: false,
         })
     }
 

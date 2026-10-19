@@ -2,13 +2,15 @@
 format: aep.planning-md/3
 id: story:parity-confluence-cql-search-v1-held
 kind: story
-status: draft
+status: archived
 title: Confluence CQL search from the REST v1 source, held on vendoring
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
 - supersedes: story:parity-confluence-cql-search
-revision: 1
+revision: 2
+transitions:
+- {from: "draft", to: "archived", at: "2026-10-19T05:54:50Z", actor: "human:timo", revision: 2}
 ---
 ## Outcome
 

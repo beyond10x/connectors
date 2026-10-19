@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T01:23:51Z",
+  "actor": "human:timo",
+  "artifact": "story:parity-jira-issue-writes",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-catalog-provider --test jira --test jira_issue_writes --test jira_transition_run (+6 lanes)",
+    "reference": "~/.cache/connectors-night-20261019/b3/green-provider-3.log"
+  }
+}

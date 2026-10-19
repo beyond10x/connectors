@@ -142,12 +142,15 @@ fn every_shipped_guard_is_a_value_of_the_catalog_guard_model() {
 
 #[test]
 fn every_shipped_closed_body_is_a_value_of_the_catalog_selection_model() {
-    const MEMBERS: [&str; 5] = [
+    const MEMBERS: [&str; 8] = [
         "body_keys",
         "body_types",
         "body_required",
         "body_nonempty",
         "body_fixed",
+        "body_enums",
+        "body_any_of",
+        "body_prefixes",
     ];
     let schema = compiled("connectors_catalog.selection.ClosedBody");
     let invariants =
@@ -156,6 +159,16 @@ fn every_shipped_closed_body_is_a_value_of_the_catalog_selection_model() {
         invariants.contains("defined(body_fixed)"),
         "the model no longer requires a fixed key's body to be closed: {invariants}"
     );
+    for clause in [
+        "defined(body_enums)",
+        "body_any_of.count",
+        "defined(body_prefixes)",
+    ] {
+        assert!(
+            invariants.contains(clause),
+            "the model no longer states `{clause}` of a closed body: {invariants}"
+        );
+    }
     let validator = jsonschema::validator_for(&schema).unwrap();
     let shipped = shipped();
     for member in MEMBERS {
@@ -377,5 +390,57 @@ fn every_shipped_refusal_text_is_a_value_of_the_catalog_selection_model() {
             reader, model,
             "{name}: reader admits {reader}, model admits {model}"
         );
+    }
+}
+
+/// Every shipped write's `conflict_status` is a value of
+/// `connectors_catalog.selection.ConflictStatus`, which admits only `409` and `412`, and the
+/// engine's reader admits the member exactly where the compiled model does
+/// (story:catalog-zendesk-ticket-writes).
+#[test]
+fn every_shipped_conflict_status_is_a_value_of_the_catalog_selection_model() {
+    let schema = compiled("connectors_catalog.selection.ConflictStatus");
+    let invariants =
+        schema["$defs"]["connectors_catalog.selection.ConflictStatus"]["x-ess-invariants"]
+            .to_string();
+    for clause in ["conflict_status == 409", "conflict_status == 412"] {
+        assert!(
+            invariants.contains(clause),
+            "the model no longer states `{clause}`: {invariants}"
+        );
+    }
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let declared: Vec<(String, Value)> = shipped()
+        .into_iter()
+        .filter_map(|(name, s)| Some((name, s.get("conflict_status")?.clone())))
+        .collect();
+    assert!(
+        !declared.is_empty(),
+        "no shipped selection declares `conflict_status`, so this check would not cover it"
+    );
+    for (name, status) in &declared {
+        assert_valid(
+            &validator,
+            name,
+            &serde_json::json!({ "conflict_status": status }),
+        );
+        assert!(
+            [409, 412].contains(&status.as_u64().unwrap()),
+            "{name}: `conflict_status` {status}"
+        );
+    }
+    // The reader takes an integer and nothing else; the status itself is the engine's to
+    // refuse when the selection loads (`adapters/catalog/tests/nested_closed_body.rs`).
+    for (status, admitted) in [
+        (serde_json::json!(409), true),
+        (serde_json::json!("409"), false),
+        (serde_json::json!(null), false),
+    ] {
+        let reader = serde_json::from_value::<Selection>(serde_json::json!({
+            "id": "ticket.update", "operation_id": "UpdateTicket", "effect": "write",
+            "conflict_status": status
+        }))
+        .is_ok();
+        assert_eq!(reader, admitted, "{status}");
     }
 }

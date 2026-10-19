@@ -17,7 +17,7 @@ Connector, instance and connection are the terms of the [vocabulary](../README.m
 
 The local CLI calls both through the approval, audit and mutation coordinator.
 Dedicated sandbox acceptance is recorded in
-[docs/evidence/gitlab-sandbox-20260913](evidence/gitlab-sandbox-20260913/README.md);
+[gitlab-sandbox-20260913 on branch `history/evidence-2026-10`](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/gitlab-sandbox-20260913/README.md);
 recovery across every storage acknowledgement remains open.
 
 The merging identity needs more than `api` scope. GitLab answers a merge request
@@ -109,7 +109,7 @@ The production CLI journeys that covered applied, refused and lost-response
 settlement, same-key observation through a newly started owner, an owner killed
 after the provider received the PUT, background recovery and post-effect
 revocation ran with the native GitLab implementation (an internal adapter the catalog provider replaced) as the child; their records stay under
-`docs/evidence/gitlab-*-20260911/`, and the host mechanics they exercised are
+`docs/evidence/gitlab-*-20260911/` on branch `history/evidence-2026-10`, and the host mechanics they exercised are
 unchanged. They have not been re-run with the catalog provider as the child;
 `story:catalog-cli-journeys` owns that.
 

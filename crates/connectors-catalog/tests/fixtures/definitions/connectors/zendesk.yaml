@@ -38,3 +38,58 @@ operations:
     op: IncrementalOrganizationExport
     description: Export the organizations changed since start_time, one page per call; each later call sends the previous page's end_time as start_time, and the walk ends on a page with end_of_stream true
   organization.show: {op: ShowOrganization, description: Read one organization by organization_id}
+  ticket.update:
+    op: UpdateTicket
+    effect: write
+    body:
+      /ticket/group_id: integer
+      /ticket/tags: string_list
+      /ticket/priority: string
+      /ticket/type: string
+      /ticket/updated_stamp: string
+      /ticket/safe_update: =true
+    body_enums:
+      /ticket/priority: [urgent, high, normal, low]
+      /ticket/type: [problem, incident, question, task]
+    body_any_of: [/ticket/group_id, /ticket/tags, /ticket/priority, /ticket/type]
+    conflict_status: 409
+    guard:
+      before:
+        read: ticket.show
+        expect: {/ticket/updated_at: body.ticket.updated_stamp}
+        mismatch: conflict
+      after: {expect: {/ticket/id: ticket_id}}
+    description: "Change one ticket's group_id, tags, priority or type, at least one of them; tags replaces the ticket's whole tag set. Send the ticket's updated_at from ticket.show as updated_stamp: the update is refused before it is sent when the ticket changed since, and as conflict when it changes in between"
+  ticket.note:
+    op: UpdateTicket
+    effect: write
+    body:
+      /ticket/comment/body: string+!
+      /ticket/comment/public: =false
+      /ticket/updated_stamp: string
+      /ticket/safe_update: =true
+    conflict_status: 409
+    guard:
+      before:
+        read: ticket.show
+        expect: {/ticket/updated_at: body.ticket.updated_stamp}
+        mismatch: conflict
+      after: {expect: {/ticket/id: ticket_id}}
+    description: "Add a private internal note to one ticket, never public; a note sent twice is two notes. Send the ticket's updated_at from ticket.show as updated_stamp: the note is refused before it is sent when the ticket changed since, and as conflict when it changes in between"
+  ticket.draft_reply:
+    op: UpdateTicket
+    effect: write
+    body:
+      /ticket/comment/body: string+!
+      /ticket/comment/public: =false
+      /ticket/updated_stamp: string
+      /ticket/safe_update: =true
+    body_prefixes: {/ticket/comment/body: "[Draft reply - not sent to the requester]\n"}
+    conflict_status: 409
+    guard:
+      before:
+        read: ticket.show
+        expect: {/ticket/updated_at: body.ticket.updated_stamp}
+        mismatch: conflict
+      after: {expect: {/ticket/id: ticket_id}}
+    description: "Add a draft reply to one ticket: a private note whose first line marks it as a draft, which a person copies into a public reply; nothing is sent to the requester, and a draft sent twice is two notes. Send the ticket's updated_at from ticket.show as updated_stamp: the draft is refused before it is sent when the ticket changed since, and as conflict when it changes in between"
