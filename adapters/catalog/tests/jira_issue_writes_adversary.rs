@@ -10,7 +10,7 @@ use connectors_core::{Error, ErrorCode, Result};
 use connectors_sdk::{
     AuthenticatedHttp, AuthenticatedWrite, HttpResponse, WriteMethod, WriteOutcome,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
     path::Path,
