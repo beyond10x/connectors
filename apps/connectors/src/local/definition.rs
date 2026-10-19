@@ -321,7 +321,7 @@ fn prepare_with(
     // left behind and stays revocable.
     let moved = moved_instance(&paths, &connector, &adapter, &reported);
     interrupted()?;
-    let (instance, alias, digest, adapter, reported) = match moved? {
+    let (instance, alias, digest, native, adapter, reported) = match moved? {
         Some(instance)
             if connectors_core::valid_id(&definitions::alias_of(&connector, &instance)) =>
         {
@@ -337,12 +337,13 @@ fn prepare_with(
             let derived = definitions::derive(&alias, &native);
             interrupted()?;
             let (adapter, reported) = derived.map_err(host_failure)?;
-            (instance, alias, digest, adapter, reported)
+            (instance, alias, digest, native, adapter, reported)
         }
         _ => (
             definitions::INSTANCE.to_owned(),
             alias,
             digest,
+            native,
             adapter,
             reported,
         ),
@@ -376,7 +377,7 @@ fn prepare_with(
     let connection = match &request.connection {
         Some(connection) => Ok(connection.clone()),
         None => connection(
-            &paths, &connector, &instance, &alias, &adapter, &reported, request,
+            &paths, &connector, &instance, &native, &adapter, &reported, request,
         ),
     };
     interrupted()?;
@@ -428,9 +429,14 @@ fn plain(name: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
-/// A regular file's bytes, at most `limit` of them.
+/// A regular file's bytes, at most `limit` of them. Anything else is refused
+/// before it is opened, since opening a named pipe waits for a writer and an
+/// interrupt does not end that wait; the opened file is checked again.
 fn read_bounded(path: &Path, limit: u64) -> Option<Vec<u8>> {
     use std::io::Read as _;
+    if !std::fs::metadata(path).ok()?.is_file() {
+        return None;
+    }
     let file = std::fs::File::open(path).ok()?;
     let metadata = file.metadata().ok()?;
     if !metadata.is_file() || metadata.len() > limit {
@@ -765,16 +771,20 @@ const QUESTION_BYTES: usize = 3584;
 /// can be reused (story:invoke-definition-reuse-credential), the question lists
 /// those and a number reuses one; otherwise it asks whether to connect. Without
 /// a terminal to ask on, or answered anything else, the command is refused
-/// naming the connect, and nothing is acquired, copied or sent.
+/// naming the connect, and nothing is acquired, copied or sent. The connect
+/// question names the provider authority the credential is validated at and,
+/// for an OAuth token endpoint elsewhere, its origin, read from the entry's
+/// native configuration `native`.
 fn connection(
     paths: &Paths,
     connector: &str,
     instance: &str,
-    alias: &str,
+    native: &Path,
     adapter: &connectors_host::local::config::Adapter,
     reported: &connectors_host::local::runtime::Bootstrap,
     request: &Request,
 ) -> Result<String, HandlerReply> {
+    let alias = &definitions::alias_of(connector, instance);
     let held = Registry::with_system_clock(&paths.state)
         .held(&adapter.instance_id, connectors_sdk::now_ms())
         .map_err(connections::registry_failure)?;
@@ -787,13 +797,23 @@ fn connection(
     let [profile] = profiles.as_slice() else {
         return Err(host_failure(Failure::InvalidConfiguration));
     };
-    let fresh = || connect(paths, alias, profile, request.credential_file.as_deref());
+    let fresh = || {
+        connect(
+            paths,
+            alias,
+            adapter,
+            profile,
+            request.credential_file.as_deref(),
+        )
+    };
     let refused = || failure("not_found", "admission", "create_connection", false);
     let deadline = connectors_sdk::now_ms() + QUESTION_MS;
     // A listing that fails offers no reuse: the plain question is asked.
     let candidates = candidates(paths, alias, adapter, reported, profile).unwrap_or_default();
     if candidates.is_empty() {
-        let question = format!("No connection for {connector}/{instance}. Connect now? [y/N] ");
+        let authority = &reported.provider_authority;
+        let token = token_origin(native).filter(|token| *token != origin(authority));
+        let question = connect_question(connector, instance, authority, token.as_deref());
         return if answered(protected::confirm(&question, deadline))? {
             fresh()
         } else {
@@ -906,6 +926,64 @@ fn shown(value: &str) -> String {
     }
 }
 
+/// The question `confirm` asks before a fresh connect: the instance, the
+/// provider authority the credential is validated at and, when an OAuth token
+/// endpoint on another origin receives it too, that origin. The question stays
+/// within the 256 bytes `protected::confirm` takes: the token origin is cut to
+/// half of what is left, and an authority that does not fit the rest is shown
+/// by its origin, cut if it must be.
+fn connect_question(
+    connector: &str,
+    instance: &str,
+    authority: &str,
+    token: Option<&str>,
+) -> String {
+    let fixed = format!("No connection for {connector}/{instance}. Connect now to ");
+    let end = "? [y/N] ";
+    let mut budget = 256usize.saturating_sub(fixed.len() + end.len());
+    let token = token
+        .map(|token| {
+            let token = format!(" (tokens from {})", cut(token, budget / 2));
+            budget = budget.saturating_sub(token.len());
+            token
+        })
+        .unwrap_or_default();
+    let authority = if authority.len() <= budget {
+        authority.to_owned()
+    } else {
+        cut(&origin(authority), budget)
+    };
+    format!("{fixed}{authority}{token}{end}")
+}
+
+/// `value`, or its first characters and `...` within `bytes` bytes.
+fn cut(value: &str, bytes: usize) -> String {
+    if value.len() <= bytes {
+        return value.to_owned();
+    }
+    let mut end = bytes.saturating_sub(3);
+    while !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}...", &value[..end])
+}
+
+/// `https://<authority>` of an `https` URL, as the provider admits its
+/// endpoints (`canonical_base`: no user information, lower-case host).
+fn origin(url: &str) -> String {
+    let rest = url.strip_prefix("https://").unwrap_or(url);
+    format!("https://{}", &rest[..rest.find('/').unwrap_or(rest.len())])
+}
+
+/// The origin of the OAuth token endpoint in the native configuration at
+/// `native`, which the provider exchanges the stored entry at; `None` for a
+/// profile with none or a file that cannot be read.
+fn token_origin(native: &Path) -> Option<String> {
+    let bytes = read_bounded(native, DEFINITION_LIMIT)?;
+    let native: Value = serde_json::from_slice(&bytes).ok()?;
+    native["auth"]["token_url"].as_str().map(origin)
+}
+
 /// The answer to a question, or the refusal when none could be asked: no
 /// controlling terminal in the foreground is the connect's `not_found`.
 fn answered<T>(answer: owner::Result<T>) -> Result<T, HandlerReply> {
@@ -975,19 +1053,23 @@ fn reuse(
 /// entry from the terminal, or from `file` (an OAuth client file becomes the
 /// entry by consent, as for `connections connect --credential-file`); under
 /// the read-only binding the owner reads the item itself. Answers the
-/// published connection.
+/// published connection. The answer was given for the entry `adapter`: one
+/// another run recorded over it meanwhile is a conflict to retry, refused
+/// before any other admission.
 fn connect(
     paths: &Paths,
     alias: &str,
+    adapter: &connectors_host::local::config::Adapter,
     profile: &str,
     file: Option<&Path>,
 ) -> Result<String, HandlerReply> {
     let refused = |error| connect_failure("connections-connect", error);
+    let config = Config::load_at(paths).map_err(host_failure)?;
+    if config.adapters.get(alias).map(|a| a.selection()) != Some(adapter.selection()) {
+        return Err(host_failure(Failure::ConcurrentRevision));
+    }
     owner::admit_capture(paths, alias, Some(profile), None, None).map_err(refused)?;
-    let read_only = Config::load_at(paths)
-        .map_err(host_failure)?
-        .selection()
-        .read_only();
+    let read_only = config.selection().read_only();
     if read_only && file.is_some() {
         return Err(usage());
     }
@@ -1222,5 +1304,30 @@ operations:
         let text = DEFINITION.replace("use: forge", "use: ../forge");
         let (root, file, bytes, parsed) = tree(&text);
         assert!(inputs(&file, root.path(), &bytes, &parsed).is_none());
+    }
+
+    /// The longest connector and a moved instance with an authority path of
+    /// thousands of bytes still make a question `protected::confirm` takes,
+    /// the host of each endpoint shown.
+    #[test]
+    fn the_connect_question_stays_within_what_confirm_takes() {
+        let connector = "c".repeat(64);
+        let instance = format!("definition-{}", "0".repeat(16));
+        let host = format!("{}.example", "h".repeat(30));
+        let authority = format!("https://{host}/{}/", "p".repeat(4000));
+        let token = format!("https://token-{host}");
+        for token in [None, Some(token.as_str())] {
+            let question = connect_question(&connector, &instance, &authority, token);
+            assert!(question.len() <= 256, "{} {question}", question.len());
+            assert!(question.contains(&format!("https://{host}")), "{question}");
+            assert!(question.ends_with("? [y/N] "), "{question}");
+            if let Some(token) = token {
+                assert!(question.contains(token), "{question}");
+            }
+        }
+        assert_eq!(
+            connect_question("gitlab", "definition", "https://gitlab.com/api/v4/", None),
+            "No connection for gitlab/definition. Connect now to https://gitlab.com/api/v4/? [y/N] "
+        );
     }
 }

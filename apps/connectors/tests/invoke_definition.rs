@@ -94,7 +94,7 @@ impl Fixture {
     }
 
     /// The CLI with no terminal: its own session, standard input closed.
-    fn run(&self, args: &[&str]) -> Output {
+    fn command(&self, args: &[&str]) -> Command {
         let mut command = Command::new(env!("CARGO_BIN_EXE_connectors"));
         command
             .args(["--output", "json", "--config"])
@@ -104,24 +104,63 @@ impl Fixture {
             .args(args)
             .stdin(Stdio::null());
         detach(&mut command);
-        command.output().unwrap()
+        command
     }
 
-    fn invoke(&self, extra: &[&str]) -> Output {
-        let definition = self.definition();
+    fn run(&self, args: &[&str]) -> Output {
+        self.command(args).output().unwrap()
+    }
+
+    /// [`Fixture::run`], or `None` when the command has not exited within
+    /// 10 s; it is then killed.
+    #[cfg(unix)]
+    fn run_within_10s(&self, args: &[&str]) -> Option<Output> {
+        let mut child = self
+            .command(args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while child.try_wait().unwrap().is_none() {
+            if std::time::Instant::now() >= until {
+                child.kill().unwrap();
+                child.wait().unwrap();
+                return None;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        Some(child.wait_with_output().unwrap())
+    }
+
+    fn args<'a>(definition: &'a str, extra: &[&'a str]) -> Vec<&'a str> {
         let mut args = vec![
             "operations",
             "invoke",
             "--definition",
-            definition.as_str(),
+            definition,
             "--operation",
             "project.get",
             "--input-json",
             r#"{"id":"org/project"}"#,
         ];
         args.extend_from_slice(extra);
-        self.run(&args)
+        args
     }
+
+    fn invoke(&self, extra: &[&str]) -> Output {
+        let definition = self.definition();
+        self.run(&Self::args(&definition, extra))
+    }
+}
+
+/// A named pipe at `path`, with no writer.
+#[cfg(unix)]
+fn named_pipe(path: &Path) {
+    use std::os::unix::ffi::OsStrExt;
+    let path = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
+    // SAFETY: a NUL-terminated path; a scalar mode.
+    assert_eq!(unsafe { libc::mkfifo(path.as_ptr(), 0o600) }, 0);
 }
 
 /// No controlling terminal: a command that would ask must refuse instead.
@@ -288,6 +327,44 @@ fn a_definition_that_cannot_be_read_is_invalid_input() {
         ]),
         2,
     );
+    assert_eq!(data["code"], "invalid_input", "{data}");
+    assert_eq!(data["stage"], "arguments", "{data}");
+}
+
+/// A definition path that is a named pipe is one that cannot be read, refused
+/// without waiting for a writer: an `open(2)` of a pipe with no writer blocks,
+/// and an interrupt does not end that wait.
+#[cfg(unix)]
+#[test]
+fn a_definition_that_is_a_named_pipe_is_refused_without_waiting_for_a_writer() {
+    let fixture = Fixture::new("", b"not read");
+    let pipe = fixture.root.path().join("defs/connectors/pipe.yaml");
+    named_pipe(&pipe);
+    let output = fixture
+        .run_within_10s(&Fixture::args(pipe.to_str().unwrap(), &[]))
+        .expect("the command still waits on the named pipe after 10 s");
+    let data = refused(&output, 2);
+    assert_eq!(data["code"], "invalid_input", "{data}");
+    assert_eq!(data["stage"], "arguments", "{data}");
+}
+
+/// A vendored source the definition names that is a named pipe is refused the
+/// same way: every file the definition names is read as the definition is.
+#[cfg(unix)]
+#[test]
+fn a_vendored_source_that_is_a_named_pipe_is_refused_without_waiting_for_a_writer() {
+    let fixture = Fixture::new("", b"replaced by a named pipe");
+    let source = fixture
+        .root
+        .path()
+        .join("defs/upstream/forge/openapi.json.gz");
+    fs::remove_file(&source).unwrap();
+    named_pipe(&source);
+    let definition = fixture.definition();
+    let output = fixture
+        .run_within_10s(&Fixture::args(&definition, &[]))
+        .expect("the command still waits on the named pipe after 10 s");
+    let data = refused(&output, 2);
     assert_eq!(data["code"], "invalid_input", "{data}");
     assert_eq!(data["stage"], "arguments", "{data}");
 }
