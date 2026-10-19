@@ -480,7 +480,7 @@
     },
     {
       "area": "Native adapters",
-      "detail": "Atlassian native documents, Docker, Alertmanager, SIP and RTVBP have designs or typed models and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built.",
+      "detail": "Alertmanager has a design or typed model and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built.",
       "href": "/docs/reference/adapters",
       "label": "Specification-only adapters",
       "status": "decided"

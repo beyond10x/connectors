@@ -98,7 +98,7 @@ As of 2026-10-16: 64 capabilities are shipped, 3 are decided and 5 are planned. 
 | [Kubernetes permission checks](./reference/adapters/kubernetes/index.md) | ○ planned | Per-operation SelfSubjectAccessReview checks and the remaining Kubernetes and Helm workflows. |
 | [Loki tenants and other authentication](./reference/adapters/loki/index.md) | ○ planned | An X-Scope-OrgID tenant header and profiles other than a bearer token; today a Loki without authentication cannot be connected. |
 | [Prometheus tenants, timeouts and other authentication](./reference/adapters/prometheus/index.md) | ○ planned | An X-Scope-OrgID tenant header, an adapter-set query timeout, a Capacity error for too many samples apart from other execution errors, and profiles other than a bearer token. |
-| [Specification-only adapters](./reference/adapters/index.md) | ◐ decided | Atlassian native documents, Docker, Alertmanager, SIP and RTVBP have designs or typed models and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built. |
+| [Specification-only adapters](./reference/adapters/index.md) | ◐ decided | Alertmanager has a design or typed model and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built. |
 | [MCP](./reference/adapters/index.md) | ○ planned | MCP invocation, projection, auth lifecycle, mutation replay and composition contracts are specified; there is no MCP runtime. |
 
 ## Distribution

@@ -561,7 +561,7 @@ pub const CAPABILITIES: &[Capability] = &[
     decided(
         "Native adapters",
         "Specification-only adapters",
-        "Atlassian native documents, Docker, Alertmanager, SIP and RTVBP have designs or typed models and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built.",
+        "Alertmanager has a design or typed model and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built.",
         "/docs/reference/adapters",
     ),
     planned(
