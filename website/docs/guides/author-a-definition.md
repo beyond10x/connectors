@@ -169,7 +169,8 @@ Each key under `operations` is the local name a caller invokes; `op` is the docu
 says more than the document's summary, which is the description otherwise.
 
 - `effect`: an operation whose method is not `GET` must say `read` or `write`, or it is refused as
-  `effect_required`. Under an approval policy a write needs an approval (`--approval-file`).
+  `effect_required`. A `write` on a `GET` operation, or on a download with no `op`, is refused as
+  `write_method`. Under an approval policy a write needs an approval (`--approval-file`).
 - Bounds: a paging style's `max` bounds its `limit` parameter (here `per_page` from 1 to 100).
   `bounds` adds others: `{per_page: {minimum: 1, maximum: 20}}` for a range, or
   `{scope: {values: [blobs]}}` to hold a string to a set of values.
@@ -255,9 +256,10 @@ The names a hand-written file meets most:
 | `source_hash_mismatch`, `source_not_gzip`, `source_outside_root` | the vendored document does not hash to `source.sha256`, is not `<name>.gz`, or lies outside the tree |
 | `unknown_operation`, `no_operation` | an `op` the document has no operation for, or none given |
 | `effect_required` | a method other than `GET` without `effect` |
+| `write_method` | `effect: write` on a method other than `POST`, `PUT`, `PATCH` or `DELETE`, or with no `op` |
 | `undeclared_variable` | a variable in `base_url` or an OAuth URL that `config` does not declare |
 | `auth_default`, `auth_incomplete`, `auth_misplaced`, `provider_id` | the profile rules above |
-| `body_type` | a body notation outside the table above |
+| `body_type` | a body notation outside the table above, or two body keys naming one path (`x` and `/x`) |
 | `unknown_guard_read`, `guard_parameter` | a guard read or binding the file cannot resolve |
 | `unknown_paging`, `ambiguous_paging`, `paging_parameter` | a paging style the file does not declare, more than one that matches, or one whose parameters the operation lacks |
 
