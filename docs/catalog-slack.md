@@ -447,8 +447,8 @@ to the local host.
   walk ends on an empty `response_metadata.next_cursor`. List the user's
   conversations with `types` set to `public_channel,private_channel` (and
   `mpim`, `im` for those), then read each one's history. A lookup of one user
-  by id or e-mail (`users.info`, `users.lookupByEmail`) is not selected on
-  either connection: read the list.
+  by id or e-mail (`users.info`, `users.lookupByEmail`) is selected on the bot
+  connection only: on the user-token connection, read the list.
 - **`query`** is required for search, and an input without it is refused
   before any request. `sort` takes `score` or `timestamp` and `sort_dir` `asc`
   or `desc`; `highlight` set to `true` adds Slack's highlight markers.
