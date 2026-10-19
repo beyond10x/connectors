@@ -264,7 +264,7 @@ The names a hand-written file meets most:
 | `undeclared_variable` | a variable in `base_url` or an OAuth URL that `config` does not declare |
 | `auth_default`, `auth_incomplete`, `auth_misplaced`, `provider_id` | the profile rules above |
 | `unreadable` | a file the definition names (the document or its amendments) is missing or cannot be opened |
-| `body_type` | a body notation outside the table above, or two body keys naming one path (`x` and `/x`) |
+| `body_type` | a body notation outside the table above, two body keys naming one path (`x` and `/x`) or one inside another (`/a` and `/a/b`), or a guard reading a body key the body does not admit or fixes |
 | `unknown_guard_read`, `guard_parameter` | a guard read or binding the file cannot resolve |
 | `unknown_paging`, `ambiguous_paging`, `paging_parameter` | a paging style the file does not declare, more than one that matches, or one whose parameters the operation lacks |
 

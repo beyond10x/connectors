@@ -525,3 +525,93 @@ fn an_any_of_over_one_key_spelled_twice_is_refused() {
         other => panic!("refused as {other:?}"),
     }
 }
+
+/// The engine refuses `body_keys` where one key's path lies inside another's
+/// (`closed.rs` `inside`), so `/a` with `/a/b` can never load.
+#[test]
+fn a_body_key_inside_another_body_key_is_refused() {
+    match lowered("    body: {/ticket/comment: string, /ticket/comment/body: string}\n").refusal() {
+        Refusal::BodyType { key, field, .. } => {
+            assert_eq!(key, "probe.write");
+            assert_eq!(field, "/ticket/comment/body");
+        }
+        other => panic!("refused as {other:?}"),
+    }
+}
+
+#[test]
+fn a_body_key_beside_another_with_a_longer_name_lowers() {
+    lowered("    body: {/ticket/comment: string, /ticket/comments: string}\n").selection();
+}
+
+const GUARDED: &str = "    guard:\n      before: {read: ticket.show, expect: {/ticket/updated_at: body.ticket.updated_stamp}}\n";
+
+fn guard_refusal(body: &str, guard: &str) -> String {
+    match lowered(&format!("{body}{guard}")).refusal() {
+        Refusal::BodyType { key, field, spec } => {
+            assert_eq!(key, "probe.write");
+            assert_eq!(field, "body.ticket.updated_stamp");
+            spec
+        }
+        other => panic!("refused as {other:?}"),
+    }
+}
+
+#[test]
+fn a_guard_reading_a_body_key_the_body_declares_lowers() {
+    lowered(&format!(
+        "    body: {{/ticket/priority: string, /ticket/updated_stamp: string}}\n{GUARDED}"
+    ))
+    .selection();
+}
+
+#[test]
+fn a_guard_reading_a_body_key_the_body_does_not_admit_is_refused() {
+    let spec = guard_refusal("    body: {/ticket/priority: string}\n", GUARDED);
+    assert!(spec.contains("does not admit"), "{spec}");
+}
+
+#[test]
+fn a_guard_reading_a_body_key_the_body_fixes_is_refused() {
+    let spec = guard_refusal(
+        "    body: {/ticket/priority: string, /ticket/updated_stamp: =x}\n",
+        GUARDED,
+    );
+    assert!(spec.contains("fixes"), "{spec}");
+}
+
+#[test]
+fn an_after_check_reading_a_body_key_the_body_does_not_admit_is_refused() {
+    let spec = guard_refusal(
+        "    body: {/ticket/priority: string}\n",
+        "    guard:\n      before: {read: ticket.show}\n      after: {expect: {/ticket/updated_at: body.ticket.updated_stamp}}\n",
+    );
+    assert!(spec.contains("does not admit"), "{spec}");
+}
+
+#[test]
+fn a_with_binding_reading_a_body_key_the_body_does_not_admit_is_refused() {
+    let spec = guard_refusal(
+        "    body: {/ticket/priority: string}\n",
+        "    guard:\n      before: {read: ticket.show, with: {ticket_id: body.ticket.updated_stamp}}\n",
+    );
+    assert!(spec.contains("does not admit"), "{spec}");
+}
+
+/// The engine refuses an operation whose read declares only `body_enums` or
+/// `body_prefixes` (`closed.rs`): each member is named in the refusal.
+#[test]
+fn a_read_declaring_only_an_empty_body_enums_or_body_prefixes_is_refused() {
+    for member in ["body_enums", "body_prefixes"] {
+        let root = zendesk_root();
+        let text = HEAD.replace(
+            "  ticket.show: {op: ShowTicket}\n",
+            &format!("  ticket.show:\n    op: ShowTicket\n    {member}: {{}}\n"),
+        );
+        let lowering = lower(&text, root.path());
+        match lowering.refusal() {
+            Refusal::Malformed(detail) => assert!(detail.contains(member), "{detail}"),
+            other => panic!("refused as {other:?}"),
+        }
+    }
+}

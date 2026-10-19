@@ -1810,13 +1810,20 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
         .ok_or_else(|| {
             Failure::Unreadable(format!("{}: no file name", selection_path.display()))
         })?;
-    let name = match request.name {
-        Some(name) => name.to_owned(),
-        None => definition_name(catalog, selection_file).ok_or_else(|| {
-            Failure::Malformed(format!(
+    let derived = definition_name(catalog, selection_file);
+    let name = match (request.name, derived) {
+        (Some(name), Some(derived)) if name != derived => {
+            return Err(Failure::Malformed(format!(
+                "`{name}` is not the name `{selection_file}` of `{catalog}` derives, `{derived}`"
+            )));
+        }
+        (Some(name), _) => name.to_owned(),
+        (None, Some(derived)) => derived,
+        (None, None) => {
+            return Err(Failure::Malformed(format!(
                 "`{selection_file}` is neither `operations.json` nor `<name>-operations.json`; give the name"
-            ))
-        })?,
+            )));
+        }
     };
     if !connectors_core::valid_id(&name) || !connectors_core::valid_id(catalog) {
         return Err(Failure::Malformed(format!(
