@@ -27,7 +27,7 @@ scope:
   path: docs/catalog-jira.md
 - confidence: cited
   path: website/docs/connectors/jira.md
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-18T22:42:34Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-18T22:42:34Z", actor: "human:timo", revision: 5}
@@ -42,22 +42,20 @@ half of parity unit U06 of `docs/fluxplane-plugin-parity.md`: `jira.issue.create
 
 ## Surface
 
-`adapters/catalog/providers/jira/operations.json` (9 ids today, one write `issue.transition.run`
-at line 23) gains two selections; `adapters/catalog/providers/jira/connector.json` admits them; the
-pinned Jira Cloud OpenAPI source under `adapters/atlassian/` is unchanged.
+`adapters/catalog/providers/jira/operations.json` gains `issue.create` and `issue.comment.add`
+(with `issue.edit`, `issue.link.add`, `issue.delete` and `issue.create_meta.fields` from
+`story:parity-jira-issue-writes`); the pinned Jira Cloud OpenAPI source under `adapters/atlassian/`
+is unchanged.
 
-A text body (the comment's body, the issue's description) is a plain-text input the selection
-wraps in a fixed Atlassian Document Format document (one `doc` with one `paragraph` of one `text`
-node), using the nested closed write bodies, fixed values and `body_keys` pointers the catalog
-engine admits since 0.54.0 (`contracts/catalog/v1alpha1/semantics.md`, "Writes"). Markdown is not
-converted (decision D1 of the epic's plan). If the engine cannot place caller text inside a fixed
-nested document, that capability is the first step of this story, modelled in
-`adapters/catalog/spec/ess/domains/selection.yaml` before the selections are written.
+As shipped in 0.54.0 (amended 2026-10-19 after the release review): a text body is Atlassian
+Document Format the caller writes; the selection fixes the document's `type` (`doc`) and `version`
+(`1`) and sends the caller's `content` as given. Wrapping plain text needs array-index pointers in the
+closed-body engine (`story:plain-text-comment-bodies`).
 
-Guards: `issue.create` has a postflight `issue.get` that confirms the key returned and the fields
-sent (project, issue type, summary) are present on the created issue; a dropped field is reported
-as `partial` with the field named, not as success. `issue.comment.add` has a postflight read of the
-comment by id. Neither needs a preflight: both append.
+Guards: `issue.create` reads the project before the POST and `issue.comment.add` reads the issue;
+a 404 or a different key refuses the write unsent. Neither reads after the write: a 201 is the proof,
+because a postflight check cannot yet require a member the write returns
+(`story:write-postflight-present-check`).
 
 ## Acceptance
 
