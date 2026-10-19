@@ -14,7 +14,7 @@ scope:
   path: adapters/catalog/tests/adversary_catalog_body_types.rs
 - confidence: cited
   path: adapters/catalog/tests/jira_issue_writes_adversary.rs
-revision: 2
+revision: 3
 ---
 ## Outcome
 
@@ -36,3 +36,6 @@ cost today is one spent approval.
   `a_comment_whose_content_is_null_is_refused_before_any_request` runs (no `#[ignore]`) and passes.
 - The line-113 case of `adversary_catalog_body_types.rs` expects a refusal, and the input schema
   declares the required untyped key non-null, so schema and `prepare` still agree.
+- A `body_any_of` member given as JSON `null` (`adapters/catalog/src/closed.rs:400`) either does not
+  count as the one change, or the contract names `null` as a clear for that provider and a test pins
+  it (found by the 0.54.0 review, lane r1, 2026-10-19).
