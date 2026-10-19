@@ -92,6 +92,24 @@ fn refusal(refused: Refused) -> HandlerReply {
     }
 }
 
+/// [`refusal`] for `callable`: on `approvals policy-set`, `prepare` and
+/// `issue` an `invalid_input` selection names the argument it refused,
+/// `adapter` (contracts/cli/v1alpha1/semantics.md, "The refused argument").
+/// Every other command, and every other refusal, is unchanged.
+fn refusal_of(callable: &str, refused: Refused) -> HandlerReply {
+    let mut reply = refusal(refused);
+    if refused == Refused::InvalidInput
+        && matches!(
+            callable,
+            "approval-policy-set" | "approval-prepare" | "approval-issue"
+        )
+        && let HandlerReply::UsageError { data, .. } = &mut reply
+    {
+        data["field"] = json!(owner::Argument::Adapter.as_str());
+    }
+    reply
+}
+
 /// The given `--adapter` alias, unresolved: it is refused or served exactly as
 /// before. `None` when the input selects otherwise; a conflicting selector is
 /// refused.
@@ -148,12 +166,13 @@ pub(super) fn alias_at(input: &Value, paths: &Paths) -> owner::Result<String> {
 /// new selectors are gone. An input selecting by `--adapter` is unchanged.
 /// Returns the configuration read to resolve it, if one was.
 pub(super) fn resolve(call: &Invocation<'_>) -> Result<(Value, Option<Config>), HandlerReply> {
-    if !selects(call.callable) || given(&call.input).map_err(refusal)?.is_some() {
+    let refused = |refused| refusal_of(call.callable, refused);
+    if !selects(call.callable) || given(&call.input).map_err(refused)?.is_some() {
         return Ok((call.input.clone(), None));
     }
     let paths = resolved(call)?;
     let config = Config::read_at(&paths).map_err(configuration_refusal)?;
-    let alias = alias(&call.input, &config).map_err(refusal)?;
+    let alias = alias(&call.input, &config).map_err(refused)?;
     let mut input = call.input.clone();
     if let Some(fields) = input.as_object_mut() {
         fields.remove("connector");
