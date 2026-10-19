@@ -673,12 +673,19 @@ fn create_meta_fields_never_resolves_to_another_path() {
     let http = Recorder(Mutex::new(Vec::new()));
     let input = json!({"projectIdOrKey": PROJECT, "issueTypeId": "10001/fields",
                        "startAt": 0, "maxResults": 200});
-    if block(engine.read(&http, "fixture", FIELDS, input)).is_ok() {
-        let sent = http.0.lock().unwrap().clone();
-        let segments: Vec<String> = ["issue", "createmeta", PROJECT, "issuetypes", "10001/fields"]
-            .iter()
-            .map(|s| (*s).to_owned())
-            .collect();
-        assert_eq!(sent, [(segments, "startAt=0&maxResults=200".to_owned())]);
+    match block(engine.read(&http, "fixture", FIELDS, input)) {
+        Err(error) => {
+            assert_eq!(error.code, ErrorCode::InvalidInput);
+            assert!(http.0.lock().unwrap().is_empty());
+        }
+        Ok(_) => {
+            let sent = http.0.lock().unwrap().clone();
+            let segments: Vec<String> =
+                ["issue", "createmeta", PROJECT, "issuetypes", "10001/fields"]
+                    .iter()
+                    .map(|s| (*s).to_owned())
+                    .collect();
+            assert_eq!(sent, [(segments, "startAt=0&maxResults=200".to_owned())]);
+        }
     }
 }

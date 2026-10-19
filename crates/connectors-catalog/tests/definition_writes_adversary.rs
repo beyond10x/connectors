@@ -466,3 +466,62 @@ fn an_import_keeps_any_of_order_and_a_further_preflights_mismatch() {
     let back: Value = serde_json::from_slice(&std::fs::read(&lowered.operations).unwrap()).unwrap();
     assert_eq!(back, shipped);
 }
+
+/// The engine sends a write only for POST, PUT, PATCH or DELETE
+/// (`write_method` in `adapters/catalog/src/lib.rs`) and refuses the selection
+/// at load otherwise, so the lowerer refuses a declared write on a GET.
+#[test]
+fn a_write_effect_on_a_get_operation_is_refused() {
+    let root = zendesk_root();
+    let text = format!(
+        "{HEAD}  probe.write:\n    op: ShowTicket\n    effect: write\n    body: {{name: string}}\n"
+    );
+    match lower(&text, root.path()).refusal() {
+        Refusal::WriteMethod { key, op, method } => {
+            assert_eq!(key, "probe.write");
+            assert_eq!(op, "ShowTicket");
+            assert_eq!(method, "get");
+        }
+        other => panic!("refused as {other:?}"),
+    }
+}
+
+/// A download names no `op`, so a declared write on it has no method at all.
+#[test]
+fn a_write_effect_on_a_download_with_no_op_is_refused() {
+    let root = zendesk_root();
+    let text = format!(
+        "{HEAD}  probe.write:\n    effect: write\n    download: {{path_prefix: attachments}}\n"
+    );
+    match lower(&text, root.path()).refusal() {
+        Refusal::WriteMethod { key, op, method } => {
+            assert_eq!(key, "probe.write");
+            assert_eq!((op.as_str(), method.as_str()), ("", ""));
+        }
+        other => panic!("refused as {other:?}"),
+    }
+}
+
+/// `x` and `/x` are one path to the engine, which refuses `body_keys` that
+/// repeat one (`closed.rs` `Closed::new`).
+#[test]
+fn a_body_key_declared_by_name_and_by_pointer_is_refused() {
+    match lowered("    body: {x: string, /x: integer}\n").refusal() {
+        Refusal::BodyType { key, field, .. } => {
+            assert_eq!(key, "probe.write");
+            assert_eq!(field, "/x");
+        }
+        other => panic!("refused as {other:?}"),
+    }
+}
+
+#[test]
+fn an_any_of_over_one_key_spelled_twice_is_refused() {
+    match lowered("    body: {x: string, /x: string}\n    body_any_of: [x, /x]\n").refusal() {
+        Refusal::BodyType { key, field, .. } => {
+            assert_eq!(key, "probe.write");
+            assert_eq!(field, "/x");
+        }
+        other => panic!("refused as {other:?}"),
+    }
+}

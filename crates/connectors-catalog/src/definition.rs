@@ -809,6 +809,13 @@ pub enum Refusal {
         op: String,
         method: String,
     },
+    /// An operation that declares `effect: write` but is not a POST, PUT,
+    /// PATCH or DELETE of the source, or has no `op` at all (`method` is empty).
+    WriteMethod {
+        key: String,
+        op: String,
+        method: String,
+    },
     /// An operation names a `paging` style the definition does not declare.
     UnknownPaging { key: String, style: String },
     /// More than one style matches the operation, and the operation names
@@ -898,6 +905,7 @@ impl Refusal {
             Self::UnknownOperation { .. } => "unknown_operation",
             Self::NoOperation { .. } => "no_operation",
             Self::EffectRequired { .. } => "effect_required",
+            Self::WriteMethod { .. } => "write_method",
             Self::UnknownPaging { .. } => "unknown_paging",
             Self::AmbiguousPaging { .. } => "ambiguous_paging",
             Self::PagingParameter { .. } => "paging_parameter",
@@ -977,6 +985,15 @@ impl std::fmt::Display for Refusal {
             Self::EffectRequired { key, op, method } => write!(
                 f,
                 "{name}: operation `{key}` (`{op}`) is {} and declares no effect",
+                method.to_uppercase()
+            ),
+            Self::WriteMethod { key, method, .. } if method.is_empty() => write!(
+                f,
+                "{name}: operation `{key}` declares effect write but names no op, so it sends no write request"
+            ),
+            Self::WriteMethod { key, op, method } => write!(
+                f,
+                "{name}: operation `{key}` (`{op}`) declares effect write but is {}, not POST, PUT, PATCH or DELETE",
                 method.to_uppercase()
             ),
             Self::UnknownPaging { key, style } => write!(
@@ -1264,6 +1281,16 @@ fn body(key: &str, operation: &Operation) -> Result<Body, Refusal> {
             spec: "a key the engine reads as a path: a plain name without `.`, or a pointer"
                 .to_owned(),
         });
+    }
+    let mut paths = BTreeSet::new();
+    for field in &body.keys {
+        if !paths.insert(path(field)) {
+            return Err(Refusal::BodyType {
+                key: key.to_owned(),
+                field: field.clone(),
+                spec: "a path no other body key names (`x` and `/x` are one path)".to_owned(),
+            });
+        }
     }
     for (field, values) in operation.body_enums.iter().flatten() {
         let mut seen = BTreeSet::new();
@@ -2331,6 +2358,17 @@ pub fn select(
             None => return Err(Refusal::NoOperation { key: key.clone() }),
         };
         let effect = match (operation.effect, found) {
+            (Some(Effect::Write), found)
+                if !found.is_some_and(|found| {
+                    matches!(found.method.as_str(), "post" | "put" | "patch" | "delete")
+                }) =>
+            {
+                return Err(Refusal::WriteMethod {
+                    key: key.clone(),
+                    op: operation.op.clone().unwrap_or_default(),
+                    method: found.map(|found| found.method.clone()).unwrap_or_default(),
+                });
+            }
             (Some(effect), _) => effect,
             (None, None) => Effect::Read,
             (None, Some(found)) if found.method == "get" => Effect::Read,
