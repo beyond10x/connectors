@@ -37,7 +37,8 @@
   file is lowered into an owner-only cache under the state directory, keyed by the digest of the
   definition and its source; its instance `<connector>.definition` lives in an owner-only entry
   beside it, and the operator's configuration file is never written. With no connection the
-  command asks once whether to connect, then runs the profile's acquisition (the token prompt, or
+  command asks once whether to connect, naming the provider endpoint the credential is validated
+  at (and an OAuth token host elsewhere), then runs the profile's acquisition (the token prompt, or
   OAuth consent with `--credential-file`); without a terminal, or on any answer but yes, it
   refuses with `next_action` naming the connect command. `--definition` is exclusive with
   `--adapter` and `--connector`/`--instance`; `--definitions-root <dir>` names the tree holding

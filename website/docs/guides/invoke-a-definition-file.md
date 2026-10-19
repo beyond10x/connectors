@@ -56,8 +56,12 @@ created
 
 On a terminal, `operations invoke --definition target/try/defs/connectors/gitlab.yaml
 --operation project.get --input-json '{"id":"group/project"}'` with those two globals lowers the
-file, finds that its instance holds no connection, and asks once,
-`No connection for gitlab/definition. Connect now? [y/N]`. Answered `y`, it runs the profile's
+file, finds that its instance holds no connection, and asks once, naming the endpoint the
+credential is validated at,
+`No connection for gitlab/definition. Connect now to https://gitlab.example.com/api/v4/? [y/N]`.
+An OAuth profile whose token endpoint is on another host names that host too, `(tokens from
+https://<host>)`. Read the endpoint before you answer: the credential you type goes there.
+Answered `y`, it runs the profile's
 own acquisition, exactly as `connections connect` does: the token prompt, `GitLab personal
 access token:` with the input hidden, or, for an OAuth profile, the consent with the client file
 `--credential-file` names. The provider validates the credential, the connection is saved, and
@@ -128,7 +132,8 @@ A connection stays bound to the host and auth profile it was made for, so a file
 host or auth profile changes cannot use it, and no connect under the instance `definition` can
 follow it. The file then becomes its own instance, `definition-` and 16 hexadecimal digits taken
 from the connector, the host and the profile: the next run asks the one connect question naming
-it, `No connection for gitlab/definition-<16 hex digits>. Connect now? [y/N]`, and connects
+it and the new host, `No connection for gitlab/definition-<16 hex digits>. Connect now to
+https://<new host>/api/v4/? [y/N]`, and connects
 fresh. A credential stored for the old host is never offered for the new one. Every later
 run of the file selects the same instance and asks nothing, and a file moved back to the old host
 is the instance `definition` again, with its connection. The connection left at the old host is

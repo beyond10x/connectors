@@ -341,6 +341,13 @@ fn classify(suite: &Suite, name: &str) -> Entry {
         ) => Some((Disposable, vec![CUSTODY])),
         (
             "connectors",
+            "definition_connect_question",
+            "the_connect_question_names_the_host_the_token_is_sent_to"
+            | "the_connect_question_of_an_oauth_profile_names_its_token_host_too"
+            | "an_entry_another_run_recorded_while_the_question_waits_is_not_connected",
+        ) => Some((Disposable, vec![PROVIDER])),
+        (
+            "connectors",
             "setup_migrate_records",
             "migrated_entries_keep_their_connections_and_approval_policies",
         ) => Some((Disposable, vec![CUSTODY])),
