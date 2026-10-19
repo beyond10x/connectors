@@ -3,10 +3,10 @@ format: aep.planning-md/3
 id: story:slack-move-names-four-writes
 kind: story
 status: draft
-title: The Slack move guide enables the four writes the shipped selection carries
+title: The Slack move guide enables the five writes the shipped selection carries
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 3
 ---
 ## Observed
 
@@ -28,3 +28,11 @@ In release 0.51.0, `docs/catalog-slack.md` contradicts itself:
   as unselected.
 - The website pages that render or link the guide stay consistent; the generated pages are
   regenerated, never edited.
+
+## Update after 0.54.0
+
+The shipped bot selection now carries five writes: the four above and `files.delete`
+(`docs/catalog-slack.md` lines 13 and 73-75; the `files.delete` row at line 219). *Limits*
+(line 923) already says five writes. The move section (line 593, "enables the two writes") still
+enables two, so what remains of this story is that section: read "five writes" for "four" in the
+acceptance above, with the move enabling all five and its output pasted from a fresh run.

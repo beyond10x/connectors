@@ -3,24 +3,28 @@ format: aep.planning-md/3
 id: story:parity-slack-files
 kind: story
 status: draft
-title: Slack file list, info, download, upload and delete
+title: Slack file upload
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
 - depends_on: story:catalog-slack-reads
 - depends_on: story:parity-slack-file-reads
 - depends_on: story:catalog-composed-write
-revision: 4
+revision: 7
 ---
 ## Outcome
 
-Slack file list, info, download, upload and delete — parity unit U13 of `docs/fluxplane-plugin-parity.md`.
+Slack file upload: `slack.file.upload`, the last open operation of parity unit U13 of
+`docs/fluxplane-plugin-parity.md` (the reads are implemented in `story:parity-slack-file-reads`,
+the delete in `story:parity-slack-file-delete`).
 
 ## Operations
 
-`slack.file.upload`, `slack.file.download`, `slack.file.delete`, `slack.file.info`, `slack.file.list`
+`slack.file.upload`
 
-52 calls since 2026-09-09 (declared and mapped undeclared names), provider `slack`, planned wave W4.
+24 calls since 2026-09-09, provider `slack`. `slack.file.list`, `slack.file.info`,
+`slack.file.download` and `slack.file.delete` are covered (`docs/fluxplane-plugin-parity.md` rows
+at lines 593-597).
 
 ## Surface
 
