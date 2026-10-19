@@ -1515,6 +1515,7 @@ impl Launch<'_> {
 enum Admission<'a> {
     /// `connections revalidate`: the only cause that re-pins changed mounted
     /// material or follows a configuration upgrade.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     Explicit {
         connection: &'a str,
         revision: &'a str,
@@ -1581,7 +1582,7 @@ fn revalidate_inner(
     scope: &Scope<'_>,
     active: &mut runtime::Child,
     registry: &registry::Registry,
-    binding: &registry::Binding,
+    #[cfg_attr(not(target_os = "linux"), allow(unused_variables))] binding: &registry::Binding,
     captured: registry::Revalidation,
     admission: Admission<'_>,
 ) -> Result<()> {
