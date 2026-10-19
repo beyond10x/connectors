@@ -2835,3 +2835,6 @@ mod pool_lock_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod adversary_tests;
