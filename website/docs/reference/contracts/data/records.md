@@ -28,10 +28,9 @@ An advertised profile must bind an exact version of this contract and supply its
 own versioned schema and conformance obligations. Framing alone is insufficient:
 [service compatibility](../compatibility.md) governs typed readers.
 
-The [Atlassian document binding](../../adapters/atlassian/contracts/documents.md)
-owns the currently proposed native document/search profiles. Its provider traces,
-representation limits, cache predicates and query grammar travel with that adapter.
-The link is an implementation index, not a dependency of this contract on that adapter.
+No native document/search profile binds this contract today. The Atlassian document
+profiles that did were removed and are in history at commit `6498a881c`; Jira and
+Confluence reads run through the catalog provider.
 
 ## Result and representation obligations
 
@@ -92,8 +91,8 @@ credentials or foreign scope metadata. A profile specifies ambiguity-hiding abse
 behavior and distinguishes host denial, provider absence, timeout and unusable
 source observations. This contract grants no automatic refresh or resend.
 
-Generic body facts and completeness decisions are modeled in
-shared ESS. Native representations
+Generic body facts and completeness decisions have no shared ESS model; the proposed
+one is in history at commit `6498a881c`. Native representations
 and selectors live in the adapter's authored ESS. Parser correctness, scope proof,
 byte accounting, current publication fences and cache behavior remain binding
 obligations; ESS shape validation does not execute them.
