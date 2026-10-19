@@ -838,12 +838,15 @@ mod tests {
                     let port = redirect.port().unwrap();
                     for target in browse(&url) {
                         let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
-                        stream
-                            .write_all(
-                                format!("GET {target} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n")
-                                    .as_bytes(),
-                            )
-                            .unwrap();
+                        let request =
+                            format!("GET {target} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n");
+                        stream.write_all(request.as_bytes()).unwrap();
+                        // Sent before the flow polls, so at the listener when it
+                        // does. A head over the limit is never read whole, and
+                        // its tail may wait for a read; it is not awaited.
+                        if request.len() <= HEAD_LIMIT {
+                            delivered(&stream);
+                        }
                         browser.push(stream);
                     }
                     presented.push(url);
@@ -1006,6 +1009,61 @@ mod tests {
         String::from_utf8_lossy(&bytes).into_owned()
     }
 
+    /// Bytes written on the client `stream` that the listener's kernel has
+    /// not acknowledged yet. TCP acknowledges data once it lies in the
+    /// receiving socket's buffer, so at 0 a request is readable on the
+    /// listener side, whether or not its connection has been accepted.
+    #[cfg(target_os = "linux")]
+    fn unacknowledged(stream: &TcpStream) -> usize {
+        use std::os::fd::AsRawFd;
+        let mut queued: libc::c_int = 0;
+        // SAFETY: TIOCOUTQ (SIOCOUTQ) on a live TCP socket writes one int:
+        // the bytes sent but not acknowledged plus those not yet sent.
+        let result = unsafe { libc::ioctl(stream.as_raw_fd(), libc::TIOCOUTQ, &mut queued) };
+        assert_eq!(result, 0, "{}", std::io::Error::last_os_error());
+        usize::try_from(queued).unwrap()
+    }
+    /// macOS keeps sent bytes in the send buffer until they are acknowledged;
+    /// `SO_NWRITE` is that buffer's count.
+    #[cfg(target_os = "macos")]
+    fn unacknowledged(stream: &TcpStream) -> usize {
+        use std::os::fd::AsRawFd;
+        let mut queued: libc::c_int = 0;
+        let mut length = std::mem::size_of::<libc::c_int>() as libc::socklen_t;
+        // SAFETY: SO_NWRITE writes one int into the buffer of that length.
+        let result = unsafe {
+            libc::getsockopt(
+                stream.as_raw_fd(),
+                libc::SOL_SOCKET,
+                libc::SO_NWRITE,
+                (&mut queued as *mut libc::c_int).cast(),
+                &mut length,
+            )
+        };
+        assert_eq!(result, 0, "{}", std::io::Error::last_os_error());
+        usize::try_from(queued).unwrap()
+    }
+    /// Elsewhere the count is not read; a write is taken as delivered.
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    fn unacknowledged(_stream: &TcpStream) -> usize {
+        0
+    }
+    /// Returns once the listener's kernel holds every byte written on
+    /// `stream`. A write returning means only that the bytes left the client
+    /// socket: macOS hands loopback packets to an input thread, so the
+    /// connection or its request can still be on the way when a test goes
+    /// on, and a listener polled meanwhile finds nothing to answer.
+    fn delivered(stream: &TcpStream) {
+        let until = Instant::now() + Duration::from_secs(10);
+        while unacknowledged(stream) != 0 {
+            assert!(
+                Instant::now() < until,
+                "the listener's kernel did not take the request within 10 s"
+            );
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+
     fn get(port: u16, target: &str) -> TcpStream {
         let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
         stream
@@ -1079,12 +1137,14 @@ mod tests {
     fn a_request_queued_before_the_flow_returns_is_answered() {
         // The flow drops its drain as soon as the exchange returns, which can be
         // before the drain thread first polls; a request already queued then is
-        // still answered 400, not closed unanswered.
+        // still answered 400, not closed unanswered. Queued means at the
+        // listener: the test waits until its kernel holds the request.
         for _ in 0..20 {
             let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
             listener.set_nonblocking(true).unwrap();
             let port = listener.local_addr().unwrap().port();
             let mut late = get(port, "/?state=late&code=other");
+            delivered(&late);
             drop(Drain::start(Loopback::new(listener)));
             let answer = read_answer(&mut late);
             assert!(answer.starts_with("HTTP/1.1 400 "), "{answer:?}");

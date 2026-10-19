@@ -414,7 +414,7 @@ impl Local {
 fn exec_failure(value: exec_credential::Refusal) -> Failure {
     use exec_credential::Refusal;
     match value {
-        Refusal::DigestMismatch | Refusal::PluginUnavailable | Refusal::KubeconfigMismatch => {
+        Refusal::DigestMismatch | Refusal::PluginUnavailable(_) | Refusal::KubeconfigMismatch => {
             Failure::InvalidConfiguration
         }
         Refusal::Timeout => Failure::Timeout,
