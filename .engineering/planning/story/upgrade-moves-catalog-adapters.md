@@ -9,7 +9,7 @@ relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:owner-stop-after-upgrade
 - depends_on: story:connection-lease-holds-unattended
-revision: 2
+revision: 3
 ---
 ## Outcome
 
@@ -46,3 +46,12 @@ story:connection-follows-configuration-upgrade's rules.
 ## Scope
 
 Primary: ess/domains/cli.yaml (SetupCheckResult, Prerequisite, NextAction), apps/connectors/src/local.rs setup-check, apps/connectors/spec/cli.yaml, connectors-host local/config.rs (first rewriter of existing config), owner.rs, adapters/catalog main.rs/local.rs (provider version), contracts/cli semantics.md, generated CLI contract, docs. Collides with owner-stop (wave c, A) and any cli.yaml unit; sequence after wave c merges. Open: provider version mechanism, permissions.operations rewrite, configuration_revision handoff to connection-follows-configuration-upgrade.
+
+## Partly delivered in 0.54.0
+
+An instance that pins nothing is now derived from the provider installed beside the CLI
+(`CHANGELOG.md` 0.54.0, Added, the connector-vocabulary bullet), and a provider executable change
+alone is followed by connections (Changed, second bullet). What remains is an entry that pins the
+provider executable by path and sha256: `setup check` does not report it as older than the CLI's
+provider, and no command moves it to the running release's binary and allowlist. The acceptance
+above stands for that case only.
