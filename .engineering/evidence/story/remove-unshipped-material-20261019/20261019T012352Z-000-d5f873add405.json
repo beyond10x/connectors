@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T01:23:52Z",
+  "actor": "human:timo",
+  "artifact": "story:remove-unshipped-material-20261019",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-build --bin connectors-build; -p connectors-spec; -p connectors-custody; -p connectors-docs; clippy",
+    "reference": "~/.cache/connectors-night-20261019/b5/"
+  }
+}

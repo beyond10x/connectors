@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-19T01:22:53Z",
+  "actor": "human:timo",
+  "artifact": "story:slack-single-user-lookups",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-20261019-night-b4-adversary",
+    "reference": "6b4aa2516",
+    "review": "review-result:wave-20261019-night-b4-adversary",
+    "outcome": "fixed"
+  }
+}

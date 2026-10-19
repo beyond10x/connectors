@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T01:23:51Z",
+  "actor": "human:timo",
+  "artifact": "story:slack-single-user-lookups",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-catalog-provider --test slack --test bundle_drift --test shipped --test connector_declarations",
+    "reference": "~/.cache/connectors-night-20261019/b4/"
+  }
+}

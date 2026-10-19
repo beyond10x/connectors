@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T01:23:51Z",
+  "actor": "human:timo",
+  "artifact": "story:definition-format-write-members",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-catalog; task check (connectors-definitions)",
+    "reference": "~/.cache/connectors-night-20261019/b1/test-catalog-2.log"
+  }
+}
