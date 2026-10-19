@@ -23,7 +23,7 @@ selections are distinct from vendor assertions.
 ## PageBulk and storage evidence
 
 The existing immutable
-[provider manifest](../../../../../../../docs/evidence/datasource-semantics-20260908/provider-source-hashes.json)
+[provider manifest](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/datasource-semantics-20260908/provider-source-hashes.json)
 retains the full official Confluence v2 source at
 `https://dac-static.atlassian.com/cloud/confluence/openapi-v2.v3.json?_v=1.8516.103`,
 SHA-256 `451377c5a598ee8155acc11b611404f309bed4a4292ea87f88ed3bfed38fa0a8`.
@@ -47,6 +47,6 @@ those guarantees cannot advertise the profile.
 
 The original Confluence v1/Jira OpenAPI, reconciliation documentation, historical
 provider declarations and independent review supplements remain unchanged in the
-original [datasource evidence intake](../../../../../../../docs/evidence/datasource-semantics-20260908/provider-evidence.md).
+original [datasource evidence intake](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/datasource-semantics-20260908/provider-evidence.md).
 Exact upstream build-source/license adoption and standalone packaging remain
 separate prerequisites; these research archives do not claim them complete.

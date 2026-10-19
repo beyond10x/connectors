@@ -15,7 +15,7 @@
 
 A log read returns a bounded observation of the provider's available logs, with explicit selection, order and truncation. Loki preserves native LogQL and returned stream labels. A result proves neither archival retention, absence of late arrivals, a provider-wide snapshot nor continuity across provider rotation/restart.
 
-Loki continuation pages one immutable retained observation. It never reissues a provider query with an adjusted timestamp edge. The selected provider API supplies neither occurrence identity nor a tie cursor; timestamp/text/label hashes cannot distinguish two genuine identical entries. A saturated provider response therefore ends with a truthful non-resumable partial result after its retained entries have been delivered. The [provider evidence record](../../../../../docs/evidence/datasource-semantics-20260908/provider-evidence.md) identifies the exact sources and selection limits.
+Loki continuation pages one immutable retained observation. It never reissues a provider query with an adjusted timestamp edge. The selected provider API supplies neither occurrence identity nor a tie cursor; timestamp/text/label hashes cannot distinguish two genuine identical entries. A saturated provider response therefore ends with a truthful non-resumable partial result after its retained entries have been delivered. The [provider evidence record](../../../../../docs/evidence/README.md "git show history/evidence-2026-10:docs/evidence/datasource-semantics-20260908/provider-evidence.md") identifies the exact sources and selection limits.
 
 ## 2. Old evidence and disposition
 
