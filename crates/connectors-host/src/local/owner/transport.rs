@@ -1316,11 +1316,29 @@ fn idle_bound() -> Duration {
 fn idle_bound() -> Duration {
     IDLE_EXIT
 }
+/// Binds the owner socket owner-only from the moment it is at `socket`. A
+/// CLI polls that path while an owner starts or listens again after
+/// retirement, and refuses a socket others may connect to as
+/// `invalid_configuration`; `bind` creates the file with the umask's mode,
+/// so binding at `socket` and restricting it afterwards leaves a window in
+/// which a polling CLI fails. The socket is bound at a staging name beside
+/// it (as long as `owner.sock`, so it fits the same `sun_path`), restricted
+/// there, and then linked at `socket`, which refuses a name already taken as
+/// `bind` would. Only the lifetime lock's holder binds, so the staging name
+/// is its own; one a dead owner left is removed first.
 #[cfg(unix)]
 fn listen(socket: &std::path::Path) -> Result<UnixListener> {
-    let listener = UnixListener::bind(socket).map_err(|_| Code::Unavailable)?;
-    std::fs::set_permissions(socket, std::fs::Permissions::from_mode(0o600))
-        .map_err(|_| Code::Unavailable)?;
+    let staging = socket.with_file_name("owner.bind");
+    match std::fs::remove_file(&staging) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Err(Code::Unavailable.into()),
+    }
+    let listener = UnixListener::bind(&staging).map_err(|_| Code::Unavailable)?;
+    let placed = std::fs::set_permissions(&staging, std::fs::Permissions::from_mode(0o600))
+        .and_then(|()| std::fs::hard_link(&staging, socket));
+    let unstaged = std::fs::remove_file(&staging);
+    placed.and(unstaged).map_err(|_| Code::Unavailable)?;
     listener
         .set_nonblocking(true)
         .map_err(|_| Code::Unavailable)?;
@@ -2726,9 +2744,10 @@ mod tests {
         // The next owner starts only after the retiring one has exited.
         std::thread::sleep(Duration::from_millis(300));
 
-        let next = UnixListener::bind(&socket).unwrap();
-        std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o600)).unwrap();
-        next.set_nonblocking(true).unwrap();
+        // Bound the way an owner binds: the CLI polls the path meanwhile, and
+        // a socket it finds there that is not yet owner-only is refused as
+        // `invalid_configuration`.
+        let next = listen(&socket).unwrap();
         // A current-build owner: it answers a greeting with or without `build`
         // and the build probe, until a CLI greets it with `build`.
         let owner = std::thread::spawn(move || {

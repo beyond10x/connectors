@@ -70,9 +70,27 @@ fn now() -> u64 {
 fn no_ambient(_: &str) -> Option<String> {
     None
 }
+/// `cp source destination`, then mode 0700. A plugin file is only ever
+/// written by a `cp` child, never through a descriptor of this process: the
+/// tests run on parallel threads and every plugin run forks, and a child
+/// forked while this process held the file open for writing keeps that
+/// descriptor until its own exec. An exec of the plugin meanwhile fails with
+/// `ETXTBSY` (`PluginUnavailable(Some(ExecutableFileBusy))`).
 fn private_copy(source: &Path, destination: &Path) {
-    fs::copy(source, destination).unwrap();
+    let status = Command::new("cp")
+        .arg(source)
+        .arg(destination)
+        .status()
+        .unwrap();
+    assert!(status.success(), "cp: {status}");
     fs::set_permissions(destination, fs::Permissions::from_mode(0o700)).unwrap();
+}
+/// Puts `contents` at `path`, mode 0700, through [`private_copy`].
+fn install(path: &Path, contents: &[u8]) {
+    let staged = path.with_extension("staged");
+    fs::write(&staged, contents).unwrap();
+    private_copy(&staged, path);
+    fs::remove_file(&staged).unwrap();
 }
 /// Descriptor numbers listed in `out` by the fixture's `/proc/$$/fd` loop.
 fn listed(out: &Path) -> Vec<i32> {
@@ -337,16 +355,15 @@ fn exec_plugin_script_inherits_only_its_own_descriptor() {
     let plugin = dir.path().join("fixture-plugin");
     let out = dir.path().join("fds");
     let token = "fixture-script-descriptor-token";
-    fs::write(
+    install(
         &plugin,
         format!(
             "#!/bin/sh\n{}\nprintf '%s' '{}'\n",
             list_descriptors(&out),
             answer(token)
-        ),
-    )
-    .unwrap();
-    fs::set_permissions(&plugin, fs::Permissions::from_mode(0o700)).unwrap();
+        )
+        .as_bytes(),
+    );
     let held = hold_descriptor(dir.path(), 901);
     let credentials = Credentials::new(binding(&plugin, &[], 5_000)).unwrap();
     let result = credentials.token(&kubeconfig(&plugin, &[], &[]), &now, &no_ambient);
@@ -393,15 +410,14 @@ fn exec_plugin_binding_refuses_the_zsh_start_up_directory() {
     };
     let dir = tempfile::tempdir().unwrap();
     let plugin: PathBuf = dir.path().join("fixture-plugin");
-    fs::write(
+    install(
         &plugin,
         format!(
             "#!{zsh}\nprint -r -- '{}'\n",
             answer("fixture-pinned-token")
-        ),
-    )
-    .unwrap();
-    fs::set_permissions(&plugin, fs::Permissions::from_mode(0o700)).unwrap();
+        )
+        .as_bytes(),
+    );
     let startup = dir.path().join("startup");
     fs::create_dir(&startup).unwrap();
     fs::write(

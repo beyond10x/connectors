@@ -549,6 +549,19 @@ impl Drop for Cluster {
         self.thread.take().unwrap().join().unwrap();
     }
 }
+/// Puts an executable `contents` at `path`, mode 0700, through a `cp` child:
+/// this process never holds a file that will be executed open for writing.
+/// The tests run on parallel threads and fork; a child forked while this
+/// process held the file open keeps that descriptor until its own exec, and
+/// an exec of the file meanwhile fails with `ETXTBSY`.
+fn executable(path: &std::path::Path, contents: &[u8]) {
+    let staged = path.with_extension("staged");
+    fs::write(&staged, contents).unwrap();
+    let status = Command::new("cp").arg(&staged).arg(path).status().unwrap();
+    assert!(status.success(), "cp: {status}");
+    fs::remove_file(&staged).unwrap();
+    fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
+}
 fn private(path: &std::path::Path, bytes: &[u8]) {
     fs::write(path, bytes).unwrap();
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
@@ -1504,16 +1517,15 @@ impl ExecPlugin {
         // The token is assembled from two halves, so the script's own bytes
         // never contain it and a disk scan for it stays meaningful.
         let (head, tail) = TOKEN_ONE.split_at(8);
-        fs::write(
+        executable(
             &path,
             format!(
                 "#!/bin/sh\necho run >> {d}/runs\n\
                  printf '{{\"apiVersion\":\"client.authentication.k8s.io/v1\",\"kind\":\"ExecCredential\",\
                  \"status\":{{\"token\":\"%s%s\",\"expirationTimestamp\":\"2099-01-01T00:00:00Z\"}}}}\\n' '{head}' '{tail}'\n"
-            ),
-        )
-        .unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+            )
+            .as_bytes(),
+        );
         Self { dir, path }
     }
     fn runs(&self) -> usize {
