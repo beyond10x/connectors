@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T18:39:52Z",
+  "actor": "human:timo",
+  "artifact": "story:connection-lease-holds-unattended",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "merges 511f7b0f5 and 6609c8792 on main; apps/connectors/tests/connection_lease.rs (13 tests), connection_lease_adversary.rs (16 tests)",
+    "reference": "CHANGELOG.md 0.54.0 Changed, first bullet"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T18:42:17Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0280-ess-052",
+  "kind": "release-plan",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "artifact",
+    "source": "git tag v0.28.0 exists; CHANGELOG.md line 1952 holds the 0.28.0 section",
+    "reference": "git tag v0.28.0"
+  }
+}

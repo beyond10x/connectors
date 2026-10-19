@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: story:registry-passive-approval-test-flake
 kind: story
-status: draft
+status: archived
 title: Approval-target passivity test fails once in a full host run
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 2
+transitions:
+- {from: "draft", to: "archived", at: "2026-10-19T18:40:21Z", actor: "human:timo", revision: 2, decided_on: {"recorded":{"diff":1}}}
 ---
 ## Outcome
 

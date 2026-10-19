@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T18:39:58Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-client-credentials-profile",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "adapters/catalog/tests/local_runtime/oauth2_client_credentials.rs (the six acceptance tests present)",
+    "reference": "CHANGELOG.md 0.29.0 Added (oauth2_client_credentials scheme)"
+  }
+}

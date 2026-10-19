@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:kubernetes-spec-service
 kind: story
-status: draft
+status: archived
 title: Generate and package the Kubernetes adapter from the current verified baseline
 relations:
 - derived_from: specification:contract-driven-connectors-design
@@ -34,7 +34,9 @@ scope:
   path: examples
 - confidence: cited
   path: spec-kinds
-revision: 7
+revision: 8
+transitions:
+- {from: "draft", to: "archived", at: "2026-10-19T18:40:24Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"diff":1}}}
 ---
 ## Context and current status
 

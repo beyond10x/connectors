@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: story:ess3-format-adoption
 kind: story
-status: draft
+status: archived
 title: Adopt the ess/3 format across every root under a pinned ESS 0.23
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 2
+transitions:
+- {from: "draft", to: "archived", at: "2026-10-19T18:40:24Z", actor: "human:timo", revision: 2, decided_on: {"recorded":{"diff":1}}}
 ---
 ## Acceptance
 

@@ -2,9 +2,11 @@
 format: aep.planning-md/3
 id: story:registry-passive-approval-test-order
 kind: story
-status: draft
+status: archived
 title: The passive approval-target registry test holds under a full parallel run
-revision: 1
+revision: 2
+transitions:
+- {from: "draft", to: "archived", at: "2026-10-19T18:40:22Z", actor: "human:timo", revision: 2, decided_on: {"recorded":{"diff":1}}}
 ---
 ## Observed
 `local::registry::tests::approval_target_is_passive_but_requires_exact_retained_admission`

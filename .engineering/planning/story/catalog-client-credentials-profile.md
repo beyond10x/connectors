@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-client-credentials-profile
 kind: story
-status: proposed
+status: implemented
 title: The catalog provider authenticates with OAuth client credentials (no refresh token)
 relations:
 - decomposes: epic:catalog-knowledge-sources
@@ -20,9 +20,11 @@ scope:
   path: docs/catalog-zendesk.md
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 5
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-05T13:33:01Z", actor: "human:timo", revision: 5}
+- {from: "proposed", to: "active", at: "2026-10-19T18:39:58Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1}}}
+- {from: "active", to: "implemented", at: "2026-10-19T18:39:58Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Problem
 

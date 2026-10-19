@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T18:42:18Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0310-probe-waves",
+  "kind": "release-plan",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "artifact",
+    "source": "git tag v0.31.0 exists; CHANGELOG.md line 1747 holds the 0.31.0 section",
+    "reference": "git tag v0.31.0"
+  }
+}

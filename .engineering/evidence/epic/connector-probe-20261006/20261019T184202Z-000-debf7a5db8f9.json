@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T18:42:02Z",
+  "actor": "human:timo",
+  "artifact": "epic:connector-probe-20261006",
+  "kind": "epic",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "artifact",
+    "source": "all 10 stories decomposing the epic are implemented (aep plan artifact list --kind story); each in-scope bullet maps to one, see CHANGELOG.md 0.30.0-0.34.0",
+    "reference": "aep plan artifact list --kind story"
+  }
+}

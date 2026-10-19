@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T18:40:24Z",
+  "actor": "human:timo",
+  "artifact": "story:kubernetes-spec-service",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "diff",
+    "source": "commit 721d6fdb5 (on main) removed the v2 generator and spec-kinds/adapter/v2 that the story's plan (private existing-v2 bundles) builds on; story's own text says do not silently extend v2",
+    "reference": "721d6fdb5"
+  }
+}

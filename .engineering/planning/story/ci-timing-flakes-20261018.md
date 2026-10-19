@@ -9,6 +9,8 @@ refs:
   reference: beyond10x/connectors#183
 relations:
 - serves: vision:independent-contract-adapters
+- supersedes: story:oauth-drain-macos-race
+- supersedes: story:kubernetes-exec-fixture-busy
 scope:
 - confidence: cited
   path: adapters/kubernetes/tests/exec_credential.rs
@@ -18,7 +20,7 @@ scope:
   path: crates/connectors-host/src/local/oauth.rs
 - confidence: cited
   path: crates/connectors-host/src/local/owner/transport.rs
-revision: 4
+revision: 5
 ---
 ## Defect
 
@@ -68,3 +70,23 @@ is fixed instead and the cause is named.
 
 Other flaky tests already recorded (`story:registry-passive-approval-test-flake`,
 `story:gmail-attachment-read-flaky-under-load` and the rest); CI retry policy.
+
+## Folded from earlier flake stories
+
+Two earlier draft stories recorded the same failure family and are archived into this one. Their
+observations and acceptance lines carry over.
+
+- `story:oauth-drain-macos-race`: `local::oauth::tests::a_request_queued_before_the_flow_returns_is_answered`
+  (the second row of the table above) also failed on pull request
+  https://github.com/beyond10x/connectors/pull/170, run 38633201731, 2026-10-14, and
+  `local::oauth::tests::second_request_refused` failed on `main`, run 38455605662, 2026-10-13; both
+  on the macOS runner only. Commit `be3f6f201` targeted the race and it still occurs. Added
+  acceptance: the cause is shown from a macOS reproduction (the drain's accept or poll order, the
+  non-blocking accept on macOS, or the test's read of a reset connection), and the two oauth tests
+  pass 500 consecutive repetitions on the macOS runner.
+- `story:kubernetes-exec-fixture-busy`: `exec_plugin_native_executable_answers_through_its_descriptor`
+  (`adapters/kubernetes/tests/exec_credential.rs:456`) answered `Err(PluginUnavailable)` once in a
+  full `cargo test -p connectors-kubernetes --no-fail-fast` run on 2026-10-16 and passed alone;
+  the same `ETXTBSY` hypothesis as the exec rows above. Added acceptance: `PluginUnavailable`
+  from an exec plugin carries the spawn error kind, so an operator can tell a missing plugin from
+  a busy one.

@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0280-ess-052
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.28.0: ESS 0.52.0 and the duplicate-key decoder refusal'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-05T12:17:36Z", actor: "human:timo", revision: 2, executor: "agent:claude"}
+- {from: "active", to: "implemented", at: "2026-10-19T18:42:17Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":2,"artifact":1}}}
 ---
 ## Outcome and authorization
 

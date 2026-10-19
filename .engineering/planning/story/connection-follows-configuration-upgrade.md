@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: story:connection-follows-configuration-upgrade
 kind: story
-status: proposed
+status: draft
 title: A connection follows a configuration upgrade without credential re-entry
 relations:
 - serves: vision:independent-contract-adapters
-revision: 4
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-06T02:14:55Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "draft", at: "2026-10-19T18:41:43Z", actor: "human:timo", revision: 6}
 ---
 ## Problem
 
@@ -54,3 +55,25 @@ the instance keeps its own state until it is revalidated itself.
 
 Upgrading across a changed provider authority, profile or identity; moving material between
 connections; reviving a revoked connection.
+
+## Delivered in 0.54.0, and what remains
+
+Most of this story shipped under ADR D12 (`CHANGELOG.md` 0.54.0, Changed, second bullet): a
+connection is bound to the credential side of its configuration (`credential_revision`) and to
+the provider executable, not to the operation list. A bundle, source or selection change leaves
+the connection `ready`; a provider executable change alone validates the stored credential once
+and follows when the recorded identity answers, refusing as `identity_mismatch` otherwise; a CA
+file, token CA, admitted host or request prefix change gives `pending` with `stale` until
+`connections revalidate`, whose next run records the new revision. No credential is asked for in
+any of these.
+
+Remaining, to be re-derived against that behaviour before work starts:
+
+- A change of only `evidence_lifetime_ms` still needs `connections revoke` and a new connect
+  (`docs/local-catalog-provider.md` around line 1083).
+- `docs/local-catalog-provider.md` still tells the operator to give the instance a new id for a
+  changed provider host or `auth` field; that refusal is deliberate and out of this story's scope.
+- Whether the acceptance lines on a revalidate across a changed CA file or admitted host are
+  already held by a test is not established here.
+
+The story returns to draft so the narrowed remainder is decided before it is proposed again.

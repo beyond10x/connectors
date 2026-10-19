@@ -9,7 +9,22 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:confluence-v1-authored-contract
 - depends_on: story:connection-lease-holds-unattended
-revision: 4
+scope:
+- confidence: cited
+  path: adapters/catalog/spec/ess
+- confidence: cited
+  path: adapters/catalog/src
+- confidence: cited
+  path: contracts/catalog/v1alpha1/semantics.md
+- confidence: cited
+  path: docs/catalog-confluence.md
+- confidence: cited
+  path: docs/local-catalog-provider.md
+- confidence: cited
+  path: ess/domains/cli.yaml
+- confidence: cited
+  path: ess/domains/credential_evidence.yaml
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-15T08:46:55Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-15T08:46:56Z", actor: "human:timo", revision: 3}

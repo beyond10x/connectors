@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0510-slack-writes-incident-reads
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.51.0: Slack writes, incident history reads and call profiles'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-14T22:05:53Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-19T18:42:19Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"artifact":1}}}
 ---
 ## Outcome
 

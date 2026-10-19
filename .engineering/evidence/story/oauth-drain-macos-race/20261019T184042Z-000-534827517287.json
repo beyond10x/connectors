@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T18:40:42Z",
+  "actor": "human:timo",
+  "artifact": "story:oauth-drain-macos-race",
+  "kind": "story",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "artifact",
+    "source": "folded into story:ci-timing-flakes-20261018 (same test a_request_queued_before_the_flow_returns_is_answered, oauth.rs:1079)",
+    "reference": "story:ci-timing-flakes-20261018"
+  }
+}

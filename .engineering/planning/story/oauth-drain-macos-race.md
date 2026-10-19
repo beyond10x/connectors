@@ -2,9 +2,11 @@
 format: aep.planning-md/3
 id: story:oauth-drain-macos-race
 kind: story
-status: draft
+status: archived
 title: A request queued on the OAuth loopback listener is answered on macOS, never dropped
-revision: 1
+revision: 2
+transitions:
+- {from: "draft", to: "archived", at: "2026-10-19T18:40:42Z", actor: "human:timo", revision: 2, decided_on: {"recorded":{"artifact":1}}}
 ---
 ## Observed
 The OAuth loopback tests in `crates/connectors-host/src/local/oauth.rs` fail intermittently on
