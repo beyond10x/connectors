@@ -222,8 +222,12 @@ in-flight revalidation's own answer (its connection summary, or its refusal)
 as soon as that one answers. A joined revalidation's own deadline still bounds
 its wait; at that deadline it is `outcome_unknown`, as an unanswered
 revalidation is, and an in-flight revalidation whose own wait ended
-`outcome_unknown` answers its joiners the same. A revalidation at another
-expected revision, or of another connection, never joins.
+`outcome_unknown` answers its joiners the same. One exception: a read's
+recollection never re-pins changed mounted material, so when the one in flight
+is a read's recollection that ends on changed mounted material, or ends without
+an answer for its joiners, each joined revalidation runs its own, identity
+probe included, within its own deadline. A revalidation at another expected
+revision, or of another connection, never joins.
 
 ## Stopping an owner
 

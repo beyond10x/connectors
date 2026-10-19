@@ -798,7 +798,8 @@ pub struct EmbeddedText {
 /// The headers by which a provider says its rate limit is spent
 /// (`connectors_catalog.selection.RateLimitHeaders`): a `403` or `429` whose
 /// `remaining` header is exactly `0` is `rate_limited`, waiting until the Unix
-/// time `reset` names unless `Retry-After` says otherwise.
+/// time `reset` names unless `Retry-After` says otherwise. A write answered
+/// `429` stays unconfirmed: only its `403` is a definite refusal.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RateLimitHeaders {

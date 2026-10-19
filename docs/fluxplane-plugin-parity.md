@@ -428,7 +428,7 @@ covered or partial, otherwise the best verdict any of its operations reaches.
 - **missing:** nothing in Connectors.
 
 An operation with 0 calls still gets a verdict. A `*.test` operation is covered by
-`connections revalidate` (`apps/connectors/spec/cli.yaml:375`) wherever Connectors has a
+`connections revalidate` (`apps/connectors/spec/cli.yaml:485`) wherever Connectors has a
 connection to that provider. That command re-runs the profile's identity probe.
 
 ## gitlab
@@ -437,7 +437,7 @@ Source: fluxplane inventory §2 gitlab.
 
 Connectors serves GitLab through the catalog provider, `adapters/catalog/providers/gitlab/operations.json`
 (line numbers below). The bundle carries all 1,847 operations of the pinned GitLab source
-(README.md:43-44), so every missing GitLab row is a selection that has not been made.
+(README.md:217), so every missing GitLab row is a selection that has not been made.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
@@ -595,7 +595,7 @@ the Slack Web API method that would back it.
 | `slack.file.delete` | 7 | 4 | 2026-09-29 | `files.delete` (:99) | covered | One write under approval on one file named by `file` (scope `files:write`). Guarded by `auth.test`, then `files.info` on the same file, which must answer `"ok": true` with that id, so a file Slack does not find is refused before the write. `file_not_found` and `file_deleted` are refused as `not_found`, `cant_delete_file` as `forbidden`; any other `"ok": false` is `outcome_unknown`. Nothing is read after (2026-10-19). |
 | `slack.file.info` | 7 | 2 | 2026-09-29 | `files.info` (:39) | covered | One file by id, with `name`, `filetype`, `mimetype`, `size` and `url_private`; scope `files:read`. A Slack error is a `200` answer with `"ok": false` (2026-10-10). |
 | `slack.file.list` | 3 | 1 | 2026-09-29 | `files.list` (:36) | covered | Pages by `page` and `count`, not by cursor; narrowed by `channel`, `user`, `types`, `ts_from` and `ts_to`; scope `files:read` (2026-10-10). |
-| `slack.test` | 3 | 3 | 2026-09-26 | `connections revalidate` (`apps/connectors/spec/cli.yaml:387`) | covered | Repeats the `GET /api/auth.test` probe with the saved bot token. |
+| `slack.test` | 3 | 3 | 2026-09-26 | `connections revalidate` (`apps/connectors/spec/cli.yaml:485`) | covered | Repeats the `GET /api/auth.test` probe with the saved bot token. |
 | `slack.emoji.list` | 1 | 1 | 2026-09-28 | `emoji.list` (:30) | covered | The workspace's custom emoji, in one call; the pinned document states no member of the answer, which is returned as Slack sent it. |
 | `slack.bookmark.add` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.add`. |
 | `slack.bookmark.delete` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.remove`. |
@@ -655,7 +655,7 @@ token as its `loki.bearer` token, sends its probe and every read below that pref
 (`adapters/loki/tests/local_runtime.rs`,
 `a_connection_through_the_grafana_datasource_proxy_reads_below_the_proxy_prefix`). The uid
 comes from `datasources.list`. The mediated route of the design, `grafana-datasource-proxy`
-(`adapters/grafana/design.md:19`), which would seal the uid and allowlist targets, is not
+(`adapters/grafana/design.md:22`), which would seal the uid and allowlist targets, is not
 built. Prometheus, like Loki, runs on a connection whose base URL is the proxy path
 ([prometheus](#prometheus)); Alertmanager through Grafana still needs its own adapter. Each read is
 tested against fixture answers in Grafana and Loki API shapes, not a live Grafana.
@@ -681,7 +681,7 @@ tested against fixture answers in Grafana and Loki API shapes, not a live Grafan
 | `grafana.folder.list` | 0 | 0 | - | — | missing | No Grafana runtime. |
 | `grafana.tempo.search` | 0 | 0 | - | — | missing | No Tempo adapter. |
 | `grafana.tempo.trace.get` | 0 | 0 | - | — | missing | No Tempo adapter. |
-| `grafana.test` | 0 | 0 | - | `connections revalidate` (`apps/connectors/spec/cli.yaml:387`) | covered | Repeats the `GET /api/datasources` probe with the saved token. |
+| `grafana.test` | 0 | 0 | - | `connections revalidate` (`apps/connectors/spec/cli.yaml:485`) | covered | Repeats the `GET /api/datasources` probe with the saved token. |
 
 ## loki
 
@@ -702,7 +702,7 @@ credential cannot be connected: the local host admits no profile without one.
 | `loki.query` | 313 | 8 | 2026-09-30 | `logs.query_range` (`adapters/loki/spec/adapter.json:321`) | covered | Unpaged: at most 1,000 lines per call over at most 24 hours; a longer read is several calls. |
 | `loki.metric` | 40 | 3 | 2026-09-24 | `logs.query_metric` (`adapters/loki/spec/adapter.json:520`) | covered | Instant and range queries. |
 | `loki.labels` | 11 | 4 | 2026-09-24 | `logs.labels` (`adapters/loki/spec/adapter.json:690`) | covered | Label names, or one label's values. |
-| `loki.test` | 6 | 4 | 2026-09-28 | `connections revalidate` (`apps/connectors/spec/cli.yaml:387`) | covered | Repeats the `GET /loki/api/v1/labels` probe with the saved token. |
+| `loki.test` | 6 | 4 | 2026-09-28 | `connections revalidate` (`apps/connectors/spec/cli.yaml:485`) | covered | Repeats the `GET /loki/api/v1/labels` probe with the saved token. |
 | `loki.recent_logs` | 0 | 0 | - | `logs.query_range` (`adapters/loki/spec/adapter.json:321`) with a start and no end | covered | No "most recent lines" read of its own: the caller computes the start, and an omitted `end_unix_ns` is the receiver clock, as for `grafana.loki.recent_logs` (2026-10-18). |
 
 ## kubernetes
@@ -716,7 +716,7 @@ Connectors native adapter: `adapters/kubernetes/spec/adapter.json`.
   2026-10-18). Its input is `namespace`, `kind`, `limit` and `cursor`, with no name filter (:286-328).
 - `resources.get` (:397) reads one object of a configured kind by name, and answers `not_found`
   when it is absent (2026-10-10).
-- Each instance configures the namespaces it may read (`adapters/kubernetes/src/lib.rs:75-89`).
+- Each instance configures the namespaces it may read (`adapters/kubernetes/src/lib.rs:37`).
   `namespaces.list` (:496) reads each configured namespace by name and omits the ones the
   cluster does not have; it never lists the cluster's namespaces (2026-10-10).
 - `deployments.history` (:593) returns the ReplicaSets one Deployment controls by owner uid, with
@@ -736,7 +736,7 @@ Connectors native adapter: `adapters/kubernetes/spec/adapter.json`.
 | `kubernetes.container.list` | 10 | 2 | 2026-09-20 | `resources.list` kind `pods` (:282) | covered | Containers are read from the full pod objects; there is no derived container list. |
 | `kubernetes.namespace.list` | 10 | 4 | 2026-09-22 | `namespaces.list` (:496) | covered | The configured namespaces the cluster has, each read by name; the cluster's namespace list is never read, so a namespace outside the configuration is not shown. |
 | `kubernetes.pod.exec` | 9 | 2 | 2026-09-15 | `pods.exec` (:2172) | covered | One command as an argument vector with no shell, in a named container; needs `pod_exec: true`, the local write exchange and an approval, and is recorded as an attempt like every write. Exit status and stdout and stderr up to `max_output_bytes` each (at most 1 MiB) come back; at most 60 s. No stdin and no TTY, so no interactive session. A lost stream is `unknown` and never resent. Verified against recorded streams, not a live cluster (2026-10-10). |
-| `kubernetes.cluster.list` | 5 | 5 | 2026-09-18 | `contexts.list` (:2066) | covered | The contexts of the one kubeconfig the local configuration names in `kubeconfig` (absolute, owner-only): name, cluster, namespace and the current flag, never credentials or servers. It reads no other kubeconfig and does not build a connection from a context; `connections list` (`apps/connectors/spec/cli.yaml:320`) lists the saved connections (2026-10-10). |
+| `kubernetes.cluster.list` | 5 | 5 | 2026-09-18 | `contexts.list` (:2066) | covered | The contexts of the one kubeconfig the local configuration names in `kubeconfig` (absolute, owner-only): name, cluster, namespace and the current flag, never credentials or servers. It reads no other kubeconfig and does not build a connection from a context; `connections list` (`apps/connectors/spec/cli.yaml:410`) lists the saved connections (2026-10-10). |
 | `kubernetes.pod.logs` | 5 | 1 | 2026-09-15 | `pods.logs` (:1840) | covered | One container's log in a configured namespace, needs `pod_logs: true`; `tail_lines` up to 1,000, `since_seconds` up to a day, `max_bytes` up to 128 KiB, timestamped lines. No follow. The per-read permission pre-check the contract names is not performed; the cluster's RBAC answer decides (2026-10-10). |
 | `kubernetes.service.list` | 4 | 1 | 2026-09-19 | `resources.list` kind `services` (:282) | covered | Configured namespaces only. |
 | `kubernetes.pod.show` | 3 | 2 | 2026-09-15 | `resources.get` kind `pods` (:397) | covered | Configured namespaces only; an absent pod answers `not_found`. |
@@ -755,7 +755,7 @@ Connectors native adapter: `adapters/kubernetes/spec/adapter.json`.
 | `kubernetes.node.list` | 0 | 0 | - | `nodes.list` (:703) | covered | Advertised only while `node_reads` is true; lists the cluster's Node objects in full, one bounded page at a time, and needs a ClusterRole granting `list` on `nodes` (`docs/local-kubernetes-cli.md:450-455`). `hosts.discover` (:1112) returns only names, addresses and conditions (2026-10-18). |
 | `kubernetes.portforward.list` | 0 | 0 | - | — | missing | No port-forward. |
 | `kubernetes.service.show` | 0 | 0 | - | `resources.get` kind `services` (:397) | covered | Configured namespaces only. |
-| `kubernetes.test` | 0 | 0 | - | `connections revalidate` (SelfSubjectReview probe, `adapters/kubernetes/src/auth.rs:16`) | covered | — |
+| `kubernetes.test` | 0 | 0 | - | `connections revalidate` (SelfSubjectReview probe, `adapters/kubernetes/src/auth.rs:24-25`) | covered | — |
 
 ## homer
 
@@ -820,7 +820,7 @@ runtime and the CLI, not a live Prometheus. Limits: no tenant header, no `timeou
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
 | `prometheus.query` | 1 | 1 | 2026-09-16 | `series.query` (`adapters/prometheus/spec/adapter.json:60`) | covered | No tenant header and no `timeout` parameter. |
-| `prometheus.test` | 1 | 1 | 2026-09-24 | `connections revalidate` (`apps/connectors/spec/cli.yaml:387`) | covered | Repeats the `GET /api/v1/status/buildinfo` probe with the saved token. |
+| `prometheus.test` | 1 | 1 | 2026-09-24 | `connections revalidate` (`apps/connectors/spec/cli.yaml:485`) | covered | Repeats the `GET /api/v1/status/buildinfo` probe with the saved token. |
 | `prometheus.alerts` | 0 | 0 | - | — | missing | Not selected. |
 | `prometheus.labels` | 0 | 0 | - | — | missing | Not selected. |
 | `prometheus.query_range` | 0 | 0 | - | `series.query_range` (`adapters/prometheus/spec/adapter.json:222`) | covered | — |
@@ -886,7 +886,7 @@ Source: fluxplane inventory §2 clock.
 
 `clock` declares no operations. It is a context provider for the current time only, so there is
 nothing to map and no row. The nearest Connectors command is `approvals clock-check`
-(`apps/connectors/spec/cli.yaml:207`), and that only checks the approval time source.
+(`apps/connectors/spec/cli.yaml:238`), and that only checks the approval time source.
 
 ## docker
 
@@ -1042,7 +1042,7 @@ Source: fluxplane inventory §2 websearch.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `websearch.provider.list` | 0 | 0 | - | `operations list --family` (`apps/connectors/spec/cli.yaml:410`) | partial | Lists the web-search operations of the configured adapters. Tavily is the only one. |
+| `websearch.provider.list` | 0 | 0 | - | `operations list --family` (`apps/connectors/spec/cli.yaml:532`) | partial | Lists the web-search operations of the configured adapters. Tavily is the only one. |
 | `websearch.search` | 0 | 0 | - | `websearch.search` (`adapters/tavily/spec/adapter.json:40`) | partial | One provider (Tavily). No aggregation over providers. |
 
 ## CLI verbs
@@ -1200,7 +1200,7 @@ The "provider in Connectors" column uses three values:
 | U16 | GitLab project and repository writes | gitlab | catalog | Catalog `operations.json` selection only. | `gitlab.repository.commit.create`, `gitlab.project.create`, `gitlab.repository.file.update`, `gitlab.branch.create`, `gitlab.branch.delete` | 36 | 0 | 36 | 0 |
 | U17 | Homer SIP capture reads | homer | new | A new catalog provider, if the Homer API's Swagger document can be pinned (not checked). Otherwise a new native adapter. | `homer.call.list`, `homer.call.show`, `homer.test`, `homer.call.qos`, `homer.search` | 32 | 1 | 33 | 33 |
 | U18 | Kubernetes reads: namespaces, single objects, events, rollout history | kubernetes | native | Change the native adapter: new kinds (namespaces, events, ReplicaSets) and a single-object read. | `kubernetes.namespace.list`, `kubernetes.pod.show`, `kubernetes.deployment.show`, `kubernetes.deployment.history`, `kubernetes.event.list` | 17 | 0 | 17 | 0 |
-| U19 | Kubernetes exec and port-forward | kubernetes | native | Change the native adapter: the streaming subresources. The execution profile is deferred (README.md:115-116). | `kubernetes.pod.exec`, `kubernetes.portforward.start`, `kubernetes.portforward.stop` | 13 | 0 | 13 | 4 |
+| U19 | Kubernetes exec and port-forward | kubernetes | native | Change the native adapter: the streaming subresources. `pods.exec` is covered (see `kubernetes.pod.exec`); port-forward and the rest of the execution profile (`docs/design.md:485`) are not. | `kubernetes.pod.exec`, `kubernetes.portforward.start`, `kubernetes.portforward.stop` | 13 | 0 | 13 | 4 |
 | U20 | Confluence CQL search | confluence | catalog | A new pinned OpenAPI source (Confluence REST v1) for the existing catalog provider. | `confluence.page.search` | 8 | 0 | 8 | 0 |
 | U21 | Kubernetes contexts | kubernetes | native | Change the native adapter and the CLI connection setup: discover kubeconfig contexts. | `kubernetes.cluster.list` | 5 | 0 | 5 | 0 |
 | U22 | Kubernetes pod logs | kubernetes | native | Change the native adapter: implement the specified `adapters/kubernetes/contracts/logs`. | `kubernetes.pod.logs` | 5 | 0 | 5 | 0 |
