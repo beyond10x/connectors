@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0310-probe-waves
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.31.0: refusal reasons, Retry-After, revalidate advice, clock floor and owner memory'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "active", at: "2026-10-06T19:15:33Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-19T18:42:18Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":4,"artifact":1}}}
 ---
 ## Outcome and authorization
 

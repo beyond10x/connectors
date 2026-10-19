@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0320-feed-gitlab-er029
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.32.0: JSON answers, the GitLab feed binding and Entity Runtime 0.29.0'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-07T16:05:49Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-19T18:42:19Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":1,"artifact":1}}}
 ---
 ## Outcome and authorization
 

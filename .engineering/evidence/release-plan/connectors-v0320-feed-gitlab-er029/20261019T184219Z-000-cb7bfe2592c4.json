@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T18:42:19Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0320-feed-gitlab-er029",
+  "kind": "release-plan",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "artifact",
+    "source": "git tag v0.32.0 exists; CHANGELOG.md line 1654 holds the 0.32.0 section",
+    "reference": "git tag v0.32.0"
+  }
+}

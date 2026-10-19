@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0300-upgrade-access-perpage
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.30.0: configuration upgrades, access probes and Zendesk per_page'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "active", at: "2026-10-06T04:34:29Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-19T18:42:18Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":2,"artifact":1}}}
 ---
 ## Outcome and authorization
 

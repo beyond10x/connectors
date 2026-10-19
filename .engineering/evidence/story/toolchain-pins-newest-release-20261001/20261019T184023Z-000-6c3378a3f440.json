@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T18:40:23Z",
+  "actor": "human:timo",
+  "artifact": "story:toolchain-pins-newest-release-20261001",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "diff",
+    "source": "Pins moved past the story: crates/connectors-spec/toolchain.json is ess 0.59.0, crates/connectors-build/aep-toolchain.json is aep 0.71.3; the story's 0.48.0/0.67.0 targets are obsolete",
+    "reference": "crates/connectors-spec/toolchain.json"
+  }
+}

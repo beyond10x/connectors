@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T18:42:17Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0290-oauth-client-er026",
+  "kind": "release-plan",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "artifact",
+    "source": "git tag v0.29.0 exists; CHANGELOG.md line 1932 holds the 0.29.0 section",
+    "reference": "git tag v0.29.0"
+  }
+}

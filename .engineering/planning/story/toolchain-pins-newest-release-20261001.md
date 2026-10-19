@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:toolchain-pins-newest-release-20261001
 kind: story
-status: draft
+status: archived
 title: Pin ESS 0.48.0 and AEP 0.67.0, the newest releases
 relations:
 - decomposes: epic:tech-debt-review-20260930
@@ -22,7 +22,9 @@ scope:
   path: docs/development.md
 - confidence: inferred
   path: ess
-revision: 3
+revision: 4
+transitions:
+- {from: "draft", to: "archived", at: "2026-10-19T18:40:23Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"diff":1}}}
 ---
 ## Defect
 

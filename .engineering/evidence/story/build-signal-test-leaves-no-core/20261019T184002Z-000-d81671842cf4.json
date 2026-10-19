@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T18:40:02Z",
+  "actor": "human:timo",
+  "artifact": "story:build-signal-test-leaves-no-core",
+  "kind": "story",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "commits e3168d976 and b4ecdb151 (on main); crates/connectors-build/src/gate.rs:904-913 sets RLIMIT_CORE 0 in the test child",
+    "reference": "crates/connectors-build/src/gate.rs"
+  }
+}

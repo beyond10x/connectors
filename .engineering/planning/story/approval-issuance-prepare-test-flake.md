@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: story:approval-issuance-prepare-test-flake
 kind: story
-status: draft
+status: archived
 title: approval_issuance prepare passivity test sees an extra store write in a full run
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 2
+transitions:
+- {from: "draft", to: "archived", at: "2026-10-19T18:40:22Z", actor: "human:timo", revision: 2, decided_on: {"recorded":{"diff":1}}}
 ---
 ## Observed
 `connectors-host` test

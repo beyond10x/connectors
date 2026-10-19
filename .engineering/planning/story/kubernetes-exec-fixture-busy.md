@@ -2,9 +2,11 @@
 format: aep.planning-md/3
 id: story:kubernetes-exec-fixture-busy
 kind: story
-status: draft
+status: archived
 title: The Kubernetes exec plugin fixture test holds under a full parallel run
-revision: 1
+revision: 2
+transitions:
+- {from: "draft", to: "archived", at: "2026-10-19T18:40:43Z", actor: "human:timo", revision: 2, decided_on: {"recorded":{"artifact":1}}}
 ---
 ## Observed
 `exec_plugin_native_executable_answers_through_its_descriptor`

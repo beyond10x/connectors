@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:connection-lease-holds-unattended
 kind: story
-status: active
+status: implemented
 title: A revalidated connection keeps serving reads, and concurrent revalidations finish within the admission bound
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-14T23:35:15Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-14T23:35:15Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-19T18:39:53Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

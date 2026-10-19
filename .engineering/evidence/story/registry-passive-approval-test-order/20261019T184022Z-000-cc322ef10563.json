@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T18:40:22Z",
+  "actor": "human:timo",
+  "artifact": "story:registry-passive-approval-test-order",
+  "kind": "story",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "diff",
+    "source": "commit 042a629ad (on main): passive inspection persists no open checkpoint; both passivity tests open the store in a fresh simulated process",
+    "reference": "git show 042a629ad"
+  }
+}
