@@ -70,9 +70,12 @@ Run in a tree; output pasted in a later revision.
 
 A Swagger 2.0 document is named with `swagger:` and a Google Discovery document with
 `discovery:`; either also names `projection:`, the file name its OpenAPI projection is recorded
-under. An OpenAPI document names neither. `amendments:` is optional: a
-`connectors-source-amendments/1` file of cited corrections to the document, applied without
-changing it.
+under. An OpenAPI document names neither. `amendments:` is optional. When
+named, the file must exist under the tree, be a `connectors-source-amendments/1` document whose
+`source_sha256` is the digest of the decompressed document, and list at least one cited
+correction; a missing file is refused as `unreadable`, a wrong digest or an empty list as
+`invalid_input`. Leave the line and the file out of the worked example if the document needs no
+correction.
 
 ## Write the file
 
@@ -187,8 +190,9 @@ says more than the document's summary, which is the description otherwise.
 | `string`, `integer`, `boolean` | carries a value of that JSON type |
 | `any` | carries any JSON value |
 | `string+` | carries a string that must not be empty (`+` only after `string`) |
+| `string_list`, `string_list!` | carries an array of strings (`+` is refused; `!` last) |
 | `string!`, `string+!`, `integer!` | must be sent (`!` last) |
-| `=value` | is fixed: the caller never sends it, and `value` is sent; `=true` and `=false` are booleans, digits an integer, anything else a string |
+| `=value` | is fixed: the caller never sends it, and `value` is sent; `=true` and `=false` are booleans, a whole number that fits 64 bits (optional leading `-` or `+`; `=007` is 7) an integer sent as a number, anything else a string |
 
 Any other notation is refused as `body_type`. A write without `body` takes an open body: any
 JSON object, sent as given, with only the approval binding it.
@@ -221,7 +225,7 @@ A `guard` checks the write before and after it is sent. The definitions reposito
   write is refused before anything is sent.
 - `after.expect` compares the write's answer the same way; `after.read` reads again instead,
   `after.absent: true` wants that read to answer 404, and `also` lists further reads before the
-  write. When the answer does not match, the outcome is unknown, not applied.
+  write. When the answer does not match, the outcome is unknown: the provider may have applied the write, so read the target before any retry.
 
 ## Check it
 
@@ -259,6 +263,7 @@ The names a hand-written file meets most:
 | `write_method` | `effect: write` on a method other than `POST`, `PUT`, `PATCH` or `DELETE`, or with no `op` |
 | `undeclared_variable` | a variable in `base_url` or an OAuth URL that `config` does not declare |
 | `auth_default`, `auth_incomplete`, `auth_misplaced`, `provider_id` | the profile rules above |
+| `unreadable` | a file the definition names (the document or its amendments) is missing or cannot be opened |
 | `body_type` | a body notation outside the table above, or two body keys naming one path (`x` and `/x`) |
 | `unknown_guard_read`, `guard_parameter` | a guard read or binding the file cannot resolve |
 | `unknown_paging`, `ambiguous_paging`, `paging_parameter` | a paging style the file does not declare, more than one that matches, or one whose parameters the operation lacks |

@@ -169,7 +169,9 @@ Every removed file stays readable at commit `6498a881c`.
   executable selection, which the credential-side binding leaves unchanged.
 - Installing a definition from an index or tag (ADR D5) and executors in other languages (D7)
   are not in this release.
-- Five fluxplane parity units stay open, 64 of 6,356 baseline calls
+- Five fluxplane parity units stay open, 64 gap-unit calls (62 of the
+  6,356 baseline calls and 2 mapped calls); coverage is 6,294 of 6,356 baseline calls (99.0 %) and
+  99 of 109 used operations (90.8 %)
   (docs/fluxplane-plugin-parity.md, "Gap units"): Homer SIP capture reads (33), the Slack file
   upload (24; the catalog engine sends no binary request body), Kubernetes port-forward (4),
   Alertmanager alerts (2) and the Kubernetes Secret read (1, waiting for a disclosure decision).

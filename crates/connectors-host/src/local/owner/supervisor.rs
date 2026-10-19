@@ -338,7 +338,7 @@ enum Answer {
     /// A read's recollection that ended with no answer a revalidation would
     /// give: changed mounted material, which a read never re-pins and an
     /// explicit revalidation does, or a recollection that ended before it
-    /// answered. Each joiner runs a revalidation of its own.
+    /// answered. Its joiners then coalesce onto one fresh revalidation.
     Rerun,
 }
 /// The answer of one revalidation in flight. The first one published is the
@@ -593,7 +593,8 @@ impl Pool {
     /// runs no identity probe and answers that revalidation's own answer
     /// (contracts/cli/v1alpha1/owner.md). A read's recollection that ends on
     /// changed mounted material, or without an answer, answers
-    /// `Answer::Rerun`: each joiner then runs its own revalidation.
+    /// `Answer::Rerun`: its joiners then coalesce onto one fresh revalidation,
+    /// the first to wake leading it and the rest joining it.
     pub fn run(&self, alias: &str, adapter: &Adapter, task: Task, deadline: u64) -> Result<Output> {
         let Task::Revalidate {
             connection,
@@ -2301,7 +2302,7 @@ mod revalidate_wait_tests {
     }
 
     /// A read's recollection that ends without new evidence answers its
-    /// joiners nothing of its own: each runs its own revalidation.
+    /// joiners nothing of its own: they coalesce onto one fresh revalidation.
     #[test]
     fn a_reads_recollection_without_new_evidence_has_its_joiners_rerun() {
         let flights: Flights = Arc::default();

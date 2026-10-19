@@ -225,8 +225,10 @@ revalidation is, and an in-flight revalidation whose own wait ended
 `outcome_unknown` answers its joiners the same. One exception: a read's
 recollection never re-pins changed mounted material, so when the one in flight
 is a read's recollection that ends on changed mounted material, or ends without
-an answer for its joiners, each joined revalidation runs its own, identity
-probe included, within its own deadline. A revalidation at another expected
+an answer for its joiners, its joiners do not take its answer. They coalesce
+onto one fresh revalidation instead: the first of them leads it and runs the
+identity probe, the others join that one and answer its answer, each within its
+own deadline. A revalidation at another expected
 revision, or of another connection, never joins.
 
 ## Stopping an owner

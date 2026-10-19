@@ -779,16 +779,17 @@ The complete configuration used against the sandbox is
   value alone otherwise. `timestamp` admits an ISO 8601 date `YYYY-MM-DD` or a
   date-time `YYYY-MM-DDTHH:MM:SS` followed by `Z` or `+HH:MM`/`-HH:MM`, and
   nothing else, so a folded value never adds a word or a qualifier; a value of
-  any other form is refused as `invalid_input` before any request. GitHub's
-  `review_requests.list` folds `since` as `updated:>=<since>`. A fold whose
+  any other form is refused as `invalid_input` before any request. For example,
+  a selection could fold `since` into a fixed `q` as `updated:>=<since>`; no shipped selection does yet. A fold whose
   `into` the selection does not fix, two folds into one value, a fold named
   like a parameter of the operation or not an id, an empty `prefix` or one
-  holding a space is refused when the selection loads. Both are modelled as
+  holding whitespace (a space, a tab or a line break) is refused when the
+  selection loads; the model states the space only. Both are modelled as
   `connectors_catalog.selection.FixedQuery`.
 - `embedded_text` is optional, for a read answering JSON: `{"content":
   "<pointer>", "encoding": "<pointer>", "size": "<pointer>", "max_bytes":
   <bytes>}` reads a file the provider's JSON answer carries as base64, such as
-  GitHub's contents and README reads, and answers with its text as `body`, in
+  a file-contents or README read (no shipped selection uses it yet), and answers with its text as `body`, in
   place of the provider's JSON. The string at `encoding` must be exactly
   `base64`; the string at `content` is decoded with ASCII whitespace ignored.
   `size`, optional, is read first: a JSON integer above `max_bytes` (1 to
