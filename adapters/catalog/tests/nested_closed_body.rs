@@ -707,3 +707,38 @@ fn the_new_members_are_omitted_when_absent_and_read_back_unchanged() {
         assert!(back.get(member).is_none(), "`{member}` written when absent");
     }
 }
+
+#[tokio::test]
+async fn an_absent_or_non_object_body_is_refused_as_missing_not_as_a_foreign_key() {
+    let engine = engine(&[update(), draft()]).unwrap();
+    for (id, input) in [
+        ("ticket.update", json!({"ticket_id": 101})),
+        ("ticket.update", json!({"ticket_id": 101, "body": 5})),
+        ("ticket.update", json!({"ticket_id": 101, "body": null})),
+        ("ticket.draft_reply", json!({"ticket_id": 101})),
+    ] {
+        let error = refused(&engine, id, input.clone()).await;
+        assert_eq!(code(&error), "invalid_input", "`{id}` {input}");
+        assert!(
+            error.message.contains("missing or not an object"),
+            "`{id}` {input}: {}",
+            error.message
+        );
+        assert!(
+            !error.message.contains("carries a key"),
+            "`{id}` {input}: {}",
+            error.message
+        );
+    }
+}
+
+#[test]
+fn an_explicit_null_rate_limit_headers_or_embedded_text_is_refused_at_load() {
+    for member in ["rate_limit_headers", "embedded_text", "conflict_status"] {
+        let mut selection =
+            json!({"id": "thing.show", "operation_id": "ShowTicket", "effect": "read"});
+        selection[member] = Value::Null;
+        let loaded = serde_json::from_value::<Selection>(selection);
+        assert!(loaded.is_err(), "`{member}: null` loaded as absent");
+    }
+}

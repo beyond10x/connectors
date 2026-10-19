@@ -888,6 +888,7 @@ fn each_read_sends_the_declared_request_with_basic_auth_and_returns_the_recorded
             Some(HEADER),
             "`{operation}` authorization"
         );
+        assert_eq!(provider.sent()[before].0, "GET", "`{operation}` method");
         let result: Value = serde_json::from_slice(&raw).unwrap();
         assert_eq!(result["status"], 200, "`{operation}` status");
         assert_eq!(result["provenance"]["instance"], "fixture-zendesk");
@@ -1408,15 +1409,15 @@ fn guide_cites_each_write_its_guard_and_the_move_steps() {
             rows.iter().any(|row| row.contains(&format!("`{id}`"))
                 && row.contains(&format!("`{operation_id}`"))
                 && row.contains(&format!("`PUT {path}`"))
-                && row.contains("`safe_update`")),
-            "no row cites `{id}` as `{operation_id}` `PUT {path}` with its guard"
+                && row.contains("`safe_update`")
+                && row.contains("`conflict`")),
+            "no row cites `{id}` as `{operation_id}` `PUT {path}` with its guard and its `conflict`"
         );
     }
     for needle in [
         "approvals prepare",
         "approvals issue",
         "operations invoke",
-        "conflict",
         DRAFT_MARKER.trim_end(),
         "https://github.com/beyond10x/connectors/releases",
     ] {

@@ -644,7 +644,7 @@ pub struct Selection {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub body_keys: Vec<String>,
     /// The JSON type of closed body keys, keyed by a name `body_keys` admits:
-    /// `string`, `integer` or `boolean`, as the provider's request body schema
+    /// `string`, `integer`, `boolean` or `string_list`, as the provider's request body schema
     /// types it, which the bundle does not record. A typed key present in a
     /// body must be a JSON value of exactly that type (no string spelling of
     /// a boolean or an integer, and no `null`), or the write is refused before
@@ -717,12 +717,20 @@ pub struct Selection {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub query_folds: BTreeMap<String, QueryFold>,
     /// A read whose JSON answer carries a file as base64, answered as its
-    /// text ([`EmbeddedText`]). Omitted when absent.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// text ([`EmbeddedText`]). Omitted when absent; an explicit `null` is refused.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_embedded_text"
+    )]
     pub embedded_text: Option<EmbeddedText>,
     /// The headers by which the provider says its rate limit is spent
-    /// ([`RateLimitHeaders`]). Omitted when absent.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// ([`RateLimitHeaders`]). Omitted when absent; an explicit `null` is refused.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_rate_limit_headers"
+    )]
     pub rate_limit_headers: Option<RateLimitHeaders>,
 }
 
@@ -841,7 +849,8 @@ pub(crate) fn guarded_body_paths(guard: &Guard) -> impl Iterator<Item = &str> {
         .filter_map(|path| path.strip_prefix("body."))
 }
 
-/// An input reference: a top-level key, or `body.<key>` one level into the body.
+/// An input reference: a top-level key, or `body.` followed by dotted keys into
+/// the body, to any depth.
 fn reference<'a>(input: &'a Value, path: &str) -> Option<&'a Value> {
     let mut current = input;
     for key in path.split('.') {
@@ -907,6 +916,24 @@ where
     D: serde::Deserializer<'de>,
 {
     u16::deserialize(deserializer).map(Some)
+}
+
+fn present_embedded_text<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<EmbeddedText>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    EmbeddedText::deserialize(deserializer).map(Some)
+}
+
+fn present_rate_limit_headers<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<RateLimitHeaders>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    RateLimitHeaders::deserialize(deserializer).map(Some)
 }
 
 fn present_mismatch<'de, D>(deserializer: D) -> std::result::Result<Option<MismatchCode>, D::Error>
