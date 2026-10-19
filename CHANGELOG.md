@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.54.0 — 2026-10-17
+## 0.54.0 — 2026-10-18
 
 ### Added
 
@@ -24,6 +24,36 @@
   provider refused is `stale` until a reconnect publishes a new one, and an instance holds one
   published connection. `connectors setup migrate` moves a legacy configuration to instances,
   keeping instance ids, revisions, executable selections and custody items.
+- Connector definitions: a hand-written `connectors-definition/1` file
+  (`schema: urn:beyond10x:connectors-definition:1`) over a vendored API source names its auth
+  profiles and operations. `connectors-build definition` lowers it to a bundle, its index, a
+  `connectors-catalog-operations/1` selection and a `connector.json` declaration under
+  `--out/<catalog>/`, and `connectors-build definition import` writes a definition from a shipped
+  selection; every shipped catalog selection lowers to its committed declaration byte for byte
+  (`architecture-decision-record:provider-definitions-and-runtimes`). The definitions themselves
+  live in the `connectors-definitions` repository.
+- `connectors operations invoke --definition <file.yaml> --operation <key>` runs an operation of
+  a definition file with no configured instance, with the existing input flags and envelope. The
+  file is lowered into an owner-only cache under the state directory, keyed by the digest of the
+  definition and its source; its instance `<connector>.definition` lives in an owner-only entry
+  beside it, and the operator's configuration file is never written. With no connection the
+  command asks once whether to connect, then runs the profile's acquisition (the token prompt, or
+  OAuth consent with `--credential-file`); without a terminal, or on any answer but yes, it
+  refuses with `next_action` naming the connect command. `--definition` is exclusive with
+  `--adapter` and `--connector`/`--instance`; `--definitions-root <dir>` names the tree holding
+  the vendored source and shared auth files (default: the parent of the file's directory). A
+  definition moved to another host connects fresh under the instance id
+  `<connector>.definition-<16 hex>`; the connection left at the old host is unchanged and stays
+  revocable. The bare `connectors invoke` remains the legacy command.
+- The one question of `operations invoke --definition` offers to reuse a stored credential of the
+  same connector when a published, current connection of another instance exists at the same
+  provider authority with the same profile authentication: the chosen connection's custody
+  version is copied inside the owner to a new connection of the definition's instance, validated
+  against the platform's trust roots, and published only when the validated identity equals the
+  source's and the source is still what was captured; the source connection is unchanged either
+  way, and a different identity publishes nothing and offers connect fresh. A copy goes only to a
+  definition instance whose profile names no URL; a credential is never reused across provider
+  authorities (docs/local-connection-registry.md, "Reusing a stored credential").
 
 ### Changed
 
@@ -33,6 +63,28 @@
   recollected first. Only a read still refused after that recollection answers
   `revalidate_connection`; a consumer launch recollects nothing. Concurrent revalidations of one
   connection both answer within the 30-second revalidation bound.
+- A connection is bound to the credential side of its configuration and to the provider
+  executable, not to the operation list (ADR D12): the binding records `credential_revision`
+  (the implementation's digest of the provider authority, instance id, profile declaration, CA
+  file, token CA, admitted hosts and request prefix; never the bundle, its source or the
+  selection) and the executable's SHA-256 beside `configuration_revision`. A bundle, source or
+  selection change leaves the connection `ready`, and an added read works with no
+  `connections revalidate`, no credential source and no question; its next revalidation records
+  the new revision. A provider executable change alone validates the stored credential once
+  under the new executable on the next read or write, follows when the recorded identity
+  answers, and refuses as `identity_mismatch`, changing nothing, otherwise; the follow keeps the
+  public revision, so a write's approval stands. A CA file, token CA, admitted host or request
+  prefix change still gives `pending` with `stale` until `connections revalidate`; a changed
+  provider authority or profile authentication still refuses as `lifecycle_conflict`; a revoked
+  connection still refuses. A connection saved before this release keeps the previous rule until
+  its first revalidation records both digests; nothing is migrated by guess. A read's automatic
+  recollection of lapsed evidence runs under the binding the connection was admitted under and
+  advances no revision; only `connections revalidate` records a configuration move.
+- `operations describe`, `operations list` and `operations invoke` start the configured,
+  digest-pinned provider, reading no credential and asking for none, when no description is
+  cached for the instance's configured selection and the instance holds a connection that is
+  current under it, unrevoked, not stale and usable (`contracts/cli/v1alpha1/semantics.md`,
+  "Launching for a description"); this replaces "never implicit launch".
 
 ### Deprecated
 
@@ -44,12 +96,29 @@
 - A passive command no longer writes the metadata store: returning an inspection's Entity Runtime
   handle persisted its observation as an open checkpoint.
 - The build runner's signal test no longer leaves a core file in the checkout.
+- `connectors-build definition` no longer writes outside `--out`: a `catalog` or a file stem that
+  is not a plain name (`..`, `/`, `\`, empty, NUL) is refused as `not_plain_name` before anything
+  is written, and `operations invoke --definition` refuses such a name before lowering.
+- `operations invoke --definition` catches an interrupt before it starts any child: the handler
+  is installed before the configuration read, which can start the provider, and an interrupt
+  seen during preparation ends the command with exit 130 whatever that step answered.
 
 ### Limitations
 
 - The Zendesk writes are verified against fixtures with the basic profile `zendesk.basic` only;
   the documented `zendesk.oauth` block requests `scope=read`, which does not cover a write.
 - The Zendesk guide's move steps still use the deprecated `[adapters.zendesk]` form.
+- OAuth consent from a definition file was tested against a token-profile fixture only, not a
+  live consent flow; consent that reads a definition's own authorize and token parameters
+  (ADR D6) is not implemented.
+- A definition cannot name its own CA file: its instance trusts the platform's roots, and every
+  `base_url` variable needs a default.
+- No command removes a cached definition or its owner-only instance entry: revoke its connection,
+  then remove `definitions/` under the state directory.
+- After a provider executable change the approval policy must be republished: approvals bind the
+  executable selection, which the credential-side binding leaves unchanged.
+- Installing a definition from an index or tag (ADR D5) and executors in other languages (D7)
+  are not in this release.
 
 ## 0.53.1 — 2026-10-17
 
