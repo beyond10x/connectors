@@ -971,3 +971,6 @@ fn a_changed_configuration_names_a_new_connection_for_keys_and_policy() {
         assert!(!error.reconnect);
     }
 }
+
+#[path = "tests/adversary_field.rs"]
+mod adversary_field;

@@ -158,7 +158,13 @@ impl LocalHandler {
             session
                 .signals()
                 .and_then(|_| approvals::execute(call, session.approval_deadline))
-                .map_err(owner_failure)
+                .map_err(|error| {
+                    if call.callable == "approval-policy-status" {
+                        owner_failure(error)
+                    } else {
+                        approval_failure(error)
+                    }
+                })
         } else if call.callable == "operations-invoke" {
             let session = self.0.borrow();
             return operations::dispatch(call, session.deadline, session.mutation_deadline)
@@ -312,10 +318,6 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
     if error.clock_format_retired && error.code == InvalidConfiguration {
         data["configuration_rule"] = json!(Rule::ApprovalClockFormatRetired.as_str());
     }
-    // The argument an `invalid_input` refused, as the CLI input model names it.
-    if let Some(field) = error.field.filter(|_| error.code == InvalidInput) {
-        data["field"] = json!(field.as_str());
-    }
     if usage {
         HandlerReply::UsageError {
             code: "failure".into(),
@@ -327,6 +329,23 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
             data,
         }
     }
+}
+
+/// `owner_failure` of `approvals policy-set`, `prepare` and `issue`: an
+/// `invalid_input` names the argument it refused, as the CLI input model names
+/// it (contracts/cli/v1alpha1/semantics.md, "The refused argument"). No other
+/// command carries `field`, an approved write's `operations invoke` included.
+fn approval_failure(error: owner::Error) -> HandlerReply {
+    let field = error
+        .field
+        .filter(|_| error.code == owner::Code::InvalidInput);
+    let mut reply = owner_failure(error);
+    if let (Some(field), HandlerReply::Error { data, .. } | HandlerReply::UsageError { data, .. }) =
+        (field, &mut reply)
+    {
+        data["field"] = json!(field.as_str());
+    }
+    reply
 }
 
 fn failure(code: &str, stage: &str, next_action: &str, usage: bool) -> HandlerReply {

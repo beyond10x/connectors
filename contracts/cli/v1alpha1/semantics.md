@@ -1135,13 +1135,18 @@ the CLI input model names it: `connection`, `operation`, `schema`, `revision`
 or `input` (the business document, from whichever of `--input-json`,
 `--input-file` or `--input-stdin`) for the target, `approve_subject` and
 `proof_output` for `issue`, `input_file` and `expected_revision` for
-`policy-set`, and `adapter` for the instance selection. `issue` refuses
-`proof_output` unless it is an absolute path of plain names, its directory
-exists, is the caller's own and admits no other user, every ancestor is
-writable only by its owner (the caller or root), and the directory holds no
-entry of that name; an existing file is never replaced. A path relative to the
-working directory is refused, not resolved. `field` never carries the caller's
-value and appears only on `invalid_input`; a refusal the presentation raises
+`policy-set`, and `adapter` for the instance selection (`--connector` with
+no `--instance` or the reverse, `--adapter` beside either, or no selector and
+no default instance; an unknown instance stays `not_found`). `issue` refuses
+`proof_output` unless it is an absolute path of plain names, no component is
+a symbolic link (each is opened without following one, so a link to a private
+directory is refused too), its directory exists, is the caller's own and
+admits no other user, every ancestor is writable only by its owner (the
+caller or root), and the directory holds no entry of that name; an existing
+file is never replaced. A path relative to the working directory is refused,
+not resolved. `field` never carries the caller's value and appears only on
+`invalid_input` of those three commands; no other command carries it, an
+approved write's `operations invoke` included; a refusal the presentation raises
 before the handler runs carries its `ess-cli/1` code and no `field`. As for
 `instance_id`, the presence rule is a host obligation: ESS declares no
 invariant on a CLI type.
