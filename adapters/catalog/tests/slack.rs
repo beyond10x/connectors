@@ -1454,6 +1454,11 @@ fn each_read_sends_the_declared_request_with_bearer_auth_and_returns_the_recorde
             Some(HEADER),
             "`{operation}` authorization"
         );
+        assert_eq!(
+            provider.exchanges()[before].0,
+            "GET",
+            "`{operation}` method"
+        );
         let result: Value = serde_json::from_slice(&raw).unwrap();
         assert_eq!(result["status"], 200, "`{operation}` status");
         assert_eq!(result["provenance"]["instance"], "fixture-slack");
@@ -2334,6 +2339,14 @@ fn users_info_and_lookup_by_email_read_one_user() {
             "/api/users.lookupByEmail?email=fixture-user-11%40example.test",
         ]
     );
+    assert!(
+        provider
+            .exchanges()
+            .iter()
+            .all(|(method, ..)| method == "GET"),
+        "a one-user read is a GET"
+    );
+    assert_eq!(provider.exchanges().len(), 2);
     for (_, authorization, token) in &requests {
         assert_eq!(authorization.as_deref(), Some(HEADER));
         assert!(!token);

@@ -756,7 +756,7 @@ fn a_one_user_read_answered_outside_the_envelope_is_never_data() {
 /// `internal`, on the two new reads and on the reads that had the envelope
 /// before.
 #[test]
-fn the_new_envelope_names_match_exactly_and_nothing_near_them() {
+fn near_spellings_of_the_new_envelope_names_are_internal() {
     let slot = Arc::new(Mutex::new(Reply::Drop));
     let reply = slot.clone();
     let provider = Provider::reading(Arc::new(move |_: &Exchange| reply.lock().unwrap().clone()));
@@ -941,8 +941,13 @@ fn the_guide_does_not_deny_selecting_the_one_user_reads() {
     }
     let guide = guide().split_whitespace().collect::<Vec<_>>().join(" ");
     let denial = "(`users.info`, `users.lookupByEmail`) is not selected on either connection";
+    let said = "(`users.info`, `users.lookupByEmail`) is selected on the bot connection only";
     assert!(
         !guide.contains(denial),
         "docs/catalog-slack.md still says: {denial}"
+    );
+    assert!(
+        guide.contains(said),
+        "docs/catalog-slack.md does not say: {said}"
     );
 }

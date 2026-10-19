@@ -357,7 +357,7 @@ impl Closed {
     fn shape(&self, value: &Value, at: &mut Path) -> Result<()> {
         let Some(members) = value.as_object() else {
             return Err(if at.is_empty() {
-                refuse("body carries a key its selection does not admit")
+                refuse("body is missing or not an object, as its selection closes it")
             } else {
                 refuse(format!(
                     "body value `/{}` is not an object, as its selection closes it",
@@ -377,7 +377,9 @@ impl Closed {
             } else if self.above(at) {
                 self.shape(member, at)?;
             } else {
-                return Err(refuse("body carries a key its selection does not admit"));
+                return Err(refuse(
+                    "body is missing or not an object, as its selection closes it",
+                ));
             }
             at.pop();
         }
