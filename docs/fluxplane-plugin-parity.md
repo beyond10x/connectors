@@ -512,7 +512,7 @@ second connection under the user-token profile `slack.user`, whose selection set
 reads `conversations.list`, `conversations.history`, `conversations.replies` and `users.list`,
 no write. A bot token reads only the channels the bot is a member of; on `slack.user` those reads
 reach every channel that user can read. Every other row is still missing. The 2026-09-09 baseline listed Slack as
-uncovered (`docs/recent-adapter-usage-20260909.md`, U12). The gap column of a missing row names
+uncovered (the usage record of 2026-09-09 (history, commit 6498a881c), U12). The gap column of a missing row names
 the Slack Web API method that would back it.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
@@ -573,7 +573,7 @@ only. It recorded neither the `endpoint_ref` nor the engine. Two indicators poin
 this is inference and was not verified:
 
 - The 2026-09-09 baseline observed incident work "against several MySQL/Aurora databases" and
-  PostgreSQL only for local fixtures (`docs/recent-adapter-usage-20260909.md`, U06).
+  PostgreSQL only for local fixtures (the usage record of 2026-09-09 (history, commit 6498a881c), U06).
 - Two calls since then put `mysql` in the verb position (fluxplane inventory §4d).
 
 ## grafana
@@ -629,7 +629,7 @@ proved by `GET /loki/api/v1/labels`, with the configured instance as its identit
 (`adapters/loki/contracts/logs/v1alpha1/semantics.md` §11.4). Each read below answers through
 `operations invoke` on that connection, tested against fixture answers in Loki v3.7.0 API shapes
 (`adapters/loki/tests/local_runtime/cli_journey.rs`). The baseline's two limits of the contract
-(`docs/recent-adapter-usage-20260909.md`, U07), no metric expressions and no label discovery, are
+(the usage record of 2026-09-09 (history, commit 6498a881c), U07), no metric expressions and no label discovery, are
 closed by §11. No `X-Scope-OrgID` tenant header is sent (§11.3), and a Loki that admits no
 credential cannot be connected: the local host admits no profile without one.
 
@@ -694,8 +694,8 @@ Connectors native adapter: `adapters/kubernetes/spec/adapter.json`.
 
 Source: fluxplane inventory §2 homer.
 
-Connectors has no Homer provider and no adapter directory. `adapters/sip` covers SIP media
-sessions, not capture search.
+Connectors has no Homer provider and no adapter directory. The removed SIP design (in history
+at commit `6498a881c`) covered SIP media sessions, not capture search.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
@@ -794,7 +794,7 @@ Source: fluxplane inventory §2 asterisk. Connectors has no Asterisk provider.
 
 Source: fluxplane inventory §2 aws.
 
-Connectors has no AWS provider (`docs/recent-adapter-usage-20260909.md`, U14). The generic
+Connectors has no AWS provider (the usage record of 2026-09-09 (history, commit 6498a881c), U14). The generic
 header credentials do not implement AWS request signing.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
@@ -823,7 +823,7 @@ nothing to map and no row. The nearest Connectors command is `approvals clock-ch
 
 Source: fluxplane inventory §2 docker.
 
-Connectors has no Docker runtime. `adapters/docker` holds only `design.md` and an ESS model.
+Connectors has no Docker runtime. The Docker design and ESS model are in history at commit `6498a881c`.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|

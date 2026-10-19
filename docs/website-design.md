@@ -3,9 +3,9 @@
 
 Status: implemented locally on 2026-09-09; moved to its own site on the shared shell on
 2026-10-08 (below). The `Documentation validation` workflow builds it, and since 2026-10-09
-`Documentation site` serves it at `https://beyond10x.github.io/connectors/`. See the
-[delivery verification](website-verification.md) for the 2026-09-09 surface,
-observed checks and limits.
+`Documentation site` serves it at `https://beyond10x.github.io/connectors/`. The
+delivery verification of the 2026-09-09 surface, with its observed checks and limits, is
+in history at commit `6498a881c`.
 
 ## Own site on the shared shell (2026-10-08)
 

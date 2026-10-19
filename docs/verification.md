@@ -4,7 +4,7 @@
 > 0.11.0 in favour of the catalog provider. The commands and paths they cite
 > existed at the recorded commits and are kept as history.
 
-Latest local review remediation: [independent review response, 2026-09-08](independent-review-response-2026-09-08.md).
+Latest local review remediation: the independent review response of 2026-09-08, in history at commit `6498a881c`.
 That run passed 50 tests and the full Rust 1.88/ESS 0.20.0 gate, plus 100 toolchain
 stress runs and live PostgreSQL deadline/cancellation checks over plaintext and TLS.
 The dated acceptance records below retain their original counts and scope.
@@ -165,7 +165,7 @@ local artifacts, not a claim of cross-machine binary reproducibility.
 The first profile has static configured instances, restart-based configuration
 activation, expiring in-memory cursors, and one federation hop. Downstream
 descriptions were captured only at gateway startup in this original evidence.
-The subsequent [review remediation](review-response-2026-09-08.md) adds atomic
+The subsequent review remediation (2026-09-08, in history at commit `6498a881c`) adds atomic
 refresh on a leaf stale-description refusal and deliberate caller resubmission. Credential-file
 rotation is separate and works on subsequent calls without restarting. No cache
 or dynamic plugin download/build installation path is advertised.
@@ -258,7 +258,7 @@ reproducible rootfs copies were removed; reports and the source workspace remain
 
 ## Full review remediation — 2026-09-08
 
-The subsequent [review response](review-response-2026-09-08.md) records all 17
+The subsequent review response (2026-09-08, in history at commit `6498a881c`) records all 17
 findings. Its [gate log](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/review-2026-09-08/gate.log) shows 35 passing tests,
 zero failures/ignored tests, formatting, warning-denying Clippy, regenerated
 schema checks, offline builds, dependency boundaries and Rust 1.88 checks for all
