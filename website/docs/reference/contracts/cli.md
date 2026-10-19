@@ -1096,7 +1096,7 @@ never replay a possible write after interruption, timeout or lost response.
 
 | Condition | `Failure.code` | Exit |
 |---|---|---|
-| decoded business document the operation schema, depth or byte bound refuses; `approvals prepare` or `approvals issue` business document that does not decode or has a trailing document; unreadable business document file; argument value the handler refuses | `invalid_input` | 2 |
+| decoded business document the operation schema, depth or byte bound refuses; `approvals prepare` or `approvals issue` business document that does not decode or has a trailing document; unreadable business document file; argument value the handler refuses; on an approval command, `field` names the argument ([below](#the-refused-argument)) | `invalid_input` | 2 |
 | TOML syntax, unsupported startup/restart, duplicate identity, bad permissions | `invalid_configuration` | 2 |
 | configuration already exists (`setup init`: with a metadata database, or one that does not load) | `configuration_exists` | 1 |
 | no safe entry channel (in place of the presentation's `cli_source`) | `protected_entry_unavailable` | 2 |
@@ -1141,6 +1141,25 @@ protected source or dispatching. The selector shape and the rule that both
 fields appear only on `invalid_configuration` are host obligations: ESS 0.40
 declares no invariant on a CLI type. No parser, OS or database text is ever
 carried.
+
+### The refused argument
+
+An `invalid_input` that `approvals policy-set`, `approvals prepare` or
+`approvals issue` decides names the argument it refused in `Failure.field`, as
+the CLI input model names it: `connection`, `operation`, `schema`, `revision`
+or `input` (the business document, from whichever of `--input-json`,
+`--input-file` or `--input-stdin`) for the target, `approve_subject` and
+`proof_output` for `issue`, `input_file` and `expected_revision` for
+`policy-set`, and `adapter` for the instance selection. `issue` refuses
+`proof_output` unless it is an absolute path of plain names, its directory
+exists, is the caller's own and admits no other user, every ancestor is
+writable only by its owner (the caller or root), and the directory holds no
+entry of that name; an existing file is never replaced. A path relative to the
+working directory is refused, not resolved. `field` never carries the caller's
+value and appears only on `invalid_input`; a refusal the presentation raises
+before the handler runs carries its `ess-cli/1` code and no `field`. As for
+`instance_id`, the presence rule is a host obligation: ESS declares no
+invariant on a CLI type.
 
 Other admitted provider/service failures preserve their existing shared error code
 inside `Failure.service_code`; `code = service_failure` identifies that route.
