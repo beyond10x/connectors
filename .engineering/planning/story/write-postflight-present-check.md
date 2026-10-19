@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:write-postflight-present-check
 kind: story
-status: draft
+status: active
 title: A write's postflight can require a member to be present, and Jira create and comment use it
 summary: issue.create and issue.comment.add report applied on a 2xx that names no id
 relations:
@@ -14,7 +14,10 @@ scope:
   path: adapters/catalog/spec/ess/domains/guard.yaml
 - confidence: cited
   path: adapters/catalog/src/lib.rs
-revision: 5
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-19T21:36:32Z", actor: "human:timo", revision: 6}
+- {from: "proposed", to: "active", at: "2026-10-19T21:36:32Z", actor: "human:timo", revision: 7}
 ---
 ## Outcome
 

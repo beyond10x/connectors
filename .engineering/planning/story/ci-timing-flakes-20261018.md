@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:ci-timing-flakes-20261018
 kind: story
-status: draft
+status: active
 title: Four tests failed on CI under load on 2026-10-18 without a change causing them
 refs:
 - provider: github
@@ -20,7 +20,10 @@ scope:
   path: crates/connectors-host/src/local/oauth.rs
 - confidence: cited
   path: crates/connectors-host/src/local/owner/transport.rs
-revision: 5
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-19T21:36:33Z", actor: "human:timo", revision: 6}
+- {from: "proposed", to: "active", at: "2026-10-19T21:36:33Z", actor: "human:timo", revision: 7}
 ---
 ## Defect
 

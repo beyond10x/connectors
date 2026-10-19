@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:owner-request-waits-outside-the-pool-lock
 kind: story
-status: draft
+status: active
 title: A request behind an instance's in-flight write never stalls another instance or overruns its own deadline
 summary: Pool::send takes an instance's control lock while it holds the workers mutex
 relations:
@@ -12,7 +12,10 @@ scope:
   path: crates/connectors-host/src/local/owner/mutation/execution.rs
 - confidence: cited
   path: crates/connectors-host/src/local/owner/supervisor.rs
-revision: 3
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-19T21:36:32Z", actor: "human:timo", revision: 4}
+- {from: "proposed", to: "active", at: "2026-10-19T21:36:33Z", actor: "human:timo", revision: 5}
 ---
 ## Outcome
 
