@@ -51,7 +51,12 @@ pub const V1BETA1: &str = "client.authentication.k8s.io/v1beta1";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Refusal {
     DigestMismatch,
-    PluginUnavailable,
+    /// The plugin cannot run. `Some` names the operating system's answer
+    /// when it refused to open, read or execute the plugin, so a missing
+    /// plugin (`NotFound`) is told apart from one some process holds open
+    /// for writing (`ExecutableFileBusy`); `None` when the file opened and
+    /// one of the plugin's rules refused it. The code is the same either way.
+    PluginUnavailable(Option<std::io::ErrorKind>),
     KubeconfigMismatch,
     Timeout,
     OutputTooLarge,
@@ -62,7 +67,7 @@ impl Refusal {
     pub fn code(self) -> &'static str {
         match self {
             Refusal::DigestMismatch => "digest_mismatch",
-            Refusal::PluginUnavailable => "plugin_unavailable",
+            Refusal::PluginUnavailable(_) => "plugin_unavailable",
             Refusal::KubeconfigMismatch => "kubeconfig_mismatch",
             Refusal::Timeout => "timeout",
             Refusal::OutputTooLarge => "output_too_large",
@@ -305,7 +310,11 @@ fn prepare(
     if let Some(home) = &binding.home {
         env.push((
             "HOME".to_owned(),
-            Zeroizing::new(home.to_str().ok_or(Refusal::PluginUnavailable)?.to_owned()),
+            Zeroizing::new(
+                home.to_str()
+                    .ok_or(Refusal::PluginUnavailable(None))?
+                    .to_owned(),
+            ),
         ));
     }
     env.push((
@@ -362,9 +371,9 @@ fn verify(binding: &Binding) -> Result<Verified, Refusal> {
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
         .open(&binding.path)
-        .map_err(|_| Refusal::PluginUnavailable)?;
+        .map_err(unavailable)?;
     // fstat on the open descriptor, never a second lookup of the path.
-    let metadata = file.metadata().map_err(|_| Refusal::PluginUnavailable)?;
+    let metadata = file.metadata().map_err(unavailable)?;
     // SAFETY: geteuid has no preconditions and cannot fail.
     let uid = unsafe { libc::geteuid() };
     if !metadata.is_file()
@@ -372,7 +381,7 @@ fn verify(binding: &Binding) -> Result<Verified, Refusal> {
         || metadata.mode() & (libc::S_ISUID | libc::S_ISGID) != 0
         || (metadata.uid() != 0 && metadata.uid() != uid)
     {
-        return Err(Refusal::PluginUnavailable);
+        return Err(Refusal::PluginUnavailable(None));
     }
     // File capabilities raise privileges on exec like a set-ID bit does. A
     // file system without extended attributes (ENOTSUP) carries none; any
@@ -388,11 +397,12 @@ fn verify(binding: &Binding) -> Result<Verified, Refusal> {
         )
     };
     if present >= 0 {
-        return Err(Refusal::PluginUnavailable);
+        return Err(Refusal::PluginUnavailable(None));
     }
-    match std::io::Error::last_os_error().raw_os_error() {
+    let error = std::io::Error::last_os_error();
+    match error.raw_os_error() {
         Some(libc::ENODATA) | Some(libc::ENOTSUP) => {}
-        _ => return Err(Refusal::PluginUnavailable),
+        _ => return Err(unavailable(error)),
     }
     let mut hasher = Sha256::new();
     let mut chunk = [0u8; 64 * 1024];
@@ -408,7 +418,7 @@ fn verify(binding: &Binding) -> Result<Verified, Refusal> {
                 hasher.update(&chunk[..n]);
             }
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
-            Err(_) => return Err(Refusal::PluginUnavailable),
+            Err(error) => return Err(unavailable(error)),
         }
     }
     if hex::encode(hasher.finalize()) != binding.sha256 {
@@ -418,7 +428,7 @@ fn verify(binding: &Binding) -> Result<Verified, Refusal> {
     // executes this one, so it must not be one of them (a parent started
     // with stdio closed). try_clone duplicates to 3 or above, close-on-exec.
     if file.as_raw_fd() < 3 {
-        file = file.try_clone().map_err(|_| Refusal::PluginUnavailable)?;
+        file = file.try_clone().map_err(unavailable)?;
     }
     Ok(Verified {
         file,
@@ -428,7 +438,15 @@ fn verify(binding: &Binding) -> Result<Verified, Refusal> {
 /// Executing a descriptor needs `fexecve`; elsewhere no plugin runs.
 #[cfg(not(target_os = "linux"))]
 fn verify(_binding: &Binding) -> Result<Verified, Refusal> {
-    Err(Refusal::PluginUnavailable)
+    Err(Refusal::PluginUnavailable(Some(
+        std::io::ErrorKind::Unsupported,
+    )))
+}
+/// The operating system refused to open, read or execute the plugin; its
+/// error kind travels with the refusal.
+#[cfg(target_os = "linux")]
+fn unavailable(error: std::io::Error) -> Refusal {
+    Refusal::PluginUnavailable(Some(error.kind()))
 }
 
 /// The argument and environment vectors `fexecve` receives, built before the
@@ -620,7 +638,9 @@ fn drain(
 
 #[cfg(not(target_os = "linux"))]
 fn run(_prepared: &Prepared, _verified: Verified) -> Result<Zeroizing<Vec<u8>>, Refusal> {
-    Err(Refusal::PluginUnavailable)
+    Err(Refusal::PluginUnavailable(Some(
+        std::io::ErrorKind::Unsupported,
+    )))
 }
 #[cfg(target_os = "linux")]
 fn run(prepared: &Prepared, verified: Verified) -> Result<Zeroizing<Vec<u8>>, Refusal> {
@@ -649,7 +669,7 @@ fn run(prepared: &Prepared, verified: Verified) -> Result<Zeroizing<Vec<u8>>, Re
     let spawned = command.spawn();
     // The parent's copy closes now; the child has exec'd or failed.
     drop(verified);
-    let mut child = spawned.map_err(|_| Refusal::PluginUnavailable)?;
+    let mut child = spawned.map_err(unavailable)?;
     let Ok(pid) = libc::pid_t::try_from(child.id()) else {
         let _ = child.kill();
         let _ = child.wait();

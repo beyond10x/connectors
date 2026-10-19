@@ -111,19 +111,36 @@ fn now() -> u64 {
 fn no_ambient(_: &str) -> Option<String> {
     None
 }
-/// A shell script plugin (`#!/bin/sh`) with `body`, mode 0700.
+/// `cp source destination`, then mode 0700. A plugin file is only ever
+/// written by a `cp` child, never through a descriptor of this process: the
+/// tests run on parallel threads and every plugin run forks, and a child
+/// forked while this process held the file open for writing keeps that
+/// descriptor until its own exec. An exec of the plugin meanwhile fails with
+/// `ETXTBSY` (`PluginUnavailable(Some(ExecutableFileBusy))`).
+fn copy(source: &Path, destination: &Path) {
+    let status = Command::new("cp")
+        .arg(source)
+        .arg(destination)
+        .status()
+        .unwrap();
+    assert!(status.success(), "cp: {status}");
+    fs::set_permissions(destination, fs::Permissions::from_mode(0o700)).unwrap();
+}
+/// A shell script plugin (`#!/bin/sh`) with `body`, mode 0700, written
+/// through [`copy`].
 fn script(dir: &Path, body: &str) -> PathBuf {
     let path = dir.join("fixture-plugin");
-    fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-    fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+    let staged = dir.join("fixture-plugin.staged");
+    fs::write(&staged, format!("#!/bin/sh\n{body}\n")).unwrap();
+    copy(&staged, &path);
+    fs::remove_file(&staged).unwrap();
     path
 }
 /// A digest-pinned copy of a system binary (a native, non-`#!` plugin).
 fn native(dir: &Path, candidates: &[&str], name: &str) -> Option<PathBuf> {
     let source = candidates.iter().find(|p| Path::new(p).exists())?;
     let path = dir.join(name);
-    fs::copy(fs::canonicalize(source).unwrap(), &path).unwrap();
-    fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+    copy(&fs::canonicalize(source).unwrap(), &path);
     assert_ne!(&fs::read(&path).unwrap()[..2], b"#!");
     Some(path)
 }
@@ -218,7 +235,17 @@ fn exec_plugin_runs_when_the_adapter_starts_with_stdio_closed() {
         let code = match &result {
             Ok(bytes) if &bytes[..] == token.as_bytes() => 0,
             Ok(_) => 10,
-            Err(r) => 20 + *r as i32,
+            Err(r) => {
+                20 + match r {
+                    Refusal::DigestMismatch => 0,
+                    Refusal::PluginUnavailable(_) => 1,
+                    Refusal::KubeconfigMismatch => 2,
+                    Refusal::Timeout => 3,
+                    Refusal::OutputTooLarge => 4,
+                    Refusal::MalformedCredential => 5,
+                    Refusal::PluginFailed => 6,
+                }
+            }
         };
         std::process::exit(code);
     }
@@ -233,7 +260,7 @@ fn exec_plugin_runs_when_the_adapter_starts_with_stdio_closed() {
         assert_eq!(
             status.code(),
             Some(0),
-            "{mode}: exit 10 is a wrong token, 20+n is Refusal discriminant n \
+            "{mode}: exit 10 is a wrong token, 20+n is Refusal n \
              (0 DigestMismatch, 1 PluginUnavailable, ..., 6 PluginFailed)"
         );
     }
@@ -345,10 +372,11 @@ fn exec_plugin_token_is_never_released_unzeroized_from_the_output_buffer() {
         let answered = result
             .as_ref()
             .is_ok_and(|t| t.starts_with(b"fixture-zero") && t.ends_with(b"-0123456789"));
+        let refused = result.as_ref().err().copied();
         drop(result);
         drop(credentials);
         ARMED.store(false, Ordering::SeqCst);
-        assert!(answered, "the plugin did not answer");
+        assert!(answered, "the plugin did not answer: {refused:?}");
         FREED_WITH_MARKER.swap(0, Ordering::SeqCst)
     };
     let split = measure(credentials);
@@ -412,7 +440,7 @@ fn exec_plugin_acl_granting_write_to_another_user_is_refused() {
         let credentials = Credentials::new(binding(&path)).unwrap();
         assert_eq!(
             credentials.token(&config, &now, &no_ambient).err(),
-            Some(Refusal::PluginUnavailable),
+            Some(Refusal::PluginUnavailable(None)),
             "{entry}"
         );
         set("m::r-x");
@@ -480,7 +508,7 @@ fn exec_plugin_file_owned_by_another_user_is_refused_before_the_digest() {
         credentials
             .token(&kubeconfig(&path, &[]), &now, &no_ambient)
             .err(),
-        Some(Refusal::PluginUnavailable),
+        Some(Refusal::PluginUnavailable(None)),
         "{}",
         path.display()
     );

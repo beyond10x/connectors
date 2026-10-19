@@ -16,6 +16,25 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Puts `contents` at `path`, mode 0700, through a `cp` child: this process
+/// never holds a file it will execute open for writing. The tests run on
+/// parallel threads and every plugin run forks; a child forked while this
+/// process held the file open keeps that descriptor until its own exec, and
+/// an exec of the file meanwhile fails with `ETXTBSY`
+/// (`PluginUnavailable(Some(ExecutableFileBusy))`).
+fn install(path: &Path, contents: &[u8]) {
+    let staged = path.with_extension("staged");
+    fs::write(&staged, contents).unwrap();
+    let status = std::process::Command::new("cp")
+        .arg(&staged)
+        .arg(path)
+        .status()
+        .unwrap();
+    assert!(status.success(), "cp: {status}");
+    fs::remove_file(&staged).unwrap();
+    fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
+}
+
 const TOKEN: &str = "fixture-adversary-token";
 const USER: &str = "eks-adversary-user";
 const V1: &str = "client.authentication.k8s.io/v1";
@@ -38,8 +57,7 @@ impl Plugin {
             "#!/bin/sh\necho run >> {d}/runs\nexport -p > {d}/env\n{}\n",
             body.replace("{d}", &d)
         );
-        fs::write(&path, script).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+        install(&path, script.as_bytes());
         Self { dir, path }
     }
     fn new(body: &str) -> Self {
