@@ -930,14 +930,12 @@ dependencies = [
 name = "connectors-spec"
 version = "0.54.0"
 dependencies = [
- "clap",
  "connectors-core",
  "connectors-host",
  "hex",
  "jsonschema",
  "serde",
  "serde_json",
- "serde_yaml_ng",
  "sha2 0.11.0",
  "tempfile",
 ]
