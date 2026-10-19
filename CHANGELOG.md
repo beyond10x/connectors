@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.54.0 — 2026-10-18
+## 0.54.0 — 2026-10-19
 
 ### Added
 
@@ -54,6 +54,31 @@
   way, and a different identity publishes nothing and offers connect fresh. A copy goes only to a
   definition instance whose profile names no URL; a credential is never reused across provider
   authorities (docs/local-connection-registry.md, "Reusing a stored credential").
+- Jira issue writes through the catalog provider, each `effect: write` with a closed body and run
+  only under an issued approval: `issue.create` (`createIssue`), `issue.comment.add`
+  (`addComment`), `issue.edit` (`editIssue`), `issue.link.add` (`linkIssues`) and
+  `issue.delete` (`deleteIssue`). The create reads the project by key first, the comment the
+  issue, the link both issues; the edit and the delete compare the issue's `fields.updated` with
+  the caller's `updated_stamp` and refuse a difference as `conflict` with nothing sent, Jira's
+  `409` to an edit is `conflict`, the edit is read again after its `204`, and the delete is
+  applied only when a read after it answers `404`. Beside them the read
+  `issue.create_meta.fields` (`getCreateIssueMetaIssueTypeId`) lists the create fields of one
+  issue type in one project (docs/catalog-jira.md, "Issue writes").
+- Slack one-user reads on the bot connection, `users.info` by user id and
+  `users.lookupByEmail` by e-mail address (scope `users:read.email`), and the write
+  `files.delete` under approval: guarded by `auth.test`, then `files.info` on the same file,
+  which must answer that file, so a file Slack does not find is refused before the write;
+  `file_not_found` and `file_deleted` are refused as `not_found` and `cant_delete_file` as
+  `forbidden` (docs/catalog-slack.md, "Files").
+- The definition format carries the write members the engine gained in this release:
+  `body_enums`, `body_any_of`, `body_prefixes`, `conflict_status`, a guard preflight's
+  `mismatch`, and `string_list` in the `body` notation. The lowerer refuses, by name
+  (`BodyEnum`, `BodyAnyOf`, `BodyPrefix`, `ConflictStatus`), the shapes the engine's loader would
+  refuse, and a body member on a read; `connectors-build definition import` writes the members
+  back from a shipped selection.
+- A guide to authoring a definition for an API with no catalog
+  (`website/docs/guides/author-a-definition.md`): the definitions-tree layout, writing the file,
+  checking it with the lowerer and invoking it with `--definition` and `--definitions-root`.
 
 ### Changed
 
@@ -85,11 +110,35 @@
   cached for the instance's configured selection and the instance holds a connection that is
   current under it, unrevoked, not stale and usable (`contracts/cli/v1alpha1/semantics.md`,
   "Launching for a description"); this replaces "never implicit launch".
+- The Slack read envelope of both selection sets names `user_not_visible` and
+  `enterprise_is_restricted` as `forbidden` and `users_not_found` as `not_found`; they were
+  `internal`.
 
 ### Deprecated
 
 - The `[adapters.<alias>]` configuration, the `--adapter` flag, the `adapters` command group and
   `connections repair` keep working and say once that they are deprecated.
+
+### Removed
+
+Every removed file stays readable at commit `6498a881c`.
+
+- `connectors-build package` and `connectors-build check`, which already failed on the local
+  realization declaration they read (`adapters/catalog/realizations/local.json`, removed with
+  them); the SQL `live_deadlines` example and the custody keychain probe examples with the
+  workflow step that ran them (4 files, 17,952 bytes).
+- The unused v2 adapter generator in `connectors-spec`: the binary, its tests and fixtures and
+  the `spec-kinds/adapter/v2` kind (6 files, 90,596 bytes); the v2 helpers stay.
+- Specification-only material no runtime implements: the Atlassian native documents profile
+  (14 files, 287,463 bytes); the media contract, the `datasource_reads` ESS domain, the 13
+  proposed session scenarios and `docs/compositions/` (17 files, 64,974 bytes); the Docker, SIP
+  and RTVBP adapter directories and their site pages (16 files, 50,527 bytes).
+- Records of finished work: `docs/waves/`, `docs/plans/` and `docs/handoff/` (62 files, 384,431
+  bytes), and six dated documents of 2026-09 with sections 27–30 and 32–34 of `docs/design.md`
+  (109,711 bytes in the deleted files).
+- `docs/evidence/`: the dated review records, logs, specification snapshots and source-hash
+  manifests of 2026-09-08 to 2026-10-02 (1,364 files, 23,441,342 bytes) moved to the branch
+  `history/evidence-2026-10`; `docs/evidence/README.md` says how to read a record there.
 
 ### Fixed
 
@@ -119,6 +168,19 @@
   executable selection, which the credential-side binding leaves unchanged.
 - Installing a definition from an index or tag (ADR D5) and executors in other languages (D7)
   are not in this release.
+- Five fluxplane parity units stay open, 64 of 6,356 baseline calls
+  (docs/fluxplane-plugin-parity.md, "Gap units"): Homer SIP capture reads (33), the Slack file
+  upload (24; the catalog engine sends no binary request body), Kubernetes port-forward (4),
+  Alertmanager alerts (2) and the Kubernetes Secret read (1, waiting for a disclosure decision).
+- Jira rich text, the description of `issue.create` and `issue.edit` and a comment's content, is
+  Atlassian Document Format the caller writes and the provider sends as given; plain text and
+  Markdown are not converted.
+- `issue.link.add` is not verified after the write: Jira answers `201` with no body, also for a
+  link that already exists. The Jira writes and the Slack reads and delete are verified against
+  fixtures only.
+- The catalog engine does not refuse a required body key sent as JSON `null` or a required
+  parameter sent as `""`: the request is sent (stories `required-body-key-refuses-null` and
+  `required-parameter-refuses-empty`).
 
 ## 0.53.1 — 2026-10-17
 
