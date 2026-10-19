@@ -312,6 +312,10 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
     if error.clock_format_retired && error.code == InvalidConfiguration {
         data["configuration_rule"] = json!(Rule::ApprovalClockFormatRetired.as_str());
     }
+    // The argument an `invalid_input` refused, as the CLI input model names it.
+    if let Some(field) = error.field.filter(|_| error.code == InvalidInput) {
+        data["field"] = json!(field.as_str());
+    }
     if usage {
         HandlerReply::UsageError {
             code: "failure".into(),

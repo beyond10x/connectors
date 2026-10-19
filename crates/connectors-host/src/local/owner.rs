@@ -93,6 +93,40 @@ impl Origin {
         *self == Self::Host
     }
 }
+/// The argument an `invalid_input` refused, as the CLI input model names it
+/// (`connectors.cli.Failure.field`). A closed set: never the caller's value.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Argument {
+    Adapter,
+    Connection,
+    Operation,
+    Schema,
+    Revision,
+    Input,
+    ApproveSubject,
+    ProofOutput,
+    InputFile,
+    ExpectedRevision,
+}
+impl Argument {
+    /// The input model's name of the argument.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Adapter => "adapter",
+            Self::Connection => "connection",
+            Self::Operation => "operation",
+            Self::Schema => "schema",
+            Self::Revision => "revision",
+            Self::Input => "input",
+            Self::ApproveSubject => "approve_subject",
+            Self::ProofOutput => "proof_output",
+            Self::InputFile => "input_file",
+            Self::ExpectedRevision => "expected_revision",
+        }
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Error {
@@ -152,6 +186,11 @@ pub struct Error {
     pub cause: Option<Cause>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attempts: Option<u32>,
+    /// On `invalid_input` only: the argument the refusal is about, named as
+    /// the CLI input model names it (`proof_output`, `input`, `connection`),
+    /// never the caller's value (contracts/cli/v1alpha1/semantics.md).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field: Option<Argument>,
 }
 impl From<Code> for Error {
     fn from(code: Code) -> Self {
@@ -171,10 +210,18 @@ impl From<Code> for Error {
             clock_format_retired: false,
             cause: None,
             attempts: None,
+            field: None,
         }
     }
 }
 impl Error {
+    /// `invalid_input` naming the argument `field` it refused.
+    #[must_use]
+    pub fn invalid_input(field: Argument) -> Self {
+        let mut error = Self::from(Code::InvalidInput);
+        error.field = Some(field);
+        error
+    }
     /// A clock use that got no clock: a retired `roughtime-clock/1` table or
     /// another invalid clock configuration is `invalid_configuration`, and
     /// any other refusal is `unavailable`.
@@ -328,6 +375,7 @@ impl From<runtime::Failure> for Error {
             clock_format_retired: false,
             cause: None,
             attempts: None,
+            field: None,
         }
     }
 }
