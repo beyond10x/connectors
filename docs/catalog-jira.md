@@ -257,8 +257,8 @@ closed: a key it does not list is refused as `invalid_input` before any request.
 
 | id | pinned `operationId` | request | read before | read after |
 |---|---|---|---|---|
-| `issue.create` | `createIssue` | `POST /rest/api/3/issue` | `getProject` on `body.fields.project.key`: `/key` must be that key | none; Jira's `201` answers `id`, `key` and `self` |
-| `issue.comment.add` | `addComment` | `POST /rest/api/3/issue/{issueIdOrKey}/comment` | `getIssue`: `/key` must be `issueIdOrKey` | none; Jira's `201` answers the comment, whose `/body/type` must be `doc` |
+| `issue.create` | `createIssue` | `POST /rest/api/3/issue` | `getProject` on `body.fields.project.key`: `/key` must be that key | none; Jira's `201` answers `id`, `key` and `self`, and `/id` and `/key` must be present (not `null`), else the outcome is `unknown` |
+| `issue.comment.add` | `addComment` | `POST /rest/api/3/issue/{issueIdOrKey}/comment` | `getIssue`: `/key` must be `issueIdOrKey` | none; Jira's `201` answers the comment, whose `/body/type` must be `doc` and whose `/id` must be present (not `null`), else the outcome is `unknown` |
 | `issue.edit` | `editIssue` | `PUT /rest/api/3/issue/{issueIdOrKey}` | `getIssue`: `/key` must be `issueIdOrKey` and `/fields/updated` `updated_stamp`, else `conflict` | `getIssue`: `/key` must be `issueIdOrKey` |
 | `issue.link.add` | `linkIssues` | `POST /rest/api/3/issueLink` | `getIssue` on `body.inwardIssue.key`, then on `body.outwardIssue.key`: each `/key` must be the key named | none; Jira's `201` has no body |
 | `issue.delete` | `deleteIssue` | `DELETE /rest/api/3/issue/{issueIdOrKey}` | `getIssue`: `/key` must be `issueIdOrKey` and `/fields/updated` `updated_stamp`, else `conflict` | `getIssue`: only a `404` proves the issue gone |

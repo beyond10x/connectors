@@ -1411,7 +1411,8 @@ fn body_keys(key: &str, declared: Option<&IndexMap<String, String>>) -> Result<B
 }
 
 /// One `expect` entry as the engine's check: `=true`/`=false` a boolean, any
-/// other `=…` a literal, else an input reference.
+/// other `=…` a literal, `?` a presence (the member exists and is not `null`),
+/// else an input reference.
 fn checks(mapping: Option<&IndexMap<String, String>>) -> Vec<Value> {
     mapping
         .into_iter()
@@ -1421,6 +1422,7 @@ fn checks(mapping: Option<&IndexMap<String, String>>) -> Vec<Value> {
                 Some("true") => serde_json::json!({"boolean": true}),
                 Some("false") => serde_json::json!({"boolean": false}),
                 Some(literal) => serde_json::json!({"literal": literal}),
+                None if expected == "?" => serde_json::json!({"present": true}),
                 None => serde_json::json!({"input": expected}),
             };
             serde_json::json!({"pointer": pointer, "expect": expect})

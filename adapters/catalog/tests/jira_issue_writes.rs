@@ -505,7 +505,8 @@ fn the_issue_writes_are_shipped_as_reviewed() {
                                            "values": {"projectIdOrKey": "body.fields.project.key"},
                                            "checks": [{"pointer": "/key",
                                                        "expect": {"input": "body.fields.project.key"}}]},
-                             "postflight": {"checks": []}}}),
+                             "postflight": {"checks": [{"pointer": "/id", "expect": {"present": true}},
+                                                       {"pointer": "/key", "expect": {"present": true}}]}}}),
         ),
         (
             COMMENT,
@@ -521,7 +522,8 @@ fn the_issue_writes_are_shipped_as_reviewed() {
                                            "checks": [{"pointer": "/key",
                                                        "expect": {"input": "issueIdOrKey"}}]},
                              "postflight": {"checks": [{"pointer": "/body/type",
-                                                        "expect": {"literal": "doc"}}]}}}),
+                                                        "expect": {"literal": "doc"}},
+                                                       {"pointer": "/id", "expect": {"present": true}}]}}}),
         ),
         (
             EDIT,
@@ -608,8 +610,9 @@ fn the_issue_writes_are_shipped_as_reviewed() {
 
 /// Approved, a create reads the project, then sends one `POST` with exactly the
 /// fields given, the description an Atlassian Document Format document passed on
-/// as sent. Jira's `201` names the new issue; nothing is compared after a create,
-/// so the same input sent twice creates twice.
+/// as sent. Jira's `201` names the new issue, whose `id` and `key` must be
+/// present; nothing pins them before a create, so the same input sent twice
+/// creates twice.
 #[test]
 fn an_approved_create_reads_the_project_and_posts_the_fields_as_given() {
     let provider = Provider::new();
