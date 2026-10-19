@@ -325,8 +325,8 @@ carries `Authorization: Basic base64(<email>/token:<API token>)`.
   compact JSON with sorted keys, and the test asserts the returned body is
   those exact bytes; a provider body with other spacing or key order is
   returned as equal JSON, not as its exact bytes.
-- The provider does not walk pages itself and does not bound `per_page` or
-  `page[size]`. It sends a read answered `429` once more after
+- The provider does not walk pages itself. It bounds `per_page` only on
+  `tickets.incremental` (1 to 1,000), and no other `per_page` or `page[size]`. It sends a read answered `429` once more after
   the delay its `Retry-After` names, when that wait leaves the second request
   time of its own before the invocation deadline, and otherwise returns it as a `rate_limited` refusal carrying that
   delay as `retry_after_seconds`

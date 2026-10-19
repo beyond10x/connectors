@@ -591,7 +591,9 @@ impl Pool {
     /// the same connection at the same expected revision queued or running,
     /// an explicit one or a read's recollection, joins it: it sends no job,
     /// runs no identity probe and answers that revalidation's own answer
-    /// (contracts/cli/v1alpha1/owner.md).
+    /// (contracts/cli/v1alpha1/owner.md). A read's recollection that ends on
+    /// changed mounted material, or without an answer, answers
+    /// `Answer::Rerun`: each joiner then runs its own revalidation.
     pub fn run(&self, alias: &str, adapter: &Adapter, task: Task, deadline: u64) -> Result<Output> {
         let Task::Revalidate {
             connection,

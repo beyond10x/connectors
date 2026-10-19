@@ -96,8 +96,9 @@ id discovers an alias; full adapter-declaration validation belongs to the separa
 specification workflow. Design-only/spec-only owners participate without fake
 runtime declarations. All authored spec/ess roots validate and compile separately.
 
-No per-file suppressions are allowed. The reviewed shared_protocol_names policy
-keeps SIP protocol vocabulary valid when a SIP adapter directory exists; it cannot
+No per-file suppressions are allowed. Since 0.54.0 `crates/connectors-build/ess-boundary.json` lists no shared protocol names. An
+adapter directory that re-adds a protocol shared with shared ESS vocabulary (for example `sip`, used by
+`sip_digest` in `ess/domains/auth_access.yaml`) must add its name to `shared_protocol_names`; the policy cannot
 suppress a forbidden native term or an adapter-path dependency. Shared adapter-path references, source
 symlinks, foreign namespaces, unloaded/nested model YAML and manifest/source
 mismatches fail. Shared protocol terms such as HTTP, OAuth and SIP are legitimate.

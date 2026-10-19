@@ -102,7 +102,9 @@
   prefix change still gives `pending` with `stale` until `connections revalidate`; a changed
   provider authority or profile authentication still refuses as `lifecycle_conflict`; a revoked
   connection still refuses. A connection saved before this release keeps the previous rule until
-  its first revalidation records both digests; nothing is migrated by guess. A read's automatic
+  its first revalidation records both digests; nothing is migrated by guess.
+  A connection under an entry that states no `credential_revision` (every adapter but the catalog provider)
+  keeps the configuration-revision rule, and its executable is not compared. A read's automatic
   recollection of lapsed evidence runs under the binding the connection was admitted under and
   advances no revision; only `connections revalidate` records a configuration move.
 - `operations describe`, `operations list` and `operations invoke` start the configured,
@@ -132,7 +134,7 @@ Every removed file stays readable at commit `6498a881c`.
 - Specification-only material no runtime implements: the Atlassian native documents profile
   (14 files, 287,463 bytes); the media contract, the `datasource_reads` ESS domain, the 13
   proposed session scenarios and `docs/compositions/` (17 files, 64,974 bytes); the Docker, SIP
-  and RTVBP adapter directories and their site pages (16 files, 50,527 bytes).
+  and RTVBP adapter directories and their site pages (30 files, 87,080 bytes).
 - Records of finished work: `docs/waves/`, `docs/plans/` and `docs/handoff/` (62 files, 384,431
   bytes), and six dated documents of 2026-09 with sections 27–30 and 32–34 of `docs/design.md`
   (109,711 bytes in the deleted files).
