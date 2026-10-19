@@ -154,7 +154,16 @@ impl Closed {
             let Some(path) = admitted(name) else {
                 return refused("declares body_types for a key its body_keys do not admit");
             };
-            closed.types.insert(path, *value_type);
+            if value_type == &BodyType::StringList && closed.scalars.contains(&path) {
+                return Err(refuse(format!(
+                    "guard of `{id}` reads body key `{name}` as a scalar, but body_types types it as a string_list"
+                )));
+            }
+            if closed.types.insert(path, *value_type).is_some() {
+                return Err(refuse(format!(
+                    "selection `{id}` repeats body_types key `{name}`"
+                )));
+            }
         }
         let mut required = BTreeSet::new();
         for name in &selection.body_required {
@@ -236,6 +245,13 @@ impl Closed {
                     "selection `{id}` fixes body key `{name}`, {reason}"
                 )));
             }
+            if let Some(path) = &path
+                && closed.fixed.iter().any(|(fixed, _)| fixed == path)
+            {
+                return Err(refuse(format!(
+                    "selection `{id}` repeats body_fixed key `{name}`"
+                )));
+            }
             closed.fixed.push((path.unwrap_or_default(), value.clone()));
         }
         for (name, values) in &selection.body_enums {
@@ -247,7 +263,11 @@ impl Closed {
                         && !values.is_empty()
                         && values.iter().all(|v| !v.is_empty() && seen.insert(v)) =>
                 {
-                    closed.enums.insert(path, values.clone());
+                    if closed.enums.insert(path, values.clone()).is_some() {
+                        return Err(refuse(format!(
+                            "selection `{id}` repeats body_enums key `{name}`"
+                        )));
+                    }
                 }
                 _ => {
                     return refused(
@@ -284,6 +304,11 @@ impl Closed {
                 Some(path)
                     if string(&path) && !fixed_names.contains(&path) && !prefix.is_empty() =>
                 {
+                    if closed.prefixes.iter().any(|(seen, _)| *seen == path) {
+                        return Err(refuse(format!(
+                            "selection `{id}` repeats body_prefixes key `{name}`"
+                        )));
+                    }
                     closed.prefixes.push((path, prefix.clone()))
                 }
                 _ => {
