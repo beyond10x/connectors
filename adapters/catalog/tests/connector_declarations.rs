@@ -759,11 +759,11 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "19 catalog-slack.md",
-            "6fbe53578644a8eeb333f757574665382e333d1a8089ff2f16f3bea056851e40",
+            "23e877ed8e54ad38b319d0ffd0c482203719b26ecd094e7e65bc8d976a6af6ca",
         ),
         (
             "20 catalog-slack.md",
-            "3d1e919d77a8426f713915b02bd72df03c0f01f5fb1a2b5850bf7eb1467e6a8c",
+            "1dc8109ddc54339d4cbcabbedc13c427fa4a180d2a74213bc4505a7e44fa8404",
         ),
         (
             "21 catalog-zendesk.md",

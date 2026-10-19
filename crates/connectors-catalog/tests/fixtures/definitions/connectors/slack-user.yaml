@@ -17,9 +17,10 @@ defaults:
     ok: /ok
     error: /error
     refusals:
-      - {values: [missing_scope, not_in_channel, no_permission, user_is_bot], code: forbidden}
+      - values: [missing_scope, not_in_channel, no_permission, user_is_bot, user_not_visible, enterprise_is_restricted]
+        code: forbidden
       - {values: [not_authed, invalid_auth, account_inactive, token_revoked], code: unauthorized}
-      - values: [channel_not_found, thread_not_found, file_not_found, file_deleted, user_not_found]
+      - values: [channel_not_found, thread_not_found, file_not_found, file_deleted, user_not_found, users_not_found]
         code: not_found
       - {values: [ratelimited], code: rate_limited}
       - values:

@@ -1,15 +1,16 @@
 # Slack through the catalog provider
 
 The catalog provider reads Slack conversations — the channels a bot token can
-see, a channel's messages and one thread — the workspace's users, the
-workspace itself, its custom emoji, the token's identity and the files the token
-can see, with their content, from the pinned Slack Web API document, posts
-messages, a direct message included, under approval, and, on a
+see, a channel's messages and one thread — the workspace's users, one user by
+id or e-mail address, the workspace itself, its custom emoji, the token's
+identity and the files the token can see, with their content, from the pinned
+Slack Web API document, posts messages, a direct message included, and deletes
+a file, under approval, and, on a
 second instance with a user token, reads the conversations, history and
 threads that user can read, the channels the bot is not in included, and
 searches messages. Nothing here is
 Slack-specific code: the Swagger 2.0 document is projected into OpenAPI 3.1.0, the projection is compiled into a
-bundle, two reviewed selection sets expose ten reads and four writes for a bot
+bundle, two reviewed selection sets expose twelve reads and five writes for a bot
 token and five reads for a user token, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Configuration, connection, approval and invocation work as described there;
@@ -49,10 +50,10 @@ without it the second command is refused with "provider is already indexed".
 `--amendments` applies
 [`slack-web.amendments.json`](../adapters/slack/upstream/slack-web.amendments.json),
 bound to the projection's SHA-256: it records `chat_postMessage`,
-`conversations_open`, `chat_update` and `chat_delete` with an `application/json`
-request body, the one body the engine sends
+`conversations_open`, `chat_update`, `chat_delete` and `files_delete` with an
+`application/json` request body, the one body the engine sends
 ([cited amendments](local-catalog-provider.md#build-the-bundle)).
-The pinned document lists `application/json` in all four operations' `consumes`
+The pinned document lists `application/json` in all five operations' `consumes`
 beside the form type, but writes their parameters as `formData`, which the
 projection carries only under the form media type.
 The first command writes `slack-web.openapi.json` and its projection record
@@ -69,10 +70,10 @@ run would not reproduce byte for byte.
 ## The shipped selection set
 
 [`adapters/catalog/providers/slack/operations.json`](../adapters/catalog/providers/slack/operations.json)
-exposes ten reads for a bot token, each `effect: read`, and four writes,
-`chat.postMessage`, `conversations.open`, `chat.update` and `chat.delete`, each
-`effect: write`
-([Messages](#messages)).
+exposes twelve reads for a bot token, each `effect: read`, and five writes,
+`chat.postMessage`, `conversations.open`, `chat.update` and `chat.delete`
+([Messages](#messages)) and `files.delete` ([Files](#files)), each
+`effect: write`.
 [`adapters/catalog/providers/slack/user-operations.json`](../adapters/catalog/providers/slack/user-operations.json)
 exposes `search.messages`, the three conversation reads and `users.list`, and
 no write, for a user token
@@ -123,8 +124,8 @@ walk is in it.
   maximum, only that "providing no `limit` value will result in Slack
   attempting to deliver you the entire result set", so the selection bounds
   nothing; send `limit` and walk the pages. There is no updated-since filter.
-  Looking up one user by id or e-mail (`users.info`, `users.lookupByEmail`) is
-  not selected: read the list.
+  One user by id or e-mail address is `users.info` or `users.lookupByEmail`,
+  each one call, below.
 - **Timestamps.** The pinned document types `ts`, `oldest` and `latest` as
   `number`, and the bundle records no input type for them, so they take any
   scalar and are sent as given. Send them as strings, such as
@@ -140,13 +141,24 @@ walk is in it.
 Every other query parameter the projection declares for an operation is
 accepted by name; one it does not declare is refused before any request.
 
-The three reads that are not lists each answer in one call:
+The five reads that are not lists each answer in one call:
 
 | id | pinned `operationId` | request | scope | answer |
 |---|---|---|---|---|
 | `team.info` | `team_info` | `GET /api/team.info` | `team:read` | `team`, an `objs_team` with `id`, `name`, `domain`, `email_domain` and `icon` |
 | `emoji.list` | `emoji_list` | `GET /api/emoji.list` | `emoji:read` | the document states only `ok` |
 | `auth.test` | `auth_test` | `GET /api/auth.test` | none | `url`, `team`, `user`, `team_id` and `user_id`, and `bot_id` for a bot token |
+| `users.info` | `users_info` | `GET /api/users.info` | `users:read` | `user`, an `objs_user` as `users.list` pages it |
+| `users.lookupByEmail` | `users_lookupByEmail` | `GET /api/users.lookupByEmail` | `users:read.email` | `user`, an `objs_user` as `users.list` pages it |
+
+- **`users.info`** requires `user`, a user id (`U…` or `W…`) from `users.list`
+  or a message; `include_locale` set to `true` adds the user's locale. A user
+  Slack does not find is refused as `not_found` (`user_not_found`), one the
+  token may not see as `forbidden` (`user_not_visible`).
+- **`users.lookupByEmail`** requires `email`, as the pinned document does; it
+  is sent in the query with `@` encoded as `%40`. An address no user of the
+  workspace has is refused as `not_found` (`users_not_found`), and
+  `enterprise_is_restricted` as `forbidden`.
 
 - **`team.info`** reads the token's own workspace. Its optional `team` names
   another workspace, which Slack answers only when the token sees it through
@@ -198,6 +210,42 @@ Without it the configuration still loads and every other read works, but
 `file.download` is refused as `forbidden` with nothing sent. Admitted without
 `credential`, the request carries no token and Slack's file host refuses it.
 Adding `hosts` changes the configuration revision.
+
+One write deletes a file. Like the [message writes](#messages) it needs an
+approval that binds the operation and the whole input, and it is sent once:
+
+| id | pinned `operationId` | request | scope | body | read before | answer |
+|---|---|---|---|---|---|---|
+| `files.delete` | `files_delete` | `POST /api/files.delete`, JSON body | `files:write` | `file`, required | `auth.test` must answer `"ok": true`; then `files.info` on `body.file` must answer `"ok": true` and `/file/id` equal to `body.file` | `ok` alone |
+
+- **The body is closed.** `file` is the only key, a non-empty string, the
+  file id (`F…`) `files.list` or `files.info` gives. Any other key, `token`
+  included, is refused before any request.
+- **The guard.** Both reads run before the write with the connection's
+  token. A file `files.info` does not find, or a token Slack refuses, is
+  refused as `forbidden` with nothing deleted, the outcome `not_attempted`.
+  So a second delete of a deleted file is refused before the write.
+- **Refusals by name.** Slack answers a refused delete `200` with
+  `"ok": false`. `file_not_found` and `file_deleted` (the file went between
+  the read and the write) are refused as `not_found`, `cant_delete_file` as
+  `forbidden`, each with Slack's `error` as its reason and never sent again;
+  each is a value the pinned error enum of `files.delete` lists. Any other
+  `"ok": false` answer, and a dispatch without a definite answer, is
+  `outcome_unknown`. Nothing is read after the write: Slack answers `200`
+  with `"ok": false` for a file already gone, so no read could prove the
+  delete.
+
+The input of one delete, as `--input-file` takes it for
+[the approval](#giving-an-approval) and the invocation:
+
+```json
+{"body":{"file":"F0000000001"}}
+```
+
+Verified against the local fixture in `adapters/catalog/tests/slack.rs`
+(`an_approved_file_delete_reads_the_file_then_sends_one_json_body` and the two
+cases after it), not against a live workspace. File upload is not selected: it
+is a binary request body, which the catalog does not send.
 
 ## Messages
 
@@ -304,9 +352,9 @@ is the provider's reason, and the refusal's code is the provider's own answer:
 
 | `error` | refused with |
 |---|---|
-| `missing_scope`, `not_in_channel`, `no_permission`, `user_is_bot` | `forbidden` |
+| `missing_scope`, `not_in_channel`, `no_permission`, `user_is_bot`, `user_not_visible`, `enterprise_is_restricted` | `forbidden` |
 | `not_authed`, `invalid_auth`, `account_inactive`, `token_revoked` | `unauthorized` |
-| `channel_not_found`, `thread_not_found`, `file_not_found`, `file_deleted`, `user_not_found` | `not_found` |
+| `channel_not_found`, `thread_not_found`, `file_not_found`, `file_deleted`, `user_not_found`, `users_not_found` | `not_found` |
 | `ratelimited` | `rate_limited`, with the delay its `Retry-After` names |
 | `invalid_cursor`, `invalid_limit`, `limit_required`, `invalid_ts_latest`, `invalid_ts_oldest`, `invalid_arg_name`, `invalid_array_arg`, `unknown_type` | `invalid_input` |
 | any other name | `internal` |
@@ -860,7 +908,10 @@ ready
   approval or with a key outside the closed body, refusal before the write when
   `auth.test` answers `ok: false`, a dropped connection and a `500` left
   unknown and sent once, an `ok: false` answer left unknown, and a direct
-  message opened and posted to. The host's approval and attempt record are
+  message opened and posted to; `files.delete` after both reads, and refused
+  before the write for a file `files.info` does not find. `users.info` and
+  `users.lookupByEmail` are checked like the other reads, each refusal by
+  Slack's name included. The host's approval and attempt record are
   not part of these tests. No live Slack workspace has been called.
 - The engine parses and re-serialises the body. The fixture's bodies are
   compact JSON with sorted keys, and the test asserts the returned body is
@@ -869,19 +920,19 @@ ready
 - The provider does not walk pages itself, and does not bound `limit` on the
   message reads or `users.list`: the pinned document states no maximum for
   them.
-- Only the bot set's ten reads and four writes and the user set's five reads
-  are selected. One user by id or e-mail (`users.info`, `users.lookupByEmail`),
-  file upload and delete, reactions and every other method of the document are
-  not selected.
+- Only the bot set's twelve reads and five writes and the user set's five reads
+  are selected. File upload, reactions and every other method of the document
+  are not selected.
   A file upload is a binary request body, which the catalog does not send.
 
 ## Credential parameters
 
-Four read methods of the pinned document declare the credential as a
+Six read methods of the pinned document declare the credential as a
 **required** parameter: `auth.test` as a required `token` header, and
-`team.info`, `emoji.list` and `search.messages` as a required `token` query
-parameter. `withhold` refuses a parameter the document requires
-("withholds `token`, which is required"); selected as they are, the three
+`team.info`, `emoji.list`, `search.messages`, `users.info` and
+`users.lookupByEmail` as a required `token` query parameter. `withhold`
+refuses a parameter the document requires
+("withholds `token`, which is required"); selected as they are, the five
 would declare the token as a required input sent in the query, and
 `auth.test` is refused as needing a header parameter the transport does not
 carry.
@@ -894,6 +945,6 @@ so it is never declared, never required and never sent. A credential name must
 be a query or header parameter of the operation that the selection does not
 also bound, mark `required`, withhold or read through a guard; anything else
 is refused when the selection loads. `withhold` keeps its meaning.
-`adapters/catalog/tests/slack.rs` pins that each of the four ships this way and
+`adapters/catalog/tests/slack.rs` pins that each of the six ships this way and
 only this way, and `adapters/catalog/tests/selection_credential.rs` pins the
 field itself.

@@ -37,6 +37,15 @@
       },
       "cite": "https://api.slack.com/web#posting_json",
       "reason": "Slack's Web API reference accepts a JSON body with a bearer token for write methods, and the pinned document's own consumes for chat.delete lists application/json beside the form type; the Swagger projection keeps only the form type because the parameters are written as formData."
+    },
+    {
+      "operation_id": "files_delete",
+      "correct_media_type": {
+        "from": "application/x-www-form-urlencoded",
+        "to": "application/json"
+      },
+      "cite": "https://api.slack.com/web#posting_json",
+      "reason": "Slack's Web API reference accepts a JSON body with a bearer token for write methods, and the pinned document's own consumes for files.delete lists application/json beside the form type; the Swagger projection keeps only the form type because the parameters are written as formData."
     }
   ]
 }

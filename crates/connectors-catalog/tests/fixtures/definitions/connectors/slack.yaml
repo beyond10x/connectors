@@ -11,9 +11,10 @@ defaults:
     ok: /ok
     error: /error
     refusals:
-      - {values: [missing_scope, not_in_channel, no_permission, user_is_bot], code: forbidden}
+      - values: [missing_scope, not_in_channel, no_permission, user_is_bot, user_not_visible, enterprise_is_restricted]
+        code: forbidden
       - {values: [not_authed, invalid_auth, account_inactive, token_revoked], code: unauthorized}
-      - values: [channel_not_found, thread_not_found, file_not_found, file_deleted, user_not_found]
+      - values: [channel_not_found, thread_not_found, file_not_found, file_deleted, user_not_found, users_not_found]
         code: not_found
       - {values: [ratelimited], code: rate_limited}
       - values:
@@ -47,6 +48,15 @@ operations:
     op: users_list
     withhold: [token]
     description: "List the workspace's users, one page per call; each later call sends the previous page's response_metadata.next_cursor as cursor, and the walk ends on a page whose next_cursor is empty. Send limit: without it Slack tries to answer the whole list at once. Slack's answer with ok false is refused, Slack's error named as the reason"
+  users.info:
+    op: users_info
+    required: [user]
+    credential: [token]
+    description: "Read one user by id (U… or W…) under user, the same record users.list pages; include_locale true adds the user's locale. Needs users:read. A user Slack does not find is refused as not_found (user_not_found), one the token may not see as forbidden (user_not_visible). Slack's answer with ok false is refused, Slack's error named as the reason"
+  users.lookupByEmail:
+    op: users_lookupByEmail
+    credential: [token]
+    description: "Read one user by e-mail address under user, the same record users.list pages; email is required. Needs users:read.email. An address no user of the workspace has is refused as not_found (users_not_found), and enterprise_is_restricted as forbidden. Slack's answer with ok false is refused, Slack's error named as the reason"
   team.info:
     op: team_info
     credential: [token]
@@ -121,3 +131,20 @@ operations:
             values: [cant_delete_message, compliance_exports_prevent_deletion]
             code: forbidden
     description: Delete one message, the one body.channel (a conversation id, a channel or a direct message) and body.ts name; body.ts is the string Slack gives, not a number. Answers channel and ts. Needs chat:write; a bot token deletes only the messages it posted. The token's auth.test is read first and must answer ok true, or nothing is sent. Slack refuses as status 200 with ok false; the answer must carry ok true to be applied. cant_delete_message and compliance_exports_prevent_deletion are refused as forbidden, message_not_found and channel_not_found as not_found, each with Slack's error as its reason; any other refusal is outcome_unknown, never applied
+  files.delete:
+    op: files_delete
+    effect: write
+    credential: [token]
+    body: {file: string+!}
+    guard:
+      before: {read: auth.test, expect: {/ok: =true}}
+      also:
+        - read: files.info
+          with: {file: body.file}
+          expect: {/ok: =true, /file/id: body.file}
+      after:
+        expect: {/ok: =true}
+        refusals:
+          - {pointer: /error, values: [file_not_found, file_deleted], code: not_found}
+          - {pointer: /error, values: [cant_delete_file], code: forbidden}
+    description: Delete one file, the one body.file names, a file id (F…) from files.list or files.info. Answers ok alone. Needs files:write. The token's auth.test is read first and must answer ok true, then files.info on body.file must answer ok true and the same file id, or nothing is sent. Slack refuses as status 200 with ok false; the answer must carry ok true to be applied. file_not_found and file_deleted are refused as not_found, cant_delete_file as forbidden, each with Slack's error as its reason; any other refusal is outcome_unknown, never applied. A second delete of a deleted file is refused before the write, since files.info no longer answers ok true
