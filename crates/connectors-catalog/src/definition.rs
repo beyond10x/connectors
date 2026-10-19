@@ -1292,6 +1292,20 @@ fn body(key: &str, operation: &Operation) -> Result<Body, Refusal> {
             });
         }
     }
+    let all: Vec<_> = body.keys.iter().filter_map(|field| path(field)).collect();
+    for field in &body.keys {
+        let own = path(field).unwrap_or_default();
+        if all
+            .iter()
+            .any(|other| other.len() < own.len() && own.starts_with(other))
+        {
+            return Err(Refusal::BodyType {
+                key: key.to_owned(),
+                field: field.clone(),
+                spec: "a path no other body key names or lies inside".to_owned(),
+            });
+        }
+    }
     for (field, values) in operation.body_enums.iter().flatten() {
         let mut seen = BTreeSet::new();
         if !body.sent_string(field)
@@ -2331,6 +2345,61 @@ fn guard(
     Ok(value)
 }
 
+/// Every input a lowered guard reads: a check's `input` and each bound value.
+fn guard_inputs<'a>(value: &'a Value, found: &mut Vec<&'a str>) {
+    match value {
+        Value::Object(map) => {
+            for (name, inner) in map {
+                match (name.as_str(), inner) {
+                    ("input", Value::String(input)) => found.push(input),
+                    ("values", Value::Object(values)) => {
+                        found.extend(values.values().filter_map(Value::as_str));
+                    }
+                    _ => guard_inputs(inner, found),
+                }
+            }
+        }
+        Value::Array(items) => items.iter().for_each(|item| guard_inputs(item, found)),
+        _ => {}
+    }
+}
+
+/// The engine's load check of a guard against a closed body: a guard reading
+/// `body.<dotted>` needs a body key the body admits and the caller sends.
+fn guard_body_reads(key: &str, body: &Body, guard: &Value) -> Result<(), Refusal> {
+    if body.keys.is_empty() {
+        return Ok(());
+    }
+    let mut inputs = Vec::new();
+    guard_inputs(guard, &mut inputs);
+    for dotted in inputs
+        .into_iter()
+        .filter_map(|input| input.strip_prefix("body."))
+    {
+        let read: Vec<&str> = dotted.split('.').collect();
+        let refuse = |spec: &str| Refusal::BodyType {
+            key: key.to_owned(),
+            field: format!("body.{dotted}"),
+            spec: spec.to_owned(),
+        };
+        let Some(field) = body
+            .keys
+            .iter()
+            .find(|field| path(field).is_some_and(|own| read.starts_with(&own)))
+        else {
+            return Err(refuse(
+                "a body key its guard reads, which its body does not admit",
+            ));
+        };
+        if body.fixed.contains_key(field) {
+            return Err(refuse(
+                "a body key its guard reads as an input, which its body fixes",
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// The selection a definition lowers to, against the inventory of its bundle
 /// and the (projected) source document whose summaries are the default
 /// descriptions. Pure: it reads and writes nothing.
@@ -2431,6 +2500,9 @@ pub fn select(
             .as_ref()
             .map(|declared| guard(definition, inventory, key, declared))
             .transpose()?;
+        if let Some(guard) = &guard {
+            guard_body_reads(key, &declared_body, guard)?;
+        }
         operations.push(SelectionEntry {
             id: key.clone(),
             operation_id: operation.op.clone(),
