@@ -4,6 +4,9 @@ id: story:ci-timing-flakes-20261018
 kind: story
 status: draft
 title: Four tests failed on CI under load on 2026-10-18 without a change causing them
+refs:
+- provider: github
+  reference: beyond10x/connectors#183
 relations:
 - serves: vision:independent-contract-adapters
 scope:
@@ -15,7 +18,7 @@ scope:
   path: crates/connectors-host/src/local/oauth.rs
 - confidence: cited
   path: crates/connectors-host/src/local/owner/transport.rs
-revision: 3
+revision: 4
 ---
 ## Defect
 
