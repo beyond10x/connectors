@@ -2,7 +2,7 @@
 
 Owner: `story:contracts-document-admission` (original F14). Base before this
 completion pass: `8e1836cad8ae1b2127ce9ae306c6d8131960db4c`.
-The original [independent reports](../../../../../../../docs/evidence/datasource-semantics-20260908/reviews/)
+The original [independent reports](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/datasource-semantics-20260908/reviews/)
 remain immutable. This implementor record proposes dispositions and evaluates the
 text manually; it is not an independent verdict or runtime conformance result.
 

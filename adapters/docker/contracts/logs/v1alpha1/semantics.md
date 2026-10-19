@@ -100,7 +100,7 @@ errors, private inspect data, origins or credentials in diagnostics.
 ## Evidence and obligations
 
 Official Engine API v1.56 ContainerLogs/ContainerAttach sources are retained in the
-[provider evidence](../../../../../docs/evidence/restart-visibility-20260908/provider-evidence.md).
+[provider evidence](../../../../../docs/evidence/README.md "git show history/evidence-2026-10:docs/evidence/restart-visibility-20260908/provider-evidence.md").
 This profile's native interpretation and future fixtures belong here. Required
 fixtures cover exact name/ID and label admission, replacement, supported drivers,
 TTY/raw and multiplexed decoding, interleaved frames, partial headers/payloads,

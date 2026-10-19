@@ -15,7 +15,7 @@ general expression and log-selector entry points. These sources support the
 selected root distinction in [§4.2](../../semantics.md#42-native-logql-scope).
 
 The earlier HTTP/LogCLI source record remains in the immutable
-[datasource evidence intake](../../../../../../../docs/evidence/datasource-semantics-20260908/provider-evidence.md).
+[datasource evidence intake](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/datasource-semantics-20260908/provider-evidence.md).
 Its HTTP interval/count evidence and LogCLI overlap refusal justify the bounded
 observation selection; they do not supply an occurrence cursor.
 

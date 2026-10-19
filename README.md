@@ -221,8 +221,8 @@ exposes every operation the native GitLab implementation carried before it was r
 all of its reads, merge-request create, update and a guarded merge have run
 against a live GitLab through it, the preconditions declared as data. Explicit
 revalidation renews the 60-second validation evidence without credential
-re-entry; see [the sandbox evidence](docs/evidence/gitlab-sandbox-20260913/README.md).
-The [2026-10-02 read replay](docs/evidence/gitlab-current-20261002/README.md)
+re-entry; see [the sandbox evidence](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/gitlab-sandbox-20260913/README.md).
+The [2026-10-02 read replay](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/gitlab-current-20261002/README.md)
 covers all eighteen current reads and saved-credential reuse after an owner
 restart. It retains one unexplained initial revalidation refusal and identifies
 the three empty-list results; historical live mutation evidence remains separate.
@@ -243,7 +243,7 @@ identity validated by one SelfSubjectReview probe, and its three reads through t
 local owner. Disposable TLS cluster and keyring fixtures prove reuse after CLI,
 owner and keyring restarts. Per-operation SelfSubjectAccessReview permission
 checks are not implemented and no result claims complete authorization coverage.
-[Real k3s acceptance](docs/evidence/kubernetes-acceptance-20261002/README.md)
+[Real k3s acceptance](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/kubernetes-acceptance-20261002/README.md)
 now covers selected reads, RBAC refusal, continuation binding and local lifecycle
 controls. Additional Kubernetes and Helm workflows remain open.
 
@@ -251,7 +251,7 @@ PostgreSQL now has it too, as the third execution family: it speaks its own wire
 protocol rather than HTTP, so the session itself is the credential check and the
 saved identity is the role and database. Its two reads run inside a read-only
 transaction with fixed statement and lock timeouts.
-[Six real PostgreSQL cases](docs/evidence/postgres-acceptance-20261002/README.md)
+[Six real PostgreSQL cases](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/postgres-acceptance-20261002/README.md)
 cover restart, incident reads, read-only refusals, native drop cancellation and
 local lifecycle controls. The plaintext fixture does not establish TLS. See the
 [PostgreSQL CLI guide](docs/local-postgres-cli.md). The same SQL connector serves MySQL,
@@ -333,7 +333,7 @@ also provides `describe`, `invoke` and `serve`.
 Install the `connectors` binary from a release page or build this source
 locally; package distribution and deployment are not configured. Historical
 [runtime verification](docs/verification.md) and the
-[specification checkpoint](docs/evidence/core-model-closure-20260909/checkpoint.md)
+[specification checkpoint](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/core-model-closure-20260909/checkpoint.md)
 describe what was checked and its limits.
 
 ## Install a release binary

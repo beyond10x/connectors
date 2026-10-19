@@ -11,7 +11,7 @@ The shared mutation ledger consumes effect knowledge without importing this prov
 
 One adapter service `connectors.docker` bound to one Docker Engine (daemon) through its API. Placement: on the host that runs the daemon (unix socket) or on a network path to a TLS-enabled daemon endpoint. First slice: read-only inventory, container logs, published-port observations; container lifecycle mutations behind approval; exec and events deferred.
 
-Selected first API binding: **Docker Engine API v1.56**, explicitly version-prefixed with no version fallback. The [official Swagger](https://docs.docker.com/reference/api/engine/version/v1.56.yaml) is pinned by exact bytes in [provider evidence](../../docs/evidence/restart-visibility-20260908/provider-evidence.md). Listed HTTP paths and lifecycle response/parameter declarations were checked against that source. A concrete daemon/transport binding must support this version before advertising the proposed operations; no live daemon was tested.
+Selected first API binding: **Docker Engine API v1.56**, explicitly version-prefixed with no version fallback. The [official Swagger](https://docs.docker.com/reference/api/engine/version/v1.56.yaml) is pinned by exact bytes in [provider evidence](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/restart-visibility-20260908/provider-evidence.md). Listed HTTP paths and lifecycle response/parameter declarations were checked against that source. A concrete daemon/transport binding must support this version before advertising the proposed operations; no live daemon was tested.
 
 ## 2. Old surface and disposition
 

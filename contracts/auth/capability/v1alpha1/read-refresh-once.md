@@ -223,7 +223,7 @@ business invocation or replay its credential exchange.
 
 ## 6. Conformance and model boundary
 
-The [textual case audit](../../../../docs/evidence/read-refresh-retry-20260909/verification.md)
+The [textual case audit](../../../../docs/evidence/README.md "git show history/evidence-2026-10:docs/evidence/read-refresh-retry-20260909/verification.md")
 covers the old/new reader distinction, complete success/refusal sequence, races,
 budgets and excluded modes. It specifies expected observations; it is not proof
 that a runtime implements this binding.
