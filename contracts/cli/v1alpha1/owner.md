@@ -6,6 +6,18 @@ The owner is a local `connectors` process with an owner-only socket and a retain
 kernel file lock in the selected private state directory. It is bound to one
 admitted absolute configuration path and the database authority UUID.
 
+A Unix owner's socket is never visible at `owner.sock` before it is owner-only.
+The owner binds it at the staging name `owner.bind` in the state directory,
+restricts it there to its own user (mode 0600) and only then links it at
+`owner.sock`; the staging name is removed again. A name already taken at
+`owner.sock` refuses the bind, and a staging socket a dead owner left is removed
+first. This holds for every bind, the first and the one idle retirement makes
+again. A command that finds a socket at `owner.sock` that is not owner-only or
+not the user's refuses it with `invalid_configuration`; it never meets one an
+owner is still restricting. On Linux both names are reached through a
+descriptor on the state directory (`/proc/self/fd/<n>/`), so a long state
+directory path does not push the socket address past `sun_path`.
+
 Passive commands contact only an existing socket or read recognized metadata.
 Admitted connect, repair, revalidate and invoke may start the owner, and so may
 `operations describe` and `operations list`, only to
@@ -288,9 +300,11 @@ names:
   so no retained worker thread is needed for it: an adapter child exits when its
   channel closes. Exact stop signals the owned child by process id only under
   the lock that reaps it; kqueue `EVFILT_PROC` with `NOTE_EXIT` reports its exit.
-- **Socket path.** There is no `/proc/self/fd`: the owner socket is bound and
-  reached by its full path, which must fit the 104-byte `sun_path`. A state
-  directory whose socket path is longer is refused before an owner starts.
+- **Socket path.** There is no `/proc/self/fd`: the owner socket is bound at
+  the full path of its staging name `owner.bind`, linked at the full path of
+  `owner.sock` once it is owner-only, and reached there, as on Linux. The two
+  names are equally long, and that path must fit the 104-byte `sun_path`. A
+  state directory whose socket path is longer is refused before an owner starts.
 
 ## Windows
 
