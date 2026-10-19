@@ -1981,6 +1981,15 @@ impl Engine {
                     ));
                 }
                 let observed = read_body(&response, false, &exposed.selection.rate_limit_reasons)?;
+                // An answer that is no object or array (an empty body, `null`,
+                // a scalar) carries no member at all: it shows nothing about
+                // the target, whatever check reads it first.
+                if !(observed.is_object() || observed.is_array()) {
+                    return Err(Error::new(
+                        ErrorCode::UpstreamProtocol,
+                        "guard preflight answered without a document",
+                    ));
+                }
                 for (pointer, expected) in preflight {
                     let current = observed.pointer(pointer);
                     if !expected.present(current) {

@@ -960,7 +960,9 @@ The complete configuration used against the sandbox is
   loads, on every check: the bundle does not record an answer member's type,
   and as text it would hold for a look-alike string where a boolean is meant.
   GitLab's `/resolvable` and `/merge_when_pipeline_succeeds` and Jira's
-  `/transitions/0/isAvailable` are compared with `{"boolean": true}`. A check that
+  `/transitions/0/isAvailable` are compared with `{"boolean": true}`. A
+  preflight answer that is no JSON object or array (an empty body, `null`, a
+  scalar) is refused as `upstream_protocol` before any check reads it. A check that
   differs refuses the write unsent as `forbidden`; a preflight declaring
   `"mismatch": "conflict"` refuses it as `conflict` instead, the provider's own
   answer read before the write (`connectors_catalog.guard.MismatchCode`), for a
