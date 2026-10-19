@@ -50,8 +50,7 @@ result envelope does not make native query/continuation semantics shared.
 
 | Owner | Native authority |
 |---|---|
-| [Atlassian](atlassian/design.md) | [Document/CQL profiles](atlassian/contracts/documents/v1alpha1/semantics.md), [grammar](atlassian/contracts/documents/v1alpha1/cql.md), [ESS](atlassian/spec/ess/system.yaml), the [authored Confluence REST v1 source](atlassian/contracts/confluence-rest-v1/README.md) the catalog provider compiles; Jira and Confluence remain distinct bindings within the intentionally combined adapter |
-| [Docker](docker/design.md) | [Container logs](docker/contracts/logs/v1alpha1/semantics.md), lifecycle intent and [ESS](docker/spec/ess/system.yaml) |
+| Atlassian | [ESS](atlassian/spec/ess/system.yaml) of the native document vocabulary, which the catalog provider's Confluence tests read; the [authored Confluence REST v1 source](atlassian/contracts/confluence-rest-v1/README.md) the catalog provider compiles; pinned Jira and Confluence documents in atlassian/upstream/ |
 | [Kubernetes](kubernetes/design.md) | [Discovery](kubernetes/contracts/discovery/v1alpha1/semantics.md), [permissions](kubernetes/contracts/auth/v1alpha1/semantics.md), [routes](kubernetes/contracts/routes/v1alpha1/semantics.md), [logs](kubernetes/contracts/logs/v1alpha1/semantics.md), restart intent and [ESS](kubernetes/spec/ess/system.yaml) |
 | [Grafana](grafana/design.md) | [Datasource discovery](grafana/contracts/discovery/v1alpha1/semantics.md), [proxy route](grafana/contracts/routes/v1alpha1/semantics.md), [ESS](grafana/spec/ess/system.yaml); native runtime and tests for `datasources.list` in grafana/; see [the Grafana guide](grafana/README.md) |
 | [Loki](loki/design.md) | [LogQL profile](loki/contracts/logs/v1alpha1/semantics.md), tenant binding and [ESS](loki/spec/ess/system.yaml); native runtime and tests in loki/; see [the Loki guide](loki/README.md) |
@@ -65,8 +64,6 @@ result envelope does not make native query/continuation semantics shared.
 | SQL | [Read profiles](sql/contracts/reads/v1alpha1/semantics.md) for PostgreSQL and MySQL, [ESS](sql/spec/ess/system.yaml); declaration, native runtime and tests live in sql/ |
 | Tavily | [Websearch profile `tavily/2026-10`](tavily/contracts/websearch/v1alpha1/semantics.md), pinned OpenAPI in tavily/upstream/, [ESS](tavily/spec/ess/system.yaml); native runtime and tests in tavily/; see [the Tavily guide](../docs/local-tavily.md) |
 | [Catalog](catalog/design.md) | Optional catalog adapter design |
-| [SIP](sip/design.md) | [Dial/effect/media binding](sip/contracts/dial/v1alpha1/semantics.md), native configuration and protocol obligations |
-| [RTVBP](rtvbp/design.md) | [Session/authority transport](rtvbp/contracts/session/v1alpha1/semantics.md), native configuration and codec obligations |
 | [MCP](mcp/design.md) | [Pinned specification revisions](mcp/contracts/protocol/v1alpha1/evidence/20260912/specification-sources.md), [ESS](mcp/spec/ess/system.yaml); protocol contracts and transport/capability profile selection remain unauthored |
 
 Each authored native model lives in `spec/ess` with namespace
@@ -79,9 +76,7 @@ workflow.
 A child consumes shared mediated capabilities without knowing its concrete parent.
 Parent discovery owns native provider recognition; recognition does not import the
 recognized adapter implementation. Concrete pairings and integration suites belong
-to [monitoring composition](../docs/compositions/monitoring.md).
-[Media composition](../docs/compositions/media-session.md) compares independent
-protocol bindings; it is not a fictional combined provider adapter.
+to composition.
 
 Historical design/review evidence may reference old paths and remains immutable.
 It is migration evidence, not an extracted adapter's normative dependency. Exact
