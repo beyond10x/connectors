@@ -19,9 +19,9 @@ types:
     of: String
 
   # What an observed value is compared with: the input value a reference names, a literal written
-  # in the selection, or a boolean written in the selection. Exactly one of the three
-  # (Expectation's invariants); serialised as `{"input": "<reference>"}`,
-  # `{"literal": "<value>"}` or `{"boolean": true}`.
+  # in the selection, a boolean written in the selection, or only its presence. Exactly one of
+  # the four (Expectation's invariants); serialised as `{"input": "<reference>"}`,
+  # `{"literal": "<value>"}`, `{"boolean": true}` or `{"present": true}`.
   #
   # `input` and `literal` compare as text: the observed scalar (a string, a number or a boolean)
   # is written as text and must equal the expected text, so a literal `"7"` holds for the
@@ -32,17 +32,25 @@ types:
   # therefore refused (the last invariant): the bundle does not record the type of an answer
   # member, so the engine refuses those two literals on every check when the selection loads, and
   # a boolean is compared with `boolean`.
+  #
+  # `present`, only `true`, compares nothing: the observed member must exist and must not be
+  # `null`, whatever its value. It is for an answer that names what the write made, whose value
+  # is not known before the write, such as the `id` and `key` of the issue Jira's `createIssue`
+  # answers, so a 2xx that names neither leaves the effect possible rather than applied.
   - name: connectors_catalog.guard.Expectation
     kind: struct
     fields:
       - {name: input, type: "Optional<connectors_catalog.guard.Reference>"}
       - {name: literal, type: "Optional<String>"}
       - {name: boolean, type: "Optional<Boolean>"}
+      - {name: present, type: "Optional<Boolean>"}
     invariants:
-      - any: [defined(input), defined(literal), defined(boolean)]
+      - any: [defined(input), defined(literal), defined(boolean), defined(present)]
       - any: [{not: defined(input)}, {not: defined(literal)}]
       - any: [{not: defined(input)}, {not: defined(boolean)}]
       - any: [{not: defined(literal)}, {not: defined(boolean)}]
+      - any: [{not: defined(present)}, {all: [{not: defined(input)}, {not: defined(literal)}, {not: defined(boolean)}]}]
+      - any: [{not: defined(present)}, present == true]
       - any: [{not: defined(literal)}, {all: [literal != "true", literal != "false"]}]
 
   # The value at the RFC 6901 `pointer` in an observed answer must equal what `expect` resolves
