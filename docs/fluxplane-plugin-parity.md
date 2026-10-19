@@ -22,6 +22,31 @@ Sources:
     A table cell that shows only `(:<line>)` refers to that plugin's file, which its section
     names.
   - Native operations are cited as `adapters/<adapter>/spec/adapter.json:<line>`.
+- **Jira writes, create fields, Slack one-user reads and file delete, 2026-10-19 (0.54.0).**
+  `jira.issue.comment.add`, `jira.issue.create`, `jira.issue.link.add`, `jira.issue.edit` and
+  `jira.issue.delete` moved from missing to covered when `addComment`, `createIssue`,
+  `linkIssues`, `editIssue` and `deleteIssue` were selected as the guarded writes
+  `issue.comment.add`, `issue.create`, `issue.link.add`, `issue.edit` and `issue.delete`
+  ([Issue writes](catalog-jira.md#issue-writes)); `jira.issue.create_meta` moved from partial
+  to covered when `getCreateIssueMetaIssueTypeId` was selected as `issue.create_meta.fields`;
+  `slack.file.delete` moved from missing to covered by the guarded write `files.delete`; and the
+  mapped `slack.user.info`, `slack.user.lookup` and `slack.user.show` (5 calls, partial) and
+  `jira.issue.comment.create` (1 call, missing) in [Used but not declared](#used-but-not-declared)
+  now land on covered through `users.info`, `users.lookupByEmail` and `issue.comment.add`.
+  Verified against fixtures in the pinned documents' shapes, not a live site or workspace. The
+  `jira` row now reads 15 / 1,364 covered, 0 / 0 partial and 6 / 0 missing, the `slack` row
+  16 / 680 covered and 14 / 24 missing. Totals: covered 119 operations / 6,294 calls, partial
+  5 / 0, missing 177 / 62, of 301 operations and 6,356 calls; 6,294 of 6,356 calls (99.0 %) and
+  99 of the 109 used operations (90.8 %) are covered. The mapped-call split moves from 116
+  covered and 8 to gap units to 122 and 2. The open column of [Gap units](#gap-units) falls
+  from 407 to 64 and that of [Waves](#waves) with it (W1 0, W2 0, W4 61): U02, U03 and U06 are
+  covered, and 5 units stay open, U17 Homer 33, U13 `slack.file.upload` 24, U19 port-forward
+  4, U24 Alertmanager 2 and U25 Kubernetes Secret 1. No operation with 0 calls moved, so
+  [Not planned until used](#not-planned-until-used) is unchanged. The selections moved the
+  line citations of `adapters/catalog/providers/jira/operations.json` (`users.search`,
+  `attachment.content`, `issue.transition.run`) and `adapters/catalog/providers/slack/operations.json`
+  (every id after `users.list`) in the [jira](#jira) and [slack](#slack) sections; they were
+  re-read on this tree.
 - **Recount, 2026-10-18 (against `c15004d81`).** Every per-operation row and every unit was
   re-read against `main` at `c15004d81`. The call counts are still this page's 2026-10-07 counts.
   - Totals: covered 112 operations / 5,957 calls, partial 6 / 5, missing 183 / 394, of 301
@@ -337,16 +362,18 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 112 | 5,957 | 92 | 5,957 |
-| partial | 6 | 5 | 1 | 5 |
-| missing | 183 | 394 | 16 | 394 |
+| covered | 119 | 6,294 | 99 | 6,294 |
+| partial | 5 | 0 | 0 | 0 |
+| missing | 177 | 62 | 10 | 62 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
+
+Covered: 6,294 of 6,356 calls (99.0 %) and 99 of the 109 used operations (90.8 %).
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
 are mapped to the operation they most likely meant in [Used but not declared](#used-but-not-declared):
 
 - 122 calls are mapped from §4a and §4b, and 2 more from §4d.
-- 116 of them land on covered capabilities. The other 8 are added to the gap units. Both are
+- 122 of them land on covered capabilities. The other 2 are added to the gap units. Both are
   the sums of the rows of that table.
 
 Per plugin (operations / calls):
@@ -354,8 +381,8 @@ Per plugin (operations / calls):
 | plugin | declared | used | calls | covered | partial | missing |
 |---|---:|---:|---:|---|---|---|
 | gitlab | 64 | 38 | 2,670 | 40 / 2,670 | 2 / 0 | 22 / 0 |
-| jira | 21 | 13 | 1,364 | 9 / 1,034 | 1 / 5 | 11 / 325 |
-| slack | 30 | 16 | 704 | 15 / 673 | 0 / 0 | 15 / 31 |
+| jira | 21 | 13 | 1,364 | 15 / 1,364 | 0 / 0 | 6 / 0 |
+| slack | 30 | 16 | 704 | 16 / 680 | 0 / 0 | 14 / 24 |
 | sql | 6 | 6 | 703 | 6 / 703 | 0 / 0 | 0 / 0 |
 | grafana | 20 | 7 | 425 | 8 / 425 | 0 / 0 | 12 / 0 |
 | loki | 5 | 4 | 370 | 5 / 370 | 0 / 0 | 0 / 0 |
@@ -378,7 +405,7 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **112 / 5,957** | **6 / 5** | **183 / 394** |
+| **total** | **301** | **109** | **6,356** | **119 / 6,294** | **5 / 0** | **177 / 62** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
@@ -501,23 +528,28 @@ Connectors catalog provider: `adapters/catalog/providers/jira/operations.json`. 
 `getTransitions` is selected as `issue.transitions`, and `doTransition` as the guarded write
 `issue.transition.run` ([Running a transition](catalog-jira.md#running-a-transition)), and
 `getAttachmentContent` as the binary read `attachment.content`
-([Attachment content](catalog-jira.md#attachment-content)). None of the others is.
+([Attachment content](catalog-jira.md#attachment-content)). Since 2026-10-19 (0.54.0)
+`getCreateIssueMetaIssueTypeId` is selected as `issue.create_meta.fields`, and `createIssue`,
+`addComment`, `editIssue`, `linkIssues` and `deleteIssue` as the guarded writes `issue.create`,
+`issue.comment.add`, `issue.edit`, `issue.link.add` and `issue.delete`
+([Issue writes](catalog-jira.md#issue-writes)), verified against a fixture in the pinned
+document's shapes, not a live site. None of the others is.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
 | `jira.issue.show` | 354 | 49 | 2026-10-07 | `issue.get` (:11) | covered | Takes `issueIdOrKey`, `fields` and `expand`. Bodies stay in ADF, not Markdown; `expand=renderedFields` adds HTML. |
 | `jira.issue.search` | 310 | 34 | 2026-10-06 | `issues.search` (:5) | covered | JQL only. Rich-text fields come back as ADF, not Markdown. |
-| `jira.issue.comment.add` | 141 | 24 | 2026-10-05 | — | missing | `addComment` is not selected. Its body would be ADF; nothing converts Markdown. |
+| `jira.issue.comment.add` | 141 | 24 | 2026-10-05 | `issue.comment.add` (:49) | covered | One comment under approval on an issue named by key, read first. The body is the content of an ADF document the caller writes, sent as given; nothing converts Markdown. `body.visibility` restricts it to a group or role. A comment sent twice is two comments (2026-10-19). |
 | `jira.issue.comment.list` | 130 | 20 | 2026-10-05 | `issue.comments` (:7) | covered | Bodies come back as ADF, not Markdown. |
 | `jira.issue.transition.list` | 127 | 20 | 2026-10-01 | `issue.transitions` (:13) | covered | The transitions open on one issue, each with its target status in `to`. Every declared filter is kept: `transitionId`, `expand=transitions.fields`, `includeUnavailableTransitions` and the ordering and remote-condition flags (2026-10-10). |
-| `jira.issue.create` | 115 | 24 | 2026-10-06 | — | missing | `createIssue` is not selected. There is no read-back check for fields Jira dropped. |
-| `jira.issue.transition.run` | 109 | 18 | 2026-10-01 | `issue.transition.run` (:23) | covered | By transition id, with the issue's current and the transition's target status ids, and an approval. Guarded: refused before the `POST` unless the issue is in the current status and the transition is open with that target; Jira's `204` is proved by reading the issue again, whose status must be the target, or the outcome is unknown. A by-name run or a walk to a target status is composition outside the catalog ([Running a transition](catalog-jira.md#running-a-transition)) (2026-10-10). |
-| `jira.issue.link.add` | 40 | 11 | 2026-09-28 | — | missing | `linkIssues` is not selected. |
-| `jira.issue.edit` | 26 | 10 | 2026-09-24 | — | missing | `editIssue` is not selected. |
-| `jira.issue.create_meta` | 5 | 5 | 2026-10-06 | `issue.create_meta` (:15) | partial | The issue types a project can create, by project id or key. fluxplane takes an `issue_type` filter (`fluxplane-plugin operation describe jira jira.issue.create_meta`, 2026-10-09) for that type's create fields; the fields of one issue type (`getCreateIssueMetaIssueTypeId`) are not selected. |
-| `jira.issue.delete` | 3 | 1 | 2026-09-16 | — | missing | `deleteIssue` is not selected. |
-| `jira.issue.attachment.get` | 2 | 1 | 2026-09-17 | `attachment.content` (:19) | covered | `getAttachmentContent` as a binary read: the bytes in base64 with their media type, length and SHA-256, refused above 2 MiB. Jira answers `303` to a download URL unless `redirect` is `false`; the redirect is followed only to `https://api.media.atlassian.com` without the credential, and only when the connection admits that host in `hosts`, so a connection without it passes `redirect=false`. That target is inferred from Atlassian's documentation, not observed on a live site (2026-10-10). |
-| `jira.user.search` | 2 | 2 | 2026-09-28 | `users.search` (:17) | covered | By `query` or exact `accountId`, over the first 1,000 matches; privacy controls may withhold email addresses. |
+| `jira.issue.create` | 115 | 24 | 2026-10-06 | `issue.create` (:39) | covered | One issue under approval, after a read of the project by key: issue type id, summary, and optionally an ADF description, labels, priority, assignee and parent. Nothing is read after Jira's `201`, so there is no check for fields Jira dropped, and the same input sent twice creates two issues (2026-10-19). |
+| `jira.issue.transition.run` | 109 | 18 | 2026-10-01 | `issue.transition.run` (:25) | covered | By transition id, with the issue's current and the transition's target status ids, and an approval. Guarded: refused before the `POST` unless the issue is in the current status and the transition is open with that target; Jira's `204` is proved by reading the issue again, whose status must be the target, or the outcome is unknown. A by-name run or a walk to a target status is composition outside the catalog ([Running a transition](catalog-jira.md#running-a-transition)) (2026-10-10). |
+| `jira.issue.link.add` | 40 | 11 | 2026-09-28 | `issue.link.add` (:75) | covered | One link under approval by link type name, after a read of the inward and the outward issue by key. Jira's `201` has no body, also for a link that already exists, and the link is not read after the write (2026-10-19). |
+| `jira.issue.edit` | 26 | 10 | 2026-09-24 | `issue.edit` (:60) | covered | One edit under approval with the issue's `fields.updated` as `updated_stamp`: a different stamp, or Jira's `409`, is `conflict`. Summary, ADF description, labels, priority and assignee. The read after Jira's `204` checks the key only, not the fields changed (2026-10-19). |
+| `jira.issue.create_meta` | 5 | 5 | 2026-10-06 | `issue.create_meta` (:15) and `issue.create_meta.fields` (:17) | covered | Two reads: the issue types a project can create, by project id or key, then the create fields of one issue type by project and the type's id (`getCreateIssueMetaIssueTypeId`), which serves fluxplane's `issue_type` filter (`fluxplane-plugin operation describe jira jira.issue.create_meta`, 2026-10-09) (2026-10-19). |
+| `jira.issue.delete` | 3 | 1 | 2026-09-16 | `issue.delete` (:88) | covered | One delete under approval with `updated_stamp` as for an edit; applied only when the read after it answers `404`, otherwise the outcome is unknown. `deleteSubtasks` is withheld, so Jira refuses an issue with subtasks (2026-10-19). |
+| `jira.issue.attachment.get` | 2 | 1 | 2026-09-17 | `attachment.content` (:21) | covered | `getAttachmentContent` as a binary read: the bytes in base64 with their media type, length and SHA-256, refused above 2 MiB. Jira answers `303` to a download URL unless `redirect` is `false`; the redirect is followed only to `https://api.media.atlassian.com` without the credential, and only when the connection admits that host in `hosts`, so a connection without it passes `redirect=false`. That target is inferred from Atlassian's documentation, not observed on a live site (2026-10-10). |
+| `jira.user.search` | 2 | 2 | 2026-09-28 | `users.search` (:19) | covered | By `query` or exact `accountId`, over the first 1,000 matches; privacy controls may withhold email addresses. |
 | `jira.index.build` | 0 | 0 | - | — | missing | A fluxplane-local index. |
 | `jira.issue.attachment.add` | 0 | 0 | - | — | missing | A multipart upload (`addAttachment`). It is not established whether the catalog can send a non-JSON request body. |
 | `jira.issue.attachment.delete` | 0 | 0 | - | — | missing | `removeAttachment` is not selected. |
@@ -525,7 +557,7 @@ Connectors catalog provider: `adapters/catalog/providers/jira/operations.json`. 
 | `jira.issue.comment.delete` | 0 | 0 | - | — | missing | `deleteComment` is not selected. |
 | `jira.issue.comment.edit` | 0 | 0 | - | — | missing | `updateComment` is not selected. |
 | `jira.issue.edit_meta` | 0 | 0 | - | — | missing | `getEditIssueMeta` is not selected. |
-| `jira.test` | 0 | 0 | - | `connections revalidate` (identity read `myself`, `docs/catalog-jira.md:84`) | covered | — |
+| `jira.test` | 0 | 0 | - | `connections revalidate` (identity read `myself`, `docs/catalog-jira.md:325`) | covered | — |
 
 ## slack
 
@@ -535,9 +567,10 @@ Connectors serves Slack through the catalog provider since 2026-10-08,
 `adapters/catalog/providers/slack/operations.json` (line numbers below), from the pinned Slack
 Web API document (`docs/catalog-slack.md`). A saved connection uses the profile `slack.bot`: a
 bot token as `Authorization: Bearer`, proved by `GET /api/auth.test`. The three conversation
-reads, `users.list`, `team.info`, `emoji.list`, `auth.test`, `files.list`, `files.info` and the
-binary download `file.download` are selected there, with the writes `chat.postMessage`,
-`conversations.open`, `chat.update` and `chat.delete` under approval; search is a
+reads, `users.list`, `users.info`, `users.lookupByEmail`, `team.info`, `emoji.list`,
+`auth.test`, `files.list`, `files.info` and the binary download `file.download` are selected
+there, with the writes `chat.postMessage`, `conversations.open`, `chat.update`, `chat.delete`
+and `files.delete` under approval; search is a
 second connection under the user-token profile `slack.user`, whose selection set
 `adapters/catalog/providers/slack/user-operations.json` selects `search.messages` and the
 reads `conversations.list`, `conversations.history`, `conversations.replies` and `users.list`,
@@ -549,28 +582,28 @@ the Slack Web API method that would back it.
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
 | `slack.thread` | 225 | 50 | 2026-10-06 | `conversations.replies` (:13), and on `slack.user` (`user-operations.json:17`) | covered | One page per call; the caller follows `response_metadata.next_cursor`. The bot connection reads only the channels the bot is in; the user-token connection (`slack.user`, scopes `channels:history`, `groups:history`, `im:history`, `mpim:history`) reads every thread that user can read. A Slack error is a `200` answer with `"ok": false`. |
-| `slack.message.send` | 132 | 30 | 2026-10-05 | `chat.postMessage` (:41) plus `conversations.open` (:52) | covered | Two writes, each under its own approval: `conversations.open` gives a direct message's channel id, and `chat.postMessage` posts `text` there or to a channel, `thread_ts` for a thread reply; scopes `chat:write` and `im:write`. Plain text and Slack mrkdwn only: no `blocks`, and no Markdown conversion. Slack's refusal, a `200` answer with `"ok": false`, is `outcome_unknown`, not applied, and its `error` string is not returned (2026-10-13). |
+| `slack.message.send` | 132 | 30 | 2026-10-05 | `chat.postMessage` (:48) plus `conversations.open` (:59) | covered | Two writes, each under its own approval: `conversations.open` gives a direct message's channel id, and `chat.postMessage` posts `text` there or to a channel, `thread_ts` for a thread reply; scopes `chat:write` and `im:write`. Plain text and Slack mrkdwn only: no `blocks`, and no Markdown conversion. Slack's refusal, a `200` answer with `"ok": false`, is `outcome_unknown`, not applied, and its `error` string is not returned (2026-10-13). |
 | `slack.message.list` | 92 | 34 | 2026-10-05 | `conversations.history` (:9), and on `slack.user` (`user-operations.json:13`) | covered | One page per call, windowed by `oldest` and `latest`. The bot connection reads only the channels the bot is in; the user-token connection (`slack.user`, scopes `channels:history`, `groups:history`, `im:history`, `mpim:history`) reads every channel that user can read. A Slack error is a `200` answer with `"ok": false`. |
 | `slack.search` | 73 | 19 | 2026-10-05 | `search.messages` (`adapters/catalog/providers/slack/user-operations.json:5`) | covered | On a second connection with a user token (`slack.user`, scope `search:read`); a bot token cannot search. Pages by `page` and `count` (1–100), not by cursor. A Slack error is a `200` answer with `"ok": false`. |
-| `slack.user.list` | 41 | 17 | 2026-10-05 | `users.list` (:17), and on `slack.user` (`user-operations.json:21`, scope `users:read`) | covered | One page per call; the caller follows `response_metadata.next_cursor`. No lookup by id or e-mail: read the list. A Slack error is a `200` answer with `"ok": false`. |
+| `slack.user.list` | 41 | 17 | 2026-10-05 | `users.list` (:17), and on `slack.user` (`user-operations.json:21`, scope `users:read`) | covered | One page per call; the caller follows `response_metadata.next_cursor`. One user by id is `users.info` (:20) and by e-mail address `users.lookupByEmail` (:24, scope `users:read.email`), on the bot connection only (2026-10-19). A Slack error is a `200` answer with `"ok": false`. |
 | `slack.channel.list` | 40 | 20 | 2026-10-05 | `conversations.list` (:5), and on `slack.user` (`user-operations.json:9`) | covered | One page of at most 1,000 per call; no lookup by channel name. On the user-token connection (`slack.user`, scopes `channels:read`, `groups:read`) it lists the private channels and direct messages that user is in. |
 | `slack.file.upload` | 24 | 10 | 2026-09-29 | — | missing | Not selected. Would be backed by `files.getUploadURLExternal` and `files.completeUploadExternal`: a binary upload, which the catalog cannot send (it reads binary answers only). |
-| `slack.message.edit` | 20 | 8 | 2026-10-03 | `chat.update` (:63) | covered | One write under approval on a message named by `channel` and `ts`, in a channel or a direct message; replaces its `text` (scope `chat:write`). No `blocks`, and no Markdown conversion; Slack resets `parse` and `link_names` on every edit. A bot token edits only its own messages: `cant_update_message` and `edit_window_closed` are refused as `forbidden`, `message_not_found` and `channel_not_found` as `not_found`; any other `"ok": false` is `outcome_unknown` (2026-10-14). |
-| `slack.info` | 15 | 8 | 2026-09-25 | `team.info` (:20) and `auth.test` (:26) | covered | Two reads, not one: `team.info` gives the workspace's id, name and domain, and `auth.test` the token's user, bot and workspace ids. |
-| `slack.file.download` | 11 | 8 | 2026-09-29 | `file.download` (:36) | covered | A binary read of a file's `url_private` or `url_private_download`: an `https` URL on `files.slack.com` under `/files-pri/`, sent with the bot token, answered as base64 with media type, length and SHA-256, refused above 2 MiB. The connection must admit `https://files.slack.com` with `"credential": true` in `hosts`; without it the download is refused as `forbidden` with nothing sent (2026-10-10). |
-| `slack.message.delete` | 10 | 6 | 2026-09-29 | `chat.delete` (:78) | covered | One write under approval on a message named by `channel` and `ts` (the string, not a number), in a channel or a direct message (scope `chat:write`). A bot token deletes only its own messages: `cant_delete_message` and `compliance_exports_prevent_deletion` are refused as `forbidden`, `message_not_found` and `channel_not_found` as `not_found`; any other `"ok": false` is `outcome_unknown` (2026-10-14). |
-| `slack.file.delete` | 7 | 4 | 2026-09-29 | — | missing | Not selected. Would be backed by `files.delete`. |
-| `slack.file.info` | 7 | 2 | 2026-09-29 | `files.info` (:32) | covered | One file by id, with `name`, `filetype`, `mimetype`, `size` and `url_private`; scope `files:read`. A Slack error is a `200` answer with `"ok": false` (2026-10-10). |
-| `slack.file.list` | 3 | 1 | 2026-09-29 | `files.list` (:29) | covered | Pages by `page` and `count`, not by cursor; narrowed by `channel`, `user`, `types`, `ts_from` and `ts_to`; scope `files:read` (2026-10-10). |
+| `slack.message.edit` | 20 | 8 | 2026-10-03 | `chat.update` (:70) | covered | One write under approval on a message named by `channel` and `ts`, in a channel or a direct message; replaces its `text` (scope `chat:write`). No `blocks`, and no Markdown conversion; Slack resets `parse` and `link_names` on every edit. A bot token edits only its own messages: `cant_update_message` and `edit_window_closed` are refused as `forbidden`, `message_not_found` and `channel_not_found` as `not_found`; any other `"ok": false` is `outcome_unknown` (2026-10-14). |
+| `slack.info` | 15 | 8 | 2026-09-25 | `team.info` (:27) and `auth.test` (:33) | covered | Two reads, not one: `team.info` gives the workspace's id, name and domain, and `auth.test` the token's user, bot and workspace ids. |
+| `slack.file.download` | 11 | 8 | 2026-09-29 | `file.download` (:43) | covered | A binary read of a file's `url_private` or `url_private_download`: an `https` URL on `files.slack.com` under `/files-pri/`, sent with the bot token, answered as base64 with media type, length and SHA-256, refused above 2 MiB. The connection must admit `https://files.slack.com` with `"credential": true` in `hosts`; without it the download is refused as `forbidden` with nothing sent (2026-10-10). |
+| `slack.message.delete` | 10 | 6 | 2026-09-29 | `chat.delete` (:85) | covered | One write under approval on a message named by `channel` and `ts` (the string, not a number), in a channel or a direct message (scope `chat:write`). A bot token deletes only its own messages: `cant_delete_message` and `compliance_exports_prevent_deletion` are refused as `forbidden`, `message_not_found` and `channel_not_found` as `not_found`; any other `"ok": false` is `outcome_unknown` (2026-10-14). |
+| `slack.file.delete` | 7 | 4 | 2026-09-29 | `files.delete` (:99) | covered | One write under approval on one file named by `file` (scope `files:write`). Guarded by `auth.test`, then `files.info` on the same file, which must answer `"ok": true` with that id, so a file Slack does not find is refused before the write. `file_not_found` and `file_deleted` are refused as `not_found`, `cant_delete_file` as `forbidden`; any other `"ok": false` is `outcome_unknown`. Nothing is read after (2026-10-19). |
+| `slack.file.info` | 7 | 2 | 2026-09-29 | `files.info` (:39) | covered | One file by id, with `name`, `filetype`, `mimetype`, `size` and `url_private`; scope `files:read`. A Slack error is a `200` answer with `"ok": false` (2026-10-10). |
+| `slack.file.list` | 3 | 1 | 2026-09-29 | `files.list` (:36) | covered | Pages by `page` and `count`, not by cursor; narrowed by `channel`, `user`, `types`, `ts_from` and `ts_to`; scope `files:read` (2026-10-10). |
 | `slack.test` | 3 | 3 | 2026-09-26 | `connections revalidate` (`apps/connectors/spec/cli.yaml:387`) | covered | Repeats the `GET /api/auth.test` probe with the saved bot token. |
-| `slack.emoji.list` | 1 | 1 | 2026-09-28 | `emoji.list` (:23) | covered | The workspace's custom emoji, in one call; the pinned document states no member of the answer, which is returned as Slack sent it. |
+| `slack.emoji.list` | 1 | 1 | 2026-09-28 | `emoji.list` (:30) | covered | The workspace's custom emoji, in one call; the pinned document states no member of the answer, which is returned as Slack sent it. |
 | `slack.bookmark.add` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.add`. |
 | `slack.bookmark.delete` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.remove`. |
 | `slack.bookmark.edit` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.edit`. |
 | `slack.bookmark.list` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.list`. |
 | `slack.channel.join` | 0 | 0 | - | — | missing | No provider. Would be backed by `conversations.join`. |
 | `slack.channel.mark-read` | 0 | 0 | - | — | missing | No provider. Would be backed by `conversations.mark`. |
-| `slack.download` | 0 | 0 | - | `file.download` (:36) | covered | The same fetch of `url_private` as `slack.file.download`, under the same `hosts` admission (2026-10-10). |
+| `slack.download` | 0 | 0 | - | `file.download` (:43) | covered | The same fetch of `url_private` as `slack.file.download`, under the same `hosts` admission (2026-10-10). |
 | `slack.index.build` | 0 | 0 | - | — | missing | A fluxplane-local index. |
 | `slack.mentions` | 0 | 0 | - | — | missing | Not selected as its own operation. `search.messages` on the user-token connection is selected; the mention classification is done on the fluxplane side. |
 | `slack.presence.get` | 0 | 0 | - | — | missing | No provider. Would be backed by `users.getPresence`. |
@@ -1082,7 +1115,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `gitlab.pipeline.show` (gitlab) | 3 | 3 | none declared (a single-pipeline read) | covered by `pipeline.get` (`adapters/catalog/providers/gitlab/operations.json:27`) | — |
 | `jira.search` (jira) | 3 | 1 | `jira.issue.search` | covered | — |
 | `slack.thread.replies` (slack) | 3 | 3 | `slack.thread` | covered | — |
-| `slack.user.info` (slack) | 3 | 2 | `slack.user.list` | partial (`users.list` only: no single-user read by id or e-mail; `users.info` and `users.lookupByEmail` are not selected) | U02 |
+| `slack.user.info` (slack) | 3 | 2 | `slack.user.list` | covered by `users.info` and `users.lookupByEmail` (`adapters/catalog/providers/slack/operations.json:20`, `:24`) since 2026-10-19 | — |
 | `jira.issue.show` (atlassian) | 2 | 1 | `jira.issue.show` | covered | — |
 | `gitlab.commit.list` (gitlab) | 2 | 1 | `gitlab.repository.commit.list` | covered | — |
 | `gitlab.pipeline.job.list` (gitlab) | 2 | 2 | `gitlab.job.list` | covered | — |
@@ -1106,14 +1139,14 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `call.list` (homer) | 1 | 1 | `homer.call.list` | missing | U17 |
 | `get_issue` (jira) | 1 | 1 | `jira.issue.show` | covered | — |
 | `issue.get` (jira) | 1 | 1 | `jira.issue.show` | covered | — |
-| `jira.issue.comment.create` (jira) | 1 | 1 | `jira.issue.comment.add` | missing | U06 |
+| `jira.issue.comment.create` (jira) | 1 | 1 | `jira.issue.comment.add` | covered by `issue.comment.add` (`adapters/catalog/providers/jira/operations.json:49`) since 2026-10-19 | — |
 | `jira.issue.view` (jira) | 1 | 1 | `jira.issue.show` | covered | — |
 | `k8s.pod.list` (kubernetes) | 1 | 1 | `kubernetes.pod.list` | covered | — |
 | `loki.query_range` (loki) | 1 | 1 | `loki.query` | covered | — |
 | `slack.conversation.list` (slack) | 1 | 1 | `slack.channel.list` | covered | — |
 | `slack.conversations.history` (slack) | 1 | 1 | `slack.message.list` | covered | — |
-| `slack.user.lookup` (slack) | 1 | 1 | `slack.user.list` | partial (`users.list` only: no single-user read by id or e-mail; `users.info` and `users.lookupByEmail` are not selected) | U02 |
-| `slack.user.show` (slack) | 1 | 1 | `slack.user.list` | partial (`users.list` only: no single-user read by id or e-mail; `users.info` and `users.lookupByEmail` are not selected) | U02 |
+| `slack.user.lookup` (slack) | 1 | 1 | `slack.user.list` | covered by `users.info` and `users.lookupByEmail` (`adapters/catalog/providers/slack/operations.json:20`, `:24`) since 2026-10-19 | — |
+| `slack.user.show` (slack) | 1 | 1 | `slack.user.list` | covered by `users.info` and `users.lookupByEmail` (`adapters/catalog/providers/slack/operations.json:20`, `:24`) since 2026-10-19 | — |
 | `sql.endpoints` (sql) | 1 | 1 | the `endpoint list` verb | covered (`adapters list`, `connections list`) | — |
 | `slack.message.list` (operation id in the plugin position, §4b) | 6 | 2 | `slack.message.list` | covered | — |
 | `slack.thread` (§4b) | 4 | 3 | `slack.thread` | covered | — |
@@ -1125,7 +1158,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `gitlab.search.blobs` (§4b) | 1 | 1 | `gitlab.search.blobs` | covered | — |
 | `jira.issue.get` (in the verb position, §4d) | 2 | 1 | `jira.issue.show` | covered | — |
 
-In total, 124 calls are mapped: 116 covered and 8 to gap units. The rest of §4 is not
+In total, 124 calls are mapped: 122 covered and 2 to gap units. The rest of §4 is not
 attributed:
 
 - **§4c:** 55 calls whose operation sat in a variable with no literal id in the same command.
@@ -1150,18 +1183,18 @@ The "provider in Connectors" column uses three values:
 | unit | name | provider | provider in Connectors | likely surface | operations | declared calls | undeclared calls | total | open |
 |---|---|---|---|---|---|---:|---:|---:|---:|
 | U01 | MySQL query and schema reads | sql | native (PostgreSQL only) | Extend the native adapter with a MySQL binding in `adapters/sql`: wire protocol, dialect, typed values. The baseline U06 already calls it required. | `sql.query`, `sql.table.show`, `sql.table.list`, `sql.test`, `sql.database.list`, `sql.index.list` | 703 | 1 | 704 | 0 |
-| U02 | Slack provider and conversation reads | slack | new | A new catalog provider with an OpenAPI source, if a current Slack Web API document can be pinned (not checked). Otherwise a new native adapter. Needs bot and user token profiles, because search needs a user token. | `slack.thread`, `slack.message.list`, `slack.search`, `slack.user.list`, `slack.channel.list`, `slack.info`, `slack.test`, `slack.emoji.list` | 490 | 22 | 512 | 5 |
-| U03 | Jira issue reads | jira | catalog | Catalog `operations.json` selection only: `getIssue`, `getCreateIssueMetaIssueTypes`, `findUsers`. | `jira.issue.show`, `jira.issue.create_meta`, `jira.user.search` | 361 | 37 | 398 | 5 |
+| U02 | Slack provider and conversation reads | slack | new | A new catalog provider with an OpenAPI source, if a current Slack Web API document can be pinned (not checked). Otherwise a new native adapter. Needs bot and user token profiles, because search needs a user token. | `slack.thread`, `slack.message.list`, `slack.search`, `slack.user.list`, `slack.channel.list`, `slack.info`, `slack.test`, `slack.emoji.list` | 490 | 22 | 512 | 0 |
+| U03 | Jira issue reads | jira | catalog | Catalog `operations.json` selection only: `getIssue`, `getCreateIssueMetaIssueTypes`, `findUsers`. | `jira.issue.show`, `jira.issue.create_meta`, `jira.user.search` | 361 | 37 | 398 | 0 |
 | U04 | Loki LogQL query, metric and labels | loki | new (`adapters/loki`: design, ESS model and `logql-range` contract) | A new native adapter. Metric queries and label discovery need contract additions. | `loki.query`, `loki.metric`, `loki.labels`, `loki.test` | 370 | 1 | 371 | 0 |
 | U05 | Grafana datasources and Loki through Grafana | grafana | new (`adapters/grafana`: design and ESS model) | A new native adapter: datasource discovery and the `grafana-datasource-proxy` mediated route. Depends on U04 for LogQL. | `grafana.loki.query`, `grafana.datasource.list`, `grafana.loki.labels`, `grafana.loki.recent_logs` | 358 | 1 | 359 | 0 |
-| U06 | Jira issue writes | jira | catalog | Catalog `operations.json` selection: `createIssue`, `editIssue`, `addComment`, `linkIssues`, `deleteIssue`, with guards to decide. Markdown-to-ADF conversion would be a catalog engine change. | `jira.issue.comment.add`, `jira.issue.create`, `jira.issue.link.add`, `jira.issue.edit`, `jira.issue.delete` | 325 | 1 | 326 | 326 |
+| U06 | Jira issue writes | jira | catalog | Catalog `operations.json` selection: `createIssue`, `editIssue`, `addComment`, `linkIssues`, `deleteIssue`, with guards to decide. Markdown-to-ADF conversion would be a catalog engine change. | `jira.issue.comment.add`, `jira.issue.create`, `jira.issue.link.add`, `jira.issue.edit`, `jira.issue.delete` | 325 | 1 | 326 | 0 |
 | U07 | Jira transitions | jira | catalog | Catalog `operations.json` selection: `getTransitions`, `doTransition`. A by-name run or a walk to a target status is composition outside the catalog. | `jira.issue.transition.list`, `jira.issue.transition.run` | 236 | 6 | 242 | 0 |
 | U08 | Slack message writes | slack | new (after U02) | Same provider surface as U02. | `slack.message.send`, `slack.message.edit`, `slack.message.delete` | 162 | 0 | 162 | 0 |
 | U09 | GitLab merge-request writes | gitlab | catalog | Catalog `operations.json` selection only: notes, discussion reply and resolve, plus guarded variants of merge (merge-when-pipeline-succeeds) and update (reopen). | `gitlab.mr.merge`, `gitlab.mr.update`, `gitlab.mr.note.create`, `gitlab.mr.discussion.reply`, `gitlab.mr.discussion.resolve` | 159 | 0 | 159 | 0 |
 | U10 | GitLab repository reads | gitlab | catalog | Catalog `operations.json` selection only: code search, tree, single commit, commit diff, branch list. | `gitlab.search.blobs`, `gitlab.repository.tree` | 110 | 15 | 125 | 0 |
 | U11 | GitLab merge-request reads | gitlab | catalog | Catalog `operations.json` selection only: merge-request diffs, discussions, notes. | `gitlab.mr.changes`, `gitlab.mr.discussion.list` | 101 | 5 | 106 | 0 |
 | U12 | Prometheus PromQL, direct and through Grafana | prometheus | new (`adapters/prometheus`: design and `promql-range` contract) | A new native adapter. Instant queries and rules need contract additions. The mediated placement depends on U05. | `grafana.prometheus.query`, `grafana.prometheus.range`, `grafana.prometheus.rules`, `prometheus.query`, `prometheus.test` | 69 | 0 | 69 | 0 |
-| U13 | Slack files | slack | new (after U02) | A catalog engine change: binary download and a multi-step external upload. | `slack.file.upload`, `slack.file.download`, `slack.file.delete`, `slack.file.info`, `slack.file.list` | 52 | 0 | 52 | 31 |
+| U13 | Slack files | slack | new (after U02) | A catalog engine change: binary download and a multi-step external upload. | `slack.file.upload`, `slack.file.download`, `slack.file.delete`, `slack.file.info`, `slack.file.list` | 52 | 0 | 52 | 24 |
 | U14 | GitLab tags and releases | gitlab | catalog | Catalog `operations.json` selection only. | `gitlab.release.create`, `gitlab.repository.tag.create`, `gitlab.repository.tag.show`, `gitlab.release.show`, `gitlab.release.link.list`, `gitlab.release.update`, `gitlab.repository.tag.delete` | 45 | 0 | 45 | 0 |
 | U15 | GitLab CI/CD writes and environments | gitlab | catalog | Catalog `operations.json` selection only. | `gitlab.pipeline.retry`, `gitlab.pipeline.cancel`, `gitlab.pipeline.create`, `gitlab.environment.list` | 36 | 0 | 36 | 0 |
 | U16 | GitLab project and repository writes | gitlab | catalog | Catalog `operations.json` selection only. | `gitlab.repository.commit.create`, `gitlab.project.create`, `gitlab.repository.file.update`, `gitlab.branch.create`, `gitlab.branch.delete` | 36 | 0 | 36 | 0 |
@@ -1174,7 +1207,7 @@ The "provider in Connectors" column uses three values:
 | U23 | Jira attachment download | jira | catalog | A catalog engine change: binary responses. | `jira.issue.attachment.get` | 2 | 0 | 2 | 0 |
 | U24 | Alertmanager alerts | alertmanager | new (`adapters/alertmanager`: design only) | A new native adapter. The alert record schema is still unauthored. | `alertmanager.alerts` | 1 | 1 | 2 | 2 |
 | U25 | Kubernetes Secret read | kubernetes | native | Change the native adapter. It needs a disclosure decision first. | `kubernetes.secret.read` | 1 | 0 | 1 | 1 |
-| | **total** | | | | 89 operations | **3,697** | **91** | **3,788** | **407** |
+| | **total** | | | | 89 operations | **3,697** | **91** | **3,788** | **64** |
 
 The operation, declared, undeclared and total columns are the 2026-10-07 baseline: the units
 covered exactly the 89 declared operations that then had calls and were partial (16) or missing
@@ -1183,19 +1216,17 @@ that baseline.
 
 The open column is recounted from the rows above: a unit's declared calls whose operation is
 still partial or missing, plus its mapped calls in [Used but not declared](#used-but-not-declared)
-that do not land on covered. A unit with 0 open is covered. The 17 operations still open are
-exactly the operations with calls that are partial (1) or missing (16) in the
-[Summary](#summary), and their 399 declared calls equal its partial (5) and missing (394)
-totals; the other 8 open calls are the mapped calls added to the gap units. The recount of
-2026-10-18 against `c15004d81` reads the same open column as 2026-10-15: 17 units are covered
-(U01, U04, U05, U07–U12, U14–U16, U18 and U20–U23) and 8 stay open with 407 calls, 10
-partial (U02 5, U03 5) and 397 missing (394 declared and 3 mapped).
+that do not land on covered. A unit with 0 open is covered. The 10 operations still open are
+exactly the operations with calls that are partial (0) or missing (10) in the
+[Summary](#summary), and their 62 declared calls equal its partial (0) and missing (62)
+totals; the other 2 open calls are the mapped calls added to the gap units. The recount of
+2026-10-18 against `c15004d81` read 8 open units with 407 calls; with 0.54.0 (2026-10-19)
+U02, U03 and U06 are covered and U13 keeps only its upload. 20 units are covered (U01–U12,
+U14–U16, U18 and U20–U23) and 5 stay open with 64 calls, all missing (62 declared and 2
+mapped).
 
-- U06 326: all five Jira writes and the mapped `jira.issue.comment.create`.
 - U17 33: no Homer runtime (`adapters/homer/` holds a design and an ESS model only).
-- U13 31: `slack.file.upload` (24) and `slack.file.delete` (7).
-- U02 5: the mapped single-user reads; `users.info` and `users.lookupByEmail` are not selected.
-- U03 5: `jira.issue.create_meta`, partial; `getCreateIssueMetaIssueTypeId` is not selected.
+- U13 24: `slack.file.upload`; the catalog engine sends no binary request body.
 - U19 4: the port-forward start and stop (2 each).
 - U24 2: no Alertmanager runtime.
 - U25 1: the Secret read, which waits for a disclosure decision.
@@ -1215,14 +1246,14 @@ the sum of its units' open calls in [Gap units](#gap-units); a wave with 0 open 
 
 | wave | units | providers | calls | open |
 |---|---|---|---:|---:|
-| W1 | U01 MySQL query and schema reads · U02 Slack provider and conversation reads · U03 Jira issue reads · U04 Loki LogQL | sql, slack, jira, loki | 1,985 | 10 |
-| W2 | U05 Grafana datasources and Loki through Grafana · U06 Jira issue writes · U08 Slack message writes · U09 GitLab merge-request writes | grafana, jira, slack, gitlab | 1,006 | 326 |
+| W1 | U01 MySQL query and schema reads · U02 Slack provider and conversation reads · U03 Jira issue reads · U04 Loki LogQL | sql, slack, jira, loki | 1,985 | 0 |
+| W2 | U05 Grafana datasources and Loki through Grafana · U06 Jira issue writes · U08 Slack message writes · U09 GitLab merge-request writes | grafana, jira, slack, gitlab | 1,006 | 0 |
 | W3 | U07 Jira transitions · U10 GitLab repository reads · U12 Prometheus PromQL · U18 Kubernetes reads | jira, gitlab, prometheus, kubernetes | 453 | 0 |
-| W4 | U11 GitLab merge-request reads · U13 Slack files · U17 Homer SIP capture reads · U19 Kubernetes exec and port-forward | gitlab, slack, homer, kubernetes | 204 | 68 |
+| W4 | U11 GitLab merge-request reads · U13 Slack files · U17 Homer SIP capture reads · U19 Kubernetes exec and port-forward | gitlab, slack, homer, kubernetes | 204 | 61 |
 | W5 | U14 GitLab tags and releases · U20 Confluence CQL search · U21 Kubernetes contexts · U23 Jira attachment download | gitlab, confluence, kubernetes, jira | 60 | 0 |
 | W6 | U15 GitLab CI/CD writes and environments · U22 Kubernetes pod logs · U24 Alertmanager alerts | gitlab, kubernetes, alertmanager | 43 | 2 |
 | W7 | U16 GitLab project and repository writes · U25 Kubernetes Secret read | gitlab, kubernetes | 37 | 1 |
-| | **total** | | **3,788** | **407** |
+| | **total** | | **3,788** | **64** |
 
 ## Not planned until used
 
