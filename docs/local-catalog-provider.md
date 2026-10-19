@@ -953,7 +953,8 @@ The complete configuration used against the sandbox is
   with `{"present": true}`, which holds when the member exists and is not
   `null`, whatever its value, for an answer that names what the write made and
   whose value is not known before it, such as the `id` and `key` Jira's
-  `issue.create` answers. `present` is only `true`; `false` is refused when
+  `issue.create` answers. An absent member fails it exactly as a `null` one
+  does, so before the write both refuse with the same code. `present` is only `true`; `false` is refused when
   the selection loads. The model's `connectors_catalog.guard.Expectation`
   holds exactly one of the four. A `literal` of `"true"` or `"false"` is refused when the selection
   loads, on every check: the bundle does not record an answer member's type,
