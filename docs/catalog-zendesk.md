@@ -216,13 +216,19 @@ does not cover a write. Move an existing install over in four steps:
    configuration. An installation still configured before connectors were
    declared converts its entries with `connectors setup migrate` first.
 
-2. Name the basic profile on the instance:
+2. Name the basic profile on the instance. In the `[connectors.zendesk.instances.support]`
+   table you already have, set `profile = "zendesk.basic"`. The whole connector block then reads:
 
    ```toml
+   [connectors.zendesk]
+   enabled = true
+
    [connectors.zendesk.instances.support]
    endpoint = "https://your-subdomain.zendesk.com"
    profile = "zendesk.basic"
    ```
+
+   A second `[connectors.zendesk.instances.support]` table makes the file unreadable.
 
 3. Configure a [bounded authenticated clock](local-clock.md), initialize
    [approval-signing keys](local-approval-keys.md), and publish an approval
