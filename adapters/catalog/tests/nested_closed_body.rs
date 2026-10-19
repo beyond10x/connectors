@@ -514,7 +514,39 @@ fn malformed_nested_members_are_refused_when_the_selection_loads() {
         edit(&mut selection);
         selection
     };
+    let plain = |extra: Value| {
+        let mut selection =
+            json!({"id": "thing.update", "operation_id": "UpdateTicket", "effect": "write"});
+        for (k, v) in extra.as_object().unwrap() {
+            selection[k] = v.clone();
+        }
+        selection
+    };
     let cases: Vec<(&str, Value)> = vec![
+        (
+            "a type named twice by a plain name and its pointer",
+            plain(json!({"body_keys": ["/s"], "body_types": {"/s": "string", "s": "integer"}})),
+        ),
+        (
+            "an enum named twice by a plain name and its pointer",
+            plain(json!({"body_keys": ["/s"], "body_types": {"/s": "string"},
+                         "body_enums": {"/s": ["a"], "s": ["b"]}})),
+        ),
+        (
+            "a fixed value named twice by a plain name and its pointer",
+            plain(json!({"body_keys": ["/flag"], "body_fixed": {"/flag": true, "flag": false}})),
+        ),
+        (
+            "a prefix named twice by a plain name and its pointer",
+            plain(json!({"body_keys": ["/s"], "body_types": {"/s": "string"},
+                         "body_prefixes": {"/s": "X", "s": "Y"}})),
+        ),
+        (
+            "a guard reading a list key",
+            change(&|s| {
+                s["guard"]["preflight"]["checks"][0]["expect"]["input"] = json!("body.ticket.tags")
+            }),
+        ),
         (
             "an empty segment",
             change(&|s| s["body_keys"][0] = json!("/ticket//group_id")),
