@@ -8,6 +8,8 @@ pub struct Revalidation {
     id: String,
     version: custody::Version,
     captured: u64,
+    /// The connection's semantic revision this capture was admitted at.
+    revision: String,
     /// The configured binding a configuration upgrade publishes the
     /// connection under; None when the connection already has it.
     upgrade: Option<Binding>,
@@ -17,6 +19,12 @@ pub struct Revalidation {
 impl Revalidation {
     pub fn version(&self) -> custody::Version {
         self.version
+    }
+    /// The connection's semantic revision this capture was admitted at: the
+    /// expected one of an explicit revalidation, the current one of a read's
+    /// recollection.
+    pub fn revision(&self) -> &str {
+        &self.revision
     }
     /// Whether this revalidation follows a configuration upgrade whose refusal
     /// a repair cannot answer: not an operation-only or executable-only move
@@ -299,13 +307,60 @@ impl Registry {
         now: u64,
         expires: u64,
     ) -> Result<Revalidation> {
+        self.capture(binding, reference, Some(revision), now, expires)
+    }
+
+    /// The one recollection a read runs when only its connection's evidence
+    /// lapsed (`connectors.cli.LocalRevalidationCause` `read_recollection`,
+    /// contracts/cli/v1alpha1/semantics.md): a revalidation capture at the
+    /// connection's current revision, under the binding it was admitted under.
+    /// It never follows a configuration upgrade; only an explicit revalidation
+    /// does, so a binding other than the connection's is a conflict here.
+    pub fn capture_recollection(
+        &self,
+        binding: &Binding,
+        reference: &str,
+        now: u64,
+        expires: u64,
+    ) -> Result<Revalidation> {
+        self.capture(binding, reference, None, now, expires)
+    }
+
+    fn capture(
+        &self,
+        binding: &Binding,
+        reference: &str,
+        revision: Option<&str>,
+        now: u64,
+        expires: u64,
+    ) -> Result<Revalidation> {
         binding.validate()?;
         if expires <= now || expires > deadline(now, 30_000)? {
             return Err(Failure::InvalidInput);
         }
         self.transaction_admission(now, false, |tx, authority, now| {
             if expires <= now { return Err(Failure::Expired); }
+            let recollection = revision.is_none();
+            let current;
+            let revision = match revision {
+                Some(revision) => revision,
+                None => {
+                    current = Self::connection(tx, reference)?.revision;
+                    current.as_str()
+                }
+            };
             let (row, upgrade) = admitted(tx,binding,reference,revision,now)?;
+            // A read's recollection refreshes the evidence under the binding
+            // the connection was admitted under and advances no revision
+            // (contracts/auth/connection/v1alpha1/semantics.md): an
+            // operation-only move (D12) leaves the credential bound as it
+            // was, so it is no upgrade here, and anything else that moved
+            // only an explicit revalidation follows.
+            let upgrade = match (recollection, follow(&row.binding, binding)) {
+                (false, _) => upgrade,
+                (true, Follow::Same | Follow::Operations) => false,
+                (true, Follow::Executable | Follow::Changed) => return Err(Failure::Conflict),
+            };
             tx.execute("DELETE FROM registry_uses WHERE expires_at_ms<=?1", [timestamp(now)?]).map_err(db)?;
             let count: i64 = tx.query_row("SELECT count(*) FROM registry_uses", [], |r| r.get(0)).map_err(db)?;
             if count >= 1000 { return Err(Failure::Capacity); }
@@ -314,7 +369,8 @@ impl Registry {
             tx.execute("INSERT INTO registry_uses (use_id,connection_ref,generation_id,version_id,publication_fence,expires_at_ms) VALUES (?1,?2,?3,?4,?5,?6)",
                 params![id,reference,row.generation,version,row.fence,timestamp(expires)?]).map_err(db)?;
             Ok(Revalidation {id, version:custody_version(authority,&row.scope_id,version)?, captured:now,
-                upgrade: upgrade.then(|| binding.clone()), moved: if upgrade { follow(&row.binding, binding) } else { Follow::Same }})
+                revision: revision.to_owned(), upgrade: upgrade.then(|| binding.clone()),
+                moved: if upgrade { follow(&row.binding, binding) } else { Follow::Same }})
         })
     }
 

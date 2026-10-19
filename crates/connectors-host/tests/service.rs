@@ -1,7 +1,7 @@
 //! Unix only: its fixtures use Unix mode bits, descriptors or file locks.
 #![cfg(unix)]
 use async_trait::async_trait;
-use connectors_core::{Descriptor, ErrorCode, Invocation, Operation, Result, WIRE_VERSION};
+use connectors_core::{Descriptor, Error, ErrorCode, Invocation, Operation, Result, WIRE_VERSION};
 use connectors_host::{
     credentials::{BoundCredential, CredentialRef, DirectorySecrets, MemorySecrets},
     federation::{DownstreamConfig, Federation, FederationConfig},
@@ -761,4 +761,45 @@ mod v1alpha2_ledger {
         assert_eq!(host.calls.load(Ordering::SeqCst), 1);
         host.task.abort();
     }
+}
+
+struct Conflicting;
+#[async_trait]
+impl Adapter for Conflicting {
+    fn descriptor(&self) -> Descriptor {
+        Descriptor {
+            version: WIRE_VERSION.into(),
+            instance: "leaf".into(),
+            adapter: "fixture".into(),
+            revision: "rev-1".into(),
+            configuration_schema: json!({"type":"object"}),
+            operations: vec![Operation {
+                id: "echo".into(),
+                description: "Always conflicts".into(),
+                contract: "operations/v1alpha1".into(),
+                profile: "read".into(),
+                input_schema: json!({"type":"object"}),
+                output_schema: json!({"type":"object"}),
+            }],
+        }
+    }
+    async fn invoke(&self, _operation: &str, _input: Value) -> Result<Value> {
+        Err(Error::new(ErrorCode::Conflict, "target changed"))
+    }
+}
+
+#[tokio::test]
+async fn legacy_invoke_never_emits_conflict() {
+    let (endpoint, task) = start(Arc::new(Conflicting)).await;
+    let client = connectors_client::Client::new(&endpoint, "service-token".into(), true).unwrap();
+    let invocation = Invocation {
+        version: WIRE_VERSION.into(),
+        request_id: "r1".into(),
+        operation: "echo".into(),
+        revision: "rev-1".into(),
+        input: json!({}),
+    };
+    let error = client.send(&invocation).await.unwrap_err();
+    assert_eq!(error.code, ErrorCode::InvalidInput);
+    task.abort();
 }

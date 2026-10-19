@@ -203,6 +203,7 @@ impl Registry {
                     version: custody_version(authority, &row.scope_id, version_id)?,
                     partition,
                     expires,
+                    lifetime: baseline.lifetime(),
                 },
                 identity: row.identity.clone().ok_or(Failure::MetadataUnavailable)?,
                 guard: ReuseGuard {
@@ -223,6 +224,7 @@ impl Registry {
             version: captured.read.version,
             partition: captured.read.partition.clone(),
             expires: captured.read.expires,
+            lifetime: captured.read.lifetime,
         };
         self.dispatch_read(captured.read, now).or_else(|refused| {
             self.cancel_read(replay, now)?;

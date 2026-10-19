@@ -43,12 +43,18 @@ fn admitted_read(
     // current fence are checked separately at the final dispatch boundary.
     // Published material that is only `pending` has an intact credential whose
     // validation evidence is no longer current (`observation::readiness`).
-    match observation::readiness(tx, &row, now, true)? {
-        State::Ready => {}
-        State::Pending if row.material.is_some() => return Err(Failure::EvidenceExpired),
+    let expired = match observation::readiness(tx, &row, now, true)? {
+        State::Ready => false,
+        State::Pending if row.material.is_some() => true,
         _ => return Err(Failure::NotReady),
-    }
-    let baseline = row.baseline.as_ref().ok_or(Failure::MetadataUnavailable)?;
+    };
+    let baseline = match row.baseline.as_ref() {
+        Some(baseline) => baseline,
+        None if expired => return Err(Failure::EvidenceExpired),
+        None => return Err(Failure::MetadataUnavailable),
+    };
+    // Scopes first: a credential below the operation's scopes needs a repair,
+    // which a recollection of its lapsed evidence cannot give it.
     if !required_scopes.is_empty()
         && !baseline
             .granted_scopes
@@ -56,6 +62,9 @@ fn admitted_read(
             .is_some_and(|s| required_scopes.is_subset(s))
     {
         return Err(Failure::InsufficientScope);
+    }
+    if expired {
+        return Err(Failure::EvidenceExpired);
     }
     Ok(row)
 }
@@ -67,6 +76,8 @@ pub struct ReadUse {
     pub(super) version: custody::Version,
     pub(super) partition: String,
     pub(super) expires: u64,
+    /// The evidence's own lifetime, collection to `valid_until`.
+    pub(super) lifetime: u64,
 }
 impl ReadUse {
     pub fn version(&self) -> custody::Version {
@@ -78,6 +89,12 @@ impl ReadUse {
     pub fn expires_at_ms(&self) -> u64 {
         self.expires
     }
+    /// The lifetime of the evidence this read was admitted on, from its
+    /// collection to its `valid_until`: the provider's probe may set it below
+    /// the profile's `evidence_lifetime_ms` (contracts/cli/v1alpha1/semantics.md).
+    pub fn evidence_lifetime_ms(&self) -> u64 {
+        self.lifetime
+    }
     #[cfg(test)]
     pub(super) fn fixture_replay(&self) -> Self {
         Self {
@@ -85,6 +102,7 @@ impl ReadUse {
             version: self.version,
             partition: self.partition.clone(),
             expires: self.expires,
+            lifetime: self.lifetime,
         }
     }
 }
@@ -213,7 +231,7 @@ impl Registry {
             tx.execute("INSERT INTO registry_uses (use_id,connection_ref,generation_id,version_id,publication_fence,expires_at_ms) VALUES (?1,?2,?3,?4,?5,?6)",
                 params![id,reference,row.generation,version_id,row.fence,timestamp(expires)?]).map_err(db)?;
             let partition=connectors_core::digest(&serde_json::json!([authority.to_string(),reference,row.generation]));
-            Ok(ReadUse {id,version:custody_version(authority,&row.scope_id,version_id)?,partition,expires})
+            Ok(ReadUse {id,version:custody_version(authority,&row.scope_id,version_id)?,partition,expires,lifetime:baseline.lifetime()})
         })
     }
 
@@ -225,9 +243,14 @@ impl Registry {
             let (reference,generation,version,fence,expires,dispatched,released): (String,String,String,String,u64,bool,bool) = tx.query_row(
                 "SELECT connection_ref,generation_id,version_id,publication_fence,expires_at_ms,dispatched,released FROM registry_uses WHERE use_id=?1", [&captured.id],
                 |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,read_time(r,4)?,r.get(5)?,r.get(6)?))).optional().map_err(db)?.ok_or(Failure::Conflict)?;
-            if now>=expires { return Err(Failure::Expired); }
-            if dispatched || released { return Err(Failure::Conflict); }
             let row = Self::connection(tx, &reference)?;
+            if now>=expires {
+                // A use bound by its evidence, not by the read's deadline, ends
+                // as expired evidence (contracts/cli/v1alpha1/semantics.md).
+                let lapsed = row.baseline.as_ref().is_some_and(|b| b.valid_until() <= expires);
+                return Err(if lapsed { Failure::EvidenceExpired } else { Failure::Expired });
+            }
+            if dispatched || released { return Err(Failure::Conflict); }
             if row.state=="revoked" { return Err(Failure::Revoked); }
             if row.fence!=fence || row.generation.as_deref()!=Some(&generation) || row.material.as_deref()!=Some(&version)
                 || captured.version!=custody_version(authority,&row.scope_id,&version)? { return Err(Failure::Conflict); }

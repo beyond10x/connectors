@@ -196,7 +196,7 @@ entities:
 #     parity:375 calls that correlation composition on the reader's side;
 #   · PCAP export, a binary blob (homer-ref:53, parity:376).
 #
-# This root shares no vocabulary with adapters/sip: that adapter places calls and lists
-# the sessions it owns (adapters/sip/design.md:16-17). Homer reads signalling captured
+# This root shares no vocabulary with the removed SIP design (commit 6498a881c, its
+# design.md:16-17), which placed calls and listed its sessions. Homer reads signalling captured
 # from calls Connectors did not necessarily place. No edge from a sip session to a Homer
 # call is declared or implied.

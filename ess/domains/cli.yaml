@@ -321,6 +321,17 @@ types:
       - {name: acquisition, type: String}
       - {name: expires_at_ms, type: Timestamp}
       - {name: profile, type: connectors.cli.PrivateStaticProfile}
+  # What admitted a revalidation (contracts/cli/v1alpha1/semantics.md, owner.md):
+  # an explicit `connections revalidate`, or the one recollection a read on
+  # `operations invoke` runs, first in its own worker job and within its own deadline,
+  # when only its connection's evidence lapsed, or would lapse before the read could use
+  # it (under half its own lifetime, collected_at to valid_until, and under the read's
+  # own deadline left), while the credential
+  # is intact. A read recollection never re-pins changed mounted material and never
+  # follows a configuration upgrade; only an explicit revalidation does.
+  - name: connectors.cli.LocalRevalidationCause
+    kind: enum
+    variants: [explicit, read_recollection]
   # Transient admitted use of the existing immutable generation/custody version.
   # No public handle, new generation, or independently owned evidence entity.
   - name: connectors.cli.LocalRevalidationAdmission
@@ -332,6 +343,7 @@ types:
       - {name: publication_fence, type: String}
       - {name: captured_at_ms, type: Timestamp}
       - {name: expires_at_ms, type: Timestamp}
+      - {name: cause, type: connectors.cli.LocalRevalidationCause}
   # Private local transport values, owned by contracts/cli/v1alpha1/private-adapter.md.
   # They bind existing owners and are not public CLI results or persisted entities.
   - name: connectors.cli.PrivateEntryField
@@ -1631,7 +1643,7 @@ commands:
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
     # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:940) and the host
-    # removal path (er.rs:4428-4430) only expires Active cursors. The error name is
+    # removal path (er.rs:4445-4447) only expires Active cursors. The error name is
     # the decision; no source names one.
 
 events:

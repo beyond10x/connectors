@@ -105,4 +105,4 @@ use constructed safe results; native dispatch and restart evidence comes from th
 separate disposable CLI journeys. Dedicated provider evidence and the wider
 acknowledgement failure matrix remain required by the owning GitLab work.
 Commands and input identities are retained in the
-[verification receipt](evidence/local-execution-audit-20260910/README.md).
+[verification receipt](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/local-execution-audit-20260910/README.md).

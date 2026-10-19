@@ -13,9 +13,8 @@ source protocol, stream metadata, ordering and source-exhaustion proof. Profile
 identifiers are open. The shared family does not impose a query language, absolute
 time window, provider catalog or universal continuation model.
 
-Current proposed bindings are [Loki](../../../../adapters/loki/contracts/logs/v1alpha1/semantics.md),
-[Kubernetes](../../../../adapters/kubernetes/contracts/logs/v1alpha1/semantics.md)
-and [Docker](../../../../adapters/docker/contracts/logs/v1alpha1/semantics.md).
+Current proposed bindings are [Loki](../../../../adapters/loki/contracts/logs/v1alpha1/semantics.md)
+and [Kubernetes](../../../../adapters/kubernetes/contracts/logs/v1alpha1/semantics.md).
 These index links create no dependency on a concrete adapter. Each adapter carries
 its own profile schema and conformance obligations when extracted.
 
@@ -108,8 +107,8 @@ errors, query text, origins or credentials enter ordinary diagnostics.
 
 [Service compatibility](../../../service/compatibility.md) governs the wire binding:
 an ordinary result slot does not confer log semantics on existing typed readers.
-[Shared ESS](../../../../ess/domains/datasource_reads.yaml) models generic
-collection/page facts and decisions; native selectors belong to adapter ESS.
+Shared ESS does not model generic collection/page facts and decisions; the proposed
+model is in history at commit `6498a881c`. Native selectors belong to adapter ESS.
 Parser, ordering, full context equality, byte accounting and current publication
 remain unimplemented binding obligations. Native profiles own their adversarial
 fixtures; schema acceptance alone does not execute those obligations.

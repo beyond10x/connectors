@@ -16,7 +16,7 @@ The adapter depends on shared service, datasource and auth contracts/SDK.
 Direct placement needs admitted native-origin egress. Mediated placement consumes
 an injected shared mediated-HTTP capability in a statically composed process;
 child code knows no concrete parent implementation. Concrete installation and
-integration suites belong to [composition](../../docs/compositions/monitoring.md).
+integration suites belong to composition.
 
 ## Authentication and configuration
 

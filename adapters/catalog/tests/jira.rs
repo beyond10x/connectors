@@ -49,7 +49,7 @@ const PROFILE: &str = "atlassian.basic";
 
 /// The shipped ids, their pinned `operationId` and their pinned path. A renamed,
 /// dropped or added id fails here.
-const SHIPPED: [(&str, &str, &str); 8] = [
+const SHIPPED: [(&str, &str, &str); 9] = [
     (
         "attachment.content",
         "getAttachmentContent",
@@ -69,6 +69,11 @@ const SHIPPED: [(&str, &str, &str); 8] = [
         "issue.create_meta",
         "getCreateIssueMetaIssueTypes",
         "/rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes",
+    ),
+    (
+        "issue.create_meta.fields",
+        "getCreateIssueMetaIssueTypeId",
+        "/rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes/{issueTypeId}",
     ),
     ("issue.get", "getIssue", "/rest/api/3/issue/{issueIdOrKey}"),
     (
@@ -96,11 +101,12 @@ fn shipped() -> Vec<Selection> {
     serde_json::from_value(file["operations"].clone()).unwrap()
 }
 
-/// The eight reads, the attachment content among them (a binary read,
-/// `tests/jira_attachment.rs`), and one write: `issue.transition.run`, `doTransition`,
-/// whose guard `tests/jira_transition_run.rs` pins.
+/// The nine reads, the attachment content among them (a binary read,
+/// `tests/jira_attachment.rs`), and six writes: `issue.transition.run`, `doTransition`,
+/// whose guard `tests/jira_transition_run.rs` pins, and the five issue writes
+/// `tests/jira_issue_writes.rs` pins.
 #[test]
-fn shipped_jira_selections_are_the_eight_reads_and_the_transition_run() {
+fn shipped_jira_selections_are_the_nine_reads_and_the_six_writes() {
     let selections = shipped();
     let bundle = bundle::load(&root().join("generated/bundles"), "jira").unwrap();
     let engine = Engine::new(&bundle, BASE, &selections).unwrap();
@@ -112,13 +118,24 @@ fn shipped_jira_selections_are_the_eight_reads_and_the_transition_run() {
     declared.sort();
     let expected: Vec<&str> = SHIPPED.iter().map(|(id, _, _)| *id).collect();
     assert_eq!(declared, expected);
-    let writes: Vec<String> = engine
+    let mut writes: Vec<String> = engine
         .declarations(&[Effect::Write])
         .into_iter()
         .map(|o| o.id)
         .collect();
-    assert_eq!(writes, ["issue.transition.run"]);
-    assert_eq!(selections.len(), SHIPPED.len() + 1);
+    writes.sort();
+    assert_eq!(
+        writes,
+        [
+            "issue.comment.add",
+            "issue.create",
+            "issue.delete",
+            "issue.edit",
+            "issue.link.add",
+            "issue.transition.run"
+        ]
+    );
+    assert_eq!(selections.len(), SHIPPED.len() + 6);
     for (id, operation_id, path) in SHIPPED {
         let selection = selections.iter().find(|s| s.id == id).unwrap();
         assert_eq!(selection.operation_id, operation_id, "`{id}`");
@@ -232,6 +249,14 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
             "none",
         ),
         (
+            "issue.create_meta.fields",
+            "getCreateIssueMetaIssueTypeId",
+            "/rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes/{issueTypeId}",
+            "`startAt`, `maxResults`",
+            "`startAt + len(fields) >= total`",
+            "none",
+        ),
+        (
             "users.search",
             "findUsers",
             "/rest/api/3/user/search",
@@ -292,6 +317,13 @@ fn page(path: &str) -> Option<Value> {
                "description": format!("fixture issue type {name}"),
                "iconUrl": format!("https://tracker.example.test/images/icons/issuetypes/{id}.png"),
                "self": format!("https://tracker.example.test/rest/api/3/issuetype/{id}")})
+    };
+    // A field of `PageOfCreateMetaIssueTypeWithField.fields`, a
+    // `FieldCreateMetadata` with its required members.
+    let field = |id: &str, name: &str, required: bool| {
+        json!({"fieldId": id, "key": id, "name": name, "required": required,
+               "hasDefaultValue": false, "operations": ["set"],
+               "schema": {"type": "string", "system": id}})
     };
     // A `User` of the `findUsers` array; no email address, as privacy
     // controls may withhold it.
@@ -356,6 +388,11 @@ fn page(path: &str) -> Option<Value> {
             "renderedFields": {"description": "<p>fixture description</p>"},
             "names": {"summary": "Summary", "status": "Status",
                       "description": "Description", "attachment": "Attachment"}}),
+        "/rest/api/3/issue/createmeta/FIX/issuetypes/10001" if has("startAt=2") => json!({
+            "startAt": 2, "maxResults": 2, "total": 3, "fields": [field("labels", "Labels", false)]}),
+        "/rest/api/3/issue/createmeta/FIX/issuetypes/10001" => json!({
+            "startAt": 0, "maxResults": 2, "total": 3,
+            "fields": [field("summary", "Summary", true), field("issuetype", "Issue Type", true)]}),
         "/rest/api/3/issue/createmeta/FIX/issuetypes" if has("startAt=2") => json!({
             "startAt": 2, "maxResults": 2, "total": 3, "issueTypes": [issue_type(3, "Bug")]}),
         "/rest/api/3/issue/createmeta/FIX/issuetypes" => json!({
@@ -587,7 +624,7 @@ fn invoke(child: &mut Child, operation: &str, input: Value) -> Value {
 
 /// Each read's first page: the input, and the exact request the fixture must
 /// observe, including the JQL time filter on the search.
-fn first_pages() -> [(&'static str, Value, &'static str); 4] {
+fn first_pages() -> [(&'static str, Value, &'static str); 5] {
     [
         (
             "issues.search",
@@ -610,6 +647,11 @@ fn first_pages() -> [(&'static str, Value, &'static str); 4] {
             "issue.create_meta",
             json!({"projectIdOrKey": "FIX", "startAt": 0, "maxResults": 2}),
             "/rest/api/3/issue/createmeta/FIX/issuetypes?startAt=0&maxResults=2",
+        ),
+        (
+            "issue.create_meta.fields",
+            json!({"projectIdOrKey": "FIX", "issueTypeId": "10001", "startAt": 0, "maxResults": 2}),
+            "/rest/api/3/issue/createmeta/FIX/issuetypes/10001?startAt=0&maxResults=2",
         ),
     ]
 }
@@ -669,6 +711,15 @@ fn next(operation: &str, input: &Value, body: &Value) -> Option<Value> {
             }
             input["startAt"] = json!(seen);
         }
+        // `startAt + len(fields) >= total`.
+        "issue.create_meta.fields" => {
+            let start = body["startAt"].as_u64().unwrap();
+            let seen = start + body["fields"].as_array().unwrap().len() as u64;
+            if seen >= body["total"].as_u64().unwrap() {
+                return None;
+            }
+            input["startAt"] = json!(seen);
+        }
         // An empty page: the body is the bare `User` array.
         "users.search" => {
             let users = body.as_array().unwrap().len() as u64;
@@ -700,6 +751,7 @@ fn each_list_walks_two_pages_and_stops_at_its_documented_end_condition() {
             "issues.search" => "issues",
             "issue.comments" => "comments",
             "issue.create_meta" => "issueTypes",
+            "issue.create_meta.fields" => "fields",
             _ => "values",
         };
         let mut input = first;
@@ -932,6 +984,46 @@ fn issue_create_meta_lists_the_issue_types_a_project_can_create() {
         .map(|t| t["name"].as_str().unwrap())
         .collect();
     assert_eq!(names, ["Task", "Story"]);
+}
+
+/// `issue.create_meta.fields` lists the fields one issue type takes on create in
+/// one project, each with `fieldId`, `name` and `required`; a call without the
+/// issue type id is refused as `invalid_input` before any request.
+#[test]
+fn issue_create_meta_fields_lists_one_issue_types_fields_and_needs_its_id() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    let outcome = child.invoke(
+        "issue.create_meta.fields",
+        &revision,
+        "one",
+        &secret(),
+        &serde_json::to_vec(&json!({"projectIdOrKey": "FIX"})).unwrap(),
+        connectors_sdk::now_ms() + 30_000,
+    );
+    assert!(
+        matches!(outcome, Err(Failure::InvalidInput)),
+        "{:?}",
+        outcome.map(|_| "an answer")
+    );
+    assert!(provider.requests().is_empty());
+    let result = invoke(
+        &mut child,
+        "issue.create_meta.fields",
+        json!({"projectIdOrKey": "FIX", "issueTypeId": "10001"}),
+    );
+    assert_eq!(
+        provider.requests().last().unwrap().0,
+        "/rest/api/3/issue/createmeta/FIX/issuetypes/10001?"
+    );
+    let fields: Vec<(&str, bool)> = result["body"]["fields"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| (f["fieldId"].as_str().unwrap(), f["required"] == json!(true)))
+        .collect();
+    assert_eq!(fields, [("summary", true), ("issuetype", true)]);
 }
 
 /// `issue.transitions` reads the transitions Jira offers the account on one

@@ -1,7 +1,7 @@
 ---
 title: Slack
 sidebar_position: 11
-description: Read Slack conversations, users and files with a bot token, post messages under approval, and search with a user token, as two pinned instances.
+description: Read Slack conversations, users and files with a bot token, post messages and delete files under approval, and search with a user token, as two pinned instances.
 lede: Slack runs as two pinned instances of the slack connector, a bot instance that reads and posts under approval and a user instance that reads and searches, because no Slack declaration ships yet.
 source: docs/catalog-slack.md, adapters/catalog/providers/slack/operations.json, adapters/catalog/providers/slack/user-operations.json, adapters/catalog/tests/slack.rs, docs/local-catalog-provider.md
 connectors: "slack"
@@ -25,7 +25,7 @@ outputs below come from the guide's run against a local HTTPS fixture standing i
 
 | Token | Reads | Writes |
 |---|---|---|
-| bot (`slack.bot`) | `conversations.list`, `conversations.history`, `conversations.replies`, `users.list`, `team.info`, `emoji.list`, `auth.test`, `files.list`, `files.info`, `file.download` | `chat.postMessage`, `conversations.open`, `chat.update`, `chat.delete`, each guarded: it reads `auth.test` first and sends nothing unless that answers `"ok": true`, and the answer must carry `"ok": true` too |
+| bot (`slack.bot`) | `conversations.list`, `conversations.history`, `conversations.replies`, `users.list`, `users.info`, `users.lookupByEmail`, `team.info`, `emoji.list`, `auth.test`, `files.list`, `files.info`, `file.download` | `chat.postMessage`, `conversations.open`, `chat.update`, `chat.delete`, `files.delete`, each guarded: it reads `auth.test` first (`files.delete` also reads the file with `files.info`) and sends nothing unless that answers `"ok": true`, and the answer must carry `"ok": true` too |
 | search (`slack.user`) | `search.messages`, `conversations.list`, `conversations.history`, `conversations.replies`, `users.list` | none |
 
 A bot reads only the conversations it is a member of; a user token reads what that person can
@@ -36,7 +36,7 @@ read, and only a user token can search.
 Install a Slack app in the workspace and keep the bot token (`xoxb-`) it issues. Grant the bot the
 scopes of what you use: `channels:read`, `groups:read`, `im:read`, `mpim:read` for
 `conversations.list`; the matching `:history` scopes for the message reads; `users:read`,
-`team:read`, `emoji:read`, `files:read`; and `chat:write` and `im:write` for the writes. For
+`users:read.email` for `users.lookupByEmail`, `team:read`, `emoji:read`, `files:read`; and `chat:write`, `im:write` and `files:write` for the writes. For
 search, keep a user token (`xoxp-`) with `search:read` and the user read scopes. Slack returns
 granted scopes only in a header the provider does not read, so a missing scope shows as
 `missing_scope` on the read that needs it.
@@ -64,7 +64,7 @@ restart = "never"
 
 [connectors.slack.instances.bot.permissions]
 profiles = ["slack.bot"]
-operations = ["conversations.list", "conversations.history", "conversations.replies", "users.list", "team.info", "emoji.list", "auth.test", "files.list", "files.info", "file.download", "chat.postMessage", "conversations.open", "chat.update", "chat.delete"]
+operations = ["conversations.list", "conversations.history", "conversations.replies", "users.list", "users.info", "users.lookupByEmail", "team.info", "emoji.list", "auth.test", "files.list", "files.info", "file.download", "chat.postMessage", "conversations.open", "chat.update", "chat.delete", "files.delete"]
 
 [connectors.slack.instances.bot.executable]
 path = "/absolute/path/connectors-catalog-provider"
@@ -137,6 +137,12 @@ $ connectors operations invoke --connector slack --instance bot --connection con
 Nothing about a new message exists to compare before it is sent, so the same input approved again
 posts a second message.
 
+`files.delete` goes the same way once the policy names it, with `{"body":{"file":"F0000000001"}}`
+as its input: it reads `auth.test` and then the file with `files.info`, and deletes nothing when
+the file is not found. Slack's `file_not_found` and `file_deleted` are refused as `not_found`,
+`cant_delete_file` as `forbidden`
+([Files in the full guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-slack.md#files)).
+
 ## Reconnect when the connection is Stale
 
 Slack answers a revoked token with `"ok": false` and `invalid_auth`; the connection turns `stale`,
@@ -161,5 +167,6 @@ $ printf '{"token":"xoxb-fixture-token"}' | connectors connections reconnect --c
   Slack entries where they are.
 - Each list returns one page per call; search pages by number (`page`, `count` 1 to 100).
 - `file.download` reads at most 2 MiB, and only on a connection whose hosts admit
-  `https://files.slack.com`.
+  `https://files.slack.com`. File upload is not offered; `files.delete` is not read back after
+  the write.
 - A Slack error arrives as `200` with `"ok": false`.

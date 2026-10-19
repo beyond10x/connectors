@@ -244,6 +244,10 @@ fn prepare_is_passive_and_digests_the_strict_input_and_current_policy() {
     let data_version: i64 = observer
         .query_row("PRAGMA data_version", [], |r| r.get(0))
         .unwrap();
+    // `prepare` opens the store as a fresh process does, as a command run
+    // directly does, not from a handle this thread already pooled; another test
+    // thread can evict that handle from the shared pool anyway.
+    crate::local::metadata::simulate_process(0x9a55_1002);
     let prepared = prepare(&t.paths, "fixture", &t.request(), until()).unwrap();
     assert_eq!(prepared.subject.authority.scope.caller, policy.principal());
     assert_eq!(
@@ -281,6 +285,8 @@ fn prepare_is_passive_and_digests_the_strict_input_and_current_policy() {
             .subject,
         prepared.subject
     );
+    crate::local::metadata::exit_process();
+    crate::local::metadata::simulate_process(0);
 }
 
 #[test]

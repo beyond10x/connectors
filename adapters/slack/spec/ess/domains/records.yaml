@@ -27,7 +27,7 @@ summary: Slack-owned provider records the parity units read or write — convers
 #                 0.23.0, read 2026-10-07. It is not in this repository; it states
 #                 operation inputs only, never an output shape.
 #   parity:<line> docs/fluxplane-plugin-parity.md (2026-10-07), § slack and § Gap units.
-#   usage:<line>  docs/recent-adapter-usage-20260909.md.
+#   usage:<line>  the usage record of 2026-09-09 (history, commit 6498a881c).
 #   src:<line>    adapters/slack/upstream/slack_web_openapi_v2_without_examples.json,
 #                 the pinned Slack Web API Swagger 2.0 document (bc08db49, SHA-256
 #                 8b92da26…936bc3a), adopted by story:catalog-slack-reads.

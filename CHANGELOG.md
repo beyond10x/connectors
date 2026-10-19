@@ -1,5 +1,191 @@
 # Changelog
 
+## 0.54.0 — 2026-10-19
+
+### Added
+
+- Zendesk ticket writes through the catalog provider, each `effect: write` and run only under an
+  issued approval: `ticket.update` (group, tags, priority, type), `ticket.note` (a private
+  internal note) and `ticket.draft_reply` (a private note behind the fixed first line
+  `[Draft reply - not sent to the requester]`; nothing reaches the requester). Each is guarded by
+  a `ShowTicket` preflight on the caller's `updated_stamp` and sends `safe_update: true`; a changed
+  ticket is refused as `conflict` with nothing sent, and Zendesk's `409` is `conflict`, never
+  retried (docs/catalog-zendesk.md, "Writes" and "Use the writes from a local install").
+- The catalog engine admits nested closed write bodies (RFC 6901 pointers in `body_keys`, each
+  object above closed), `string_list` body types, fixed values, enums, any-of sets and required
+  prefixes, all held before anything is sent; a closed-body refusal names the key. The shared
+  error code `conflict` (`ErrorCode::Conflict`), a write's `conflict_status` and a guard
+  preflight's `mismatch: conflict` carry a lost update as `conflict`.
+- Connector vocabulary: providers declare their connectors (`connector.json`); a
+  `connectors-local/5` configuration enables connectors and names their instances, and an
+  instance that pins nothing is derived from the provider installed beside the CLI. `--connector`
+  and `--instance` select an instance; `instances` replaces the `adapters` group and
+  `connections reconnect` replaces `connections repair`. A connection whose stored credential the
+  provider refused is `stale` until a reconnect publishes a new one, and an instance holds one
+  published connection. `connectors setup migrate` moves a legacy configuration to instances,
+  keeping instance ids, revisions, executable selections and custody items.
+- Connector definitions: a hand-written `connectors-definition/1` file
+  (`schema: urn:beyond10x:connectors-definition:1`) over a vendored API source names its auth
+  profiles and operations. `connectors-build definition` lowers it to a bundle, its index, a
+  `connectors-catalog-operations/1` selection and a `connector.json` declaration under
+  `--out/<catalog>/`, and `connectors-build definition import` writes a definition from a shipped
+  selection; every shipped catalog selection lowers to its committed declaration byte for byte
+  (`architecture-decision-record:provider-definitions-and-runtimes`). The definitions themselves
+  live in the `connectors-definitions` repository.
+- `connectors operations invoke --definition <file.yaml> --operation <key>` runs an operation of
+  a definition file with no configured instance, with the existing input flags and envelope. The
+  file is lowered into an owner-only cache under the state directory, keyed by the digest of the
+  definition and its source; its instance `<connector>.definition` lives in an owner-only entry
+  beside it, and the operator's configuration file is never written. With no connection the
+  command asks once whether to connect, naming the provider endpoint the credential is validated
+  at (and an OAuth token host elsewhere), then runs the profile's acquisition (the token prompt, or
+  OAuth consent with `--credential-file`); without a terminal, or on any answer but yes, it
+  refuses with `next_action` naming the connect command. `--definition` is exclusive with
+  `--adapter` and `--connector`/`--instance`; `--definitions-root <dir>` names the tree holding
+  the vendored source and shared auth files (default: the parent of the file's directory). A
+  definition moved to another host connects fresh under the instance id
+  `<connector>.definition-<16 hex>`; the connection left at the old host is unchanged and stays
+  revocable. The bare `connectors invoke` remains the legacy command.
+- The one question of `operations invoke --definition` offers to reuse a stored credential of the
+  same connector when a published, current connection of another instance exists at the same
+  provider authority with the same profile authentication: the chosen connection's custody
+  version is copied inside the owner to a new connection of the definition's instance, validated
+  against the platform's trust roots, and published only when the validated identity equals the
+  source's and the source is still what was captured; the source connection is unchanged either
+  way, and a different identity publishes nothing and offers connect fresh. A copy goes only to a
+  definition instance whose profile names no URL; a credential is never reused across provider
+  authorities (docs/local-connection-registry.md, "Reusing a stored credential").
+- Jira issue writes through the catalog provider, each `effect: write` with a closed body and run
+  only under an issued approval: `issue.create` (`createIssue`), `issue.comment.add`
+  (`addComment`), `issue.edit` (`editIssue`), `issue.link.add` (`linkIssues`) and
+  `issue.delete` (`deleteIssue`). The create reads the project by key first, the comment the
+  issue, the link both issues; the edit and the delete compare the issue's `fields.updated` with
+  the caller's `updated_stamp` and refuse a difference as `conflict` with nothing sent, Jira's
+  `409` to an edit is `conflict`, the edit is read again after its `204`, and the delete is
+  applied only when a read after it answers `404`. Beside them the read
+  `issue.create_meta.fields` (`getCreateIssueMetaIssueTypeId`) lists the create fields of one
+  issue type in one project (docs/catalog-jira.md, "Issue writes").
+- Slack one-user reads on the bot connection, `users.info` by user id and
+  `users.lookupByEmail` by e-mail address (scope `users:read.email`), and the write
+  `files.delete` under approval: guarded by `auth.test`, then `files.info` on the same file,
+  which must answer that file, so a file Slack does not find is refused before the write;
+  `file_not_found` and `file_deleted` are refused as `not_found` and `cant_delete_file` as
+  `forbidden` (docs/catalog-slack.md, "Files").
+- The definition format carries the write members the engine gained in this release:
+  `body_enums`, `body_any_of`, `body_prefixes`, `conflict_status`, a guard preflight's
+  `mismatch`, and `string_list` in the `body` notation. The lowerer refuses, by name
+  (`BodyEnum`, `BodyAnyOf`, `BodyPrefix`, `ConflictStatus`), the shapes the engine's loader would
+  refuse, and a body member on a read; `connectors-build definition import` writes the members
+  back from a shipped selection.
+- A guide to authoring a definition for an API with no catalog
+  (`website/docs/guides/author-a-definition.md`): the definitions-tree layout, writing the file,
+  checking it with the lowerer and invoking it with `--definition` and `--definitions-root`.
+
+### Changed
+
+- A connection connected or revalidated once keeps serving reads unattended: a read on lapsed
+  validation evidence recollects it once from the credential in custody (no re-entry, no new
+  custody version) before it is served, and evidence with less than half its lifetime left is
+  recollected first. Only a read still refused after that recollection answers
+  `revalidate_connection`; a consumer launch recollects nothing. Concurrent revalidations of one
+  connection both answer within the 30-second revalidation bound.
+- A connection is bound to the credential side of its configuration and to the provider
+  executable, not to the operation list (ADR D12): the binding records `credential_revision`
+  (the implementation's digest of the provider authority, instance id, profile declaration, CA
+  file, token CA, admitted hosts and request prefix; never the bundle, its source or the
+  selection) and the executable's SHA-256 beside `configuration_revision`. A bundle, source or
+  selection change leaves the connection `ready`, and an added read works with no
+  `connections revalidate`, no credential source and no question; its next revalidation records
+  the new revision. A provider executable change alone validates the stored credential once
+  under the new executable on the next read or write, follows when the recorded identity
+  answers, and refuses as `identity_mismatch`, changing nothing, otherwise; the follow keeps the
+  public revision, so a write's approval stands. A CA file, token CA, admitted host or request
+  prefix change still gives `pending` with `stale` until `connections revalidate`; a changed
+  provider authority or profile authentication still refuses as `lifecycle_conflict`; a revoked
+  connection still refuses. A connection saved before this release keeps the previous rule until
+  its first revalidation records both digests; nothing is migrated by guess.
+  A connection under an entry that states no `credential_revision` (every adapter but the catalog provider)
+  keeps the configuration-revision rule, and its executable is not compared. A read's automatic
+  recollection of lapsed evidence runs under the binding the connection was admitted under and
+  advances no revision; only `connections revalidate` records a configuration move.
+- `operations describe`, `operations list` and `operations invoke` start the configured,
+  digest-pinned provider, reading no credential and asking for none, when no description is
+  cached for the instance's configured selection and the instance holds a connection that is
+  current under it, unrevoked, not stale and usable (`contracts/cli/v1alpha1/semantics.md`,
+  "Launching for a description"); this replaces "never implicit launch".
+- The Slack read envelope of both selection sets names `user_not_visible` and
+  `enterprise_is_restricted` as `forbidden` and `users_not_found` as `not_found`; they were
+  `internal`.
+
+### Deprecated
+
+- The `[adapters.<alias>]` configuration, the `--adapter` flag, the `adapters` command group and
+  `connections repair` keep working and say once that they are deprecated.
+
+### Removed
+
+Every removed file stays readable at commit `6498a881c`.
+
+- `connectors-build package` and `connectors-build check`, which already failed on the local
+  realization declaration they read (`adapters/catalog/realizations/local.json`, removed with
+  them); the SQL `live_deadlines` example and the custody keychain probe examples with the
+  workflow step that ran them (4 files, 17,952 bytes).
+- The unused v2 adapter generator in `connectors-spec`: the binary, its tests and fixtures and
+  the `spec-kinds/adapter/v2` kind (6 files, 90,596 bytes); the v2 helpers stay.
+- Specification-only material no runtime implements: the Atlassian native documents profile
+  (14 files, 287,463 bytes); the media contract, the `datasource_reads` ESS domain, the 13
+  proposed session scenarios and `docs/compositions/` (17 files, 64,974 bytes); the Docker, SIP
+  and RTVBP adapter directories and their site pages (30 files, 87,080 bytes).
+- Records of finished work: `docs/waves/`, `docs/plans/` and `docs/handoff/` (62 files, 384,431
+  bytes), and six dated documents of 2026-09 with sections 27–30 and 32–34 of `docs/design.md`
+  (109,711 bytes in the deleted files).
+- `docs/evidence/`: the dated review records, logs, specification snapshots and source-hash
+  manifests of 2026-09-08 to 2026-10-02 (1,364 files, 23,441,342 bytes) moved to the branch
+  `history/evidence-2026-10`; `docs/evidence/README.md` says how to read a record there.
+
+### Fixed
+
+- A passive command no longer writes the metadata store: returning an inspection's Entity Runtime
+  handle persisted its observation as an open checkpoint.
+- The build runner's signal test no longer leaves a core file in the checkout.
+- `connectors-build definition` no longer writes outside `--out`: a `catalog` or a file stem that
+  is not a plain name (`..`, `/`, `\`, empty, NUL) is refused as `not_plain_name` before anything
+  is written, and `operations invoke --definition` refuses such a name before lowering.
+- `operations invoke --definition` catches an interrupt before it starts any child: the handler
+  is installed before the configuration read, which can start the provider, and an interrupt
+  seen during preparation ends the command with exit 130 whatever that step answered.
+
+### Limitations
+
+- The Zendesk writes are verified against fixtures with the basic profile `zendesk.basic` only;
+  the documented `zendesk.oauth` block requests `scope=read`, which does not cover a write.
+- OAuth consent from a definition file was tested against a token-profile fixture only, not a
+  live consent flow; consent that reads a definition's own authorize and token parameters
+  (ADR D6) is not implemented.
+- A definition cannot name its own CA file: its instance trusts the platform's roots, and every
+  `base_url` variable needs a default.
+- No command removes a cached definition or its owner-only instance entry: revoke its connection,
+  then remove `definitions/` under the state directory.
+- After a provider executable change the approval policy must be republished: approvals bind the
+  executable selection, which the credential-side binding leaves unchanged.
+- Installing a definition from an index or tag (ADR D5) and executors in other languages (D7)
+  are not in this release.
+- Five fluxplane parity units stay open, 64 gap-unit calls (62 of the
+  6,356 baseline calls and 2 mapped calls); coverage is 6,294 of 6,356 baseline calls (99.0 %) and
+  99 of 109 used operations (90.8 %)
+  (docs/fluxplane-plugin-parity.md, "Gap units"): Homer SIP capture reads (33), the Slack file
+  upload (24; the catalog engine sends no binary request body), Kubernetes port-forward (4),
+  Alertmanager alerts (2) and the Kubernetes Secret read (1, waiting for a disclosure decision).
+- Jira rich text, the description of `issue.create` and `issue.edit` and a comment's content, is
+  Atlassian Document Format the caller writes and the provider sends as given; plain text and
+  Markdown are not converted.
+- `issue.link.add` is not verified after the write: Jira answers `201` with no body, also for a
+  link that already exists. The Jira writes and the Slack reads and delete are verified against
+  fixtures only.
+- The catalog engine does not refuse a required body key sent as JSON `null` or a required
+  parameter sent as `""`: the request is sent (stories `required-body-key-refuses-null` and
+  `required-parameter-refuses-empty`).
+
 ## 0.53.1 — 2026-10-17
 
 ### Changed

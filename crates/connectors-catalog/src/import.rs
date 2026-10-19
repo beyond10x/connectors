@@ -39,7 +39,8 @@ use crate::definition::{
     Binary, Bound, ConfigField, ConfigType, Custody, Datasource, DatasourceKind, Defaults,
     Download, Effect, Envelope, FeedAuthor, FeedBody, FeedContainers, FeedCursor, FeedItems,
     FeedPosition, Guard, GuardAfter, GuardBefore, GuardRead, GuardRefusal, IdentitySource,
-    Operation, PagingStyle, ProviderDefinition, ResponseKind, SchemaId, Source, TextRefusal,
+    MismatchCode, Operation, PagingStyle, ProviderDefinition, ResponseKind, SchemaId, Source,
+    TextRefusal,
 };
 use crate::inventory::{Inventory, Location};
 use indexmap::IndexMap;
@@ -204,6 +205,14 @@ struct ShippedOperation {
     body_nonempty: Vec<String>,
     #[serde(default)]
     body_fixed: BTreeMap<String, Value>,
+    #[serde(default)]
+    body_enums: BTreeMap<String, Vec<String>>,
+    #[serde(default)]
+    body_any_of: Vec<String>,
+    #[serde(default)]
+    body_prefixes: BTreeMap<String, String>,
+    #[serde(default)]
+    conflict_status: Option<u16>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -221,6 +230,8 @@ struct ShippedPreflight {
     operation_id: String,
     values: IndexMap<String, String>,
     checks: Vec<ShippedCheck>,
+    #[serde(default)]
+    mismatch: Option<MismatchCode>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -1142,6 +1153,7 @@ impl Context<'_> {
             read: self.read_key(&preflight.operation_id),
             with: self.with(operation, &preflight.operation_id, &preflight.values)?,
             expect: expectations(operation, &preflight.checks)?,
+            mismatch: preflight.mismatch,
         })
     }
 
@@ -1197,7 +1209,10 @@ fn body_notation(shipped: &ShippedOperation) -> Result<Option<IndexMap<String, S
         let any = !shipped.body_types.is_empty()
             || !shipped.body_required.is_empty()
             || !shipped.body_nonempty.is_empty()
-            || !shipped.body_fixed.is_empty();
+            || !shipped.body_fixed.is_empty()
+            || !shipped.body_enums.is_empty()
+            || !shipped.body_any_of.is_empty()
+            || !shipped.body_prefixes.is_empty();
         return if any {
             Err(refused("body fields without body_keys".to_owned()))
         } else {
@@ -1210,6 +1225,9 @@ fn body_notation(shipped: &ShippedOperation) -> Result<Option<IndexMap<String, S
         .chain(&shipped.body_required)
         .chain(&shipped.body_nonempty)
         .chain(shipped.body_fixed.keys())
+        .chain(shipped.body_enums.keys())
+        .chain(&shipped.body_any_of)
+        .chain(shipped.body_prefixes.keys())
     {
         if !shipped.body_keys.contains(key) {
             return Err(refused(format!("`{key}` is not a body key")));
@@ -1257,7 +1275,10 @@ fn body_notation(shipped: &ShippedOperation) -> Result<Option<IndexMap<String, S
             continue;
         }
         let kind = shipped.body_types.get(key).map_or("any", String::as_str);
-        if !matches!(kind, "string" | "integer" | "boolean" | "any") {
+        if !matches!(
+            kind,
+            "string" | "integer" | "boolean" | "string_list" | "any"
+        ) {
             return Err(refused(format!("`{key}` has the type `{kind}`")));
         }
         let mut spec = kind.to_owned();
@@ -1273,6 +1294,19 @@ fn body_notation(shipped: &ShippedOperation) -> Result<Option<IndexMap<String, S
         body.insert(key.clone(), spec);
     }
     Ok(Some(body))
+}
+
+/// A `body_*` map of the selection as the definition's, in `body_keys` order.
+fn in_body_order<T: Clone>(
+    shipped: &ShippedOperation,
+    members: &BTreeMap<String, T>,
+) -> Option<IndexMap<String, T>> {
+    let ordered: IndexMap<String, T> = shipped
+        .body_keys
+        .iter()
+        .filter_map(|key| members.get(key).map(|value| (key.clone(), value.clone())))
+        .collect();
+    (!members.is_empty()).then_some(ordered)
 }
 
 fn is_page_bound(bound: &Bound) -> Option<u64> {
@@ -1776,13 +1810,20 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
         .ok_or_else(|| {
             Failure::Unreadable(format!("{}: no file name", selection_path.display()))
         })?;
-    let name = match request.name {
-        Some(name) => name.to_owned(),
-        None => definition_name(catalog, selection_file).ok_or_else(|| {
-            Failure::Malformed(format!(
+    let derived = definition_name(catalog, selection_file);
+    let name = match (request.name, derived) {
+        (Some(name), Some(derived)) if name != derived => {
+            return Err(Failure::Malformed(format!(
+                "`{name}` is not the name `{selection_file}` of `{catalog}` derives, `{derived}`"
+            )));
+        }
+        (Some(name), _) => name.to_owned(),
+        (None, Some(derived)) => derived,
+        (None, None) => {
+            return Err(Failure::Malformed(format!(
                 "`{selection_file}` is neither `operations.json` nor `<name>-operations.json`; give the name"
-            ))
-        })?,
+            )));
+        }
     };
     if !connectors_core::valid_id(&name) || !connectors_core::valid_id(catalog) {
         return Err(Failure::Malformed(format!(
@@ -1972,6 +2013,10 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
                 .filter(|texts| !texts.is_empty()),
             custody: operation.custody.clone(),
             body: body_notation(operation)?,
+            body_enums: in_body_order(operation, &operation.body_enums),
+            body_any_of: (!operation.body_any_of.is_empty()).then(|| operation.body_any_of.clone()),
+            body_prefixes: in_body_order(operation, &operation.body_prefixes),
+            conflict_status: operation.conflict_status,
             guard,
             description: (operation.description != summary)
                 .then(|| operation.description.clone())

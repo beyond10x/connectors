@@ -30,6 +30,10 @@ fn approval_target_is_passive_but_requires_exact_retained_admission() {
         .unwrap();
     // A system-clock registry must not sample that clock on this path. The
     // retained evidence is expired, but it still identifies this exact target.
+    // The calls below open the store as a fresh process does, as a command run
+    // directly does, not from a handle this thread already pooled; another test
+    // thread can evict that handle from the shared pool anyway.
+    crate::local::metadata::simulate_process(0x9a55_1001);
     let passive = Registry::with_system_clock(root.path());
     assert_eq!(
         passive
@@ -79,6 +83,8 @@ fn approval_target_is_passive_but_requires_exact_retained_admission() {
         passive.approval_target(&binding(), &reference, &BTreeSet::new()),
         Err(Failure::Revoked)
     );
+    crate::local::metadata::exit_process();
+    crate::local::metadata::simulate_process(0);
 }
 
 #[test]
@@ -297,6 +303,40 @@ fn an_expired_evidence_read_is_refused_by_name_and_revalidation_readmits_it() {
         registry.admit_read(&binding(), &reference, &none, NOW + 3_600_000),
         Err(Failure::NotReady)
     );
+}
+
+/// story:connection-lease-holds-unattended: a captured read carries its
+/// evidence's own lifetime (collection to `valid_until`, here shorter than the
+/// profile's bound), and a read whose evidence lapses between its capture and
+/// its dispatch is refused as expired evidence, not as the read's own timeout.
+/// A use bound by the read's deadline alone still expires as a timeout.
+#[test]
+fn a_read_whose_evidence_lapses_before_dispatch_is_refused_as_expired_evidence() {
+    let (_root, registry) = fixture();
+    let acquisition = registry.begin(&binding(), NOW).unwrap();
+    let claim = registry.consume(acquisition, NOW).unwrap();
+    let mut short = baseline("one", NOW);
+    short.valid_until_ms = NOW + 8_000;
+    let candidate = registry.prepare(&claim, short, 12, NOW).unwrap();
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let none = BTreeSet::new();
+    let bounded = registry
+        .capture_read(&binding(), &reference, &none, NOW, NOW + 1000)
+        .unwrap();
+    assert_eq!(bounded.evidence_lifetime_ms(), 8_000);
+    assert!(matches!(
+        registry.dispatch_read(bounded, NOW + 1000),
+        Err(Failure::Expired)
+    ));
+    let at = NOW + 7_500;
+    let read = registry
+        .capture_read(&binding(), &reference, &none, at, at + 30_000)
+        .unwrap();
+    assert_eq!(read.expires_at_ms(), NOW + 8_000);
+    assert!(matches!(
+        registry.dispatch_read(read, NOW + 8_000),
+        Err(Failure::EvidenceExpired)
+    ));
 }
 
 /// Known invalid material is not expired evidence either: only a repair helps.

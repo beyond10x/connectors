@@ -311,7 +311,7 @@ exposed. `schema.list`, `query.read`, the four catalogue reads and `profile.read
 whole surface. Read profiles are checked against scripted wire fixtures only; no live
 database has run one yet.
 
-The [retained real-provider restart evidence](evidence/provider-restarts-20261002/README.md)
+The [retained real-provider restart evidence](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/provider-restarts-20261002/README.md)
 covers a disposable PostgreSQL server and saved-credential reuse. Wire-protocol
 fixtures remain separate from that provider evidence. Neither establishes TLS
 for the plaintext loopback sandbox, and neither covers MySQL.

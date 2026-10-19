@@ -1,6 +1,6 @@
 # Adapter design: catalog, pre-compiled third-party specifications, and the generic HTTP engine
 
-- **Status:** the `provider` realization is implemented as `connectors-catalog-provider` (`src/`), over bundles built by `connectors-build catalog` from `crates/connectors-catalog`; the `catalog` index-service realization is not. Evidence: `docs/evidence/gitlab-sandbox-20260913/README.md`, section *Through the catalog provider*; the shipped GitLab selection set `providers/gitlab/operations.json` exposes every operation the native adapter exposed; that adapter is retired and GitLab has this one runtime. One adapter crate `adapters/catalog/` (`docs/design.md:212`) building one executable with two realizations: `catalog` (index service) and `provider` (generic engine bound to one bundle). One build-time pipeline in `crates/connectors-spec` and `crates/connectors-build`.
+- **Status:** the `provider` realization is implemented as `connectors-catalog-provider` (`src/`), over bundles built by `connectors-build catalog` from `crates/connectors-catalog`; the `catalog` index-service realization is not. Evidence: `git show history/evidence-2026-10:docs/evidence/gitlab-sandbox-20260913/README.md`, section *Through the catalog provider*; the shipped GitLab selection set `providers/gitlab/operations.json` exposes every operation the native adapter exposed; that adapter is retired and GitLab has this one runtime. One adapter crate `adapters/catalog/` (`docs/design.md:212`) building one executable with two realizations: `catalog` (index service) and `provider` (generic engine bound to one bundle). One build-time pipeline in `crates/connectors-spec` and `crates/connectors-build`.
 - **Old baseline:** `../connectors` at `81459ac4`: `providers/*.toml` (65), `specs/` (83 files; 32 pinned spec entries over 17 providers in `connectors.lock`), `catalog/*.catalog.json` (65), `connectors.lock`, `SOURCES.toml` (28 sources), crates `connector-spec` (16,479 lines), `catalog-build` (9,594), `catalog`, `catalog-reader`, `catalog-cli`, `connector-resolve` (4,462), `integration-catalog` (3,935).
 - **Contract:** [contracts/catalog/v1alpha1/semantics.md](../../contracts/catalog/v1alpha1/semantics.md). Index: [contracts/README.md](../../contracts/README.md).
 
@@ -10,11 +10,11 @@
 
 | Part | Old | New |
 |---|---|---|
-| Ingest: third-party or hand-authored declaration → reviewed, pre-compiled artifact | `connector-spec` (TOML and OpenAPI front-ends) + `catalog-build` (`catalog build`) | `connectors-spec --generate` per adapter document + `connectors-build catalog build` over all of them |
+| Ingest: third-party or hand-authored declaration → reviewed, pre-compiled artifact | `connector-spec` (TOML and OpenAPI front-ends) + `catalog-build` (`catalog build`) | `connectors-build catalog` over each pinned `adapters/<id>/upstream/` source |
 | Distribution: which definitions exist, provenance, where the artifact is | `catalog-reader` pack embedded in every consumer; `catalog` typed view | `adapters/catalog` realization `catalog`, or a plain index directory with no process |
 | Generic execution: one engine runs every declared HTTP operation | `integration-catalog` ("One adapter for every declared provider", `crates/integration-catalog/src/lib.rs:1`) + `connector-resolve` | `adapters/catalog` realization `provider`, one process per loaded bundle |
 
-The analogy asked for holds: as `integration-sip` was the SIP adapter, `integration-catalog` was the adapter for every catalogued provider; in this repository that is `adapters/catalog` next to `adapters/sip`. The difference from the old system is that the catalog is optional (`docs/design.md:39,147`), the pack is gone (`docs/design.md:79`), and execution authority does not change when a service is found through the catalog (`docs/design.md:1006`).
+The analogy asked for holds: as `integration-sip` was the SIP adapter, `integration-catalog` was the adapter for every catalogued provider; in this repository that is `adapters/catalog`. The difference from the old system is that the catalog is optional (`docs/design.md:39,147`), the pack is gone (`docs/design.md:79`), and execution authority does not change when a service is found through the catalog (`docs/design.md:1006`).
 
 Scope by numbers (counts over `../connectors/catalog/*.catalog.json` on 2026-09-08): 65 providers, 1,017 operations; 1,001 on `http_v1`, which the generic engine covers; 8 `sql_v1`, 5 `cdp_v1`, 2 `audio_v1`, 1 `sip_v1`, which belong to the SQL and media adapters and are out of scope here. 738 operations are in the 17 spec-backed providers; 279 are in the 48 hand-authored ones. Methods: GET 547, POST 250, PUT 94, DELETE 92, PATCH 18, none 16. Direction: read 568, write 449.
 
@@ -133,7 +133,7 @@ The catalog is a service-discovery source (`docs/design.md:319-323`): it names s
 | mapping `error_envelope` (`code_pointer`, `message_pointer`), `pagination`, `rate_limit` | 172, 8, and rate-limit declarations in the old documents |
 | curation block per operation: `expose`, `effects`, `risk`, `idempotency`, `requires_auth`, `placement` | `[[patch.operations]]` fields; OpenAPI supplies none (`docs/design.md:900-906`) |
 | Swagger 2.0 exact projection as a recorded transform | 2 old inputs |
-| default `prepare`/`finish` realization for `generic-http` | today required handwritten (`spec-kinds/adapter/v2/semantics.md:20-21`) |
+| default `prepare`/`finish` realization for `generic-http` | today required handwritten (`spec-kinds/adapter/v2/semantics.md:20-21`, in history at commit `6498a881c`) |
 
 Pipeline per provider, as implemented: pinned source under `adapters/<id>/upstream/` → `connectors-build catalog` → `adapters/catalog/generated/bundles/<id>.bundle.json` plus `index.json` → the reviewed selection set `providers/<id>/operations.json`. The earlier design named `connectors-spec --generate` and a per-adapter `generated/` tree; that path was retired with the native GitLab adapter. Normal Cargo builds read committed outputs and never invoke ESS or the network (`docs/development.md`).
 

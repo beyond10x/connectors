@@ -246,7 +246,9 @@ gets them only through `setup checkpoints-enable --confirm one-way`. Enabling is
 one-way for older releases: connectors 0.32.0 and earlier (Entity Runtime 0.28.0
 and earlier) refuse to open the store afterwards, and no command removes them.
 The host persists a handle's verified observation as the checkpoint when it
-returns the handle to its process pool.
+returns the handle to its process pool, except after a passive inspection: a
+passive command only reads the store ([owner transport](../contracts/cli/v1alpha1/owner.md)),
+and the checkpoint advances only when a use that may write returns a handle.
 
 | Open | What the provider verifies | What the host verifies before the handle answers |
 |---|---|---|

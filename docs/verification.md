@@ -4,7 +4,7 @@
 > 0.11.0 in favour of the catalog provider. The commands and paths they cite
 > existed at the recorded commits and are kept as history.
 
-Latest local review remediation: [independent review response, 2026-09-08](independent-review-response-2026-09-08.md).
+Latest local review remediation: the independent review response of 2026-09-08, in history at commit `6498a881c`.
 That run passed 50 tests and the full Rust 1.88/ESS 0.20.0 gate, plus 100 toolchain
 stress runs and live PostgreSQL deadline/cancellation checks over plaintext and TLS.
 The dated acceptance records below retain their original counts and scope.
@@ -55,7 +55,7 @@ cargo clippy --locked -p connectors-conformance --all-targets -- -D warnings
 ```
 
 The workspace run contains **14 passing tests**, with no failed or ignored tests.
-[The captured test log](evidence/2026-09-08-workspace-tests.log) distinguishes tests
+[The captured test log](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/2026-09-08-workspace-tests.log) distinguishes tests
 from empty unit/doc-test targets. It covers strict/duplicate JSON and response
 envelopes; canonical descriptors and drift; unsupported spec declarations; service
 authentication, schema/version/revision refusal before dispatch; generic federation
@@ -114,7 +114,7 @@ target/debug/connectors-conformance --token-file .local/e2e/service.secret \
   --allow-plaintext
 ```
 
-[The captured JSON result](evidence/2026-09-08-live-acceptance.json) records discovery
+[The captured JSON result](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/2026-09-08-live-acceptance.json) records discovery
 and authentication refusal for every leaf, then successful direct and federated
 operation/refusal scenarios for all three providers. The runner source is
 [connectors-conformance](../crates/connectors-conformance/src/main.rs).
@@ -157,15 +157,15 @@ credential/config creation, the discovery-to-binding step, acceptance and cleanu
 
 ## Evidence scope and remaining design work
 
-[Build hashes](evidence/2026-09-08-build.sha256) identify the tested local binaries
-and dependency lock; [source hashes](evidence/2026-09-08-source.sha256) identify the
+[Build hashes](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/2026-09-08-build.sha256) identify the tested local binaries
+and dependency lock; [source hashes](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/2026-09-08-source.sha256) identify the
 runtime, contract and declaration files. Build hashes are observations of these
 local artifacts, not a claim of cross-machine binary reproducibility.
 
 The first profile has static configured instances, restart-based configuration
 activation, expiring in-memory cursors, and one federation hop. Downstream
 descriptions were captured only at gateway startup in this original evidence.
-The subsequent [review remediation](review-response-2026-09-08.md) adds atomic
+The subsequent review remediation (2026-09-08, in history at commit `6498a881c`) adds atomic
 refresh on a leaf stale-description refusal and deliberate caller resubmission. Credential-file
 rotation is separate and works on subsequent calls without restarting. No cache
 or dynamic plugin download/build installation path is advertised.
@@ -190,7 +190,7 @@ Connectors checkout were not integrated or changed by this implementation.
 The follow-up story is `story:gitlab-spec-service`. Local commit
 `75f1c7275d7b227d5a2e4a3e95bfc5c9b2de262a` preserves the previous workspace before
 this implementation. The generation and packaging guide, retired with the native
-internal adapter in 0.11.0, explained reproduction; [the evidence directory](evidence/gitlab-spec-service-2026-09-08/)
+internal adapter in 0.11.0, explained reproduction; [the evidence directory](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/gitlab-spec-service-2026-09-08/)
 contains the exact build, source, test, runtime and shutdown observations.
 
 Observed verification:
@@ -258,11 +258,11 @@ reproducible rootfs copies were removed; reports and the source workspace remain
 
 ## Full review remediation — 2026-09-08
 
-The subsequent [review response](review-response-2026-09-08.md) records all 17
-findings. Its [gate log](evidence/review-2026-09-08/gate.log) shows 35 passing tests,
+The subsequent review response (2026-09-08, in history at commit `6498a881c`) records all 17
+findings. Its [gate log](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/review-2026-09-08/gate.log) shows 35 passing tests,
 zero failures/ignored tests, formatting, warning-denying Clippy, regenerated
 schema checks, offline builds, dependency boundaries and Rust 1.88 checks for all
-targets. The [audit](evidence/review-2026-09-08/audit.json) has no vulnerabilities
+targets. The [audit](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/review-2026-09-08/audit.json) has no vulnerabilities
 or warnings. It adds local PostgreSQL protocol and TLS fixtures without claiming
 a repeat of the earlier live services or image build.
 
@@ -277,17 +277,17 @@ env -u CONNECTORS_ESS PATH="~/.cargo/bin:~/.local/bin:$PATH" TMPDIR="$PWD/.local
 env -u CONNECTORS_ESS PATH="~/.local/bin:~/.cargo/bin:$PATH" TMPDIR="$PWD/.local/tmp" CARGO_BUILD_JOBS=2 cargo run --locked -p connectors-build -- gate --msrv
 ```
 
-The corresponding [cargo-first](evidence/ess-toolchain-2026-09-08/gate-pin-cargo-first.log)
-and [local-first](evidence/ess-toolchain-2026-09-08/gate-pin-local-first.log) logs
+The corresponding [cargo-first](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/ess-toolchain-2026-09-08/gate-pin-cargo-first.log)
+and [local-first](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/ess-toolchain-2026-09-08/gate-pin-local-first.log) logs
 contain 39 passing tests each. With the same cargo-first environment,
 `cargo test --locked -p connectors-spec --test generation` passed
-[5/5](evidence/ess-toolchain-2026-09-08/generation-pin-cargo-first.log).
+[5/5](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/ess-toolchain-2026-09-08/generation-pin-cargo-first.log).
 
 With `CONNECTORS_ESS` unset and `PATH=~/.cargo/bin:/usr/bin:/bin`,
 `target/debug/connectors-build gate --msrv` and the standalone generation tests
 both refused the absent 0.9.2 binary, naming the pin and searched locations:
-[gate refusal](evidence/ess-toolchain-2026-09-08/missing-pin.log),
-[generation refusal](evidence/ess-toolchain-2026-09-08/generation-missing-pin.log).
+[gate refusal](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/ess-toolchain-2026-09-08/missing-pin.log),
+[generation refusal](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/ess-toolchain-2026-09-08/generation-missing-pin.log).
 No installed executable was renamed. Isolated resolver tests also cover matching
 and mismatching explicit flags/environment paths, cache selection, both PATH
 orders, and agreement between the committed manifest and the repository pin.
@@ -295,7 +295,7 @@ orders, and agreement between the committed manifest and the repository pin.
 ## ESS pin upgrade — 2026-09-08
 
 Upgraded the repository pin to official ESS 0.20.0 after the preceding resolver
-acceptance. [Release metadata](evidence/ess-toolchain-2026-09-08/release.json)
+acceptance. [Release metadata](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/ess-toolchain-2026-09-08/release.json)
 records the exact tag commit, platform archive checksum and executable hashes.
 The verified release is at `.local/toolchains/ess/0.20.0/bin/ess`; both global
 installations remain unchanged. The generation guide (retired with the native
@@ -313,20 +313,20 @@ target/debug/connectors-spec --generate --specification adapters/gitlab/spec/ada
 cargo run --locked -p connectors-build -- package --output .local/gitlab-package-ess-020 --image connectors-v2-gitlab:ess-020-local
 ```
 
-The [full gate](evidence/ess-toolchain-2026-09-08/gate-020.log) reports 39 passing
+The [full gate](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/ess-toolchain-2026-09-08/gate-020.log) reports 39 passing
 tests (including generation 5/5, GitLab obligations 4/4 and the compile-fail test),
 zero failures/ignored tests, formatting, Clippy with warnings denied, offline
 builds, internal adapter/CLI dependency boundaries, Rust 1.88 all-target checks, and ESS/AEP
-validation. The explicit [drift check](evidence/ess-toolchain-2026-09-08/drift-020.log)
-passes. The [package run](evidence/ess-toolchain-2026-09-08/package-020.log)
+validation. The explicit [drift check](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/ess-toolchain-2026-09-08/drift-020.log)
+passes. The [package run](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/ess-toolchain-2026-09-08/package-020.log)
 validates and compiles the physical realization and projects the compiler's
 unmodified build IR. No `build-ir.projectable.json` or empty-secrets shim is needed.
 
 The retained image is `connectors-v2-gitlab:ess-020-local`,
 `sha256:1049d78855d994db3f92020b55e582697942ee2f7ca7a0ced531c8e023ee3a94`.
-Its [build evidence](evidence/ess-toolchain-2026-09-08/build-evidence.json) binds
+Its [build evidence](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/ess-toolchain-2026-09-08/build-evidence.json) binds
 the toolchain, generated manifest, complete source snapshot and root filesystem.
-An [artifact check](evidence/ess-toolchain-2026-09-08/artifact-020.json) confirms
+An [artifact check](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/ess-toolchain-2026-09-08/artifact-020.json) confirms
 the running image identity, reads its binary back and matches SHA-256
 `161aef1b55c13e424b351f598c634cfce6df2d72757f2489dfd9a9c987482733`, and
 rechecks all 81 code/Cargo source inputs against the package snapshot. Later
@@ -345,11 +345,11 @@ the gateway started and this command exited 0:
 target/debug/connectors-conformance --gitlab-only --token-file .local/ess-020-live/secrets/service.secret --gitlab http://127.0.0.1:27201/ --gateway http://127.0.0.1:27200/ --allow-plaintext
 ```
 
-The [live report](evidence/ess-toolchain-2026-09-08/live-020.json) passes all three
+The [live report](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/ess-toolchain-2026-09-08/live-020.json) passes all three
 groups: authenticated discovery/token refusal, direct reads/refusals, and federated
-reads/refusals. An explicit [continuation check](evidence/ess-toolchain-2026-09-08/continuation-020.json)
+reads/refusals. An explicit [continuation check](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/ess-toolchain-2026-09-08/continuation-020.json)
 additionally requires a cursor and a distinct second issue on both paths. Both
-services [exited 0 on SIGTERM](evidence/ess-toolchain-2026-09-08/shutdown-020.json);
+services [exited 0 on SIGTERM](https://github.com/beyond10x/connectors/blob/history/evidence-2026-10/docs/evidence/ess-toolchain-2026-09-08/shutdown-020.json);
 the task container, copied probe binary and caller credential were removed. The
 image and non-secret build reports remain local.
 

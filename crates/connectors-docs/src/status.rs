@@ -172,6 +172,13 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Local runtime",
+        "Unattended reads",
+        "A connection connected or revalidated once keeps serving reads across any number of evidence lifetimes: a read on lapsed evidence recollects it once from custody, with no re-entry, before it is served.",
+        "apps/connectors/tests/connection_lease.rs::a_revalidated_connection_serves_reads_across_three_evidence_lifetimes",
+        "/docs/concepts/local-runtime",
+    ),
+    shipped(
+        "Local runtime",
         "Connector instances",
         "A connectors-local/5 configuration enables connectors by name and names their instances; an instance that pins nothing is derived from the catalog provider installed beside the CLI.",
         "apps/connectors/tests/derived_instance.rs::the_cli_derives_an_instance_named_alone_from_the_provider_beside_it",
@@ -299,8 +306,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Jira Cloud",
-        "Issue search by JQL, one issue by key, comments, changelogs, an issue's available transitions, a project's creatable issue types, user search, an attachment's content, and running one transition by id under a guard that reads the issue before and after it, over HTTP basic authentication (one issue, issue types and user search since 0.39.0).",
-        "adapters/catalog/tests/jira.rs::shipped_jira_selections_are_the_eight_reads_and_the_transition_run",
+        "Issue search by JQL, one issue by key, comments, changelogs, an issue's available transitions, a project's creatable issue types and one issue type's create fields, user search, an attachment's content, running one transition by id under a guard that reads the issue before and after it, and creating, commenting on, editing, linking and deleting issues under approval, each guarded by a read before it (edit and delete on the caller's updated stamp, refused as conflict), over HTTP basic authentication (one issue, issue types and user search since 0.39.0); the writes are verified against fixtures, not a live site.",
+        "adapters/catalog/tests/jira.rs::shipped_jira_selections_are_the_nine_reads_and_the_six_writes",
         "/docs/reference/adapters/catalog",
     ),
     shipped(
@@ -341,8 +348,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Zendesk Support",
-        "Tickets, users and organizations changed since a start time, one of each by id, and a ticket's comments, with OAuth client credentials or an API token.",
-        "adapters/catalog/tests/zendesk.rs::shipped_zendesk_selections_are_exactly_the_seven_reads",
+        "Tickets, users and organizations changed since a start time, one of each by id, and a ticket's comments, with OAuth client credentials or an API token; a ticket update, a private note and a draft reply behind an approval, refused as a conflict when the ticket changed since it was read.",
+        "adapters/catalog/tests/zendesk.rs::shipped_zendesk_selections_are_the_seven_reads_and_three_writes",
         "/docs/reference/adapters/catalog",
     ),
     shipped(
@@ -369,7 +376,7 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Slack conversations",
-        "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0), users.list, team.info, emoji.list and auth.test, and on a second connection with a user token search.messages and the three conversation reads and users.list, which reach every conversation that user can read, the channels the bot is not in included; verified against a local fixture only.",
+        "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0), users.list, one user by id (users.info) or e-mail address (users.lookupByEmail), team.info, emoji.list and auth.test, and on a second connection with a user token search.messages and the three conversation reads and users.list, which reach every conversation that user can read, the channels the bot is not in included; verified against a local fixture only.",
         "adapters/catalog/tests/slack.rs::shipped_slack_selections_are_exactly_the_bot_reads_and_writes_and_the_user_reads",
         "/docs/reference/adapters/catalog",
     ),
@@ -383,14 +390,14 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Slack files",
-        "files.list, files.info and file.download, which reads a file's url_private on files.slack.com as a binary body with the bot token, only where the connection admits that host with the credential; verified against a local fixture only.",
+        "files.list, files.info and file.download, which reads a file's url_private on files.slack.com as a binary body with the bot token, only where the connection admits that host with the credential, and files.delete under approval after the token's auth.test read and a files.info read of the file, with file_not_found and file_deleted refused as not_found and cant_delete_file as forbidden; verified against a local fixture only.",
         "adapters/catalog/tests/slack.rs::the_download_reads_url_private_with_the_token_on_an_admitted_host",
         "/docs/reference/adapters/catalog",
     ),
     shipped(
         "Catalog provider",
         "Slack read refusals",
-        "A Slack read answered 200 with ok false is refused, never returned as an empty read: Slack's error is the reason, and missing_scope and not_in_channel are forbidden, invalid_auth and its kin unauthorized, an unknown channel, thread, file or user not_found, ratelimited rate_limited with its Retry-After, a bad cursor or argument invalid_input, and any other name internal, on every JSON read of both Slack sets; verified against a local fixture only.",
+        "A Slack read answered 200 with ok false is refused, never returned as an empty read: Slack's error is the reason, and missing_scope, not_in_channel and user_not_visible are forbidden, invalid_auth and its kin unauthorized, an unknown channel, thread, file or user not_found, an e-mail address no user has (users_not_found) not_found, ratelimited rate_limited with its Retry-After, a bad cursor or argument invalid_input, and any other name internal, on every JSON read of both Slack sets; verified against a local fixture only.",
         "adapters/catalog/tests/slack.rs::each_slack_error_answered_ok_false_is_a_refusal_naming_it",
         "/docs/reference/adapters/catalog",
     ),
@@ -554,7 +561,7 @@ pub const CAPABILITIES: &[Capability] = &[
     decided(
         "Native adapters",
         "Specification-only adapters",
-        "Atlassian native documents, Docker, Alertmanager, SIP and RTVBP have designs or typed models and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built.",
+        "Alertmanager has a design or typed model and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built.",
         "/docs/reference/adapters",
     ),
     planned(

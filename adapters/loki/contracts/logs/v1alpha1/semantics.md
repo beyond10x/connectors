@@ -15,7 +15,7 @@
 
 A log read returns a bounded observation of the provider's available logs, with explicit selection, order and truncation. Loki preserves native LogQL and returned stream labels. A result proves neither archival retention, absence of late arrivals, a provider-wide snapshot nor continuity across provider rotation/restart.
 
-Loki continuation pages one immutable retained observation. It never reissues a provider query with an adjusted timestamp edge. The selected provider API supplies neither occurrence identity nor a tie cursor; timestamp/text/label hashes cannot distinguish two genuine identical entries. A saturated provider response therefore ends with a truthful non-resumable partial result after its retained entries have been delivered. The [provider evidence record](../../../../../docs/evidence/datasource-semantics-20260908/provider-evidence.md) identifies the exact sources and selection limits.
+Loki continuation pages one immutable retained observation. It never reissues a provider query with an adjusted timestamp edge. The selected provider API supplies neither occurrence identity nor a tie cursor; timestamp/text/label hashes cannot distinguish two genuine identical entries. A saturated provider response therefore ends with a truthful non-resumable partial result after its retained entries have been delivered. The [provider evidence record](../../../../../docs/evidence/README.md "git show history/evidence-2026-10:docs/evidence/datasource-semantics-20260908/provider-evidence.md") identifies the exact sources and selection limits.
 
 ## 2. Old evidence and disposition
 
@@ -205,15 +205,15 @@ ESS boundary.
 
 LogQL range selection, direction and required selector equalities are typed in the
 [Loki-owned model](../../../spec/ess/domains/reads.yaml). Shared collection/page facts and
-decisions remain in `ess/domains/datasource_reads.yaml`; adapter predicates and
-runtime enforcement are not supplied by these private shapes.
+decisions have no shared ESS model; the proposed one is in history at commit `6498a881c`. Adapter
+predicates and runtime enforcement are not supplied by these private shapes.
 
 | Entity / value | Notes |
 |---|---|
 | `OperationDeclaration.profile = logql-range` | value |
 | Streams, lines | not entities; payload |
 
-Proposed provider-independent collection/page facts and completeness decisions belong in `ess/domains/datasource_reads.yaml`; native selections remain adapter-owned as above. Provider grammar, full context equality, occurrence preservation/order, decoding, clocks, numeric/byte bounds and atomic current publication remain explicitly UNMAPPED binding obligations. No persistent provider entity, parser, public codec or cache implementation is introduced.
+Proposed provider-independent collection/page facts and completeness decisions have no shared ESS model today; native selections remain adapter-owned as above. Provider grammar, full context equality, occurrence preservation/order, decoding, clocks, numeric/byte bounds and atomic current publication remain explicitly UNMAPPED binding obligations. No persistent provider entity, parser, public codec or cache implementation is introduced.
 
 ## 10. Open decisions
 

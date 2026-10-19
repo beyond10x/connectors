@@ -10,11 +10,13 @@
 //! time window, `Authorization: Bearer …`, never a `token` query parameter)
 //! and the returned body bytes are asserted, every list walks two pages to an
 //! empty `response_metadata.next_cursor`, and the `auth.test` identity read
-//! yields the token's user id. `auth.test`, `team.info`, `emoji.list` and
-//! `search.messages`, whose pinned `token` parameter is required, ship with
+//! yields the token's user id. `auth.test`, `team.info`, `emoji.list`,
+//! `search.messages` and the two one-user reads, `users.info` and
+//! `users.lookupByEmail`, whose pinned `token` parameter is required, ship with
 //! `token` named as the selection's credential; withholding it instead is
-//! still refused. The four writes, `chat.postMessage`, `conversations.open`,
-//! `chat.update` and `chat.delete`, run on private protocol two through
+//! still refused. The
+//! five writes, `chat.postMessage`, `conversations.open`, `chat.update`,
+//! `chat.delete` and `files.delete`, run on private protocol two through
 //! prepare and commit, the transport the host drives once it holds an
 //! approval: the exact JSON request after the guard's `auth.test` read,
 //! refusal without an approval, an ambiguous dispatch left unknown and sent
@@ -70,8 +72,14 @@ const SOURCE_SHA256: &str = "8b92da26a3c5b11d20042a9f36d81f1fa6fc9382c5ddc471bab
 
 /// The bot selection set's ids, their pinned `operationId` and the path the
 /// bundle records. A renamed, dropped or added id fails here.
-const SHIPPED: [(&str, &str, &str); 9] = [
+const SHIPPED: [(&str, &str, &str); 11] = [
     ("auth.test", "auth_test", "/api/auth.test"),
+    ("users.info", "users_info", "/api/users.info"),
+    (
+        "users.lookupByEmail",
+        "users_lookupByEmail",
+        "/api/users.lookupByEmail",
+    ),
     ("files.info", "files_info", "/api/files.info"),
     ("files.list", "files_list", "/api/files.list"),
     (
@@ -117,7 +125,14 @@ const USER_SHIPPED: [(&str, &str, &str); 5] = [
 ];
 /// The methods whose pinned `token` is required, so their selections name it
 /// as the credential instead of withholding it.
-const CREDENTIAL: [&str; 4] = ["auth_test", "emoji_list", "search_messages", "team_info"];
+const CREDENTIAL: [&str; 6] = [
+    "auth_test",
+    "emoji_list",
+    "search_messages",
+    "team_info",
+    "users_info",
+    "users_lookupByEmail",
+];
 
 fn root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -259,8 +274,9 @@ fn refusal(selections: &[Selection]) -> String {
     }
 }
 
-/// `team.info`, `emoji.list` and `search.messages` declare `token` as a
-/// required query parameter and `auth.test` as a required header
+/// `team.info`, `emoji.list`, `search.messages`, `users.info` and
+/// `users.lookupByEmail` declare `token` as a required query parameter and
+/// `auth.test` as a required header
 /// (`docs/catalog-slack.md`, "Credential parameters"). `withhold` still
 /// refuses a required parameter, and without either field the bot token would
 /// be a required input sent in the query, or `auth.test` would be refused for
@@ -272,6 +288,8 @@ fn methods_whose_pinned_token_is_required_ship_with_it_as_the_credential() {
         ("team.info", "team_info"),
         ("emoji.list", "emoji_list"),
         ("search.messages", "search_messages"),
+        ("users.info", "users_info"),
+        ("users.lookupByEmail", "users_lookupByEmail"),
     ] {
         let message = refusal(&[selection(id, operation_id, &["token"])]);
         assert!(
@@ -296,7 +314,7 @@ fn methods_whose_pinned_token_is_required_ship_with_it_as_the_credential() {
             "{message}"
         );
     }
-    // Each shipped selection of the four names `token` as its credential.
+    // Each shipped selection of the six names `token` as its credential.
     let all: Vec<Selection> = shipped().into_iter().chain(user_shipped()).collect();
     for operation_id in CREDENTIAL {
         let selection = all
@@ -503,6 +521,18 @@ fn guide_cites_each_discovery_read_and_search() {
             "`emoji:read`",
         ),
         ("auth.test", "auth_test", "/api/auth.test", "none"),
+        (
+            "users.info",
+            "users_info",
+            "/api/users.info",
+            "`users:read`",
+        ),
+        (
+            "users.lookupByEmail",
+            "users_lookupByEmail",
+            "/api/users.lookupByEmail",
+            "`users:read.email`",
+        ),
         (
             "search.messages",
             "search_messages",
@@ -746,6 +776,24 @@ fn deleted(body: &Value) -> Value {
         .unwrap_or_else(|| json!({"ok": true, "channel": body["channel"], "ts": body["ts"]}))
 }
 
+/// A file `files.info` finds whose delete is read and then left unanswered,
+/// the connection closed: the dispatch is ambiguous.
+const DROPPED_FILE: &str = "F0FIXTUREDROP";
+/// What `files.delete` answers: the pinned success schema, `ok` alone, for
+/// `F0FIXTURE01`; Slack's refusal, `200` with `ok: false`, for the others:
+/// `F0FIXTURE02` deleted in the meantime, `F0FIXTURE03` not the bot's to
+/// delete, `F0FIXTURE04` an error the selection does not declare.
+fn file_deleted(body: &Value) -> Value {
+    let error = match body["file"].as_str() {
+        Some("F0FIXTURE01") => return json!({"ok": true}),
+        Some("F0FIXTURE02") => "file_deleted",
+        Some("F0FIXTURE03") => "cant_delete_file",
+        Some("F0FIXTURE04") => "request_timeout",
+        _ => "file_not_found",
+    };
+    json!({"ok": false, "error": error})
+}
+
 fn channel(n: u64) -> Value {
     json!({"id": format!("C0FIXTURE{n:02}"), "name": format!("fixture-channel-{n}"),
            "is_channel": true, "is_private": false, "is_archived": false,
@@ -849,9 +897,30 @@ fn page(path: &str) -> Option<Value> {
         "/api/files.list" => json!({
             "ok": true, "files": [file(1), file(2)],
             "paging": {"count": 2, "page": 1, "pages": 2, "total": 3}}),
-        "/api/files.info" if has("file=F0FIXTURE01") => json!({
-            "ok": true, "file": file(1), "comments": []}),
-        "/api/files.info" => json!({"ok": false, "error": "file_not_found"}),
+        // Files one to four and the one whose delete goes unanswered are
+        // found; any other is not.
+        "/api/files.info" => match (1..=4).find(|n| has(&format!("file=F0FIXTURE{n:02}"))) {
+            Some(n) => json!({"ok": true, "file": file(n), "comments": []}),
+            None if has(&format!("file={DROPPED_FILE}")) => json!({
+                "ok": true, "file": {"id": DROPPED_FILE, "name": "fixture-dropped.pdf"},
+                "comments": []}),
+            None => json!({"ok": false, "error": "file_not_found"}),
+        },
+        // One user by id: `U0FIXTURE11` is found, `U0FIXTURE19` is hidden
+        // from the token, any other is not found.
+        "/api/users.info" if has("user=U0FIXTURE11") => json!({"ok": true, "user": user(11)}),
+        "/api/users.info" if has("user=U0FIXTURE19") => {
+            json!({"ok": false, "error": "user_not_visible"})
+        }
+        "/api/users.info" => json!({"ok": false, "error": "user_not_found"}),
+        // One user by e-mail address, as the engine sends it (`@` as `%40`).
+        "/api/users.lookupByEmail" if has("email=fixture-user-11%40example.test") => {
+            json!({"ok": true, "user": user(11)})
+        }
+        "/api/users.lookupByEmail" if has("email=fixture-guest%40example.test") => {
+            json!({"ok": false, "error": "enterprise_is_restricted"})
+        }
+        "/api/users.lookupByEmail" => json!({"ok": false, "error": "users_not_found"}),
         _ => return None,
     })
 }
@@ -1086,6 +1155,11 @@ impl Provider {
                             }
                             "/api/chat.update" => Some((200, edited(&sent))),
                             "/api/chat.delete" => Some((200, deleted(&sent))),
+                            "/api/files.delete" if sent["file"] == DROPPED_FILE => {
+                                observed.lock().unwrap().push((path, authorization, token_header));
+                                continue;
+                            }
+                            "/api/files.delete" => Some((200, file_deleted(&sent))),
                             _ => None,
                         };
                         if let Some((status, answer)) = answer {
@@ -1379,6 +1453,11 @@ fn each_read_sends_the_declared_request_with_bearer_auth_and_returns_the_recorde
             requests[before].1.as_deref(),
             Some(HEADER),
             "`{operation}` authorization"
+        );
+        assert_eq!(
+            provider.exchanges()[before].0,
+            "GET",
+            "`{operation}` method"
         );
         let result: Value = serde_json::from_slice(&raw).unwrap();
         assert_eq!(result["status"], 200, "`{operation}` status");
@@ -1686,11 +1765,13 @@ fn a_slack_error_answer_is_a_refusal_naming_slacks_error() {
 
 /// How the Slack sets classify Slack's `200` with `ok: false`: each named
 /// `error` and the code it is refused with. `otherwise` is every other name.
-const MAPPED: [(&str, &str); 22] = [
+const MAPPED: [(&str, &str); 25] = [
     ("missing_scope", "forbidden"),
     ("not_in_channel", "forbidden"),
     ("no_permission", "forbidden"),
     ("user_is_bot", "forbidden"),
+    ("user_not_visible", "forbidden"),
+    ("enterprise_is_restricted", "forbidden"),
     ("not_authed", "unauthorized"),
     ("invalid_auth", "unauthorized"),
     ("account_inactive", "unauthorized"),
@@ -1700,6 +1781,7 @@ const MAPPED: [(&str, &str); 22] = [
     ("file_not_found", "not_found"),
     ("file_deleted", "not_found"),
     ("user_not_found", "not_found"),
+    ("users_not_found", "not_found"),
     ("ratelimited", "rate_limited"),
     ("invalid_cursor", "invalid_input"),
     ("invalid_limit", "invalid_input"),
@@ -1827,7 +1909,7 @@ fn every_slack_read_declares_the_ok_envelope_and_no_write_does() {
             assert_eq!(found[0]["code"], code, "{set} `{}` `{name}`", selection.id);
         }
     }
-    assert_eq!(enveloped, 9 + 5, "the enveloped reads");
+    assert_eq!(enveloped, 11 + 5, "the enveloped reads");
 }
 
 /// Each mapped Slack error, served `200` with `ok: false`, is a refusal
@@ -1907,6 +1989,8 @@ fn no_slack_read_answers_success_on_ok_false() {
         "conversations.replies" => json!({"channel": "C0FIXTURE01", "ts": "1780000100.000100"}),
         "files.info" => json!({"file": "F0FIXTURE01"}),
         "search.messages" => json!({"query": "fixture"}),
+        "users.info" => json!({"user": "U0FIXTURE11"}),
+        "users.lookupByEmail" => json!({"email": "fixture-user-11@example.test"}),
         _ => json!({}),
     };
     let mut read = 0;
@@ -1928,7 +2012,7 @@ fn no_slack_read_answers_success_on_ok_false() {
             read += 1;
         }
     }
-    assert_eq!(read, 9 + 5);
+    assert_eq!(read, 11 + 5);
 }
 
 /// The envelope is a read's: on a write, a download, a text read or a binary
@@ -2216,6 +2300,114 @@ fn files_list_walks_two_pages_by_page_and_files_info_reads_one_file() {
     assert_eq!(provider.requests().len(), 3);
 }
 
+/// story:slack-single-user-lookups: one user by id (`users.info`, `user`
+/// required) and by e-mail address (`users.lookupByEmail`, `email` required by
+/// the pinned document), each one GET with the bearer token and no `token`
+/// parameter, answering Slack's `user`. A user Slack does not find or hides
+/// from the token is refused by Slack's name for it, sent once; a missing
+/// `user` or `email`, or a `token` input, is refused before any request.
+#[test]
+fn users_info_and_lookup_by_email_read_one_user() {
+    let selections = shipped();
+    let info = selections.iter().find(|s| s.id == "users.info").unwrap();
+    assert_eq!(info.required, ["user"]);
+    assert_eq!(info.credential, ["token"]);
+    let lookup = selections
+        .iter()
+        .find(|s| s.id == "users.lookupByEmail")
+        .unwrap();
+    assert!(lookup.required.is_empty());
+    assert_eq!(lookup.credential, ["token"]);
+
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let by_id = invoke(&mut child, "users.info", &json!({"user": "U0FIXTURE11"}));
+    assert_eq!(by_id["status"], 200);
+    assert_eq!(by_id["body"], json!({"ok": true, "user": user(11)}));
+    let by_email = invoke(
+        &mut child,
+        "users.lookupByEmail",
+        &json!({"email": "fixture-user-11@example.test"}),
+    );
+    assert_eq!(by_email["body"], json!({"ok": true, "user": user(11)}));
+    let requests = provider.requests();
+    let routes: Vec<&str> = requests.iter().map(|(path, _, _)| path.as_str()).collect();
+    assert_eq!(
+        routes,
+        [
+            "/api/users.info?user=U0FIXTURE11",
+            "/api/users.lookupByEmail?email=fixture-user-11%40example.test",
+        ]
+    );
+    assert!(
+        provider
+            .exchanges()
+            .iter()
+            .all(|(method, ..)| method == "GET"),
+        "a one-user read is a GET"
+    );
+    assert_eq!(provider.exchanges().len(), 2);
+    for (_, authorization, token) in &requests {
+        assert_eq!(authorization.as_deref(), Some(HEADER));
+        assert!(!token);
+    }
+    for (operation, input, failure, reason) in [
+        (
+            "users.info",
+            json!({"user": "U0FIXTURE99"}),
+            Failure::ProviderNotFound,
+            "user_not_found",
+        ),
+        (
+            "users.info",
+            json!({"user": "U0FIXTURE19"}),
+            Failure::ProviderForbidden,
+            "user_not_visible",
+        ),
+        (
+            "users.lookupByEmail",
+            json!({"email": "nobody@example.test"}),
+            Failure::ProviderNotFound,
+            "users_not_found",
+        ),
+        (
+            "users.lookupByEmail",
+            json!({"email": "fixture-guest@example.test"}),
+            Failure::ProviderForbidden,
+            "enterprise_is_restricted",
+        ),
+    ] {
+        let before = provider.requests().len();
+        let refusal = explained(&mut child, operation, &input).expect_err(reason);
+        assert_eq!(
+            provider.requests().len(),
+            before + 1,
+            "`{reason}` sent once"
+        );
+        assert_eq!(refusal.failure, failure, "`{operation}` {input}");
+        assert_eq!(refusal.reason.as_deref(), Some(reason), "`{operation}`");
+    }
+    let sent = provider.requests().len();
+    for (operation, input) in [
+        ("users.info", json!({})),
+        ("users.lookupByEmail", json!({})),
+        ("users.info", json!({"user": "U0FIXTURE11", "token": TOKEN})),
+        (
+            "users.lookupByEmail",
+            json!({"email": "fixture-user-11@example.test", "token": TOKEN}),
+        ),
+    ] {
+        assert!(
+            matches!(
+                attempt(&mut child, operation, &input),
+                Err(Failure::InvalidInput)
+            ),
+            "`{operation}` {input}"
+        );
+    }
+    assert_eq!(provider.requests().len(), sent);
+}
+
 /// The download through the provider child on a connection that admits the
 /// fixture's origin as a file host with the credential: `url_private` is read
 /// with the bot token, and the bytes come back with their media type, length
@@ -2313,9 +2505,9 @@ fn a_connection_admitting_a_host_no_selection_reaches_does_not_load() {
 
 // ── Message send: `chat.postMessage` and `conversations.open` ─────────────────
 
-/// The bot set's four writes, their pinned `operationId` and the path the
+/// The bot set's five writes, their pinned `operationId` and the path the
 /// bundle records. A renamed, dropped or added write fails here.
-const WRITES: [(&str, &str, &str); 4] = [
+const WRITES: [(&str, &str, &str); 5] = [
     ("chat.delete", "chat_delete", "/api/chat.delete"),
     (
         "chat.postMessage",
@@ -2328,6 +2520,7 @@ const WRITES: [(&str, &str, &str); 4] = [
         "conversations_open",
         "/api/conversations.open",
     ),
+    ("files.delete", "files_delete", "/api/files.delete"),
 ];
 
 /// Prepare and commit one write on this child: the transport the host's
@@ -2670,6 +2863,11 @@ fn declared(id: &str) -> Value {
              "values": ["cant_delete_message", "compliance_exports_prevent_deletion"],
              "code": "forbidden"}
         ]),
+        "files.delete" => json!([
+            {"pointer": "/error", "values": ["file_not_found", "file_deleted"],
+             "code": "not_found"},
+            {"pointer": "/error", "values": ["cant_delete_file"], "code": "forbidden"}
+        ]),
         _ => unreachable!(),
     }
 }
@@ -2686,6 +2884,7 @@ fn edit_and_delete_ship_closed_bodies_and_declare_slacks_refusals_by_name() {
     for (id, keys) in [
         ("chat.update", vec!["channel", "ts", "text"]),
         ("chat.delete", vec!["channel", "ts"]),
+        ("files.delete", vec!["file"]),
     ] {
         let selection = shipped().into_iter().find(|s| s.id == id).unwrap();
         assert_eq!(selection.body_keys, keys, "`{id}`");
@@ -2963,4 +3162,171 @@ fn an_undeclared_or_unanswered_edit_or_delete_is_unknown_and_sent_once() {
         .map(|(id, input)| (format!("/api/{id}"), input["body"].clone()))
         .collect();
     assert_eq!(provider.posts(), expected);
+}
+
+// ── File delete: `files.delete` ─────────────────────────────────────────────
+
+fn file_delete_input(file: &str) -> Value {
+    json!({"body": {"file": file}})
+}
+
+/// story:parity-slack-file-delete: besides the `auth.test` read every Slack
+/// write makes, the delete reads the file with `files.info` on `body.file`,
+/// and refuses unless that answers `ok` true and the same file id.
+#[test]
+fn the_file_delete_reads_the_file_before_it() {
+    let selection = shipped()
+        .into_iter()
+        .find(|s| s.id == "files.delete")
+        .unwrap();
+    let guard = serde_json::to_value(selection.guard.as_ref().unwrap()).unwrap();
+    assert_eq!(
+        guard["further_preflights"],
+        json!([{"operation_id": "files_info", "values": {"file": "body.file"},
+                "checks": [{"pointer": "/ok", "expect": {"boolean": true}},
+                           {"pointer": "/file/id", "expect": {"input": "body.file"}}]}])
+    );
+    assert!(guard["postflight"].get("read").is_none());
+}
+
+/// Approved, `files.delete` reads `auth.test` and `files.info` on the file,
+/// then sends exactly one `POST /api/files.delete` with the body as supplied,
+/// as JSON, with the bearer token and no `token` parameter, and returns
+/// Slack's answer.
+#[test]
+fn an_approved_file_delete_reads_the_file_then_sends_one_json_body() {
+    let provider = Provider::writing(false);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let input = file_delete_input("F0FIXTURE01");
+    let result = write(&mut child, "files.delete", &input)
+        .unwrap_or_else(|failure| panic!("`files.delete` refused in prepare: {failure:?}"));
+    assert_eq!(result.effect, WriteEffect::Applied);
+    let result = result.result.unwrap();
+    assert_eq!(result["status"], 200);
+    assert_eq!(result["body"], json!({"ok": true}));
+    assert_eq!(result["provenance"]["instance"], "fixture-slack");
+    let exchanges = provider.exchanges();
+    let calls: Vec<(&str, &str)> = exchanges
+        .iter()
+        .map(|(method, route, _, _)| (method.as_str(), route.as_str()))
+        .collect();
+    assert_eq!(
+        calls,
+        [
+            ("GET", "/api/auth.test"),
+            ("GET", "/api/files.info"),
+            ("POST", "/api/files.delete"),
+        ]
+    );
+    assert!(
+        exchanges[2]
+            .2
+            .as_deref()
+            .is_some_and(|kind| kind.starts_with("application/json")),
+        "{:?}",
+        exchanges[2].2
+    );
+    assert_eq!(exchanges[2].3, input["body"]);
+    let requests = provider.requests();
+    assert_eq!(requests[1].0, "/api/files.info?file=F0FIXTURE01");
+    for (path, authorization, token_header) in requests {
+        assert_eq!(authorization.as_deref(), Some(HEADER), "{path}");
+        assert!(!token_header && !path.contains("token="), "{path}");
+    }
+}
+
+/// A file deleted in the meantime (`file_deleted`) is refused as the
+/// provider's `not_found`, one the bot may not delete (`cant_delete_file`) as
+/// `forbidden`; an `ok: false` the selection does not declare, and a dispatch
+/// left unanswered, are unknown. Each was sent exactly once.
+#[test]
+fn a_file_delete_slack_refuses_is_refused_or_unknown_and_sent_once() {
+    let provider = Provider::writing(false);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let cases = [
+        (
+            "F0FIXTURE02",
+            WriteEffect::Refused,
+            Some(Failure::ProviderNotFound),
+        ),
+        (
+            "F0FIXTURE03",
+            WriteEffect::Refused,
+            Some(Failure::ProviderForbidden),
+        ),
+        ("F0FIXTURE04", WriteEffect::Unknown, None),
+        (DROPPED_FILE, WriteEffect::Unknown, None),
+    ];
+    for (file, effect, failure) in &cases {
+        let result = write(&mut child, "files.delete", &file_delete_input(file))
+            .unwrap_or_else(|failure| panic!("`{file}` refused in prepare: {failure:?}"));
+        assert_eq!(result.effect, *effect, "`{file}`");
+        assert!(result.result.is_err(), "`{file}`");
+        if let Some(failure) = failure {
+            assert_eq!(
+                format!("{:?}", result.result.err()),
+                format!("{:?}", Some(failure)),
+                "`{file}`"
+            );
+        }
+    }
+    let expected: Vec<(String, Value)> = cases
+        .iter()
+        .map(|(file, _, _)| ("/api/files.delete".to_owned(), json!({"file": file})))
+        .collect();
+    assert_eq!(provider.posts(), expected, "each was sent exactly once");
+}
+
+/// Nothing is deleted without an approval, for a file `files.info` does not
+/// find, for an input outside the closed body (no `file`, an empty one, a
+/// number, `token` or another key), or when Slack refuses the token at
+/// `auth.test`.
+#[test]
+fn a_file_delete_without_an_approval_a_file_or_a_token_sends_nothing() {
+    let provider = Provider::writing(false);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let outcome = attempt(
+        &mut child,
+        "files.delete",
+        &file_delete_input("F0FIXTURE01"),
+    );
+    assert!(matches!(outcome, Err(Failure::Unsupported)), "{outcome:?}");
+    let outcome = write(
+        &mut child,
+        "files.delete",
+        &file_delete_input("F0FIXTURE99"),
+    );
+    assert!(
+        matches!(outcome, Err(Failure::Forbidden)),
+        "{:?}",
+        outcome.map(|result| result.effect)
+    );
+    for input in [
+        json!({"body": {}}),
+        json!({"body": {"file": ""}}),
+        json!({"body": {"file": 1}}),
+        json!({"body": {"file": "F0FIXTURE01", "token": TOKEN}}),
+        json!({"body": {"file": "F0FIXTURE01", "channel": "C0FIXTURE01"}}),
+    ] {
+        let outcome = write(&mut child, "files.delete", &input);
+        assert!(
+            matches!(outcome, Err(Failure::InvalidInput)),
+            "{input}: {:?}",
+            outcome.map(|result| result.effect)
+        );
+    }
+    assert!(provider.posts().is_empty(), "a delete was sent");
+    let rejected = Provider::writing(true);
+    let mut child = Child::spawn(&rejected.selection()).unwrap();
+    let outcome = write(
+        &mut child,
+        "files.delete",
+        &file_delete_input("F0FIXTURE01"),
+    );
+    assert!(
+        matches!(outcome, Err(Failure::Forbidden)),
+        "{:?}",
+        outcome.map(|result| result.effect)
+    );
+    assert!(rejected.posts().is_empty(), "a delete was sent");
 }

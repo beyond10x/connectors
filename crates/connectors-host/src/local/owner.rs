@@ -284,7 +284,8 @@ impl From<runtime::Failure> for Error {
             | F::StaleCursor
             | F::ProviderNotFound
             | F::ProviderRateLimited
-            | F::ProviderInternal => Code::ServiceFailure,
+            | F::ProviderInternal
+            | F::ProviderConflict => Code::ServiceFailure,
         };
         let service_code = match e {
             F::InvalidCredential => Some(connectors_core::ErrorCode::Unauthorized),
@@ -293,6 +294,7 @@ impl From<runtime::Failure> for Error {
             F::ProviderNotFound => Some(connectors_core::ErrorCode::NotFound),
             F::ProviderRateLimited => Some(connectors_core::ErrorCode::RateLimited),
             F::ProviderInternal => Some(connectors_core::ErrorCode::Internal),
+            F::ProviderConflict => Some(connectors_core::ErrorCode::Conflict),
             _ => None,
         };
         // Provider only where the child reports the upstream's own answer to a
@@ -306,7 +308,8 @@ impl From<runtime::Failure> for Error {
             F::ProviderForbidden
             | F::ProviderNotFound
             | F::ProviderTimeout
-            | F::ProviderCapacity => Origin::Provider,
+            | F::ProviderCapacity
+            | F::ProviderConflict => Origin::Provider,
             _ => Origin::Host,
         };
         Self {
@@ -683,12 +686,19 @@ pub fn admit_invoke(paths: &Paths, alias: &str, call: &Value, document: &[u8]) -
         runtime::INPUT_LIMIT,
     )?;
     let connection = input(call, "connection")?;
-    registry::Registry::with_system_clock(&paths.state).admit_read(
+    // Evidence that only lapsed is admitted here: the read's worker job
+    // recollects it once before it captures the read
+    // (contracts/cli/v1alpha1/semantics.md), and refuses it only if it is still
+    // not current after that.
+    match registry::Registry::with_system_clock(&paths.state).admit_read(
         &bootstrap.binding(&requirement.profile)?,
         &connection,
         &requirement.scopes,
         connectors_sdk::now_ms(),
-    )?;
+    ) {
+        Ok(()) | Err(registry::Failure::EvidenceExpired) => {}
+        Err(error) => return Err(error.into()),
+    }
     if !custody::available_for(&config.selection()) {
         return Err(Code::CustodyUnavailable.into());
     }

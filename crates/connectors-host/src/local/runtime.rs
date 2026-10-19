@@ -71,6 +71,9 @@ pub enum Failure {
     /// a host that predates them refuses the reply as unreadable.
     ProviderTimeout,
     ProviderCapacity,
+    /// The upstream answered a write that its target changed since it was
+    /// read; nothing was applied. Additive like `provider_forbidden`.
+    ProviderConflict,
 }
 pub type Result<T> = std::result::Result<T, Failure>;
 
@@ -409,6 +412,7 @@ impl Failure {
             ErrorCode::NotFound if error.upstream_answer => Self::ProviderNotFound,
             ErrorCode::Timeout if error.upstream_answer => Self::ProviderTimeout,
             ErrorCode::Capacity if error.upstream_answer => Self::ProviderCapacity,
+            ErrorCode::Conflict if error.upstream_answer => Self::ProviderConflict,
             ErrorCode::RateLimited => Self::ProviderRateLimited,
             ErrorCode::Internal => Self::ProviderInternal,
             _ => Self::from_service(error),
@@ -426,6 +430,9 @@ impl Failure {
             ErrorCode::Timeout => Self::Timeout,
             ErrorCode::Capacity => Self::Capacity,
             ErrorCode::UpstreamProtocol => Self::Protocol,
+            // Only the upstream raises a conflict; were it raised before any
+            // request, it would be the input the caller sent.
+            ErrorCode::Conflict => Self::InvalidInput,
             ErrorCode::Internal | ErrorCode::Unavailable | ErrorCode::RateLimited => {
                 Self::Unavailable
             }

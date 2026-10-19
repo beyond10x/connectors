@@ -167,7 +167,7 @@ fn family(route: &str) -> &'static str {
         "Data reads"
     } else if route.starts_with("/contracts/discovery/") {
         "Discovery and composition"
-    } else if ["/contracts/sessions", "/contracts/media"].contains(&route) {
+    } else if route == "/contracts/sessions" {
         "Sessions and media"
     } else {
         "Service and execution"

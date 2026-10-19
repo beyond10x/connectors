@@ -42,10 +42,10 @@ The vocabulary in use today gives one word several meanings and has none for wha
 | profile | an auth method (`google.oauth`) and a contract subset | `ess/domains/auth_bindings.yaml` `ProfileDeclaration`; `docs/design.md:137` |
 
 The Google guides then configure two instances per API, a read instance and a write instance with a
-wider scope, because a connection's scopes cannot be widened in place
-(`docs/waves/wave-20260930c-google-oauth-discovery/README.md:38`). Four Google APIs with reads and
-writes are eight instances, eight consents and, while the OAuth app is in *Testing*, eight weekly
-re-consents (`docs/catalog-google-oauth.md:113-120`).
+wider scope, because a connection's scopes cannot be widened in place (the record of wave
+`wave-20260930c-google-oauth-discovery`, README line 38, in history at commit `6498a881c`). Four
+Google APIs with reads and writes are eight instances, eight consents and, while the OAuth app is
+in *Testing*, eight weekly re-consents (`docs/catalog-google-oauth.md:113-120`).
 
 ## What changes
 
