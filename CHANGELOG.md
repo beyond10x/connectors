@@ -156,7 +156,6 @@ Every removed file stays readable at commit `6498a881c`.
 
 - The Zendesk writes are verified against fixtures with the basic profile `zendesk.basic` only;
   the documented `zendesk.oauth` block requests `scope=read`, which does not cover a write.
-- The Zendesk guide's move steps still use the deprecated `[adapters.zendesk]` form.
 - OAuth consent from a definition file was tested against a token-profile fixture only, not a
   live consent flow; consent that reads a definition's own authorize and token parameters
   (ADR D6) is not implemented.

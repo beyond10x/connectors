@@ -210,37 +210,18 @@ ticket) only; the documented `zendesk.oauth` block requests `scope=read`, which
 does not cover a write. Move an existing install over in four steps:
 
 1. Replace the binaries with the release's `connectors` and
-   `connectors-catalog-provider`, and the selection file with the release's
-   `adapters/catalog/providers/zendesk/operations.json`. Print the provider's
-   bootstrap and take its new `configuration_revision` and the executable's
-   SHA-256:
+   `connectors-catalog-provider`. An instance of the `zendesk` connector takes
+   the selection, the three writes beside the seven reads, and the provider
+   executable from the shipped connector, so nothing is copied into the
+   configuration. An installation still configured before connectors were
+   declared converts its entries with `connectors setup migrate` first.
 
-   ```sh
-   connectors-catalog-provider --local-config /absolute/path/zendesk-catalog.json --print-local-bootstrap
-   sha256sum /absolute/path/connectors-catalog-provider
-   ```
-
-2. Select private protocol two on the adapter, which carries writes, and permit
-   the writes beside the reads:
+2. Name the basic profile on the instance:
 
    ```toml
-   [adapters.zendesk]
-   instance_id = "zendesk-support"
-   adapter_id = "catalog"
-   configuration_revision = "REPLACE_FROM_BOOTSTRAP"
-   protocol = "v1alpha1"
-   private_protocol = "connectors-private/2"
-   startup = "on-demand"
-   restart = "never"
-
-   [adapters.zendesk.permissions]
-   profiles = ["zendesk.basic"]
-   operations = ["tickets.incremental", "ticket.show", "ticket.comments", "users.incremental", "user.show", "organizations.incremental", "organization.show", "ticket.update", "ticket.note", "ticket.draft_reply"]
-
-   [adapters.zendesk.executable]
-   path = "/absolute/path/connectors-catalog-provider"
-   sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
-   args = ["--local-config", "/absolute/path/zendesk-catalog.json"]
+   [connectors.zendesk.instances.support]
+   endpoint = "https://your-subdomain.zendesk.com"
+   profile = "zendesk.basic"
    ```
 
 3. Configure a [bounded authenticated clock](local-clock.md), initialize
@@ -251,13 +232,15 @@ does not cover a write. Move an existing install over in four steps:
    {"operations":["ticket.update","ticket.note","ticket.draft_reply"]}
    ```
 
-4. Reconnect (`connections connect --adapter zendesk --profile zendesk.basic`)
-   and describe each write for its `schema` and `revision`. For each write, put
-   the input in a file, `approvals prepare` it, pass the subject's digest to
+4. Connect with the [API token](#api-token-zendeskbasic) credential document
+   (`connections connect --connector zendesk --instance support --profile
+   zendesk.basic --credential-file ~/private/zendesk.json`) and describe each
+   write for its `schema` and `revision`. For each write, put the input in a
+   file, `approvals prepare` it, pass the subject's digest to
    `approvals issue --approve-subject`, and invoke with the proof:
 
    ```sh
-   connectors operations invoke --adapter zendesk \
+   connectors operations invoke --connector zendesk --instance support \
      --connection "$connection" --operation ticket.note \
      --schema "$schema" --revision "$revision" --input-file note.json \
      --approval-file "$proof_file" --idempotency-key "$business_key" --output json
