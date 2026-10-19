@@ -129,17 +129,10 @@ TMPDIR="$PWD/.local/tmp" CARGO_BUILD_JOBS=2 cargo run --locked -p connectors-bui
 ```
 
 Normal builds consume checked-in generated files and need neither ESS nor networked
-vendor-source refresh. Kubernetes and SQL use v1 descriptor generation: omit
-`--generate` and select their `generated/descriptor.json` output. GitLab is served
-by the catalog provider from a bundle compiled with `connectors-build catalog`;
-see [the catalog provider guide](local-catalog-provider.md).
-
-The v2 generator (`connectors-spec --generate`, ESS-backed Rust for a GET-only
-internal adapter document) keeps its tests against the frozen fixture
-`crates/connectors-spec/tests/fixtures/gitlab-v2.json`, whose upstream pin names
-`adapters/gitlab/upstream/openapi_v3.yaml`; no committed adapter selects it
-today. Generation and its tests need the pinned ESS release and the recorded rustfmt
-version, resolved as described under [Pinned tools](#pinned-tools).
+vendor-source refresh. GitLab is served by the catalog provider from a bundle compiled
+with `connectors-build catalog`; see [the catalog provider guide](local-catalog-provider.md).
+There is no v2 adapter generator: `connectors-spec` compiles `connectors.adapter/v1`
+documents and holds the pinned ESS toolchain record.
 
 Each internal adapter's default `service` feature adds its standalone executable and host
 wiring. To embed only its contract implementation, disable default features:

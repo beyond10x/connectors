@@ -25,7 +25,7 @@ The shared boundary an application, an adapter or a host builds on, and the `con
 | `connectors-custody` | [`crates/connectors-custody`](https://github.com/beyond10x/connectors/tree/main/crates/connectors-custody) | `use connectors_custody` | Credential custody of the local host: the read and write backend traits, an in-memory reference, one platform binding each for the Secret Service, the macOS login keychain and the Windows Credential Manager, and the explicitly selected read-only mounted-secret binding on Linux. |
 | `connectors-host` | [`crates/connectors-host`](https://github.com/beyond10x/connectors/tree/main/crates/connectors-host) | `use connectors_host` | Adapter service host: HTTP serving, credential references, one-hop federation, and the local owner, custody and metadata runtime. |
 | `connectors-sdk` | [`crates/connectors-sdk`](https://github.com/beyond10x/connectors/tree/main/crates/connectors-sdk) | `use connectors_sdk` | The adapter interface and shared semantic mechanisms (descriptors, handler verification, cursors); concrete infrastructure stays with the host. |
-| `connectors-spec` | [`crates/connectors-spec`](https://github.com/beyond10x/connectors/tree/main/crates/connectors-spec) | `use connectors_spec`, binary `connectors-spec` | The adapter specification kind: compiles adapter specifications to descriptors and pins the ESS release used for generation. |
+| `connectors-spec` | [`crates/connectors-spec`](https://github.com/beyond10x/connectors/tree/main/crates/connectors-spec) | `use connectors_spec` | The adapter specification kind: compiles adapter specifications to descriptors and pins the ESS release used for generation. |
 
 ## Adapters
 
