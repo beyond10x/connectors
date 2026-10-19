@@ -186,8 +186,12 @@ lists every reason an entry is kept.
 
 Source release **v0.54.0** keeps connection metadata in Entity Runtime over an
 Eventlog SQLite store, specified at ESS source format `ess/15`, with GitLab, Jira Cloud, Confluence Cloud, HubSpot CRM and Zendesk Support served from their pinned OpenAPI sources, and Google Drive, Slides, Calendar and Gmail from pinned Discovery documents projected to OpenAPI, through
-the catalog provider. The [changelog](CHANGELOG.md) records its scope and
-remaining work.
+the catalog provider. A hand-written `connectors-definition/1` file runs with no configured
+instance through `connectors operations invoke --definition <file> --operation <key>`, which
+lowers it, asks once whether to connect (offering a stored credential of the same connector
+when one fits) and invokes through the same owner, admission, approval and audit
+([guide](https://beyond10x.github.io/connectors/docs/guides/invoke-a-definition-file)). The
+[changelog](CHANGELOG.md) records its scope and remaining work.
 
 The local CLI implements setup, configured instance management, protected
 connect/reconnect, saved-credential revalidation, connection inspection/revoke, cached operation discovery and
