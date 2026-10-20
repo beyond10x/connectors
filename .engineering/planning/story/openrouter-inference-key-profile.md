@@ -14,7 +14,7 @@ scope:
   path: crates/connectors-catalog/src/definition.rs
 - confidence: inferred
   path: crates/connectors-catalog/tests/fixtures/definitions/connectors/openrouter.yaml
-revision: 3
+revision: 4
 ---
 ## Outcome
 
@@ -58,3 +58,21 @@ this the inference instance would stay pointing at a path story:catalog-provider
 
 story:instances-resolve-through-locked-index depends on this story: its OpenRouter migration
 acceptance needs both profiles.
+
+## Probe result, 2026-10-20
+
+A probe test settled the inferred risk above, and it was wrong: the inference-key instance migrates
+without a second profile. `probe_openrouter_label_management_and_inference`, appended to
+`apps/connectors/tests/setup_migrate.rs` in a throwaway worktree (archived, not merged), with an
+OpenRouter `connector.json` lowered from the fixture definition (label "OpenRouter management key")
+added to the compiled-in declarations. Run through `b10x-build-slot cargo test --locked -p connectors
+--test setup_migrate probe_openrouter_label`: `test result: ok. 1 passed; 0 failed`, exit 0. Two
+path-configured entries differing only in `auth.label` both read back
+`disposition="migrated" reason=null differing_field=null connector="openrouter"`: `orm` (the
+management label) and `ori` ("OpenRouter inference key"). Read from the code, as a hypothesis:
+`migrate.rs` compares its nine FIELDS and the instance's alias, description, endpoint and profile,
+never `auth.label`.
+
+The operator's "openrouter A" stands as decided ("regardless of the test outcome"); the acceptance
+test above still holds it. The b10x-chef-orchestrator session has told the operator the result; if
+the operator drops A, this story is archived.

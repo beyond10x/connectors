@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-20T11:52:53Z",
+  "actor": "human:timo",
+  "artifact": "story:write-postflight-present-check",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "acceptance 2 mirror: connectors-definitions pull request 4 merged as c8062b7fe; connectors/jira.yaml carries the issue.create /id,/key and issue.comment.add /id present checks; task check passed on the pull request",
+    "reference": "https://github.com/beyond10x/connectors-definitions/pull/4"
+  }
+}
