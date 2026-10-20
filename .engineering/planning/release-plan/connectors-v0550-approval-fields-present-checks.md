@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0550-approval-fields-present-checks
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.55.0: approval refusals name their argument, present checks, the pool lock and the owner socket'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-20T10:28:55Z", actor: "human:timo", revision: 2, decided_on: {"recorded":{"test_result":1}}}
+- {from: "active", to: "implemented", at: "2026-10-20T11:52:52Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":2}}}
 ---
 ## Outcome
 

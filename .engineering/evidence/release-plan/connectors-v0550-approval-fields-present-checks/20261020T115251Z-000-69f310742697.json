@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-20T11:52:51Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0550-approval-fields-present-checks",
+  "kind": "release-plan",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "v0.55.0 annotated tag by b10x-bot[bot] on 163b6b98c (merge of #195, ancestor of origin/main, tree equals 54f719e9e); release page by b10x-bot[bot], Latest; release-binaries run 39415034079 success; 4 archives and SHA256SUMS on the page, sha256sum -c OK for all 4",
+    "reference": "https://github.com/beyond10x/connectors/releases/tag/v0.55.0"
+  }
+}
