@@ -8,7 +8,7 @@ relations:
 - decomposes: epic:catalog-connectors-only-in-definitions
 - serves: vision:independent-contract-adapters
 - depends_on: story:definitions-release-index
-revision: 2
+revision: 3
 ---
 ## Outcome
 
@@ -44,8 +44,14 @@ format version and an unmet feature are each a refusal by name. Epic step 1.
   redirect (not verified). How install fetches the asset is this story's implementation and is
   recorded at delivery. Tests serve a release from a local directory and need no network (design
   section 11, M3: "install from a local directory and from a git tag").
-- `story:definitions-pin-covers-catalog` calls the fetch-and-verify core from tests in other
-  crates, so it lives in a library crate, not only in `apps/connectors` (inferred).
+- The fetch-and-verify core has two callers besides this command, so it lives in a library crate,
+  not only in `apps/connectors` (inferred): tests in other crates, and the fetch of the pinned
+  release that runs before cargo (both added by `story:definitions-pin-covers-catalog`). Under
+  option C of `decision-blocker:catalog-first-run-source`, `build.rs` embeds what that fetch
+  wrote (`story:instances-resolve-through-locked-index`), so the fetch runs before
+  `connectors-catalog-provider` can build: the crate holding the core does not depend on it,
+  directly or through `connectors-build` (`crates/connectors-build/Cargo.toml:11`), and can be
+  run on its own (inferred).
 - The reference lowerer is `crates/connectors-catalog/src/definition.rs` (`lower()`, ADR D3).
   When installed definitions are lowered is not decided by this story.
 
@@ -75,7 +81,8 @@ format version and an unmet feature are each a refusal by name. Epic step 1.
 
 - Instances resolving a connector through the locked index (last sentence of D5):
   `story:instances-resolve-through-locked-index`.
-- What a shipped binary serves before any install: `decision-blocker:catalog-first-run-source`.
+- What a binary serves before any install: the pinned release it embeds (option C),
+  `story:instances-resolve-through-locked-index`.
 - `list`, `verify`, `update` (design section 6), re-consent on a profile change, D6.
 
 ## Acceptance

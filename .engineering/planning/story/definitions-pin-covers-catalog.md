@@ -8,12 +8,13 @@ relations:
 - decomposes: epic:catalog-connectors-only-in-definitions
 - serves: vision:independent-contract-adapters
 - depends_on: story:definitions-install
-revision: 2
+revision: 3
 ---
 ## Outcome
 
 - This repository pins one connectors-definitions tag in a committed lock in the format of
-  `story:definitions-install`, and the gate installs it before its offline test step.
+  `story:definitions-install`. A step that runs before cargo, in CI and locally, fetches and
+  digest-checks that release into a cache outside the working tree.
 - A shared test-support function opens the installed pinned release and lowers one named
   connector with the reference lowerer into a temporary directory, writing what
   `connectors-build definition` writes (bundle, index, selection, declaration;
@@ -39,10 +40,14 @@ revision: 2
   `connectors/README.md` states the same rule.
 - The gate runs `cargo build` and `cargo test --workspace --locked --offline`
   (`crates/connectors-build/src/gate.rs:149-150`); CI runs `cargo fetch --locked`, then the gate
-  (`.github/workflows/rust-gate.yml:56,62-63`). Tests therefore read a release installed before
-  the offline step and never fetch; a test that finds none fails naming the install command
-  (inferred). `pages.yml`, `macos-host.yml` and `windows-host.yml` run tests or generators that
-  the later stories point at the release, so they install it too (inferred from
+  (`.github/workflows/rust-gate.yml:56,62-63`). Tests therefore read a release fetched before
+  cargo runs and never fetch; a test that finds none fails naming the fetch command (inferred).
+  The fetch is not a gate or `connectors-build` subcommand: `connectors-build` depends on
+  `connectors-catalog-provider` (`crates/connectors-build/Cargo.toml:11`), whose `build.rs` embeds
+  this release under option C of `decision-blocker:catalog-first-run-source`
+  (`story:instances-resolve-through-locked-index`). `pages.yml`, `macos-host.yml` and
+  `windows-host.yml` run tests or generators that
+  the later stories point at the release, so they fetch it first too (inferred from
   `.github/workflows/pages.yml:51-52`, `macos-host.yml:43`, `windows-host.yml:51`).
 - The crate that holds the test-support function is chosen at implementation. A dev-dependency
   back onto a crate it depends on (for example `connectors-catalog`, which holds the lowerer) is a
@@ -70,7 +75,7 @@ revision: 2
 - `crates/connectors-build/src/gate.rs` (cited: the offline test step)
 - `.github/workflows/rust-gate.yml`, `pages.yml`, `macos-host.yml`, `windows-host.yml` (cited)
 - the check test (inferred: beside `crates/connectors-catalog/tests/definition_import.rs`)
-- `AGENTS.md` (inferred: how to install the pinned release before running tests locally)
+- `AGENTS.md` (inferred: how to fetch the pinned release before running cargo locally)
 
 ## Acceptance
 

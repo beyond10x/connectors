@@ -7,7 +7,7 @@ title: Catalog connectors live only in connectors-definitions
 relations:
 - implements: architecture-decision-record:provider-definitions-and-runtimes
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 ---
 ## Outcome
 
@@ -67,11 +67,22 @@ Set with the b10x-chef-orchestrator session on 2026-10-20, after the v0.55.0 rel
 2. A check that every in-tree provider (the 14 directories and `slack-user`) exists in
    connectors-definitions at the pinned tag, red if not.
 3. Tests read the installed release instead of `tests/fixtures/definitions`.
-4. Delete `adapters/catalog/providers`, `adapters/catalog/generated/bundles` and the fixture copy.
+4. The build embeds the pinned release, and then `adapters/catalog/providers`,
+   `adapters/catalog/generated/bundles` and the fixture copy are deleted. First-run is option C of
+   `decision-blocker:catalog-first-run-source`, decided by the operator on 2026-10-20: the release
+   named by the committed pin is fetched and digest-checked into a cache before cargo runs, never
+   committed, and the binary carries it. An instance resolves from that embedded release, or from
+   the locked index after an explicit D5 install of another tag.
 
 ## Open questions
 
-- How the shipped binary archives find their catalog connectors on first run, before any install.
+- How Slack and OpenRouter instances get a bundle and a selection once the tree is gone. They ship
+  no declaration and are configured in the pinned form, with paths into a checkout of this tree
+  (`docs/catalog-slack.md:403,412`, `docs/catalog-openrouter.md:68,77`;
+  `adapters/catalog/tests/connector_declarations.rs:186-190`), and the D5 cache holds definitions,
+  not lowered bundles. `story:catalog-provider-data-removed` does not land before this is
+  answered.
 - Whether the `connector.json` byte-equality checks (D11) move to connectors-definitions' gate.
 - connectors-definitions has no tag and no release yet (`git tag` and `gh release list` empty on
-  2026-10-20); step 1 needs its first one.
+  2026-10-20); `story:definitions-release-index` cuts the first one after
+  https://github.com/beyond10x/connectors-definitions/pull/4 merges.
