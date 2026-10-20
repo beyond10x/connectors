@@ -3,7 +3,7 @@ use connectors_sdk::Secret;
 use std::{
     collections::BTreeMap,
     sync::{
-        Arc, Condvar, Mutex, Weak,
+        Arc, Condvar, Mutex, MutexGuard, TryLockError, Weak,
         atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering},
         mpsc,
     },
@@ -306,6 +306,30 @@ impl Drop for Permit<'_> {
         }
     }
 }
+/// How often a request whose instance's control lock is held tries it again.
+const CONTROL_RETRY: Duration = Duration::from_millis(5);
+/// An instance's control lock, awaited no longer than the request's own
+/// `deadline` (`timeout`) and not once the pool has stopped (`unavailable`).
+/// `std::sync::Mutex` has no timed lock, so the lock is tried again every
+/// [`CONTROL_RETRY`].
+fn lock_until<'a>(
+    control: &'a Mutex<lifecycle::Control>,
+    deadline: u64,
+    stopped: &AtomicBool,
+) -> Result<MutexGuard<'a, lifecycle::Control>> {
+    loop {
+        match control.try_lock() {
+            Ok(guard) => return Ok(guard),
+            Err(TryLockError::Poisoned(_)) => return Err(Code::Unavailable.into()),
+            Err(TryLockError::WouldBlock) => {}
+        }
+        if stopped.load(Ordering::SeqCst) {
+            return Err(Code::Unavailable.into());
+        }
+        let left = until(deadline)?.saturating_duration_since(Instant::now());
+        std::thread::sleep(left.min(CONTROL_RETRY));
+    }
+}
 pub(super) struct Pool {
     workers: Mutex<BTreeMap<String, Worker>>,
     paths: Arc<Paths>,
@@ -505,6 +529,61 @@ impl Pool {
         flight: Option<Arc<Flight>>,
     ) -> Result<(mpsc::Receiver<Result<Output>>, Dispatch)> {
         until(deadline)?;
+        let (sender, control, queued) = self.admit(adapter)?;
+        // A write holds its instance's control lock through its native commit
+        // (`mutation::execution::execute`). The wait is this instance's alone:
+        // `workers` is released, so no other instance's request waits with it.
+        let mut control = lock_until(&control, deadline, &self.stopped)?;
+        if self.stopped.load(Ordering::SeqCst) {
+            return Err(Code::Unavailable.into());
+        }
+        until(deadline)?;
+        if control.stopping
+            && control
+                .child
+                .as_ref()
+                .map(|c| lifecycle::exited(&c.handle))
+                .transpose()?
+                .unwrap_or(true)
+        {
+            control.stopping = false;
+        }
+        control.check(control.epoch)?;
+        let (reply, receiver) = mpsc::channel();
+        let dispatch = Dispatch::default();
+        sender
+            .try_send(Work::Invoke(Box::new(Job {
+                alias: alias.into(),
+                adapter: adapter.clone(),
+                task,
+                deadline,
+                reply: Reply {
+                    sender: reply,
+                    flight,
+                },
+                epoch: control.epoch,
+                queued: Some(queued),
+                dispatch: dispatch.clone(),
+            })))
+            .map_err(|e| match e {
+                mpsc::TrySendError::Full(_) => Code::Capacity,
+                mpsc::TrySendError::Disconnected(_) => Code::Unavailable,
+            })?;
+        Ok((receiver, dispatch))
+    }
+    /// The instance's worker, started if it has none, as the sender, control
+    /// and queued count a request needs: taken under `workers` and nothing
+    /// else, so that `workers` is never held while a control lock is awaited.
+    /// The request counts as queued from here, so the owner never reads one
+    /// that waits on its instance's control lock as idle.
+    fn admit(
+        &self,
+        adapter: &Adapter,
+    ) -> Result<(
+        mpsc::SyncSender<Work>,
+        Arc<Mutex<lifecycle::Control>>,
+        JobQueued,
+    )> {
         let mut workers = self.workers.lock().map_err(|_| Code::Unavailable)?;
         if self.stopped.load(Ordering::SeqCst) {
             return Err(Code::Unavailable.into());
@@ -552,40 +631,11 @@ impl Pool {
             );
         }
         let worker = &workers[&adapter.instance_id];
-        let mut control = worker.control.lock().map_err(|_| Code::Unavailable)?;
-        if control.stopping
-            && control
-                .child
-                .as_ref()
-                .map(|c| lifecycle::exited(&c.handle))
-                .transpose()?
-                .unwrap_or(true)
-        {
-            control.stopping = false;
-        }
-        control.check(control.epoch)?;
-        let (reply, receiver) = mpsc::channel();
-        let dispatch = Dispatch::default();
-        worker
-            .sender
-            .try_send(Work::Invoke(Box::new(Job {
-                alias: alias.into(),
-                adapter: adapter.clone(),
-                task,
-                deadline,
-                reply: Reply {
-                    sender: reply,
-                    flight,
-                },
-                epoch: control.epoch,
-                queued: Some(JobQueued::new(&worker.queued)),
-                dispatch: dispatch.clone(),
-            })))
-            .map_err(|e| match e {
-                mpsc::TrySendError::Full(_) => Code::Capacity,
-                mpsc::TrySendError::Disconnected(_) => Code::Unavailable,
-            })?;
-        Ok((receiver, dispatch))
+        Ok((
+            worker.sender.clone(),
+            worker.control.clone(),
+            JobQueued::new(&worker.queued),
+        ))
     }
     /// Runs a job on its instance's worker. A revalidation that finds one of
     /// the same connection at the same expected revision queued or running,
@@ -2604,3 +2654,187 @@ mod revalidation_retry_tests {
         assert_eq!((error.cause, error.attempts), (None, None));
     }
 }
+
+/// story:owner-request-waits-outside-the-pool-lock: a request for an instance
+/// whose control lock is held, as a write holds it through its native commit,
+/// waits only on that instance and answers `timeout` by its own deadline; a
+/// request for any other instance is not delayed by it.
+#[cfg(test)]
+mod pool_lock_tests {
+    use super::*;
+    use crate::local::config::{Executable, Startup};
+
+    fn adapter(instance: &str) -> Adapter {
+        Adapter {
+            credential_revision: None,
+            instance_id: instance.into(),
+            adapter_id: "adapter".into(),
+            configuration_revision: "config".into(),
+            protocol: "v1alpha1".into(),
+            private_protocol: None,
+            startup: Startup::OnDemand,
+            restart: Default::default(),
+            permissions: Default::default(),
+            executable: Executable {
+                path: "/not-launched".into(),
+                sha256: "a".repeat(64),
+                args: Vec::new(),
+            },
+        }
+    }
+
+    fn read() -> Task {
+        Task::Invoke {
+            connection: "connection".into(),
+            operation: "read".into(),
+            schema: "schema".into(),
+            revision: "revision".into(),
+            document: b"{}".to_vec(),
+        }
+    }
+
+    /// A pool with two stand-in workers: `held`, which keeps every job
+    /// unanswered until shutdown, and `answering`, which answers each at once.
+    fn pool() -> (Arc<Pool>, tempfile::TempDir) {
+        let root = tempfile::tempdir().unwrap();
+        let pool = Pool::new(
+            Arc::new(Paths {
+                config: root.path().join("unread-config"),
+                state: root.path().join("unopened-state"),
+            }),
+            uuid::Uuid::new_v4().to_string(),
+        );
+        for (instance, answers) in [("held", false), ("answering", true)] {
+            let (sender, receiver) = mpsc::sync_channel::<Work>(16);
+            let thread = std::thread::spawn(move || {
+                let mut held = Vec::new();
+                while let Ok(work) = receiver.recv() {
+                    match work {
+                        Work::Invoke(job) if answers => {
+                            job.reply.send(Ok(Output::Value(json!(null))));
+                        }
+                        work => held.push(work),
+                    }
+                }
+            });
+            pool.workers.lock().unwrap().insert(
+                instance.into(),
+                Worker {
+                    sender,
+                    thread,
+                    control: Arc::new(Mutex::new(lifecycle::Control::default())),
+                    busy: Arc::new(AtomicBool::new(false)),
+                    recovering: Arc::new(AtomicBool::new(false)),
+                    recovery_pending: Arc::new(AtomicBool::new(false)),
+                    queued: Arc::new(AtomicUsize::new(0)),
+                },
+            );
+        }
+        (Arc::new(pool), root)
+    }
+
+    fn worker_state(pool: &Pool) -> (Arc<Mutex<lifecycle::Control>>, Arc<AtomicUsize>) {
+        let workers = pool.workers.lock().unwrap();
+        let worker = &workers["held"];
+        (worker.control.clone(), worker.queued.clone())
+    }
+
+    #[test]
+    fn a_held_instance_delays_no_other_and_its_own_request_times_out_by_its_deadline() {
+        let (pool, _root) = pool();
+        let (control, _) = worker_state(&pool);
+        let guard = control.lock().unwrap();
+        let deadline = connectors_sdk::now_ms() + 300;
+        let done = Arc::new(AtomicBool::new(false));
+        let (answered, answer) = mpsc::channel();
+        let held = {
+            let (pool, done) = (pool.clone(), done.clone());
+            std::thread::spawn(move || {
+                let code = pool
+                    .run("held", &adapter("held"), read(), deadline)
+                    .err()
+                    .map(|error| error.code);
+                let _ = answered.send((code, connectors_sdk::now_ms()));
+                done.store(true, Ordering::SeqCst);
+            })
+        };
+        // Requests for the other instance, one after another, for as long as
+        // the request for the held one is unanswered.
+        let other = {
+            let (pool, done) = (pool.clone(), done.clone());
+            std::thread::spawn(move || {
+                let mut slowest = Duration::ZERO;
+                loop {
+                    let started = Instant::now();
+                    let deadline = connectors_sdk::now_ms() + 5_000;
+                    let answer = pool.run("answering", &adapter("answering"), read(), deadline);
+                    slowest = slowest.max(started.elapsed());
+                    assert!(answer.is_ok(), "the answering stand-in answers");
+                    if done.load(Ordering::SeqCst) {
+                        break slowest;
+                    }
+                    std::thread::yield_now();
+                }
+            })
+        };
+        let own = answer.recv_timeout(Duration::from_millis(800)).ok();
+        drop(guard);
+        let slowest = other.join().unwrap();
+        held.join().unwrap();
+        pool.shutdown().unwrap();
+        assert!(
+            slowest < Duration::from_millis(100),
+            "a request for another instance took {slowest:?} behind the held one"
+        );
+        let (code, at) = own.expect("the held instance's request still waited past its deadline");
+        assert_eq!(code, Some(Code::Timeout));
+        assert!(
+            at <= deadline + 100,
+            "answered {} ms after its own deadline",
+            at - deadline
+        );
+    }
+
+    #[test]
+    fn a_request_waiting_on_a_held_instance_answers_unavailable_once_the_pool_stops() {
+        let (pool, _root) = pool();
+        let (control, queued) = worker_state(&pool);
+        let guard = control.lock().unwrap();
+        let (answered, answer) = mpsc::channel();
+        let held = {
+            let pool = pool.clone();
+            std::thread::spawn(move || {
+                let deadline = connectors_sdk::now_ms() + 5_000;
+                let code = pool
+                    .run("held", &adapter("held"), read(), deadline)
+                    .err()
+                    .map(|error| error.code);
+                let _ = answered.send(code);
+            })
+        };
+        // The request is admitted and counted as work while it waits on the
+        // held instance's lock.
+        let until = Instant::now() + Duration::from_secs(5);
+        while queued.load(Ordering::SeqCst) == 0 && Instant::now() < until {
+            std::thread::yield_now();
+        }
+        let waiting = queued.load(Ordering::SeqCst) == 1;
+        pool.stopped.store(true, Ordering::SeqCst);
+        let own = answer.recv_timeout(Duration::from_secs(1)).ok();
+        drop(guard);
+        held.join().unwrap();
+        pool.shutdown().unwrap();
+        assert!(
+            waiting,
+            "a request waiting on its instance's lock was not counted as work"
+        );
+        assert_eq!(
+            own,
+            Some(Some(Code::Unavailable)),
+            "a request waiting on its instance's lock outlived the pool's stop"
+        );
+    }
+}
+
+#[cfg(test)]
+mod adversary_tests;

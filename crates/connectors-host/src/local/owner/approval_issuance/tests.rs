@@ -766,6 +766,195 @@ fn production_cli_approval_issuance_and_restart() {
     );
 }
 
+/// story:approval-issue-slack-bot-post (issue #180): `approvals issue` after a
+/// `prepare` that succeeded answered `invalid_input` and named nothing, so the
+/// caller could not tell which argument to change. Every `invalid_input` the
+/// command can answer names the argument it refused, as the CLI input model
+/// names it, one case per site in `resolve` and `issue`.
+#[test]
+fn every_invalid_input_issue_answers_names_the_argument_it_refused() {
+    let root = root();
+    let t = setup(root.path(), None, NO_CLOCK);
+    t.fake_issuer();
+    t.policy();
+    let approved = prepare(&t.paths, "fixture", &t.request(), until())
+        .unwrap()
+        .subject_sha256;
+    let refused = |request: &Request<'_>, output: &Path| match issue(
+        &t.paths,
+        "fixture",
+        request,
+        &approved,
+        output,
+        until(),
+    ) {
+        Err(error) => (error.code, error.field.map(Argument::as_str)),
+        Ok(_) => panic!("issued to {}", output.display()),
+    };
+    let invalid = |field: &'static str| (Code::InvalidInput, Some(field));
+    let fresh = root.path().join("fresh-proof.json");
+
+    // The target selectors and the business document, reconstructed by `resolve`.
+    let long = "r".repeat(257);
+    let large = "x".repeat(TARGET_LIMIT + 1);
+    let deep = format!(
+        "{{\"name\":{}0{}}}",
+        "[".repeat(runtime::channel::DEPTH + 1),
+        "]".repeat(runtime::channel::DEPTH + 1)
+    );
+    let wide = format!(
+        "{{\"name\":\"{}\",\"at\":\"2026-09-11T00:00:00Z\"}}",
+        "x".repeat(TARGET_LIMIT - 80)
+    );
+    let cases = [
+        (
+            "connection",
+            Request {
+                connection: "",
+                ..t.request()
+            },
+        ),
+        (
+            "operation",
+            Request {
+                operation: "not an id",
+                ..t.request()
+            },
+        ),
+        (
+            "schema",
+            Request {
+                schema: "not/an/id",
+                ..t.request()
+            },
+        ),
+        (
+            "revision",
+            Request {
+                revision: &long,
+                ..t.request()
+            },
+        ),
+        (
+            "input",
+            Request {
+                input: &large,
+                ..t.request()
+            },
+        ),
+        (
+            "input",
+            Request {
+                input: &deep,
+                ..t.request()
+            },
+        ),
+        (
+            "input",
+            Request {
+                input: "{\"name\":",
+                ..t.request()
+            },
+        ),
+        (
+            "input",
+            Request {
+                input: &wide,
+                ..t.request()
+            },
+        ),
+        (
+            "input",
+            Request {
+                input: r#"{"name":"item","at":"bad-date"}"#,
+                ..t.request()
+            },
+        ),
+    ];
+    let mut seen = Vec::new();
+    let mut expected = Vec::new();
+    for (index, (field, request)) in cases.iter().enumerate() {
+        seen.push((index, refused(request, &fresh)));
+        expected.push((index, invalid(field)));
+    }
+
+    // The proof output: a new file, named by an absolute plain path, in an
+    // existing directory only its owner can enter.
+    let open = root.path().join("open");
+    std::fs::create_dir(&open).unwrap();
+    #[cfg(unix)]
+    std::fs::set_permissions(&open, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let existing = root.path().join("existing-proof.json");
+    std::fs::write(&existing, b"{}").unwrap();
+    #[cfg(unix)]
+    std::fs::set_permissions(&existing, std::fs::Permissions::from_mode(0o600)).unwrap();
+    for (index, output) in [
+        Path::new("proof.json").to_owned(),
+        Path::new("/").to_owned(),
+        root.path().join("missing/proof.json"),
+        // Only unix gives `open` a mode others can read; elsewhere it is not
+        // an open directory and the case would test nothing.
+        #[cfg(unix)]
+        open.join("proof.json"),
+        existing.clone(),
+    ]
+    .iter()
+    .enumerate()
+    {
+        seen.push((cases.len() + index, refused(&t.request(), output)));
+        expected.push((cases.len() + index, invalid("proof_output")));
+    }
+    assert_eq!(seen, expected);
+    assert!(!fresh.exists() && !open.join("proof.json").exists());
+    assert_eq!(std::fs::read(&existing).unwrap(), b"{}");
+}
+
+/// The same rule for `approvals policy-set`, the other command of this module
+/// that reads an argument: its document and its expected revision.
+#[test]
+fn every_invalid_input_policy_set_answers_names_the_argument_it_refused() {
+    let root = root();
+    let t = setup(root.path(), None, NO_CLOCK);
+    t.fake_issuer();
+    let refused = |document: &[u8], revision: Option<i64>| {
+        let error = policy_set(&t.paths, "fixture", document, revision, until()).unwrap_err();
+        (error.code, error.field.map(Argument::as_str))
+    };
+    let invalid = |field: &'static str| (Code::InvalidInput, Some(field));
+    let large = vec![b' '; REQUEST_LIMIT + 1];
+    let deep = format!(
+        "{{\"operations\":{}{}}}",
+        "[".repeat(runtime::channel::DEPTH + 1),
+        "]".repeat(runtime::channel::DEPTH + 1)
+    );
+    let mut seen = Vec::new();
+    let mut expected = Vec::new();
+    for (index, document) in [
+        large.as_slice(),
+        deep.as_bytes(),
+        br#"{"operations":"#,
+        br#"{"operations":[],"issuer":"spoofed"}"#,
+        br#"{"operations":["item.write","item.write"]}"#,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        seen.push((index, refused(document, None)));
+        expected.push((index, invalid("input_file")));
+    }
+    let documents = expected.len();
+    for (index, revision) in [0, -1, 1 << 53].into_iter().enumerate() {
+        let index = documents + index;
+        seen.push((
+            index,
+            refused(br#"{"operations":["item.write"]}"#, Some(revision)),
+        ));
+        expected.push((index, invalid("expected_revision")));
+    }
+    assert_eq!(seen, expected);
+    assert!(policy_status(&t.paths, "fixture").unwrap().is_none());
+}
+
 /// story:pending-connection-refusal-names-its-remedy: the instance's approval
 /// keys and approval policy refuse a configuration whose revision the instance
 /// has not followed as `lifecycle_conflict` naming a new connection; every
@@ -785,3 +974,7 @@ fn a_changed_configuration_names_a_new_connection_for_keys_and_policy() {
         assert!(!error.reconnect);
     }
 }
+
+#[cfg(unix)]
+#[path = "tests/adversary_field.rs"]
+mod adversary_field;

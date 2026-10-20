@@ -357,7 +357,7 @@ connectors --output json approvals issue --adapter router --connection "$connect
   --operation key.create --schema "$schema" --revision "$revision" \
   --input-json '{"body":{"name":"agent-inference","limit":5,"limit_reset":"monthly"}}' \
   --approve-subject 2471a53c18995f3444509c3edbb2d5372b4e8df240bb98aec3ac39a10b3d575b \
-  --proof-output proof.json
+  --proof-output "$HOME/private/proof.json"
 ```
 
 ```json
@@ -370,7 +370,7 @@ Create one inference key, with an idempotency key and the proof:
 connectors --output json operations invoke --adapter router --connection "$connection" \
   --operation key.create --schema "$schema" --revision "$revision" \
   --input-json '{"body":{"name":"agent-inference","limit":5,"limit_reset":"monthly"}}' \
-  --idempotency-key agent-inference-1 --approval-file proof.json
+  --idempotency-key agent-inference-1 --approval-file "$HOME/private/proof.json"
 ```
 
 ```json
