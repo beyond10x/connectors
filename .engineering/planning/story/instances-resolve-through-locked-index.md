@@ -12,6 +12,7 @@ relations:
 - depends_on: story:catalog-tests-read-pinned-release-gitlab-engine
 - depends_on: story:catalog-tests-read-pinned-release-providers
 - depends_on: story:definition-tests-read-pinned-release
+- depends_on: story:openrouter-inference-key-profile
 revision: 4
 ---
 ## Outcome
