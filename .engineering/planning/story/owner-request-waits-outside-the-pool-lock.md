@@ -2,20 +2,21 @@
 format: aep.planning-md/3
 id: story:owner-request-waits-outside-the-pool-lock
 kind: story
-status: active
+status: implemented
 title: A request behind an instance's in-flight write never stalls another instance or overruns its own deadline
 summary: Pool::send takes an instance's control lock while it holds the workers mutex
 relations:
 - serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
-  path: crates/connectors-host/src/local/owner/mutation/execution.rs
-- confidence: cited
   path: crates/connectors-host/src/local/owner/supervisor.rs
-revision: 5
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/supervisor/adversary_tests.rs
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-19T21:36:32Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-19T21:36:33Z", actor: "human:timo", revision: 5}
+- {from: "active", to: "implemented", at: "2026-10-20T00:45:32Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":1,"verification":1}}}
 ---
 ## Outcome
 
@@ -44,3 +45,12 @@ its own story.
 - The pool clones the worker's sender, control and queue under `workers` and releases `workers`
   before it waits on the control lock; the deadline and `stopped` are re-checked after the wait.
 - The existing supervisor, lease and revalidation-join suites pass unchanged.
+
+## Scope delivered
+
+Delivered by wave 20261019-post0540 (`git diff --name-only 52769afb3...impl/owner-request-waits-outside-the-pool-lock`); every path is **cited** by that diff. The `## Scope` section above is the plan; differences are listed under *Corrections*.
+
+- `crates/connectors-host/src/local/owner/supervisor.rs`
+- `crates/connectors-host/src/local/owner/supervisor/adversary_tests.rs`
+
+**Corrections:** `crates/connectors-host/src/local/owner/mutation/execution.rs` was planned (cited) and not touched: the fix belongs in the pool, and holding the control lock through the native commit is kept on purpose.

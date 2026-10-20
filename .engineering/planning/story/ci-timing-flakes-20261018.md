@@ -13,14 +13,26 @@ relations:
 - supersedes: story:kubernetes-exec-fixture-busy
 scope:
 - confidence: cited
+  path: adapters/kubernetes/src/exec_credential.rs
+- confidence: cited
+  path: adapters/kubernetes/src/local.rs
+- confidence: cited
   path: adapters/kubernetes/tests/exec_credential.rs
 - confidence: cited
+  path: adapters/kubernetes/tests/exec_credential_adversary.rs
+- confidence: cited
   path: adapters/kubernetes/tests/exec_credential_security.rs
+- confidence: cited
+  path: adapters/kubernetes/tests/exec_credential_verification.rs
+- confidence: cited
+  path: adapters/kubernetes/tests/local_runtime.rs
+- confidence: cited
+  path: contracts/cli/v1alpha1/owner.md
 - confidence: cited
   path: crates/connectors-host/src/local/oauth.rs
 - confidence: cited
   path: crates/connectors-host/src/local/owner/transport.rs
-revision: 7
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-19T21:36:33Z", actor: "human:timo", revision: 6}
 - {from: "proposed", to: "active", at: "2026-10-19T21:36:33Z", actor: "human:timo", revision: 7}
@@ -93,3 +105,35 @@ observations and acceptance lines carry over.
   the same `ETXTBSY` hypothesis as the exec rows above. Added acceptance: `PluginUnavailable`
   from an exec plugin carries the spawn error kind, so an operator can tell a missing plugin from
   a busy one.
+
+## Scope delivered
+
+Delivered by wave 20261019-post0540 (`git diff --name-only 52769afb3...impl/ci-timing-flakes-20261018`); every path is **cited** by that diff. The `## Scope` section above is the plan; differences are listed under *Corrections*.
+
+- `adapters/kubernetes/src/exec_credential.rs`
+- `adapters/kubernetes/src/local.rs`
+- `adapters/kubernetes/tests/exec_credential.rs`
+- `adapters/kubernetes/tests/exec_credential_adversary.rs`
+- `adapters/kubernetes/tests/exec_credential_security.rs`
+- `adapters/kubernetes/tests/exec_credential_verification.rs`
+- `adapters/kubernetes/tests/local_runtime.rs`
+- `contracts/cli/v1alpha1/owner.md`
+- `crates/connectors-host/src/local/oauth.rs`
+- `crates/connectors-host/src/local/owner/transport.rs`
+
+**Corrections:** `adapters/kubernetes/src/exec_credential.rs` and `local.rs`, three more Kubernetes test files with the same `ETXTBSY` race, and `contracts/cli/v1alpha1/owner.md` were touched beyond the plan.
+
+## Remaining after wave 20261019-post0540
+
+Delivered and merged in `wave/20261019-post0540` (U4, merge cf742e7d3): the exec-plugin `ETXTBSY`
+cause (58 of 58 local failures `PluginUnavailable(Some(ExecutableFileBusy))`; `exec_credential`
+253/300 before, 1000/1000 after), the owner socket bind-then-chmod window (reproduced, fixed in
+`transport.rs` `listen`), the oauth drain wait (cause inferred for macOS, not reproduced on Linux),
+each story test 200/200 under load on Linux.
+
+Not done, so the story stays active:
+- 20 consecutive CI runs of the macOS "host and CLI" job and 20 of the Linux repository gate, with
+  run ids. The macOS hard link of the owner socket has not run anywhere until the wave's pull
+  request (review-result:wave-20261019-post0540-u4-adversary-1, finding 2).
+- "An operator can tell a missing plugin from a busy one" moved to
+  story:exec-plugin-busy-reaches-the-operator.

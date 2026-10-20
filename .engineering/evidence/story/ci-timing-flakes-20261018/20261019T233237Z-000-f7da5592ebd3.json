@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T23:32:37Z",
+  "actor": "human:timo",
+  "artifact": "story:ci-timing-flakes-20261018",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "repeat the exec_credential test binary under load (loadavg 13-46 on 20 cores): every run passes",
+    "reference": "~/.cache/connectors-wave-20261019b/u4/diag-exec_credential.log (base: 253/300 pass, 47 fail, all PluginUnavailable(ExecutableFileBusy)) vs ~/.cache/connectors-wave-20261019b/u4/after3-exec_credential.log (fixed: 1000/1000); VERIFIED for Linux; macOS not measured"
+  }
+}

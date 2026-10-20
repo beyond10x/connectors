@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-20T00:08:30Z",
+  "actor": "human:timo",
+  "artifact": "story:approval-issue-slack-bot-post",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "the ignored Slack bot approval journey (adapters/catalog/tests/local_runtime/slack_approval.rs): prepare then issue from fixtures; each --proof-output refusal names proof_output and the approved post succeeds",
+    "reference": "~/.cache/connectors-wave-20261019b/u1/red-journey.log (base 52769afb3 code: field null, 1 failed) vs ~/.cache/connectors-wave-20261019b/u1/r1-journey.log (478aae2e6: 1 passed); VERIFIED"
+  }
+}

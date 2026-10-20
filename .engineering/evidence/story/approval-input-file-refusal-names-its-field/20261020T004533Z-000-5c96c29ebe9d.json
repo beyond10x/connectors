@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-20T00:45:33Z",
+  "actor": "human:timo",
+  "artifact": "story:approval-input-file-refusal-names-its-field",
+  "kind": "story",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "covered by wave 20261019-post0540 U1 correction e565a3b4e: approvals prepare and issue name input for a refused --input-file or oversized --input-stdin (approval_field_adversary_2.rs::an_approval_business_document_refused_from_a_file_or_stdin_names_input); the INFEASIBLE verdict of u1-adversary-1 finding 5 was wrong (review-result:wave-20261019-post0540-u1-adversary-2)",
+    "reference": "~/.cache/connectors-wave-20261019b/integration/gate-1.log"
+  }
+}
