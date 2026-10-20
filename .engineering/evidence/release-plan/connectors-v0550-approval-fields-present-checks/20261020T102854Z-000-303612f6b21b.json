@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-20T10:28:54Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0550-approval-fields-present-checks",
+  "kind": "release-plan",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate --msrv (ESS 0.59.0, aep 0.71.3) on 9201b1177 plus the release edits: 28 steps exit 0, 2858 passed, 0 failed, 145 ignored, all checks passed",
+    "reference": "~/.cache/connectors-wave-20261019b/integration/release-gate.log"
+  }
+}

@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.55.0 — 2026-10-20
+
+### Added
+
+- An `invalid_input` that `approvals policy-set`, `approvals prepare` or `approvals issue` decides
+  names the refused argument in the new optional `Failure.field`: `connection`, `operation`,
+  `schema`, `revision`, `input`, `approve_subject`, `proof_output`, `input_file`,
+  `expected_revision` or `adapter`. The value is one of these names, never the caller's value; no
+  other command carries `field` (contracts/cli/v1alpha1/semantics.md, "The refused argument").
+- A catalog guard check can require a member to be present: `{"present": true}` holds when the
+  member exists and is not `null`; `present: false` is refused when the selection loads. A
+  connector definition writes it as `"?"` (`{/id: "?"}`); `"=?"` is the literal text `?`
+  (docs/local-catalog-provider.md, website/docs/guides/author-a-definition.md).
+
+### Changed
+
+- Jira `issue.create` checks `/id` and `/key` after the write and `issue.comment.add` checks
+  `/id`, so a `2xx` answer that names no new id (`201` with no body, `{}`, `204`) is `unknown`,
+  not `applied` (docs/catalog-jira.md).
+- Before a write, a `present` check refuses an absent member as it refuses a `null` one:
+  `forbidden`, or `conflict` under `mismatch: conflict`. A preflight answer that is no JSON object
+  or array (an empty body, `null`, a scalar) is refused as `upstream_protocol` before any check
+  reads it.
+- An owner request for one instance no longer waits behind another instance's write: the pool
+  releases its lock before it waits on the instance's control lock, and the wait ends at the
+  request's deadline (`timeout`) or when the owner stops (`unavailable`).
+- The owner binds its socket at `owner.bind` in the state directory, restricts it to its own user
+  (mode 0600) and only then links it at `owner.sock`, so a command never finds the socket before
+  it is owner-only (contracts/cli/v1alpha1/owner.md).
+
+### Fixed
+
+- `approvals issue` refusing its `--proof-output` (a relative path, a directory other users can
+  read, an existing file, a symbolic-link component) now says so with `field: "proof_output"`;
+  before, the refusal named no argument
+  ([#180](https://github.com/beyond10x/connectors/issues/180)). The OpenRouter guide's example wrote
+  the proof to a relative path, which `issue` refuses; it now uses a private absolute path.
+- Test flakes on CI ([#183](https://github.com/beyond10x/connectors/issues/183)): the Kubernetes
+  exec-plugin tests no longer write the plugin from the test process (a child forked by a parallel
+  test kept it open and the plugin's exec failed with `ETXTBSY`), and the OAuth drain tests wait
+  until the listener's kernel has acknowledged a request.
+
+### Limitations
+
+- The `connectors-definitions` repository does not yet carry the Jira `present` checks of
+  `issue.create` and `issue.comment.add`; a definition using `"?"` needs this release, since an
+  earlier lowerer reads `"?"` as an input reference.
+- An exec plugin that cannot run answers `invalid_configuration` whether it is missing or busy; the
+  operator cannot tell the two apart yet.
+- The macOS OAuth drain fix rests on an inferred cause (asynchronous loopback delivery); it was not
+  reproduced on Linux, and the 20 consecutive macOS CI runs that would confirm it are not recorded.
+
 ## 0.54.0 — 2026-10-19
 
 ### Added
