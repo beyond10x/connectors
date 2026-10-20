@@ -9,7 +9,7 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:instances-resolve-through-locked-index
 - depends_on: story:definitions-fixture-copy-removed
-revision: 1
+revision: 2
 ---
 ## Outcome
 
@@ -51,19 +51,20 @@ Every other reader has moved in the stories this one depends on.
   has no input, and it is removed with its test. Whether a byte-equality check moves to
   connectors-definitions is the open D11 question on the epic.
 - Text that names the paths: `AGENTS.md:87` (the onboarding rule),
-  `contracts/catalog/v1alpha1/semantics.md`, 14 pages under `docs/`, 17 pages under
-  `website/docs/`, and comments in two files under `adapters/*/spec/` and `adapters/*/contracts/`.
-  Each says where the data lives now.
+  `contracts/catalog/v1alpha1/semantics.md`, 12 pages under `docs/` and 15 under `website/docs/`
+  (all but the Slack and OpenRouter guides and their two site pages, which
+  `story:instances-resolve-through-locked-index` rewrites for `--connector`), and comments in two
+  files under `adapters/*/spec/` and `adapters/*/contracts/`. Each says where the data lives now.
 
-## Open before this lands
+## Ordering
 
-Slack and OpenRouter ship no declaration and are configured in the pinned form, with
-`bundle_directory` and `operations_file` pointing into a checkout of this tree
-(`docs/catalog-slack.md:403,412,470`, `docs/catalog-openrouter.md:68,77,197,206`;
-`adapters/catalog/tests/connector_declarations.rs:186-190`). After this deletion those paths do
-not exist, and the D5 install cache holds definitions, not lowered bundles. Nobody has decided how
-such an instance gets its bundle and selection. The question is on the epic; this story does not
-answer it, and it does not land before it is answered.
+- `depends_on story:instances-resolve-through-locked-index`: the build embeds the pinned release,
+  and every connector, `slack`, `slack-user` and `openrouter` included, is served by name from it
+  (option A of `decision-blocker:slack-openrouter-pinned-source`), so no guide needs a path into
+  this tree, and a path-configured instance moves through `setup migrate` there. That story also
+  removes the Slack and OpenRouter hold-outs from
+  `connector_declarations.rs` and `guide_instances.rs`; this one removes their reads by path.
+- `depends_on story:definitions-fixture-copy-removed`: the fixture copy is gone first.
 
 ## Domain relations
 
@@ -84,7 +85,8 @@ None beyond those of `story:instances-resolve-through-locked-index`.
 - Vendored upstream sources under `adapters/*/upstream/` (not in the epic order).
 - `adapters/catalog/tests/hand_written/`: its JSON keeps the placeholder paths as the record of
   what the guides showed (`adapters/catalog/tests/hand_written/mod.rs:1-7`).
-- The build-time fetch and embedding: `story:instances-resolve-through-locked-index`.
+- The build-time fetch and embedding, serving `slack`, `slack-user` and `openrouter` by name, and
+  the Slack and OpenRouter guides and site pages: `story:instances-resolve-through-locked-index`.
 
 ## Acceptance
 
