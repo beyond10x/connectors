@@ -141,23 +141,33 @@ impl Session {
             )
         })()
         .unwrap_or(false);
-        if self
+        let approval = self
             .selection
             .as_ref()
-            .is_some_and(|s| matches!(s.callable.as_str(), "approval-prepare" | "approval-issue"))
-            || is_write
-        {
+            .is_some_and(|s| matches!(s.callable.as_str(), "approval-prepare" | "approval-issue"));
+        // An approval command's refused business document names `input`
+        // (contracts/cli/v1alpha1/semantics.md, "The refused argument"); an
+        // approved write's `operations invoke` names nothing.
+        let named = |mut error: owner::Error| {
+            if approval && error.code == Code::InvalidInput && error.field.is_none() {
+                error.field = Some(owner::Argument::Input);
+            }
+            error
+        };
+        if approval || is_write {
             return match source {
                 ProtectedSource::DocumentFile(path) => protected::document_until(
                     Some(&path),
                     self.approval_deadline,
                     owner::approval_issuance::TARGET_LIMIT,
-                ),
+                )
+                .map_err(named),
                 ProtectedSource::DocumentStdin => protected::document_until(
                     None,
                     self.approval_deadline,
                     owner::approval_issuance::TARGET_LIMIT,
-                ),
+                )
+                .map_err(named),
                 _ => Err(Code::InvalidInput.into()),
             };
         }
@@ -295,7 +305,11 @@ impl Session {
             // Sources and DynamicValidator expose only generic errors. Render
             // the owner's closed failure through the same generated error shape
             // so admission refusals retain their actionable CLI semantics.
-            let reply = super::owner_failure(error);
+            let reply = if matches!(callable.as_str(), "approval-prepare" | "approval-issue") {
+                super::approval_failure(error)
+            } else {
+                super::owner_failure(error)
+            };
             let (code, data, exit_code) = match reply {
                 HandlerReply::UsageError { code, data } => (code, data, 2),
                 HandlerReply::Error { code, data } => (code, data, 1),

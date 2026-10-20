@@ -1,7 +1,7 @@
 //! Trusted local approval coordination. Only metadata is used to prepare a
 //! subject. Issuance owns the exact policy/key leases and protected publication;
 //! neither path starts an owner/adapter or authorizes a business dispatch.
-use super::{Code, Error, Result, selected};
+use super::{Argument, Code, Error, Result, selected};
 use crate::local::{
     approval_keys, approval_policy, approvals,
     config::{Adapter, Config, Paths},
@@ -127,12 +127,17 @@ pub fn policy_set(
     until: Instant,
 ) -> Result<approval_policy::View> {
     check(until)?;
+    let document_refused = || Error::invalid_input(Argument::InputFile);
     if document.len() > REQUEST_LIMIT {
-        return Err(Code::InvalidInput.into());
+        return Err(document_refused());
     }
-    runtime::channel::depth(document).map_err(|_| Code::InvalidInput)?;
+    runtime::channel::depth(document).map_err(|_| document_refused())?;
     let input: PolicyInput =
-        connectors_core::read_json(document).map_err(|_| Code::InvalidInput)?;
+        connectors_core::read_json(document).map_err(|_| document_refused())?;
+    // A policy revision is a positive JSON-safe integer (approval_policy.rs).
+    if expected_revision.is_some_and(|revision| !(1..=(1 << 53) - 1).contains(&revision)) {
+        return Err(Error::invalid_input(Argument::ExpectedRevision));
+    }
     let (config, adapter) = selected(paths, alias)?;
     let bootstrap = snapshot(paths, &adapter)?;
     let selection = selection(&config, &adapter, &bootstrap)?;
@@ -140,9 +145,14 @@ pub fn policy_set(
         required_write(&adapter, &bootstrap, operation)?;
     }
     check(until)?;
+    // What the store refuses as input past the revision is the operation
+    // list: too many, or one named twice.
     let result = policy_store(paths, &adapter)?
         .set_admitted(&selection, input.operations, expected_revision)
-        .map_err(policy_error)?;
+        .map_err(|failure| match policy_error(failure) {
+            error if error.code == Code::InvalidInput => document_refused(),
+            error => error,
+        })?;
     // A committed update cannot become a definite pre-publication refusal.
     check(until).map_err(|_| Code::OutcomeUnknown)?;
     Ok(result)
@@ -192,21 +202,25 @@ pub(super) fn resolve(
     until: Instant,
 ) -> Result<Resolved> {
     check(until)?;
-    if request.input.len() > TARGET_LIMIT
-        || [
-            &request.connection,
-            &request.operation,
-            &request.schema,
-            &request.revision,
-        ]
-        .iter()
-        .any(|s| s.is_empty() || s.len() > 256 || !connectors_core::valid_id(s))
-    {
-        return Err(Code::InvalidInput.into());
+    // Each refusal names the argument it refused, as the CLI input model
+    // names it (issue #180: `issue` named none).
+    let input_refused = || Error::invalid_input(Argument::Input);
+    if request.input.len() > TARGET_LIMIT {
+        return Err(input_refused());
     }
-    runtime::channel::depth(request.input.as_bytes()).map_err(|_| Code::InvalidInput)?;
+    for (field, value) in [
+        (Argument::Connection, request.connection),
+        (Argument::Operation, request.operation),
+        (Argument::Schema, request.schema),
+        (Argument::Revision, request.revision),
+    ] {
+        if value.is_empty() || value.len() > 256 || !connectors_core::valid_id(value) {
+            return Err(Error::invalid_input(field));
+        }
+    }
+    runtime::channel::depth(request.input.as_bytes()).map_err(|_| input_refused())?;
     let input: Value =
-        connectors_core::read_json(request.input.as_bytes()).map_err(|_| Code::InvalidInput)?;
+        connectors_core::read_json(request.input.as_bytes()).map_err(|_| input_refused())?;
     // Independently bound both projected envelopes, not merely the input text.
     // The local helper has no public wire request id, executor or route.
     let target = json!({"connection":request.connection,"operation":request.operation,
@@ -217,7 +231,7 @@ pub(super) fn resolve(
     if connectors_core::canonical(&target).len() > TARGET_LIMIT
         || connectors_core::canonical(&helper).len() > REQUEST_LIMIT
     {
-        return Err(Code::InvalidInput.into());
+        return Err(input_refused());
     }
     let (config, adapter) = selected(paths, alias)?;
     let bootstrap = snapshot(paths, &adapter)?;
@@ -233,7 +247,7 @@ pub(super) fn resolve(
         .operation(request.operation)
         .map_err(|_| Code::NotFound)?;
     connectors_sdk::validate_write_value(&operation.input_schema, &input)
-        .map_err(|_| Code::InvalidInput)?;
+        .map_err(|_| input_refused())?;
     let connection_revision = registry::Registry::new(&paths.state).approval_target(
         &bootstrap.binding(&required.profile)?,
         request.connection,
@@ -289,8 +303,10 @@ pub(super) fn resolve(
         approval_mode: "required".into(),
     };
     subject.canonical_bytes().map_err(proof_error)?;
+    // Serializing values the host built is no argument's fault: like the
+    // protected document in `issue`, a failure there is `unavailable`.
     let subject_sha256 =
-        connectors_core::digest(&serde_json::to_value(&subject).map_err(|_| Code::InvalidInput)?);
+        connectors_core::digest(&serde_json::to_value(&subject).map_err(|_| Code::Unavailable)?);
     let preparation = Preparation {
         subject,
         subject_sha256,
@@ -308,7 +324,7 @@ pub(super) fn resolve(
         },
     };
     if serde_json::to_vec(&json!({"adapter":alias,"preparation":preparation}))
-        .map_err(|_| Code::InvalidInput)?
+        .map_err(|_| Code::Unavailable)?
         .len()
         > RESULT_LIMIT
     {
@@ -352,11 +368,14 @@ pub fn issue(
     if first.preparation.subject_sha256 != approved {
         return Err(Code::Forbidden.into());
     }
-    filesystem::validate_path(output).map_err(|_| Code::InvalidInput)?;
-    let parent = filesystem::directory(output.parent().ok_or(Code::InvalidInput)?, false, true)
-        .map_err(|_| Code::InvalidInput)?;
-    let name = output.file_name().ok_or(Code::InvalidInput)?;
-    filesystem::require_absent(&parent, name).map_err(|_| Code::InvalidInput)?;
+    // A new file, named by an absolute plain path, in an existing directory
+    // only its owner can enter: anything else refuses naming the argument.
+    let output_refused = || Error::invalid_input(Argument::ProofOutput);
+    filesystem::validate_path(output).map_err(|_| output_refused())?;
+    let parent = filesystem::directory(output.parent().ok_or_else(output_refused)?, false, true)
+        .map_err(|_| output_refused())?;
+    let name = output.file_name().ok_or_else(output_refused)?;
+    filesystem::require_absent(&parent, name).map_err(|_| output_refused())?;
     check(until)?;
     // Network acquisition must precede every policy/key/custody lease.
     let selected = first
