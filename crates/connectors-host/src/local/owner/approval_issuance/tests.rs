@@ -892,6 +892,9 @@ fn every_invalid_input_issue_answers_names_the_argument_it_refused() {
         Path::new("proof.json").to_owned(),
         Path::new("/").to_owned(),
         root.path().join("missing/proof.json"),
+        // Only unix gives `open` a mode others can read; elsewhere it is not
+        // an open directory and the case would test nothing.
+        #[cfg(unix)]
         open.join("proof.json"),
         existing.clone(),
     ]
