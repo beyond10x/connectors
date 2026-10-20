@@ -41,12 +41,16 @@ pub enum Effect {
 /// JSON type, so only that JSON boolean holds and a string, a number or `null`
 /// in its place differs. A literal `"true"` or `"false"` is refused when the
 /// selection loads, since as text it would hold for a look-alike string.
+/// `present`, only `true`, compares nothing: the member must exist and must not
+/// be `null`, for an answer that names what the write made, such as a created
+/// issue's `id`; `false` is refused when the selection loads.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Expectation {
     Input(String),
     Literal(String),
     Boolean(bool),
+    Present(bool),
 }
 
 /// One comparison: the value at `pointer` in an observed body must equal what
@@ -503,7 +507,7 @@ impl Guard {
             .map(|(_, reference)| reference)
             .chain(self.checks().filter_map(|check| match &check.expect {
                 Expectation::Input(path) => Some(path),
-                Expectation::Literal(_) | Expectation::Boolean(_) => None,
+                Expectation::Literal(_) | Expectation::Boolean(_) | Expectation::Present(_) => None,
             }))
     }
 }
@@ -860,29 +864,34 @@ fn reference<'a>(input: &'a Value, path: &str) -> Option<&'a Value> {
 }
 
 /// What a resolved check compares an observed value with: text, from an input
-/// or a literal, or a JSON boolean.
+/// or a literal, or a JSON boolean; or nothing, the member only present.
 #[derive(Clone, Debug)]
 enum Pinned {
     Text(String),
     Boolean(bool),
+    Present,
 }
 
 impl Pinned {
     /// Whether an observed value is present in the form this comparison
-    /// reads: a scalar for text, any JSON value for a boolean.
+    /// reads: a scalar for text, any JSON value for a boolean. A presence
+    /// always reads: an absent member is its comparison failing, as a `null`
+    /// one is, so both refuse the same way.
     fn present(&self, observed: Option<&Value>) -> bool {
         match self {
             Pinned::Text(_) => observed.and_then(scalar).is_some(),
             Pinned::Boolean(_) => observed.is_some(),
+            Pinned::Present => true,
         }
     }
 
-    /// Whether an observed value holds: text equal as text, or exactly the
-    /// JSON boolean.
+    /// Whether an observed value holds: text equal as text, exactly the JSON
+    /// boolean, or, for a presence, any value but `null`.
     fn holds(&self, observed: Option<&Value>) -> bool {
         match self {
             Pinned::Text(text) => observed.and_then(scalar).as_deref() == Some(text.as_str()),
             Pinned::Boolean(flag) => observed == Some(&Value::Bool(*flag)),
+            Pinned::Present => observed.is_some_and(|value| !value.is_null()),
         }
     }
 }
@@ -1390,6 +1399,17 @@ impl Engine {
                 }) {
                     return Err(refuse(format!(
                         "guard of `{}` compares `{}` with a literal boolean spelling; write the expectation as {{\"boolean\": …}}",
+                        selection.id, check.pointer
+                    )));
+                }
+                // A presence is only `true`, as the model holds it: an absent
+                // member is proved by `absent` and a read, not by a check.
+                if let Some(check) = checks
+                    .iter()
+                    .find(|check| check.expect == Expectation::Present(false))
+                {
+                    return Err(refuse(format!(
+                        "guard of `{}` expects `{}` with a presence other than true",
                         selection.id, check.pointer
                     )));
                 }
@@ -1909,6 +1929,7 @@ impl Engine {
                             ),
                             Expectation::Literal(text) => Pinned::Text(text.clone()),
                             Expectation::Boolean(flag) => Pinned::Boolean(*flag),
+                            Expectation::Present(_) => Pinned::Present,
                         };
                         Ok((check.pointer.clone(), value))
                     })
@@ -1960,6 +1981,15 @@ impl Engine {
                     ));
                 }
                 let observed = read_body(&response, false, &exposed.selection.rate_limit_reasons)?;
+                // An answer that is no object or array (an empty body, `null`,
+                // a scalar) carries no member at all: it shows nothing about
+                // the target, whatever check reads it first.
+                if !(observed.is_object() || observed.is_array()) {
+                    return Err(Error::new(
+                        ErrorCode::UpstreamProtocol,
+                        "guard preflight answered without a document",
+                    ));
+                }
                 for (pointer, expected) in preflight {
                     let current = observed.pointer(pointer);
                     if !expected.present(current) {

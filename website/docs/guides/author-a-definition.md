@@ -221,9 +221,11 @@ A `guard` checks the write before and after it is sent. The definitions reposito
   `{read: branch.get, with: {branch: body.source_branch}, expect: {/commit/id: sha}}`. A parameter
   the read does not have is refused as `guard_parameter`.
 - `expect` maps a JSON pointer into the read's answer to an input reference (`discussion_id`,
-  `body.resolved`), a literal (`=opened`) or a boolean (`=true`). If one comparison fails, the
-  write is refused before anything is sent.
-- `after.expect` compares the write's answer the same way; `after.read` reads again instead,
+  `body.resolved`), a literal (`=opened`), a boolean (`=true`) or `"?"`, which holds when the
+  member exists and is not `null`, whatever its value. If one comparison fails, the write is
+  refused before anything is sent.
+- `after.expect` compares the write's answer the same way; `"?"` there requires what a create
+  names, such as Jira's `{/id: "?", /key: "?"}` after `issue.create`. `after.read` reads again instead,
   `after.absent: true` wants that read to answer 404, and `also` lists further reads before the
   write. When the answer does not match, the outcome is unknown: the provider may have applied the write, so read the target before any retry.
 

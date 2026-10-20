@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T23:01:11Z",
+  "actor": "human:timo",
+  "artifact": "story:owner-request-waits-outside-the-pool-lock",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test --locked -p connectors-host --lib pool_lock_tests: a request for another instance answers in under 100 ms while one instance's control lock is held",
+    "reference": "~/.cache/connectors-wave-20261019b/u3/red.log (base 52769afb3: 805 ms, 2 failed) vs ~/.cache/connectors-wave-20261019b/u3/adversary-1/coord-lib.log (f1a433cc0 tree: 535 passed); VERIFIED"
+  }
+}

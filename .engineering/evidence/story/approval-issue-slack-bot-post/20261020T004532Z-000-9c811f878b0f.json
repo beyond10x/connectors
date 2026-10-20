@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-20T00:45:32Z",
+  "actor": "human:timo",
+  "artifact": "story:approval-issue-slack-bot-post",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "acceptance 3: the wave base 52769afb3 carries the code of 83aee7c96 (git diff 83aee7c96 52769afb3 outside .engineering is empty). On it, prepare then issue with a private absolute --proof-output succeeds; #180's refusal is one of the --proof-output checks (relative path, readable directory, existing file), answered without a field. The Slack journey's field assertions fail there and pass from 478aae2e6; the release that names the field is the next one cut from main.",
+    "reference": "~/.cache/connectors-wave-20261019b/u1/red-journey.log vs ~/.cache/connectors-wave-20261019b/u1/r1-journey.log"
+  }
+}

@@ -778,6 +778,7 @@ types:
       # pinned by tests.
       - {name: clock_refusal, type: "Optional<connectors.clock.Refusal>"}
       - {name: clock_sources, type: "Optional<List<connectors.clock.SourceReport>>"}
+      - {name: field, type: "Optional<String>"}
       # ESS-LIMIT: cause and attempts appear only on a `connections revalidate` failure at
       # stage dispatch that the owner classified as transient (contracts/cli/v1alpha1/semantics.md
       # §6, "Revalidation retries"): cause names the class of the last attempt, attempts the

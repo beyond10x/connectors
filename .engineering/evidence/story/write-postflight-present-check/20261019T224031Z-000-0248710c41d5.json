@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-19T22:40:31Z",
+  "actor": "human:timo",
+  "artifact": "story:write-postflight-present-check",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test --locked -p connectors-catalog-provider --test jira_write_postflight_present: issue.create answered 201 with no body is unknown, not applied",
+    "reference": "~/.cache/connectors-wave-20261019b/u2/red.log (base 52769afb3: applied, 4 failed) vs ~/.cache/connectors-wave-20261019b/u2/verify-treatment.log (55606279d: 7 passed); VERIFIED"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-20T00:45:31Z",
+  "actor": "human:timo",
+  "artifact": "story:approval-issue-slack-bot-post",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate on wave/20261019-post0540 f96b0c013: 15 steps exit 0, 2858 passed, 0 failed, 145 ignored, all checks passed",
+    "reference": "~/.cache/connectors-wave-20261019b/integration/gate-1.log"
+  }
+}

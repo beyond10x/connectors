@@ -18,6 +18,30 @@ const TOKEN: &str = "fixture-exec-plugin-token";
 const USER: &str = "eks-fixture-user";
 const LATER: &str = "2030-01-01T00:00:00Z";
 
+/// Puts `contents` at `path`, mode 0700, through a `cp` child: this process
+/// never holds a file it will execute open for writing. The tests run on
+/// parallel threads and every plugin run forks; a child forked while this
+/// process held the file open keeps that descriptor until its own exec, and
+/// an exec of the file meanwhile fails with `ETXTBSY`
+/// (`PluginUnavailable(Some(ExecutableFileBusy))`). `cp` has exited, and
+/// closed the file, when this returns.
+fn install(path: &Path, contents: &[u8]) {
+    let staged = path.with_extension("staged");
+    fs::write(&staged, contents).unwrap();
+    copy(&staged, path);
+    fs::remove_file(&staged).unwrap();
+}
+/// `cp source destination`, then mode 0700: see [`install`].
+fn copy(source: &Path, destination: &Path) {
+    let status = std::process::Command::new("cp")
+        .arg(source)
+        .arg(destination)
+        .status()
+        .unwrap();
+    assert!(status.success(), "cp: {status}");
+    fs::set_permissions(destination, fs::Permissions::from_mode(0o700)).unwrap();
+}
+
 struct Plugin {
     dir: tempfile::TempDir,
     path: PathBuf,
@@ -29,8 +53,7 @@ impl Plugin {
         let path = dir.path().join("fixture-plugin");
         let d = dir.path().display();
         let script = format!("#!/bin/sh\necho run >> {d}/runs\nexport -p > {d}/env\n{body}\n");
-        fs::write(&path, script).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+        install(&path, script.as_bytes());
         fs::create_dir(dir.path().join("home")).unwrap();
         Self { dir, path }
     }
@@ -38,10 +61,9 @@ impl Plugin {
     fn answering() -> Self {
         let plugin = Self::new("");
         let d = plugin.dir.path().display();
-        let path = plugin.path.clone();
-        let script = fs::read_to_string(&path).unwrap()
+        let script = fs::read_to_string(&plugin.path).unwrap()
             + &format!("read -r line < {d}/answer\nprintf '%s\\n' \"$line\"\n");
-        fs::write(&path, script).unwrap();
+        install(&plugin.path, script.as_bytes());
         plugin
     }
     fn answer(&self, expiry: Option<&str>) {
@@ -192,7 +214,7 @@ fn exec_plugin_digest_mismatch_refuses_before_the_process_runs() {
     let credentials = Credentials::new(plugin.binding()).unwrap();
     let mut script = fs::read_to_string(&plugin.path).unwrap();
     script.push_str("# replaced\n");
-    fs::write(&plugin.path, script).unwrap();
+    install(&plugin.path, script.as_bytes());
     assert_eq!(
         token(&credentials, &config, &clock("2029-01-01T00:00:00Z")),
         Err(Refusal::DigestMismatch)
@@ -286,37 +308,51 @@ fn exec_plugin_deadline_overrun_is_refused_and_killed() {
         .into_iter()
         .find(|p| Path::new(p).exists())
         .unwrap();
-    let plugin = Plugin::new("");
-    let d = plugin.dir.path().display();
-    let script = fs::read_to_string(&plugin.path).unwrap()
-        + &format!("echo $$ > {d}/pid\n{sleep} 30 &\necho $! > {d}/grandchild\nwait\n");
-    fs::write(&plugin.path, script).unwrap();
-    let mut binding = plugin.binding();
-    binding.timeout_ms = Some(300);
-    let credentials = Credentials::new(binding).unwrap();
-    let config = kubeconfig(&plugin.path, &[]);
-    let started = Instant::now();
-    assert_eq!(
-        token(&credentials, &config, &clock("2029-01-01T00:00:00Z")),
-        Err(Refusal::Timeout)
-    );
-    assert!(started.elapsed() < Duration::from_secs(5));
-    let pid: i32 = fs::read_to_string(plugin.dir.path().join("pid"))
-        .unwrap()
-        .trim()
-        .parse()
-        .unwrap();
-    let grandchild: i32 = fs::read_to_string(plugin.dir.path().join("grandchild"))
-        .unwrap()
-        .trim()
-        .parse()
-        .unwrap();
-    // The whole process group is killed, the plugin's own children included.
-    let until = Instant::now() + Duration::from_secs(5);
-    while !(dead(pid) && dead(grandchild)) {
-        assert!(Instant::now() < until, "plugin process group survived");
-        std::thread::sleep(Duration::from_millis(20));
+    // Under load the deadline can pass before the plugin's shell has started
+    // its grandchild (observed at load average 77 on 20 cores: no `pid`
+    // file). Such a run is still a timeout, but it shows nothing about the
+    // group; the scenario then runs again with a fresh plugin.
+    for attempt in 1.. {
+        let plugin = Plugin::new("");
+        let d = plugin.dir.path().display();
+        let script = fs::read_to_string(&plugin.path).unwrap()
+            + &format!("echo $$ > {d}/pid\n{sleep} 30 &\necho $! > {d}/grandchild\nwait\n");
+        install(&plugin.path, script.as_bytes());
+        let mut binding = plugin.binding();
+        binding.timeout_ms = Some(300);
+        let credentials = Credentials::new(binding).unwrap();
+        let config = kubeconfig(&plugin.path, &[]);
+        let started = Instant::now();
+        assert_eq!(
+            token(&credentials, &config, &clock("2029-01-01T00:00:00Z")),
+            Err(Refusal::Timeout)
+        );
+        assert!(started.elapsed() < Duration::from_secs(5));
+        // The plugin is reaped when the run returns, so what it wrote is all
+        // it will ever write.
+        let (Some(pid), Some(grandchild)) = (
+            pid_in(&plugin.dir.path().join("pid")),
+            pid_in(&plugin.dir.path().join("grandchild")),
+        ) else {
+            assert!(
+                attempt < 10,
+                "in 10 runs the plugin never started its grandchild before the deadline"
+            );
+            continue;
+        };
+        // The whole process group is killed, the plugin's own children included.
+        let until = Instant::now() + Duration::from_secs(5);
+        while !(dead(pid) && dead(grandchild)) {
+            assert!(Instant::now() < until, "plugin process group survived");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        return;
     }
+}
+
+/// The process id a fixture wrote to `path`, if it got as far as writing it.
+fn pid_in(path: &Path) -> Option<i32> {
+    fs::read_to_string(path).ok()?.trim().parse().ok()
 }
 
 #[test]
@@ -434,8 +470,7 @@ fn exec_plugin_native_executable_answers_through_its_descriptor() {
         .unwrap();
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("echo");
-    fs::copy(fs::canonicalize(echo).unwrap(), &path).unwrap();
-    fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+    copy(&fs::canonicalize(echo).unwrap(), &path);
     assert_ne!(&fs::read(&path).unwrap()[..2], b"#!");
     let binding = Binding {
         sha256: hex::encode(Sha256::digest(fs::read(&path).unwrap())),
@@ -478,7 +513,9 @@ fn exec_plugin_symbolic_link_at_the_pinned_path_is_refused() {
             &kubeconfig(&link, &[]),
             &clock("2029-01-01T00:00:00Z")
         ),
-        Err(Refusal::PluginUnavailable)
+        Err(Refusal::PluginUnavailable(Some(
+            std::io::Error::from_raw_os_error(libc::ELOOP).kind()
+        )))
     );
     assert_eq!(plugin.runs(), 0);
 }
@@ -493,7 +530,7 @@ fn exec_plugin_writable_or_set_id_file_is_refused() {
         let credentials = Credentials::new(plugin.binding()).unwrap();
         assert_eq!(
             token(&credentials, &config, &clock("2029-01-01T00:00:00Z")),
-            Err(Refusal::PluginUnavailable),
+            Err(Refusal::PluginUnavailable(None)),
             "{mode:o}"
         );
     }
@@ -532,7 +569,7 @@ fn exec_plugin_fifo_at_the_path_is_refused_without_blocking() {
             &kubeconfig(&path, &[]),
             &clock("2029-01-01T00:00:00Z")
         ),
-        Err(Refusal::PluginUnavailable)
+        Err(Refusal::PluginUnavailable(None))
     );
     assert!(started.elapsed() < Duration::from_secs(5));
 }
@@ -700,7 +737,7 @@ fn exec_plugin_file_with_capabilities_is_refused() {
             &kubeconfig(&plugin.path, &[]),
             &clock("2029-01-01T00:00:00Z")
         ),
-        Err(Refusal::PluginUnavailable)
+        Err(Refusal::PluginUnavailable(None))
     );
     assert_eq!(plugin.runs(), 0);
 }
@@ -723,7 +760,7 @@ fn exec_plugin_group_left_behind_is_killed_when_the_run_ends() {
             "{sleep} 30 > /dev/null 2>&1 &\necho $! > {d}/left\n\
              read -r line < {d}/answer\nprintf '%s\\n' \"$line\"\nexit 0\n"
         );
-    fs::write(&plugin.path, script).unwrap();
+    install(&plugin.path, script.as_bytes());
     let credentials = Credentials::new(plugin.binding()).unwrap();
     assert_eq!(
         token(
@@ -755,41 +792,114 @@ fn exec_plugin_group_left_behind_is_killed_when_the_run_ends() {
 #[test]
 #[cfg(target_os = "linux")]
 fn exec_plugin_deadline_closes_stdout_for_an_escaped_descendant() {
-    let plugin = Plugin::new("");
-    let d = plugin.dir.path().display();
-    let script = fs::read_to_string(&plugin.path).unwrap()
-        + &format!(
-            "/usr/bin/setsid /bin/sh -c 'trap \"\" PIPE; echo $$ > {d}/escaped; \
-             /usr/bin/sleep 1; echo late || : > {d}/epipe' &\n/usr/bin/sleep 30\n"
+    // The plugin marks `ready` only once its descendant has left the group
+    // (it wrote `escaped` after setsid). Under load the deadline can pass
+    // before that; such a run is still a timeout but has no escaped
+    // descendant to observe, and the scenario runs again with a fresh plugin.
+    for attempt in 1.. {
+        let plugin = Plugin::new("");
+        let d = plugin.dir.path().display();
+        let script = fs::read_to_string(&plugin.path).unwrap()
+            + &format!(
+                "/usr/bin/setsid /bin/sh -c 'trap \"\" PIPE; echo $$ > {d}/escaped; \
+                 /usr/bin/sleep 1; echo late || : > {d}/epipe' &\n\
+                 while [ ! -s {d}/escaped ]; do :; done\n: > {d}/ready\n/usr/bin/sleep 30\n"
+            );
+        install(&plugin.path, script.as_bytes());
+        let mut binding = plugin.binding();
+        binding.timeout_ms = Some(300);
+        let credentials = Credentials::new(binding).unwrap();
+        let started = Instant::now();
+        assert_eq!(
+            token(
+                &credentials,
+                &kubeconfig(&plugin.path, &[]),
+                &clock("2029-01-01T00:00:00Z")
+            ),
+            Err(Refusal::Timeout)
         );
-    fs::write(&plugin.path, script).unwrap();
-    let mut binding = plugin.binding();
-    binding.timeout_ms = Some(300);
-    let credentials = Credentials::new(binding).unwrap();
-    let started = Instant::now();
+        assert!(started.elapsed() < Duration::from_secs(4));
+        let escaped = pid_in(&plugin.dir.path().join("escaped"));
+        if !plugin.dir.path().join("ready").exists() {
+            if let Some(pid) = escaped {
+                // SAFETY: the pid is this test's own fixture descendant.
+                unsafe { libc::kill(pid, libc::SIGKILL) };
+            }
+            assert!(
+                attempt < 10,
+                "in 10 runs the plugin's descendant never left its group before the deadline"
+            );
+            continue;
+        }
+        let escaped = escaped.expect("ready is written only after escaped");
+        // The descendant writes once more after its pause, then exits: its
+        // write failed (EPIPE) if and only if `epipe` exists then.
+        let until = Instant::now() + Duration::from_secs(30);
+        while !dead(escaped) {
+            if Instant::now() >= until {
+                // SAFETY: the pid is this test's own fixture descendant.
+                unsafe { libc::kill(escaped, libc::SIGKILL) };
+                panic!("the escaped descendant did not finish within 30 s");
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(
+            plugin.dir.path().join("epipe").exists(),
+            "the read end of the plugin's stdout outlived the timeout"
+        );
+        return;
+    }
+}
+
+/// story:kubernetes-exec-fixture-busy: a plugin some process holds open for
+/// writing cannot be executed (`ETXTBSY`), and a missing one cannot be
+/// opened. Both are `plugin_unavailable`; the refusal carries the operating
+/// system's error kind, so the two are told apart. Once the writer lets go,
+/// the same plugin runs. The writer is a child process: a descriptor this
+/// process held would reach every child another test forks meanwhile, and
+/// keep the plugin busy after it was closed here (see [`install`]).
+#[test]
+#[cfg(target_os = "linux")]
+fn exec_plugin_unavailable_names_a_busy_plugin_apart_from_a_missing_one() {
+    use std::io::{BufRead, ErrorKind};
+    let plugin = Plugin::answering();
+    plugin.answer(Some(LATER));
+    let config = kubeconfig(&plugin.path, &[]);
+    let at = clock("2029-01-01T00:00:00Z");
+    let mut writer = std::process::Command::new("/bin/sh")
+        .args([
+            "-c",
+            "exec 3>>\"$1\" && echo held && read -r line",
+            "writer",
+        ])
+        .arg(&plugin.path)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut held = String::new();
+    std::io::BufReader::new(writer.stdout.as_mut().unwrap())
+        .read_line(&mut held)
+        .unwrap();
+    assert_eq!(held, "held\n");
+    let credentials = Credentials::new(plugin.binding()).unwrap();
     assert_eq!(
-        token(
-            &credentials,
-            &kubeconfig(&plugin.path, &[]),
-            &clock("2029-01-01T00:00:00Z")
-        ),
-        Err(Refusal::Timeout)
+        token(&credentials, &config, &at),
+        Err(Refusal::PluginUnavailable(Some(
+            ErrorKind::ExecutableFileBusy
+        )))
     );
-    assert!(started.elapsed() < Duration::from_secs(4));
-    let epipe = plugin.dir.path().join("epipe");
-    let until = Instant::now() + Duration::from_secs(6);
-    while !epipe.exists() && Instant::now() < until {
-        std::thread::sleep(Duration::from_millis(50));
-    }
-    if let Ok(pid) = fs::read_to_string(plugin.dir.path().join("escaped"))
-        && let Ok(pid) = pid.trim().parse::<i32>()
-    {
-        // SAFETY: the pid is this test's own fixture descendant.
-        unsafe { libc::kill(pid, libc::SIGKILL) };
-    }
-    assert!(
-        epipe.exists(),
-        "the read end of the plugin's stdout outlived the timeout"
+    assert_eq!(plugin.runs(), 0);
+    writer.kill().unwrap();
+    writer.wait().unwrap();
+    assert_eq!(token(&credentials, &config, &at), Ok(TOKEN.to_owned()));
+    assert_eq!(plugin.runs(), 1);
+    let binding = plugin.binding();
+    fs::remove_file(&plugin.path).unwrap();
+    let missing = Credentials::new(binding).unwrap();
+    assert_eq!(
+        token(&missing, &config, &at),
+        Err(Refusal::PluginUnavailable(Some(ErrorKind::NotFound)))
     );
 }
 

@@ -75,7 +75,8 @@ operations:
       /fields/parent/key: string+
     guard:
       before: {read: getProject, with: {projectIdOrKey: body.fields.project.key}, expect: {/key: body.fields.project.key}}
-    description: "Create one issue in the project body.fields.project.key, of the issue type body.fields.issuetype.id, with body.fields.summary; body.fields.description is an Atlassian Document Format document sent as given, and body.fields.labels, body.fields.priority.id, body.fields.assignee.accountId and body.fields.parent.key are optional (issue.create_meta.fields lists what an issue type takes). The provider reads the project first and refuses before any write when it is absent or has another key. Nothing is compared before a create: the same input approved and sent twice creates two issues. Jira answers 201 with the new issue's id, key and self"
+      after: {expect: {/id: "?", /key: "?"}}
+    description: "Create one issue in the project body.fields.project.key, of the issue type body.fields.issuetype.id, with body.fields.summary; body.fields.description is an Atlassian Document Format document sent as given, and body.fields.labels, body.fields.priority.id, body.fields.assignee.accountId and body.fields.parent.key are optional (issue.create_meta.fields lists what an issue type takes). The provider reads the project first and refuses before any write when it is absent or has another key. Nothing is compared before a create: the same input approved and sent twice creates two issues. Jira answers 201 with the new issue's id, key and self; an answer without the id or the key leaves the outcome unknown"
   issue.comment.add:
     op: addComment
     effect: write
@@ -88,8 +89,8 @@ operations:
     body_enums: {/visibility/type: [group, role]}
     guard:
       before: {read: issue.get, expect: {/key: issueIdOrKey}}
-      after: {expect: {/body/type: =doc}}
-    description: "Add one comment to one issue by key: body.body.content is the content of an Atlassian Document Format document, sent as given, whose type doc and version 1 are fixed; body.visibility.type (group or role) and body.visibility.value restrict who sees it. The provider reads the issue first and refuses before any write when it is absent or its key is not issueIdOrKey. A comment sent twice is two comments. Jira answers 201 with the comment, its id among it, whose body must be a doc"
+      after: {expect: {/body/type: =doc, /id: "?"}}
+    description: "Add one comment to one issue by key: body.body.content is the content of an Atlassian Document Format document, sent as given, whose type doc and version 1 are fixed; body.visibility.type (group or role) and body.visibility.value restrict who sees it. The provider reads the issue first and refuses before any write when it is absent or its key is not issueIdOrKey. A comment sent twice is two comments. Jira answers 201 with the comment, whose id must be present and whose body must be a doc; an answer without them leaves the outcome unknown"
   issue.edit:
     op: editIssue
     effect: write
