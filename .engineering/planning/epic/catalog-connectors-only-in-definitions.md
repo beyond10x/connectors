@@ -7,7 +7,7 @@ title: Catalog connectors live only in connectors-definitions
 relations:
 - implements: architecture-decision-record:provider-definitions-and-runtimes
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 ---
 ## Outcome
 
@@ -76,12 +76,11 @@ Set with the b10x-chef-orchestrator session on 2026-10-20, after the v0.55.0 rel
 
 ## Open questions
 
-- How Slack and OpenRouter instances get a bundle and a selection once the tree is gone. They ship
-  no declaration and are configured in the pinned form, with paths into a checkout of this tree
-  (`docs/catalog-slack.md:403,412`, `docs/catalog-openrouter.md:68,77`;
-  `adapters/catalog/tests/connector_declarations.rs:186-190`), and the D5 cache holds definitions,
-  not lowered bundles. `story:catalog-provider-data-removed` does not land before this is
-  answered.
+- Decided 2026-10-20, option A of `decision-blocker:slack-openrouter-pinned-source`: `slack`,
+  `slack-user` and `openrouter` are served by name from the embedded release, and Slack stays two
+  connectors. The Slack and OpenRouter guides move to `--connector`, and an instance configured by
+  path moves through `setup migrate`, with a test that one migrates
+  (`story:instances-resolve-through-locked-index`).
 - Whether the `connector.json` byte-equality checks (D11) move to connectors-definitions' gate.
 - connectors-definitions has no tag and no release yet (`git tag` and `gh release list` empty on
   2026-10-20); `story:definitions-release-index` cuts the first one after
