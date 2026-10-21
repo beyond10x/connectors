@@ -1553,6 +1553,16 @@ impl Engine {
         })
     }
 
+    /// The engine with the feed's root-relative item links resolved under the origin of
+    /// `api_base`, the instance's `https` API base, where the declaration names no `url_base`;
+    /// without a feed it is unchanged.
+    pub fn with_link_origin(mut self, api_base: &str) -> Result<Self> {
+        if let Some(feed) = self.feed.take() {
+            self.feed = Some(feed.with_link_origin(api_base)?);
+        }
+        Ok(self)
+    }
+
     /// Every origin a selected binary read may reach besides the API base. A
     /// connection admits only these; a read reaching one it does not admit is
     /// refused before anything is sent there.

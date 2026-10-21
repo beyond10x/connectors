@@ -1128,7 +1128,9 @@ impl Local {
             }
             None => None,
         };
+        // A feed's root-relative item links resolve under the origin of the API base.
         let engine = Engine::with_feed(&bundle, &document_base, &operations, feed.as_ref())
+            .and_then(|engine| engine.with_link_origin(&base))
             .map_err(Failure::from_service)?;
         // Every admitted host is a distinct canonical https origin that some
         // selected binary read reaches: the selection names what it may need,

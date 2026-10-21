@@ -3,10 +3,52 @@
   "info": {
     "title": "Feed fixture provider",
     "version": "1",
-    "description": "A fictional provider the catalog feed engine is held to the datasource.feed/v1alpha1 suite against. Rooms hold messages; a message is listed by edit time or through a change cursor."
+    "description": "A fictional provider the catalog feed engine is held to the datasource.feed/v1alpha1 suite against. Rooms hold messages; a message is listed by edit time, through a change cursor, or by a query whose answer pages on by a token or a next link. Rooms are listed by cursor, by offset or by a next link."
   },
   "servers": [{"url": "https://feed.fixture.test/v1"}],
   "paths": {
+    "/room-index": {
+      "get": {
+        "operationId": "listRoomIndex",
+        "parameters": [
+          {"name": "startAt", "in": "query", "required": false, "schema": {"type": "integer"}},
+          {"name": "maxResults", "in": "query", "required": false, "schema": {"type": "integer"}}
+        ],
+        "responses": {"200": {"description": "Rooms from startAt, with isLast on the final page", "content": {"application/json": {}}}}
+      }
+    },
+    "/room-directory": {
+      "get": {
+        "operationId": "listRoomDirectory",
+        "parameters": [
+          {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer"}},
+          {"name": "start", "in": "query", "required": false, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "One page of rooms, and a next link while more remain", "content": {"application/json": {}}}}
+      }
+    },
+    "/message-search": {
+      "get": {
+        "operationId": "searchMessages",
+        "parameters": [
+          {"name": "q", "in": "query", "required": true, "schema": {"type": "string"}},
+          {"name": "maxResults", "in": "query", "required": false, "schema": {"type": "integer"}},
+          {"name": "pageToken", "in": "query", "required": false, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Messages a query selects, at most two per page, and a token while more remain", "content": {"application/json": {}}}}
+      }
+    },
+    "/message-query": {
+      "get": {
+        "operationId": "queryMessages",
+        "parameters": [
+          {"name": "filter", "in": "query", "required": true, "schema": {"type": "string"}},
+          {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer"}},
+          {"name": "after", "in": "query", "required": false, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Messages a query selects, at most two per page, and a relative next link while more remain", "content": {"application/json": {}}}}
+      }
+    },
     "/rooms": {
       "get": {
         "operationId": "listRooms",
