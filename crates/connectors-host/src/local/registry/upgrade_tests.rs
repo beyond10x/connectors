@@ -408,6 +408,196 @@ fn a_different_identity_refuses_the_upgrade_and_keeps_the_credential() {
     assert!(before.refused.is_none());
 }
 
+/// The credential side of a catalog configuration whose admitted hosts are
+/// `hosts` and whose request prefix is `prefix`, as a digest
+/// (`credential_revision`, adapters/catalog/src/local.rs): a changed host set
+/// or prefix moves it, and moves neither the provider authority (the API base)
+/// nor the profile declaration
+/// (adapters/catalog/tests/credential_revision_security.rs).
+fn routed(configuration: &str, hosts: &[&str], prefix: Option<&str>) -> Binding {
+    let admitted = binding();
+    let mut side = serde_json::json!({
+        "instance": admitted.instance_id,
+        "api_base": admitted.provider_authority,
+        "profile_revision": admitted.profile.revision,
+        "hosts": hosts,
+    });
+    if let Some(prefix) = prefix {
+        side["request_prefix"] = serde_json::json!(prefix);
+    }
+    Binding {
+        configuration_revision: configuration.into(),
+        credential_revision: Some(connectors_core::digest(&side)),
+        executable: Some("a".repeat(64)),
+        ..admitted
+    }
+}
+
+const FILES: &str = "https://files.fixture.invalid";
+
+/// The configuration a connection was saved under, and each routing change
+/// the story names: the same instance, authority, profile and executable.
+fn routing_changes() -> (Binding, [(&'static str, Binding); 2]) {
+    (
+        routed("config-1", &[FILES], None),
+        [
+            (
+                "admitted host set",
+                routed(
+                    "config-2",
+                    &[FILES, "https://other-files.fixture.invalid"],
+                    None,
+                ),
+            ),
+            (
+                "request prefix",
+                routed("config-2", &[FILES], Some("/code")),
+            ),
+        ],
+    )
+}
+
+fn observe_as(registry: &Registry, configured: &Binding, reference: &str) -> ObservedConnection {
+    registry
+        .describe(
+            "fixture-instance",
+            "fixture-adapter",
+            Configured {
+                configuration_revision: &configured.configuration_revision,
+                credential_revision: configured.credential_revision.as_deref(),
+                executable: configured.executable.as_deref(),
+            },
+            reference,
+            LATER,
+            true,
+        )
+        .unwrap()
+}
+
+/// A connection published under `saved`; its reference, public revision and
+/// custody version.
+fn connected_as(registry: &Registry, saved: &Binding) -> (String, String, custody::Version) {
+    let acquisition = registry.begin(saved, NOW).unwrap();
+    let claim = registry.consume(acquisition, NOW).unwrap();
+    let candidate = registry
+        .prepare(&claim, validated("one", NOW), 12, NOW)
+        .unwrap();
+    let version = candidate.version();
+    let reference = publish_fixture(registry, candidate, NOW);
+    let revision = observe_as(registry, saved, &reference).revision;
+    (reference, revision, version)
+}
+
+/// story:connection-follows-configuration-upgrade, narrowed acceptance: a
+/// changed admitted host set or request prefix stales the connection, and
+/// `connections revalidate` follows it with the material already in custody:
+/// no acquisition, no credential source, the same custody version. It answers
+/// `ready`, and the binding names the configured revision.
+#[test]
+fn a_changed_host_set_or_request_prefix_follows_a_revalidation_without_reentry() {
+    let (saved, changes) = routing_changes();
+    for (name, configured) in changes {
+        let (root, registry) = fixture();
+        let (reference, revision, version) = connected_as(&registry, &saved);
+        assert_eq!(follow(&saved, &configured), Follow::Changed, "{name}");
+        let stale = observe_as(&registry, &configured, &reference);
+        assert!(stale.stale, "{name}");
+        assert_eq!(stale.state, State::Pending, "{name}");
+        let scopes = BTreeSet::from(["read".to_owned()]);
+        assert_eq!(
+            registry.admit_read(&configured, &reference, &scopes, LATER),
+            Err(Failure::UpgradeRequired),
+            "{name}"
+        );
+
+        registry
+            .admit_revalidation(&configured, &reference, &revision, LATER)
+            .unwrap();
+        let captured = registry
+            .capture_revalidation(&configured, &reference, &revision, LATER, LATER + 1000)
+            .unwrap();
+        assert!(captured.version() == version, "{name}");
+        assert!(captured.upgrades(), "{name}");
+        let dispatched = registry.dispatch_revalidation(captured, LATER).unwrap();
+        assert_eq!(
+            registry.finish_revalidation(dispatched, Ok(validated("one", LATER)), LATER),
+            Ok(()),
+            "{name}"
+        );
+
+        let observed = observe_as(&registry, &configured, &reference);
+        assert_eq!(observed.state, State::Ready, "{name}");
+        assert!(!observed.stale, "{name}");
+        assert_ne!(observed.revision, revision, "{name}");
+        let after = recorded(root.path(), &reference);
+        assert_eq!(after.binding, configured, "{name}");
+        assert_eq!(after.binding.configuration_revision, "config-2", "{name}");
+        assert_eq!(after.instance_revision, "config-2", "{name}");
+        assert_eq!(after.revision, observed.revision, "{name}");
+        assert_eq!(after.refused, None, "{name}");
+        assert_eq!(after.invalid, None, "{name}");
+        assert_eq!(after.acquisitions, 1, "{name}");
+        registry
+            .admit_read(&configured, &reference, &scopes, LATER)
+            .unwrap();
+        // The record replays to the same projection in a fresh handle.
+        drop(registry);
+        let reopened = Registry::new(root.path());
+        assert_eq!(
+            observe_as(&reopened, &configured, &reference).state,
+            State::Ready,
+            "{name}"
+        );
+        assert_eq!(recorded(root.path(), &reference), after, "{name}");
+    }
+}
+
+/// The same changes, the new provider's validation answering another
+/// identity: the upgrade is refused by name and publishes nothing. The
+/// connection keeps its binding, public revision, fence, evidence and
+/// credential, its instance keeps the old revision, and only the refusal of
+/// the configured revision is recorded.
+#[test]
+fn a_changed_host_set_or_request_prefix_answering_another_identity_publishes_nothing() {
+    let (saved, changes) = routing_changes();
+    for (name, configured) in changes {
+        let (root, registry) = fixture();
+        let (reference, revision, _) = connected_as(&registry, &saved);
+        let before = recorded(root.path(), &reference);
+        let captured = registry
+            .capture_revalidation(&configured, &reference, &revision, LATER, LATER + 1000)
+            .unwrap();
+        let dispatched = registry.dispatch_revalidation(captured, LATER).unwrap();
+        assert_eq!(
+            registry.finish_revalidation(dispatched, Ok(validated("other", LATER)), LATER),
+            Err(Failure::UpgradeIdentityMismatch),
+            "{name}"
+        );
+        let after = recorded(root.path(), &reference);
+        assert_eq!(
+            after,
+            Recorded {
+                refused: Some("config-2".into()),
+                ..before
+            },
+            "{name}"
+        );
+        assert_eq!(after.binding, saved, "{name}");
+        assert_eq!(after.revision, revision, "{name}");
+        assert_eq!(after.instance_revision, "config-1", "{name}");
+        assert_eq!(after.invalid, None, "{name}");
+        assert_eq!(
+            observe_as(&registry, &saved, &reference).state,
+            State::Ready,
+            "{name}"
+        );
+        assert!(
+            observe_as(&registry, &configured, &reference).stale,
+            "{name}"
+        );
+    }
+}
+
 #[test]
 fn a_revoked_connection_is_not_upgraded() {
     let (root, registry) = fixture();
