@@ -9,6 +9,12 @@
 //!   the `(id, revision)` pairs already returned at that instant, which are skipped on resume.
 //! - **cursor**: the provider keeps a change cursor. The watermark carries it unchanged.
 //!
+//! A time filter is sent as a parameter or inside a query template (JQL, CQL) whose container
+//! and time values are quoted literals; at minute precision the overlap minute is re-read and
+//! what the watermark holds within it is dropped by `(id, revision)`, and a page continuation
+//! reads further pages within one call. A container listing continues by the provider's token,
+//! by one parameter of its next link (never requested), after a key, or by offset.
+//!
 //! Both are wrapped with the profile, the instance and the container, so a watermark issued for
 //! any other is refused as `stale_cursor`, never answered as a first read. That refusal comes
 //! after the container's admission: an unknown container and one whose items the provider
@@ -39,6 +45,10 @@ pub const RESULT_BYTES: usize = 3 * 1024 * 1024;
 pub const WATERMARK_BYTES: usize = 16 * 1024;
 /// The longest id, revision or instant read from a provider record.
 const FIELD_BYTES: usize = 1024;
+/// The longest query template.
+const TEMPLATE_BYTES: usize = 1024;
+/// The most listing requests one `feed.items` call with a page continuation makes.
+pub const PAGES: usize = 10;
 const MARK_FORMAT: &str = "catalog-feed/1";
 
 // ---- the declaration -------------------------------------------------------------------------
@@ -84,9 +94,17 @@ pub struct VisibilityRule {
     pub map: BTreeMap<String, Visibility>,
 }
 
+/// Offset paging: the listing ends on the answer for which `complete` holds.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OffsetPaging {
+    pub complete: Condition,
+}
+
 /// How a listing continues, sent as `parameter`: the provider's own continuation read back at
-/// `next` in the answer, or the key at `last` in the last record of a full page, for a provider
-/// that lists after a key it is given. Exactly one of the two.
+/// `next` in the answer (with `url_parameter`, that query parameter of the next link at `next`),
+/// the key at `last` in the last record of a full page, for a provider that lists after a key it
+/// is given, or the index of the next page's first record (`offset`). Exactly one of the three.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CursorPaging {
@@ -94,7 +112,11 @@ pub struct CursorPaging {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url_parameter: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offset: Option<OffsetPaging>,
 }
 
 /// Reads one container by id; `record` points at it in the answer.
@@ -129,11 +151,57 @@ pub struct Containers {
     pub visibility: Option<VisibilityRule>,
 }
 
-/// An inclusive lower bound on `updated_at`, answered oldest change first.
+/// The resolution of a time filter: the kept instant as it is, or its minute in UTC.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Precision {
+    Instant,
+    Minute,
+}
+
+/// The query languages a template is written in; both quote a value as `"..."`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryLanguage {
+    Jql,
+    Cql,
+}
+
+/// A query sent as `parameter`: `first` with a `{container}` slot, `resume` with a
+/// `{container}` and a `{since}` slot. Each value is a quoted literal, never spliced raw.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QueryTemplate {
+    pub parameter: String,
+    pub language: QueryLanguage,
+    pub first: String,
+    pub resume: String,
+}
+
+/// A continuation within one `feed.items` call, sent as `parameter`: the token at `next`, or,
+/// with `url_parameter`, that query parameter of the next link at `next`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Continuation {
+    pub parameter: String,
+    pub next: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url_parameter: Option<String>,
+}
+
+/// An inclusive lower bound on `updated_at`, answered oldest change first: sent as `parameter`
+/// or inside `query`, exactly one of the two, and read further by `page` within one call.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TimeFilter {
-    pub parameter: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parameter: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub precision: Option<Precision>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query: Option<QueryTemplate>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<Continuation>,
 }
 
 /// The provider's change cursor, its end condition, and the statuses with which it refuses a
@@ -175,7 +243,9 @@ pub struct BodyField {
 #[serde(deny_unknown_fields)]
 pub struct Items {
     pub operation_id: String,
-    pub container: String,
+    /// The parameter that takes the container id; absent exactly when a time `query` carries it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub container: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub query: Option<BTreeMap<String, String>>,
     pub limit: String,
@@ -190,6 +260,9 @@ pub struct Items {
     pub body: BodyField,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    /// Where the answer names the base its relative item links are under.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url_base: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -279,6 +352,11 @@ pub(crate) struct Feed {
     list: Template,
     lookup: Template,
     items: Template,
+    /// The time query's two templates, parsed when the declaration loads.
+    query: Option<Query>,
+    /// The origin of the instance's API base, which a root-relative item link resolves under
+    /// when the declaration names no `url_base`.
+    links: Option<String>,
     containers_declaration: connectors_core::Operation,
     items_declaration: connectors_core::Operation,
 }
@@ -288,6 +366,223 @@ fn pointer(name: &str, pointer: &str) -> Result<()> {
         Ok(())
     } else {
         Err(refuse(format!("feed `{name}` is not a JSON pointer")))
+    }
+}
+
+/// A query parameter name of a next link: 1 to 128 visible ASCII characters.
+fn url_name(name: &str, value: &str) -> Result<()> {
+    if value.is_empty() || value.len() > 128 || !value.bytes().all(|b| b.is_ascii_graphic()) {
+        return Err(refuse(format!(
+            "feed `{name}` is not 1 to 128 visible ASCII characters"
+        )));
+    }
+    Ok(())
+}
+
+// ---- query templates -------------------------------------------------------------------------
+
+/// One piece of a parsed query template.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Part {
+    Text(String),
+    Container,
+    Since,
+}
+
+/// A time query, its templates parsed and checked.
+struct Query {
+    parameter: String,
+    first: Vec<Part>,
+    resume: Vec<Part>,
+}
+
+/// `text`, the template `name`, as text and slots. Refused: a template longer than
+/// [`TEMPLATE_BYTES`], a control character, a brace outside a slot, a slot other than
+/// `{container}` and `{since}`, a slot beside a `"`, `'` or `\` (where a value would be read as
+/// part of a literal the template opened, not as its own), and slot counts other than `first`
+/// (`{container}` once, no `{since}`) and `resume` (each once) take.
+fn template(name: &str, text: &str, resume: bool) -> Result<Vec<Part>> {
+    if text.len() > TEMPLATE_BYTES {
+        return Err(refuse(format!(
+            "feed `{name}` is longer than {TEMPLATE_BYTES} bytes"
+        )));
+    }
+    if text.chars().any(char::is_control) {
+        return Err(refuse(format!("feed `{name}` holds a control character")));
+    }
+    let stray = || refuse(format!("feed `{name}` has a stray brace"));
+    let mut parts = Vec::new();
+    let mut rest = text;
+    while !rest.is_empty() {
+        let at = rest.find(['{', '}']).unwrap_or(rest.len());
+        if at > 0 {
+            parts.push(Part::Text(rest[..at].to_owned()));
+        }
+        rest = &rest[at..];
+        if rest.is_empty() {
+            break;
+        }
+        if rest.starts_with('}') {
+            return Err(stray());
+        }
+        let end = rest.find('}').ok_or_else(stray)?;
+        let slot = &rest[1..end];
+        if slot.contains('{') {
+            return Err(stray());
+        }
+        parts.push(match slot {
+            "container" => Part::Container,
+            "since" => Part::Since,
+            other => {
+                return Err(refuse(format!(
+                    "feed `{name}` names an unknown slot `{{{other}}}`"
+                )));
+            }
+        });
+        rest = &rest[end + 1..];
+    }
+    let quoting = |c: char| matches!(c, '"' | '\'' | '\\');
+    for (index, part) in parts.iter().enumerate() {
+        if matches!(part, Part::Text(_)) {
+            continue;
+        }
+        let before = index
+            .checked_sub(1)
+            .and_then(|i| parts.get(i))
+            .and_then(|p| match p {
+                Part::Text(text) => text.chars().next_back(),
+                _ => None,
+            });
+        let after = parts.get(index + 1).and_then(|p| match p {
+            Part::Text(text) => text.chars().next(),
+            _ => None,
+        });
+        if before.is_some_and(quoting) || after.is_some_and(quoting) {
+            return Err(refuse(format!(
+                "feed `{name}` puts a slot beside a quote or backslash; the engine quotes each value"
+            )));
+        }
+    }
+    let count = |slot: &Part| parts.iter().filter(|p| *p == slot).count();
+    let (containers, sinces) = (count(&Part::Container), count(&Part::Since));
+    if !resume && (containers, sinces) != (1, 0) {
+        return Err(refuse(format!(
+            "feed `{name}` names `{{container}}` once and `{{since}}` never"
+        )));
+    }
+    if resume && (containers, sinces) != (1, 1) {
+        return Err(refuse(format!(
+            "feed `{name}` names `{{container}}` and `{{since}}` once each"
+        )));
+    }
+    Ok(parts)
+}
+
+/// `value` as one quoted literal of the query languages: `"`, each `\` and `"` in it escaped
+/// with a `\`, then `"`. A value holding a control character is refused, never sent.
+fn quote(value: &str) -> Result<String> {
+    if value.chars().any(char::is_control) {
+        return Err(refuse("a query value holds a control character"));
+    }
+    let mut quoted = String::with_capacity(value.len() + 2);
+    quoted.push('"');
+    for c in value.chars() {
+        if matches!(c, '"' | '\\') {
+            quoted.push('\\');
+        }
+        quoted.push(c);
+    }
+    quoted.push('"');
+    Ok(quoted)
+}
+
+/// The template filled in one pass: each slot's value is quoted, and no value is read again as
+/// template text.
+fn render(parts: &[Part], container: &str, since: Option<&str>) -> Result<String> {
+    let container = quote(container)?;
+    let since = since.map(quote).transpose()?;
+    let mut text = String::new();
+    for part in parts {
+        match part {
+            Part::Text(piece) => text.push_str(piece),
+            Part::Container => text.push_str(&container),
+            Part::Since => text.push_str(since.as_deref().ok_or_else(Error::internal)?),
+        }
+    }
+    Ok(text)
+}
+
+// ---- next links ------------------------------------------------------------------------------
+
+/// The one value of the query parameter `name` in the link `url`, form-decoded. Only the query
+/// is read: the scheme, host and path are ignored and the link is never requested. `None` for a
+/// link without a query, without the parameter or with it twice, with an empty value, or with
+/// text that does not decode to UTF-8.
+pub(crate) fn url_parameter(url: &str, name: &str) -> Option<String> {
+    if url.len() > WATERMARK_BYTES {
+        return None;
+    }
+    let url = url.split('#').next()?;
+    let (_, query) = url.split_once('?')?;
+    let mut found = None;
+    for pair in query.split('&') {
+        let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+        if form_decode(key)? != name {
+            continue;
+        }
+        if found.is_some() {
+            return None;
+        }
+        found = Some(form_decode(value)?);
+    }
+    found.filter(|value| !value.is_empty())
+}
+
+/// `text` form-decoded: `+` is a space and `%XX` a byte; `None` for a malformed escape or bytes
+/// that are not UTF-8.
+fn form_decode(text: &str) -> Option<String> {
+    let bytes = text.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut at = 0;
+    while at < bytes.len() {
+        match bytes[at] {
+            b'+' => {
+                decoded.push(b' ');
+                at += 1;
+            }
+            b'%' => {
+                let hex = bytes.get(at + 1..at + 3)?;
+                if !hex.iter().all(u8::is_ascii_hexdigit) {
+                    return None;
+                }
+                decoded.push(u8::from_str_radix(std::str::from_utf8(hex).ok()?, 16).ok()?);
+                at += 3;
+            }
+            byte => {
+                decoded.push(byte);
+                at += 1;
+            }
+        }
+    }
+    String::from_utf8(decoded).ok()
+}
+
+/// The continuation an answer carries at `next`: the token itself, or with `url_parameter` that
+/// parameter of the link. An absent, null or empty `next` ends the list; a link that lost its
+/// parameter is `unavailable`, never the end.
+fn continuation(answer: &Value, next: &str, url_parameter: Option<&str>) -> Result<Option<String>> {
+    let Some(found) = answer
+        .pointer(next)
+        .and_then(scalar)
+        .filter(|next| !next.is_empty())
+    else {
+        return Ok(None);
+    };
+    match url_parameter {
+        None => Ok(Some(found)),
+        Some(name) => self::url_parameter(&found, name).map(Some).ok_or_else(|| {
+            unavailable("provider answered a next link without the continuation it names")
+        }),
     }
 }
 
@@ -437,10 +732,23 @@ impl Feed {
         }
         let c = &d.containers;
         let i = &d.items;
-        if c.cursor.next.is_some() == c.cursor.last.is_some() {
+        let ways = [
+            c.cursor.next.is_some(),
+            c.cursor.last.is_some(),
+            c.cursor.offset.is_some(),
+        ];
+        if ways.iter().filter(|way| **way).count() != 1 {
             return Err(refuse(
-                "feed listing continues by exactly one of `next` and `last`",
+                "feed listing continues by exactly one of `next` and `last`, or by `offset` alone",
             ));
+        }
+        if let Some(name) = &c.cursor.url_parameter {
+            if c.cursor.next.is_none() {
+                return Err(refuse(
+                    "feed `containers.cursor.url_parameter` reads a `next` link, and the listing has none",
+                ));
+            }
+            url_name("containers.cursor.url_parameter", name)?;
         }
         if c.kind.is_some() == c.kind_word.is_some() {
             return Err(refuse(
@@ -470,6 +778,10 @@ impl Feed {
         for (name, value) in [
             ("containers.cursor.next", c.cursor.next.as_ref()),
             ("containers.cursor.last", c.cursor.last.as_ref()),
+            (
+                "containers.cursor.offset.complete.pointer",
+                c.cursor.offset.as_ref().map(|o| &o.complete.pointer),
+            ),
             ("containers.kind", c.kind.as_ref()),
             ("containers.name", c.name.as_ref()),
             (
@@ -482,6 +794,7 @@ impl Feed {
                 i.author.as_ref().and_then(|a| a.display_name.as_ref()),
             ),
             ("items.url", i.url.as_ref()),
+            ("items.url_base", i.url_base.as_ref()),
             ("items.parent", i.parent.as_ref()),
             ("items.deleted", i.deleted.as_ref().map(|c| &c.pointer)),
         ] {
@@ -493,8 +806,49 @@ impl Feed {
             return Err(refuse("feed body names no representation"));
         }
         supports(d)?;
-        let resume = match &i.position {
-            Position::Time(time) => &time.parameter,
+        let time = match &i.position {
+            Position::Time(time) => Some(time),
+            Position::Cursor(_) => None,
+        };
+        let query = time.and_then(|time| time.query.as_ref());
+        if let Some(time) = time {
+            if time.parameter.is_some() == time.query.is_some() {
+                return Err(refuse(
+                    "feed time position takes exactly one of `parameter` and `query`",
+                ));
+            }
+            if time.query.is_some() && time.precision != Some(Precision::Minute) {
+                return Err(refuse(
+                    "feed time position: a query reads at `precision: minute`",
+                ));
+            }
+            if let Some(page) = &time.page {
+                pointer("items.position.page.next", &page.next)?;
+                if let Some(name) = &page.url_parameter {
+                    url_name("items.position.page.url_parameter", name)?;
+                }
+            }
+        }
+        if i.container.is_some() == query.is_some() {
+            return Err(refuse(
+                "feed `items.container` is absent exactly when a query selects the container",
+            ));
+        }
+        let parsed = query
+            .map(|query| -> Result<Query> {
+                Ok(Query {
+                    parameter: query.parameter.clone(),
+                    first: template("items.position.query.first", &query.first, false)?,
+                    resume: template("items.position.query.resume", &query.resume, true)?,
+                })
+            })
+            .transpose()?;
+        let mut sometimes: Vec<&str> = Vec::new();
+        match &i.position {
+            Position::Time(time) => {
+                sometimes.extend(time.parameter.as_deref());
+                sometimes.extend(time.page.as_ref().map(|page| page.parameter.as_str()));
+            }
             Position::Cursor(cursor) => {
                 pointer("items.position.next", &cursor.next)?;
                 pointer("items.position.complete", &cursor.complete.pointer)?;
@@ -506,9 +860,18 @@ impl Feed {
                 {
                     return Err(refuse("feed stale statuses must be refusals (4xx)"));
                 }
-                &cursor.parameter
+                sometimes.push(&cursor.parameter);
             }
-        };
+        }
+        // The container is a path or query parameter; a query is a query parameter only.
+        let mut always: Vec<(&str, bool)> = Vec::new();
+        always.extend(i.container.as_deref().map(|name| (name, true)));
+        always.push((i.limit.as_str(), false));
+        always.extend(
+            parsed
+                .as_ref()
+                .map(|query| (query.parameter.as_str(), false)),
+        );
         let list = bind(
             bundle,
             base,
@@ -529,8 +892,8 @@ impl Feed {
             bundle,
             base,
             &i.operation_id,
-            &[(&i.container, true), (&i.limit, false)],
-            &[resume],
+            &always,
+            &sometimes,
             i.query.as_ref(),
         )?;
         let (containers_declaration, items_declaration) = declarations(d);
@@ -540,9 +903,34 @@ impl Feed {
             list,
             lookup,
             items,
+            query: parsed,
+            links: None,
             containers_declaration,
             items_declaration,
         })
+    }
+
+    /// The feed with root-relative item links resolved under the origin of `api_base`, the
+    /// instance's `https` API base.
+    pub(crate) fn with_link_origin(mut self, api_base: &str) -> Result<Self> {
+        let origin = crate::origin(api_base)
+            .ok_or_else(|| refuse("feed item links resolve under an https API base"))?;
+        self.links = Some(origin);
+        Ok(self)
+    }
+
+    /// The base an answer's relative item links resolve under: the `http(s)` URL at `url_base`
+    /// when declared (none when the answer carries no usable one), otherwise the origin.
+    fn link_base(&self, answer: &Value) -> Option<String> {
+        let Some(pointer) = &self.declaration.items.url_base else {
+            return self.links.clone();
+        };
+        let base = answer.pointer(pointer).and_then(Value::as_str)?;
+        let usable = (base.starts_with("https://") || base.starts_with("http://"))
+            && base.len() <= FIELD_BYTES
+            && !base.contains(['?', '#', '\\'])
+            && !base.chars().any(|c| c.is_whitespace() || c.is_control());
+        usable.then(|| base.trim_end_matches('/').to_owned())
     }
 
     pub(crate) fn declarations(&self) -> [connectors_core::Operation; 2] {
@@ -698,6 +1086,11 @@ impl Feed {
             None => None,
             Some(token) => Some(self.open(token, instance, None)?.cursor.ok_or_else(stale)?),
         };
+        // An offset cursor is the index of the page's first record, which this binding issued.
+        let start = match (&c.cursor.offset, &cursor) {
+            (Some(_), Some(cursor)) => cursor.parse::<u64>().map_err(|_| stale())?,
+            _ => 0,
+        };
         let mut values = vec![(c.limit.as_str(), limit.to_string())];
         if let Some(cursor) = cursor {
             values.push((c.cursor.parameter.as_str(), cursor));
@@ -726,10 +1119,25 @@ impl Feed {
             }));
         }
         let next = match (&c.cursor.next, &c.cursor.last) {
-            (Some(next), _) => answer
-                .pointer(next)
-                .and_then(scalar)
-                .filter(|next| !next.is_empty()),
+            (Some(next), _) => continuation(&answer, next, c.cursor.url_parameter.as_deref())?,
+            // The next page starts after every record this one carried, a direct one included;
+            // the listing ends where the declared flag says, and an empty page the provider does
+            // not call the last cannot be continued.
+            (None, None) => match &c.cursor.offset {
+                Some(offset) if offset.complete.holds(&answer) => None,
+                Some(_) if records.is_empty() => {
+                    return Err(unavailable(
+                        "provider answered an empty page it does not call the last",
+                    ));
+                }
+                Some(_) => Some(
+                    start
+                        .checked_add(records.len() as u64)
+                        .ok_or_else(Error::internal)?
+                        .to_string(),
+                ),
+                None => return Err(Error::internal()),
+            },
             // A page shorter than the limit is the end. A full one continues after the key of
             // its last record, a direct one included; one without a key cannot be continued
             // and is never reported complete.
@@ -772,6 +1180,10 @@ impl Feed {
         connectors_sdk::validate(&self.items_declaration.input_schema, &input)?;
         let container = input["container"].as_str().ok_or_else(Error::internal)?;
         let limit = input["limit"].as_u64().ok_or_else(Error::internal)?;
+        // A container id a query cannot carry as a literal is refused before any request.
+        if self.query.is_some() {
+            quote(container)?;
+        }
         let lookup = &self.declaration.containers.lookup;
         let answer = self
             .get(
@@ -841,70 +1253,122 @@ impl Feed {
         time: &TimeFilter,
     ) -> Result<(Vec<Value>, Mark, bool)> {
         let i = &self.declaration.items;
+        let minute = time.precision == Some(Precision::Minute);
+        // At minute precision the provider filters by the kept instant's minute and answers
+        // that whole minute again; the watermark holds what was returned within it.
+        let bucket = |at: i128| if minute { floor_minute(at) } else { at };
         let seen: BTreeSet<(String, String)> = mark.seen.iter().cloned().collect();
-        // Every item returned at the kept instant comes back with the filter; asking for that
-        // many more keeps a page of unseen items within reach.
-        let requested = limit + seen.len() as u64;
-        if seen.len() as u64 >= self.declaration.max_limit {
+        let since = mark.time.as_deref().and_then(instant);
+        let floor = since.map(bucket);
+        // Every item returned in the kept instant or minute comes back with the filter; asking
+        // for that many more keeps a page of unseen items within reach. A list read further by
+        // its continuation reaches them on later pages.
+        if time.page.is_none() && seen.len() as u64 >= self.declaration.max_limit {
             return Err(unavailable(
                 "more items share one instant than one provider page holds",
             ));
         }
-        let requested = requested.min(self.declaration.max_limit);
-        let mut values = vec![
-            (i.container.as_str(), container.to_owned()),
-            (i.limit.as_str(), requested.to_string()),
-        ];
-        let since = match &mark.time {
-            Some(text) => {
-                values.push((time.parameter.as_str(), text.clone()));
-                instant(text)
+        let requested = (limit + seen.len() as u64).min(self.declaration.max_limit);
+        let mut values = vec![(i.limit.as_str(), requested.to_string())];
+        if let Some(name) = &i.container {
+            values.push((name.as_str(), container.to_owned()));
+        }
+        match (&time.parameter, &self.query) {
+            (Some(parameter), _) => {
+                if let (Some(at), Some(text)) = (since, &mark.time) {
+                    let bound = if minute {
+                        format!("{}:00Z", civil_minute(at, 'T')?)
+                    } else {
+                        text.clone()
+                    };
+                    values.push((parameter.as_str(), bound));
+                }
             }
-            None => None,
-        };
-        let answer = self
-            .get(http, &self.items, values, i.query.as_ref())
-            .await?
-            .map_err(refused)?;
-        let records = Self::records(&answer, &i.records)?;
+            (None, Some(query)) => {
+                let text = match since {
+                    None => render(&query.first, container, None)?,
+                    Some(at) => render(&query.resume, container, Some(&civil_minute(at, ' ')?))?,
+                };
+                values.push((query.parameter.as_str(), text));
+            }
+            (None, None) => return Err(Error::internal()),
+        }
         let mut items = Vec::new();
         let mut last: Option<(i128, String)> = None;
-        let mut at_last: Vec<(String, String)> = Vec::new();
-        let mut previous = since;
+        let mut in_bucket: Vec<(String, String)> = Vec::new();
+        // The order is checked from the start of what the filter re-reads.
+        let mut previous = floor;
         let mut unseen_left = false;
-        for record in records {
-            let mapped = self.item(record)?;
-            // The watermark is only as sound as the order: an answer out of order, or before
-            // the filter, could put it past an item not yet returned.
-            if previous.is_some_and(|previous| mapped.updated < previous) {
-                return Err(unavailable("provider answered out of updated_at order"));
+        let mut token: Option<String> = None;
+        let mut pages = 0;
+        let complete = loop {
+            let mut sent = values.clone();
+            if let (Some(page), Some(token)) = (&time.page, &token) {
+                sent.push((page.parameter.as_str(), token.clone()));
             }
-            previous = Some(mapped.updated);
-            let pair = (mapped.id.clone(), mapped.revision.clone());
-            if Some(mapped.updated) == since && seen.contains(&pair) {
-                continue;
+            let answer = self
+                .get(http, &self.items, sent, i.query.as_ref())
+                .await?
+                .map_err(refused)?;
+            pages += 1;
+            let records = Self::records(&answer, &i.records)?;
+            let base = self.link_base(&answer);
+            for record in records {
+                let mapped = self.item(record, base.as_deref())?;
+                // The watermark is only as sound as the order: an answer out of order, or
+                // before the filter, could put it past an item not yet returned.
+                if previous.is_some_and(|previous| mapped.updated < previous) {
+                    return Err(unavailable("provider answered out of updated_at order"));
+                }
+                previous = Some(mapped.updated);
+                let pair = (mapped.id.clone(), mapped.revision.clone());
+                let at = bucket(mapped.updated);
+                if Some(at) == floor && seen.contains(&pair) {
+                    continue;
+                }
+                if items.len() as u64 == limit {
+                    unseen_left = true;
+                    break;
+                }
+                if last.as_ref().is_none_or(|(kept, _)| *kept != at) {
+                    in_bucket.clear();
+                }
+                last = Some((at, mapped.updated_text.clone()));
+                in_bucket.push(pair);
+                items.push(mapped.value);
             }
+            let Some(page) = &time.page else {
+                break (records.len() as u64) < requested && !unseen_left;
+            };
+            if unseen_left {
+                break false;
+            }
+            let Some(next) = continuation(&answer, &page.next, page.url_parameter.as_deref())?
+            else {
+                break true;
+            };
             if items.len() as u64 == limit {
-                unseen_left = true;
-                break;
+                break false;
             }
-            if last.as_ref().is_none_or(|(at, _)| *at != mapped.updated) {
-                at_last.clear();
+            if pages == PAGES {
+                if items.is_empty() {
+                    return Err(unavailable(
+                        "more items share one minute than the pages one read may request hold",
+                    ));
+                }
+                break false;
             }
-            last = Some((mapped.updated, mapped.updated_text.clone()));
-            at_last.push(pair);
-            items.push(mapped.value);
-        }
+            token = Some(next);
+        };
         if let Some((at, text)) = last {
-            if Some(at) == since {
-                at_last.extend(seen);
+            if Some(at) == floor {
+                in_bucket.extend(seen);
             }
-            at_last.sort();
-            at_last.dedup();
+            in_bucket.sort();
+            in_bucket.dedup();
             mark.time = Some(text);
-            mark.seen = at_last;
+            mark.seen = in_bucket;
         }
-        let complete = (records.len() as u64) < requested && !unseen_left;
         Ok((items, mark, complete))
     }
 
@@ -917,8 +1381,10 @@ impl Feed {
         cursor: &ChangeCursor,
     ) -> Result<(Vec<Value>, Mark, bool)> {
         let i = &self.declaration.items;
+        // A change cursor has no query, so the load check left a container parameter.
+        let name = i.container.as_deref().ok_or_else(Error::internal)?;
         let mut values = vec![
-            (i.container.as_str(), container.to_owned()),
+            (name, container.to_owned()),
             (i.limit.as_str(), limit.to_string()),
         ];
         if let Some(position) = &mark.cursor {
@@ -936,13 +1402,17 @@ impl Feed {
                 }
             })?;
         let records = Self::records(&answer, &i.records)?;
+        let base = self.link_base(&answer);
         // The provider's cursor is past every record it answered, so none can be held back.
         if records.len() as u64 > limit {
             return Err(unavailable("provider answered more records than requested"));
         }
         let items = records
             .iter()
-            .map(|record| self.item(record).map(|mapped| mapped.value))
+            .map(|record| {
+                self.item(record, base.as_deref())
+                    .map(|mapped| mapped.value)
+            })
             .collect::<Result<Vec<_>>>()?;
         if let Some(next) = answer
             .pointer(&cursor.next)
@@ -955,7 +1425,7 @@ impl Feed {
         Ok((items, mark, complete))
     }
 
-    fn item(&self, record: &Value) -> Result<Mapped> {
+    fn item(&self, record: &Value, base: Option<&str>) -> Result<Mapped> {
         let i = &self.declaration.items;
         let id = required(record, &i.id)?;
         let revision = required(record, &i.revision)?;
@@ -985,7 +1455,7 @@ impl Feed {
             .as_ref()
             .and_then(|p| record.pointer(p))
             .and_then(Value::as_str)
-            .filter(|url| url.starts_with("https://") || url.starts_with("http://"));
+            .and_then(|url| link(url, base));
         let parent = i
             .parent
             .as_ref()
@@ -1029,6 +1499,20 @@ struct Mapped {
     updated_text: String,
 }
 
+/// An item link: an `http(s)` URL as it is, or a path rooted at one `/` appended to `base`.
+/// Anything else, and a path without a base, is no link.
+fn link(url: &str, base: Option<&str>) -> Option<String> {
+    if url.starts_with("https://") || url.starts_with("http://") {
+        return Some(url.to_owned());
+    }
+    let base = base?;
+    let rooted = url.starts_with('/')
+        && !url.starts_with("//")
+        && !url.contains('\\')
+        && !url.chars().any(|c| c.is_whitespace() || c.is_control());
+    rooted.then(|| format!("{base}{url}"))
+}
+
 /// A required scalar field of a record, as text.
 fn required(record: &Value, pointer: &str) -> Result<String> {
     record
@@ -1038,12 +1522,72 @@ fn required(record: &Value, pointer: &str) -> Result<String> {
         .ok_or_else(|| unavailable("provider answered a record the declaration cannot read"))
 }
 
-/// A required RFC 3339 instant: the provider's text and its position in time.
+/// A required instant and its position in time: RFC 3339 text as the provider wrote it, or an
+/// instant with a `±hhmm` offset rewritten in UTC ([`compact_offset`]).
 fn time(record: &Value, pointer: &str) -> Result<(String, i128)> {
     let text = required(record, pointer)?;
-    let at = instant(&text)
-        .ok_or_else(|| unavailable("provider answered an instant that is not RFC 3339"))?;
-    Ok((text, at))
+    let refused = || unavailable("provider answered an instant that is not RFC 3339");
+    if let Some(at) = instant(&text) {
+        return Ok((text, at));
+    }
+    let utc = compact_offset(&text).ok_or_else(refused)?;
+    let at = instant(&utc).ok_or_else(refused)?;
+    Ok((utc, at))
+}
+
+/// An RFC 3339 date-time but for an offset written `±hhmm`, as some providers write it,
+/// rewritten in UTC with `Z`, its fraction kept; `None` for anything else.
+fn compact_offset(text: &str) -> Option<String> {
+    let (head, offset) = text.split_at_checked(text.len().checked_sub(5)?)?;
+    let [sign, h1, h2, m1, m2] = offset.as_bytes() else {
+        return None;
+    };
+    let sign: i128 = match sign {
+        b'+' => 1,
+        b'-' => -1,
+        _ => return None,
+    };
+    let digits = [*h1, *h2, *m1, *m2];
+    if !digits.iter().all(u8::is_ascii_digit) {
+        return None;
+    }
+    let value = |a: u8, b: u8| i128::from(a - b'0') * 10 + i128::from(b - b'0');
+    let (hours, minutes) = (value(*h1, *h2), value(*m1, *m2));
+    if hours > 23 || minutes > 59 {
+        return None;
+    }
+    let local = instant(&format!("{head}Z"))?;
+    let at = local - sign * (hours * 3600 + minutes * 60) * 1_000_000_000;
+    let seconds = i64::try_from(at.div_euclid(1_000_000_000)).ok()?;
+    let fraction = head.get(19..)?;
+    Some(format!("{}{fraction}Z", civil(seconds, 'T')))
+}
+
+/// The UTC date and time of `seconds` since the Unix epoch, `YYYY-MM-DD<separator>HH:MM:SS`.
+fn civil(seconds: i64, separator: char) -> String {
+    let (year, month, day) = date(seconds.div_euclid(86_400));
+    let rem = seconds.rem_euclid(86_400);
+    format!(
+        "{year:04}-{month:02}-{day:02}{separator}{:02}:{:02}:{:02}",
+        rem / 3600,
+        rem % 3600 / 60,
+        rem % 60
+    )
+}
+
+/// The start of the UTC minute holding `at`, in nanoseconds since the Unix epoch.
+fn floor_minute(at: i128) -> i128 {
+    at - at.rem_euclid(60_000_000_000)
+}
+
+/// The UTC minute holding `at`, `YYYY-MM-DD<separator>HH:MM`: the time literal a minute query
+/// sends, formatted from the parsed instant, never from the provider's text.
+fn civil_minute(at: i128, separator: char) -> Result<String> {
+    let seconds =
+        i64::try_from(floor_minute(at).div_euclid(1_000_000_000)).map_err(|_| Error::internal())?;
+    let mut text = civil(seconds, separator);
+    text.truncate(16);
+    Ok(text)
 }
 
 /// The records body envelope of a text, clipped on a UTF-8 boundary.
@@ -1297,11 +1841,8 @@ pub(crate) fn instant(text: &str) -> Option<i128> {
     Some(i128::from(seconds) * 1_000_000_000 + nanos)
 }
 
-/// `ms` since the Unix epoch as an RFC 3339 instant in UTC, millisecond precision.
-fn rfc3339(ms: u64) -> String {
-    let secs = ms / 1000;
-    let days = (secs / 86_400) as i64;
-    let rem = secs % 86_400;
+/// The civil date of a day count since 1970-01-01 (Howard Hinnant's algorithm).
+fn date(days: i64) -> (i64, i64, i64) {
     let z = days + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z.rem_euclid(146_097);
@@ -1311,18 +1852,127 @@ fn rfc3339(ms: u64) -> String {
     let day = doy - (153 * mp + 2) / 5 + 1;
     let month = if mp < 10 { mp + 3 } else { mp - 9 };
     let year = yoe + era * 400 + i64::from(month <= 2);
-    format!(
-        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.{:03}Z",
-        rem / 3600,
-        rem % 3600 / 60,
-        rem % 60,
-        ms % 1000
-    )
+    (year, month, day)
+}
+
+/// `ms` since the Unix epoch as an RFC 3339 instant in UTC, millisecond precision.
+fn rfc3339(ms: u64) -> String {
+    let seconds = i64::try_from(ms / 1000).unwrap_or(i64::MAX);
+    format!("{}.{:03}Z", civil(seconds, 'T'), ms % 1000)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_offset_without_a_colon_is_read_and_rewritten_in_utc() {
+        let read = |text: &str| time(&json!({"at": text}), "/at").ok();
+        let utc = |text: &str| (text.to_owned(), instant(text).unwrap());
+        assert_eq!(
+            read("2026-10-06T09:00:00.000+0000"),
+            Some(utc("2026-10-06T09:00:00.000Z"))
+        );
+        assert_eq!(
+            read("2026-10-06T11:30:05+0230"),
+            Some(utc("2026-10-06T09:00:05Z"))
+        );
+        assert_eq!(
+            read("2026-10-05T23:59:59.5-0130"),
+            Some(utc("2026-10-06T01:29:59.5Z"))
+        );
+        assert_eq!(
+            read("2026-01-01T00:15:00+0100"),
+            Some(utc("2025-12-31T23:15:00Z"))
+        );
+        // RFC 3339 text keeps its own form.
+        assert_eq!(
+            read("2026-10-06T11:00:00+02:00"),
+            Some((
+                "2026-10-06T11:00:00+02:00".to_owned(),
+                instant("2026-10-06T09:00:00Z").unwrap()
+            ))
+        );
+        for bad in [
+            "2026-10-06T09:00:00+2400",
+            "2026-10-06T09:00:00+0060",
+            "2026-10-06T09:00:00+02",
+            "2026-10-06T09:00:00 0200",
+            "2026-10-06T09:00:00Z0200",
+            "2026-10-06T09:00+0200",
+            "2026-02-30T09:00:00+0200",
+            "+0200",
+        ] {
+            assert_eq!(read(bad), None, "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_minute_is_formatted_from_the_parsed_instant_in_utc() {
+        let at = |text: &str| instant(text).unwrap();
+        assert_eq!(
+            civil_minute(at("2026-10-06T09:00:59.999Z"), ' ').unwrap(),
+            "2026-10-06 09:00"
+        );
+        assert_eq!(
+            civil_minute(at("2026-10-06T01:00:00+02:00"), ' ').unwrap(),
+            "2026-10-05 23:00"
+        );
+        assert_eq!(
+            civil_minute(at("1969-12-31T23:59:30Z"), 'T').unwrap(),
+            "1969-12-31T23:59"
+        );
+        assert_eq!(
+            floor_minute(at("2026-10-06T09:00:30Z")),
+            at("2026-10-06T09:00:00Z")
+        );
+    }
+
+    #[test]
+    fn a_next_link_yields_one_decoded_parameter_or_none() {
+        let read = |url: &str| url_parameter(url, "start");
+        assert_eq!(
+            read("https://h.test/x?limit=1&start=p%3A2"),
+            Some("p:2".into())
+        );
+        assert_eq!(read("/x?start=a+b%2Bc"), Some("a b+c".into()));
+        assert_eq!(read("x?st%61rt=v#start=w"), Some("v".into()));
+        assert_eq!(read("?start=%E2%9C%93"), Some("\u{2713}".into()));
+        for none in [
+            "https://h.test/x",
+            "https://h.test/x?limit=1",
+            "https://h.test/x#start=1",
+            "/x?start=",
+            "/x?start",
+            "/x?start=1&start=2",
+            "/x?start=%zz",
+            "/x?start=%2",
+            "/x?start=%FF",
+            "/x?start=%+1",
+        ] {
+            assert_eq!(read(none), None, "{none}");
+        }
+        assert_eq!(
+            read(&format!("/x?start={}", "a".repeat(WATERMARK_BYTES))),
+            None
+        );
+    }
+
+    #[test]
+    fn a_query_value_is_one_literal_and_a_template_fills_in_one_pass() {
+        assert_eq!(quote("plain").unwrap(), "\"plain\"");
+        assert_eq!(quote(r#"a"b\c"#).unwrap(), r#""a\"b\\c""#);
+        assert_eq!(quote(r#"\""#).unwrap(), r#""\\\"""#);
+        for control in ["a\nb", "a\u{0}b", "\u{7f}", "\u{85}"] {
+            assert!(quote(control).is_err(), "{control:?}");
+        }
+        let parts = template("t", "a = {container} AND b >= {since}", true).unwrap();
+        // A value that looks like a slot stays text.
+        assert_eq!(
+            render(&parts, "{since}", Some("2026-10-06 09:00")).unwrap(),
+            r#"a = "{since}" AND b >= "2026-10-06 09:00""#
+        );
+    }
 
     #[test]
     fn instants_are_read_as_rfc_3339_or_not_at_all() {

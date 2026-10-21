@@ -49,9 +49,14 @@ fn build(feed: &Value, selections: &[Selection]) -> connectors_core::Result<Engi
 
 #[test]
 fn a_feed_declaration_adds_the_two_family_operations_under_its_profile() {
-    for name in ["time.operations.json", "cursor.operations.json"] {
+    for name in [
+        "time.operations.json",
+        "cursor.operations.json",
+        "time-query.operations.json",
+        "time-next.operations.json",
+    ] {
         let feed = declaration(name);
-        let engine = build(&feed, &[]).unwrap();
+        let engine = build(&feed, &[]).unwrap_or_else(|e| panic!("{name}: {}", e.message));
         let declared = engine.declarations(&[Effect::Read]);
         let ids: Vec<&str> = declared.iter().map(|o| o.id.as_str()).collect();
         assert_eq!(ids, [CONTAINERS, ITEMS], "{name}");
@@ -255,6 +260,237 @@ fn a_declaration_the_bundle_cannot_carry_is_refused_before_any_request() {
         refused.message.contains("an id of the feed family"),
         "{}",
         refused.message
+    );
+}
+
+/// Each case changes one field of a valid offset, next-link or query declaration; each is
+/// refused when the engine is built. A query template is checked whole before any request: a
+/// slot it does not know, a slot where a quote or backslash would let a value leave its literal,
+/// and text the provider would read as something other than the declared query.
+#[test]
+fn a_listing_shape_or_query_template_the_engine_cannot_hold_is_refused_before_any_request() {
+    let time = declaration("time.operations.json");
+    let query = declaration("time-query.operations.json");
+    let next = declaration("time-next.operations.json");
+    let first = "/items/position/value/query/first";
+    let resume = "/items/position/value/query/resume";
+    let cases: Vec<(&str, Value, &str)> = vec![
+        (
+            "offset beside a next pointer",
+            adding(
+                &time,
+                "/containers/cursor",
+                "offset",
+                json!({"complete": {"pointer": "/isLast", "equals": true}}),
+            ),
+            "exactly one of `next` and `last`",
+        ),
+        (
+            "url parameter without a next pointer",
+            adding(
+                &query,
+                "/containers/cursor",
+                "url_parameter",
+                json!("startAt"),
+            ),
+            "`containers.cursor.url_parameter` reads a `next` link",
+        ),
+        (
+            "empty url parameter",
+            with(&next, "/containers/cursor/url_parameter", json!("")),
+            "`containers.cursor.url_parameter` is not 1 to 128 visible ASCII characters",
+        ),
+        (
+            "url parameter with a space",
+            with(&next, "/containers/cursor/url_parameter", json!("st art")),
+            "`containers.cursor.url_parameter` is not 1 to 128 visible ASCII characters",
+        ),
+        (
+            "offset end flag not a pointer",
+            with(
+                &query,
+                "/containers/cursor/offset/complete/pointer",
+                json!("isLast"),
+            ),
+            "`containers.cursor.offset.complete.pointer` is not a JSON pointer",
+        ),
+        (
+            "time read by a parameter and a query",
+            adding(
+                &query,
+                "/items/position/value",
+                "parameter",
+                json!("pageToken"),
+            ),
+            "exactly one of `parameter` and `query`",
+        ),
+        (
+            "time read by neither",
+            removing(&query, "/items/position/value", "query"),
+            "exactly one of `parameter` and `query`",
+        ),
+        (
+            "query without minute precision",
+            removing(&query, "/items/position/value", "precision"),
+            "a query reads at `precision: minute`",
+        ),
+        (
+            "query at instant precision",
+            with(&query, "/items/position/value/precision", json!("instant")),
+            "a query reads at `precision: minute`",
+        ),
+        (
+            "container parameter beside a query",
+            adding(&query, "/items", "container", json!("maxResults")),
+            "`items.container` is absent exactly when a query selects the container",
+        ),
+        (
+            "no container parameter and no query",
+            removing(&time, "/items", "container"),
+            "`items.container` is absent exactly when a query selects the container",
+        ),
+        (
+            "unknown slot",
+            with(&query, first, json!("room = {room} ORDER BY edited ASC")),
+            "unknown slot `{room}`",
+        ),
+        (
+            "first read with a time",
+            with(
+                &query,
+                first,
+                json!("room = {container} AND edited >= {since}"),
+            ),
+            "`items.position.query.first` names `{container}` once and `{since}` never",
+        ),
+        (
+            "resume without a time",
+            with(
+                &query,
+                resume,
+                json!("room = {container} ORDER BY edited ASC"),
+            ),
+            "`items.position.query.resume` names `{container}` and `{since}` once each",
+        ),
+        (
+            "container twice",
+            with(
+                &query,
+                resume,
+                json!("room = {container} OR room = {container} AND edited >= {since}"),
+            ),
+            "`items.position.query.resume` names `{container}` and `{since}` once each",
+        ),
+        (
+            "slot inside double quotes",
+            with(&query, first, json!("room = \"{container}\"")),
+            "beside a quote or backslash",
+        ),
+        (
+            "slot inside single quotes",
+            with(&query, first, json!("room = '{container}'")),
+            "beside a quote or backslash",
+        ),
+        (
+            "slot after a backslash",
+            with(&query, first, json!("room = \\{container}")),
+            "beside a quote or backslash",
+        ),
+        (
+            "stray closing brace",
+            with(&query, first, json!("room = {container} }")),
+            "stray brace",
+        ),
+        (
+            "unclosed slot",
+            with(&query, first, json!("room = {container")),
+            "stray brace",
+        ),
+        (
+            "control character",
+            with(
+                &query,
+                first,
+                json!("room = {container}\nORDER BY edited ASC"),
+            ),
+            "control character",
+        ),
+        (
+            "template longer than 1024 bytes",
+            with(
+                &query,
+                first,
+                json!(format!("room = {{container}}{}", " ".repeat(1024))),
+            ),
+            "longer than 1024 bytes",
+        ),
+        (
+            "query parameter absent",
+            with(
+                &query,
+                "/items/position/value/query/parameter",
+                json!("jql"),
+            ),
+            "binds `jql`",
+        ),
+        (
+            "query parameter bound twice",
+            with(
+                &query,
+                "/items/position/value/query/parameter",
+                json!("maxResults"),
+            ),
+            "`maxResults` of `searchMessages` twice",
+        ),
+        (
+            "page parameter absent",
+            with(
+                &query,
+                "/items/position/value/page/parameter",
+                json!("token"),
+            ),
+            "binds `token`",
+        ),
+        (
+            "page continuation not a pointer",
+            with(
+                &query,
+                "/items/position/value/page/next",
+                json!("nextPageToken"),
+            ),
+            "`items.position.page.next` is not a JSON pointer",
+        ),
+        (
+            "link base not a pointer",
+            with(&next, "/items/url_base", json!("_links/base")),
+            "`items.url_base` is not a JSON pointer",
+        ),
+        (
+            "empty page url parameter",
+            with(&next, "/items/position/value/page/url_parameter", json!("")),
+            "`items.position.page.url_parameter` is not 1 to 128 visible ASCII characters",
+        ),
+    ];
+    for (case, feed, reason) in cases {
+        match build(&feed, &[]) {
+            Ok(_) => panic!("{case}: accepted"),
+            Err(error) => assert!(error.message.contains(reason), "{case}: {}", error.message),
+        }
+    }
+    // Root-relative item links resolve under the origin of an https API base.
+    let engine = || build(&query, &[]).unwrap();
+    for base in [
+        "/v1",
+        "http://feed.fixture.test/v1",
+        "ftp://feed.fixture.test",
+        "",
+    ] {
+        assert!(engine().with_link_origin(base).is_err(), "{base}");
+    }
+    assert!(
+        engine()
+            .with_link_origin("https://feed.fixture.test/v1/")
+            .is_ok()
     );
 }
 
