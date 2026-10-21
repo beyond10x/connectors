@@ -902,7 +902,8 @@ fn emit_suite(ir: &ess_compiler::ir::EssIr, dir: &str, out: &Path) -> Result<Emi
 /// Written as `ess-mutation-manifest/2`: this scoped emitter records each suite's refusals but
 /// does not decide which guard mutants left their outcome unsatisfiable (ESS keeps that analysis
 /// private to its own `emit`), and `/3` is the format that claims it was decided. For the same
-/// reason no mutant carries `identical_answer`, a `/5` field ESS decides privately too.
+/// reason no mutant carries `identical_answer`, a `/5` field ESS decides privately too, or
+/// `overlap_taken_by`, the `/6` one.
 fn manifest(
     ir: &ess_compiler::ir::EssIr,
     baseline: EmittedSuite,
@@ -948,6 +949,7 @@ pub fn emit(root: &Path, out: &Path) -> Result<()> {
             dir: None,
             id: mutant.id.clone(),
             identical_answer: None,
+            overlap_taken_by: None,
             refusals: None,
             refused: None,
             scenarios: None,
