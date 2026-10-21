@@ -397,6 +397,26 @@ fn a_listing_shape_or_query_template_the_engine_cannot_hold_is_refused_before_an
             "beside a quote or backslash",
         ),
         (
+            "slot inside a literal, apart from its quotes",
+            with(&query, first, json!("text ~ \"a {container} b\"")),
+            "puts a slot inside a literal",
+        ),
+        (
+            "slot after an escaped quote inside a literal",
+            with(&query, first, json!("text ~ \"a\\\" {container} b\"")),
+            "puts a slot inside a literal",
+        ),
+        (
+            "literal left open",
+            with(&query, first, json!("room = {container} AND text ~ 'open")),
+            "leaves a literal open",
+        ),
+        (
+            "backslash outside a literal",
+            with(&query, first, json!("room = {container} AND text ~ a\\ b")),
+            "backslash outside a literal",
+        ),
+        (
             "stray closing brace",
             with(&query, first, json!("room = {container} }")),
             "stray brace",
@@ -477,21 +497,20 @@ fn a_listing_shape_or_query_template_the_engine_cannot_hold_is_refused_before_an
             Err(error) => assert!(error.message.contains(reason), "{case}: {}", error.message),
         }
     }
-    // Root-relative item links resolve under the origin of an https API base.
+    // Root-relative item links resolve under the origin of an https API base; a base with no
+    // hostname origin leaves them `null` and never refuses a feed that loaded without it.
     let engine = || build(&query, &[]).unwrap();
     for base in [
+        "https://feed.fixture.test/v1/",
+        "https://[fd00::1]/v1",
+        "https://feed.fixture.test./v1",
         "/v1",
         "http://feed.fixture.test/v1",
         "ftp://feed.fixture.test",
         "",
     ] {
-        assert!(engine().with_link_origin(base).is_err(), "{base}");
+        assert!(engine().with_link_origin(base).is_ok(), "{base}");
     }
-    assert!(
-        engine()
-            .with_link_origin("https://feed.fixture.test/v1/")
-            .is_ok()
-    );
 }
 
 fn with(feed: &Value, pointer: &str, value: Value) -> Value {
