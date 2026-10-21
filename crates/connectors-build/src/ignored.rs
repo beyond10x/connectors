@@ -140,7 +140,8 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "local::registry::store_cost_tests::read_invoke_cost_by_store_size"
             | "local::registry::store_cost_tests::batch_cost_by_subject"
             | "local::registry::store_cost_tests::first_owner_open_of_a_grown_store"
-            | "local::registry::store_cost_tests::owner_start_of_a_grown_store" => {
+            | "local::registry::store_cost_tests::owner_start_of_a_grown_store"
+            | "local::registry::store_cost_tests::two_revalidations_of_a_grown_store" => {
                 Some((Timing, vec![]))
             }
             "local::oauth_adversary_tests::chrome_following_the_redirect_is_accepted"
@@ -208,9 +209,25 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "cli_journey::guarded_merge::custody_journey::a_create_whose_operation_has_no_custody_target_is_refused_before_it_is_sent"
             | "cli_journey::guarded_merge::custody_journey::a_created_token_custody_refuses_is_reported_by_its_hash_and_held_nowhere"
             | "cli_journey::guarded_merge::custody_journey::a_created_token_is_held_as_a_new_connection_and_only_its_hash_is_returned"
+            | "cli_journey::guarded_merge::custody_journey::a_write_after_an_executable_only_change_is_validated_once_and_sent"
+            | "cli_journey::guarded_merge::custody_journey::security2_a_proof_issued_before_an_executable_only_change_authorizes_no_write"
+            | "cli_journey::guarded_merge::custody_journey::security2_a_write_whose_new_executable_answers_another_identity_sends_nothing"
             | "cli_journey::revision_recovery::a_changed_evidence_lifetime_recovers_with_a_new_connection_in_two_commands"
             | "cli_journey::revision_recovery::no_next_action_after_a_revision_change_returns_to_an_earlier_refusal"
             | "cli_journey::revision_recovery::revalidate_replaces_the_adapter_process_of_an_earlier_entry"
+            | "cli_journey::revision_recovery::a_selection_only_change_leaves_the_connection_ready_and_serves_the_added_read"
+            | "cli_journey::revision_recovery::a_changed_ca_file_stales_the_connection_until_it_is_revalidated"
+            | "cli_journey::revision_recovery::a_replaced_executable_lists_ready_and_one_validation_follows_it"
+            | "cli_journey::revision_recovery::a_replaced_executable_answering_another_identity_changes_nothing"
+            | "cli_journey::revision_recovery::a_connection_saved_without_the_digest_keeps_the_revision_rule_until_revalidated"
+            | "cli_journey::revision_recovery::adv_the_added_read_succeeds_after_a_selection_only_change_without_revalidation"
+            | "cli_journey::revision_recovery::adv_a_read_under_a_replaced_executable_validates_once_and_is_served"
+            | "cli_journey::revision_recovery::adv2_a_stopped_instance_answers_description_unavailable_for_a_new_selection"
+            | "cli_journey::revision_recovery::revision_recovery_security::security_the_added_read_succeeds_after_a_selection_only_change_without_revalidation"
+            | "cli_journey::revision_recovery::revision_recovery_security::security_a_read_follows_an_executable_only_change_only_after_the_identity_answers"
+            | "cli_journey::revision_recovery::revision_recovery_security::security2_a_revoked_connection_starts_nothing_for_a_description"
+            | "cli_journey::revision_recovery::revision_recovery_security::security2_a_description_launch_does_not_resume_a_stopped_instance"
+            | "cli_journey::revision_recovery::revision_recovery_security::security2_operations_describe_starts_no_owner_without_a_current_connection"
             | "cli_journey::revision_recovery_adversary::adversary_a_changed_profile_id_names_the_path_that_recovers"
             | "cli_journey::revision_recovery_adversary::adversary_a_lifetime_changed_and_reverted_leaves_the_first_connection_usable"
             | "cli_journey::revision_recovery_adversary::adversary_the_connection_left_by_a_changed_authentication_stays_revocable",
@@ -361,6 +378,16 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "connectors-conformance",
             "configuration_refusal_adversary",
             "the_contract_refuses_configuration_coordinates_that_are_not_the_declared_ones",
+        )
+        | (
+            "connectors-catalog-provider",
+            "jira_issue_writes_adversary",
+            "a_comment_whose_content_is_null_is_refused_before_any_request",
+        )
+        | (
+            "connectors-catalog-provider",
+            "slack_adversary",
+            "an_empty_user_or_email_sends_nothing",
         ) => Some((Deferred, vec![])),
         _ => None,
     };
