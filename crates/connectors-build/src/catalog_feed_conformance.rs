@@ -1672,6 +1672,15 @@ fn a_relative_item_link_resolves_under_the_answers_base_or_the_origin() {
             capabilities: claimed(&feed),
         };
         assert_eq!(first_link(&unrooted), Value::Null, "{path:?}");
+        // An API base whose host is no hostname has no origin to resolve under.
+        let literal = Catalog {
+            engine: Engine::with_feed(&bundle, &base, &[], Some(&feed))
+                .and_then(|engine| engine.with_link_origin("https://[fd00::1]/v1"))
+                .unwrap(),
+            profile: feed.profile.clone(),
+            capabilities: claimed(&feed),
+        };
+        assert_eq!(first_link(&literal), Value::Null, "{path:?}");
     }
     assert!(
         relative > 0,
