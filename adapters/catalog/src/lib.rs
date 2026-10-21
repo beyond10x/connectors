@@ -1555,11 +1555,11 @@ impl Engine {
 
     /// The engine with the feed's root-relative item links resolved under the origin of
     /// `api_base`, the instance's `https` API base, where the declaration names no `url_base`;
-    /// without a feed it is unchanged.
+    /// without a feed it is unchanged. A base with no hostname origin (an IP literal in
+    /// brackets, say) leaves those links `null` and is never a refusal; the `Result` keeps the
+    /// builder chain of [`Engine::with_feed`].
     pub fn with_link_origin(mut self, api_base: &str) -> Result<Self> {
-        if let Some(feed) = self.feed.take() {
-            self.feed = Some(feed.with_link_origin(api_base)?);
-        }
+        self.feed = self.feed.take().map(|feed| feed.with_link_origin(api_base));
         Ok(self)
     }
 

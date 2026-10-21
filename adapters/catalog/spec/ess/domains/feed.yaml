@@ -50,7 +50,8 @@ types:
   # Offset paging: `parameter` takes the index of a page's first record, the listing's `limit` its
   # size. The next page starts after the records the answer carried, direct ones included; the
   # listing ends on the answer for which `complete` holds (such as an `isLast: true`), and an empty
-  # answer for which it does not is unavailable.
+  # answer for which it does not is unavailable. A cursor whose index plus the `limit` would pass
+  # the largest index the engine counts (2^64 - 1) is a stale cursor, refused before any request.
   - name: connectors_catalog.feed.OffsetPaging
     kind: struct
     fields:
@@ -127,9 +128,13 @@ types:
 
   # A query sent as `parameter`, with two slots: `{container}`, the container id, and `{since}`,
   # the kept instant's minute in UTC as `"YYYY-MM-DD HH:MM"`. Each value is a quoted literal of
-  # `language`, never spliced raw, and a slot may not stand next to a quote or a `\`. `first`, the
-  # first read, holds `{container}` once and no `{since}`; `resume` holds each once. The engine
-  # checks both when the selection file loads.
+  # `language`, never spliced raw. A slot may not stand next to a quote or a `\`, nor inside a
+  # literal the template opens with `"` or `'` (a `\` in it escapes the next character), and the
+  # template may not leave a literal open or hold a `\` outside one. `first`, the first read,
+  # holds `{container}` once and no `{since}`; `resume` holds each once. The engine checks both
+  # when the selection file loads.
+  # A kept instant whose UTC year is outside 0000 to 9999 has no `{since}` literal: the
+  # watermark holding it is a stale cursor.
   - name: connectors_catalog.feed.QueryTemplate
     kind: struct
     fields:
@@ -225,10 +230,11 @@ types:
       - {name: body, type: connectors_catalog.feed.BodyField}
       # An `http(s)://` URL, or one path rooted at a single `/`, which resolves under `url_base`
       # when declared and otherwise under the origin of the instance's API base; anything else
-      # is no URL.
+      # is no URL. An API base whose host is not a hostname (an IP literal in brackets, say) has
+      # no such origin, and a relative URL under it is then no URL, never a refusal to load.
       - {name: url, type: "Optional<connectors_catalog.feed.Pointer>"}
       # Where the answer names the base its relative item URLs are under (an `http(s)://` URL
-      # without a query or fragment), read in the whole answer. Declared, a relative URL resolves
+      # with a non-empty host and no user information, query or fragment), read in the whole answer. Declared, a relative URL resolves
       # only under it: an answer without a usable base gives no URL.
       - {name: url_base, type: "Optional<connectors_catalog.feed.Pointer>"}
       - {name: parent, type: "Optional<connectors_catalog.feed.Pointer>"}

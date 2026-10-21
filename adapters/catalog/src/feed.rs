@@ -398,8 +398,9 @@ struct Query {
 
 /// `text`, the template `name`, as text and slots. Refused: a template longer than
 /// [`TEMPLATE_BYTES`], a control character, a brace outside a slot, a slot other than
-/// `{container}` and `{since}`, a slot beside a `"`, `'` or `\` (where a value would be read as
-/// part of a literal the template opened, not as its own), and slot counts other than `first`
+/// `{container}` and `{since}`, a slot beside a `"`, `'` or `\` or inside a literal the template
+/// opens with `"` or `'` (where a value would be read as part of that literal, not as its own),
+/// a literal left open, a `\` outside a literal, and slot counts other than `first`
 /// (`{container}` once, no `{since}`) and `resume` (each once) take.
 fn template(name: &str, text: &str, resume: bool) -> Result<Vec<Part>> {
     if text.len() > TEMPLATE_BYTES {
@@ -462,6 +463,39 @@ fn template(name: &str, text: &str, resume: bool) -> Result<Vec<Part>> {
                 "feed `{name}` puts a slot beside a quote or backslash; the engine quotes each value"
             )));
         }
+    }
+    // A slot inside a literal the template opens would let its value close that literal.
+    let mut open: Option<char> = None;
+    let mut escaped = false;
+    for part in &parts {
+        let Part::Text(text) = part else {
+            if open.is_some() {
+                return Err(refuse(format!(
+                    "feed `{name}` puts a slot inside a literal; the engine quotes each value"
+                )));
+            }
+            continue;
+        };
+        for c in text.chars() {
+            match open {
+                Some(_) if escaped => escaped = false,
+                Some(_) if c == '\\' => escaped = true,
+                Some(quote) if c == quote => open = None,
+                Some(_) => {}
+                None if matches!(c, '"' | '\'') => open = Some(c),
+                // Outside a literal a provider may or may not read `\` as an escape, so where a
+                // literal starts would be the provider's guess, not the template's.
+                None if c == '\\' => {
+                    return Err(refuse(format!(
+                        "feed `{name}` has a backslash outside a literal"
+                    )));
+                }
+                None => {}
+            }
+        }
+    }
+    if open.is_some() {
+        return Err(refuse(format!("feed `{name}` leaves a literal open")));
     }
     let count = |slot: &Part| parts.iter().filter(|p| *p == slot).count();
     let (containers, sinces) = (count(&Part::Container), count(&Part::Since));
@@ -911,22 +945,32 @@ impl Feed {
     }
 
     /// The feed with root-relative item links resolved under the origin of `api_base`, the
-    /// instance's `https` API base.
-    pub(crate) fn with_link_origin(mut self, api_base: &str) -> Result<Self> {
-        let origin = crate::origin(api_base)
-            .ok_or_else(|| refuse("feed item links resolve under an https API base"))?;
-        self.links = Some(origin);
-        Ok(self)
+    /// instance's `https` API base. A base with no such origin (a host that is not a hostname,
+    /// such as a bracketed IP literal) leaves those links `null`; it never refuses the feed.
+    pub(crate) fn with_link_origin(mut self, api_base: &str) -> Self {
+        self.links = crate::origin(api_base);
+        self
     }
 
     /// The base an answer's relative item links resolve under: the `http(s)` URL at `url_base`
-    /// when declared (none when the answer carries no usable one), otherwise the origin.
+    /// when declared (none when the answer carries no usable one: no host, user information, a
+    /// query or fragment), otherwise the origin.
     fn link_base(&self, answer: &Value) -> Option<String> {
         let Some(pointer) = &self.declaration.items.url_base else {
             return self.links.clone();
         };
         let base = answer.pointer(pointer).and_then(Value::as_str)?;
-        let usable = (base.starts_with("https://") || base.starts_with("http://"))
+        let authority = base
+            .strip_prefix("https://")
+            .or_else(|| base.strip_prefix("http://"))?;
+        // A base without a host would let the link's own path name one.
+        let authority = authority.split('/').next().unwrap_or_default();
+        let host = match authority.strip_prefix('[') {
+            Some(literal) => literal.split(']').next().unwrap_or_default(),
+            None => authority.split(':').next().unwrap_or_default(),
+        };
+        let usable = !host.is_empty()
+            && !authority.contains('@')
             && base.len() <= FIELD_BYTES
             && !base.contains(['?', '#', '\\'])
             && !base.chars().any(|c| c.is_whitespace() || c.is_control());
@@ -1087,8 +1131,13 @@ impl Feed {
             Some(token) => Some(self.open(token, instance, None)?.cursor.ok_or_else(stale)?),
         };
         // An offset cursor is the index of the page's first record, which this binding issued.
+        // One whose next page could not be counted was not issued by this binding.
         let start = match (&c.cursor.offset, &cursor) {
-            (Some(_), Some(cursor)) => cursor.parse::<u64>().map_err(|_| stale())?,
+            (Some(_), Some(cursor)) => cursor
+                .parse::<u64>()
+                .ok()
+                .filter(|start| start.checked_add(limit).is_some())
+                .ok_or_else(stale)?,
             _ => 0,
         };
         let mut values = vec![(c.limit.as_str(), limit.to_string())];
@@ -1581,10 +1630,15 @@ fn floor_minute(at: i128) -> i128 {
 }
 
 /// The UTC minute holding `at`, `YYYY-MM-DD<separator>HH:MM`: the time literal a minute query
-/// sends, formatted from the parsed instant, never from the provider's text.
+/// sends, formatted from the parsed instant, never from the provider's text. `at` is a
+/// watermark's instant; one whose UTC year is outside 0000 to 9999 has no literal of that shape,
+/// so the watermark is stale.
 fn civil_minute(at: i128, separator: char) -> Result<String> {
-    let seconds =
-        i64::try_from(floor_minute(at).div_euclid(1_000_000_000)).map_err(|_| Error::internal())?;
+    let seconds = i64::try_from(floor_minute(at).div_euclid(1_000_000_000)).map_err(|_| stale())?;
+    let (year, _, _) = date(seconds.div_euclid(86_400));
+    if !(0..=9999).contains(&year) {
+        return Err(stale());
+    }
     let mut text = civil(seconds, separator);
     text.truncate(16);
     Ok(text)
@@ -1922,6 +1976,21 @@ mod tests {
             civil_minute(at("1969-12-31T23:59:30Z"), 'T').unwrap(),
             "1969-12-31T23:59"
         );
+        assert_eq!(
+            civil_minute(at("9999-12-31T23:59:59Z"), ' ').unwrap(),
+            "9999-12-31 23:59"
+        );
+        assert_eq!(
+            civil_minute(at("0000-01-01T00:00:00Z"), ' ').unwrap(),
+            "0000-01-01 00:00"
+        );
+        for outside in ["9999-12-31T23:59:00-01:00", "0000-01-01T00:30:00+01:00"] {
+            assert_eq!(
+                civil_minute(at(outside), ' ').unwrap_err().code,
+                ErrorCode::StaleCursor,
+                "{outside}"
+            );
+        }
         assert_eq!(
             floor_minute(at("2026-10-06T09:00:30Z")),
             at("2026-10-06T09:00:00Z")
