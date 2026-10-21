@@ -1108,6 +1108,23 @@ parameter. After upgrading:
    upgrades](local-connection-registry.md#configuration-upgrades).
 3. Issue every write approval policy bound to the instance again.
 
+The same upgrade path holds for any later change to a connected instance's
+configuration, for a connection saved under an entry that states
+`credential_revision`, and none of it asks for a credential. A change to the
+bundle, its source or the selection, or a replaced provider executable, is
+followed: the connection stays `ready` and is not stale. After an executable
+change, one validation under the new executable follows it when the provider
+answers the recorded identity; a read runs it itself when the description is
+cached, or `connections revalidate` does, and another identity is refused as `identity_mismatch` and
+changes nothing. A change to the CA file, the token CA, the admitted `hosts` or
+the `request_prefix` moves the bootstrap's `credential_revision`: the connection
+reports `pending` with `stale` set until `connections revalidate`, which follows
+it with the credential already in custody and answers the connection's new
+revision. A change to `evidence_lifetime_ms` alone needs `connections revoke` of
+the old connection and then `connections connect` under the same `instance` id.
+A changed provider host or any other `auth` field still needs a new `instance`
+id, as step 2 says.
+
 Separately, the declared input of these shipped reads changed, because each
 has a repeated parameter: Jira `issues.search`; Confluence `pages.changed`,
 `space.pages`, `page.get` and `page.comments`; and GitLab `issues.list`
