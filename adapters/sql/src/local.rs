@@ -149,6 +149,7 @@ impl Local {
         );
         let descriptor = adapter.descriptor();
         let bootstrap = Bootstrap {
+            bindings: None,
             credential_revision: None,
             executable: None,
             instance: config.instance.clone(),
@@ -239,6 +240,7 @@ impl connectors_host::local::runtime::Adapter for Local {
             .await
             .map_err(Failure::from_provider)?;
         Ok(Baseline {
+            binding: None,
             // The role (PostgreSQL) or user (MySQL) name is the principal the
             // server authorises against, and the database scopes it, so the pair
             // is the identity. A changed host or port is a changed configuration

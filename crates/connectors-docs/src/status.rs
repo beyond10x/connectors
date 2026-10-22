@@ -305,6 +305,20 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Catalog provider",
+        "Feed time query in an unknown zone",
+        "A declared feed's time query can be read by the provider in a zone it is not told, between utc_offsets least and greatest minutes east of UTC, and a resume then starts early enough to skip no item in any such zone. The Jira issue feed that declares it, profile jira-issues/1, is a test fixture only and not in the shipped Jira selection, so no Jira instance has a feed; verified in every profile zone from UTC-12:00 to UTC+14:00 against fixtures from the upstream description, not a live Jira (*unreleased*).",
+        "adapters/catalog/tests/jira_feed.rs::every_profile_zone_from_utc_minus_12_to_utc_plus_14_resumes_without_a_skip",
+        "/docs/reference/contracts/catalog",
+    ),
+    shipped(
+        "Catalog provider",
+        "Confluence page feed",
+        "A Confluence REST v1 binding of datasource.feed/v1alpha1, profile confluence-pages/1: spaces as containers, their pages as items, resumed by a CQL lastmodified query and continued by the cursor of the next link. It is a test fixture only and not in the shipped confluence-v1 selection, so no Confluence instance has a feed; once a selection carries it, only a connection bound to REST v1 reads it. Verified in every profile zone from UTC-12:00 to UTC+14:00 against fixtures written from the v1 reference, not a live Confluence; the CQL lastmodified precision and order are not established (*unreleased*).",
+        "adapters/catalog/tests/confluence_v1_feed.rs::every_zone_from_utc_minus_12_to_utc_plus_14_resumes_without_a_skip",
+        "/docs/reference/contracts/catalog",
+    ),
+    shipped(
+        "Catalog provider",
         "Jira Cloud",
         "Issue search by JQL, one issue by key, comments, changelogs, an issue's available transitions, a project's creatable issue types and one issue type's create fields, user search, an attachment's content, running one transition by id under a guard that reads the issue before and after it, and creating, commenting on, editing, linking and deleting issues under approval, each guarded by a read before it (edit and delete on the caller's updated stamp, refused as conflict), over HTTP basic authentication (one issue, issue types and user search since 0.39.0); the writes are verified against fixtures, not a live site.",
         "adapters/catalog/tests/jira.rs::shipped_jira_selections_are_the_nine_reads_and_the_six_writes",

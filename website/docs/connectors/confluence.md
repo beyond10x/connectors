@@ -114,6 +114,11 @@ connectors connections reconnect --connector confluence --instance work \
   --expected-revision "<revision from the list>" --credential-file ~/private/atlassian.json
 ```
 
+A pinned instance can instead carry both APIs and bind the one the token reaches each time it
+validates; the guide's
+[one instance for either API](https://github.com/beyond10x/connectors/blob/main/docs/catalog-confluence.md#one-instance-for-either-api)
+writes its configuration.
+
 ## Limits
 
 - Verified against local HTTPS fixtures only (`adapters/catalog/tests/confluence.rs`,
@@ -123,3 +128,6 @@ connectors connections reconnect --connector confluence --instance work \
 - `pages.changed` has no updated-since parameter: stop the walk at the first item older than your
   cutoff.
 - Take a cursor from `_links.next` percent-decoded, or it is encoded twice.
+- The REST v1 page feed (`adapters/catalog/contracts/feed/v1alpha1/confluence-v1.md`) is held
+  only over a test fixture; no instance has `feed.containers` or `feed.items` yet.
+- The shipped declarations carry no `bindings`, so only a pinned instance binds either API.

@@ -1,0 +1,82 @@
+domain: connectors_catalog.binding
+summary: The alternative bindings of one catalog provider instance, the optional `bindings` member of a `connectors-catalog-local/2` configuration, of which validation selects the one the credential can read.
+
+# Normative owner: docs/local-catalog-provider.md, "Alternative bindings", and
+# contracts/catalog/v1alpha1/semantics.md, "Alternative bindings". The engine reads this document
+# as `bindings`; the binding it selects is the `binding` of the private validation baseline
+# (connectors.cli.PrivateBaseline) and of the evidence the host stores
+# (connectors.credential_evidence.EvidenceSnapshot.operation_binding).
+#
+# One instance, one base, one authentication profile and one credential, served by more than one
+# description: the configuration's own provider bundle and selection set are the first binding,
+# and each alternative names another bundle and selection set of the same base. The identity
+# probe is shared and runs once; each binding then has its own access probe. Validation tries
+# the bindings in order and binds to the first whose access probe answers 2xx. A refusal moves
+# on to the next binding only when it is the answer `next` names; any other refusal stands, so a
+# wrong password or a 403 is never retried against another API. When every binding is refused,
+# nothing binds and the refusal names each answer.
+#
+# The probe runs at connect, repair and revalidate. A read dispatches under the binding of the
+# evidence it captured; an id that binding does not serve is refused as not found before any
+# request, and a revision of another binding is stale.
+
+types:
+  # A binding's name, unique within the configuration. The first binding's id is `id` below.
+  - name: connectors_catalog.binding.Id
+    kind: newtype
+    of: String
+
+  # The answer that moves validation on to the next binding: an access probe answer with exactly
+  # this HTTP status whose admitted reason (`message`, `error_description` or `error` of the JSON
+  # body, `connectors_core::reason`) contains `reason`, compared case-insensitively. Only a
+  # refusal of the binding moves on: `status` is 401 or 403, the two answers that make every
+  # binding tried refused `insufficient_scope`; any other is refused when the configuration loads.
+  - name: connectors_catalog.binding.Next
+    kind: struct
+    fields:
+      - {name: status, type: Integer}
+      - {name: reason, type: String}
+    invariants:
+      - any: [status == 401, status == 403]
+      - reason.count >= 1
+      - reason.utf8_bytes <= 256
+
+  # A binding's access probe: a GET relative to the provider base whose 2xx proves the
+  # credential can read this binding's API. The body is not read.
+  - name: connectors_catalog.binding.Access
+    kind: struct
+    fields:
+      - {name: path, type: String}
+      - {name: query, type: "Optional<Map<String, String>>"}
+    invariants:
+      - path.count >= 1
+
+  # Another description of the same instance. `provider` names the bundle loaded from the
+  # configuration's `bundle_directory`, and `operations_file` its selection set, which is read
+  # only: a configuration with bindings serves no write. `next` is present exactly when another
+  # alternative follows.
+  - name: connectors_catalog.binding.Alternative
+    kind: struct
+    fields:
+      - {name: id, type: connectors_catalog.binding.Id}
+      - {name: provider, type: String}
+      - {name: operations_file, type: String}
+      - {name: access, type: connectors_catalog.binding.Access}
+      - {name: next, type: "Optional<connectors_catalog.binding.Next>"}
+    invariants:
+      - provider.count >= 1
+      - operations_file.count >= 1
+
+  # The configuration's bindings. `id` names the first binding, whose bundle, selection set and
+  # access probe are the configuration's own `provider`, `operations_file` and `auth.access`, so
+  # a configuration with bindings declares `auth.access`. `next` is the answer that moves from the
+  # first binding to the first alternative, and is required whenever an alternative exists.
+  # Alternative ids differ from `id` and from each other.
+  - name: connectors_catalog.binding.Bindings
+    kind: struct
+    fields:
+      - {name: id, type: connectors_catalog.binding.Id}
+      - {name: next, type: connectors_catalog.binding.Next}
+      - {name: alternatives, type: "List<connectors_catalog.binding.Alternative>"}
+    invariants:
+      - alternatives.count >= 1

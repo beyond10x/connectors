@@ -49,9 +49,14 @@ fn build(feed: &Value, selections: &[Selection]) -> connectors_core::Result<Engi
 
 #[test]
 fn a_feed_declaration_adds_the_two_family_operations_under_its_profile() {
-    for name in ["time.operations.json", "cursor.operations.json"] {
+    for name in [
+        "time.operations.json",
+        "cursor.operations.json",
+        "time-query.operations.json",
+        "time-next.operations.json",
+    ] {
         let feed = declaration(name);
-        let engine = build(&feed, &[]).unwrap();
+        let engine = build(&feed, &[]).unwrap_or_else(|e| panic!("{name}: {}", e.message));
         let declared = engine.declarations(&[Effect::Read]);
         let ids: Vec<&str> = declared.iter().map(|o| o.id.as_str()).collect();
         assert_eq!(ids, [CONTAINERS, ITEMS], "{name}");
@@ -258,6 +263,256 @@ fn a_declaration_the_bundle_cannot_carry_is_refused_before_any_request() {
     );
 }
 
+/// Each case changes one field of a valid offset, next-link or query declaration; each is
+/// refused when the engine is built. A query template is checked whole before any request: a
+/// slot it does not know, a slot where a quote or backslash would let a value leave its literal,
+/// and text the provider would read as something other than the declared query.
+#[test]
+fn a_listing_shape_or_query_template_the_engine_cannot_hold_is_refused_before_any_request() {
+    let time = declaration("time.operations.json");
+    let query = declaration("time-query.operations.json");
+    let next = declaration("time-next.operations.json");
+    let first = "/items/position/value/query/first";
+    let resume = "/items/position/value/query/resume";
+    let cases: Vec<(&str, Value, &str)> = vec![
+        (
+            "offset beside a next pointer",
+            adding(
+                &time,
+                "/containers/cursor",
+                "offset",
+                json!({"complete": {"pointer": "/isLast", "equals": true}}),
+            ),
+            "exactly one of `next` and `last`",
+        ),
+        (
+            "url parameter without a next pointer",
+            adding(
+                &query,
+                "/containers/cursor",
+                "url_parameter",
+                json!("startAt"),
+            ),
+            "`containers.cursor.url_parameter` reads a `next` link",
+        ),
+        (
+            "empty url parameter",
+            with(&next, "/containers/cursor/url_parameter", json!("")),
+            "`containers.cursor.url_parameter` is not 1 to 128 visible ASCII characters",
+        ),
+        (
+            "url parameter with a space",
+            with(&next, "/containers/cursor/url_parameter", json!("st art")),
+            "`containers.cursor.url_parameter` is not 1 to 128 visible ASCII characters",
+        ),
+        (
+            "offset end flag not a pointer",
+            with(
+                &query,
+                "/containers/cursor/offset/complete/pointer",
+                json!("isLast"),
+            ),
+            "`containers.cursor.offset.complete.pointer` is not a JSON pointer",
+        ),
+        (
+            "time read by a parameter and a query",
+            adding(
+                &query,
+                "/items/position/value",
+                "parameter",
+                json!("pageToken"),
+            ),
+            "exactly one of `parameter` and `query`",
+        ),
+        (
+            "time read by neither",
+            removing(&query, "/items/position/value", "query"),
+            "exactly one of `parameter` and `query`",
+        ),
+        (
+            "query without minute precision",
+            removing(&query, "/items/position/value", "precision"),
+            "a query reads at `precision: minute`",
+        ),
+        (
+            "query at instant precision",
+            with(&query, "/items/position/value/precision", json!("instant")),
+            "a query reads at `precision: minute`",
+        ),
+        (
+            "container parameter beside a query",
+            adding(&query, "/items", "container", json!("maxResults")),
+            "`items.container` is absent exactly when a query selects the container",
+        ),
+        (
+            "no container parameter and no query",
+            removing(&time, "/items", "container"),
+            "`items.container` is absent exactly when a query selects the container",
+        ),
+        (
+            "unknown slot",
+            with(&query, first, json!("room = {room} ORDER BY edited ASC")),
+            "unknown slot `{room}`",
+        ),
+        (
+            "first read with a time",
+            with(
+                &query,
+                first,
+                json!("room = {container} AND edited >= {since}"),
+            ),
+            "`items.position.query.first` names `{container}` once and `{since}` never",
+        ),
+        (
+            "resume without a time",
+            with(
+                &query,
+                resume,
+                json!("room = {container} ORDER BY edited ASC"),
+            ),
+            "`items.position.query.resume` names `{container}` and `{since}` once each",
+        ),
+        (
+            "container twice",
+            with(
+                &query,
+                resume,
+                json!("room = {container} OR room = {container} AND edited >= {since}"),
+            ),
+            "`items.position.query.resume` names `{container}` and `{since}` once each",
+        ),
+        (
+            "slot inside double quotes",
+            with(&query, first, json!("room = \"{container}\"")),
+            "beside a quote or backslash",
+        ),
+        (
+            "slot inside single quotes",
+            with(&query, first, json!("room = '{container}'")),
+            "beside a quote or backslash",
+        ),
+        (
+            "slot after a backslash",
+            with(&query, first, json!("room = \\{container}")),
+            "beside a quote or backslash",
+        ),
+        (
+            "slot inside a literal, apart from its quotes",
+            with(&query, first, json!("text ~ \"a {container} b\"")),
+            "puts a slot inside a literal",
+        ),
+        (
+            "slot after an escaped quote inside a literal",
+            with(&query, first, json!("text ~ \"a\\\" {container} b\"")),
+            "puts a slot inside a literal",
+        ),
+        (
+            "literal left open",
+            with(&query, first, json!("room = {container} AND text ~ 'open")),
+            "leaves a literal open",
+        ),
+        (
+            "backslash outside a literal",
+            with(&query, first, json!("room = {container} AND text ~ a\\ b")),
+            "backslash outside a literal",
+        ),
+        (
+            "stray closing brace",
+            with(&query, first, json!("room = {container} }")),
+            "stray brace",
+        ),
+        (
+            "unclosed slot",
+            with(&query, first, json!("room = {container")),
+            "stray brace",
+        ),
+        (
+            "control character",
+            with(
+                &query,
+                first,
+                json!("room = {container}\nORDER BY edited ASC"),
+            ),
+            "control character",
+        ),
+        (
+            "template longer than 1024 bytes",
+            with(
+                &query,
+                first,
+                json!(format!("room = {{container}}{}", " ".repeat(1024))),
+            ),
+            "longer than 1024 bytes",
+        ),
+        (
+            "query parameter absent",
+            with(
+                &query,
+                "/items/position/value/query/parameter",
+                json!("jql"),
+            ),
+            "binds `jql`",
+        ),
+        (
+            "query parameter bound twice",
+            with(
+                &query,
+                "/items/position/value/query/parameter",
+                json!("maxResults"),
+            ),
+            "`maxResults` of `searchMessages` twice",
+        ),
+        (
+            "page parameter absent",
+            with(
+                &query,
+                "/items/position/value/page/parameter",
+                json!("token"),
+            ),
+            "binds `token`",
+        ),
+        (
+            "page continuation not a pointer",
+            with(
+                &query,
+                "/items/position/value/page/next",
+                json!("nextPageToken"),
+            ),
+            "`items.position.page.next` is not a JSON pointer",
+        ),
+        (
+            "link base not a pointer",
+            with(&next, "/items/url_base", json!("_links/base")),
+            "`items.url_base` is not a JSON pointer",
+        ),
+        (
+            "empty page url parameter",
+            with(&next, "/items/position/value/page/url_parameter", json!("")),
+            "`items.position.page.url_parameter` is not 1 to 128 visible ASCII characters",
+        ),
+    ];
+    for (case, feed, reason) in cases {
+        match build(&feed, &[]) {
+            Ok(_) => panic!("{case}: accepted"),
+            Err(error) => assert!(error.message.contains(reason), "{case}: {}", error.message),
+        }
+    }
+    // Root-relative item links resolve under the origin of an https API base; a base with no
+    // hostname origin leaves them `null` and never refuses a feed that loaded without it.
+    let engine = || build(&query, &[]).unwrap();
+    for base in [
+        "https://feed.fixture.test/v1/",
+        "https://[fd00::1]/v1",
+        "https://feed.fixture.test./v1",
+        "/v1",
+        "http://feed.fixture.test/v1",
+        "ftp://feed.fixture.test",
+        "",
+    ] {
+        assert!(engine().with_link_origin(base).is_ok(), "{base}");
+    }
+}
+
 fn with(feed: &Value, pointer: &str, value: Value) -> Value {
     let mut changed = feed.clone();
     *changed.pointer_mut(pointer).expect(pointer) = value;
@@ -350,9 +605,10 @@ impl connectors_sdk::AuthenticatedHttp for Refusing {
     }
 }
 
-/// Once the lookup answered the container, the provider's own 403 on its item listing is a
-/// container the connection cannot read: `not_found`, with the message an unknown container gets.
-/// A quota refusal is not that, and neither is a refusal the host raised before any answer.
+/// Once the lookup answered the container, the provider's own 403, 404 or 410 on its item
+/// listing is a container the connection cannot read: `not_found`, with the message an unknown
+/// container gets. A quota refusal is not that, and neither is a refusal the host raised before
+/// any answer, whose code and message are kept.
 #[tokio::test]
 async fn a_provider_refusal_of_a_visible_containers_items_is_not_found() {
     for name in ["time.operations.json", "cursor.operations.json"] {
@@ -385,6 +641,29 @@ async fn a_provider_refusal_of_a_visible_containers_items_is_not_found() {
             "{name}"
         );
         assert_eq!(forbidden.message, "container not found", "{name}");
+        let missing = read(|| {
+            Ok(connectors_sdk::HttpResponse {
+                status: 404,
+                headers: Default::default(),
+                body: br#"{"message":"404 Not found"}"#.to_vec(),
+            })
+        })
+        .await;
+        let gone = read(|| {
+            Ok(connectors_sdk::HttpResponse {
+                status: 410,
+                headers: Default::default(),
+                body: br#"{"message":"410 Gone"}"#.to_vec(),
+            })
+        })
+        .await;
+        for (status, error) in [(404, &missing), (410, &gone)] {
+            assert_eq!(
+                (&error.code, error.message.as_str()),
+                (&connectors_core::ErrorCode::NotFound, "container not found"),
+                "{name}: listing {status}"
+            );
+        }
         let busy = read(|| {
             Ok(connectors_sdk::HttpResponse {
                 status: 429,
@@ -402,6 +681,21 @@ async fn a_provider_refusal_of_a_visible_containers_items_is_not_found() {
         })
         .await;
         assert_eq!(host.code, connectors_core::ErrorCode::Forbidden, "{name}");
+        let host = read(|| {
+            Err(connectors_core::Error::new(
+                connectors_core::ErrorCode::NotFound,
+                "the host found no such route",
+            ))
+        })
+        .await;
+        assert_eq!(
+            (&host.code, host.message.as_str()),
+            (
+                &connectors_core::ErrorCode::NotFound,
+                "the host found no such route"
+            ),
+            "{name}"
+        );
     }
 }
 
@@ -535,6 +829,196 @@ async fn a_watermark_is_judged_only_after_the_container_is_admitted() {
     }
 }
 
+/// A time position's rooms and listings as the generic fixtures declare them: the room is known
+/// or not, and every listing answers `status` with `listed`. Each listing's query is recorded.
+struct Judging {
+    known: bool,
+    status: u16,
+    listed: Value,
+    listings: std::sync::Mutex<Vec<Vec<(String, String)>>>,
+}
+
+#[async_trait::async_trait]
+impl connectors_sdk::AuthenticatedHttp for Judging {
+    async fn get(
+        &self,
+        path: &[&str],
+        query: &[(&str, String)],
+    ) -> connectors_core::Result<connectors_sdk::HttpResponse> {
+        let (status, body) = match path {
+            ["rooms", "room"] if self.known => {
+                (200, json!({"room": {"id": "room", "access": "invite"}}))
+            }
+            ["rooms", "room"] => (404, json!({"error": "no such room"})),
+            ["rooms", "room", "messages"] | ["message-search"] | ["message-query"] => {
+                self.listings.lock().unwrap().push(
+                    query
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.clone()))
+                        .collect(),
+                );
+                (self.status, self.listed.clone())
+            }
+            other => panic!("unexpected read {other:?}"),
+        };
+        Ok(connectors_sdk::HttpResponse {
+            status,
+            headers: Default::default(),
+            body: serde_json::to_vec(&body).unwrap(),
+        })
+    }
+}
+
+/// A watermark in the engine's own format for `feed`'s profile, the instance and the room, kept
+/// at `time` and holding `seen` pairs at it.
+fn kept(feed: &Value, time: &str, seen: usize) -> String {
+    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+    let pairs: Vec<Value> = (0..seen).map(|n| json!([format!("m{n}"), "1"])).collect();
+    let mut mark = json!({"format": "catalog-feed/1", "profile": feed["profile"],
+                          "instance": "feed-instance", "container": "room", "time": time});
+    if seen > 0 {
+        mark["seen"] = json!(pairs);
+    }
+    URL_SAFE_NO_PAD.encode(serde_json::to_vec(&mark).unwrap())
+}
+
+/// The class of `a_watermark_is_judged_only_after_the_container_is_admitted`, for a watermark
+/// in this binding's own format that this read still cannot resume: one whose `{since}` falls
+/// outside the years 0000 to 9999, at minute precision with a parameter, with a query, and with
+/// a query shifted by `utc_offsets`, and one holding as many pairs as one provider page, with no
+/// `page` to read past them. Each is no longer resumable, so each is `stale_cursor`, as the
+/// family answers such a watermark. Every such answer comes only after the lookup and a
+/// first-read listing have answered: an unknown room and a room whose listing the provider
+/// refuses answer `not_found` alike, whatever the watermark, and the listing that decides it
+/// carries no resume filter. One pair fewer resumes.
+#[tokio::test]
+async fn a_watermark_this_binding_issued_but_cannot_resume_is_judged_only_after_admission() {
+    use connectors_core::ErrorCode::StaleCursor;
+    let time = declaration("time.operations.json");
+    let minute = adding(&time, "/items/position/value", "precision", json!("minute"));
+    let query = declaration("time-query.operations.json");
+    let offsets = |least: i64, greatest: i64| {
+        adding(
+            &query,
+            "/items/position/value/query",
+            "utc_offsets",
+            json!({"least": least, "greatest": greatest}),
+        )
+    };
+    let next = declaration("time-next.operations.json");
+    let (low, high) = ("0000-01-01T00:30:00+01:00", "9999-12-31T23:59:00-01:00");
+    let cases = [
+        (
+            "instant, full seen set",
+            time.clone(),
+            "2026-10-06T09:00:00Z",
+            100,
+            StaleCursor,
+        ),
+        (
+            "minute parameter, low year",
+            minute.clone(),
+            low,
+            0,
+            StaleCursor,
+        ),
+        (
+            "minute parameter, high year",
+            minute.clone(),
+            high,
+            0,
+            StaleCursor,
+        ),
+        (
+            "minute parameter, full seen set",
+            minute.clone(),
+            "2026-10-06T09:00:00Z",
+            100,
+            StaleCursor,
+        ),
+        ("query, low year", query.clone(), low, 0, StaleCursor),
+        ("query, high year", query.clone(), high, 0, StaleCursor),
+        (
+            "query shifted -120..0, low year",
+            offsets(-120, 0),
+            "0000-01-01T01:00:00Z",
+            0,
+            StaleCursor,
+        ),
+        (
+            "query shifted 120..120, high year",
+            offsets(120, 120),
+            "9999-12-31T23:00:00Z",
+            0,
+            StaleCursor,
+        ),
+        ("next link, low year", next.clone(), low, 0, StaleCursor),
+        ("next link, high year", next.clone(), high, 0, StaleCursor),
+    ];
+    let mut wrong = Vec::new();
+    for (name, feed, at, seen, verdict) in cases {
+        let engine = build(&feed, &[]).unwrap_or_else(|e| panic!("{name}: {}", e.message));
+        let records = feed["items"]["records"]
+            .as_str()
+            .unwrap()
+            .trim_start_matches('/');
+        let mut listed = json!({});
+        listed[records] = json!([]);
+        let read = |known: bool, status: u16, watermark: String| {
+            let http = Judging {
+                known,
+                status,
+                listed: listed.clone(),
+                listings: Default::default(),
+            };
+            let engine = &engine;
+            async move {
+                let input = json!({"container": "room", "limit": 10, "watermark": watermark});
+                let answer = engine.read(&http, "feed-instance", ITEMS, input).await;
+                let answer = answer.map_err(|error| (error.code, error.message));
+                (answer, http.listings.into_inner().unwrap())
+            }
+        };
+        let watermark = kept(&feed, at, seen);
+        let (unknown, listings) = read(false, 200, watermark.clone()).await;
+        if unknown.as_ref().err().map(|e| &e.0) != Some(&connectors_core::ErrorCode::NotFound)
+            || !listings.is_empty()
+        {
+            wrong.push(format!(
+                "{name}: unknown room {unknown:?}, {} listing(s)",
+                listings.len()
+            ));
+        }
+        let (refused, _) = read(true, 403, watermark.clone()).await;
+        if refused.as_ref().err() != unknown.as_ref().err() {
+            wrong.push(format!(
+                "{name}: refused listing {refused:?}, unknown room {unknown:?}"
+            ));
+        }
+        let (judged, listings) = read(true, 200, watermark.clone()).await;
+        let resumed_from = |listing: &Vec<(String, String)>| {
+            listing
+                .iter()
+                .any(|(k, v)| k == "updated_since" || v.contains(">="))
+        };
+        if judged.as_ref().err().map(|e| &e.0) != Some(&verdict)
+            || listings.len() != 1
+            || listings.iter().any(resumed_from)
+        {
+            wrong.push(format!("{name}: {judged:?} after listings {listings:?}"));
+        }
+        if seen > 0 {
+            let (resumed, _) = read(true, 200, kept(&feed, at, seen - 1)).await;
+            if resumed.is_err() {
+                wrong.push(format!(
+                    "{name}: one pair fewer did not resume: {resumed:?}"
+                ));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
 /// A listing declared with `cursor.last` continues after the key of a full page's last record,
 /// a direct one included; a shorter page is the end; a full page whose last record has no key is
 /// `unavailable`, never complete. A fixed `kind_word` is every listed container's `kind`.
@@ -595,6 +1079,44 @@ async fn a_last_key_listing_continues_after_a_full_page_and_a_fixed_word_is_ever
             vec![pair("cursor", "b"), pair("limit", "2")],
             vec![pair("limit", "2")],
         ]
+    );
+}
+
+/// A listing cursor carries the provider's cursor, so a provider cursor of 13,000 bytes passes
+/// its 16 KiB ceiling: `unavailable`, with a message that names the provider's cursor, not items
+/// sharing an instant, which a listing cursor never holds. One of 100 bytes does not pass it.
+#[tokio::test]
+async fn a_listing_cursor_past_the_ceiling_is_unavailable_for_the_providers_cursor() {
+    let engine = build(&declaration("time.operations.json"), &[]).unwrap();
+    let listing = |next: String| Rooms {
+        pages: std::sync::Mutex::new(vec![json!({"rooms": [], "next_cursor": next})]),
+        queries: Default::default(),
+    };
+    let short = engine
+        .read(
+            &listing("c".repeat(100)),
+            "feed-instance",
+            CONTAINERS,
+            json!({"limit": 2}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(short["complete"], json!(false), "control");
+    let long = engine
+        .read(
+            &listing("c".repeat(13_000)),
+            "feed-instance",
+            CONTAINERS,
+            json!({"limit": 2}),
+        )
+        .await
+        .map_err(|error| (error.code, error.message));
+    assert_eq!(
+        long.map(|_| ()),
+        Err((
+            connectors_core::ErrorCode::Unavailable,
+            "the cursor would exceed its ceiling; the provider's cursor is too long".to_owned()
+        ))
     );
 }
 

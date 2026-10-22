@@ -1160,8 +1160,11 @@ access; it never contains raw provider evidence or custody references.
 `Failure.service_reason` is the one provider text a failure may carry, and only
 in this admitted form. It appears on `operations invoke` of a read, at
 `stage = dispatch`, when the provider refused the dispatched request: beside
-`service_code`, or on the provider's own `forbidden`. It is absent otherwise,
-and absent unless every rule below holds:
+`service_code`, or on the provider's own `forbidden`. It also appears on a
+validation (`connections connect`, `reconnect`, `repair`, `revalidate`) refused
+with `code = not_granted` because every [alternative binding](#bound-connections)
+of the instance was refused, naming each binding's answer. It is absent
+otherwise, and absent unless every rule below holds:
 
 - **Source.** The provider adapter read it from the refusal's response body, and
   only from the first of the top-level `message`, `error_description` and
@@ -1206,8 +1209,8 @@ and absent unless every rule below holds:
 
 The reason is text for a person reading why the provider refused, such as the
 missing token scope behind an `unauthorized`. It never decides `code`, `stage`
-or `next_action`, and a client must not parse it. A guarded write's failure, a
-connection probe's answer and every other route carry none.
+or `next_action`, and a client must not parse it. A guarded write's failure,
+any other connection probe's answer and every other route carry none.
 
 `Failure.retry_after_seconds` is the delay a provider named before a
 rate-limited read may be sent again, so the caller can wait. It appears on
@@ -1586,6 +1589,33 @@ row here and in the [owner](owner.md#windows), [adapter](private-adapter.md#wind
 and [consumer](consumer-launch.md#8-windows) Windows sections. These Windows
 rows are specified; until the host and CLI suites run on a Windows runner, none
 of them is observed.
+
+## Bound connections
+
+An instance may describe its operations as more than one binding, each its own
+descriptor and operations, of which a validation selects the one its credential
+can read ([private adapter binding](private-adapter.md#alternative-bindings); the
+catalog provider's [`bindings`](../../catalog/v1alpha1/semantics.md#34-alternative-bindings)).
+The connection is then bound: `ConnectionDescription.binding` names the binding
+its current evidence selected, and is absent for every instance without bindings.
+A connection whose every binding was refused is not made; the validation fails
+with `code = not_granted` and a `service_reason` naming each answer.
+
+Each validation selects again. When `connections revalidate` (or `repair`)
+selects another binding than the evidence it replaces, the result says so in
+`ConnectionRevalidateResult.rebound`, `{"from": <id>, "to": <id>}`, absent
+otherwise; a read recollecting evidence may rebind as well, and that read refuses
+as `stale_description` unsent, so the next read runs under the new binding.
+
+`operations invoke` admits and dispatches a read under the binding of the
+evidence it captured: an id that binding does not serve refuses as `not_found`
+before any request, though another binding of the instance serves it.
+`operations list` and `operations describe` answer the first binding by default,
+as for every instance; with `--connection CONNECTION`, a connection of the
+selected instance, they answer the binding that connection's evidence selected,
+and its revision is the one `operations invoke` checks. A connection the
+selected instance does not hold refuses as `not_found`, as `connections describe`
+refuses it, and one never validated answers the first binding.
 
 ## Operations by family
 

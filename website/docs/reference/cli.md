@@ -530,6 +530,7 @@ connectors operations describe [OPTIONS] --operation <field:operation>
 | `--adapter <ALIAS>` | no | none | any | Deprecated: the alias of a configured entry; select with --connector and --instance |
 | `--connector <field:connector>` | no | none | any |  |
 | `--instance <field:instance>` | no | none | any |  |
+| `--connection <field:connection>` | no | none | any |  |
 | `--operation <field:operation>` | yes | none | any |  |
 
 ## `connectors operations invoke`
@@ -571,6 +572,7 @@ connectors operations list [OPTIONS]
 | `--adapter <ALIAS>` | no | none | any | Deprecated: the alias of a configured entry; select with --connector and --instance |
 | `--connector <field:connector>` | no | none | any |  |
 | `--instance <field:instance>` | no | none | any |  |
+| `--connection <field:connection>` | no | none | any |  |
 | `--family <field:family>` | no | none | any |  |
 | `--limit <field:limit>` | no | none | any |  |
 | `--cursor <field:cursor>` | no | none | any |  |

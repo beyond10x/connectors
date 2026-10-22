@@ -555,7 +555,9 @@ The complete configuration used against the sandbox is
   the identity read refuses it. The body is not read. Omitted, nothing changes and
   existing configuration revisions hold. Confluence declares a v2 page read here
   ([Confluence guide](catalog-confluence.md)), because its v1 identity read passes
-  for a token whose scopes do not cover the v2 page reads (#102).
+  for a token whose scopes do not cover the v2 page reads (#102). With
+  [alternative bindings](#alternative-bindings), a named refusal of this read moves
+  validation on to another binding's read instead.
 - `identity.source` is `api` when omitted, the read shown above. `id_token`,
   for `oauth2_refresh` only, takes the subject from the `sub` of the token
   answer's `id_token`, after checking that its `iss` is
@@ -1034,6 +1036,70 @@ input `pipeline_id` and `/head_pipeline/status` literally `success`. After it:
 `/state` literally `merged` and `/sha` still the pinned head. Those are the
 checks the retired native `merge_request.validate` made in Rust, as five lines of data.
 
+### Alternative bindings
+
+One credential may read one of several APIs of the same site, and which one is only known when
+the site answers: Confluence REST v2 refuses a token outside its scopes that REST v1 reads. The
+optional `bindings` member lets one instance serve whichever API its credential reads. The
+configuration's own `provider`, `operations_file` and `auth.access` are the first binding, named
+by `bindings.id`; each alternative names another bundle from the same `bundle_directory`, its own
+selection set and its own access read. The pairing is data: the provider names no API
+([contract](../contracts/catalog/v1alpha1/semantics.md#34-alternative-bindings)).
+
+```json
+"bindings": {
+  "id": "v2",
+  "next": {"status": 401, "reason": "scope does not match"},
+  "alternatives": [
+    {
+      "id": "v1",
+      "provider": "confluence-v1",
+      "operations_file": "/absolute/path/adapters/catalog/providers/confluence-v1/operations.json",
+      "access": {"path": "rest/api/space", "query": {"limit": "1"}}
+    }
+  ]
+}
+```
+
+- `id` and each alternative's `id` are distinct ids. There are 1 to 8 alternatives, tried in
+  order.
+- `next` is the answer that moves validation from a binding to the one after it: its `status`,
+  401 or 403, and `reason`, text of at most 256 bytes that the provider's admitted reason must
+  contain, compared case-insensitively. Any other `status` is refused when the configuration
+  loads. `bindings.next` belongs to the first binding; every alternative but the last states its
+  own `next`, and the last states none.
+- The first binding requires `auth.access`, and every alternative its `access`, written as
+  `auth.access` is. The identity is read from the API: an `id_token` identity is refused.
+- Every selection set reads only. A configuration with `bindings` that selects a write is
+  refused, because a write's approval binds one description. The bindings share `api_base`, the
+  admitted hosts, the `auth` profile and the credential; every binding's reads count when the
+  admitted hosts are checked.
+- A derived instance has no bindings: an instance with them is pinned.
+
+Validation reads the identity once, then the scopes, then the first binding's access read. A 2xx
+binds the connection there. A refusal that matches that binding's `next` moves on to the next
+binding's access read; any other refusal stands. A wrong password is refused at the identity
+read as `invalid_credential`, and nothing else is tried. When every binding tried was refused
+with 401 or 403, the connection is refused as `insufficient_scope` with a reason naming each
+answer and the provider's reason when it gave one, such as `binding v2 answered 401
+(Unauthorized; scope does not match); binding v1 answered 403`. Any other status is refused as
+the access read refuses it without bindings. Every validation, a revalidation included, starts
+again from the first binding.
+
+The bootstrap describes the first binding as before and carries each alternative's description
+and requirements under `bindings`. Each binding's description has its own revision. The bindings
+enter the configuration revision, so adding them moves it; a configuration without them keeps
+its revision and prints the bootstrap it printed before. Through the CLI:
+
+- `connections connect`, `describe` and `revalidate` name the bound binding as `binding`, and a
+  revalidation that binds another one says so as `"rebound": {"from": "v1", "to": "v2"}`.
+- `operations list` and `operations describe` with `--connection` describe the binding that
+  connection reads through; without it, the first binding.
+- `operations invoke` reads under the binding the connection's evidence selected. An id that
+  binding does not serve is `not_found` before any request, and the revision of another
+  binding's description is `stale_description`: describe again with `--connection`.
+- The instance's `permissions.operations` names ids of every binding it allows.
+
 ### Array and required query parameters
 
 A query parameter the pinned source declares as an array with `style: form` and
@@ -1107,6 +1173,23 @@ parameter. After upgrading:
    to it when it publishes. See [Configuration
    upgrades](local-connection-registry.md#configuration-upgrades).
 3. Issue every write approval policy bound to the instance again.
+
+The same upgrade path holds for any later change to a connected instance's
+configuration, for a connection saved under an entry that states
+`credential_revision`, and none of it asks for a credential. A change to the
+bundle, its source or the selection, or a replaced provider executable, is
+followed: the connection stays `ready` and is not stale. After an executable
+change, one validation under the new executable follows it when the provider
+answers the recorded identity; a read runs it itself when the description is
+cached, or `connections revalidate` does, and another identity is refused as `identity_mismatch` and
+changes nothing. A change to the CA file, the token CA, the admitted `hosts` or
+the `request_prefix` moves the bootstrap's `credential_revision`: the connection
+reports `pending` with `stale` set until `connections revalidate`, which follows
+it with the credential already in custody and answers the connection's new
+revision. A change to `evidence_lifetime_ms` alone needs `connections revoke` of
+the old connection and then `connections connect` under the same `instance` id.
+A changed provider host or any other `auth` field still needs a new `instance`
+id, as step 2 says.
 
 Separately, the declared input of these shipped reads changed, because each
 has a repeated parameter: Jira `issues.search`; Confluence `pages.changed`,

@@ -783,6 +783,7 @@ fn two_revalidations_of_a_grown_store() {
         let finished = registry.finish_revalidation(
             dispatched,
             Ok(ValidatedBaseline {
+                binding: None,
                 identity: ExternalIdentity {
                     kind: "fixture-account".into(),
                     subject: "one".into(),

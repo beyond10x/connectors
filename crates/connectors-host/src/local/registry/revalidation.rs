@@ -15,6 +15,8 @@ pub struct Revalidation {
     upgrade: Option<Binding>,
     /// What moved between the saved binding and `upgrade` (`follow`).
     moved: Follow,
+    /// The binding the evidence this revalidation replaces selected.
+    prior: Option<String>,
 }
 impl Revalidation {
     pub fn version(&self) -> custody::Version {
@@ -36,6 +38,11 @@ impl Revalidation {
     /// (`Follow::Executable`), classified inside its own capture.
     pub fn follows_executable(&self) -> bool {
         self.upgrade.is_some() && self.moved == Follow::Executable
+    }
+    /// The binding the connection's evidence named when this was captured
+    /// (`EvidenceSnapshot.operation_binding`): what a rebinding moves from.
+    pub fn prior_binding(&self) -> Option<&str> {
+        self.prior.as_deref()
     }
 }
 #[cfg_attr(test, derive(Clone))]
@@ -370,7 +377,8 @@ impl Registry {
                 params![id,reference,row.generation,version,row.fence,timestamp(expires)?]).map_err(db)?;
             Ok(Revalidation {id, version:custody_version(authority,&row.scope_id,version)?, captured:now,
                 revision: revision.to_owned(), upgrade: upgrade.then(|| binding.clone()),
-                moved: if upgrade { follow(&row.binding, binding) } else { Follow::Same }})
+                moved: if upgrade { follow(&row.binding, binding) } else { Follow::Same },
+                prior: row.baseline.as_ref().and_then(|b| b.operation_binding.clone())})
         })
     }
 

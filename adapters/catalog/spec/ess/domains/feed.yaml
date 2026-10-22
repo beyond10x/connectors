@@ -39,20 +39,45 @@ types:
       - {name: pointer, type: connectors_catalog.feed.Pointer}
       - {name: map, type: "Map<String, connectors_catalog.feed.Visibility>"}
 
-  # How a listing continues, sent as `parameter`; exactly one of `next` and `last` (Declaration's
-  # invariants).
+  # The query parameter of a returned next URL that carries a continuation. The engine reads that
+  # one parameter, percent- and form-decoded, and sends it as its own `parameter`; it never
+  # requests the URL, whose host and path are ignored. A relative and an absolute URL read alike;
+  # a URL without the parameter, or with it twice, is unavailable.
+  - name: connectors_catalog.feed.UrlParameter
+    kind: newtype
+    of: String
+
+  # Offset paging: `parameter` takes the index of a page's first record, the listing's `limit` its
+  # size. The next page starts after the records the answer carried, direct ones included; the
+  # listing ends on the answer for which `complete` holds (such as an `isLast: true`), and an empty
+  # answer for which it does not is unavailable. A cursor whose index plus the `limit` would pass
+  # the largest index the engine counts (2^64 - 1) is a stale cursor, refused before any request.
+  - name: connectors_catalog.feed.OffsetPaging
+    kind: struct
+    fields:
+      - {name: complete, type: connectors_catalog.feed.Condition}
+
+  # How a listing continues, sent as `parameter`; exactly one of `next`, `last` and `offset`
+  # (Declaration's invariants).
   # - `next`: the provider's own continuation, read in the whole answer. An absent, null or empty
-  #   `next` ends the listing.
+  #   `next` ends the listing. With `url_parameter`, `next` is a URL and the continuation is that
+  #   parameter of it.
   # - `last`: the key of the last record of a full page, read in that record, for a provider that
   #   lists after a key it is given; the declaration's `query` orders the listing by that key. A
   #   page with fewer records than the limit ends the listing, and a full page whose last record
   #   has no key is unavailable, never complete.
+  # - `offset`: offset paging.
   - name: connectors_catalog.feed.CursorPaging
     kind: struct
     fields:
       - {name: parameter, type: connectors_catalog.feed.Parameter}
       - {name: next, type: "Optional<connectors_catalog.feed.Pointer>"}
+      - {name: url_parameter, type: "Optional<connectors_catalog.feed.UrlParameter>"}
       - {name: last, type: "Optional<connectors_catalog.feed.Pointer>"}
+      - {name: offset, type: "Optional<connectors_catalog.feed.OffsetPaging>"}
+    invariants:
+      - any: [{not: defined(url_parameter)}, defined(next)]
+      - any: [{not: defined(url_parameter)}, {url_parameter.count: {gte: 1, lte: 128}}]
 
   # Reads one container by id, so that `feed.items` answers an unknown and an excluded direct
   # container alike, before any item is read.
@@ -87,13 +112,102 @@ types:
       # Absent: every container is private and none is direct.
       - {name: visibility, type: "Optional<connectors_catalog.feed.VisibilityRule>"}
 
-  # The watermark is the last returned item's `updated_at` and the (id, revision) pairs returned
-  # at that instant. `parameter` is an inclusive lower bound on `updated_at`, and the provider
-  # answers in ascending `updated_at` order; the engine checks that order on every answer.
-  - name: connectors_catalog.feed.TimeFilter
+  # The resolution of the provider's time filter. `instant` (the default) sends the kept
+  # `updated_at` as it is. `minute` sends that instant's minute, in UTC: the provider re-reads
+  # that minute up to the kept instant, which the watermark already holds and the engine drops,
+  # and each request of such a resume asks for `max_limit` items. At either precision the
+  # watermark holds the (id, revision) pairs returned at the kept instant only, so how many share
+  # the kept minute does not grow it.
+  - name: connectors_catalog.feed.Precision
+    kind: enum
+    variants: [instant, minute]
+
+  # The query languages a template is written in. Both quote a value as `"..."`, a `\` before
+  # each `"` and `\` in it; a value holding a control character is refused, never sent.
+  - name: connectors_catalog.feed.QueryLanguage
+    kind: enum
+    variants: [jql, cql]
+
+  # A query sent as `parameter`, with two slots: `{container}`, the container id, and `{since}`,
+  # the kept instant's minute in UTC as `"YYYY-MM-DD HH:MM"`. Each value is a quoted literal of
+  # `language`, never spliced raw. A slot may not stand next to a quote or a `\`, nor inside a
+  # literal the template opens with `"` or `'` (a `\` in it escapes the next character), and the
+  # template may not leave a literal open or hold a `\` outside one. `first`, the first read,
+  # holds `{container}` once and no `{since}`; `resume` holds each once. The engine checks both
+  # when the selection file loads.
+  # A kept instant whose UTC year is outside 0000 to 9999 has no `{since}` literal: the
+  # watermark holding it is a stale cursor, answered as every watermark this read cannot resume
+  # is, once the listing sent as a first read has answered.
+  # `utc_offsets` states that the provider reads `{since}` as wall time in a zone the engine is not
+  # told, whose offset lies within it; `{since}` is then the kept minute shifted by its `least`,
+  # and that shifted minute's UTC year is the one held to 0000 to 9999. Absent, the provider
+  # reads `{since}` in UTC.
+  - name: connectors_catalog.feed.QueryTemplate
     kind: struct
     fields:
       - {name: parameter, type: connectors_catalog.feed.Parameter}
+      - {name: language, type: connectors_catalog.feed.QueryLanguage}
+      - {name: first, type: String}
+      - {name: resume, type: String}
+      - {name: utc_offsets, type: "Optional<connectors_catalog.feed.UtcOffsets>"}
+    invariants:
+      - first.count >= 1
+      - first.count <= 1024
+      - resume.count >= 1
+      - resume.count <= 1024
+
+  # The offsets from UTC, in minutes east of it, between which lies that of the zone a provider
+  # reads `{since}` in, both bounds included (UTC-12:00 to UTC+14:00 is `least: -720`,
+  # `greatest: 840`). The engine then sends the kept minute shifted by `least`, so the provider's
+  # filter starts at or before that minute in every such zone, and drops each re-read item whose
+  # `updated_at` falls before the kept instant, which the watermark already holds; the order is
+  # checked from the earliest start, the kept minute shifted by `least - greatest`. Such a
+  # resume re-reads up to `greatest - least` minutes before the kept minute and asks for
+  # `max_limit` items a page; a resume whose 10 pages hold no unseen item is unavailable.
+  - name: connectors_catalog.feed.UtcOffsets
+    kind: struct
+    fields:
+      - {name: least, type: Integer}
+      - {name: greatest, type: Integer}
+    invariants:
+      - least >= -1439
+      - least <= 1439
+      - greatest >= -1439
+      - greatest <= 1439
+      - least <= greatest
+
+  # A continuation within one `feed.items` call: `parameter` sends the token read at `next` in the
+  # answer, or, with `url_parameter`, that parameter of the URL at `next`. An absent, null or empty
+  # `next` ends the list. It is never kept in a watermark.
+  - name: connectors_catalog.feed.Continuation
+    kind: struct
+    fields:
+      - {name: parameter, type: connectors_catalog.feed.Parameter}
+      - {name: next, type: connectors_catalog.feed.Pointer}
+      - {name: url_parameter, type: "Optional<connectors_catalog.feed.UrlParameter>"}
+    invariants:
+      - any: [{not: defined(url_parameter)}, {url_parameter.count: {gte: 1, lte: 128}}]
+
+  # The watermark is the last returned item's `updated_at` and the (id, revision) pairs returned
+  # at that instant, at either precision. The lower bound is inclusive and the provider answers
+  # in ascending `updated_at` order; the engine checks that order on every answer. A watermark
+  # this binding issued that the declaration cannot resume (a `{since}` outside the years 0000
+  # to 9999, or, without `page`, at least `max_limit` pairs) is a stale cursor, judged only after
+  # the container lookup and a listing sent as a first read have answered. The bound is sent either as `parameter` or inside `query`, exactly one of the
+  # two; a `query` is at `minute` precision. With `page`, one call reads further pages until it
+  # holds `limit` unseen items or the list ends. A query with `utc_offsets` is read with `page`.
+  - name: connectors_catalog.feed.TimeFilter
+    kind: struct
+    fields:
+      - {name: parameter, type: "Optional<connectors_catalog.feed.Parameter>"}
+      - {name: precision, type: "Optional<connectors_catalog.feed.Precision>"}
+      - {name: query, type: "Optional<connectors_catalog.feed.QueryTemplate>"}
+      - {name: page, type: "Optional<connectors_catalog.feed.Continuation>"}
+    invariants:
+      - any: [defined(parameter), defined(query)]
+      - any: [{not: defined(parameter)}, {not: defined(query)}]
+      - any: [{not: defined(query)}, {precision: minute}]
+      - any: [{not: defined(query.utc_offsets)}, defined(page)]
 
   # The watermark is the provider's own change cursor: a position after the last change the
   # answer carried. `complete` holds on the answer that reached the newest change; `stale` lists
@@ -131,8 +245,9 @@ types:
     kind: struct
     fields:
       - {name: operation_id, type: String}
-      # The parameter that takes the container id.
-      - {name: container, type: String}
+      # The parameter that takes the container id; absent exactly when a time filter's `query`
+      # carries it (the engine checks this when the selection file loads).
+      - {name: container, type: "Optional<String>"}
       - {name: query, type: "Optional<Map<String, String>>"}
       - {name: limit, type: connectors_catalog.feed.Parameter}
       - {name: position, type: connectors_catalog.feed.Position}
@@ -144,7 +259,15 @@ types:
       - {name: updated_at, type: connectors_catalog.feed.Pointer}
       - {name: author, type: "Optional<connectors_catalog.feed.AuthorFields>"}
       - {name: body, type: connectors_catalog.feed.BodyField}
+      # An `http(s)://` URL, or one path rooted at a single `/`, which resolves under `url_base`
+      # when declared and otherwise under the origin of the instance's API base; anything else
+      # is no URL. An API base whose host is not a hostname (an IP literal in brackets, say) has
+      # no such origin, and a relative URL under it is then no URL, never a refusal to load.
       - {name: url, type: "Optional<connectors_catalog.feed.Pointer>"}
+      # Where the answer names the base its relative item URLs are under (an `http(s)://` URL
+      # with a non-empty host and no user information, query or fragment), read in the whole answer. Declared, a relative URL resolves
+      # only under it: an answer without a usable base gives no URL.
+      - {name: url_base, type: "Optional<connectors_catalog.feed.Pointer>"}
       - {name: parent, type: "Optional<connectors_catalog.feed.Pointer>"}
       # Absent: the profile observes no deletions and never reports a tombstone.
       - {name: deleted, type: "Optional<connectors_catalog.feed.Condition>"}
@@ -194,8 +317,10 @@ types:
       - max_limit <= 100
       - any: [{capabilities.deletions: not-observed}, defined(items.deleted)]
       - any: [{capabilities.deletions: observed}, {not: defined(items.deleted)}]
-      - any: [defined(containers.cursor.next), defined(containers.cursor.last)]
+      - any: [defined(containers.cursor.next), defined(containers.cursor.last), defined(containers.cursor.offset)]
       - any: [{not: defined(containers.cursor.next)}, {not: defined(containers.cursor.last)}]
+      - any: [{not: defined(containers.cursor.next)}, {not: defined(containers.cursor.offset)}]
+      - any: [{not: defined(containers.cursor.last)}, {not: defined(containers.cursor.offset)}]
       - any: [defined(containers.kind), defined(containers.kind_word)]
       - any: [{not: defined(containers.kind)}, {not: defined(containers.kind_word)}]
       - any: [{not: defined(containers.kind_word)}, {containers.kind_word.count: {gte: 1, lte: 128}}]

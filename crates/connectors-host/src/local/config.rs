@@ -2422,6 +2422,7 @@ mod derived_instance_tests {
                 "input_schema": {"type": "object"}, "output_schema": {"type": "object"}})
         };
         Bootstrap {
+            bindings: None,
             credential_revision: None,
             executable: None,
             instance: instance.into(),

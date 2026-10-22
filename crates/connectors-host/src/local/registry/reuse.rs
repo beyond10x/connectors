@@ -204,6 +204,7 @@ impl Registry {
                     partition,
                     expires,
                     lifetime: baseline.lifetime(),
+                    binding: baseline.operation_binding.clone(),
                 },
                 identity: row.identity.clone().ok_or(Failure::MetadataUnavailable)?,
                 guard: ReuseGuard {
@@ -225,6 +226,7 @@ impl Registry {
             partition: captured.read.partition.clone(),
             expires: captured.read.expires,
             lifetime: captured.read.lifetime,
+            binding: captured.read.binding.clone(),
         };
         self.dispatch_read(captured.read, now).or_else(|refused| {
             self.cancel_read(replay, now)?;

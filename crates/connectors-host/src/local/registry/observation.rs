@@ -21,6 +21,9 @@ pub struct ObservedConnection {
     pub observed_at_ms: u64,
     pub valid_until_ms: u64,
     pub stale: bool,
+    /// The binding the connection's current evidence selected, for an
+    /// instance that declares alternative bindings.
+    pub binding: Option<String>,
 }
 pub struct Page {
     pub connections: Vec<ObservedConnection>,
@@ -320,6 +323,10 @@ fn observe(
     } else {
         deadline(now, ENTRY_MS)?
     };
+    let binding = row
+        .baseline
+        .as_ref()
+        .and_then(|baseline| baseline.operation_binding.clone());
     Ok(ObservedConnection {
         reference: row.reference,
         instance: row.binding.instance_id,
@@ -330,6 +337,7 @@ fn observe(
         observed_at_ms: now,
         valid_until_ms,
         stale,
+        binding,
     })
 }
 

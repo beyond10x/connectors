@@ -1125,13 +1125,19 @@ fn worker(
                     .map(Output::Write)
                 }
                 Task::Ensure { .. } => Ok(Output::Bootstrap(active.bootstrap().clone(), job.epoch)),
+                // A validation refused under every alternative binding keeps
+                // the reason naming each answer (private-adapter.md).
                 Task::Validate {
                     profile, secret, ..
-                } => Ok(Output::Baseline(active.validate(
-                    &profile,
-                    &secret,
-                    job.deadline.min(connectors_sdk::now_ms() + 30_000),
-                )?)),
+                } => Ok(Output::Baseline(
+                    active
+                        .validate_explained(
+                            &profile,
+                            &secret,
+                            job.deadline.min(connectors_sdk::now_ms() + 30_000),
+                        )
+                        .map_err(validation_refusal)?,
+                )),
                 Task::Revalidate {
                     connection,
                     revision,
@@ -1146,6 +1152,9 @@ fn worker(
                         connectors_sdk::now_ms(),
                         job.deadline,
                     )?;
+                    let prior = active
+                        .bootstrap()
+                        .effective_binding(captured.prior_binding());
                     revalidate(
                         &Scope {
                             paths: &paths,
@@ -1175,9 +1184,18 @@ fn worker(
                         connectors_sdk::now_ms(),
                         true,
                     )?;
-                    Ok(Output::Value(
-                        json!({"connection":connection_value(&job.alias,observed)}),
-                    ))
+                    // The validation selected another binding than the
+                    // evidence it replaced (contracts/cli/v1alpha1/semantics.md,
+                    // "Bound connections").
+                    let rebound = match (prior, observed.binding.clone()) {
+                        (Some(from), Some(to)) if from != to => Some(json!({"from":from,"to":to})),
+                        _ => None,
+                    };
+                    let mut value = json!({"connection":connection_value(&job.alias,observed)});
+                    if let Some(rebound) = rebound {
+                        value["rebound"] = rebound;
+                    }
+                    Ok(Output::Value(value))
                 }
                 Task::Invoke {
                     connection,
@@ -1186,7 +1204,12 @@ fn worker(
                     revision,
                     document,
                 } => {
-                    let bootstrap = active.bootstrap().clone();
+                    // The description the caller read names its binding by
+                    // its revision; the read runs under that binding's view
+                    // only if its captured evidence selected it.
+                    let declared = active.bootstrap().clone();
+                    let described = declared.described_binding(&revision)?;
+                    let bootstrap = declared.bound(described.as_deref())?;
                     if bootstrap.descriptor()?.revision != revision
                         || schema(&bootstrap, &operation)? != expected_schema
                     {
@@ -1432,6 +1455,14 @@ fn worker(
                         }
                         other => other?,
                     };
+                    // Evidence that selected another binding than the one the
+                    // caller described, a recollection's rebinding among
+                    // them, refuses the read unsent: the next description is
+                    // the bound one (contracts/cli/v1alpha1/semantics.md).
+                    if declared.effective_binding(captured.operation_binding()) != described {
+                        registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                        return Err(Code::StaleDescription.into());
+                    }
                     let version = captured.version();
                     let selection = config.selection();
                     let material =
@@ -1490,8 +1521,14 @@ fn worker(
                     }
                     let dispatched = registry.dispatch_read(captured, connectors_sdk::now_ms())?;
                     drop(guard);
-                    let result = active.invoke_explained(
-                        &operation, &revision, &partition, &material, &document, deadline,
+                    let result = active.invoke_bound(
+                        described.as_deref(),
+                        &operation,
+                        &revision,
+                        &partition,
+                        &material,
+                        &document,
+                        deadline,
                     );
                     // The provider refused the stored credential as unauthorized
                     // (a refresh token answered `invalid_grant`, a token or basic
@@ -1768,10 +1805,18 @@ fn revalidate_inner(
     let upgrade = captured.upgrades();
     let dispatched = registry.dispatch_revalidation(captured, connectors_sdk::now_ms())?;
     drop(guard);
+    // The reason the last attempt was refused with, kept beside
+    // `insufficient_scope` alone (`validation_refusal`).
+    let refused = std::cell::Cell::new(None);
     let (result, attempts, cause) = revalidate_with_retries(
         deadline,
         || {
-            let result = active.validate(profile, &material, deadline);
+            let result = active
+                .validate_explained(profile, &material, deadline)
+                .map_err(|refusal| {
+                    refused.set(refusal.reason);
+                    refusal.failure
+                });
             (result, active.running().unwrap_or(false))
         },
         || stopped.load(Ordering::SeqCst),
@@ -1807,6 +1852,9 @@ fn revalidate_inner(
             // credential the new provider refuses needs a new connection.
             let mut error = retried(error, attempts, cause);
             error.reconnect = upgrade && reason.is_some();
+            if matches!(reason, Some(registry::InvalidCredential::Insufficient)) {
+                error.service_reason = refused.take();
+            }
             return Err(error);
         }
     }

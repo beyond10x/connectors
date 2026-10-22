@@ -201,12 +201,13 @@ impl Scenario {
     }
 
     /// Adds a second trust root to the CA file: the same server stays
-    /// trusted, the credential side of the configuration moves.
-    fn trust_another_root(&self) {
+    /// trusted, the credential side of the configuration moves. Answers the
+    /// new configuration revision.
+    fn trust_another_root(&self) -> String {
         let other = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
         let roots = format!("{}{}", self.provider.pem, other.cert.pem());
         private(&self.provider.ca, roots.as_bytes());
-        self.reconfigure(|_| {});
+        self.reconfigure(|_| {})
     }
 
     /// Replaces the provider executable with a copy that differs in one
@@ -526,17 +527,28 @@ fn a_selection_only_change_leaves_the_connection_ready_and_serves_the_added_read
 
 /// A changed CA file moves the credential side: the connection lists
 /// `pending` and stale until `connections revalidate`, which follows it, after
-/// which the read is served.
+/// which the read is served. The binding moved, so the revalidate answer names
+/// a new public revision of the connection, the one `connections describe`
+/// names afterwards, and the instance runs under the configured revision
+/// (story:connection-follows-configuration-upgrade).
 #[test]
 #[ignore = "requires built production CLI and qualified disposable Secret Service"]
 fn a_changed_ca_file_stales_the_connection_until_it_is_revalidated() {
     let scenario = Scenario::connected_under(Some(&S1), true);
-    scenario.trust_another_root();
+    let saved = scenario.revision.borrow().clone();
+    let configured = scenario.trust_another_root();
     let listed = scenario.list();
     assert_eq!(listed["connections"][0]["state"], "pending", "{listed}");
     assert_eq!(listed["stale"], true, "{listed}");
     let revalidated = success(scenario.run(Recovery::Revalidate))["connection"].clone();
     assert_eq!(revalidated["summary"]["state"], "ready", "{revalidated}");
+    assert_eq!(revalidated["stale"], false, "{revalidated}");
+    let answered = revalidated["summary"]["revision"].as_str().unwrap();
+    assert_ne!(answered, saved, "{revalidated}");
+    let described = scenario.describe();
+    assert_eq!(described["summary"]["revision"], answered, "{described}");
+    let status = scenario.cli.status();
+    assert_eq!(status["configuration_revision"], configured, "{status}");
     let read = success(scenario.invoke("project.get", json!({"id": "org/project"})));
     assert_eq!(read["result"]["body"]["id"], 7, "{read}");
 }

@@ -1,6 +1,6 @@
 # datasource.feed/v1alpha1
 
-**Status:** proposed. One binding is implemented: GitLab, profile `gitlab-merge-requests/1` (`adapters/catalog/contracts/feed/v1alpha1/gitlab.md`), checked against recorded provider shapes.
+**Status:** proposed. One binding is implemented: GitLab, profile `gitlab-merge-requests/1` (`adapters/catalog/contracts/feed/v1alpha1/gitlab.md`), checked against recorded provider shapes. A Jira binding, profile `jira-issues/1` (`adapters/catalog/contracts/feed/v1alpha1/jira.md`), is declared only in a test fixture and is not shipped. A Confluence REST v1 binding, profile `confluence-pages/1` (`adapters/catalog/contracts/feed/v1alpha1/confluence-v1.md`), is declared only in a test fixture and is not shipped.
 
 ## Shared contract and adapter ownership
 
