@@ -2,11 +2,12 @@
 //! `feed-binding` suite its profile's capabilities select, in five profile zones from UTC-12:00
 //! to UTC+14:00.
 //!
-//! The binding is the declaration `adapters/catalog/tests/feed/jira/feed.json`, realized by the
-//! catalog engine over the committed Jira bundle; its profile statement is
-//! `adapters/catalog/contracts/feed/v1alpha1/jira.md`. It is not in the shipped Jira selection
-//! file `adapters/catalog/providers/jira/operations.json`, since the connector definition format
-//! every shipped selection round-trips through cannot yet express it. Nothing here maps a field
+//! The binding is the `feed` of the shipped Jira selection
+//! `adapters/catalog/providers/jira/operations.json`, realized by the catalog engine over the
+//! committed Jira bundle; its profile statement is
+//! `adapters/catalog/contracts/feed/v1alpha1/jira.md`. That block is the 0.56.0 fixture
+//! `adapters/catalog/tests/feed/jira/feed.json`, which is what the definition `connectors/jira.yaml`
+//! lowers to (`crates/connectors-catalog/tests/definition_feed.rs`). Nothing here maps a field
 //! or forms a watermark: [`Jira`] only answers the requests the engine sends, from the suite's
 //! provider state, the way the upstream description says Jira answers them.
 //!
@@ -44,7 +45,7 @@ use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
     future::Future,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Mutex,
     task::{Context, Poll, Waker},
 };
@@ -81,8 +82,23 @@ fn recorded(name: &str) -> Value {
     serde_json::from_slice(&std::fs::read(&path).expect("upstream shape")).unwrap()
 }
 
+/// The declaration the suite runs.
 fn declaration() -> Declaration {
-    serde_json::from_value(recorded("feed.json")).expect("the fixture is a feed declaration")
+    declaration_in(&provider().join("providers/jira")).unwrap_or_else(|error| panic!("{error}"))
+}
+
+/// The feed declaration for the selection in `directory`: the `feed` block of its
+/// `operations.json`.
+fn declaration_in(directory: &Path) -> Result<Declaration, String> {
+    let path = directory.join("operations.json");
+    let at = |error: &dyn std::fmt::Display| format!("{}: {error}", path.display());
+    let selection: Value =
+        serde_json::from_slice(&std::fs::read(&path).map_err(|error| at(&error))?)
+            .map_err(|error| at(&error))?;
+    let feed = selection
+        .get("feed")
+        .ok_or_else(|| at(&"the selection has no `feed` block"))?;
+    serde_json::from_value(feed.clone()).map_err(|error| at(&format!("`feed`: {error}")))
 }
 
 fn block_on<F: Future>(future: F) -> F::Output {
@@ -639,6 +655,26 @@ fn the_jira_feed_binding_passes_the_scenarios_its_profile_declares_in_every_zone
             "{zone}: {}",
             run.summary()
         );
+    }
+}
+
+/// The declaration the suite runs is the shipped Jira selection's `feed` block, not a fixture
+/// beside it: the same selection without that block, in a provider directory of its own, yields
+/// no declaration, and the failure names the missing `feed`.
+#[test]
+fn the_jira_declaration_comes_from_the_shipped_selection() {
+    let shipped = provider().join("providers/jira/operations.json");
+    let mut selection: Value = serde_json::from_slice(&std::fs::read(&shipped).unwrap()).unwrap();
+    selection.as_object_mut().unwrap().remove("feed");
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::write(
+        directory.path().join("operations.json"),
+        serde_json::to_vec_pretty(&selection).unwrap(),
+    )
+    .unwrap();
+    match declaration_in(directory.path()) {
+        Ok(_) => panic!("a selection without its `feed` block still yields a declaration"),
+        Err(error) => assert!(error.contains("`feed`"), "{error}"),
     }
 }
 

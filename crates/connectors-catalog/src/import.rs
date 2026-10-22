@@ -29,7 +29,8 @@
 //! Choices the notation leaves open are made the same way every time: a paging
 //! style (`limit` and `max`, no `request`) for a page-size bound that every
 //! operation with that parameter carries, when at least two do or the feed
-//! needs it; a field moved into `defaults` when every operation it applies to
+//! needs it, and a style of `limit` alone for a page-size parameter of the feed
+//! that no operation bounds; a field moved into `defaults` when every operation it applies to
 //! carries the same value; a guard read by the first operation key that names
 //! it; `effect` only where the lowerer cannot infer it; `description` only
 //! where it is not the source's summary.
@@ -38,9 +39,9 @@ use crate::definition::{
     self, Auth, AuthAccess, AuthIdentity, AuthLibrary, AuthLibraryId, AuthScheme, AuthScopes,
     Binary, Bound, ConfigField, ConfigType, Custody, Datasource, DatasourceKind, Defaults,
     Download, Effect, Envelope, FeedAuthor, FeedBody, FeedContainers, FeedCursor, FeedItems,
-    FeedPosition, Guard, GuardAfter, GuardBefore, GuardRead, GuardRefusal, IdentitySource,
-    MismatchCode, Operation, PagingStyle, ProviderDefinition, ResponseKind, SchemaId, Source,
-    TextRefusal,
+    FeedPage, FeedPosition, FeedPrecision, FeedQuery, Guard, GuardAfter, GuardBefore, GuardRead,
+    GuardRefusal, IdentitySource, MismatchCode, Operation, PagingStyle, ProviderDefinition,
+    ResponseKind, SchemaId, Source, TextRefusal,
 };
 use crate::inventory::{Inventory, Location};
 use indexmap::IndexMap;
@@ -312,7 +313,14 @@ struct ShippedContainers {
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ShippedPositionValue {
-    parameter: String,
+    #[serde(default)]
+    parameter: Option<String>,
+    #[serde(default)]
+    precision: Option<FeedPrecision>,
+    #[serde(default)]
+    query: Option<FeedQuery>,
+    #[serde(default)]
+    page: Option<FeedPage>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -327,7 +335,8 @@ struct ShippedPosition {
 struct ShippedItems {
     operation_id: String,
     #[allow(dead_code)]
-    container: String,
+    #[serde(default)]
+    container: Option<String>,
     #[serde(default)]
     query: Option<BTreeMap<String, String>>,
     limit: String,
@@ -340,6 +349,12 @@ struct ShippedItems {
     #[serde(default)]
     author: Option<FeedAuthor>,
     body: FeedBody,
+    #[serde(default)]
+    url: Option<String>,
+    #[serde(default)]
+    url_base: Option<String>,
+    #[serde(default)]
+    parent: Option<String>,
 }
 
 // ---- the documented configuration -----------------------------------------------------------
@@ -1329,7 +1344,8 @@ fn is_page_bound(bound: &Bound) -> Option<u64> {
 
 /// The paging styles: one per page-size parameter that every operation having
 /// it (and not withholding it) bounds the same, when at least two do or the
-/// feed pages by it.
+/// feed pages by it; and one of `limit` alone for each page-size parameter of
+/// the feed that none of those covers.
 fn styles(
     context: &Context<'_>,
     operations: &IndexMap<String, Operation>,
@@ -1401,6 +1417,23 @@ fn styles(
                 last: None,
             },
         );
+    }
+    // A feed pages by a style's `limit`; where no operation bounds it, the
+    // style names no `max` and the feed's cap is the declaration's own.
+    for parameter in feed_limits {
+        if !styles.contains_key(*parameter) {
+            styles.insert(
+                (*parameter).to_owned(),
+                PagingStyle {
+                    request: None,
+                    next: None,
+                    limit: Some((*parameter).to_owned()),
+                    max: None,
+                    total: None,
+                    last: None,
+                },
+            );
+        }
     }
     styles
 }
@@ -1564,6 +1597,9 @@ fn datasource(context: &Context<'_>, feed: &ShippedFeed) -> Result<(String, Data
                 query: items.query.clone(),
                 position: FeedPosition {
                     time: items.position.value.parameter.clone(),
+                    query: items.position.value.query.clone(),
+                    precision: items.position.value.precision,
+                    page: items.position.value.page.clone(),
                 },
                 records: non_empty(&items.records),
                 id: items.id.clone(),
@@ -1572,6 +1608,9 @@ fn datasource(context: &Context<'_>, feed: &ShippedFeed) -> Result<(String, Data
                 updated_at: items.updated_at.clone(),
                 author: items.author.clone(),
                 body: items.body.clone(),
+                url: items.url.clone(),
+                url_base: items.url_base.clone(),
+                parent: items.parent.clone(),
             },
             filters: None,
         },

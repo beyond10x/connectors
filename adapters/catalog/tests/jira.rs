@@ -49,7 +49,7 @@ const PROFILE: &str = "atlassian.basic";
 
 /// The shipped ids, their pinned `operationId` and their pinned path. A renamed,
 /// dropped or added id fails here.
-const SHIPPED: [(&str, &str, &str); 9] = [
+const SHIPPED: [(&str, &str, &str); 11] = [
     (
         "attachment.content",
         "getAttachmentContent",
@@ -86,6 +86,16 @@ const SHIPPED: [(&str, &str, &str); 9] = [
         "searchAndReconsileIssuesUsingJql",
         "/rest/api/3/search/jql",
     ),
+    (
+        "project.get",
+        "getProject",
+        "/rest/api/3/project/{projectIdOrKey}",
+    ),
+    (
+        "projects.list",
+        "searchProjects",
+        "/rest/api/3/project/search",
+    ),
     ("users.search", "findUsers", "/rest/api/3/user/search"),
 ];
 
@@ -101,12 +111,13 @@ fn shipped() -> Vec<Selection> {
     serde_json::from_value(file["operations"].clone()).unwrap()
 }
 
-/// The nine reads, the attachment content among them (a binary read,
-/// `tests/jira_attachment.rs`), and six writes: `issue.transition.run`, `doTransition`,
+/// The eleven reads, the attachment content among them (a binary read,
+/// `tests/jira_attachment.rs`) and the project list and lookup the issue feed reads
+/// (`tests/jira_feed.rs`), and six writes: `issue.transition.run`, `doTransition`,
 /// whose guard `tests/jira_transition_run.rs` pins, and the five issue writes
 /// `tests/jira_issue_writes.rs` pins.
 #[test]
-fn shipped_jira_selections_are_the_nine_reads_and_the_six_writes() {
+fn shipped_jira_selections_are_the_eleven_reads_and_the_six_writes() {
     let selections = shipped();
     let bundle = bundle::load(&root().join("generated/bundles"), "jira").unwrap();
     let engine = Engine::new(&bundle, BASE, &selections).unwrap();
