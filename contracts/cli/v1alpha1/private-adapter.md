@@ -85,9 +85,11 @@ omitted when there is none. The host does not trust the child to have redacted
 it: it admits the reason again and drops it, keeping the failure's code, when it
 is not already in admitted form or holds any piece of the protected document the
 host sent for that call. The reason never decides the failure's code. A failed
-reply to anything but an `invoke` (a `validate`, a write's prepare, commit or
-cancel) that carries a `reason` is a malformed reply, refused as a protocol
-failure like any other. A host that predates the field
+`validate` may carry a `reason` beside `insufficient_scope` only, admitted the
+same way: the answers that refused each [alternative binding](#alternative-bindings).
+A failed reply to anything else (a `validate` with another code, a write's
+prepare, commit or cancel) that carries a `reason` is a malformed reply, refused
+as a protocol failure like any other. A host that predates the field
 refuses a reply that carries it.
 
 The second is the optional `retry_after_seconds` beside
@@ -115,11 +117,11 @@ idempotency key or authority to repeat provider work.
 | `hello` | `version`, `nonce`, `child_incarnation` | both empty |
 | `ready` | same challenge fields, `bootstrap` | both empty |
 | `validate` | `request_id`, `profile`, `deadline_ms` | candidate document / empty |
-| `validated` | `request_id`, `baseline` | both empty |
-| `invoke` | `request_id`, `operation`, `revision`, `partition`, `deadline_ms` | exact retained material / decoded provider-input carrier |
+| `validated` | `request_id`, `baseline` (its `binding` exactly when the bootstrap declares `bindings`) | both empty |
+| `invoke` | `request_id`, `operation`, `revision`, `partition`, `deadline_ms`, optional `binding` | exact retained material / decoded provider-input carrier |
 | `success` | `request_id` | empty / provider-result carrier |
 | `stop` / `stopped` | `request_id` | both empty |
-| `failed` | `request_id`, closed `code`, optional `reason` and `retry_after_seconds` (a failed `invoke` only; the latter beside `provider_rate_limited` only) | both empty |
+| `failed` | `request_id`, closed `code`, optional `reason` and `retry_after_seconds` (a failed `invoke` only, or a `reason` beside a validation's `insufficient_scope`; the latter beside `provider_rate_limited` only) | both empty |
 
 Version is `connectors-private/1`. Startup challenges and child incarnations are
 UUIDs. Exchange identities and cursor partitions use the shared bounded identifier
@@ -137,6 +139,34 @@ handler consumes the private buffer for that one call, checking the marker and
 original admission. This binding keeps secrets out of the parser's ordinary
 `serde_json::Value` allocations; the marker is neither an identity nor a resumable
 capability. Recording/demo handlers cannot obtain the protected buffer.
+
+## Alternative bindings
+
+An instance whose one credential may read one of several APIs describes each as
+a binding (`connectors.cli.PrivateBindings`, the catalog provider's
+[`bindings`](../../catalog/v1alpha1/semantics.md#34-alternative-bindings)). The
+bootstrap's own `descriptor` and `requirements` are the first binding, named by
+`bindings.id`; each of `bindings.alternatives` carries its own `id`, `descriptor`
+and `requirements` for the same instance, profiles and configuration revision.
+The host validates every binding as it validates the bootstrap, and refuses a
+bootstrap whose ids repeat, whose descriptors share a revision, or that declares a
+write beside bindings. A bootstrap without `bindings` keeps its bytes.
+
+Validation selects one binding: the `validated` baseline names it in `binding`,
+present exactly when the bootstrap declares `bindings` and then one of their ids;
+any other baseline is a malformed reply. The host stores the id beside the
+generation's evidence (`connectors.credential_evidence.EvidenceSnapshot.operation_binding`).
+A read is admitted and checked against the bound binding's requirement, revision
+and output schema, and its `invoke` names that binding in `binding`, omitted for a
+bootstrap without bindings. The child answers an `invoke` naming a binding it does
+not declare as `stale_description`, and an operation that binding does not serve
+as `not_found`.
+
+When the read's captured evidence names another binding than the description the
+read was admitted under, as when a revalidation between admission and capture
+rebound the connection, the host releases the use unsent and refuses the read as
+`stale_description`. A binding id that the current bootstrap no longer declares is
+`stale_description` with a revalidation to follow.
 
 ## Process loss and deadlines
 

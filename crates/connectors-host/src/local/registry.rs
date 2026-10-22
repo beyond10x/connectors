@@ -345,6 +345,9 @@ pub struct ValidatedBaseline {
     pub credential_expires_at_ms: Option<u64>,
     pub collected_at_ms: u64,
     pub valid_until_ms: u64,
+    /// The binding of the instance's operations this validation selected
+    /// (`runtime::Baseline::binding`); `None` for an instance without bindings.
+    pub binding: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -373,6 +376,11 @@ struct EvidenceSnapshot {
     granted_scopes: Option<BTreeSet<String>>,
     credential_expires_at: Option<u64>,
     checks: Vec<EvidenceCheck>,
+    /// The binding the generation's validation selected
+    /// (`connectors.credential_evidence.EvidenceSnapshot.operation_binding`).
+    /// Omitted when absent, so evidence stored without it keeps its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    operation_binding: Option<String>,
 }
 
 /// Holds only a path; each operation closes its SQLite handle before returning.

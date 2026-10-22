@@ -306,6 +306,7 @@ impl Local {
         let mut reads = full.clone();
         reads.operations.retain(|o| o.id != "pods.exec");
         let bootstrap = Bootstrap {
+            bindings: None,
             credential_revision: None,
             executable: None,
             instance: config.instance,
@@ -524,6 +525,7 @@ impl connectors_host::local::runtime::Adapter for Local {
             .await
             .map_err(native_failure)?;
         Ok(Baseline {
+            binding: None,
             identity: registry::ExternalIdentity {
                 kind: "kubernetes.user".into(),
                 subject: value.username,

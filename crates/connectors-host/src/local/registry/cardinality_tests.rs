@@ -155,6 +155,7 @@ fn an_instance_holding_two_connections_keeps_them_and_connects_after_both_are_re
         .prepare(
             &claim,
             ValidatedBaseline {
+                binding: None,
                 identity: ExternalIdentity {
                     kind: "fixture-account".into(),
                     subject: "two".into(),
@@ -225,6 +226,7 @@ fn a_held_connection_under_an_older_revision_names_its_revalidation() {
         .unwrap();
     let dispatched = registry.dispatch_revalidation(captured, LATER).unwrap();
     let baseline = ValidatedBaseline {
+        binding: None,
         identity: ExternalIdentity {
             kind: "fixture-account".into(),
             subject: "one".into(),
@@ -286,6 +288,7 @@ fn held_names_the_published_non_revoked_connections_of_the_instance() {
         .prepare(
             &claim,
             ValidatedBaseline {
+                binding: None,
                 identity: ExternalIdentity {
                     kind: "fixture-account".into(),
                     subject: "two".into(),

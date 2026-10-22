@@ -137,6 +137,7 @@ fn setup(root: &Path, socket: Option<&Path>, clock_addresses: [&str; 2]) -> Targ
         configuration_schema: json!({"type":"object"}),
     };
     let bootstrap = runtime::Bootstrap {
+        bindings: None,
         credential_revision: None,
         executable: None,
         instance: adapter.instance_id.clone(),
@@ -190,6 +191,7 @@ fn setup(root: &Path, socket: Option<&Path>, clock_addresses: [&str; 2]) -> Targ
         .prepare(
             &claim,
             registry::ValidatedBaseline {
+                binding: None,
                 identity: registry::ExternalIdentity {
                     kind: "fixture".into(),
                     subject: "owner".into(),

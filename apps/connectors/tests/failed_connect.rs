@@ -480,6 +480,7 @@ fn bootstrap() -> runtime::Bootstrap {
         configuration_schema: json!({"type":"object"}),
     };
     runtime::Bootstrap {
+        bindings: None,
         credential_revision: None,
         executable: None,
         instance: "forge-local".into(),
@@ -506,6 +507,7 @@ fn publish(state: &Path, bootstrap: &runtime::Bootstrap, socket: &Path) -> Strin
     let material = connectors_sdk::Secret(br#"{"token":"fixture"}"#.to_vec());
     let now = connectors_sdk::now_ms();
     let baseline = registry::ValidatedBaseline {
+        binding: None,
         identity: registry::ExternalIdentity {
             kind: "fixture.user".into(),
             subject: "fixture-subject-1".into(),
@@ -694,6 +696,7 @@ struct MismatchingProvider {
 impl runtime::Adapter for MismatchingProvider {
     fn bootstrap(&self) -> runtime::Bootstrap {
         runtime::Bootstrap {
+            bindings: None,
             configuration_revision: self.revision.clone(),
             ..bootstrap()
         }

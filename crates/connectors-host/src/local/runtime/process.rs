@@ -136,6 +136,7 @@ impl Child {
             _image: image,
             channel,
             bootstrap: Bootstrap {
+                bindings: None,
                 credential_revision: None,
                 executable: None,
                 instance: String::new(),
@@ -246,6 +247,20 @@ impl Child {
         secret: &Secret,
         deadline_ms: u64,
     ) -> Result<Baseline> {
+        self.validate_explained(profile, secret, deadline_ms)
+            .map_err(|refusal| refusal.failure)
+    }
+    /// [`Child::validate`] with the child's reason beside `insufficient_scope`,
+    /// admitted again here against `secret`: the answers that refused each
+    /// alternative binding (private-adapter.md, "Alternative bindings"). A
+    /// reason beside any other code, and a baseline naming a binding the
+    /// bootstrap does not declare, are protocol violations.
+    pub fn validate_explained(
+        &mut self,
+        profile: &str,
+        secret: &Secret,
+        deadline_ms: u64,
+    ) -> std::result::Result<Baseline, Refusal> {
         self.bootstrap.profile(profile)?;
         let id = uuid::Uuid::new_v4().to_string();
         let frame = self.exchange(
@@ -262,18 +277,33 @@ impl Child {
             Reply::Validated {
                 request_id,
                 baseline,
-            } if request_id == id && frame.document.is_empty() => Ok(baseline),
-            // Only a failed `invoke` may carry a reason; one on a validation
-            // reply is a protocol violation, like any other malformed reply.
+            } if request_id == id
+                && frame.document.is_empty()
+                && self.bootstrap.declares_binding(baseline.binding.as_deref()) =>
+            {
+                Ok(baseline)
+            }
+            // A failed validation carries a reason only beside
+            // `insufficient_scope`; one beside any other code is a protocol
+            // violation, like any other malformed reply.
             Reply::Failed {
                 request_id,
                 code,
-                reason: None,
+                reason,
                 retry_after_seconds: None,
-            } if request_id == id && frame.document.is_empty() => Err(code),
+            } if request_id == id
+                && frame.document.is_empty()
+                && (reason.is_none() || code == Failure::InsufficientScope) =>
+            {
+                Err(Refusal {
+                    failure: code,
+                    reason: super::admitted(reason, secret),
+                    retry_after_seconds: None,
+                })
+            }
             _ => {
                 self.terminate();
-                Err(Failure::Protocol)
+                Err(Failure::Protocol.into())
             }
         }
     }
@@ -303,9 +333,34 @@ impl Child {
         input: &[u8],
         deadline_ms: u64,
     ) -> std::result::Result<Vec<u8>, Refusal> {
+        self.invoke_bound(
+            None,
+            operation,
+            revision,
+            partition,
+            secret,
+            input,
+            deadline_ms,
+        )
+    }
+    /// [`Child::invoke_explained`] under `binding`, the binding the read's
+    /// evidence selected: the requirement, revision and output schema are
+    /// that binding's (`Bootstrap::bound`), and the request names it.
+    #[allow(clippy::too_many_arguments)]
+    pub fn invoke_bound(
+        &mut self,
+        binding: Option<&str>,
+        operation: &str,
+        revision: &str,
+        partition: &str,
+        secret: &Secret,
+        input: &[u8],
+        deadline_ms: u64,
+    ) -> std::result::Result<Vec<u8>, Refusal> {
         let mut reason = None;
         let mut delay = None;
         self.dispatch(
+            binding,
             operation,
             revision,
             partition,
@@ -324,6 +379,7 @@ impl Child {
     #[allow(clippy::too_many_arguments)]
     fn dispatch(
         &mut self,
+        binding: Option<&str>,
         operation: &str,
         revision: &str,
         partition: &str,
@@ -336,8 +392,8 @@ impl Child {
         if input.len() > INPUT_LIMIT || !connectors_core::valid_id(partition) {
             return Err(Failure::InvalidInput);
         }
-        let requirement = self
-            .bootstrap
+        let bound = self.bootstrap.bound(binding)?;
+        let requirement = bound
             .requirements
             .iter()
             .find(|r| r.operation == operation)
@@ -345,7 +401,8 @@ impl Child {
         if requirement.effect != Effect::Read {
             return Err(Failure::Unsupported);
         }
-        if self.bootstrap.descriptor()?.revision != revision {
+        let descriptor = bound.descriptor()?;
+        if descriptor.revision != revision {
             return Err(Failure::StaleDescription);
         }
         channel::depth(input)?;
@@ -357,6 +414,7 @@ impl Child {
                 revision: revision.into(),
                 partition: partition.into(),
                 deadline_ms,
+                binding: binding.map(str::to_owned),
             },
             Some(secret),
             input,
@@ -368,7 +426,6 @@ impl Child {
                     channel::depth(&frame.document)?;
                     let value = connectors_core::read_json(&frame.document)
                         .map_err(|_| Failure::Protocol)?;
-                    let descriptor = self.bootstrap.descriptor()?;
                     let operation = descriptor
                         .operation(operation)
                         .map_err(Failure::from_service)?;
@@ -814,7 +871,7 @@ mod tests {
     use crate::local::config::{Adapter, Executable, Restart, Startup};
 
     pub(super) fn bootstrap() -> Bootstrap {
-        Bootstrap {
+        Bootstrap { bindings: None,
 credential_revision: None,
 executable: None,
             instance: "fixture".into(), adapter: "fixture".into(), protocol: "v1alpha1".into(),
@@ -890,6 +947,60 @@ executable: None,
                     code: Failure::ProviderRateLimited,
                     reason: None,
                     retry_after_seconds: Some(7),
+                },
+                None,
+                &[],
+                until,
+            )
+            .unwrap();
+            std::thread::sleep(Duration::from_secs(30));
+            return;
+        }
+        // A validation refused under every binding, naming each answer, and
+        // one answered under a binding the bootstrap does not declare.
+        if mode == "fixture-mode-validate-scope-reason" {
+            let Request::Validate { request_id, .. } = request.control else {
+                panic!("expected validation")
+            };
+            channel::write(
+                &mut stream,
+                &Reply::Failed {
+                    request_id,
+                    code: Failure::InsufficientScope,
+                    reason: Some(
+                        "binding v2 answered 401 (scope does not match); binding v1 answered 403 (fixture forbidden)"
+                            .into(),
+                    ),
+                    retry_after_seconds: None,
+                },
+                None,
+                &[],
+                until,
+            )
+            .unwrap();
+            std::thread::sleep(Duration::from_secs(30));
+            return;
+        }
+        if mode == "fixture-mode-validate-undeclared-binding" {
+            let Request::Validate { request_id, .. } = request.control else {
+                panic!("expected validation")
+            };
+            let now = connectors_sdk::now_ms();
+            channel::write(
+                &mut stream,
+                &Reply::Validated {
+                    request_id,
+                    baseline: Baseline {
+                        identity: registry::ExternalIdentity {
+                            kind: "account".into(),
+                            subject: "fixture-subject".into(),
+                        },
+                        granted_scopes: None,
+                        credential_expires_at_ms: None,
+                        collected_at_ms: now,
+                        valid_until_ms: now + 60_000,
+                        binding: Some("v1".into()),
+                    },
                 },
                 None,
                 &[],
@@ -1047,6 +1158,117 @@ executable: None,
         );
         assert!(!child.live);
         assert!(child.process.try_wait().unwrap().is_some());
+    }
+
+    /// story:confluence-token-kind-binding: a validation refused under every
+    /// alternative binding carries the reason naming each answer beside
+    /// `insufficient_scope`, and the child keeps running; a baseline naming a
+    /// binding the bootstrap does not declare is a protocol violation, and the
+    /// child is terminated.
+    #[test]
+    fn a_scope_refusal_keeps_its_reason_and_an_undeclared_binding_is_refused() {
+        let mut child = fixture_child("fixture-mode-validate-scope-reason");
+        let refusal = child
+            .validate_explained(
+                "fixture",
+                &Secret(b"fictional".to_vec()),
+                connectors_sdk::now_ms() + 2000,
+            )
+            .err()
+            .unwrap();
+        assert_eq!(refusal.failure, Failure::InsufficientScope);
+        assert_eq!(
+            refusal.reason.as_deref(),
+            Some(
+                "binding v2 answered 401 (scope does not match); binding v1 answered 403 (fixture forbidden)"
+            )
+        );
+        assert!(child.live);
+
+        let mut child = fixture_child("fixture-mode-validate-undeclared-binding");
+        assert_eq!(
+            child
+                .validate(
+                    "fixture",
+                    &Secret(b"fictional".to_vec()),
+                    connectors_sdk::now_ms() + 2000
+                )
+                .err(),
+            Some(Failure::Protocol)
+        );
+        assert!(!child.live);
+        assert!(child.process.try_wait().unwrap().is_some());
+    }
+
+    /// story:confluence-token-kind-binding: a bootstrap's bindings are read
+    /// only descriptions of the same instance under ids and revisions of
+    /// their own, a description names its binding by its revision, and a
+    /// bootstrap without bindings answers as before.
+    #[test]
+    fn bindings_are_distinct_read_only_descriptions_named_by_revision() {
+        let first: serde_json::Value = serde_json::from_str(&bootstrap().descriptor).unwrap();
+        let mut other = first.clone();
+        other["revision"] = serde_json::json!("fixture-descriptor-v1");
+        let alternative = |id: &str, descriptor: &serde_json::Value, effect| AlternativeBinding {
+            id: id.into(),
+            descriptor: descriptor.to_string(),
+            requirements: vec![Requirement {
+                effect,
+                ..bootstrap().requirements[0].clone()
+            }],
+        };
+        let with = |alternatives| Bootstrap {
+            bindings: Some(Bindings {
+                id: "v2".into(),
+                alternatives,
+            }),
+            ..bootstrap()
+        };
+        let bound = with(vec![alternative("v1", &other, Effect::Read)]);
+        bound.validate().unwrap();
+        let described = |revision| bound.described_binding(revision);
+        assert_eq!(
+            described("fixture-descriptor").unwrap().as_deref(),
+            Some("v2")
+        );
+        assert_eq!(
+            described("fixture-descriptor-v1").unwrap().as_deref(),
+            Some("v1")
+        );
+        assert_eq!(
+            described("fixture-other").err(),
+            Some(Failure::StaleDescription)
+        );
+        let view = bound.bound(Some("v1")).unwrap();
+        assert_eq!(view.descriptor().unwrap().revision, "fixture-descriptor-v1");
+        assert!(view.bindings.is_none());
+        assert_eq!(
+            bound.bound(Some("v3")).err(),
+            Some(Failure::StaleDescription)
+        );
+        assert_eq!(bound.effective_binding(None).as_deref(), Some("v2"));
+        assert_eq!(bound.effective_binding(Some("v1")).as_deref(), Some("v1"));
+        assert!(bound.declares_binding(Some("v1")));
+        assert!(!bound.declares_binding(None) && !bound.declares_binding(Some("v3")));
+
+        let plain = bootstrap();
+        assert_eq!(plain.described_binding("fixture-descriptor").unwrap(), None);
+        assert!(plain.declares_binding(None) && !plain.declares_binding(Some("v2")));
+        assert_eq!(plain.effective_binding(None), None);
+        assert_eq!(
+            plain.bound(Some("v2")).err(),
+            Some(Failure::StaleDescription)
+        );
+
+        for refused in [
+            with(vec![]),
+            with(vec![alternative("v2", &other, Effect::Read)]),
+            with(vec![alternative("v1", &first, Effect::Read)]),
+            with(vec![alternative("v1", &other, Effect::Write)]),
+            with(vec![alternative("not an id", &other, Effect::Read)]),
+        ] {
+            assert_eq!(refused.validate().err(), Some(Failure::Protocol));
+        }
     }
 
     fn fixture_child(mode: &str) -> Child {
