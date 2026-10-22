@@ -1,0 +1,22 @@
+{
+  "self": "https://tracker.example.test/rest/api/3/project/10000",
+  "id": "10000",
+  "key": "FIX",
+  "name": "Fixture Project",
+  "description": "A fixture project",
+  "projectTypeKey": "software",
+  "simplified": false,
+  "style": "classic",
+  "isPrivate": false,
+  "archived": false,
+  "properties": {},
+  "avatarUrls": {
+    "48x48": "https://tracker.example.test/secure/projectavatar?size=large&pid=10000"
+  },
+  "projectCategory": {
+    "self": "https://tracker.example.test/rest/api/3/projectCategory/10000",
+    "id": "10000",
+    "name": "Fixtures",
+    "description": "Fixture projects"
+  }
+}
