@@ -172,6 +172,15 @@ Atlassian ESS model names both sets (`ConfluenceV1Read`, `ConfluenceV2Read` in
 - **`page.comments`** takes the content `id`; `location=footer` limits it to
   footer comments, and `expand=body.storage` adds their bodies.
 
+The set declares no page feed. A `datasource.feed/v1alpha1` binding under
+profile `confluence-pages/1` is specified in
+[confluence-v1.md](../adapters/catalog/contracts/feed/v1alpha1/confluence-v1.md)
+and held to the family's suite over a test fixture, but it is not in the shipped
+selection, so `feed.containers` and `feed.items` are not `confluence-v1`
+operations: the connector definition format the shipped selections round-trip
+through cannot carry it yet. Only REST v1 can serve it; REST v2 lists pages with
+no time filter to resume by.
+
 The `confluence-v1` connector
 ([`adapters/catalog/providers/confluence-v1/connector.json`](../adapters/catalog/providers/confluence-v1/connector.json))
 declares the same `atlassian.basic` profile as `confluence`; only its access

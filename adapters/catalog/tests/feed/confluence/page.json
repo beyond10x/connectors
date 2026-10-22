@@ -1,0 +1,62 @@
+{
+  "id": "1001",
+  "type": "page",
+  "status": "current",
+  "title": "Fixture page 1001",
+  "space": {
+    "id": 65538,
+    "key": "DOCS",
+    "name": "Fixture Space",
+    "type": "global",
+    "status": "current"
+  },
+  "history": {
+    "latest": true,
+    "createdBy": {
+      "type": "known",
+      "accountId": "fixture-user-1",
+      "accountType": "atlassian",
+      "displayName": "Fixture User 1",
+      "publicName": "Fixture User 1"
+    },
+    "createdDate": "2026-08-01T08:00:00.000Z",
+    "_expandable": {
+      "lastUpdated": "",
+      "previousVersion": "",
+      "contributors": "",
+      "nextVersion": ""
+    }
+  },
+  "version": {
+    "by": {
+      "type": "known",
+      "accountId": "fixture-user-2",
+      "accountType": "atlassian",
+      "displayName": "Fixture User 2",
+      "publicName": "Fixture User 2"
+    },
+    "when": "2026-09-20T10:00:00.000Z",
+    "friendlyWhen": "Sep 20, 2026",
+    "message": "",
+    "number": 4,
+    "minorEdit": false,
+    "contentTypeModified": false
+  },
+  "_expandable": {
+    "childTypes": "",
+    "container": "/rest/api/space/DOCS",
+    "metadata": "",
+    "operations": "",
+    "children": "/rest/api/content/1001/child",
+    "restrictions": "/rest/api/content/1001/restriction/byOperation",
+    "ancestors": "",
+    "body": "",
+    "descendants": "/rest/api/content/1001/descendant"
+  },
+  "_links": {
+    "webui": "/spaces/DOCS/pages/1001",
+    "editui": "/pages/resumedraft.action?draftId=1001",
+    "tinyui": "/x/6QM",
+    "self": "https://site.example.test/wiki/rest/api/content/1001"
+  }
+}

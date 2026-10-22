@@ -53,6 +53,12 @@ const V1_ACCESS: &str = "/wiki/rest/api/space?limit=1";
 /// The reads one page under each API.
 const V2_PAGE: &str = "/wiki/api/v2/pages/1001?body-format=storage";
 const V1_PAGE: &str = "/wiki/rest/api/content/1001?expand=body.storage";
+/// The reads of a first `feed.items` page under v1 (story:confluence-feed-binding): the space,
+/// then its pages by CQL, oldest modification first.
+const V1_SPACE: &str = "/wiki/rest/api/space/DOCS?";
+const V1_FEED: &str = "/wiki/rest/api/content/search?cql=space+%3D+%22DOCS%22+and+type+%3D+page+order+by+lastmodified+asc&expand=history%2Cversion&limit=10";
+/// The feed's two reads, which only the v1 binding serves, and only with the feed declared.
+const FEED_IDS: [&str; 2] = ["feed.containers", "feed.items"];
 /// The v2 and v1 ids the shipped selection sets serve.
 const V2_IDS: [&str; 4] = ["page.comments", "page.get", "pages.changed", "space.pages"];
 const V1_IDS: [&str; 7] = [
@@ -136,9 +142,20 @@ fn v2_page() -> Value {
            "body": {"storage": {"representation": "storage", "value": "<p>v2 page 1001</p>"}},
            "_links": {"webui": "/spaces/FIX/pages/1001"}})
 }
+/// The Confluence v1 feed shapes `confluence_v1_feed` reads, taken from the v1 reference.
+fn feed_shape(name: &str) -> Value {
+    serde_json::from_slice(&fs::read(root().join("tests/feed/confluence").join(name)).unwrap())
+        .unwrap()
+}
 fn served(path: &str, mode: Mode) -> (u16, Value) {
     let (route, _) = path.split_once('?').unwrap_or((path, ""));
     match path {
+        V1_SPACE => mode.v1.answer(feed_shape("space.json")),
+        V1_FEED => mode.v1.answer(
+            json!({"results": [feed_shape("page.json")], "start": 0, "limit": 10,
+                   "size": 1,
+                   "_links": {"base": "https://site.example.test/wiki", "context": "/wiki"}}),
+        ),
         V2_ACCESS => mode
             .v2
             .answer(json!({"results": [], "_links": {"base": "https://site.example.test/wiki"}})),
@@ -298,7 +315,10 @@ impl Provider {
             .unwrap()
     }
     fn bootstrap(&self) -> Bootstrap {
-        let output = Self::bootstrap_of(&self.config);
+        Self::bootstrap_at(&self.config)
+    }
+    fn bootstrap_at(config: &Path) -> Bootstrap {
+        let output = Self::bootstrap_of(config);
         assert!(
             output.status.success(),
             "bootstrap inspection failed: {}",
@@ -309,7 +329,11 @@ impl Provider {
         bootstrap
     }
     fn selection(&self) -> Adapter {
-        let bootstrap = self.bootstrap();
+        self.selection_of(&self.config)
+    }
+    /// The host's selection of the provider child for the configuration at `config`.
+    fn selection_of(&self, config: &Path) -> Adapter {
+        let bootstrap = Self::bootstrap_at(config);
         let binary = PathBuf::from(env!("CARGO_BIN_EXE_connectors-catalog-provider"))
             .canonicalize()
             .unwrap();
@@ -326,12 +350,24 @@ impl Provider {
             executable: Executable {
                 sha256: hex::encode(Sha256::digest(fs::read(&binary).unwrap())),
                 path: binary,
-                args: vec![
-                    "--local-config".into(),
-                    self.config.to_str().unwrap().into(),
-                ],
+                args: vec!["--local-config".into(), config.to_str().unwrap().into()],
             },
         }
+    }
+    /// This instance's configuration with the v1 alternative's selection set carrying the
+    /// Confluence v1 feed declaration (`tests/feed/confluence/feed.json`) beside the shipped
+    /// operations, as the shipped selection will once it can carry one.
+    fn with_v1_feed(&self) -> PathBuf {
+        let mut selection: Value = serde_json::from_slice(
+            &fs::read(root_path("providers/confluence-v1/operations.json")).unwrap(),
+        )
+        .unwrap();
+        selection["feed"] = feed_shape("feed.json");
+        let file = self.root.path().join("private/confluence-v1-feed.json");
+        private(&file, &serde_json::to_vec(&selection).unwrap());
+        self.variant(|config| {
+            config["bindings"]["alternatives"][0]["operations_file"] = json!(file);
+        })
     }
     /// `edit` applied to this instance's configuration, written beside it.
     fn variant(&self, edit: impl FnOnce(&mut Value)) -> PathBuf {
@@ -716,6 +752,62 @@ fn an_id_the_bound_binding_lacks_is_a_named_refusal() {
     assert_eq!(refusal.failure, Failure::StaleDescription);
     assert!(provider.take().is_empty(), "a refused read sent a request");
     assert!(child.running().unwrap());
+}
+
+/// story:confluence-feed-binding: the feed is a read of the v1 binding only. With the v1
+/// alternative's selection set carrying the Confluence v1 feed declaration, a connection the
+/// token kind binds to v1 reads `feed.items` under the binding's profile; bound to v2, the same
+/// read is refused by name before anything is sent, since REST v2 has no time filter to resume by.
+#[test]
+fn a_connection_bound_to_v1_reads_the_feed_and_one_bound_to_v2_does_not() {
+    let provider = Provider::new(V2_SCOPE_REFUSED);
+    let config = provider.with_v1_feed();
+    let bootstrap = Provider::bootstrap_at(&config);
+    assert_eq!(ids(&bootstrap), V2_IDS);
+    let mut v1_ids: Vec<&str> = V1_IDS.iter().chain(&FEED_IDS).copied().collect();
+    v1_ids.sort();
+    assert_eq!(ids(&bootstrap.bound(Some("v1")).unwrap()), v1_ids);
+    assert_eq!(ids(&bootstrap.bound(Some("v2")).unwrap()), V2_IDS);
+
+    let mut child = Child::spawn(&provider.selection_of(&config)).unwrap();
+    provider.take();
+    let baseline = validate(&mut child, &secret()).unwrap();
+    assert_eq!(baseline.binding.as_deref(), Some("v1"));
+    provider.take();
+    let page = invoke(
+        &mut child,
+        "v1",
+        "feed.items",
+        &json!({"container": "DOCS", "limit": 10}),
+    )
+    .unwrap();
+    assert_eq!(provider.take(), [V1_SPACE, V1_FEED]);
+    assert_eq!(page["provenance"]["profile"], "confluence-pages/1");
+    assert_eq!(page["provenance"]["instance"], INSTANCE);
+    assert_eq!(page["complete"], true);
+    let items = page["items"].as_array().unwrap();
+    assert_eq!(items.len(), 1, "{page}");
+    assert_eq!(items[0]["id"], "1001");
+    assert_eq!(items[0]["revision"], "4");
+    assert_eq!(items[0]["updated_at"], "2026-09-20T10:00:00.000Z");
+    assert_eq!(
+        items[0]["url"],
+        "https://site.example.test/wiki/spaces/DOCS/pages/1001"
+    );
+
+    provider.set(V2_ANSWERED);
+    let rebound = validate(&mut child, &secret()).unwrap();
+    assert_eq!(rebound.binding.as_deref(), Some("v2"));
+    provider.take();
+    let refusal = invoke(
+        &mut child,
+        "v2",
+        "feed.items",
+        &json!({"container": "DOCS", "limit": 10}),
+    )
+    .expect_err("refused");
+    assert_eq!(refusal.failure, Failure::NotFound);
+    assert!(provider.take().is_empty(), "a refused read sent a request");
 }
 
 /// The production CLI, its owner and a disposable Secret Service, for the
