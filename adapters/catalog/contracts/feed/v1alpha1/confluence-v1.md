@@ -193,16 +193,18 @@ after it are not returned while that many pages stay changed in the window.
 How many pages share the kept minute does not grow the watermark: it holds the pairs of the pages
 at the kept instant only. Pages whose `version.when` is one millisecond are bounded by the 16 KiB
 watermark ceiling: 866 with five-digit ids and 638 with ten-digit ones, measured with the
-fixture's 27-byte instance name; a longer instance name holds fewer. Past that, the read whose
-watermark would pass the ceiling answers `unavailable` ("the watermark would exceed its ceiling;
-too many items share one instant"), after the pages earlier reads returned, none skipped.
+fixture's 27-byte instance name and 4-byte space key; a longer instance name or space key holds
+fewer. Past that, the read whose watermark would pass the ceiling answers `unavailable` ("the
+watermark would exceed its ceiling; the container id is too long or too many items share one
+instant"), after the pages earlier reads returned, none skipped.
 
 ## Errors
 
 As the engine maps them: Confluence 400 (a query it refuses), 409, 412 and 422 are
 `invalid_input`; 404 and 410 `not_found`; 401, 403, 429 and 5xx as the generic read table; any
-other status or a body that is not JSON `unavailable`. Once the space lookup has answered, a 403
-from the search that is not a quota refusal is `not_found`, as for a space the user cannot see. A
+other status or a body that is not JSON `unavailable`. Once the space lookup has answered, a 403,
+404 or 410 from the search that is not a quota refusal is `not_found`, with the same message as
+for a space the user cannot see. A
 watermark not issued for this profile, instance and space is `stale_cursor` only after the search
 answered: the binding reads it as a first read and discards what it lists. A watermark whose shifted
 minute falls outside the years 0000 to 9999 is `stale_cursor` the same way, only after the search

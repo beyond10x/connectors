@@ -192,8 +192,8 @@ types:
   # at that instant, at either precision. The lower bound is inclusive and the provider answers
   # in ascending `updated_at` order; the engine checks that order on every answer. A watermark
   # this binding issued that the declaration cannot resume (a `{since}` outside the years 0000
-  # to 9999, or, without `page`, at least `max_limit` pairs) is judged only after the container
-  # lookup and a listing sent as a first read have answered. The bound is sent either as `parameter` or inside `query`, exactly one of the
+  # to 9999, or, without `page`, at least `max_limit` pairs) is a stale cursor, judged only after
+  # the container lookup and a listing sent as a first read have answered. The bound is sent either as `parameter` or inside `query`, exactly one of the
   # two; a `query` is at `minute` precision. With `page`, one call reads further pages until it
   # holds `limit` unseen items or the list ends. A query with `utc_offsets` is read with `page`.
   - name: connectors_catalog.feed.TimeFilter

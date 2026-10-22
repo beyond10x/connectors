@@ -605,9 +605,10 @@ impl connectors_sdk::AuthenticatedHttp for Refusing {
     }
 }
 
-/// Once the lookup answered the container, the provider's own 403 on its item listing is a
-/// container the connection cannot read: `not_found`, with the message an unknown container gets.
-/// A quota refusal is not that, and neither is a refusal the host raised before any answer.
+/// Once the lookup answered the container, the provider's own 403, 404 or 410 on its item
+/// listing is a container the connection cannot read: `not_found`, with the message an unknown
+/// container gets. A quota refusal is not that, and neither is a refusal the host raised before
+/// any answer, whose code and message are kept.
 #[tokio::test]
 async fn a_provider_refusal_of_a_visible_containers_items_is_not_found() {
     for name in ["time.operations.json", "cursor.operations.json"] {
@@ -640,6 +641,29 @@ async fn a_provider_refusal_of_a_visible_containers_items_is_not_found() {
             "{name}"
         );
         assert_eq!(forbidden.message, "container not found", "{name}");
+        let missing = read(|| {
+            Ok(connectors_sdk::HttpResponse {
+                status: 404,
+                headers: Default::default(),
+                body: br#"{"message":"404 Not found"}"#.to_vec(),
+            })
+        })
+        .await;
+        let gone = read(|| {
+            Ok(connectors_sdk::HttpResponse {
+                status: 410,
+                headers: Default::default(),
+                body: br#"{"message":"410 Gone"}"#.to_vec(),
+            })
+        })
+        .await;
+        for (status, error) in [(404, &missing), (410, &gone)] {
+            assert_eq!(
+                (&error.code, error.message.as_str()),
+                (&connectors_core::ErrorCode::NotFound, "container not found"),
+                "{name}: listing {status}"
+            );
+        }
         let busy = read(|| {
             Ok(connectors_sdk::HttpResponse {
                 status: 429,
@@ -657,6 +681,21 @@ async fn a_provider_refusal_of_a_visible_containers_items_is_not_found() {
         })
         .await;
         assert_eq!(host.code, connectors_core::ErrorCode::Forbidden, "{name}");
+        let host = read(|| {
+            Err(connectors_core::Error::new(
+                connectors_core::ErrorCode::NotFound,
+                "the host found no such route",
+            ))
+        })
+        .await;
+        assert_eq!(
+            (&host.code, host.message.as_str()),
+            (
+                &connectors_core::ErrorCode::NotFound,
+                "the host found no such route"
+            ),
+            "{name}"
+        );
     }
 }
 
@@ -846,14 +885,15 @@ fn kept(feed: &Value, time: &str, seen: usize) -> String {
 /// The class of `a_watermark_is_judged_only_after_the_container_is_admitted`, for a watermark
 /// in this binding's own format that this read still cannot resume: one whose `{since}` falls
 /// outside the years 0000 to 9999, at minute precision with a parameter, with a query, and with
-/// a query shifted by `utc_offsets` (`stale_cursor`), and one holding as many pairs as one
-/// provider page, with no `page` to read past them (`unavailable`). Every such answer comes only
-/// after the lookup and a first-read listing have answered: an unknown room and a room whose
-/// listing the provider refuses answer `not_found` alike, whatever the watermark, and the
-/// listing that decides it carries no resume filter. One pair fewer resumes.
+/// a query shifted by `utc_offsets`, and one holding as many pairs as one provider page, with no
+/// `page` to read past them. Each is no longer resumable, so each is `stale_cursor`, as the
+/// family answers such a watermark. Every such answer comes only after the lookup and a
+/// first-read listing have answered: an unknown room and a room whose listing the provider
+/// refuses answer `not_found` alike, whatever the watermark, and the listing that decides it
+/// carries no resume filter. One pair fewer resumes.
 #[tokio::test]
 async fn a_watermark_this_binding_issued_but_cannot_resume_is_judged_only_after_admission() {
-    use connectors_core::ErrorCode::{StaleCursor, Unavailable};
+    use connectors_core::ErrorCode::StaleCursor;
     let time = declaration("time.operations.json");
     let minute = adding(&time, "/items/position/value", "precision", json!("minute"));
     let query = declaration("time-query.operations.json");
@@ -873,7 +913,7 @@ async fn a_watermark_this_binding_issued_but_cannot_resume_is_judged_only_after_
             time.clone(),
             "2026-10-06T09:00:00Z",
             100,
-            Unavailable,
+            StaleCursor,
         ),
         (
             "minute parameter, low year",
@@ -894,7 +934,7 @@ async fn a_watermark_this_binding_issued_but_cannot_resume_is_judged_only_after_
             minute.clone(),
             "2026-10-06T09:00:00Z",
             100,
-            Unavailable,
+            StaleCursor,
         ),
         ("query, low year", query.clone(), low, 0, StaleCursor),
         ("query, high year", query.clone(), high, 0, StaleCursor),
@@ -1039,6 +1079,44 @@ async fn a_last_key_listing_continues_after_a_full_page_and_a_fixed_word_is_ever
             vec![pair("cursor", "b"), pair("limit", "2")],
             vec![pair("limit", "2")],
         ]
+    );
+}
+
+/// A listing cursor carries the provider's cursor, so a provider cursor of 13,000 bytes passes
+/// its 16 KiB ceiling: `unavailable`, with a message that names the provider's cursor, not items
+/// sharing an instant, which a listing cursor never holds. One of 100 bytes does not pass it.
+#[tokio::test]
+async fn a_listing_cursor_past_the_ceiling_is_unavailable_for_the_providers_cursor() {
+    let engine = build(&declaration("time.operations.json"), &[]).unwrap();
+    let listing = |next: String| Rooms {
+        pages: std::sync::Mutex::new(vec![json!({"rooms": [], "next_cursor": next})]),
+        queries: Default::default(),
+    };
+    let short = engine
+        .read(
+            &listing("c".repeat(100)),
+            "feed-instance",
+            CONTAINERS,
+            json!({"limit": 2}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(short["complete"], json!(false), "control");
+    let long = engine
+        .read(
+            &listing("c".repeat(13_000)),
+            "feed-instance",
+            CONTAINERS,
+            json!({"limit": 2}),
+        )
+        .await
+        .map_err(|error| (error.code, error.message));
+    assert_eq!(
+        long.map(|_| ()),
+        Err((
+            connectors_core::ErrorCode::Unavailable,
+            "the cursor would exceed its ceiling; the provider's cursor is too long".to_owned()
+        ))
     );
 }
 
