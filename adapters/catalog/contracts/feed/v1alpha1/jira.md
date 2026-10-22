@@ -186,8 +186,9 @@ A resume re-reads, before the kept minute, 12 hours plus the zone's offset: none
 12 hours at UTC, 26 hours at UTC+14:00. When its 10 pages of 100 hold no issue it has not returned
 (about 1,000 issues changed in that window, as a bulk edit of that many can), it answers
 `unavailable` ("more items changed in the re-read window than the pages one read may request
-hold"), and stays so for that watermark. A consumer then starts again with a first read, which
-returns every issue again.
+hold"), and stays so for that watermark. Starting again with a first read does not get past it:
+once that read's watermark is inside the same window, its resume answers the same, and the issues
+after it are not returned while that many issues stay changed in the window.
 
 How many issues share the kept minute does not grow the watermark: it holds the pairs of the
 issues at the kept instant only, each revision the 28-byte `updated` text. Issues whose `updated`
