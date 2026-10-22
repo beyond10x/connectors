@@ -11,6 +11,8 @@ mod aep_toolchain;
 #[cfg(test)]
 mod catalog_feed_conformance;
 mod cli;
+#[cfg(test)]
+mod confluence_feed_conformance;
 mod docs;
 mod ess_boundary;
 #[cfg(test)]
