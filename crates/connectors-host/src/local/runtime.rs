@@ -551,8 +551,97 @@ pub struct Bootstrap {
     pub descriptor: String,
     pub profiles: Vec<Profile>,
     pub requirements: Vec<Requirement>,
+    /// The instance's alternative descriptions, of which validation selects
+    /// one (`connectors.cli.PrivateBindings`); `descriptor` and
+    /// `requirements` above are the first. Omitted when absent, so a
+    /// bootstrap without it keeps its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bindings: Option<Bindings>,
+}
+/// The bindings of one instance (private-adapter.md, "Alternative bindings").
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Bindings {
+    /// The binding the bootstrap's own descriptor and requirements describe.
+    pub id: String,
+    /// The others, in the order validation tries them.
+    pub alternatives: Vec<AlternativeBinding>,
+}
+/// One alternative description of the same instance, profiles and
+/// configuration: its own descriptor and requirements.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AlternativeBinding {
+    pub id: String,
+    pub descriptor: String,
+    pub requirements: Vec<Requirement>,
 }
 impl Bootstrap {
+    /// This bootstrap as `binding` describes it: its own descriptor and
+    /// requirements for the first binding and for none, an alternative's for
+    /// that alternative. The view names no bindings. A binding the bootstrap
+    /// does not declare is a description it does not have: stale.
+    pub fn bound(&self, binding: Option<&str>) -> Result<Bootstrap> {
+        let alternative = match (binding, &self.bindings) {
+            (None, _) => None,
+            (Some(id), Some(bindings)) if id == bindings.id => None,
+            (Some(id), Some(bindings)) => Some(
+                bindings
+                    .alternatives
+                    .iter()
+                    .find(|alternative| alternative.id == id)
+                    .ok_or(Failure::StaleDescription)?,
+            ),
+            (Some(_), None) => return Err(Failure::StaleDescription),
+        };
+        let mut view = self.clone();
+        view.bindings = None;
+        if let Some(alternative) = alternative {
+            view.descriptor = alternative.descriptor.clone();
+            view.requirements = alternative.requirements.clone();
+        }
+        Ok(view)
+    }
+    /// The binding whose description carries `revision`: none for a
+    /// bootstrap without bindings, the first binding for its own descriptor.
+    /// Every binding's revision is its own (`validate_bindings`), so a
+    /// description names the binding it was read under; a revision of none
+    /// of them is stale.
+    pub fn described_binding(&self, revision: &str) -> Result<Option<String>> {
+        let Some(bindings) = &self.bindings else {
+            return Ok(None);
+        };
+        if self.descriptor()?.revision == revision {
+            return Ok(Some(bindings.id.clone()));
+        }
+        for alternative in &bindings.alternatives {
+            if self.bound(Some(&alternative.id))?.descriptor()?.revision == revision {
+                return Ok(Some(alternative.id.clone()));
+            }
+        }
+        Err(Failure::StaleDescription)
+    }
+    /// The binding a read on evidence that selected `binding` runs under:
+    /// the first for evidence that names none, under a bootstrap that
+    /// declares bindings. The result is compared with
+    /// [`Bootstrap::described_binding`], never trusted unchecked.
+    pub fn effective_binding(&self, binding: Option<&str>) -> Option<String> {
+        match (&self.bindings, binding) {
+            (Some(bindings), None) => Some(bindings.id.clone()),
+            (_, binding) => binding.map(str::to_owned),
+        }
+    }
+    /// Whether `binding` is one this bootstrap declares, `None` exactly for
+    /// a bootstrap without bindings: the binding a baseline may name.
+    pub fn declares_binding(&self, binding: Option<&str>) -> bool {
+        match (binding, &self.bindings) {
+            (None, None) => true,
+            (Some(id), Some(bindings)) => {
+                id == bindings.id || bindings.alternatives.iter().any(|a| a.id == id)
+            }
+            _ => false,
+        }
+    }
     pub fn validate_for(&self, protocol: PrivateProtocol) -> Result<()> {
         self.validate()?;
         if self.requirements.iter().any(|requirement| {
@@ -683,6 +772,42 @@ impl Bootstrap {
                 return Err(Failure::Protocol);
             }
         }
+        if let Some(bindings) = &self.bindings {
+            self.validate_bindings(bindings, descriptor.revision)?;
+        }
+        Ok(())
+    }
+    /// Every binding is a valid description of this instance under a name of
+    /// its own and a revision of its own, and none of them writes: a write's
+    /// approval and audit bind one description, not a choice of them.
+    fn validate_bindings(&self, bindings: &Bindings, first: String) -> Result<()> {
+        if !connectors_core::valid_id(&bindings.id)
+            || bindings.alternatives.is_empty()
+            || bindings.alternatives.len() > 8
+        {
+            return Err(Failure::Protocol);
+        }
+        let mut ids = BTreeSet::from([bindings.id.as_str()]);
+        let mut revisions = BTreeSet::from([first]);
+        let mut views = vec![self.bound(None)?];
+        for alternative in &bindings.alternatives {
+            if !connectors_core::valid_id(&alternative.id) || !ids.insert(&alternative.id) {
+                return Err(Failure::Protocol);
+            }
+            let view = self.bound(Some(&alternative.id))?;
+            view.validate()?;
+            if !revisions.insert(view.descriptor()?.revision) {
+                return Err(Failure::Protocol);
+            }
+            views.push(view);
+        }
+        if views
+            .iter()
+            .flat_map(|view| &view.requirements)
+            .any(|requirement| requirement.effect != Effect::Read)
+        {
+            return Err(Failure::Protocol);
+        }
         Ok(())
     }
 }
@@ -701,6 +826,11 @@ pub struct Baseline {
     pub credential_expires_at_ms: Option<u64>,
     pub collected_at_ms: u64,
     pub valid_until_ms: u64,
+    /// The binding this validation selected, exactly when the bootstrap
+    /// declares bindings (`Bootstrap::declares_binding`). Omitted when absent,
+    /// so a baseline without it keeps its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binding: Option<String>,
 }
 impl Baseline {
     pub fn into_registry(self) -> registry::ValidatedBaseline {
@@ -710,6 +840,7 @@ impl Baseline {
             credential_expires_at_ms: self.credential_expires_at_ms,
             collected_at_ms: self.collected_at_ms,
             valid_until_ms: self.valid_until_ms,
+            binding: self.binding,
         }
     }
 }
@@ -733,6 +864,10 @@ enum Request {
         revision: String,
         partition: String,
         deadline_ms: u64,
+        /// The binding the read's evidence selected; omitted for a bootstrap
+        /// without bindings, so the request keeps its bytes.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        binding: Option<String>,
     },
     Stop {
         request_id: String,

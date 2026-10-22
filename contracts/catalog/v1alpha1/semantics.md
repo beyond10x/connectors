@@ -195,6 +195,34 @@ What a declaration cannot express, each a reviewed extension of this shape rathe
 - a body built from several fields, or anything but text, and an `author` or `parent` that is not one scalar field;
 - binding a watermark to the connection rather than the instance: the engine is not told which connection it reads through.
 
+### 3.4 Alternative bindings
+
+**Status:** implemented in `adapters/catalog/src/local.rs`; held by `adapters/catalog/tests/confluence_binding.rs`. Confluence declares the first configured use: REST v2 (`confluence`) first, REST v1 (`confluence-v1`) its alternative ([docs/catalog-confluence.md](../../../docs/catalog-confluence.md#one-instance-for-either-api)).
+
+One instance whose credential may read one of several APIs of the same base declares them as data: the optional `bindings` of its `connectors-catalog-local/2` configuration. The configuration's own provider, selection set and `auth.access` are the first binding; each alternative names another bundle (by provider, from the same `bundle_directory`), its selection set and its access probe. The engine names no provider. The declaration is modelled in [adapters/catalog/spec/ess/domains/binding.yaml](../../../adapters/catalog/spec/ess/domains/binding.yaml).
+
+```json
+{
+  "bindings": {
+    "id": "<first binding>",
+    "next": {"status": 401, "reason": "<text in the admitted reason>"},
+    "alternatives": [
+      {"id": "<binding>", "provider": "<bundle>", "operations_file": "<selection set>",
+       "access": {"path": "<read>", "query": {"<name>": "<value>"}},
+       "next": {"status": 401, "reason": "<text>"}}
+    ]
+  }
+}
+```
+
+| Concern | Rule |
+|---|---|
+| Shape | Ids are unique; `next` is required before every alternative and refused after the last; `status` is a 4xx. The first binding needs `auth.access`, every alternative its `access`. Every selection set is read only: a configuration with bindings serves no write. Alternatives share the base, the hosts, the authentication profile and the credential. Anything else is refused when the configuration loads. |
+| Description | Each binding is its own descriptor and requirements; their revisions differ, each digesting its binding id. The private bootstrap describes the first binding as before and carries the others under `bindings` ([private adapter binding](../../cli/v1alpha1/private-adapter.md#alternative-bindings)). The bindings enter the configuration revision; a configuration without them keeps its revision. |
+| Validation | The identity probe runs once, and its refusal stands: a wrong password is `invalid_credential`, never retried under another binding. The scope read follows, then the first binding's access probe. A 2xx binds there. A refusal whose status equals `next.status` and whose admitted reason (`connectors_core::reason`) contains `next.reason`, case-insensitively, moves on to the next binding's probe; any other refusal stands. Every validation starts again from the first binding, so a revalidation may select another. |
+| Refusal | When every binding tried is refused with 401 or 403, validation is `insufficient_scope` with one reason naming each answer in order, `binding <id> answered <status> (<admitted reason>)` joined by `; `, admitted again and bounded to 256 bytes. Any other status is the probe's failure as without bindings. |
+| Reads | A read names the binding its connection's evidence selected. An id that binding does not serve is `not_found` before any request; a revision of another binding is `stale_description`. |
+
 ## 4. Rules
 
 - Optional: a directly configured service is fully usable without an index or a catalog service (`docs/design.md:325,1006`).
@@ -238,6 +266,7 @@ The [service compatibility limits](../../service/compatibility.md#7-limits-and-c
 - No network: run generation and every catalog operation with a network sentinel; zero connections (old `tests/main/no_network.rs` shape).
 - Determinism: generate the same adapter twice with the pinned toolchain; manifests and index digest are identical.
 - Public authentication metadata: serialize every catalog output and bundle file; neither the fixture's secret token nor its actual environment/custody/file locator may appear. Safe profile requirements remain distinguishable from private runtime bindings.
+- Alternative bindings (section 3.4): the first binding refused with its `next` answer and the second answered → bound to the second, and a read under it returns its answer; the first answered → bound to it, no request to the second's probe; both refused → `insufficient_scope` naming both answers; a wrong password → `invalid_credential` after the identity read alone; a first-binding refusal that is not its `next` → that refusal, no second probe; a later validation that sees the first answering → bound to it; an id the bound binding lacks → `not_found`, no request.
 
 ## 7. Compatibility
 
@@ -245,6 +274,7 @@ The [service compatibility limits](../../service/compatibility.md#7-limits-and-c
 - `connectors-catalog-operations/1` gains the optional `feed` (section 3.3). A selection file without it loads, and its configuration revision is computed, exactly as before; one with it is refused by a reader older than this section, which denies unknown fields.
 - A selection gains the optional `query_fixed` and `query_folds` (a query value the caller cannot send, and a caller input folded into it, `connectors_catalog.selection.FixedQuery`), `embedded_text` (a JSON answer's base64 file read as text, `connectors_catalog.selection.EmbeddedText`) and `rate_limit_headers` (`connectors_catalog.selection.RateLimitHeaders`), each owned by [the catalog provider guide](../../../docs/local-catalog-provider.md#configure-the-provider). Each is omitted when absent, so every selection without it keeps its bytes and its configuration revision; one with it is refused by an older reader, which denies unknown fields.
 - A write's closed body keys may be RFC 6901 pointers into nested objects (`/ticket/comment/body`), a plain name meaning the top-level key as before, and `body_types` gains `string_list`. A selection gains the optional `body_enums`, `body_any_of` and `body_prefixes` (`connectors_catalog.selection.ClosedBody`) and `conflict_status` (`connectors_catalog.selection.ConflictStatus`), and a guard preflight gains the optional `mismatch` (`connectors_catalog.guard.MismatchCode`: a differing check refused as `conflict` rather than `forbidden`), owned by the same guide. Each is omitted when absent, so every selection without it keeps its bytes and its configuration revision; an older reader refuses one with it, which it denies as an unknown field, and reads a pointer key as a literal top-level name.
+- `connectors-catalog-local/2` gains the optional `bindings` (section 3.4). A configuration without it loads, and its configuration revision, bootstrap and validation are computed, exactly as before; one with it is refused by an older reader, which denies unknown fields, and needs a host that reads the bootstrap's `bindings` and the baseline's `binding`.
 - A guard check's expectation gains `{"present": true}` (`connectors_catalog.guard.Expectation`): the member exists and is not `null`, whatever its value, owned by [the catalog provider guide](../../../docs/local-catalog-provider.md#configure-the-provider). A selection without it keeps its bytes and its configuration revision; an older reader refuses one with it as an unknown variant.
 - [Service compatibility](../../service/compatibility.md) owns the extended descriptor fields, singular profile, auth alternatives and generic limits. These require the proposed `v1alpha2` codec. Index, adapter-kind, bundle and configuration readers retain their own independent version decisions; a service-wire bump does not extend them.
 - Old `catalog/<id>.catalog.json` documents and `catalog.pack` bytes are not preserved (`docs/design.md:911`). Old operation ids are preserved only where the migration contract selects them (`docs/design.md:1095`).

@@ -887,6 +887,7 @@ pub(super) fn binding() -> Binding {
 }
 fn baseline(subject: &str, now: u64) -> ValidatedBaseline {
     ValidatedBaseline {
+        binding: None,
         identity: ExternalIdentity {
             kind: "fixture-account".into(),
             subject: subject.into(),
@@ -1009,6 +1010,7 @@ fn publication_preserves_unobserved_scope_and_credential_expiry() {
         .prepare(
             &claim,
             ValidatedBaseline {
+                binding: None,
                 identity: ExternalIdentity {
                     kind: "fixture-account".into(),
                     subject: "one".into(),

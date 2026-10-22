@@ -25,6 +25,19 @@ pub trait Adapter: Send + Sync {
         Err(Failure::Unsupported)
     }
     async fn validate(&self, profile: &str, document: Secret) -> Result<Baseline>;
+    /// [`Adapter::validate`] with the reason beside `insufficient_scope` when
+    /// every alternative binding was refused (private-adapter.md,
+    /// "Alternative bindings"); the server answers through this one and sends
+    /// a reason beside no other code. By default no reason is given.
+    async fn validate_explained(
+        &self,
+        profile: &str,
+        document: Secret,
+    ) -> std::result::Result<Baseline, Refusal> {
+        self.validate(profile, document)
+            .await
+            .map_err(Refusal::from)
+    }
     async fn invoke(
         &self,
         operation: &str,
@@ -48,6 +61,25 @@ pub trait Adapter: Send + Sync {
         self.invoke(operation, partition, document, input)
             .await
             .map_err(Refusal::from)
+    }
+    /// [`Adapter::invoke_explained`] under `binding`, one the bootstrap
+    /// declares (the server has checked it, with the operation, revision and
+    /// input, against that binding's description). By default only an
+    /// unbound read is served.
+    async fn invoke_bound(
+        &self,
+        binding: Option<&str>,
+        operation: &str,
+        partition: &str,
+        document: Secret,
+        input: Value,
+        deadline: Instant,
+    ) -> std::result::Result<Value, Refusal> {
+        if binding.is_some() {
+            return Err(Failure::Unsupported.into());
+        }
+        self.invoke_explained(operation, partition, document, input, deadline)
+            .await
     }
 }
 
@@ -192,6 +224,7 @@ fn run(mut channel: channel::Stream, adapter: impl Adapter) -> Result<()> {
                 revision,
                 partition,
                 deadline_ms,
+                binding,
             } => (
                 request_id,
                 deadline_ms,
@@ -199,6 +232,7 @@ fn run(mut channel: channel::Stream, adapter: impl Adapter) -> Result<()> {
                     operation,
                     revision,
                     partition,
+                    binding,
                 },
             ),
             Request::Stop { request_id }
@@ -240,7 +274,19 @@ fn run(mut channel: channel::Stream, adapter: impl Adapter) -> Result<()> {
                         if !frame.document.is_empty() {
                             return Err(Failure::Protocol);
                         }
-                        let baseline = adapter.validate(&profile, frame.secret).await?;
+                        let baseline = adapter
+                            .validate_explained(&profile, frame.secret)
+                            .await
+                            .map_err(|refusal| {
+                                if refusal.failure == Failure::InsufficientScope {
+                                    reason = refusal.reason;
+                                }
+                                refusal.failure
+                            })?;
+                        // The host refuses any other baseline: send none.
+                        if !bootstrap.declares_binding(baseline.binding.as_deref()) {
+                            return Err(Failure::Protocol);
+                        }
                         Ok((
                             Reply::Validated {
                                 request_id: id.clone(),
@@ -253,15 +299,17 @@ fn run(mut channel: channel::Stream, adapter: impl Adapter) -> Result<()> {
                         operation,
                         revision,
                         partition,
+                        binding,
                     } => {
                         if !connectors_core::valid_id(&partition) {
                             return Err(Failure::Protocol);
                         }
-                        let descriptor = bootstrap.descriptor()?;
+                        let bound = bootstrap.bound(binding.as_deref())?;
+                        let descriptor = bound.descriptor()?;
                         if revision != descriptor.revision {
                             return Err(Failure::StaleDescription);
                         }
-                        let requirement = bootstrap
+                        let requirement = bound
                             .requirements
                             .iter()
                             .find(|r| r.operation == operation)
@@ -278,7 +326,14 @@ fn run(mut channel: channel::Stream, adapter: impl Adapter) -> Result<()> {
                         connectors_sdk::validate(&declaration.input_schema, &input)
                             .map_err(Failure::from_service)?;
                         let result = adapter
-                            .invoke_explained(&operation, &partition, frame.secret, input, until)
+                            .invoke_bound(
+                                binding.as_deref(),
+                                &operation,
+                                &partition,
+                                frame.secret,
+                                input,
+                                until,
+                            )
                             .await
                             .map_err(|refusal| {
                                 reason = refusal.reason;
@@ -326,5 +381,6 @@ enum Action {
         operation: String,
         revision: String,
         partition: String,
+        binding: Option<String>,
     },
 }

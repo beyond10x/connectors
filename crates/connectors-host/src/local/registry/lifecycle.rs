@@ -828,6 +828,7 @@ pub(super) fn recollected_snapshot(
         granted_scopes: native.granted_scopes.clone(),
         credential_expires_at: native.credential_expires_at_ms,
         checks,
+        operation_binding: native.binding.clone(),
     })
 }
 

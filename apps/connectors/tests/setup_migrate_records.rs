@@ -90,6 +90,7 @@ fn bootstrap(alias: &str, adapter: &str) -> runtime::Bootstrap {
         configuration_schema: json!({"type":"object"}),
     };
     runtime::Bootstrap {
+        bindings: None,
         credential_revision: None,
         executable: None,
         instance,
@@ -151,6 +152,7 @@ impl runtime::Adapter for Fixture {
         writeln!(log, "{}", digest(&document.0)).unwrap();
         let now = connectors_sdk::now_ms();
         Ok(runtime::Baseline {
+            binding: None,
             identity: registry::ExternalIdentity {
                 kind: "fixture.user".into(),
                 subject: "fixture-subject-1".into(),

@@ -78,6 +78,9 @@ pub struct ReadUse {
     pub(super) expires: u64,
     /// The evidence's own lifetime, collection to `valid_until`.
     pub(super) lifetime: u64,
+    /// The binding the captured evidence was validated under, when the
+    /// instance declares alternative bindings.
+    pub(super) binding: Option<String>,
 }
 impl ReadUse {
     pub fn version(&self) -> custody::Version {
@@ -95,6 +98,12 @@ impl ReadUse {
     pub fn evidence_lifetime_ms(&self) -> u64 {
         self.lifetime
     }
+    /// The binding the captured generation's validation selected
+    /// (`EvidenceSnapshot.operation_binding`); absent for an instance without
+    /// alternative bindings, and for evidence stored before them.
+    pub fn operation_binding(&self) -> Option<&str> {
+        self.binding.as_deref()
+    }
     #[cfg(test)]
     pub(super) fn fixture_replay(&self) -> Self {
         Self {
@@ -103,6 +112,7 @@ impl ReadUse {
             partition: self.partition.clone(),
             expires: self.expires,
             lifetime: self.lifetime,
+            binding: self.binding.clone(),
         }
     }
 }
@@ -231,7 +241,7 @@ impl Registry {
             tx.execute("INSERT INTO registry_uses (use_id,connection_ref,generation_id,version_id,publication_fence,expires_at_ms) VALUES (?1,?2,?3,?4,?5,?6)",
                 params![id,reference,row.generation,version_id,row.fence,timestamp(expires)?]).map_err(db)?;
             let partition=connectors_core::digest(&serde_json::json!([authority.to_string(),reference,row.generation]));
-            Ok(ReadUse {id,version:custody_version(authority,&row.scope_id,version_id)?,partition,expires,lifetime:baseline.lifetime()})
+            Ok(ReadUse {id,version:custody_version(authority,&row.scope_id,version_id)?,partition,expires,lifetime:baseline.lifetime(),binding:baseline.operation_binding.clone()})
         })
     }
 

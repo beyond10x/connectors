@@ -8739,6 +8739,12 @@
             "connection": {
               "kind": "struct",
               "fields": {
+                "binding": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "string"
+                  }
+                },
                 "external_identity": {
                   "kind": "optional",
                   "of": {
@@ -9274,6 +9280,12 @@
             "connection": {
               "kind": "struct",
               "fields": {
+                "binding": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "string"
+                  }
+                },
                 "external_identity": {
                   "kind": "optional",
                   "of": {
@@ -10833,6 +10845,12 @@
             "connection": {
               "kind": "struct",
               "fields": {
+                "binding": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "string"
+                  }
+                },
                 "external_identity": {
                   "kind": "optional",
                   "of": {
@@ -11371,6 +11389,12 @@
             "connection": {
               "kind": "struct",
               "fields": {
+                "binding": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "string"
+                  }
+                },
                 "external_identity": {
                   "kind": "optional",
                   "of": {
@@ -11440,6 +11464,20 @@
                 },
                 "valid_until_ms": {
                   "kind": "integer"
+                }
+              }
+            },
+            "rebound": {
+              "kind": "optional",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "from": {
+                    "kind": "string"
+                  },
+                  "to": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -12469,6 +12507,12 @@
               "of": {
                 "kind": "struct",
                 "fields": {
+                  "binding": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "string"
+                    }
+                  },
                   "external_identity": {
                     "kind": "optional",
                     "of": {
@@ -12971,6 +13015,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connection": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -14109,6 +14159,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connection": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -18149,6 +18205,13 @@
           }
         },
         {
+          "field": "connection",
+          "source": {
+            "kind": "option",
+            "long": "connection"
+          }
+        },
+        {
           "field": "operation",
           "source": {
             "kind": "option",
@@ -18289,6 +18352,13 @@
           "source": {
             "kind": "option",
             "long": "instance"
+          }
+        },
+        {
+          "field": "connection",
+          "source": {
+            "kind": "option",
+            "long": "connection"
           }
         },
         {
