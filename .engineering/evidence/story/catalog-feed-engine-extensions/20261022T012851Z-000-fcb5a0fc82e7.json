@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-22T01:28:51Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-feed-engine-extensions",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:feed-extensions-security-20261022",
+    "review": "review-result:feed-extensions-security-20261022",
+    "outcome": "fixed"
+  }
+}
