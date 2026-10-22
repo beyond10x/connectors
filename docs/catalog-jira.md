@@ -44,6 +44,13 @@ exposes nine reads and six writes: `issue.transition.run`, guarded as
 source operation that moved, fails the gate. The bundle refuses at load any
 `operation_id` the pinned document lacks.
 
+The set declares no issue feed. A `datasource.feed/v1alpha1` binding under
+profile `jira-issues/1` is specified in
+[jira.md](../adapters/catalog/contracts/feed/v1alpha1/jira.md) and held to the
+family's suite over a test fixture, but it is not in the shipped selection, so
+`feed.containers` and `feed.items` are not Jira operations: the connector
+definition format the shipped selections round-trip through cannot carry it yet.
+
 Every list returns one page per call. The provider returns `status`, `body` and
 `provenance`; `body` is Jira's page unchanged, and the paging fields that decide
 the end of a walk are in it.

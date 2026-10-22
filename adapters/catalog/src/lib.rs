@@ -2527,8 +2527,8 @@ fn joined_fits(value_type: Option<ValueType>, value: &Value) -> bool {
 /// The declared schema of a repeated query parameter: an array of its element
 /// type, or one scalar read as [`joined_fits`] reads it. The type stays a union
 /// with the scalar types because callers already send a comma-joined string
-/// (Jira's `fields`, Confluence's `space-id`; `docs/catalog-jira.md`,
-/// `docs/catalog-confluence.md`). `pattern` applies only to a string, and
+/// (an issue search's `fields`, a page listing's `space-id`; the provider
+/// guides under `docs/`). `pattern` applies only to a string, and
 /// `minItems` only to an array.
 fn repeated_schema(value_type: Option<ValueType>, required: bool) -> Value {
     let mut schema = match value_type {

@@ -253,7 +253,7 @@ struct Configuration {
     bundle_directory: PathBuf,
     api_base: String,
     /// The leading part of the `api_base` path that an API gateway adds in
-    /// front of the document's paths, such as `/ex/jira/<cloud id>`. Requests
+    /// front of the document's paths, such as `/ex/<product>/<cloud id>`. Requests
     /// still go to the full `api_base`; only the document's base-path check
     /// starts after it.
     #[serde(default)]

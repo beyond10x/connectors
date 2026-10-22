@@ -135,6 +135,10 @@ types:
   # when the selection file loads.
   # A kept instant whose UTC year is outside 0000 to 9999 has no `{since}` literal: the
   # watermark holding it is a stale cursor.
+  # `utc_offsets` states that the provider reads `{since}` as wall time in a zone the engine is not
+  # told, whose offset lies within it; `{since}` is then the kept minute shifted by its `least`,
+  # and that shifted minute's UTC year is the one held to 0000 to 9999. Absent, the provider
+  # reads `{since}` in UTC.
   - name: connectors_catalog.feed.QueryTemplate
     kind: struct
     fields:
@@ -142,11 +146,32 @@ types:
       - {name: language, type: connectors_catalog.feed.QueryLanguage}
       - {name: first, type: String}
       - {name: resume, type: String}
+      - {name: utc_offsets, type: "Optional<connectors_catalog.feed.UtcOffsets>"}
     invariants:
       - first.count >= 1
       - first.count <= 1024
       - resume.count >= 1
       - resume.count <= 1024
+
+  # The offsets from UTC, in minutes east of it, between which lies that of the zone a provider
+  # reads `{since}` in, both bounds included (UTC-12:00 to UTC+14:00 is `least: -720`,
+  # `greatest: 840`). The engine then sends the kept minute shifted by `least`, so the provider's
+  # filter starts at or before that minute in every such zone, and drops each re-read item whose
+  # `updated_at` falls before the kept minute, which the watermark already holds; the order is
+  # checked from the earliest start, the kept minute shifted by `least - greatest`. Such a
+  # resume re-reads up to `greatest - least` minutes before the kept minute and asks for
+  # `max_limit` items a page; a resume whose 10 pages hold no unseen item is unavailable.
+  - name: connectors_catalog.feed.UtcOffsets
+    kind: struct
+    fields:
+      - {name: least, type: Integer}
+      - {name: greatest, type: Integer}
+    invariants:
+      - least >= -1439
+      - least <= 1439
+      - greatest >= -1439
+      - greatest <= 1439
+      - least <= greatest
 
   # A continuation within one `feed.items` call: `parameter` sends the token read at `next` in the
   # answer, or, with `url_parameter`, that parameter of the URL at `next`. An absent, null or empty
@@ -165,7 +190,7 @@ types:
   # and the provider answers in ascending `updated_at` order; the engine checks that order on
   # every answer. The bound is sent either as `parameter` or inside `query`, exactly one of the
   # two; a `query` is at `minute` precision. With `page`, one call reads further pages until it
-  # holds `limit` unseen items or the list ends.
+  # holds `limit` unseen items or the list ends. A query with `utc_offsets` is read with `page`.
   - name: connectors_catalog.feed.TimeFilter
     kind: struct
     fields:
@@ -177,6 +202,7 @@ types:
       - any: [defined(parameter), defined(query)]
       - any: [{not: defined(parameter)}, {not: defined(query)}]
       - any: [{not: defined(query)}, {precision: minute}]
+      - any: [{not: defined(query.utc_offsets)}, defined(page)]
 
   # The watermark is the provider's own change cursor: a position after the last change the
   # answer carried. `complete` holds on the answer that reached the newest change; `stale` lists
