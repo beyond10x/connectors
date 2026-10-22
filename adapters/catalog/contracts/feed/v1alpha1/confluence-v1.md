@@ -118,7 +118,8 @@ bodies at the 64 KiB item ceiling would pass the 3 MiB page ceiling. It is not e
 
 The watermark is a time watermark on `version.when` at minute precision. v1 offers no change cursor,
 and the fixtures declare a CQL date literal to the minute. It holds the last returned page's
-`version.when` and the `(id, revision)` pairs returned within that minute, the kept minute. Pages
+`version.when`, the kept instant, whose minute is the kept minute, and the `(id, revision)` pairs
+returned at that instant. Pages
 are asked for oldest `lastmodified` first, and an answer whose `version.when` runs out of that order
 is `unavailable`. The watermark is scoped to the profile, the catalog instance and the space.
 
@@ -133,7 +134,7 @@ A resume sends the kept minute less 12 hours, written as UTC wall time: a kept m
 sends `"2026-10-05 21:00"`. That is the declaration's `utc_offsets` (`least: -720`,
 `greatest: 840`). In every profile zone from UTC-12:00 to UTC+14:00, Confluence's filter then starts
 at or before the kept minute, so no page changed after it is skipped. A page re-read before the kept
-minute is dropped, since the watermark already holds it; one within it is skipped by its pair. Order
+instant is dropped, since the watermark already holds it; one at it is skipped by its pair. Order
 is checked from 26 hours before the kept minute, the earliest start the zones allow, and each
 request of a resume asks for 100 pages.
 
@@ -159,7 +160,7 @@ those extra minutes.
 Not established. Whether a page shows up in the CQL search as soon as its version is written is
 not stated in the authored contract, which offers nothing the binding could send for
 read-after-write consistency. A page that shows up in the search only after a read has returned one
-changed later is, at the next resume, before the kept minute and dropped as held: it is skipped
+changed later is, at the next resume, before the kept instant and dropped as held: it is skipped
 until it changes again. No bound on that lag is known, and none was measured.
 
 ## Deletions
@@ -184,6 +185,13 @@ A resume re-reads, before the kept minute, 12 hours plus the zone's offset: none
 hold"), and stays so for that watermark. A consumer then starts again with a first read, which
 returns every page again.
 
+How many pages share the kept minute does not grow the watermark: it holds the pairs of the pages
+at the kept instant only. Pages whose `version.when` is one millisecond are bounded by the 16 KiB
+watermark ceiling: 866 with five-digit ids and 638 with ten-digit ones, measured with the
+fixture's 27-byte instance name; a longer instance name holds fewer. Past that, the read whose
+watermark would pass the ceiling answers `unavailable` ("the watermark would exceed its ceiling;
+too many items share one instant"), after the pages earlier reads returned, none skipped.
+
 ## Errors
 
 As the engine maps them: Confluence 400 (a query it refuses), 409, 412 and 422 are
@@ -192,7 +200,8 @@ other status or a body that is not JSON `unavailable`. Once the space lookup has
 from the search that is not a quota refusal is `not_found`, as for a space the user cannot see. A
 watermark not issued for this profile, instance and space is `stale_cursor` only after the search
 answered: the binding reads it as a first read and discards what it lists. A watermark whose shifted
-minute falls outside the years 0000 to 9999 is `stale_cursor`.
+minute falls outside the years 0000 to 9999 is `stale_cursor` the same way, only after the search
+answered.
 
 ## Which binding serves the feed
 
@@ -237,5 +246,7 @@ direct conversation.
 `adapters/catalog/tests/confluence_v1_feed.rs` holds the exact requests, the field mapping over
 those shapes, the listing's continuation and a next link without its `start`, the search's cursor
 pages, the resume in every zone from UTC-12:00 to UTC+14:00 in quarter hours, a new version within
-the kept minute, the resume that answers `unavailable` at the ceiling, a space Confluence does not
-show, and that neither Confluence selection declares a feed.
+the kept minute, the resume that answers `unavailable` at the ceiling, 900 pages changed within one
+minute all returned once, the pages one millisecond holds at the watermark ceiling, a watermark
+before the year 0000 answered only after the search, a space Confluence does not show, and that
+neither Confluence selection declares a feed.

@@ -113,9 +113,11 @@ types:
       - {name: visibility, type: "Optional<connectors_catalog.feed.VisibilityRule>"}
 
   # The resolution of the provider's time filter. `instant` (the default) sends the kept
-  # `updated_at` as it is. `minute` sends that instant's minute, in UTC: the provider re-reads the
-  # overlap minute, and the watermark holds every (id, revision) pair returned within it, so none
-  # is lost or repeated however many share that minute.
+  # `updated_at` as it is. `minute` sends that instant's minute, in UTC: the provider re-reads
+  # that minute up to the kept instant, which the watermark already holds and the engine drops,
+  # and each request of such a resume asks for `max_limit` items. At either precision the
+  # watermark holds the (id, revision) pairs returned at the kept instant only, so how many share
+  # the kept minute does not grow it.
   - name: connectors_catalog.feed.Precision
     kind: enum
     variants: [instant, minute]
@@ -134,7 +136,8 @@ types:
   # holds `{container}` once and no `{since}`; `resume` holds each once. The engine checks both
   # when the selection file loads.
   # A kept instant whose UTC year is outside 0000 to 9999 has no `{since}` literal: the
-  # watermark holding it is a stale cursor.
+  # watermark holding it is a stale cursor, answered as every watermark this read cannot resume
+  # is, once the listing sent as a first read has answered.
   # `utc_offsets` states that the provider reads `{since}` as wall time in a zone the engine is not
   # told, whose offset lies within it; `{since}` is then the kept minute shifted by its `least`,
   # and that shifted minute's UTC year is the one held to 0000 to 9999. Absent, the provider
@@ -157,7 +160,7 @@ types:
   # reads `{since}` in, both bounds included (UTC-12:00 to UTC+14:00 is `least: -720`,
   # `greatest: 840`). The engine then sends the kept minute shifted by `least`, so the provider's
   # filter starts at or before that minute in every such zone, and drops each re-read item whose
-  # `updated_at` falls before the kept minute, which the watermark already holds; the order is
+  # `updated_at` falls before the kept instant, which the watermark already holds; the order is
   # checked from the earliest start, the kept minute shifted by `least - greatest`. Such a
   # resume re-reads up to `greatest - least` minutes before the kept minute and asks for
   # `max_limit` items a page; a resume whose 10 pages hold no unseen item is unavailable.
@@ -186,9 +189,11 @@ types:
       - any: [{not: defined(url_parameter)}, {url_parameter.count: {gte: 1, lte: 128}}]
 
   # The watermark is the last returned item's `updated_at` and the (id, revision) pairs returned
-  # at that instant, or, at `minute` precision, within that minute. The lower bound is inclusive
-  # and the provider answers in ascending `updated_at` order; the engine checks that order on
-  # every answer. The bound is sent either as `parameter` or inside `query`, exactly one of the
+  # at that instant, at either precision. The lower bound is inclusive and the provider answers
+  # in ascending `updated_at` order; the engine checks that order on every answer. A watermark
+  # this binding issued that the declaration cannot resume (a `{since}` outside the years 0000
+  # to 9999, or, without `page`, at least `max_limit` pairs) is judged only after the container
+  # lookup and a listing sent as a first read have answered. The bound is sent either as `parameter` or inside `query`, exactly one of the
   # two; a `query` is at `minute` precision. With `page`, one call reads further pages until it
   # holds `limit` unseen items or the list ends. A query with `utc_offsets` is read with `page`.
   - name: connectors_catalog.feed.TimeFilter

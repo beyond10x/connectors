@@ -202,12 +202,12 @@ fn utc_offsets_are_optional_and_round_trip() {
     }
 }
 
-/// Without `utc_offsets` a resume sends the kept UTC minute and asks for the limit plus the
-/// items the watermark holds; with them it sends the minute `least` before and full pages.
+/// Without `utc_offsets` a resume sends the kept UTC minute; with them it sends the minute
+/// `least` before. Either re-reads that minute up to the kept instant, so it asks for full pages.
 #[test]
 fn a_widened_resume_sends_the_least_offset_minute_and_asks_for_full_pages() {
     for (feed, since, requested) in [
-        (selection()["feed"].clone(), "2026-10-06 09:00", "10"),
+        (selection()["feed"].clone(), "2026-10-06 09:00", "100"),
         (
             offset(json!({"least": -120, "greatest": 180})),
             "2026-10-06 07:00",
@@ -231,20 +231,22 @@ fn a_widened_resume_sends_the_least_offset_minute_and_asks_for_full_pages() {
     }
 }
 
-/// What a widened filter answers before the kept minute is the watermark's and is dropped; the
-/// order is checked from the earliest start the offsets allow, `least - greatest` before the
-/// kept minute, and an answer before that start is `unavailable`.
+/// What a widened filter answers before the kept instant is the watermark's and is dropped, in
+/// the kept minute too; the order is checked from the earliest start the offsets allow,
+/// `least - greatest` before the kept minute, and an answer before that start is `unavailable`.
 #[test]
 fn a_widened_resume_drops_what_precedes_the_kept_minute_and_checks_order_from_the_earliest_start() {
     let engine = build(&offset(json!({"least": -120, "greatest": 180}))).unwrap();
     let http = Provider::new(listing(vec![
         record("early", "2026-10-06T04:00:00Z"),
         record("before", "2026-10-06T08:59:59Z"),
-        record("kept", "2026-10-06T09:00:10Z"),
+        record("held", "2026-10-06T09:00:10Z"),
+        record("kept", "2026-10-06T09:00:30Z"),
+        record("later", "2026-10-06T09:00:40Z"),
         record("after", "2026-10-06T09:10:00Z"),
     ]));
     let page = resume(&engine, &http, "2026-10-06T09:00:30Z", 10).unwrap();
-    assert_eq!(ids(&page), ["kept", "after"]);
+    assert_eq!(ids(&page), ["kept", "later", "after"]);
     assert_eq!(page["complete"], json!(true));
 
     let http = Provider::new(listing(vec![
@@ -265,7 +267,8 @@ fn a_widened_resume_drops_what_precedes_the_kept_minute_and_checks_order_from_th
 }
 
 /// The literal keeps the `YYYY-MM-DD HH:MM` shape after the shift: a watermark whose shifted
-/// minute leaves the years 0000 to 9999 is stale before any search.
+/// minute leaves the years 0000 to 9999 is stale, answered once the search, sent as a first
+/// read, has answered (`semantics.md` §3.3, Watermark scope).
 #[test]
 fn a_shift_past_the_literal_years_is_a_stale_watermark() {
     for (offsets, time) in [
@@ -282,7 +285,13 @@ fn a_shift_past_the_literal_years_is_a_stale_watermark() {
         let http = Provider::new(listing(vec![]));
         let error = resume(&engine, &http, time, 10).unwrap_err();
         assert_eq!(error.code, ErrorCode::StaleCursor, "{offsets} {time}");
-        assert!(http.searches().is_empty(), "{offsets} {time}");
+        let searches = http.searches();
+        assert_eq!(searches.len(), 1, "{offsets} {time}");
+        assert_eq!(
+            sent(&searches[0], "q"),
+            Some(r#"room = "room1" ORDER BY edited ASC"#),
+            "{offsets} {time}"
+        );
     }
     let engine = build(&selection()["feed"]).unwrap();
     let http = Provider::new(listing(vec![]));
