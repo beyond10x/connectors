@@ -102,8 +102,9 @@ not returned.
 **Revision.** The version number. Each published edit makes a new version, and with it a new
 revision. Two edits within one minute give two revisions, and both are returned. A change that makes
 no version, such as a comment or a label, gives no new revision. Whether such a change moves
-`lastmodified` is not established. If it does, the page is re-read under its old version and
-dropped as held.
+`lastmodified` is not established. If it does, the search orders the page by its new
+`lastmodified` while its `version.when` stays old, and every read of the space, a first read
+included, answers `unavailable` (out of `updated_at` order) until the page gets a new version.
 
 **Times.** As Confluence writes them; the fixtures write UTC (`…Z`). `history` is not in the
 authored contract, which names only the fields the shipped reads rely on, so `created_at` and
@@ -125,7 +126,10 @@ is `unavailable`. The watermark is scoped to the profile, the catalog instance a
 
 Not established, since no site was read: that CQL accepts `order by lastmodified asc`, that a
 `lastmodified` literal names a minute and no finer, and that a page's `lastmodified` is its
-`version.when`. The fixtures declare one form, and the simulated Confluence answers it.
+`version.when`. The fixtures declare one form, and the simulated Confluence answers it. Whether
+the search cursor is keyed or positional is not established either. Under a positional cursor, a
+page versioned between two searches of one call moves the pages after it one place forward, so one
+of them is not returned while the read reports `complete` and its watermark passes the page.
 
 A first read sends no `lastmodified` clause and reaches every page of the space the user may see,
 from the oldest modification forward.
@@ -182,8 +186,9 @@ A resume re-reads, before the kept minute, 12 hours plus the zone's offset: none
 12 hours at UTC, 26 hours at UTC+14:00. When its 10 pages of 100 hold no page it has not returned
 (about 1,000 pages changed in that window), it answers
 `unavailable` ("more items changed in the re-read window than the pages one read may request
-hold"), and stays so for that watermark. A consumer then starts again with a first read, which
-returns every page again.
+hold"), and stays so for that watermark. Starting again with a first read does not get past it:
+once that read's watermark is inside the same window, its resume answers the same, and the pages
+after it are not returned while that many pages stay changed in the window.
 
 How many pages share the kept minute does not grow the watermark: it holds the pairs of the pages
 at the kept instant only. Pages whose `version.when` is one millisecond are bounded by the 16 KiB
