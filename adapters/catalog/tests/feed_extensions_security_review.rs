@@ -3,6 +3,7 @@
 //! engine's `datasource.feed/v1alpha1` binding (`contracts/catalog/v1alpha1/semantics.md`). Each
 //! case drives the fixture declarations in `tests/feed/` with an in-process provider whose
 //! answers the case states; no live provider is called.
+#![cfg(unix)]
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use connectors_catalog::{bundle::Bundle, ingest, inventory};
 use connectors_catalog_provider::{
