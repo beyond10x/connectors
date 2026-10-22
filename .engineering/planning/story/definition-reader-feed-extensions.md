@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:definition-reader-feed-extensions
 kind: story
-status: draft
+status: active
 title: The definition reader lowers the Jira and Confluence feeds of connectors-definitions 536945d
 summary: definition.rs and import.rs accept offset, url_parameter, a query position, utc_offsets, url and url_base; both feeds move into the shipped selections
 relations:
@@ -41,12 +41,19 @@ scope:
 - confidence: cited
   path: docs/catalog-jira.md
 - confidence: cited
+  path: website/data/status.json
+- confidence: cited
   path: website/docs/connectors/confluence.md
+- confidence: cited
+  path: website/docs/connectors/index.md
 - confidence: cited
   path: website/docs/connectors/jira.md
 - confidence: cited
   path: website/docs/status.md
-revision: 4
+revision: 9
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-22T09:48:11Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":6}}, executor: "agent:connectors-session", correlation: "wave-20261022"}
+- {from: "proposed", to: "active", at: "2026-10-22T09:48:11Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":6}}, executor: "agent:connectors-session", correlation: "wave-20261022"}
 ---
 ## Outcome
 
@@ -130,8 +137,9 @@ blocks are in them; the pinned connectors-definitions release already carries bo
 - `the_jira_issue_feed_lowers_to_the_shipped_declaration`: `jira.yaml` at `536945d` lowers to the
   `feed` in `adapters/catalog/providers/jira/operations.json`, equal to the 0.56.0 fixture
   `adapters/catalog/tests/feed/jira/feed.json`.
-- `the_confluence_page_feed_lowers_to_the_shipped_declaration`: the same for
-  `confluence-v1.yaml`.
+- `the_confluence_page_feed_lowers_to_the_shipped_declaration`: `confluence-v1.yaml` at `536945d`
+  lowers to the `feed` in `adapters/catalog/providers/confluence-v1/operations.json`, equal to the
+  0.56.0 fixture `adapters/catalog/tests/feed/confluence/feed.json`.
 - One refusal per rule, in order:
   1. `a_cursor_naming_none_of_next_last_offset_is_refused`
   2. `a_cursor_naming_two_of_next_last_offset_is_refused`

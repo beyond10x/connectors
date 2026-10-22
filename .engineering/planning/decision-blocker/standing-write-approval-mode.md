@@ -2,12 +2,14 @@
 format: aep.planning-md/3
 id: decision-blocker:standing-write-approval-mode
 kind: decision-blocker
-status: open
+status: cleared
 title: How is a write admitted for an agent running unattended?
 summary: Approvals bind one exact input, live at most u16 seconds and are spent once; A standing approval, B auto-issuer, C per-send human
 relations:
 - blocks: story:standing-write-approval-for-unattended-agents
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-22T09:22:46Z", actor: "human:timo", revision: 3, executor: "agent:connectors-session", correlation: "relayed-by-b10x-chef-orchestrator-20261022"}
 ---
 ## Question
 
@@ -44,3 +46,17 @@ Recommendation A: it keeps a person as the issuer and bounds what the agent can 
 
 Timo picks an option. A needs an ADR before story:standing-write-approval-for-unattended-agents
 moves past draft.
+
+## Decided (2026-10-22)
+
+Option A. Timo's answer "a", relayed by the orchestrator session `b10x-chef-orchestrator` on
+2026-10-22, with these bounds:
+- The operator grants a standing approval explicitly; nothing grants one by default.
+- Its scope is exact: connector, operation and target (for example a channel id).
+- It has an expiry and can be revoked.
+- Every send under it is recorded with the grant id.
+- It never covers an operation outside its scope.
+
+The per-input approvals stay as they are; the standing approval is an added mode, and the
+CHANGELOG lists it as a feature. The scope check gets an adversary pass before it merges.
+story:standing-write-approval-for-unattended-agents runs in the wave after the MCP waves.

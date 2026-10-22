@@ -11,7 +11,6 @@ relations:
 - depends_on: story:catalog-tests-read-pinned-release-gitlab-engine
 - depends_on: story:catalog-tests-read-pinned-release-providers
 - depends_on: story:definition-reader-feed-extensions
-- depends_on: story:agent-tool-projection
 revision: 2
 ---
 ## Outcome

@@ -8,7 +8,7 @@ summary: Download Connectors, connect Slack and Jira, and use them from Claude t
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: epic:mcp-contracts
-revision: 4
+revision: 6
 ---
 ## Outcome
 
@@ -60,15 +60,23 @@ Order: story:claude-connects-to-the-mcp-server, then story:claude-getting-starte
 "With Claude" section links the MCP page) and story:agent-tool-projection.
 
 Added 2026-10-22 from the Loom Kubernetes agent design (questions Q2 and Q3, milestone M6):
-- story:readme-names-mounted-custody: Q3. Container custody exists as `mounted_secret`
-  (story:mounted-secret-custody, implemented); the README still says there is one fixed binding.
+- Q3, the README: container custody exists as `mounted_secret` (story:mounted-secret-custody,
+  implemented); the README still says there is one fixed binding. story:docs-first-run-path fixes
+  it, as it rewrites that README block; story:readme-names-mounted-custody is archived into it.
 - story:mounted-custody-kind-secret-volume: Q3, the proof on a real Kubernetes Secret volume.
-- story:standing-write-approval-for-unattended-agents: Q2, blocked by
-  decision-blocker:standing-write-approval-mode.
+- story:standing-write-approval-for-unattended-agents: Q2, option A decided 2026-10-22
+  (decision-blocker:standing-write-approval-mode, cleared).
 - M6, the design's MCP read proxy, is served by story:claude-connects-to-the-mcp-server and
   story:agent-tool-projection. Reads only, as both stories state.
 
 The epic's acceptance below covers the first three stories. The added ones carry their own.
+
+Outside this repository: `connectors/jira-agent.yaml`, `connectors/slack-agent.yaml` and the
+`agent` rule of `spec/domains/definition.yaml` belong to `beyond10x/connectors-definitions`
+(upstream-blocker:definitions-lack-agent-projections). This plan does not write them. They are
+requested from b10x-chef-orchestrator in the report that closes story:claude-connects-to-the-mcp-server;
+until a commit there clears the blocker, story:agent-tool-projection and the epic's projection
+acceptance wait.
 
 ## Acceptance
 
@@ -99,5 +107,5 @@ The epic is complete when, on one release cut through `AGENTS.md` § Cutting a r
     mutation binding exists.
 - Approval, connection and refusal semantics are those of the MCP server contracts
   (`adapters/mcp/contracts/server/v1alpha1/`); this epic changes none of them, except through
-  story:standing-write-approval-for-unattended-agents if its decision picks a contract change.
+  story:standing-write-approval-for-unattended-agents, which adds a standing approval mode.
 - Windows binaries stay with `epic:local-cli-on-macos-and-windows`.
