@@ -856,9 +856,28 @@ fn shipped() -> Vec<(PathBuf, Value)> {
         .collect()
 }
 
-/// Every declaration, the fixtures' and the shipped providers', is a value of the adapter's own
-/// model (`adapters/catalog/spec/ess`), and the engine's reader carries every field of it: read
-/// and written back, it is the same document.
+/// Every provider binding held as a fixture until the shipped selection can carry it, in name
+/// order: `adapters/catalog/tests/feed/<provider>/feed.json`, as a selection file would hold it.
+fn fixture_bindings() -> Vec<(PathBuf, Value)> {
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(directory())
+        .expect("feed fixtures")
+        .map(|entry| entry.expect("entry").path().join("feed.json"))
+        .filter(|path| path.is_file())
+        .collect();
+    paths.sort();
+    paths
+        .into_iter()
+        .map(|path| {
+            let feed: Value =
+                serde_json::from_slice(&std::fs::read(&path).expect("binding fixture")).unwrap();
+            (path, json!({"feed": feed}))
+        })
+        .collect()
+}
+
+/// Every declaration, the fixtures', the provider bindings held as fixtures and the shipped
+/// providers', is a value of the adapter's own model (`adapters/catalog/spec/ess`), and the
+/// engine's reader carries every field of it: read and written back, it is the same document.
 #[test]
 fn every_declared_feed_is_a_value_of_the_catalog_feed_model() {
     let root = feed_conformance::root();
@@ -894,7 +913,16 @@ fn every_declared_feed_is_a_value_of_the_catalog_feed_model() {
         !shipped.is_empty(),
         "no shipped provider declares a feed, so none is checked here"
     );
-    for (path, raw) in fixtures.chain(shipped) {
+    let bindings = fixture_bindings();
+    let named: BTreeSet<String> = bindings
+        .iter()
+        .filter_map(|(path, _)| Some(path.parent()?.file_name()?.to_str()?.to_owned()))
+        .collect();
+    assert!(
+        named.contains("confluence") && named.contains("jira"),
+        "{named:?}"
+    );
+    for (path, raw) in fixtures.chain(bindings).chain(shipped) {
         let errors: Vec<String> = validator
             .iter_errors(&raw["feed"])
             .map(|e| format!("{}: {e}", e.instance_path()))
