@@ -7,6 +7,7 @@ title: Mounted custody proven against a Kubernetes Secret volume
 relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:mounted-secret-custody
+- decomposes: epic:connectors-with-claude
 revision: 1
 ---
 ## Outcome
