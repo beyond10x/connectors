@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0560-feed-extensions-bindings
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.56.0: catalog bindings, feed engine extensions, Jira and Confluence feeds over fixtures'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-22T05:25:27Z", actor: "human:timo", revision: 2, decided_on: {"recorded":{"test_result":1}}}
+- {from: "active", to: "implemented", at: "2026-10-22T07:48:05Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":2}}}
 ---
 ## Outcome
 
