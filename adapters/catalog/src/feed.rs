@@ -1113,13 +1113,19 @@ impl Feed {
         Ok(mark)
     }
 
+    /// The token of `mark`, or `unavailable` past the ceiling, naming what fills it: a listing
+    /// cursor carries the provider's cursor or key, a watermark the container id and the pairs
+    /// at its kept instant.
     fn issue(mark: &Mark) -> Result<String> {
         let token =
             URL_SAFE_NO_PAD.encode(serde_json::to_vec(mark).map_err(|_| Error::internal())?);
         if token.len() > WATERMARK_BYTES {
-            return Err(unavailable(
-                "the watermark would exceed its ceiling; too many items share one instant",
-            ));
+            return Err(unavailable(if mark.container.is_none() {
+                "the cursor would exceed its ceiling; the provider's cursor is too long"
+            } else {
+                "the watermark would exceed its ceiling; the container id is too long or too many \
+                 items share one instant"
+            }));
         }
         Ok(token)
     }
@@ -1327,11 +1333,13 @@ impl Feed {
             Position::Cursor(cursor) => self.by_cursor(http, container, limit, mark, cursor).await,
         }
         // The lookup answered, so the connection sees the container; the provider's own refusal
-        // of its items that is not a quota refusal (classified `rate_limited`) is a container the
-        // connection cannot read, which the family answers exactly as an unknown one. A refusal
-        // the host raised, not the provider, keeps its code.
+        // of its items that is not a quota refusal (classified `rate_limited`), a 403, 404 or
+        // 410, is a container the connection cannot read, which the family answers exactly as an
+        // unknown one, message included. A refusal the host raised, not the provider, keeps its
+        // code and message.
         .map_err(|error| {
-            if error.code == ErrorCode::Forbidden && error.upstream_answer {
+            let code = matches!(error.code, ErrorCode::Forbidden | ErrorCode::NotFound);
+            if code && error.upstream_answer {
                 not_found()
             } else {
                 error
@@ -1378,9 +1386,13 @@ impl Feed {
         // many more keeps a page of unseen items within reach. A list read further by its
         // continuation reaches them on later pages. A resume at minute precision re-reads an
         // unknown number of items before the kept instant, so it asks for full pages.
+        // Without `page`, a watermark holding a provider page of pairs is no longer resumable:
+        // the family's `stale_cursor`.
         if time.page.is_none() && seen.len() as u64 >= self.declaration.max_limit {
-            return Err(unavailable(
-                "more items share one instant than one provider page holds",
+            return Err(Error::new(
+                ErrorCode::StaleCursor,
+                "the watermark holds as many items at one instant as one provider page; no read \
+                 from it gets past them",
             ));
         }
         let requested = if minute && since.is_some() {

@@ -193,17 +193,18 @@ after it are not returned while that many issues stay changed in the window.
 How many issues share the kept minute does not grow the watermark: it holds the pairs of the
 issues at the kept instant only, each revision the 28-byte `updated` text. Issues whose `updated`
 is one millisecond are bounded by the 16 KiB watermark ceiling: 296 with five-digit ids, measured
-with the fixture's 18-byte instance name; a longer instance name or id holds fewer. Past that, the
-read whose watermark would pass the ceiling answers `unavailable` ("the watermark would exceed its
-ceiling; too many items share one instant"), after the issues earlier reads returned, none
-skipped.
+with the fixture's 18-byte instance name and five-digit project id; a longer instance name, project
+id or issue id holds fewer. Past that, the read whose watermark would pass the ceiling answers
+`unavailable` ("the watermark would exceed its ceiling; the container id is too long or too many
+items share one instant"), after the issues earlier reads returned, none skipped.
 
 ## Errors
 
 As the engine maps them: Jira 400 (a search Jira refuses), 409, 412 and 422 are `invalid_input`;
 404 and 410 `not_found`; 401, 403, 429 and 5xx as the generic read table; any other status or a
-body that is not JSON `unavailable`. Once the project lookup has answered, a 403 from the search
-that is not a quota refusal is `not_found`, as for a project the user cannot see. A watermark not
+body that is not JSON `unavailable`. Once the project lookup has answered, a 403, 404 or 410 from
+the search that is not a quota refusal is `not_found`, with the same message as for a project the
+user cannot see. A watermark not
 issued for this profile, instance and project is `stale_cursor` only after the search answered:
 the binding reads it as a first read and discards what it lists. A watermark whose shifted minute
 falls outside the years 0000 to 9999 is `stale_cursor` the same way, only after the search

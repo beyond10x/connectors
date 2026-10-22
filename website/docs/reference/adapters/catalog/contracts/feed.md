@@ -123,9 +123,16 @@ new revision. A consumer that needs removals reconciles another way, outside thi
 `limit` 1 to 100 (GitLab's `per_page` cap); watermark and listing cursor 16 KiB; per-item body
 64 KiB; serialized page 3 MiB; provider deadline as the generic read (30 s). `feed.containers`
 makes one GitLab request and `feed.items` two (the project, then one page of merge requests). A
-read asks GitLab for `limit` merge requests plus those already returned at the kept instant; 100
-or more merge requests changed within one millisecond answer `unavailable`, as the Errors section
-says for a watermark this read cannot resume: only after the merge request list answered.
+read asks GitLab for `limit` merge requests plus those already returned at the kept instant, so a
+watermark holding 100 of them, all changed within one millisecond, is one no read gets past: it
+is no longer resumable, and a read from it answers `stale_cursor`, as the Errors section says for
+a watermark this read cannot resume, only after the merge request list answered. Starting again
+with a first read does not get past it either: that read reaches the same millisecond, and the
+merge requests changed after it are not returned while 100 or more share it.
+
+The watermark carries the project id and the pairs at the kept instant, and a page whose
+watermark would pass 16 KiB answers `unavailable` ("the watermark would exceed its ceiling; the
+container id is too long or too many items share one instant").
 
 ## Errors
 
@@ -133,9 +140,9 @@ As the engine maps them: GitLab 400, 409, 412 and 422 are `invalid_input`; 404 a
 `not_found`; 401, 403, 429 and 5xx as the generic read table; any other status or a body that is
 not JSON `unavailable`. One exception: when GitLab shows the project (`GET /projects/:id`
 answers) but refuses its merge requests with 403, as it does for a project whose merge requests
-feature is disabled or kept to members, `feed.items` answers `not_found`, exactly as for a
-project the token cannot see, whatever watermark the read carries; the family answers a
-container the connection cannot read so. A watermark not issued for this profile, instance and
+feature is disabled or kept to members, or answers them 404 or 410, `feed.items` answers
+`not_found` with the same message as for a project the token cannot see, whatever watermark the
+read carries; the family answers a container the connection cannot read so. A watermark not issued for this profile, instance and
 project is `stale_cursor` only after the merge request list answered: the binding then sends it
 without `updated_after` and discards what it lists, so `feed.items` still makes two requests. A
 403 on the project itself, or on the project listing, stays `forbidden`: it does not tell a
