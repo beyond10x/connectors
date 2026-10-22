@@ -6,7 +6,7 @@ Linux CLI presentation, configuration and host lifecycle choices selected by
 and [fixtures](fixtures/values.json) describe data and expected traces. Neither a
 generated parser nor a recording handler proves keyring durability, process
 ownership, provider authentication or restart recovery. The existing runtime
-continues to support the [documented three-adapter slice](../../../README.md#where-the-project-stands).
+serves the connectors of the [README support table](../../../README.md#where-the-project-stands).
 Setup, configured inventory and passive connection management have production
 handlers, `setup checkpoints-enable` (§3) included. The [private adapter transport](private-adapter.md) has process/TLS
 fixtures. Protected GitLab acquisition and restart reuse pass disposable runtime

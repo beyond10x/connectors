@@ -42,10 +42,11 @@ Every release is a source release with `connectors` binaries for Linux and macOS
 [status page](./status.md) lists each capability with the test that holds it. In short:
 
 - The **catalog provider** serves GitLab, Jira Cloud, Confluence Cloud, HubSpot CRM, Zendesk
-  Support, Google Drive, Slides, Calendar and Gmail, Opsgenie, Slack and Runpod from their pinned
-  API documents, with no Rust per endpoint ([catalog provider](./concepts/catalog-provider.md)).
+  Support, Google Drive, Slides, Calendar and Gmail, Opsgenie, Slack, Runpod and OpenRouter from
+  their pinned API documents, with no Rust per endpoint
+  ([catalog provider](./concepts/catalog-provider.md)).
 - **Native connectors** run Kubernetes resource reads and discovery, PostgreSQL and MySQL reads,
-  Tavily web search, Loki LogQL reads and Grafana data-source records
+  Tavily web search, Loki LogQL reads, Prometheus PromQL reads and Grafana data-source records
   ([connector reference](./reference/adapters/index.md)).
 - The **local `connectors` CLI** keeps connection metadata in Entity Runtime over an Eventlog SQLite
   store and credentials in the platform's keyring, starts the process that serves each configured
@@ -58,8 +59,9 @@ Every release is a source release with `connectors` binaries for Linux and macOS
 
 - Not a hosted service. Nothing here deploys anything; release pages carry Linux and macOS
   binaries of the `connectors` command, and package distribution is not configured.
-- Not a credential vault. Custody is the platform's keyring; a credential never travels in
-  operation input, and the federation host never holds a provider credential.
+- Not a credential vault. Custody is the platform's keyring, or a read-only mounted directory in a
+  container; a credential never travels in operation input, and the federation host never holds
+  a provider credential.
 - Not a retry layer. No host retries a provider request on its own; an uncertain write stays
   uncertain and is never sent twice.
 - Not an agent runtime or an MCP server. MCP contracts are specified, and no MCP runtime exists.
