@@ -10,15 +10,17 @@
 //! - **cursor**: the provider keeps a change cursor. The watermark carries it unchanged.
 //!
 //! A time filter is sent as a parameter or inside a query template (JQL, CQL) whose container
-//! and time values are quoted literals; at minute precision the overlap minute is re-read and
-//! what the watermark holds within it is dropped by `(id, revision)`, and a page continuation
+//! and time values are quoted literals; at minute precision the overlap minute is re-read, what
+//! precedes the kept instant in it is dropped and what the watermark holds at that instant is
+//! dropped by `(id, revision)`, and a page continuation
 //! reads further pages within one call. A container listing continues by the provider's token,
 //! by one parameter of its next link (never requested), after a key, or by offset.
 //!
 //! Both are wrapped with the profile, the instance and the container, so a watermark issued for
-//! any other is refused as `stale_cursor`, never answered as a first read. That refusal comes
-//! after the container's admission: an unknown container and one whose items the provider
-//! refuses answer `not_found` whatever the watermark.
+//! any other is refused as `stale_cursor`, never answered as a first read. That refusal, and
+//! every other a resume derives from its watermark, comes after the container's admission and
+//! the listing: an unknown container and one whose items the provider refuses answer
+//! `not_found` whatever the watermark.
 use crate::{path_within, read_body, scalar};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use connectors_catalog::{
@@ -184,7 +186,7 @@ pub struct QueryTemplate {
 /// The offsets from UTC, in minutes east of it, between which lies that of the zone the provider
 /// reads `{since}` in, both included; each within a day of UTC, `least` not above `greatest`.
 /// A resume sends the kept minute shifted by `least`, so the provider's filter starts at or
-/// before it in every such zone, and drops what it re-reads before the kept minute.
+/// before it in every such zone, and drops what it re-reads before the kept instant.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct UtcOffsets {
@@ -1293,21 +1295,35 @@ impl Feed {
             return Err(not_found());
         }
         // Admission of the container precedes any disclosure, whether the watermark is valid
-        // included: a watermark this read cannot resume is answered `stale_cursor` only once the
-        // listing shows the connection can read the container. Until then it reads as a first
-        // read, whose records are discarded, never returned.
-        let (mark, resumable) = match input.get("watermark").and_then(Value::as_str) {
-            None => (self.mark(instance, Some(container)), true),
+        // included: a watermark this read cannot resume, one not issued for it or one whose
+        // resume the declaration cannot send, is answered only once the listing shows the
+        // connection can read the container. Until then it reads as a first read, whose records
+        // are discarded, never returned.
+        let (mut mark, mut verdict) = match input.get("watermark").and_then(Value::as_str) {
+            None => (self.mark(instance, Some(container)), None),
             Some(token) => match self.open(token, instance, Some(container)) {
-                Ok(mark) => (mark, true),
+                Ok(mark) => (mark, None),
                 Err(error) if error.code == ErrorCode::StaleCursor => {
-                    (self.mark(instance, Some(container)), false)
+                    (self.mark(instance, Some(container)), Some(error))
                 }
                 Err(error) => return Err(error),
             },
         };
         let page = match &self.declaration.items.position {
-            Position::Time(time) => self.by_time(http, container, limit, mark, time).await,
+            Position::Time(time) => {
+                // Everything a resume derives from its watermark is derived here, before any
+                // request. A first read's plan holds nothing from a watermark, so its failure
+                // is the read's own and is answered at once.
+                let plan = match self.plan(container, limit, &mark, time) {
+                    Ok(plan) => plan,
+                    Err(error) => {
+                        verdict.get_or_insert(error);
+                        mark = self.mark(instance, Some(container));
+                        self.plan(container, limit, &mark, time)?
+                    }
+                };
+                self.by_time(http, limit, mark, time, plan).await
+            }
             Position::Cursor(cursor) => self.by_cursor(http, container, limit, mark, cursor).await,
         }
         // The lookup answered, so the connection sees the container; the provider's own refusal
@@ -1321,8 +1337,8 @@ impl Feed {
                 error
             }
         })?;
-        if !resumable {
-            return Err(stale());
+        if let Some(verdict) = verdict {
+            return Err(verdict);
         }
         let (items, next, complete) = page;
         Self::bounded(json!({
@@ -1333,22 +1349,22 @@ impl Feed {
         }))
     }
 
-    async fn by_time(
-        &self,
-        http: &dyn AuthenticatedHttp,
+    /// The first request of a time-position read from `mark`, and what its answers are checked
+    /// against. A watermark this binding issued that the declaration cannot resume fails here.
+    fn plan<'a>(
+        &'a self,
         container: &str,
         limit: u64,
-        mut mark: Mark,
-        time: &TimeFilter,
-    ) -> Result<(Vec<Value>, Mark, bool)> {
+        mark: &Mark,
+        time: &'a TimeFilter,
+    ) -> Result<Plan<'a>> {
         let i = &self.declaration.items;
         let minute = time.precision == Some(Precision::Minute);
-        // At minute precision the provider filters by the kept instant's minute and answers
-        // that whole minute again; the watermark holds what was returned within it.
-        let bucket = |at: i128| if minute { floor_minute(at) } else { at };
         let seen: BTreeSet<(String, String)> = mark.seen.iter().cloned().collect();
         let since = mark.time.as_deref().and_then(instant);
-        let floor = since.map(bucket);
+        // At minute precision the provider filters by the kept instant's minute and answers
+        // that minute again up to the kept instant.
+        let start = since.map(|at| if minute { floor_minute(at) } else { at });
         // A provider reading `{since}` in a zone within the declared offsets starts its filter
         // `shift` before the kept minute at the latest, and `reach` before it at the earliest.
         let widened = match (since, self.query.as_ref().and_then(|query| query.offsets)) {
@@ -1358,18 +1374,19 @@ impl Feed {
             )),
             _ => None,
         };
-        // Every item returned in the kept instant or minute comes back with the filter; asking
-        // for that many more keeps a page of unseen items within reach. A list read further by
-        // its continuation reaches them on later pages. A widened resume re-reads an unknown
-        // number of items before the kept minute, so it asks for full pages.
+        // Every item returned at the kept instant comes back with the filter; asking for that
+        // many more keeps a page of unseen items within reach. A list read further by its
+        // continuation reaches them on later pages. A resume at minute precision re-reads an
+        // unknown number of items before the kept instant, so it asks for full pages.
         if time.page.is_none() && seen.len() as u64 >= self.declaration.max_limit {
             return Err(unavailable(
                 "more items share one instant than one provider page holds",
             ));
         }
-        let requested = match widened {
-            Some(_) => self.declaration.max_limit,
-            None => (limit + seen.len() as u64).min(self.declaration.max_limit),
+        let requested = if minute && since.is_some() {
+            self.declaration.max_limit
+        } else {
+            (limit + seen.len() as u64).min(self.declaration.max_limit)
         };
         let mut values = vec![(i.limit.as_str(), requested.to_string())];
         if let Some(name) = &i.container {
@@ -1399,15 +1416,42 @@ impl Feed {
             }
             (None, None) => return Err(Error::internal()),
         }
-        let mut items = Vec::new();
-        let mut last: Option<(i128, String)> = None;
-        let mut in_bucket: Vec<(String, String)> = Vec::new();
         // The order is checked from the start of what the filter re-reads: the kept instant or
         // minute, or, widened, the earliest start the declared offsets allow.
-        let mut previous = match (floor, widened) {
-            (Some(floor), Some((_, reach))) => Some(floor.checked_add(reach).ok_or_else(stale)?),
-            (floor, _) => floor,
+        let start = match (start, widened) {
+            (Some(start), Some((_, reach))) => Some(start.checked_add(reach).ok_or_else(stale)?),
+            (start, _) => start,
         };
+        Ok(Plan {
+            values,
+            requested,
+            since,
+            start,
+            widened: widened.is_some(),
+            seen,
+        })
+    }
+
+    async fn by_time(
+        &self,
+        http: &dyn AuthenticatedHttp,
+        limit: u64,
+        mut mark: Mark,
+        time: &TimeFilter,
+        plan: Plan<'_>,
+    ) -> Result<(Vec<Value>, Mark, bool)> {
+        let i = &self.declaration.items;
+        let Plan {
+            values,
+            requested,
+            since,
+            start: mut previous,
+            widened,
+            seen,
+        } = plan;
+        let mut items = Vec::new();
+        let mut last: Option<(i128, String)> = None;
+        let mut at_last: Vec<(String, String)> = Vec::new();
         let mut unseen_left = false;
         let mut token: Option<String> = None;
         let mut pages = 0;
@@ -1431,28 +1475,41 @@ impl Feed {
                     return Err(unavailable("provider answered out of updated_at order"));
                 }
                 previous = Some(mapped.updated);
-                // Before the kept minute, a widened filter re-reads what the watermark holds.
-                if widened.is_some() && floor.is_some_and(|floor| mapped.updated < floor) {
+                // Before the kept instant, a minute or widened filter re-reads what the
+                // watermark holds; at it, the watermark's pairs are what was returned.
+                if since.is_some_and(|since| mapped.updated < since) {
                     continue;
                 }
                 let pair = (mapped.id.clone(), mapped.revision.clone());
-                let at = bucket(mapped.updated);
-                if Some(at) == floor && seen.contains(&pair) {
+                if Some(mapped.updated) == since && seen.contains(&pair) {
                     continue;
                 }
                 if items.len() as u64 == limit {
                     unseen_left = true;
                     break;
                 }
-                if last.as_ref().is_none_or(|(kept, _)| *kept != at) {
-                    in_bucket.clear();
+                if last
+                    .as_ref()
+                    .is_none_or(|(kept, _)| *kept != mapped.updated)
+                {
+                    at_last.clear();
                 }
-                last = Some((at, mapped.updated_text.clone()));
-                in_bucket.push(pair);
+                last = Some((mapped.updated, mapped.updated_text.clone()));
+                at_last.push(pair);
                 items.push(mapped.value);
             }
             let Some(page) = &time.page else {
-                break (records.len() as u64) < requested && !unseen_left;
+                let full = records.len() as u64 >= requested;
+                // A full answer of items the watermark holds would be answered again and
+                // again: no read from this watermark gets past them.
+                if full && items.is_empty() {
+                    return Err(unavailable(if time.precision == Some(Precision::Minute) {
+                        "more items share one minute than one provider page holds"
+                    } else {
+                        "more items share one instant than one provider page holds"
+                    }));
+                }
+                break !full && !unseen_left;
             };
             if unseen_left {
                 break false;
@@ -1466,7 +1523,7 @@ impl Feed {
             }
             if pages == PAGES {
                 if items.is_empty() {
-                    return Err(unavailable(if widened.is_some() {
+                    return Err(unavailable(if widened {
                         "more items changed in the re-read window than the pages one read may request hold"
                     } else {
                         "more items share one minute than the pages one read may request hold"
@@ -1477,13 +1534,13 @@ impl Feed {
             token = Some(next);
         };
         if let Some((at, text)) = last {
-            if Some(at) == floor {
-                in_bucket.extend(seen);
+            if Some(at) == since {
+                at_last.extend(seen);
             }
-            in_bucket.sort();
-            in_bucket.dedup();
+            at_last.sort();
+            at_last.dedup();
             mark.time = Some(text);
-            mark.seen = in_bucket;
+            mark.seen = at_last;
         }
         Ok((items, mark, complete))
     }
@@ -1742,6 +1799,22 @@ struct Mark {
     time: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     seen: Vec<(String, String)>,
+}
+
+/// What a time-position read sends first and checks its answers against, all of it derived
+/// from the watermark before any request.
+struct Plan<'a> {
+    /// The listing's query values, without a page continuation.
+    values: Vec<(&'a str, String)>,
+    /// The records each listing request asks for.
+    requested: u64,
+    /// The kept instant: what precedes it is held, and at it the pairs in `seen` are.
+    since: Option<i128>,
+    /// The earliest `updated_at` an answer may hold.
+    start: Option<i128>,
+    /// Whether the provider reads `{since}` in a zone within declared offsets.
+    widened: bool,
+    seen: BTreeSet<(String, String)>,
 }
 
 // ---- declarations ----------------------------------------------------------------------------

@@ -106,7 +106,7 @@ update gives a new revision, also one that moves no family field (a status, an a
 changes within one millisecond give one. The revision is the text Jira wrote, offset included, and
 the upstream writes top-level timestamps "in the system default user time zone". The same instant
 written with another offset is another revision: when that zone changes between two reads, the
-issues at the kept minute are returned once more under the new text, nothing else about them
+issues at the kept instant are returned once more under the new text, nothing else about them
 changed.
 
 **Body.** The summary. An issue's `description` is Atlassian Document Format, a JSON value the
@@ -121,8 +121,9 @@ the family's `parent` must, is not established from the pinned upstream.
 ## Watermark and first read
 
 The watermark is a time watermark on `updated` at minute precision (the search offers no change
-cursor, and a JQL date literal names a minute). It holds the last returned issue's `updated`
-and the `(id, revision)` pairs returned within that minute, the kept minute. Issues are asked for
+cursor, and a JQL date literal names a minute). It holds the last returned issue's `updated`, the
+kept instant, whose minute is the kept minute, and the `(id, revision)` pairs returned at that
+instant. Issues are asked for
 oldest `updated` first; an answer out of that order is `unavailable`. The watermark is scoped to the
 profile, the catalog instance and the project.
 
@@ -134,7 +135,7 @@ A resume sends the kept minute less 12 hours, written as UTC wall time: a kept m
 sends `"2026-10-05 21:00"`. That is the declaration's `utc_offsets` (`least: -720`,
 `greatest: 840`). In every profile zone from UTC-12:00 to UTC+14:00, Jira's filter then starts at
 or before the kept minute, so no issue changed after it is skipped. An issue re-read before the kept
-minute is dropped, since the watermark already holds it; one within it is skipped by its pair. Order
+instant is dropped, since the watermark already holds it; one at it is skipped by its pair. Order
 is checked from 26 hours before the kept minute, the earliest start the zones allow, and each
 request of a resume asks for 100 issues.
 
@@ -162,7 +163,7 @@ extra minutes.
 Not established. The upstream says "Recent updates might not be immediately visible in the returned
 search results" and offers `reconcileIssues`, at most 50 issue ids, for read-after-write
 consistency; the binding does not send it. An issue that shows up in the search only after a read
-has returned one updated later is, at the next resume, before the kept minute and dropped as held:
+has returned one updated later is, at the next resume, before the kept instant and dropped as held:
 it is skipped until it changes again. The upstream gives no bound on that lag, and none was
 measured.
 
@@ -188,6 +189,14 @@ A resume re-reads, before the kept minute, 12 hours plus the zone's offset: none
 hold"), and stays so for that watermark. A consumer then starts again with a first read, which
 returns every issue again.
 
+How many issues share the kept minute does not grow the watermark: it holds the pairs of the
+issues at the kept instant only, each revision the 28-byte `updated` text. Issues whose `updated`
+is one millisecond are bounded by the 16 KiB watermark ceiling: 296 with five-digit ids, measured
+with the fixture's 18-byte instance name; a longer instance name or id holds fewer. Past that, the
+read whose watermark would pass the ceiling answers `unavailable` ("the watermark would exceed its
+ceiling; too many items share one instant"), after the issues earlier reads returned, none
+skipped.
+
 ## Errors
 
 As the engine maps them: Jira 400 (a search Jira refuses), 409, 412 and 422 are `invalid_input`;
@@ -196,7 +205,8 @@ body that is not JSON `unavailable`. Once the project lookup has answered, a 403
 that is not a quota refusal is `not_found`, as for a project the user cannot see. A watermark not
 issued for this profile, instance and project is `stale_cursor` only after the search answered:
 the binding reads it as a first read and discards what it lists. A watermark whose shifted minute
-falls outside the years 0000 to 9999 is `stale_cursor`.
+falls outside the years 0000 to 9999 is `stale_cursor` the same way, only after the search
+answered.
 
 ## What the declaration cannot express
 
@@ -227,4 +237,5 @@ names each change. The simulation reads the literal and writes times in the same
 `adapters/catalog/tests/jira_feed.rs` holds the exact requests, the field mapping over those
 shapes, the listing's continuation, the resume in every zone from UTC-12:00 to UTC+14:00 in quarter
 hours, a written zone other than the read one, a written zone that changes between reads, the
-resume that answers `unavailable` at the ceiling, and that the shipped selection declares no feed.
+resume that answers `unavailable` at the ceiling, the issues one millisecond holds at the watermark
+ceiling, and that the shipped selection declares no feed.

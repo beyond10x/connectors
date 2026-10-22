@@ -29,15 +29,15 @@ types:
   # The answer that moves validation on to the next binding: an access probe answer with exactly
   # this HTTP status whose admitted reason (`message`, `error_description` or `error` of the JSON
   # body, `connectors_core::reason`) contains `reason`, compared case-insensitively. Only a
-  # refusal can move on, so `status` is a 4xx.
+  # refusal of the binding moves on: `status` is 401 or 403, the two answers that make every
+  # binding tried refused `insufficient_scope`; any other is refused when the configuration loads.
   - name: connectors_catalog.binding.Next
     kind: struct
     fields:
       - {name: status, type: Integer}
       - {name: reason, type: String}
     invariants:
-      - status >= 400
-      - status <= 499
+      - any: [status == 401, status == 403]
       - reason.count >= 1
       - reason.utf8_bytes <= 256
 

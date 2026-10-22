@@ -109,7 +109,8 @@ new revision. A consumer that needs removals reconciles another way, outside thi
 64 KiB; serialized page 3 MiB; provider deadline as the generic read (30 s). `feed.containers`
 makes one GitLab request and `feed.items` two (the project, then one page of merge requests). A
 read asks GitLab for `limit` merge requests plus those already returned at the kept instant; 100
-or more merge requests changed within one millisecond answer `unavailable`.
+or more merge requests changed within one millisecond answer `unavailable`, as the Errors section
+says for a watermark this read cannot resume: only after the merge request list answered.
 
 ## Errors
 
