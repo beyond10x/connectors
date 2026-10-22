@@ -7,7 +7,7 @@ title: The definitions notation cannot express the Jira and Confluence feeds
 relations:
 - blocks: story:jira-feed-binding
 - blocks: story:confluence-feed-binding
-revision: 2
+revision: 3
 ---
 # The definitions notation cannot express the Jira and Confluence feeds
 
@@ -35,3 +35,15 @@ shipped Jira and Confluence selections carry no `feed`.
 Clears when the definitions schema names these fields, this repository's reader and lowering
 (`definition.rs`, `import.rs`) carry them, and the two feed blocks move into the shipped
 selections with `definition_import` green.
+
+## Upstream progress
+
+2026-10-22: the definitions schema names the fields. `beyond10x/connectors-definitions` main
+`306fa86335688cfe970bae10e37c064ec003c597` (pull request 5) adds `FeedCursor.offset` and
+`url_parameter`; an optional `FeedPosition.time` beside `query` (with `utc_offsets`), `precision`
+and `page`; and `FeedItems.url`, `url_base` and `parent`. No tag was cut. The exactly-one and range
+rules are stated in that domain's summary only, so this repository's reader must enforce them.
+
+What remains here: `definition.rs` and `import.rs` carry the fields and the rules, and the Jira and
+Confluence definitions carry their feed blocks, so the two feeds can move into the shipped
+selections with `definition_import` green. Wave 20261021 ships them fixture-backed.
