@@ -11,6 +11,7 @@ relations:
 - depends_on: story:feed-bindings-discoverable
 - depends_on: story:catalog-feed-engine
 - depends_on: story:catalog-feed-engine-extensions
+- depends_on: story:definition-reader-feed-extensions
 scope:
 - confidence: inferred
   path: CHANGELOG.md
@@ -32,7 +33,7 @@ scope:
   path: crates/connectors-build/src/main.rs
 - confidence: inferred
   path: crates/connectors-docs/src/status.rs
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-06T19:55:09Z", actor: "agent:claude", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-06T19:55:09Z", actor: "agent:claude", revision: 3}
@@ -53,7 +54,7 @@ The family's conformance suite passes against the binding with recorded provider
 
 Derived 2026-10-21 by `story-scoper` at e26481df09. Every line is **cited** (read from the story or the tree) or **inferred**.
 
-- **Primary surface:** `adapters/catalog/providers/jira/operations.json` (the `feed` block) — cited
+- **Shipped `feed` block:** `adapters/catalog/providers/jira/operations.json` is owned by story:definition-reader-feed-extensions (2026-10-22), which this story depends on; this story does not write it — cited
 - **Binding files (new):** `adapters/catalog/contracts/feed/v1alpha1/jira.md`, `adapters/catalog/tests/jira_feed.rs`, `adapters/catalog/tests/feed/jira/{project,issue}.json`, `crates/connectors-build/src/jira_feed_conformance.rs`, its mod line in `crates/connectors-build/src/main.rs` — inferred (GitLab pattern)
 - **Pins that move:** `adapters/catalog/tests/gateway_prefix.rs:171-172`, `adapters/catalog/tests/connector_declarations.rs:736,740,744` — cited
 - **Pins that stay:** `adapters/catalog/generated/bundles/jira.bundle.json` (the three feed operations `searchProjects`, `getProject`, `searchAndReconsileIssuesUsingJql` are already in it), `adapters/catalog/providers/jira/connector.json` — cited

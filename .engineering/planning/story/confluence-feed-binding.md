@@ -11,6 +11,7 @@ relations:
 - depends_on: story:feed-bindings-discoverable
 - depends_on: story:catalog-feed-engine
 - depends_on: story:catalog-feed-engine-extensions
+- depends_on: story:definition-reader-feed-extensions
 scope:
 - confidence: inferred
   path: CHANGELOG.md
@@ -30,7 +31,7 @@ scope:
   path: crates/connectors-catalog/tests/fixtures/definitions/connectors/confluence-v1.yaml
 - confidence: inferred
   path: crates/connectors-docs/src/status.rs
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-06T19:55:10Z", actor: "agent:claude", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-06T19:55:10Z", actor: "agent:claude", revision: 3}
@@ -51,10 +52,10 @@ The family's conformance suite passes against the binding with recorded provider
 
 Derived 2026-10-21 by `story-scoper` at e26481df09. Every line is **cited** or **inferred**.
 
-- **Primary surface:** `adapters/catalog/providers/confluence-v1/operations.json` (the `feed` block) — cited (pattern: `providers/gitlab/operations.json`)
+- **Shipped `feed` block:** `adapters/catalog/providers/confluence-v1/operations.json` is owned by story:definition-reader-feed-extensions (2026-10-22), which this story depends on; this story does not write it — cited
 - **Not this binding:** `confluence` (v2): `getPages` and `getPagesInSpace` take no time parameter and there is no change cursor (`adapters/catalog/src/feed.rs:6-10`) — cited. A v2 feed needs a descending-walk shape and its own story.
 - **Binding files (new):** `adapters/catalog/contracts/feed/v1alpha1/confluence-v1.md`, `adapters/catalog/tests/confluence_v1_feed.rs`, `adapters/catalog/tests/feed/confluence/{space,page}.json`, `crates/connectors-build/src/confluence_feed_conformance.rs`, its mod line in `crates/connectors-build/src/main.rs` — inferred (GitLab pattern)
-- **Definitions copy:** `crates/connectors-catalog/tests/fixtures/definitions/connectors/confluence-v1.yaml` (GitLab's feed sits at `gitlab.yaml:312-314`) — inferred
+- **Definitions copy (refreshed by story:definition-reader-feed-extensions):** `crates/connectors-catalog/tests/fixtures/definitions/connectors/confluence-v1.yaml` (GitLab's feed sits at `gitlab.yaml:312-314`) — inferred
 - **Engine items needed:** the next-URL parameter cursor (`getSpaces` `start`, `searchContentByCQL` `cursor`; `adapters/catalog/tests/confluence_v1.rs:421,451,736-739`), the CQL template, relative item URLs if `url` maps `_links.webui` — cited, from `story:catalog-feed-engine-extensions`
 - **Revision pins that move:** none for `confluence-v1` (grep of `adapters/catalog/tests`) — cited absence
 - **Also likely:** `CHANGELOG.md`, `crates/connectors-docs/src/status.rs:336-338` and its regenerated pages — inferred
