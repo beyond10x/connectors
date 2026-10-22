@@ -850,3 +850,170 @@ async fn a_space_confluence_does_not_show_is_not_found() {
     assert_eq!(error.code, ErrorCode::NotFound);
     assert_eq!(site.calls.lock().unwrap().len(), 1);
 }
+
+/// A watermark in the engine's own format for this instance and `space`, kept at `time`.
+fn kept(space: &str, time: &str) -> String {
+    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+    let mark = json!({"format": "catalog-feed/1", "profile": PROFILE, "instance": INSTANCE,
+                      "container": space, "time": time, "seen": [["1002", "4"]]});
+    URL_SAFE_NO_PAD.encode(serde_json::to_vec(&mark).unwrap())
+}
+
+/// A watermark kept in the first hours of the year 0000 is one the binding cannot resume: the
+/// literal it would send, 12 hours before the kept minute, falls before the year 0000. It is
+/// `stale_cursor` only once the space lookup and the search, sent as a first read with no
+/// `lastmodified` clause, have answered; a space Confluence does not show this user stays
+/// `not_found`, and nothing is searched.
+#[tokio::test]
+async fn a_watermark_before_the_year_zero_is_stale_only_after_the_search_answered() {
+    let engine = engine();
+    let site = Site::new(0, around_the_watermark());
+    let error = engine
+        .read(
+            &site,
+            INSTANCE,
+            ITEMS,
+            json!({"container": SPACE, "limit": 10,
+                   "watermark": kept(SPACE, "0000-01-01T05:00:00.000Z")}),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::StaleCursor);
+    assert_eq!(site.searches(), [FIRST]);
+
+    let site = Site::new(0, around_the_watermark());
+    let error = engine
+        .read(
+            &site,
+            INSTANCE,
+            ITEMS,
+            json!({"container": "HIDDEN", "limit": 10,
+                   "watermark": kept("HIDDEN", "0000-01-01T05:00:00.000Z")}),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::NotFound);
+    assert!(site.searches().is_empty());
+
+    let site = Site::new(0, around_the_watermark());
+    let resumed = engine
+        .read(
+            &site,
+            INSTANCE,
+            ITEMS,
+            json!({"container": SPACE, "limit": 10,
+                   "watermark": kept(SPACE, "0000-01-01T12:00:00.000Z")}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(ids(&resumed), ["1001", "1002", "1003"]);
+    assert_eq!(since_of(&site.searches()[0]), Some("0000-01-01 00:00"));
+}
+
+/// A bulk change of 900 pages within one UTC minute, 66 milliseconds apart, in a zone at
+/// UTC+14:00: read 100 a call, every page comes back exactly once and the last call is
+/// `complete`. The watermark holds only the pages at its kept instant, so it stays far below its
+/// 16 KiB ceiling however many pages share the kept minute, and the bound is the 10 v1 pages one
+/// call re-reads.
+#[tokio::test]
+async fn nine_hundred_pages_changed_in_one_minute_are_all_returned_once() {
+    let engine = engine();
+    let start = at("2026-10-06 09:00:00");
+    let pages: Vec<Page> = (0..900)
+        .map(|n| Page {
+            id: 20_000 + n,
+            version: 1,
+            created: start,
+            updated: start + n as i64 * 66,
+        })
+        .collect();
+    let site = Site::new(840, pages);
+    let mut watermark = Value::Null;
+    let mut returned: Vec<String> = Vec::new();
+    let mut reads = 0;
+    loop {
+        reads += 1;
+        assert!(reads <= 11, "no complete page after {reads} reads");
+        let mut input = json!({"container": SPACE, "limit": 100});
+        if !watermark.is_null() {
+            input["watermark"] = watermark.clone();
+        }
+        let page = engine
+            .read(&site, INSTANCE, ITEMS, input)
+            .await
+            .unwrap_or_else(|error| {
+                panic!(
+                    "read {reads}, after {} pages (watermark {} bytes): {:?} {}",
+                    returned.len(),
+                    watermark.as_str().map_or(0, str::len),
+                    error.code,
+                    error.message
+                )
+            });
+        returned.extend(ids(&page).into_iter().map(str::to_owned));
+        watermark = page["next_watermark"].clone();
+        if page["complete"] == json!(true) {
+            break;
+        }
+    }
+    let unique: std::collections::BTreeSet<&String> = returned.iter().collect();
+    assert_eq!(unique.len(), 900, "pages returned: {}", returned.len());
+    assert_eq!(returned.len(), 900, "a page was returned twice");
+}
+
+/// `count` pages with ids from `first`, each at version 1, whose last version is one
+/// millisecond, read 100 a call from a first read until a call is `complete` or refused: the
+/// ids returned, and the refusal.
+async fn one_millisecond(first: u64, count: u64) -> (Vec<String>, Option<(ErrorCode, String)>) {
+    let engine = engine();
+    let at = at("2026-10-06 09:00:00");
+    let pages: Vec<Page> = (0..count)
+        .map(|n| Page {
+            id: first + n,
+            version: 1,
+            created: at,
+            updated: at,
+        })
+        .collect();
+    let site = Site::new(0, pages);
+    let mut watermark = Value::Null;
+    let mut returned = Vec::new();
+    for _ in 0..11 {
+        let mut input = json!({"container": SPACE, "limit": 100});
+        if !watermark.is_null() {
+            input["watermark"] = watermark.clone();
+        }
+        match engine.read(&site, INSTANCE, ITEMS, input).await {
+            Ok(page) => {
+                returned.extend(ids(&page).into_iter().map(str::to_owned));
+                watermark = page["next_watermark"].clone();
+                if page["complete"] == json!(true) {
+                    return (returned, None);
+                }
+            }
+            Err(error) => return (returned, Some((error.code, error.message))),
+        }
+    }
+    panic!("no complete page after 11 reads of {count} pages");
+}
+
+/// The watermark holds the pairs of the pages sharing its kept instant, so the 16 KiB ceiling
+/// bounds how many pages one millisecond may hold: 866 with five-digit ids and 638 with
+/// ten-digit ones here, all returned once. One more is `unavailable` at the read whose
+/// watermark would pass the ceiling, after the pages earlier reads returned, none skipped.
+#[tokio::test]
+async fn pages_sharing_one_millisecond_are_bounded_by_the_watermark_ceiling() {
+    let ceiling = Some((
+        ErrorCode::Unavailable,
+        "the watermark would exceed its ceiling; too many items share one instant".to_owned(),
+    ));
+    for (first, held, before) in [(20_000, 866, 800), (1_000_000_000, 638, 600)] {
+        let expected: Vec<String> = (0..held).map(|n| (first + n).to_string()).collect();
+        let (returned, refusal) = one_millisecond(first, held).await;
+        assert_eq!(refusal, None, "{first}");
+        assert_eq!(returned, expected, "{first}");
+        let (returned, refusal) = one_millisecond(first, held + 1).await;
+        assert_eq!(refusal, ceiling, "{first}");
+        assert_eq!(returned, expected[..before], "{first}");
+    }
+}

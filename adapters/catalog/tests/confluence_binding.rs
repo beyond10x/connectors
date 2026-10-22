@@ -575,6 +575,55 @@ fn unusable_bindings_are_refused_at_load() {
     }
 }
 
+/// Only a refusal of the binding moves validation on, and the outcome when every binding tried
+/// is refused is `insufficient_scope` only for 401 and 403 (`contracts/catalog/v1alpha1/
+/// semantics.md` §3.4, Refusal): a `next.status` outside the two, `bindings.next` or an
+/// alternative's own, is refused when the configuration loads, and either of the two loads.
+#[test]
+fn a_next_status_other_than_401_or_403_is_refused_at_load() {
+    let provider = Provider::new(V2_ANSWERED);
+    // A second alternative, so that the first states a `next` of its own.
+    let with_second = |c: &mut Value, first_next: u16| {
+        c["bindings"]["alternatives"][0]["next"] = json!({"status": first_next, "reason": "x"});
+        let second = json!({
+            "id": "v1-again",
+            "provider": "confluence-v1",
+            "operations_file": root_path("providers/confluence-v1/operations.json"),
+            "access": {"path": "rest/api/space", "query": {"limit": "1"}}
+        });
+        c["bindings"]["alternatives"]
+            .as_array_mut()
+            .unwrap()
+            .push(second);
+    };
+    let loads = |edit: &dyn Fn(&mut Value)| {
+        let path = provider.variant(edit);
+        Provider::bootstrap_of(&path).status.success()
+    };
+    let mut wrong = Vec::new();
+    for status in [401u16, 403] {
+        if !loads(&|c| c["bindings"]["next"]["status"] = json!(status)) {
+            wrong.push(format!("bindings.next.status {status} was refused"));
+        }
+        if !loads(&|c| with_second(c, status)) {
+            wrong.push(format!(
+                "bindings.alternatives[0].next.status {status} was refused"
+            ));
+        }
+    }
+    for status in [400u16, 402, 404, 405, 407, 409, 410, 412, 422, 429, 499] {
+        if loads(&|c| c["bindings"]["next"]["status"] = json!(status)) {
+            wrong.push(format!("bindings.next.status {status} was admitted"));
+        }
+        if loads(&|c| with_second(c, status)) {
+            wrong.push(format!(
+                "bindings.alternatives[0].next.status {status} was admitted"
+            ));
+        }
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
 /// Acceptance 1: refused for scope on v2, answered on v1, the connection
 /// binds to v1 and reads the v1 page.
 #[test]
