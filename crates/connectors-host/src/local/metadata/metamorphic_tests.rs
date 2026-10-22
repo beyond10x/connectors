@@ -216,6 +216,7 @@ fn binding() -> registry::Binding {
 
 fn baseline(subject: &str, now: u64) -> registry::ValidatedBaseline {
     registry::ValidatedBaseline {
+        binding: None,
         identity: registry::ExternalIdentity {
             kind: "fixture-account".into(),
             subject: subject.into(),

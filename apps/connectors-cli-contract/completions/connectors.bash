@@ -3007,7 +3007,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__operations__subcmd__describe)
-            opts="-h --adapter --connector --instance --operation --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --connection --operation --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -3022,6 +3022,10 @@ _connectors() {
                     return 0
                     ;;
                 --instance)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connection)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -3201,7 +3205,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__operations__subcmd__list)
-            opts="-h --adapter --connector --instance --family --limit --cursor --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --connection --family --limit --cursor --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -3216,6 +3220,10 @@ _connectors() {
                     return 0
                     ;;
                 --instance)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connection)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

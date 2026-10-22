@@ -52,7 +52,18 @@ pub(super) fn describe(
             Ok::<_, owner::Error>((family, request))
         })
         .transpose()?;
-    let bootstrap = owner::described(paths, alias, None)?;
+    // With `--connection`, the binding that connection reads through
+    // (contracts/cli/v1alpha1/semantics.md, "Bound connections").
+    let connection = match call.input.get("connection") {
+        None | Some(Value::Null) => None,
+        Some(value) => Some(
+            value
+                .as_str()
+                .filter(|connection| connectors_core::valid_id(connection))
+                .ok_or(Code::InvalidInput)?,
+        ),
+    };
+    let bootstrap = owner::bound_described(paths, alias, connection)?;
     let descriptor = bootstrap.descriptor()?;
     if let Some((family, request)) = request {
         let operations = descriptor
@@ -338,6 +349,7 @@ mod json_value_tests {
             effect,
         };
         runtime::Bootstrap {
+            bindings: None,
             credential_revision: None,
             executable: None,
             instance: "forge-local".into(),

@@ -109,12 +109,75 @@ fn block_on<F: Future>(future: F) -> F::Output {
 
 /// The fixture API over the suite's provider state. Rooms are containers, messages items. A
 /// message is listed by edit time (`messages`, `updated_since` inclusive, oldest first only when
-/// asked with `order=asc`) or through the provider's change cursor (`changes`), which refuses a
-/// cursor it never issued with 410. Instants compare as text: every instant the suite writes has
-/// the one form `YYYY-MM-DDTHH:MM:SSZ`.
+/// asked with `order=asc`), through the provider's change cursor (`changes`), which refuses a
+/// cursor it never issued with 410, or by a query (`message-search`, `message-query`) of the one
+/// form `room = "<room>" [AND edited >= "<YYYY-MM-DD HH:MM>"] ORDER BY edited ASC`, whose literals
+/// read `\"` and `\\` back and which answers at most [`QUERY_PAGE`] messages a page. Rooms are
+/// listed by cursor (`rooms`), by offset (`room-index`) or by an absolute next link
+/// (`room-directory`). Instants compare as text: every instant the suite writes has the one form
+/// `YYYY-MM-DDTHH:MM:SSZ`, and `message-search` writes it with a `+0000` offset instead.
 struct Simulated<'a> {
     source: &'a Source,
     calls: Mutex<Vec<String>>,
+    queries: Mutex<Vec<BTreeMap<String, String>>>,
+}
+
+/// The most messages a query answers in one page, so that a minute holding more is read in
+/// several.
+const QUERY_PAGE: usize = 3;
+
+/// The server every next link the simulated provider writes names.
+const SERVER: &str = "https://feed.fixture.test/v1";
+
+/// One quoted literal at the start of `text`, `\"` and `\\` read back, and the text after it;
+/// `None` for anything else, a `\` before another character included.
+fn literal(text: &str) -> Option<(String, &str)> {
+    let body = text.strip_prefix('"')?;
+    let mut read = String::new();
+    let mut escaped = false;
+    for (at, c) in body.char_indices() {
+        match (escaped, c) {
+            (true, '"' | '\\') => {
+                read.push(c);
+                escaped = false;
+            }
+            (true, _) => return None,
+            (false, '\\') => escaped = true,
+            (false, '"') => return Some((read, &body[at + 1..])),
+            (false, _) => read.push(c),
+        }
+    }
+    None
+}
+
+/// The room and the minute a simulated query selects; `None` for a query of any other form.
+fn selection(query: &str) -> Option<(String, Option<String>)> {
+    const ORDER: &str = " ORDER BY edited ASC";
+    let (room, rest) = literal(query.strip_prefix("room = ")?)?;
+    if rest == ORDER {
+        return Some((room, None));
+    }
+    let (since, rest) = literal(rest.strip_prefix(" AND edited >= ")?)?;
+    let minute = since.len() == 16 && since.as_bytes()[10] == b' ';
+    (rest == ORDER && minute).then_some((room, Some(since)))
+}
+
+/// An instant's minute as a simulated query writes it.
+fn minute(at: &str) -> String {
+    at[..16].replace('T', " ")
+}
+
+/// `text` form-encoded, as a query value in a next link.
+fn form(text: &str) -> String {
+    text.bytes()
+        .map(|b| match b {
+            b' ' => "+".to_owned(),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                (b as char).to_string()
+            }
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
 }
 
 impl<'a> Simulated<'a> {
@@ -122,11 +185,34 @@ impl<'a> Simulated<'a> {
         Self {
             source,
             calls: Mutex::default(),
+            queries: Mutex::default(),
         }
     }
 
     fn calls(&self) -> Vec<String> {
         self.calls.lock().unwrap().clone()
+    }
+
+    fn queries(&self) -> Vec<BTreeMap<String, String>> {
+        self.queries.lock().unwrap().clone()
+    }
+
+    /// A message as the query search answers it: its fields apart, instants with `+0000`.
+    fn issue(id: &str, item: &Item) -> Value {
+        let offset = |at: &str| format!("{}+0000", at.trim_end_matches('Z'));
+        json!({
+            "id": id,
+            "fields": {
+                "version": item.revision,
+                "created": offset(&item.created_at),
+                "updated": offset(&item.updated_at),
+                "reporter": {"accountId": "member-1", "displayName": "Member One"},
+                "text": if item.deleted { Value::Null } else { json!(format!("{id} at {}", item.revision)) },
+                "link": format!("{SERVER}/rooms/{}/{id}", item.container),
+                "reply_to": item.parent,
+                "removed": item.deleted,
+            },
+        })
     }
 
     fn room(id: &str, container: &Container) -> Value {
@@ -161,10 +247,13 @@ impl<'a> Simulated<'a> {
                 .find(|(key, _)| *key == name)
                 .map(|(_, value)| value.as_str())
         };
-        let limit = match get("limit").map(str::parse::<usize>) {
-            None => 100,
-            Some(Ok(limit)) if (1..=100).contains(&limit) => limit,
-            Some(_) => return (400, json!({"error": "limit"})),
+        let size = |name: &str| match get(name).map(str::parse::<usize>) {
+            None => Some(100),
+            Some(Ok(limit)) if (1..=100).contains(&limit) => Some(limit),
+            Some(_) => None,
+        };
+        let Some(limit) = size("limit") else {
+            return (400, json!({"error": "limit"}));
         };
         let source = self.source;
         let in_room = |room: &str| -> Vec<(&String, &Item)> {
@@ -247,6 +336,133 @@ impl<'a> Simulated<'a> {
                     json!({"changes": changes, "cursor": next.to_string(), "has_more": has_more}),
                 )
             }
+            ["room-index"] => {
+                let rooms: Vec<_> = source.containers.iter().collect();
+                let (Some(size), Some(start)) = (
+                    size("maxResults"),
+                    get("startAt").map_or(Some(0), |start| start.parse::<usize>().ok()),
+                ) else {
+                    return (400, json!({"error": "page"}));
+                };
+                // A provider that lost its place answers an empty page it does not call the last.
+                if start > rooms.len() {
+                    return (
+                        200,
+                        json!({"startAt": start, "values": [], "isLast": false}),
+                    );
+                }
+                let end = (start + size).min(rooms.len());
+                let page: Vec<Value> = rooms[start..end]
+                    .iter()
+                    .map(|(id, container)| Self::room(id, container))
+                    .collect();
+                (
+                    200,
+                    json!({"startAt": start, "maxResults": size, "values": page, "isLast": end == rooms.len()}),
+                )
+            }
+            ["room-directory"] => {
+                let rooms: Vec<_> = source.containers.iter().collect();
+                let start = match get("start") {
+                    None => 0,
+                    Some(start) => match start
+                        .strip_prefix("p:")
+                        .and_then(|n| n.parse::<usize>().ok())
+                    {
+                        Some(start) if start <= rooms.len() => start,
+                        _ => return (400, json!({"error": "start"})),
+                    },
+                };
+                let end = (start + limit).min(rooms.len());
+                let page: Vec<Value> = rooms[start..end]
+                    .iter()
+                    .map(|(id, container)| Self::room(id, container))
+                    .collect();
+                let mut links = json!({"base": SERVER});
+                if end < rooms.len() {
+                    // A room of this kind ends its page with a link that has lost its position.
+                    let lost = rooms[end - 1].1.kind == "link-without-start";
+                    links["next"] = json!(if lost {
+                        format!("{SERVER}/room-directory?limit={limit}")
+                    } else {
+                        format!("{SERVER}/room-directory?limit={limit}&start=p%3A{end}")
+                    });
+                }
+                (
+                    200,
+                    json!({"results": page, "start": start, "size": end - start, "_links": links}),
+                )
+            }
+            [path @ ("message-search" | "message-query")] => {
+                let search = *path == "message-search";
+                let (filter, page_size, token, prefix) = if search {
+                    ("q", "maxResults", "pageToken", "t")
+                } else {
+                    ("filter", "limit", "after", "c:")
+                };
+                let (Some(query), Some(size)) = (get(filter), size(page_size)) else {
+                    return (400, json!({"error": "query"}));
+                };
+                let Some((room, since)) = selection(query) else {
+                    return (400, json!({"error": "query does not parse"}));
+                };
+                let start = match get(token) {
+                    None => 0,
+                    Some(token) => match token
+                        .strip_prefix(prefix)
+                        .and_then(|n| n.parse::<usize>().ok())
+                    {
+                        Some(start) => start,
+                        None => return (400, json!({"error": "token"})),
+                    },
+                };
+                let mut listed: Vec<(&String, &Item)> = in_room(&room)
+                    .into_iter()
+                    .filter(|(_, item)| {
+                        since
+                            .as_ref()
+                            .is_none_or(|since| minute(&item.updated_at) >= *since)
+                    })
+                    .collect();
+                listed.sort_by(|a, b| (&a.1.updated_at, a.0).cmp(&(&b.1.updated_at, b.0)));
+                let end = (start + size.min(QUERY_PAGE)).min(listed.len());
+                let Some(page) = listed.get(start..end) else {
+                    return (400, json!({"error": "token"}));
+                };
+                let more = end < listed.len();
+                if search {
+                    let issues: Vec<Value> = page
+                        .iter()
+                        .map(|(id, item)| Self::issue(id, item))
+                        .collect();
+                    let mut body = json!({"issues": issues, "isLast": !more});
+                    if more {
+                        body["nextPageToken"] = json!(format!("t{end}"));
+                    }
+                    (200, body)
+                } else {
+                    let results: Vec<Value> = page
+                        .iter()
+                        .map(|(id, item)| {
+                            let mut message = Self::message(id, item);
+                            message["_links"] =
+                                json!({"webui": format!("/rooms/{}/{id}", item.container)});
+                            message
+                        })
+                        .collect();
+                    let mut links = json!({"base": SERVER});
+                    if more {
+                        links["next"] = json!(format!(
+                            "/message-query?filter={}&limit={size}&after=c%3A{end}",
+                            form(query)
+                        ));
+                    }
+                    (
+                        200,
+                        json!({"results": results, "size": end - start, "_links": links}),
+                    )
+                }
+            }
             _ => (404, json!({"error": "no such path"})),
         }
     }
@@ -260,6 +476,12 @@ impl AuthenticatedHttp for Simulated<'_> {
         query: &[(&str, String)],
     ) -> connectors_core::Result<HttpResponse> {
         self.calls.lock().unwrap().push(segments.join("/"));
+        self.queries.lock().unwrap().push(
+            query
+                .iter()
+                .map(|(key, value)| ((*key).to_owned(), value.clone()))
+                .collect(),
+        );
         let (status, body) = self.answer(segments, query);
         Ok(HttpResponse {
             status,
@@ -270,6 +492,9 @@ impl AuthenticatedHttp for Simulated<'_> {
 }
 
 // ---- the binding under test ------------------------------------------------------------------
+
+/// One provider request: its path and the query it sent.
+type Request = (String, BTreeMap<String, String>);
 
 /// A declaration realized by the catalog engine. Every answer is checked against the output
 /// schema the engine declares for its operation.
@@ -283,8 +508,10 @@ impl Catalog {
     fn new(declared: &Declared) -> Self {
         let provider = declared.raw["provider"].as_str().expect("provider");
         let (bundle, base) = bundle(provider);
-        let engine =
-            Engine::with_feed(&bundle, &base, &[], Some(&declared.feed)).unwrap_or_else(|e| {
+        // Root-relative item links resolve under the origin of the API base.
+        let engine = Engine::with_feed(&bundle, &base, &[], Some(&declared.feed))
+            .and_then(|engine| engine.with_link_origin(SERVER))
+            .unwrap_or_else(|e| {
                 panic!("{:?}: {e}", declared.path);
             });
         Self {
@@ -301,6 +528,17 @@ impl Catalog {
         operation: &str,
         input: Value,
     ) -> (Result<Value, Error>, Vec<String>) {
+        let (result, requests) = self.requests(source, operation, input);
+        (result, requests.into_iter().map(|(path, _)| path).collect())
+    }
+
+    /// One invocation and each provider request it made, with the query sent.
+    fn requests(
+        &self,
+        source: &Source,
+        operation: &str,
+        input: Value,
+    ) -> (Result<Value, Error>, Vec<Request>) {
         let http = Simulated::new(source);
         let result = block_on(self.engine.read(&http, INSTANCE, operation, input));
         if let Ok(output) = &result {
@@ -317,7 +555,10 @@ impl Catalog {
                 .collect();
             assert!(errors.is_empty(), "{operation}: {errors:?}\n{output:#}");
         }
-        (result, http.calls())
+        (
+            result,
+            http.calls().into_iter().zip(http.queries()).collect(),
+        )
     }
 }
 
@@ -615,9 +856,28 @@ fn shipped() -> Vec<(PathBuf, Value)> {
         .collect()
 }
 
-/// Every declaration, the fixtures' and the shipped providers', is a value of the adapter's own
-/// model (`adapters/catalog/spec/ess`), and the engine's reader carries every field of it: read
-/// and written back, it is the same document.
+/// Every provider binding held as a fixture until the shipped selection can carry it, in name
+/// order: `adapters/catalog/tests/feed/<provider>/feed.json`, as a selection file would hold it.
+fn fixture_bindings() -> Vec<(PathBuf, Value)> {
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(directory())
+        .expect("feed fixtures")
+        .map(|entry| entry.expect("entry").path().join("feed.json"))
+        .filter(|path| path.is_file())
+        .collect();
+    paths.sort();
+    paths
+        .into_iter()
+        .map(|path| {
+            let feed: Value =
+                serde_json::from_slice(&std::fs::read(&path).expect("binding fixture")).unwrap();
+            (path, json!({"feed": feed}))
+        })
+        .collect()
+}
+
+/// Every declaration, the fixtures', the provider bindings held as fixtures and the shipped
+/// providers', is a value of the adapter's own model (`adapters/catalog/spec/ess`), and the
+/// engine's reader carries every field of it: read and written back, it is the same document.
 #[test]
 fn every_declared_feed_is_a_value_of_the_catalog_feed_model() {
     let root = feed_conformance::root();
@@ -653,7 +913,16 @@ fn every_declared_feed_is_a_value_of_the_catalog_feed_model() {
         !shipped.is_empty(),
         "no shipped provider declares a feed, so none is checked here"
     );
-    for (path, raw) in fixtures.chain(shipped) {
+    let bindings = fixture_bindings();
+    let named: BTreeSet<String> = bindings
+        .iter()
+        .filter_map(|(path, _)| Some(path.parent()?.file_name()?.to_str()?.to_owned()))
+        .collect();
+    assert!(
+        named.contains("confluence") && named.contains("jira"),
+        "{named:?}"
+    );
+    for (path, raw) in fixtures.chain(bindings).chain(shipped) {
         let errors: Vec<String> = validator
             .iter_errors(&raw["feed"])
             .map(|e| format!("{}: {e}", e.instance_path()))
@@ -999,5 +1268,450 @@ fn adversary_an_all_private_declaration_is_still_held_to_the_providers_kind() {
         CountStatus::Failed,
         "a declaration reading the container id as its kind passed under `kind: provider-word`:\n{}",
         run.summary()
+    );
+}
+
+// ---- the list shapes real providers use, wave 20261021 U1 ----------------------------------
+
+/// The time position of a declaration.
+fn time_value(declared: &Declared) -> &Value {
+    &declared.raw["feed"]["items"]["position"]["value"]
+}
+
+/// Every declaration whose items a query selects, and the parameter the query is sent as.
+fn queried() -> Vec<(Declared, String)> {
+    declared()
+        .into_iter()
+        .filter_map(|declared| {
+            let parameter = time_value(&declared)["query"]["parameter"]
+                .as_str()?
+                .to_owned();
+            Some((declared, parameter))
+        })
+        .collect()
+}
+
+/// `id@revision` of every item of a `feed.items` answer, in its order.
+fn delivered(page: &Value) -> Vec<String> {
+    page["items"]
+        .as_array()
+        .expect("items")
+        .iter()
+        .map(|item| {
+            format!(
+                "{}@{}",
+                item["id"].as_str().unwrap(),
+                item["revision"].as_str().unwrap()
+            )
+        })
+        .collect()
+}
+
+/// The ids of a `feed.containers` answer, in its order.
+fn listed(page: &Value) -> Vec<String> {
+    page["containers"]
+        .as_array()
+        .expect("containers")
+        .iter()
+        .map(|container| container["id"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+/// Each listing shape the declaration offers is run by some fixture; a fixture directory that
+/// lost one would leave that shape untested while every remaining run stays green.
+#[test]
+fn the_fixture_declarations_cover_every_listing_shape() {
+    let declared = declared();
+    type Shape = fn(&Value) -> bool;
+    let shapes: [(&str, Shape); 7] = [
+        ("containers by a next token", |f| {
+            f["containers"]["cursor"]["next"].is_string()
+                && f["containers"]["cursor"].get("url_parameter").is_none()
+        }),
+        ("containers by a next link", |f| {
+            f["containers"]["cursor"]["url_parameter"].is_string()
+        }),
+        ("containers by offset", |f| {
+            f["containers"]["cursor"]["offset"]["complete"].is_object()
+        }),
+        ("items by a jql query", |f| {
+            f["items"]["position"]["value"]["query"]["language"] == "jql"
+        }),
+        ("items by a cql query", |f| {
+            f["items"]["position"]["value"]["query"]["language"] == "cql"
+        }),
+        ("item pages by a token", |f| {
+            let page = &f["items"]["position"]["value"]["page"];
+            page.is_object() && page.get("url_parameter").is_none()
+        }),
+        ("item pages by a next link", |f| {
+            f["items"]["position"]["value"]["page"]["url_parameter"].is_string()
+        }),
+    ];
+    for (shape, test) in shapes {
+        assert!(
+            declared.iter().any(|d| test(&d.raw["feed"])),
+            "no fixture declaration lists {shape}"
+        );
+    }
+}
+
+/// A query at minute precision re-reads the minute it resumes from and pages within it: seven
+/// items in one minute, more than one provider page holds, are each delivered once by one call
+/// over several pages, the continuation sent only after the first. A resume sends the minute as
+/// a quoted literal and returns only what changed since; reading at a limit below the minute's
+/// size delivers each item once over several calls.
+#[test]
+fn a_minute_query_pages_within_one_minute_and_resumes_by_what_it_holds() {
+    let queried = queried();
+    assert!(!queried.is_empty());
+    for (declaration, parameter) in queried {
+        let path = &declaration.path;
+        let page_parameter = time_value(&declaration)["page"]["parameter"]
+            .as_str()
+            .expect("a query declaration pages")
+            .to_owned();
+        let catalog = Catalog::new(&declaration);
+        let mut source = Source::default();
+        room(&mut source, "room", "public");
+        let seven = ["a", "b", "c", "d", "e", "f", "g"];
+        for (second, id) in seven.iter().enumerate() {
+            add(
+                &mut source,
+                "room",
+                id,
+                "r1",
+                &format!("2026-10-06T09:00:{second:02}Z"),
+            );
+        }
+        let (first, requests) = catalog.requests(
+            &source,
+            "feed.items",
+            json!({"container": "room", "limit": 10}),
+        );
+        let first = first.unwrap_or_else(|e| panic!("{path:?}: {e}"));
+        let all: Vec<String> = seven.iter().map(|id| format!("{id}@r1")).collect();
+        assert_eq!(delivered(&first), all, "{path:?}");
+        assert_eq!(first["complete"], json!(true), "{path:?}");
+        assert_eq!(
+            first["items"][0]["updated_at"],
+            json!("2026-10-06T09:00:00Z")
+        );
+        assert_eq!(
+            requests.len(),
+            1 + seven.len().div_ceil(QUERY_PAGE),
+            "{path:?}: the lookup, then one request per page: {requests:?}"
+        );
+        assert!(requests.len() > 2, "{path:?}: {requests:?}");
+        assert_eq!(
+            requests[1].1[&parameter], r#"room = "room" ORDER BY edited ASC"#,
+            "{path:?}"
+        );
+        assert!(!requests[1].1.contains_key(&page_parameter), "{path:?}");
+        for (_, query) in &requests[2..] {
+            assert!(query.contains_key(&page_parameter), "{path:?}: {query:?}");
+            assert_eq!(query[&parameter], requests[1].1[&parameter], "{path:?}");
+        }
+        let watermark = first["next_watermark"].as_str().unwrap().to_owned();
+        let (idle, requests) = catalog.requests(
+            &source,
+            "feed.items",
+            json!({"container": "room", "watermark": watermark, "limit": 10}),
+        );
+        let idle = idle.unwrap();
+        assert_eq!(idle["items"], json!([]), "{path:?}");
+        assert_eq!(idle["complete"], json!(true), "{path:?}");
+        assert_eq!(idle["next_watermark"], json!(watermark), "{path:?}");
+        assert_eq!(
+            requests[1].1[&parameter],
+            r#"room = "room" AND edited >= "2026-10-06 09:00" ORDER BY edited ASC"#,
+            "{path:?}"
+        );
+
+        change(&mut source, "b", "r2", "2026-10-06T09:00:30Z", false);
+        add(&mut source, "room", "h", "r1", "2026-10-06T09:00:31Z");
+        add(&mut source, "room", "i", "r1", "2026-10-06T09:01:00Z");
+        let resumed = catalog
+            .call(
+                &source,
+                "feed.items",
+                json!({"container": "room", "watermark": watermark, "limit": 10}),
+            )
+            .0
+            .unwrap();
+        assert_eq!(delivered(&resumed), ["b@r2", "h@r1", "i@r1"], "{path:?}");
+        assert_eq!(resumed["complete"], json!(true), "{path:?}");
+
+        let mut watermark: Option<String> = None;
+        let mut each = Vec::new();
+        for _ in 0..20 {
+            let mut input = json!({"container": "room", "limit": 2});
+            if let Some(watermark) = &watermark {
+                input["watermark"] = json!(watermark);
+            }
+            let page = catalog.call(&source, "feed.items", input).0.unwrap();
+            each.extend(delivered(&page));
+            watermark = page["next_watermark"].as_str().map(str::to_owned);
+            if page["complete"] == json!(true) {
+                break;
+            }
+        }
+        each.sort();
+        let expected = [
+            "a@r1", "b@r2", "c@r1", "d@r1", "e@r1", "f@r1", "g@r1", "h@r1", "i@r1",
+        ];
+        assert_eq!(each, expected, "{path:?}");
+    }
+}
+
+/// A container id reaches the provider's query as one quoted literal of the language, its `"`
+/// and `\` escaped, on a first read and on a resume: an id that would close the literal and add
+/// a clause selects only its own container. An id holding a control character is refused before
+/// any item listing is sent.
+#[test]
+fn a_container_id_reaches_the_query_quoted_and_cannot_add_a_clause() {
+    for (declaration, parameter) in queried() {
+        let path = &declaration.path;
+        let catalog = Catalog::new(&declaration);
+        let mut source = Source::default();
+        let hostile = r#"x" OR room = "other"#;
+        let escaped = r#"back\slash \" quote"#;
+        for id in [hostile, escaped, "other"] {
+            room(&mut source, id, "public");
+        }
+        add(&mut source, hostile, "mine", "r1", "2026-10-06T09:00:00Z");
+        add(
+            &mut source,
+            escaped,
+            "slashed",
+            "r1",
+            "2026-10-06T09:00:01Z",
+        );
+        add(&mut source, "other", "theirs", "r1", "2026-10-06T09:00:02Z");
+        for (container, literal, own) in [
+            (hostile, r#""x\" OR room = \"other""#, "mine@r1"),
+            (escaped, r#""back\\slash \\\" quote""#, "slashed@r1"),
+        ] {
+            let (page, requests) = catalog.requests(
+                &source,
+                "feed.items",
+                json!({"container": container, "limit": 10}),
+            );
+            let page = page.unwrap_or_else(|e| panic!("{path:?}: {container}: {e}"));
+            assert_eq!(delivered(&page), [own], "{path:?}");
+            assert_eq!(
+                requests[1].1[&parameter],
+                format!("room = {literal} ORDER BY edited ASC"),
+                "{path:?}"
+            );
+            let (resumed, requests) = catalog.requests(
+                &source,
+                "feed.items",
+                json!({"container": container, "watermark": page["next_watermark"], "limit": 10}),
+            );
+            assert_eq!(delivered(&resumed.unwrap()), Vec::<String>::new());
+            assert_eq!(
+                requests[1].1[&parameter],
+                format!(r#"room = {literal} AND edited >= "2026-10-06 09:00" ORDER BY edited ASC"#),
+                "{path:?}"
+            );
+        }
+        let broken = "line\nbreak";
+        room(&mut source, broken, "public");
+        let (refused, requests) = catalog.requests(
+            &source,
+            "feed.items",
+            json!({"container": broken, "limit": 10}),
+        );
+        assert_eq!(
+            refused.unwrap_err().code,
+            ErrorCode::InvalidInput,
+            "{path:?}"
+        );
+        assert!(
+            requests
+                .iter()
+                .all(|(sent, _)| !sent.starts_with("message")),
+            "{path:?}: an item listing was sent: {requests:?}"
+        );
+    }
+}
+
+/// A listing continued by a next link reads only the named parameter of it, decoded, and never
+/// requests the link; it ends on the answer that carries no link. A link that lost the parameter
+/// is `unavailable`, never complete.
+#[test]
+fn a_next_link_listing_reads_one_parameter_and_ends_without_a_link() {
+    let linked: Vec<Declared> = declared()
+        .into_iter()
+        .filter(|d| d.raw["feed"]["containers"]["cursor"]["url_parameter"].is_string())
+        .collect();
+    assert!(!linked.is_empty());
+    for declaration in linked {
+        let path = &declaration.path;
+        let parameter = declaration.raw["feed"]["containers"]["cursor"]["parameter"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let catalog = Catalog::new(&declaration);
+        let mut source = Source::default();
+        for id in ["a", "b", "c"] {
+            room(&mut source, id, "public");
+        }
+        let (mut cursor, mut ids, mut sent) = (None::<String>, Vec::new(), Vec::new());
+        for _ in 0..10 {
+            let mut input = json!({"limit": 1});
+            if let Some(cursor) = &cursor {
+                input["cursor"] = json!(cursor);
+            }
+            let (page, requests) = catalog.requests(&source, "feed.containers", input);
+            let page = page.unwrap_or_else(|e| panic!("{path:?}: {e}"));
+            assert_eq!(requests.len(), 1, "{path:?}: {requests:?}");
+            sent.push(requests[0].1.get(&parameter).cloned());
+            ids.extend(listed(&page));
+            if page["complete"] == json!(true) {
+                assert!(page["next_cursor"].is_null());
+                break;
+            }
+            cursor = page["next_cursor"].as_str().map(str::to_owned);
+        }
+        assert_eq!(ids, ["a", "b", "c"], "{path:?}");
+        assert_eq!(
+            sent,
+            [None, Some("p:1".to_owned()), Some("p:2".to_owned())],
+            "{path:?}"
+        );
+        let mut lost = Source::default();
+        room(&mut lost, "a", "public");
+        room(&mut lost, "b", "public");
+        lost.containers.get_mut("a").unwrap().kind = "link-without-start".into();
+        let (refused, _) = catalog.requests(&lost, "feed.containers", json!({"limit": 1}));
+        assert_eq!(
+            refused.unwrap_err().code,
+            ErrorCode::Unavailable,
+            "{path:?}"
+        );
+    }
+}
+
+/// An offset listing sends the index of the next page's first record, and ends on the answer its
+/// declared flag calls the last. An empty answer that is not the last is `unavailable`, never
+/// complete.
+#[test]
+fn an_offset_listing_ends_on_its_last_flag() {
+    let offset: Vec<Declared> = declared()
+        .into_iter()
+        .filter(|d| d.raw["feed"]["containers"]["cursor"]["offset"].is_object())
+        .collect();
+    assert!(!offset.is_empty());
+    for declaration in offset {
+        let path = &declaration.path;
+        let parameter = declaration.raw["feed"]["containers"]["cursor"]["parameter"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let catalog = Catalog::new(&declaration);
+        let mut source = Source::default();
+        for id in ["a", "b", "c"] {
+            room(&mut source, id, "public");
+        }
+        let (first, requests) = catalog.requests(&source, "feed.containers", json!({"limit": 2}));
+        let first = first.unwrap();
+        assert_eq!(listed(&first), ["a", "b"], "{path:?}");
+        assert_eq!(first["complete"], json!(false));
+        assert!(!requests[0].1.contains_key(&parameter));
+        let cursor = first["next_cursor"].clone();
+        let (second, requests) = catalog.requests(
+            &source,
+            "feed.containers",
+            json!({"limit": 2, "cursor": cursor}),
+        );
+        let second = second.unwrap();
+        assert_eq!(requests[0].1[&parameter], "2", "{path:?}");
+        assert_eq!(listed(&second), ["c"], "{path:?}");
+        assert_eq!(second["complete"], json!(true));
+        assert!(second["next_cursor"].is_null());
+        let mut fewer = Source::default();
+        room(&mut fewer, "a", "public");
+        let (lost, _) = catalog.requests(
+            &fewer,
+            "feed.containers",
+            json!({"limit": 2, "cursor": cursor}),
+        );
+        assert_eq!(lost.unwrap_err().code, ErrorCode::Unavailable, "{path:?}");
+    }
+}
+
+/// The first item of `room` as `catalog` reads it, and that item's link.
+fn first_link(catalog: &Catalog) -> Value {
+    let mut source = Source::default();
+    room(&mut source, "room", "public");
+    add(&mut source, "room", "a", "r1", "2026-10-06T09:00:00Z");
+    let page = catalog
+        .call(
+            &source,
+            "feed.items",
+            json!({"container": "room", "limit": 1}),
+        )
+        .0
+        .unwrap();
+    page["items"][0]["url"].clone()
+}
+
+/// An item link the provider writes as a path rooted at `/` resolves under the base its answer
+/// names, when the declaration points at one, and otherwise under the origin of the API base;
+/// with neither it is no link, never a guess. An absolute link is kept as it is.
+#[test]
+fn a_relative_item_link_resolves_under_the_answers_base_or_the_origin() {
+    let mut relative = 0;
+    for declaration in declared() {
+        let path = &declaration.path;
+        let link = first_link(&Catalog::new(&declaration));
+        let text = link.as_str().unwrap_or_else(|| panic!("{path:?}: no link"));
+        assert!(
+            text.starts_with("https://feed.fixture.test/") && text.ends_with("/rooms/room/a"),
+            "{path:?}: {text}"
+        );
+        if declaration.raw["feed"]["items"].get("url_base").is_none() {
+            continue;
+        }
+        relative += 1;
+        assert_eq!(link, json!(format!("{SERVER}/rooms/room/a")), "{path:?}");
+        let mut raw = declaration.raw.clone();
+        raw["feed"]["items"]
+            .as_object_mut()
+            .unwrap()
+            .remove("url_base");
+        let feed: Declaration = serde_json::from_value(raw["feed"].clone()).unwrap();
+        let unbased = Declared {
+            path: declaration.path.clone(),
+            raw,
+            feed: feed.clone(),
+        };
+        assert_eq!(
+            first_link(&Catalog::new(&unbased)),
+            json!("https://feed.fixture.test/rooms/room/a"),
+            "{path:?}"
+        );
+        let (bundle, base) = bundle(declaration.raw["provider"].as_str().unwrap());
+        let unrooted = Catalog {
+            engine: Engine::with_feed(&bundle, &base, &[], Some(&feed)).unwrap(),
+            profile: feed.profile.clone(),
+            capabilities: claimed(&feed),
+        };
+        assert_eq!(first_link(&unrooted), Value::Null, "{path:?}");
+        // An API base whose host is no hostname has no origin to resolve under.
+        let literal = Catalog {
+            engine: Engine::with_feed(&bundle, &base, &[], Some(&feed))
+                .and_then(|engine| engine.with_link_origin("https://[fd00::1]/v1"))
+                .unwrap(),
+            profile: feed.profile.clone(),
+            capabilities: claimed(&feed),
+        };
+        assert_eq!(first_link(&literal), Value::Null, "{path:?}");
+    }
+    assert!(
+        relative > 0,
+        "no fixture writes a relative item link under a declared base"
     );
 }

@@ -384,6 +384,85 @@ async fn a_project_gitlab_does_not_show_is_not_found() {
     assert_eq!(http.calls.lock().unwrap().len(), 1);
 }
 
+/// `gitlab.md`, Ceilings: 100 merge requests changed within one millisecond, read 50 a call.
+/// The second read's watermark holds all 100 pairs, and the read from it is `stale_cursor`, after
+/// the project and a merge request list sent as a first read answered. A first read started
+/// again reaches the same watermark. GitLab answers as a list ordered by `updated_at`, oldest
+/// first, `per_page` at a time.
+#[tokio::test]
+async fn a_watermark_of_100_merge_requests_in_one_millisecond_is_stale_and_reached_again() {
+    let engine = engine();
+    let at = "2026-10-06T09:00:00.000Z";
+    let shared: Vec<Value> = (1..=100)
+        .map(|iid| merge_request(iid, at, at, json!("")))
+        .collect();
+    let read = |watermark: Option<&Value>, listed: &[Value]| {
+        let engine = &engine;
+        let http = answers(vec![
+            (200, project(1001, "Group / Project", "private")),
+            (200, json!(listed)),
+        ]);
+        let mut input = json!({"container": "1001", "limit": 50});
+        if let Some(watermark) = watermark {
+            input["watermark"] = watermark.clone();
+        }
+        async move {
+            let page = engine
+                .read(&http, INSTANCE, ITEMS, input)
+                .await
+                .map_err(|error| (error.code, error.message));
+            let calls = http.calls.into_inner().unwrap();
+            let listing = calls[1].1.clone();
+            let get = |name: &str| {
+                listing
+                    .iter()
+                    .find(|(key, _)| key == name)
+                    .map(|(_, value)| value.clone())
+            };
+            (page, get("per_page"), get("updated_after"))
+        }
+    };
+    let ids = |page: &Value| -> Vec<String> {
+        page["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| item["id"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    let expected: Vec<String> = (1..=100).map(|iid: u64| iid.to_string()).collect();
+    let mut kept = Vec::new();
+    for _ in 0..2 {
+        let (first, per_page, since) = read(None, &shared[..50]).await;
+        let first = first.unwrap();
+        assert_eq!((per_page.as_deref(), since), (Some("50"), None));
+        assert_eq!(ids(&first), expected[..50]);
+        let (second, per_page, since) = read(Some(&first["next_watermark"]), &shared).await;
+        let second = second.unwrap();
+        assert_eq!(
+            (per_page.as_deref(), since.as_deref()),
+            (Some("100"), Some(at))
+        );
+        assert_eq!(ids(&second), expected[50..]);
+        assert_eq!(second["complete"], json!(false));
+        let (third, per_page, since) = read(Some(&second["next_watermark"]), &shared[..50]).await;
+        assert_eq!(
+            (per_page.as_deref(), since),
+            (Some("50"), None),
+            "the list is read as a first read"
+        );
+        assert!(
+            matches!(&third, Err((ErrorCode::StaleCursor, _))),
+            "{third:?}"
+        );
+        kept.push(second["next_watermark"].clone());
+    }
+    assert_eq!(
+        kept[0], kept[1],
+        "a first read started again reaches the same watermark"
+    );
+}
+
 /// GitLab deletes a merge request outright; the profile observes no deletions, so no item is
 /// ever a tombstone, whatever its state. A closed or merged merge request is an ordinary item.
 #[tokio::test]

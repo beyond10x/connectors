@@ -1553,6 +1553,16 @@ impl Engine {
         })
     }
 
+    /// The engine with the feed's root-relative item links resolved under the origin of
+    /// `api_base`, the instance's `https` API base, where the declaration names no `url_base`;
+    /// without a feed it is unchanged. A base with no hostname origin (an IP literal in
+    /// brackets, say) leaves those links `null` and is never a refusal; the `Result` keeps the
+    /// builder chain of [`Engine::with_feed`].
+    pub fn with_link_origin(mut self, api_base: &str) -> Result<Self> {
+        self.feed = self.feed.take().map(|feed| feed.with_link_origin(api_base));
+        Ok(self)
+    }
+
     /// Every origin a selected binary read may reach besides the API base. A
     /// connection admits only these; a read reaching one it does not admit is
     /// refused before anything is sent there.
@@ -2517,8 +2527,8 @@ fn joined_fits(value_type: Option<ValueType>, value: &Value) -> bool {
 /// The declared schema of a repeated query parameter: an array of its element
 /// type, or one scalar read as [`joined_fits`] reads it. The type stays a union
 /// with the scalar types because callers already send a comma-joined string
-/// (Jira's `fields`, Confluence's `space-id`; `docs/catalog-jira.md`,
-/// `docs/catalog-confluence.md`). `pattern` applies only to a string, and
+/// (an issue search's `fields`, a page listing's `space-id`; the provider
+/// guides under `docs/`). `pattern` applies only to a string, and
 /// `minItems` only to an array.
 fn repeated_schema(value_type: Option<ValueType>, required: bool) -> Value {
     let mut schema = match value_type {

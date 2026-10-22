@@ -7913,6 +7913,7 @@ mod tests {
         };
         const NOW: u64 = 1_789_056_000_000;
         let baseline = |now: u64| ValidatedBaseline {
+            binding: None,
             identity: ExternalIdentity {
                 kind: "fixture-account".into(),
                 subject: "one".into(),

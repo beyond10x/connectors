@@ -105,6 +105,7 @@ fn bootstrap(instance: &str) -> runtime::Bootstrap {
         configuration_schema: json!({"type":"object"}),
     };
     runtime::Bootstrap {
+        bindings: None,
         credential_revision: None,
         executable: None,
         instance: instance.into(),

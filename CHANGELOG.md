@@ -1,5 +1,74 @@
 # Changelog
 
+## 0.56.0 — 2026-10-22
+
+### Added
+
+- One catalog instance can pick its API each time it validates. A `connectors-catalog-local/2`
+  native configuration takes an optional `bindings` member: 1 to 8 alternatives, each with its
+  own bundle, selection set and access read, and the answer that moves on to the next (`next`).
+  Read-only, pinned instances only (docs/catalog-confluence.md, "One instance for either API").
+- `connections connect`, `describe` and `revalidate` name the `binding`; a revalidation that
+  changes it adds `"rebound": {"from", "to"}`. `operations list` and `operations describe` take
+  `--connection` to describe the binding that connection uses.
+- When every binding refuses, the result is `insufficient_scope` and names each answer. A wrong
+  password is `invalid_credential` and tries no other binding.
+- The catalog feed engine reads the list shapes Jira and Confluence answer with: offset container
+  paging that ends on a declared flag, a cursor read from one query parameter of a returned next
+  URL, a JQL or CQL item template whose container and time slots are quoted literals checked when
+  the selection loads, `±hhmm` offsets and minute precision, a body-token continuation (`page`),
+  and relative item URLs resolved under the connection's origin or a declared `items.url_base`
+  (contracts/catalog/v1alpha1/semantics.md §3.3).
+- A feed time query can carry `utc_offsets {least, greatest}` (minutes east of UTC, -1439 to
+  1439; `page` required) when the provider reads `{since}` in a zone the engine is not told. A
+  resume sends the kept minute shifted by `least`, drops re-read items the watermark already
+  holds, checks order from `least - greatest` earlier, and answers `unavailable` when its 10 pages
+  hold only re-read items. An older reader refuses a selection that uses it.
+- Jira issue feed (`datasource.feed/v1alpha1`, profile `jira-issues/1`) and Confluence REST v1
+  page feed (profile `confluence-pages/1`), specified in
+  `adapters/catalog/contracts/feed/v1alpha1/{jira,confluence-v1}.md` and held to the feed suite in
+  five profile zones over test fixtures. Neither is in a shipped selection yet (Limitations).
+
+### Changed
+
+- The ESS pin moves from 0.59.0 to 0.67.0 (`crates/connectors-spec/toolchain.json` and the
+  `ess-*` dependencies); the Rust 1.88 MSRV holds.
+- docs/local-catalog-provider.md says which configuration changes a connection follows on one
+  revalidation without re-entering the secret, and which need a new instance.
+- A binding whose `next.status` is not 401 or 403 is refused when the configuration loads.
+- A minute-precision feed keeps only the items at the watermark's instant, so about 1,000 items
+  changed in one minute are read in full; an item indexed late inside the kept minute but stamped
+  before that instant is not re-read.
+
+### Fixed
+
+- A feed watermark the read cannot resume is judged only after the container lookup and the
+  listing answer.
+- A feed watermark that can no longer be resumed (no `page`, a provider page of items at one
+  instant, such as 100 GitLab merge requests in one millisecond) answers `stale_cursor`, as the
+  feed family contract says, instead of `unavailable`.
+- Once the container lookup has answered, a 404 or 410 from the item listing answers `not_found`
+  "container not found", as a 403 already did.
+- The watermark ceiling message names what fills it: the provider's cursor, or the container id
+  and the items sharing one instant.
+
+### Limitations
+
+- The shipped Jira and `confluence-v1` selections carry no `feed`, so no instance has
+  `feed.containers` or `feed.items` yet: the connector definition notation cannot express offset
+  paging, the query template or `utc_offsets`. Once a selection carries the Confluence feed, only a
+  connection bound to REST v1 reads it.
+- The shipped connector declarations carry no `bindings`; only a pinned instance binds.
+- The bindings and both feeds are verified against local fixtures only. Not established against a
+  live site: Jira search index lag; CQL `lastmodified` precision, its ordering and whether it
+  equals `version.when`; the zone each query language reads its literal in.
+- More than 296 Jira issues or 866 Confluence pages changed in one millisecond answer
+  `unavailable`.
+- About 1,000 items changed within a feed's re-read window (12 to 26 hours) leave it
+  `unavailable` for that watermark, and a first read does not get past it.
+- 100 or more GitLab merge requests changed in one millisecond in one project bring a first read
+  back to the same `stale_cursor` watermark, so a consumer that starts again loops.
+
 ## 0.55.0 — 2026-10-20
 
 ### Added

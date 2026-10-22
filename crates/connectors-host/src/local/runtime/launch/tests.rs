@@ -516,6 +516,7 @@ fn publish(
     let claim = registry.consume(acquisition, clock()).unwrap();
     let now = clock();
     let baseline = registry::ValidatedBaseline {
+        binding: None,
         identity: registry::ExternalIdentity {
             kind: "fixture".into(),
             subject: "one".into(),

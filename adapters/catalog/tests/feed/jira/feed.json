@@ -1,0 +1,77 @@
+{
+  "profile": "jira-issues/1",
+  "capabilities": {
+    "deletions": "not-observed",
+    "kind": "fixed-word",
+    "revision": "update-time",
+    "visibility": "all-private"
+  },
+  "max_limit": 100,
+  "containers": {
+    "operation_id": "searchProjects",
+    "lookup": {
+      "operation_id": "getProject",
+      "parameter": "projectIdOrKey",
+      "record": ""
+    },
+    "query": {
+      "action": "view",
+      "orderBy": "key",
+      "status": "live"
+    },
+    "limit": "maxResults",
+    "cursor": {
+      "parameter": "startAt",
+      "offset": {
+        "complete": {
+          "pointer": "/isLast",
+          "equals": true
+        }
+      }
+    },
+    "records": "/values",
+    "id": "/id",
+    "name": "/name",
+    "kind_word": "project"
+  },
+  "items": {
+    "operation_id": "searchAndReconsileIssuesUsingJql",
+    "query": {
+      "fields": "summary,created,updated,creator"
+    },
+    "limit": "maxResults",
+    "position": {
+      "kind": "time",
+      "value": {
+        "query": {
+          "parameter": "jql",
+          "language": "jql",
+          "first": "project = {container} ORDER BY updated ASC",
+          "resume": "project = {container} AND updated >= {since} ORDER BY updated ASC",
+          "utc_offsets": {
+            "least": -720,
+            "greatest": 840
+          }
+        },
+        "precision": "minute",
+        "page": {
+          "parameter": "nextPageToken",
+          "next": "/nextPageToken"
+        }
+      }
+    },
+    "records": "/issues",
+    "id": "/id",
+    "revision": "/fields/updated",
+    "created_at": "/fields/created",
+    "updated_at": "/fields/updated",
+    "author": {
+      "id": "/fields/creator/accountId",
+      "display_name": "/fields/creator/displayName"
+    },
+    "body": {
+      "pointer": "/fields/summary",
+      "representation": "text/plain"
+    }
+  }
+}

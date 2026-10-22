@@ -417,7 +417,30 @@ types:
       - {name: descriptor, type: String}
       - {name: profiles, type: "List<connectors.cli.PrivateStaticProfile>"}
       - {name: requirements, type: "List<connectors.cli.PrivateOperationRequirement>"}
+      # Present only for an instance whose operations bind, at validation, to one of
+      # several alternative descriptions (contracts/cli/v1alpha1/private-adapter.md,
+      # "Alternative bindings"); absent otherwise, so a bootstrap without it keeps
+      # its bytes.
+      - {name: bindings, type: "Optional<connectors.cli.PrivateBindings>"}
     # descriptor is one bounded JSON document, decoded as the existing Descriptor.
+  # ESS-LIMIT: id names the binding the bootstrap's own descriptor and requirements
+  # describe, the first one validation tries; the alternatives follow in the order
+  # validation tries them. Ids are unique, the descriptors' revisions are distinct,
+  # and a bootstrap with bindings declares no write. ESS declares no invariant on a
+  # CLI type, so the host enforces these and tests pin them.
+  - name: connectors.cli.PrivateBindings
+    kind: struct
+    fields:
+      - {name: id, type: String}
+      - {name: alternatives, type: "List<connectors.cli.PrivateAlternativeBinding>"}
+  # One alternative description of the same instance: same profiles, configuration and
+  # credential, its own descriptor and requirements.
+  - name: connectors.cli.PrivateAlternativeBinding
+    kind: struct
+    fields:
+      - {name: id, type: String}
+      - {name: descriptor, type: String}
+      - {name: requirements, type: "List<connectors.cli.PrivateOperationRequirement>"}
   - name: connectors.cli.PrivateBaseline
     kind: struct
     fields:
@@ -426,6 +449,10 @@ types:
       - {name: credential_expires_at_ms, type: "Optional<Timestamp>"}
       - {name: collected_at_ms, type: Timestamp}
       - {name: valid_until_ms, type: Timestamp}
+      # ESS-LIMIT: the binding this validation's answers selected; present exactly
+      # when the bootstrap declares bindings, and then one of their ids. The host
+      # refuses any other reply as a protocol violation.
+      - {name: binding, type: "Optional<String>"}
   - name: connectors.cli.StartupMode
     kind: enum
     variants: [on-demand, automatic]
@@ -716,7 +743,8 @@ types:
       - {name: next_action, type: "connectors.cli.NextAction"}
       - {name: service_code, type: "Optional<connectors.service_wire.ErrorCode>"}
       # ESS-LIMIT: service_reason is at most 256 bytes of admitted provider text, present only
-      # beside service_code or on a provider forbidden (contracts/cli/v1alpha1/semantics.md).
+      # beside service_code, on a provider forbidden, or beside not_granted from a validation
+      # whose bindings were all refused (contracts/cli/v1alpha1/semantics.md).
       # As for instance_id below, ESS declares no invariant on a CLI type, so the bound, the
       # redaction and the presence rule are enforced by the host and pinned by tests.
       - {name: service_reason, type: "Optional<String>"}
@@ -856,6 +884,9 @@ types:
       - {name: valid_until_ms, type: "Integer"}
       - {name: source, type: "connectors.cli.MetadataSource"}
       - {name: stale, type: "Boolean"}
+      # The binding the connection's current evidence selected, for an instance that
+      # declares alternative bindings; absent otherwise.
+      - {name: binding, type: "Optional<String>"}
   # Public projection of the existing acquisition owner: Pending/Completing -> pending,
   # Completed -> completed, Failed/Expired -> failed. The safe reason is present
   # exactly when failed; a yielded connection is present exactly when completed.
@@ -1208,6 +1239,14 @@ types:
     kind: struct
     fields:
       - {name: connection, type: "connectors.cli.ConnectionDescription"}
+      # Present only when this revalidation selected another binding than the evidence
+      # it replaced.
+      - {name: rebound, type: "Optional<connectors.cli.ConnectionRebound>"}
+  - name: connectors.cli.ConnectionRebound
+    kind: struct
+    fields:
+      - {name: from, type: "String"}
+      - {name: to, type: "String"}
   # Selectors and the caller's arguments. args is one JSON array of strings, appended
   # verbatim after the consumer's pinned argv prefix; the handler refuses any other value,
   # or an element holding NUL, as invalid_input. The protected document reaches the consumer
@@ -1270,6 +1309,8 @@ types:
       - {name: adapter, type: "Optional<String>"}
       - {name: connector, type: "Optional<String>"}
       - {name: instance, type: "Optional<String>"}
+      # Lists the operations of the binding this connection's evidence selected.
+      - {name: connection, type: "Optional<String>"}
       - {name: family, type: "Optional<String>"}
       - {name: limit, type: "Optional<Integer>"}
       - {name: cursor, type: "Optional<String>"}
@@ -1290,6 +1331,8 @@ types:
       - {name: adapter, type: "Optional<String>"}
       - {name: connector, type: "Optional<String>"}
       - {name: instance, type: "Optional<String>"}
+      # Describes the operation under the binding this connection's evidence selected.
+      - {name: connection, type: "Optional<String>"}
       - {name: operation, type: "String"}
   - name: connectors.cli.OperationDescribeResult
     kind: struct
