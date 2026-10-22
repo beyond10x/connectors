@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-22T05:25:27Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0560-feed-extensions-bindings",
+  "kind": "release-plan",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate --msrv (ESS 0.67.0, aep 0.71.3) on d0c32e43c plus the release edits: 28 steps exit 0, 2944 passed, 0 failed, 146 ignored, all checks passed",
+    "reference": "~/.cache/connectors-wave-20261021/int/gate-final.log"
+  }
+}
