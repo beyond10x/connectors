@@ -32,3 +32,42 @@ operations:
   content.search:
     op: searchByCQL
     description: Search the site with a CQL query (cql, required; such as type = page and text ~ "release notes"), one page of results per call, each with title, excerpt, url, lastModified and the matched content; the walk sends the cursor from _links.next and ends on a page without it
+datasources:
+  pages:
+    kind: feed
+    profile: confluence-pages/1
+    capabilities:
+      deletions: not-observed
+      kind: fixed-word
+      revision: opaque
+      visibility: all-private
+    containers:
+      list: spaces.list
+      lookup: space.get
+      query: {status: current}
+      cursor: {parameter: start, next: /_links/next, url_parameter: start}
+      records: /results
+      id: /key
+      name: /name
+      kind_word: space
+    items:
+      list: pages.changed
+      query: {expand: "history,version"}
+      position:
+        query:
+          parameter: cql
+          language: cql
+          first: "space = {container} and type = page order by lastmodified asc"
+          resume: "space = {container} and type = page and lastmodified >= {since} order by lastmodified asc"
+          utc_offsets: {least: -720, greatest: 840}
+        precision: minute
+        page: {parameter: cursor, next: /_links/next, url_parameter: cursor}
+      records: /results
+      id: /id
+      revision: /version/number
+      created_at: /history/createdDate
+      updated_at: /version/when
+      author: {id: /history/createdBy/accountId, display_name: /history/createdBy/displayName}
+      body: {pointer: /title, representation: text/plain}
+      url: /_links/webui
+      url_base: /_links/base

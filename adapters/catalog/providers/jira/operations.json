@@ -16,6 +16,10 @@
      "description": "List the issue types the account can create in one project, by id or key, one page per call; the walk ends when startAt plus the page's issueTypes reaches total"},
     {"id": "issue.create_meta.fields", "operation_id": "getCreateIssueMetaIssueTypeId", "effect": "read",
      "description": "List the fields one issue type takes when an issue is created in one project, by project id or key and the issue type's id from issue.create_meta, one page per call of at most 200; each field carries fieldId, name, required, schema and allowedValues, and the walk ends when startAt plus the page's fields reaches total"},
+    {"id": "projects.list", "operation_id": "searchProjects", "effect": "read",
+     "description": "List the projects the account can see, one page per call; action=view narrows to those it can browse, status=live leaves out archived and trashed ones, and the walk ends on a page with isLast true"},
+    {"id": "project.get", "operation_id": "getProject", "effect": "read",
+     "description": "Read one project by id or key"},
     {"id": "users.search", "operation_id": "findUsers", "effect": "read",
      "description": "Find active users whose display name or email address starts with query, or by exact accountId, one page per call of the first 1,000 matches; the walk ends on an empty page"},
     {"id": "attachment.content", "operation_id": "getAttachmentContent", "effect": "read",
@@ -97,5 +101,41 @@
                      "mismatch": "conflict"},
        "postflight": {"checks": [], "read": {"operation_id": "getIssue", "values": {"issueIdOrKey": "issueIdOrKey"}},
                       "absent": true}}}
-  ]
+  ],
+  "feed": {
+    "profile": "jira-issues/1",
+    "capabilities": {"deletions": "not-observed", "kind": "fixed-word",
+                     "revision": "update-time", "visibility": "all-private"},
+    "max_limit": 100,
+    "containers": {
+      "operation_id": "searchProjects",
+      "lookup": {"operation_id": "getProject", "parameter": "projectIdOrKey", "record": ""},
+      "query": {"action": "view", "orderBy": "key", "status": "live"},
+      "limit": "maxResults",
+      "cursor": {"parameter": "startAt", "offset": {"complete": {"pointer": "/isLast", "equals": true}}},
+      "records": "/values",
+      "id": "/id",
+      "name": "/name",
+      "kind_word": "project"
+    },
+    "items": {
+      "operation_id": "searchAndReconsileIssuesUsingJql",
+      "query": {"fields": "summary,created,updated,creator"},
+      "limit": "maxResults",
+      "position": {"kind": "time", "value": {
+        "query": {"parameter": "jql", "language": "jql",
+                  "first": "project = {container} ORDER BY updated ASC",
+                  "resume": "project = {container} AND updated >= {since} ORDER BY updated ASC",
+                  "utc_offsets": {"least": -720, "greatest": 840}},
+        "precision": "minute",
+        "page": {"parameter": "nextPageToken", "next": "/nextPageToken"}}},
+      "records": "/issues",
+      "id": "/id",
+      "revision": "/fields/updated",
+      "created_at": "/fields/created",
+      "updated_at": "/fields/updated",
+      "author": {"id": "/fields/creator/accountId", "display_name": "/fields/creator/displayName"},
+      "body": {"pointer": "/fields/summary", "representation": "text/plain"}
+    }
+  }
 }

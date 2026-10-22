@@ -679,13 +679,15 @@ fn a_derived_configuration_refuses_what_it_cannot_derive() {
 /// before declarations existed (measured on `06339356e3`). A regenerated
 /// bundle or selection moves these legitimately, in the same change: the three
 /// Jira pins moved when `issue.create` and `issue.comment.add` required their
-/// new `id` present after the write.
+/// new `id` present after the write, and again with the two `confluence-v1`
+/// pins when the Jira and Confluence v1 selections gained their `feed` (and
+/// Jira `projects.list` and `project.get`).
 #[test]
 fn documented_native_configurations_keep_their_revisions() {
     let pinned: BTreeMap<String, &str> = [
         (
             "00 catalog-confluence.md",
-            "e29d7d0838aa6bdc2a86e6758db521f874db73616dc1caf21c02ceb52df94b24",
+            "42702bda6cd24595ff5f69750b3fdda271fb380f71d73f073eac2a0014719def",
         ),
         (
             "01 catalog-confluence.md",
@@ -701,7 +703,7 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "04 catalog-confluence.md",
-            "e29d7d0838aa6bdc2a86e6758db521f874db73616dc1caf21c02ceb52df94b24",
+            "42702bda6cd24595ff5f69750b3fdda271fb380f71d73f073eac2a0014719def",
         ),
         (
             "05 catalog-google-calendar.md",
@@ -733,15 +735,15 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "12 catalog-jira.md",
-            "dfa6ec1812374e7b897b85ac58f52c2eb253463a9fa14d1bcd60cb5ef525051b",
+            "dffb974880505f1da2a2a943b605841096792ee98be3b29b5846349b225a4a66",
         ),
         (
             "13 catalog-jira.md",
-            "e1e3411e96498a6e7b831660e7ef0713c1bc9364b8fd48b378ec38f118e4a55f",
+            "3521245f808b67229f3d206ca08656863ec85b7c30bbff94f089f873fcaa40b0",
         ),
         (
             "14 catalog-jira.md",
-            "e9b6b3e70cc9e1cf49985e16261d789bb23f241a67b55173f69b54bd4e74e10d",
+            "2c5a6e6c8dd7eefd3311a36fb5b1e0742cd49bb518bbcc55489f3f0dcee0b058",
         ),
         (
             "15 catalog-openrouter.md",

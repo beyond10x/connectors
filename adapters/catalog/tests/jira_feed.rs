@@ -1,8 +1,8 @@
 //! story:jira-feed-binding: a Jira declaration binds `datasource.feed/v1alpha1` as data
 //! (`adapters/catalog/contracts/feed/v1alpha1/jira.md`), and the catalog engine reads it over the
-//! committed Jira bundle. The declaration is the fixture `tests/feed/jira/feed.json`, not part of
-//! the shipped Jira selection file, which carries no `feed` until the connector definition format
-//! every shipped selection round-trips through can express one. A container is a project the user
+//! committed Jira bundle. The declaration is the `feed` of the shipped Jira selection file
+//! `providers/jira/operations.json`, which is the 0.56.0 fixture `tests/feed/jira/feed.json`
+//! unchanged. A container is a project the user
 //! can view; an item is one of its issues. Every answer here is a Jira record in the shape of
 //! `tests/feed/jira/*.json`, taken from the pinned upstream description, not recorded from a
 //! running Jira; the requests the engine sends are recorded and checked. The family's suite runs against the same declaration in
@@ -40,8 +40,13 @@ fn recorded(name: &str) -> Value {
         .unwrap()
 }
 
+/// The `feed` of the shipped Jira selection.
 fn declaration() -> Value {
-    recorded("feed.json")
+    let selection: Value = serde_json::from_slice(
+        &std::fs::read(root().join("providers/jira/operations.json")).unwrap(),
+    )
+    .unwrap();
+    selection["feed"].clone()
 }
 
 fn engine() -> Engine {
@@ -475,24 +480,45 @@ fn the_jira_feed_declaration_binds_the_family_under_its_profile() {
     assert!(engine.declarations(&[Effect::Write]).is_empty());
 }
 
-/// The binding is not shipped: the Jira selection file carries no `feed`, and the engine over it
-/// declares no read of the family. The connector definition format every shipped selection
-/// round-trips through (`crates/connectors-catalog/tests/definition_import.rs`) has no offset
-/// listing, time query or `utc_offsets` to carry the declaration in
-/// (`adapters/catalog/contracts/feed/v1alpha1/jira.md`).
+/// The binding is shipped: the Jira selection file carries the declaration as its `feed`, the
+/// 0.56.0 fixture `tests/feed/jira/feed.json` unchanged, and the engine over the shipped
+/// selection declares the family's two reads under the binding's profile beside the selected
+/// operations. The connector definition lowers to that block
+/// (`crates/connectors-catalog/tests/definition_feed.rs`).
 #[test]
-fn the_shipped_jira_selection_declares_no_feed() {
+fn the_shipped_jira_selection_carries_the_issue_feed() {
     let shipped: Value = serde_json::from_slice(
         &std::fs::read(root().join("providers/jira/operations.json")).unwrap(),
     )
     .unwrap();
-    assert!(shipped.get("feed").is_none());
+    assert_eq!(shipped.get("feed"), Some(&recorded("feed.json")));
     let selections: Vec<Selection> = serde_json::from_value(shipped["operations"].clone()).unwrap();
+    let feed: Declaration = serde_json::from_value(shipped["feed"].clone()).unwrap();
     let bundle = bundle::load(&root().join("generated/bundles"), "jira").unwrap();
-    let engine = Engine::new(&bundle, BASE, &selections).unwrap();
+    let engine = Engine::with_feed(&bundle, BASE, &selections, Some(&feed)).unwrap();
     let declared = engine.declarations(&[Effect::Read]);
-    assert!(!declared.is_empty());
-    assert!(declared.iter().all(|o| o.contract != FEED_CONTRACT));
+    let family: Vec<_> = declared
+        .iter()
+        .filter(|o| o.contract == FEED_CONTRACT)
+        .collect();
+    let ids: std::collections::BTreeSet<&str> = family.iter().map(|o| o.id.as_str()).collect();
+    assert_eq!(ids, [CONTAINERS, ITEMS].into());
+    assert!(family.iter().all(|o| o.profile == PROFILE));
+    let selected: Vec<String> = Engine::new(&bundle, BASE, &selections)
+        .unwrap()
+        .declarations(&[Effect::Read])
+        .iter()
+        .map(|o| o.id.clone())
+        .collect();
+    let others: Vec<String> = declared
+        .iter()
+        .filter(|o| o.contract != FEED_CONTRACT)
+        .map(|o| o.id.clone())
+        .collect();
+    assert_eq!(
+        others, selected,
+        "the selected reads are declared as before"
+    );
 }
 
 /// `feed.containers` lists the live projects the user can view, by key, one Jira page a call,
@@ -905,4 +931,31 @@ async fn issues_sharing_one_millisecond_are_bounded_by_the_watermark_ceiling() {
         ))
     );
     assert_eq!(returned, expected[..200]);
+}
+
+// ---- adversary, wave 20261022 U1 -----------------------------------------------------------
+
+/// What the definition reader lets through still reaches the engine: the shipped declaration
+/// with a `first` naming `{since}`, or a query or page parameter `searchAndReconsileIssuesUsingJql`
+/// does not take, is no feed the engine loads. `crates/connectors-catalog/tests/definition_feed.rs`
+/// holds the reader to refusing each when it lowers.
+#[test]
+fn adversary_the_engine_refuses_what_the_reader_lowers() {
+    let bundle = bundle::load(&root().join("generated/bundles"), "jira").unwrap();
+    for (pointer, value) in [
+        (
+            "/items/position/value/query/first",
+            json!("project = {container} AND updated >= {since} ORDER BY updated ASC"),
+        ),
+        ("/items/position/value/query/parameter", json!("jqlx")),
+        ("/items/position/value/page/parameter", json!("pageTokenx")),
+    ] {
+        let mut raw = declaration();
+        *raw.pointer_mut(pointer).unwrap() = value;
+        let feed: Declaration = serde_json::from_value(raw).unwrap();
+        let refused = Engine::with_feed(&bundle, BASE, &[], Some(&feed))
+            .map(|_| ())
+            .expect_err(pointer);
+        println!("{pointer}: {refused}");
+    }
 }

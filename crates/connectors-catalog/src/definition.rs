@@ -514,7 +514,27 @@ pub enum DatasourceKind {
     Feed,
 }
 
-/// `connectors_definitions.definition.FeedCursor`.
+/// `connectors_definitions.definition.FeedCondition`: the value at `pointer`
+/// in a page equals `equals`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FeedCondition {
+    pub pointer: String,
+    pub equals: Value,
+}
+
+/// `connectors_definitions.definition.FeedOffset`: the cursor parameter takes
+/// the count of records walked so far, and the walk ends on the page where
+/// `complete` holds.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FeedOffset {
+    pub complete: FeedCondition,
+}
+
+/// `connectors_definitions.definition.FeedCursor`: exactly one of `next`,
+/// `last` and `offset` (rule `feed_cursor_continuation`), and `url_parameter`
+/// only beside `next` (rule `feed_cursor_url_parameter`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FeedCursor {
@@ -522,7 +542,11 @@ pub struct FeedCursor {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub url_parameter: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub last: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offset: Option<FeedOffset>,
 }
 
 /// `connectors_definitions.definition.FeedContainers`: `list` and `lookup`
@@ -544,12 +568,80 @@ pub struct FeedContainers {
     pub kind_word: Option<String>,
 }
 
-/// `connectors_definitions.definition.FeedPosition`: the query parameter that
-/// takes "changed since" as a time.
+/// `connectors_definitions.definition.FeedPrecision`: how finely the provider
+/// compares a "changed since" time.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FeedPrecision {
+    Instant,
+    Minute,
+}
+
+impl FeedPrecision {
+    fn word(self) -> &'static str {
+        match self {
+            Self::Instant => "instant",
+            Self::Minute => "minute",
+        }
+    }
+}
+
+/// `connectors_definitions.definition.FeedQueryLanguage`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FeedQueryLanguage {
+    Jql,
+    Cql,
+}
+
+/// `connectors_definitions.definition.FeedUtcOffsets`: the least and greatest
+/// offset from UTC, in minutes, a provider may compare `{since}` in.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct FeedUtcOffsets {
+    pub least: i64,
+    pub greatest: i64,
+}
+
+/// `connectors_definitions.definition.FeedQuery`: the query parameter that
+/// takes a whole query, `first` for a walk from the start and `resume` for
+/// one from a time.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FeedQuery {
+    pub parameter: String,
+    pub language: FeedQueryLanguage,
+    pub first: String,
+    pub resume: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub utc_offsets: Option<FeedUtcOffsets>,
+}
+
+/// `connectors_definitions.definition.FeedPage`: the parameter that takes the
+/// token at `next` for the following page of items.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FeedPage {
+    pub parameter: String,
+    pub next: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url_parameter: Option<String>,
+}
+
+/// `connectors_definitions.definition.FeedPosition`: "changed since" as the
+/// query parameter `time` takes, or as a whole `query`; exactly one of the two
+/// (rule `feed_position_filter`).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FeedPosition {
-    pub time: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query: Option<FeedQuery>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub precision: Option<FeedPrecision>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page: Option<FeedPage>,
 }
 
 /// `connectors_definitions.definition.FeedAuthor`.
@@ -586,6 +678,15 @@ pub struct FeedItems {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub author: Option<FeedAuthor>,
     pub body: FeedBody,
+    /// A JSON pointer to the item's link (rule `feed_item_pointer`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// A JSON pointer to the base `url` is relative to (rule `feed_item_pointer`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url_base: Option<String>,
+    /// A JSON pointer to the item's parent (rule `feed_item_pointer`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
 }
 
 /// `connectors_definitions.definition.Datasource`. `filters` name preset item
@@ -854,10 +955,18 @@ pub enum Refusal {
     /// A datasource names an operation key the definition does not declare.
     UnknownDatasourceOperation { datasource: String, key: String },
     /// A datasource operation lacks what the feed derives from it: a single
-    /// path parameter, or a paging style with `limit` and `max`.
+    /// path parameter, or a paging style with `limit`.
     DatasourceOperation {
         datasource: String,
         key: String,
+        detail: String,
+    },
+    /// A feed datasource breaks a rule the definitions schema states only in
+    /// its domain summary; [`Refusal::name`] is the rule's name, the detail
+    /// what broke it.
+    Feed {
+        datasource: String,
+        rule: FeedRule,
         detail: String,
     },
     /// More feed datasources than the catalog provider's selection carries (one).
@@ -918,6 +1027,7 @@ impl Refusal {
             Self::ConflictStatus { .. } => "conflict_status",
             Self::UnknownDatasourceOperation { .. } => "unknown_datasource_operation",
             Self::DatasourceOperation { .. } => "datasource_operation",
+            Self::Feed { rule, .. } => rule.name(),
             Self::FeedCount(_) => "feed_count",
             Self::FilterParameter { .. } => "filter_parameter",
             Self::Reference { .. } => "reference",
@@ -925,6 +1035,79 @@ impl Refusal {
             Self::NotPlainName { .. } => "not_plain_name",
             Self::Pipeline(_) => "pipeline",
             Self::Write(_) => "write",
+        }
+    }
+}
+
+/// A feed datasource rule the definitions schema states only in prose (its
+/// domain summary, and for [`FeedRule::PositionParameter`] the descriptions of
+/// the fields), so the reader enforces it. [`FeedRule::name`] is the refusal's
+/// name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FeedRule {
+    /// A cursor names exactly one of `next`, `last` and `offset`.
+    CursorContinuation,
+    /// `url_parameter` appears only beside `next`.
+    CursorUrlParameter,
+    /// A position names exactly one of `time` and `query`.
+    PositionFilter,
+    /// A query's `first` holds `{container}` once and `{since}` never: the
+    /// first read has no time to fill in, and the engine loads no such feed.
+    QueryFirst,
+    /// A query's `resume` holds `{container}` and `{since}` exactly once each.
+    QueryResume,
+    /// A query position is at `minute` precision.
+    QueryPrecision,
+    /// Items with a query position name no container parameter: their list
+    /// operation has no path parameter.
+    QueryContainer,
+    /// `utc_offsets` lies within -1439..1439, and `least` is not above `greatest`.
+    UtcOffsets,
+    /// `utc_offsets` needs `page`.
+    UtcOffsetsPage,
+    /// `url`, `url_base` and `parent` are JSON pointers.
+    ItemPointer,
+    /// The parameters a position names, `time`, `query.parameter` and
+    /// `page.parameter`, are query parameters of the items' list operation,
+    /// which the engine binds them to.
+    PositionParameter,
+}
+
+impl FeedRule {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::CursorContinuation => "feed_cursor_continuation",
+            Self::CursorUrlParameter => "feed_cursor_url_parameter",
+            Self::PositionFilter => "feed_position_filter",
+            Self::QueryFirst => "feed_query_first",
+            Self::QueryResume => "feed_query_resume",
+            Self::QueryPrecision => "feed_query_precision",
+            Self::QueryContainer => "feed_query_container",
+            Self::UtcOffsets => "feed_utc_offsets",
+            Self::UtcOffsetsPage => "feed_utc_offsets_page",
+            Self::ItemPointer => "feed_item_pointer",
+            Self::PositionParameter => "feed_position_parameter",
+        }
+    }
+
+    /// The rule as the refusal states it.
+    pub fn statement(self) -> &'static str {
+        match self {
+            Self::CursorContinuation => "a cursor names exactly one of next, last and offset",
+            Self::CursorUrlParameter => "url_parameter appears only beside next",
+            Self::PositionFilter => "a position names exactly one of time and query",
+            Self::QueryFirst => "first holds {container} once and {since} never",
+            Self::QueryResume => "resume holds {container} and {since} exactly once each",
+            Self::QueryPrecision => "a query position is at minute precision",
+            Self::QueryContainer => "items with a query position name no container parameter",
+            Self::UtcOffsets => {
+                "utc_offsets lies within -1439..1439 and least is not above greatest"
+            }
+            Self::UtcOffsetsPage => "utc_offsets needs page",
+            Self::ItemPointer => "url, url_base and parent are JSON pointers",
+            Self::PositionParameter => {
+                "the parameters a position names are query parameters of items.list"
+            }
         }
     }
 }
@@ -1052,6 +1235,15 @@ impl std::fmt::Display for Refusal {
             } => write!(
                 f,
                 "{name}: datasource `{datasource}` operation `{key}`: {detail}"
+            ),
+            Self::Feed {
+                datasource,
+                rule,
+                detail,
+            } => write!(
+                f,
+                "{name}: datasource `{datasource}`: {detail}; {}",
+                rule.statement()
             ),
             Self::FeedCount(count) => write!(
                 f,
@@ -2085,31 +2277,211 @@ fn sole_path_parameter(
 }
 
 /// The paging style's page-size parameter and cap for a datasource operation.
+/// A style without `max` leaves the cap to the feed's.
 fn page_size(
     definition: &ProviderDefinition,
     datasource: &str,
     key: &str,
     operation: &Operation,
     query: &[&str],
-) -> Result<(String, u64), Refusal> {
+) -> Result<(String, Option<u64>), Refusal> {
     let lacking = || Refusal::DatasourceOperation {
         datasource: datasource.to_owned(),
         key: key.to_owned(),
-        detail: "the feed needs a paging style with limit and max".to_owned(),
+        detail: "the feed needs a paging style with limit".to_owned(),
     };
     let withheld = carried(definition, operation).withhold;
     let (_, style) = paging_style(key, operation, definition.paging.as_ref(), query, &withheld)?
         .ok_or_else(lacking)?;
-    match (&style.limit, style.max) {
-        (Some(limit), Some(max)) => Ok((limit.clone(), max)),
-        _ => Err(lacking()),
+    match &style.limit {
+        Some(limit) => Ok((limit.clone(), style.max)),
+        None => Err(lacking()),
     }
+}
+
+/// The page-size cap of a feed whose items' paging style names no `max`: the
+/// most the catalog provider's feed declaration admits
+/// (`adapters/catalog/src/feed.rs`, `max_limit` 1 to 100).
+pub const FEED_MAX_LIMIT: u64 = 100;
+
+/// How many times `needle` occurs in `text`, in words.
+fn times(text: &str, needle: &str) -> String {
+    match text.matches(needle).count() {
+        1 => "once".to_owned(),
+        count => format!("{count} times"),
+    }
+}
+
+/// Whether `text` is a JSON pointer (RFC 6901): empty, or `/` and reference
+/// tokens in which `~` is followed by `0` or `1`.
+fn is_pointer(text: &str) -> bool {
+    if text.is_empty() {
+        return true;
+    }
+    let Some(tokens) = text.strip_prefix('/') else {
+        return false;
+    };
+    let mut bytes = tokens.bytes();
+    while let Some(byte) = bytes.next() {
+        if byte == b'~' && !matches!(bytes.next(), Some(b'0' | b'1')) {
+            return false;
+        }
+    }
+    true
+}
+
+/// The rules of one feed datasource that its fields alone decide, in the
+/// order the schema's domain summary states them; the ones that need the
+/// items' operation ([`FeedRule::QueryContainer`] and
+/// [`FeedRule::PositionParameter`]) are in [`feed`].
+fn feed_rules(name: &str, datasource: &Datasource) -> Result<(), Refusal> {
+    let refuse = |rule: FeedRule, detail: String| Refusal::Feed {
+        datasource: name.to_owned(),
+        rule,
+        detail,
+    };
+    let cursor = &datasource.containers.cursor;
+    let named: Vec<&str> = [
+        ("next", cursor.next.is_some()),
+        ("last", cursor.last.is_some()),
+        ("offset", cursor.offset.is_some()),
+    ]
+    .into_iter()
+    .filter_map(|(field, present)| present.then_some(field))
+    .collect();
+    match named.as_slice() {
+        [_] => {}
+        [] => {
+            return Err(refuse(
+                FeedRule::CursorContinuation,
+                "containers.cursor names none of next, last and offset".to_owned(),
+            ));
+        }
+        [head @ .., tail] => {
+            return Err(refuse(
+                FeedRule::CursorContinuation,
+                format!("containers.cursor names {} and {tail}", head.join(", ")),
+            ));
+        }
+    }
+    if let Some(parameter) = &cursor.url_parameter
+        && cursor.next.is_none()
+    {
+        return Err(refuse(
+            FeedRule::CursorUrlParameter,
+            format!(
+                "containers.cursor gives url_parameter `{parameter}` beside {}, not next",
+                named[0]
+            ),
+        ));
+    }
+    let position = &datasource.items.position;
+    let query = match (&position.time, &position.query) {
+        (Some(_), None) => None,
+        (None, Some(query)) => Some(query),
+        (None, None) => {
+            return Err(refuse(
+                FeedRule::PositionFilter,
+                "items.position names neither time nor query".to_owned(),
+            ));
+        }
+        (Some(_), Some(_)) => {
+            return Err(refuse(
+                FeedRule::PositionFilter,
+                "items.position names both time and query".to_owned(),
+            ));
+        }
+    };
+    if let Some(query) = query {
+        if query.first.matches("{container}").count() != 1 || query.first.contains("{since}") {
+            return Err(refuse(
+                FeedRule::QueryFirst,
+                format!(
+                    "items.position.query.first holds {{container}} {} and {{since}} {}",
+                    times(&query.first, "{container}"),
+                    times(&query.first, "{since}")
+                ),
+            ));
+        }
+        if query.resume.matches("{container}").count() != 1
+            || query.resume.matches("{since}").count() != 1
+        {
+            return Err(refuse(
+                FeedRule::QueryResume,
+                format!(
+                    "items.position.query.resume holds {{container}} {} and {{since}} {}",
+                    times(&query.resume, "{container}"),
+                    times(&query.resume, "{since}")
+                ),
+            ));
+        }
+        match position.precision {
+            Some(FeedPrecision::Minute) => {}
+            Some(other) => {
+                return Err(refuse(
+                    FeedRule::QueryPrecision,
+                    format!("items.position has a query at precision {}", other.word()),
+                ));
+            }
+            None => {
+                return Err(refuse(
+                    FeedRule::QueryPrecision,
+                    "items.position has a query and no precision".to_owned(),
+                ));
+            }
+        }
+        if let Some(offsets) = &query.utc_offsets {
+            for (bound, value) in [("least", offsets.least), ("greatest", offsets.greatest)] {
+                if !(-1439..=1439).contains(&value) {
+                    return Err(refuse(
+                        FeedRule::UtcOffsets,
+                        format!(
+                            "items.position.query.utc_offsets {bound} {value} is outside -1439..1439"
+                        ),
+                    ));
+                }
+            }
+            if offsets.least > offsets.greatest {
+                return Err(refuse(
+                    FeedRule::UtcOffsets,
+                    format!(
+                        "items.position.query.utc_offsets least {} is above greatest {}",
+                        offsets.least, offsets.greatest
+                    ),
+                ));
+            }
+            if position.page.is_none() {
+                return Err(refuse(
+                    FeedRule::UtcOffsetsPage,
+                    "items.position gives query.utc_offsets and no page".to_owned(),
+                ));
+            }
+        }
+    }
+    let items = &datasource.items;
+    for (field, value) in [
+        ("url", &items.url),
+        ("url_base", &items.url_base),
+        ("parent", &items.parent),
+    ] {
+        if let Some(value) = value
+            && !is_pointer(value)
+        {
+            return Err(refuse(
+                FeedRule::ItemPointer,
+                format!("items.{field} `{value}` is not a JSON pointer"),
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// The feed a definition's datasource lowers to, in the catalog provider's
 /// `datasource.feed/v1alpha1` declaration shape. Operation ids, page-size
-/// parameters, the cap, the lookup parameter and the items' container
-/// parameter are derived; the rest is carried as written.
+/// parameters, the cap (the items' style's `max`, else [`FEED_MAX_LIMIT`]),
+/// the lookup parameter and, for a `time` position, the items' container
+/// parameter are derived; the rest is carried as written. The rules the schema
+/// states only in prose are enforced first ([`FeedRule`]).
 fn feed(
     definition: &ProviderDefinition,
     inventory: &crate::inventory::Inventory,
@@ -2124,12 +2496,58 @@ fn feed(
             Err(Refusal::FeedCount(datasources.len()))
         };
     };
+    feed_rules(name, datasource)?;
     let containers = &datasource.containers;
     let items = &datasource.items;
     let (list_operation, list, list_query) = keyed(definition, inventory, name, &containers.list)?;
     let (_, lookup, _) = keyed(definition, inventory, name, &containers.lookup)?;
     let (items_operation, items_found, items_query) =
         keyed(definition, inventory, name, &items.list)?;
+    if items.position.query.is_some() {
+        let path: Vec<&str> = items_found
+            .parameters
+            .iter()
+            .filter(|parameter| parameter.location == crate::inventory::Location::Path)
+            .map(|parameter| parameter.name.as_str())
+            .collect();
+        if !path.is_empty() {
+            return Err(Refusal::Feed {
+                datasource: name.clone(),
+                rule: FeedRule::QueryContainer,
+                detail: format!(
+                    "items.list `{}` has the path parameter{} `{}`",
+                    items.list,
+                    if path.len() == 1 { "" } else { "s" },
+                    path.join("`, `")
+                ),
+            });
+        }
+    }
+    let position = &items.position;
+    for (field, parameter) in [
+        ("time", position.time.as_deref()),
+        (
+            "query.parameter",
+            position.query.as_ref().map(|q| q.parameter.as_str()),
+        ),
+        (
+            "page.parameter",
+            position.page.as_ref().map(|p| p.parameter.as_str()),
+        ),
+    ] {
+        if let Some(parameter) = parameter
+            && !items_query.contains(&parameter)
+        {
+            return Err(Refusal::Feed {
+                datasource: name.clone(),
+                rule: FeedRule::PositionParameter,
+                detail: format!(
+                    "items.position.{field} `{parameter}` is not a query parameter of items.list `{}`",
+                    items.list
+                ),
+            });
+        }
+    }
     let (containers_limit, _) = page_size(
         definition,
         name,
@@ -2171,11 +2589,23 @@ fn feed(
     if let Some(word) = &containers.kind_word {
         containers_value["kind_word"] = Value::from(word.as_str());
     }
+    let mut time = serde_json::Map::new();
+    if let Some(parameter) = &position.time {
+        time.insert("parameter".to_owned(), Value::from(parameter.as_str()));
+    }
+    if let Some(precision) = position.precision {
+        time.insert("precision".to_owned(), Value::from(precision.word()));
+    }
+    if let Some(query) = &position.query {
+        time.insert("query".to_owned(), serde_json::json!(query));
+    }
+    if let Some(page) = &position.page {
+        time.insert("page".to_owned(), serde_json::json!(page));
+    }
     let mut items_value = serde_json::json!({
         "operation_id": items_found.operation_id,
-        "container": sole_path_parameter(name, &items.list, items_found)?,
         "limit": items_limit,
-        "position": {"kind": "time", "value": {"parameter": items.position.time}},
+        "position": {"kind": "time", "value": time},
         "records": items.records.clone().unwrap_or_default(),
         "id": items.id,
         "revision": items.revision,
@@ -2183,16 +2613,29 @@ fn feed(
         "updated_at": items.updated_at,
         "body": items.body,
     });
+    if position.query.is_none() {
+        items_value["container"] =
+            Value::from(sole_path_parameter(name, &items.list, items_found)?);
+    }
     if let Some(query) = &items.query {
         items_value["query"] = serde_json::json!(query);
     }
     if let Some(author) = &items.author {
         items_value["author"] = serde_json::json!(author);
     }
+    for (field, value) in [
+        ("url", &items.url),
+        ("url_base", &items.url_base),
+        ("parent", &items.parent),
+    ] {
+        if let Some(value) = value {
+            items_value[field] = Value::from(value.as_str());
+        }
+    }
     Ok(Some(serde_json::json!({
         "profile": datasource.profile,
         "capabilities": datasource.capabilities,
-        "max_limit": max_limit,
+        "max_limit": max_limit.unwrap_or(FEED_MAX_LIMIT),
         "containers": containers_value,
         "items": items_value,
     })))
