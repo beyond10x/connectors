@@ -160,3 +160,5 @@ connectors connections reconnect --connector jira --instance work \
   `rate_limited` with `retry_after_seconds` when the retry does not fit.
 - `attachment.content` reads at most 2 MiB.
 - The OAuth gateway form is not verified live, and the provider does not refresh an OAuth token.
+- The issue feed (`adapters/catalog/contracts/feed/v1alpha1/jira.md`) is held only over a test
+  fixture; no instance has `feed.containers` or `feed.items` yet.
