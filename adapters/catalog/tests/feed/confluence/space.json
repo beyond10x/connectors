@@ -1,0 +1,24 @@
+{
+  "id": 65538,
+  "key": "DOCS",
+  "name": "Fixture Space",
+  "type": "global",
+  "status": "current",
+  "_expandable": {
+    "settings": "/rest/api/space/DOCS/settings",
+    "metadata": "",
+    "operations": "",
+    "lookAndFeel": "/rest/api/settings/lookandfeel?spaceKey=DOCS",
+    "identifiers": "",
+    "permissions": "",
+    "icon": "",
+    "description": "",
+    "theme": "/rest/api/space/DOCS/theme",
+    "history": "",
+    "homepage": "/rest/api/content/1000"
+  },
+  "_links": {
+    "webui": "/spaces/DOCS",
+    "self": "https://site.example.test/wiki/rest/api/space/DOCS"
+  }
+}
