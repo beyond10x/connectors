@@ -19,6 +19,8 @@ mod gate;
 #[cfg(test)]
 mod gitlab_feed_conformance;
 mod ignored;
+#[cfg(test)]
+mod jira_feed_conformance;
 mod live_read_loop;
 mod metadata_conformance;
 mod metadata_entities;

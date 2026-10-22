@@ -168,7 +168,8 @@ pub enum QueryLanguage {
 }
 
 /// A query sent as `parameter`: `first` with a `{container}` slot, `resume` with a
-/// `{container}` and a `{since}` slot. Each value is a quoted literal, never spliced raw.
+/// `{container}` and a `{since}` slot. Each value is a quoted literal, never spliced raw. With
+/// `utc_offsets` the provider reads `{since}` as wall time in a zone within them; without, in UTC.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct QueryTemplate {
@@ -176,6 +177,19 @@ pub struct QueryTemplate {
     pub language: QueryLanguage,
     pub first: String,
     pub resume: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub utc_offsets: Option<UtcOffsets>,
+}
+
+/// The offsets from UTC, in minutes east of it, between which lies that of the zone the provider
+/// reads `{since}` in, both included; each within a day of UTC, `least` not above `greatest`.
+/// A resume sends the kept minute shifted by `least`, so the provider's filter starts at or
+/// before it in every such zone, and drops what it re-reads before the kept minute.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UtcOffsets {
+    pub least: i64,
+    pub greatest: i64,
 }
 
 /// A continuation within one `feed.items` call, sent as `parameter`: the token at `next`, or,
@@ -394,7 +408,13 @@ struct Query {
     parameter: String,
     first: Vec<Part>,
     resume: Vec<Part>,
+    offsets: Option<UtcOffsets>,
 }
+
+/// The most minutes a declared offset from UTC lies from it: just under a day.
+const OFFSET_MINUTES: i64 = 1439;
+
+const MINUTE: i128 = 60_000_000_000;
 
 /// `text`, the template `name`, as text and slots. Refused: a template longer than
 /// [`TEMPLATE_BYTES`], a control character, a brace outside a slot, a slot other than
@@ -856,6 +876,25 @@ impl Feed {
                     "feed time position: a query reads at `precision: minute`",
                 ));
             }
+            if let Some(offsets) = time.query.as_ref().and_then(|query| query.utc_offsets) {
+                let bounded = |minutes: i64| (-OFFSET_MINUTES..=OFFSET_MINUTES).contains(&minutes);
+                if !bounded(offsets.least)
+                    || !bounded(offsets.greatest)
+                    || offsets.least > offsets.greatest
+                {
+                    return Err(refuse(
+                        "feed query `utc_offsets`: `least` and `greatest` lie from -1439 to 1439 \
+                         minutes and `least` is not above `greatest`",
+                    ));
+                }
+                // The re-read window holds the items it drops; only a continued list reaches
+                // past them.
+                if time.page.is_none() {
+                    return Err(refuse(
+                        "feed query `utc_offsets`: the time position reads further by `page`",
+                    ));
+                }
+            }
             if let Some(page) = &time.page {
                 pointer("items.position.page.next", &page.next)?;
                 if let Some(name) = &page.url_parameter {
@@ -874,6 +913,7 @@ impl Feed {
                     parameter: query.parameter.clone(),
                     first: template("items.position.query.first", &query.first, false)?,
                     resume: template("items.position.query.resume", &query.resume, true)?,
+                    offsets: query.utc_offsets,
                 })
             })
             .transpose()?;
@@ -1309,15 +1349,28 @@ impl Feed {
         let seen: BTreeSet<(String, String)> = mark.seen.iter().cloned().collect();
         let since = mark.time.as_deref().and_then(instant);
         let floor = since.map(bucket);
+        // A provider reading `{since}` in a zone within the declared offsets starts its filter
+        // `shift` before the kept minute at the latest, and `reach` before it at the earliest.
+        let widened = match (since, self.query.as_ref().and_then(|query| query.offsets)) {
+            (Some(_), Some(offsets)) => Some((
+                i128::from(offsets.least) * MINUTE,
+                i128::from(offsets.least - offsets.greatest) * MINUTE,
+            )),
+            _ => None,
+        };
         // Every item returned in the kept instant or minute comes back with the filter; asking
         // for that many more keeps a page of unseen items within reach. A list read further by
-        // its continuation reaches them on later pages.
+        // its continuation reaches them on later pages. A widened resume re-reads an unknown
+        // number of items before the kept minute, so it asks for full pages.
         if time.page.is_none() && seen.len() as u64 >= self.declaration.max_limit {
             return Err(unavailable(
                 "more items share one instant than one provider page holds",
             ));
         }
-        let requested = (limit + seen.len() as u64).min(self.declaration.max_limit);
+        let requested = match widened {
+            Some(_) => self.declaration.max_limit,
+            None => (limit + seen.len() as u64).min(self.declaration.max_limit),
+        };
         let mut values = vec![(i.limit.as_str(), requested.to_string())];
         if let Some(name) = &i.container {
             values.push((name.as_str(), container.to_owned()));
@@ -1336,7 +1389,11 @@ impl Feed {
             (None, Some(query)) => {
                 let text = match since {
                     None => render(&query.first, container, None)?,
-                    Some(at) => render(&query.resume, container, Some(&civil_minute(at, ' ')?))?,
+                    Some(at) => {
+                        let shift = widened.map_or(0, |(shift, _)| shift);
+                        let at = floor_minute(at).checked_add(shift).ok_or_else(stale)?;
+                        render(&query.resume, container, Some(&civil_minute(at, ' ')?))?
+                    }
                 };
                 values.push((query.parameter.as_str(), text));
             }
@@ -1345,8 +1402,12 @@ impl Feed {
         let mut items = Vec::new();
         let mut last: Option<(i128, String)> = None;
         let mut in_bucket: Vec<(String, String)> = Vec::new();
-        // The order is checked from the start of what the filter re-reads.
-        let mut previous = floor;
+        // The order is checked from the start of what the filter re-reads: the kept instant or
+        // minute, or, widened, the earliest start the declared offsets allow.
+        let mut previous = match (floor, widened) {
+            (Some(floor), Some((_, reach))) => Some(floor.checked_add(reach).ok_or_else(stale)?),
+            (floor, _) => floor,
+        };
         let mut unseen_left = false;
         let mut token: Option<String> = None;
         let mut pages = 0;
@@ -1370,6 +1431,10 @@ impl Feed {
                     return Err(unavailable("provider answered out of updated_at order"));
                 }
                 previous = Some(mapped.updated);
+                // Before the kept minute, a widened filter re-reads what the watermark holds.
+                if widened.is_some() && floor.is_some_and(|floor| mapped.updated < floor) {
+                    continue;
+                }
                 let pair = (mapped.id.clone(), mapped.revision.clone());
                 let at = bucket(mapped.updated);
                 if Some(at) == floor && seen.contains(&pair) {
@@ -1401,9 +1466,11 @@ impl Feed {
             }
             if pages == PAGES {
                 if items.is_empty() {
-                    return Err(unavailable(
-                        "more items share one minute than the pages one read may request hold",
-                    ));
+                    return Err(unavailable(if widened.is_some() {
+                        "more items changed in the re-read window than the pages one read may request hold"
+                    } else {
+                        "more items share one minute than the pages one read may request hold"
+                    }));
                 }
                 break false;
             }
@@ -1626,7 +1693,7 @@ fn civil(seconds: i64, separator: char) -> String {
 
 /// The start of the UTC minute holding `at`, in nanoseconds since the Unix epoch.
 fn floor_minute(at: i128) -> i128 {
-    at - at.rem_euclid(60_000_000_000)
+    at - at.rem_euclid(MINUTE)
 }
 
 /// The UTC minute holding `at`, `YYYY-MM-DD<separator>HH:MM`: the time literal a minute query
