@@ -847,3 +847,60 @@ async fn a_project_jira_does_not_show_is_not_found() {
     assert_eq!(error.code, ErrorCode::NotFound);
     assert_eq!(jira.calls.lock().unwrap().len(), 1);
 }
+
+/// `count` issues numbered from 20000 whose `updated` is one millisecond, read 100 a call from
+/// a first read until a call is `complete` or refused: the ids returned, and the refusal.
+async fn one_millisecond(count: u64) -> (Vec<String>, Option<(ErrorCode, String)>) {
+    let engine = engine();
+    let at = at("2026-10-06 09:00:00");
+    let issues: Vec<Issue> = (0..count)
+        .map(|n| Issue {
+            number: 20_000 + n,
+            created: at,
+            updated: at,
+        })
+        .collect();
+    let jira = Zoned::new(0, issues);
+    let mut watermark = Value::Null;
+    let mut returned = Vec::new();
+    for _ in 0..10 {
+        let mut input = json!({"container": PROJECT, "limit": 100});
+        if !watermark.is_null() {
+            input["watermark"] = watermark.clone();
+        }
+        match engine.read(&jira, INSTANCE, ITEMS, input).await {
+            Ok(page) => {
+                returned.extend(ids(&page).into_iter().map(str::to_owned));
+                watermark = page["next_watermark"].clone();
+                if page["complete"] == json!(true) {
+                    return (returned, None);
+                }
+            }
+            Err(error) => return (returned, Some((error.code, error.message))),
+        }
+    }
+    panic!("no complete page after 10 reads of {count} issues");
+}
+
+/// The watermark holds the pairs of the issues sharing its kept instant, and a revision is the
+/// 28-byte `updated` text, so the 16 KiB ceiling bounds how many issues one millisecond may
+/// hold: 296 with five-digit ids here, all returned once. One more is `unavailable` at the
+/// read whose watermark would pass the ceiling, after the 200 issues earlier reads returned,
+/// none skipped. How many share the kept minute does not count.
+#[tokio::test]
+async fn issues_sharing_one_millisecond_are_bounded_by_the_watermark_ceiling() {
+    let (returned, refusal) = one_millisecond(296).await;
+    assert_eq!(refusal, None);
+    let expected: Vec<String> = (0..296).map(|n| (20_000 + n).to_string()).collect();
+    assert_eq!(returned, expected);
+
+    let (returned, refusal) = one_millisecond(297).await;
+    assert_eq!(
+        refusal,
+        Some((
+            ErrorCode::Unavailable,
+            "the watermark would exceed its ceiling; too many items share one instant".into()
+        ))
+    );
+    assert_eq!(returned, expected[..200]);
+}

@@ -1063,10 +1063,11 @@ selection set and its own access read. The pairing is data: the provider names n
 
 - `id` and each alternative's `id` are distinct ids. There are 1 to 8 alternatives, tried in
   order.
-- `next` is the answer that moves validation from a binding to the one after it: its `status`, a
-  4xx, and `reason`, text of at most 256 bytes that the provider's admitted reason must contain,
-  compared case-insensitively. `bindings.next` belongs to the first binding; every alternative
-  but the last states its own `next`, and the last states none.
+- `next` is the answer that moves validation from a binding to the one after it: its `status`,
+  401 or 403, and `reason`, text of at most 256 bytes that the provider's admitted reason must
+  contain, compared case-insensitively. Any other `status` is refused when the configuration
+  loads. `bindings.next` belongs to the first binding; every alternative but the last states its
+  own `next`, and the last states none.
 - The first binding requires `auth.access`, and every alternative its `access`, written as
   `auth.access` is. The identity is read from the API: an `id_token` identity is refused.
 - Every selection set reads only. A configuration with `bindings` that selects a write is

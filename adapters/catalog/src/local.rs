@@ -134,8 +134,10 @@ struct NextAnswer {
     reason: String,
 }
 impl NextAnswer {
+    /// Only a refusal of the binding moves on: 401 or 403, the two answers the outcome counts
+    /// when every binding tried is refused (`insufficient_scope`).
     fn usable(&self) -> bool {
-        (400..=499).contains(&self.status)
+        matches!(self.status, 401 | 403)
             && !self.reason.trim().is_empty()
             && self.reason.len() <= 256
             && !self.reason.chars().any(char::is_control)

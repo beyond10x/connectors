@@ -790,6 +790,195 @@ async fn a_watermark_is_judged_only_after_the_container_is_admitted() {
     }
 }
 
+/// A time position's rooms and listings as the generic fixtures declare them: the room is known
+/// or not, and every listing answers `status` with `listed`. Each listing's query is recorded.
+struct Judging {
+    known: bool,
+    status: u16,
+    listed: Value,
+    listings: std::sync::Mutex<Vec<Vec<(String, String)>>>,
+}
+
+#[async_trait::async_trait]
+impl connectors_sdk::AuthenticatedHttp for Judging {
+    async fn get(
+        &self,
+        path: &[&str],
+        query: &[(&str, String)],
+    ) -> connectors_core::Result<connectors_sdk::HttpResponse> {
+        let (status, body) = match path {
+            ["rooms", "room"] if self.known => {
+                (200, json!({"room": {"id": "room", "access": "invite"}}))
+            }
+            ["rooms", "room"] => (404, json!({"error": "no such room"})),
+            ["rooms", "room", "messages"] | ["message-search"] | ["message-query"] => {
+                self.listings.lock().unwrap().push(
+                    query
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.clone()))
+                        .collect(),
+                );
+                (self.status, self.listed.clone())
+            }
+            other => panic!("unexpected read {other:?}"),
+        };
+        Ok(connectors_sdk::HttpResponse {
+            status,
+            headers: Default::default(),
+            body: serde_json::to_vec(&body).unwrap(),
+        })
+    }
+}
+
+/// A watermark in the engine's own format for `feed`'s profile, the instance and the room, kept
+/// at `time` and holding `seen` pairs at it.
+fn kept(feed: &Value, time: &str, seen: usize) -> String {
+    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+    let pairs: Vec<Value> = (0..seen).map(|n| json!([format!("m{n}"), "1"])).collect();
+    let mut mark = json!({"format": "catalog-feed/1", "profile": feed["profile"],
+                          "instance": "feed-instance", "container": "room", "time": time});
+    if seen > 0 {
+        mark["seen"] = json!(pairs);
+    }
+    URL_SAFE_NO_PAD.encode(serde_json::to_vec(&mark).unwrap())
+}
+
+/// The class of `a_watermark_is_judged_only_after_the_container_is_admitted`, for a watermark
+/// in this binding's own format that this read still cannot resume: one whose `{since}` falls
+/// outside the years 0000 to 9999, at minute precision with a parameter, with a query, and with
+/// a query shifted by `utc_offsets` (`stale_cursor`), and one holding as many pairs as one
+/// provider page, with no `page` to read past them (`unavailable`). Every such answer comes only
+/// after the lookup and a first-read listing have answered: an unknown room and a room whose
+/// listing the provider refuses answer `not_found` alike, whatever the watermark, and the
+/// listing that decides it carries no resume filter. One pair fewer resumes.
+#[tokio::test]
+async fn a_watermark_this_binding_issued_but_cannot_resume_is_judged_only_after_admission() {
+    use connectors_core::ErrorCode::{StaleCursor, Unavailable};
+    let time = declaration("time.operations.json");
+    let minute = adding(&time, "/items/position/value", "precision", json!("minute"));
+    let query = declaration("time-query.operations.json");
+    let offsets = |least: i64, greatest: i64| {
+        adding(
+            &query,
+            "/items/position/value/query",
+            "utc_offsets",
+            json!({"least": least, "greatest": greatest}),
+        )
+    };
+    let next = declaration("time-next.operations.json");
+    let (low, high) = ("0000-01-01T00:30:00+01:00", "9999-12-31T23:59:00-01:00");
+    let cases = [
+        (
+            "instant, full seen set",
+            time.clone(),
+            "2026-10-06T09:00:00Z",
+            100,
+            Unavailable,
+        ),
+        (
+            "minute parameter, low year",
+            minute.clone(),
+            low,
+            0,
+            StaleCursor,
+        ),
+        (
+            "minute parameter, high year",
+            minute.clone(),
+            high,
+            0,
+            StaleCursor,
+        ),
+        (
+            "minute parameter, full seen set",
+            minute.clone(),
+            "2026-10-06T09:00:00Z",
+            100,
+            Unavailable,
+        ),
+        ("query, low year", query.clone(), low, 0, StaleCursor),
+        ("query, high year", query.clone(), high, 0, StaleCursor),
+        (
+            "query shifted -120..0, low year",
+            offsets(-120, 0),
+            "0000-01-01T01:00:00Z",
+            0,
+            StaleCursor,
+        ),
+        (
+            "query shifted 120..120, high year",
+            offsets(120, 120),
+            "9999-12-31T23:00:00Z",
+            0,
+            StaleCursor,
+        ),
+        ("next link, low year", next.clone(), low, 0, StaleCursor),
+        ("next link, high year", next.clone(), high, 0, StaleCursor),
+    ];
+    let mut wrong = Vec::new();
+    for (name, feed, at, seen, verdict) in cases {
+        let engine = build(&feed, &[]).unwrap_or_else(|e| panic!("{name}: {}", e.message));
+        let records = feed["items"]["records"]
+            .as_str()
+            .unwrap()
+            .trim_start_matches('/');
+        let mut listed = json!({});
+        listed[records] = json!([]);
+        let read = |known: bool, status: u16, watermark: String| {
+            let http = Judging {
+                known,
+                status,
+                listed: listed.clone(),
+                listings: Default::default(),
+            };
+            let engine = &engine;
+            async move {
+                let input = json!({"container": "room", "limit": 10, "watermark": watermark});
+                let answer = engine.read(&http, "feed-instance", ITEMS, input).await;
+                let answer = answer.map_err(|error| (error.code, error.message));
+                (answer, http.listings.into_inner().unwrap())
+            }
+        };
+        let watermark = kept(&feed, at, seen);
+        let (unknown, listings) = read(false, 200, watermark.clone()).await;
+        if unknown.as_ref().err().map(|e| &e.0) != Some(&connectors_core::ErrorCode::NotFound)
+            || !listings.is_empty()
+        {
+            wrong.push(format!(
+                "{name}: unknown room {unknown:?}, {} listing(s)",
+                listings.len()
+            ));
+        }
+        let (refused, _) = read(true, 403, watermark.clone()).await;
+        if refused.as_ref().err() != unknown.as_ref().err() {
+            wrong.push(format!(
+                "{name}: refused listing {refused:?}, unknown room {unknown:?}"
+            ));
+        }
+        let (judged, listings) = read(true, 200, watermark.clone()).await;
+        let resumed_from = |listing: &Vec<(String, String)>| {
+            listing
+                .iter()
+                .any(|(k, v)| k == "updated_since" || v.contains(">="))
+        };
+        if judged.as_ref().err().map(|e| &e.0) != Some(&verdict)
+            || listings.len() != 1
+            || listings.iter().any(resumed_from)
+        {
+            wrong.push(format!("{name}: {judged:?} after listings {listings:?}"));
+        }
+        if seen > 0 {
+            let (resumed, _) = read(true, 200, kept(&feed, at, seen - 1)).await;
+            if resumed.is_err() {
+                wrong.push(format!(
+                    "{name}: one pair fewer did not resume: {resumed:?}"
+                ));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
 /// A listing declared with `cursor.last` continues after the key of a full page's last record,
 /// a direct one included; a shorter page is the end; a full page whose last record has no key is
 /// `unavailable`, never complete. A fixed `kind_word` is every listed container's `kind`.
