@@ -1005,7 +1005,9 @@ async fn one_millisecond(first: u64, count: u64) -> (Vec<String>, Option<(ErrorC
 async fn pages_sharing_one_millisecond_are_bounded_by_the_watermark_ceiling() {
     let ceiling = Some((
         ErrorCode::Unavailable,
-        "the watermark would exceed its ceiling; too many items share one instant".to_owned(),
+        "the watermark would exceed its ceiling; the container id is too long or too many items \
+         share one instant"
+            .to_owned(),
     ));
     for (first, held, before) in [(20_000, 866, 800), (1_000_000_000, 638, 600)] {
         let expected: Vec<String> = (0..held).map(|n| (first + n).to_string()).collect();
