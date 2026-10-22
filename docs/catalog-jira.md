@@ -358,7 +358,7 @@ enabled = true
 endpoint = "https://your-domain.atlassian.net/rest/api/3"
 ```
 
-The bundle, the fifteen operations, the profile and the provider executable are
+The bundle, the seventeen operations, the profile and the provider executable are
 derived from the shipped connector:
 
 ```console
