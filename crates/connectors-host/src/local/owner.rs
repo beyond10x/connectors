@@ -397,6 +397,16 @@ impl From<runtime::Refusal> for Error {
         error
     }
 }
+/// A validation's refusal: the child's reason survives only beside
+/// `insufficient_scope`, where it names the answer that refused each
+/// alternative binding (private-adapter.md, "Alternative bindings").
+fn validation_refusal(refusal: runtime::Refusal) -> Error {
+    let mut error = Error::from(refusal.failure);
+    if refusal.failure == runtime::Failure::InsufficientScope {
+        error.service_reason = refusal.reason;
+    }
+    error
+}
 fn until(deadline: u64) -> Result<Instant> {
     deadline
         .checked_sub(connectors_sdk::now_ms())
@@ -529,6 +539,39 @@ pub fn described(
         other => other,
     }
 }
+/// [`described`] as `connection` reads it: the binding that connection's
+/// current evidence selected, or the first binding without a connection and
+/// for one whose evidence names none (`Bootstrap::bound`). A connection the
+/// instance does not hold is `not_found`, as `connections describe` answers.
+/// An instance without bindings is described as before
+/// (contracts/cli/v1alpha1/semantics.md, "Bound connections").
+pub fn bound_described(
+    paths: &Paths,
+    alias: &str,
+    connection: Option<&str>,
+) -> Result<runtime::Bootstrap> {
+    let bootstrap = described(paths, alias, connection)?;
+    if bootstrap.bindings.is_none() {
+        return Ok(bootstrap);
+    }
+    let binding = match connection {
+        None => None,
+        Some(connection) => {
+            let (_, adapter) = selected(paths, alias)?;
+            registry::Registry::with_system_clock(&paths.state)
+                .describe(
+                    &adapter.instance_id,
+                    &adapter.adapter_id,
+                    adapter.configured(),
+                    connection,
+                    connectors_sdk::now_ms(),
+                    false,
+                )?
+                .binding
+        }
+    };
+    Ok(bootstrap.bound(binding.as_deref())?)
+}
 fn cached_unbound(paths: &Paths, alias: &str) -> Result<runtime::Bootstrap> {
     cached_through(paths, alias, |paths, alias| {
         if transport::in_owner() {
@@ -641,7 +684,9 @@ pub fn admit_operation<'a>(
 }
 pub fn operation_snapshot(paths: &Paths, alias: &str, call: &Value) -> Result<runtime::Bootstrap> {
     let (_, adapter) = selected(paths, alias)?;
-    let bootstrap = described(paths, alias, call.get("connection").and_then(Value::as_str))?;
+    // An invoke is admitted against the binding its connection reads
+    // through: an id that binding lacks is `not_found` before any request.
+    let bootstrap = bound_described(paths, alias, call.get("connection").and_then(Value::as_str))?;
     let operation = input(call, "operation")?;
     admit_operation(&adapter, &bootstrap, &operation)?;
     if bootstrap.descriptor()?.revision != input(call, "revision")?
@@ -957,8 +1002,14 @@ fn launch_failure(error: registry::Failure) -> Error {
     }
 }
 pub fn connection_value(alias: &str, value: registry::ObservedConnection) -> Value {
-    json!({"summary":{"adapter":alias,"instance_id":value.instance,"connection":value.reference,"profile":value.profile,"revision":value.revision,"state":value.state},
-        "external_identity":value.identity,"observed_at_ms":value.observed_at_ms,"valid_until_ms":value.valid_until_ms,"source":"authority","stale":value.stale})
+    let mut described = json!({"summary":{"adapter":alias,"instance_id":value.instance,"connection":value.reference,"profile":value.profile,"revision":value.revision,"state":value.state},
+        "external_identity":value.identity,"observed_at_ms":value.observed_at_ms,"valid_until_ms":value.valid_until_ms,"source":"authority","stale":value.stale});
+    // Named only for an instance that declares alternative bindings
+    // (`connectors.cli.ConnectionDescription.binding`).
+    if let Some(binding) = value.binding {
+        described["binding"] = json!(binding);
+    }
+    described
 }
 
 #[derive(Serialize, Deserialize)]
@@ -1081,6 +1132,7 @@ mod cached_tests {
 
     fn bootstrap(instance: &str) -> runtime::Bootstrap {
         runtime::Bootstrap {
+            bindings: None,
             credential_revision: None,
             executable: None,
             instance: instance.into(),

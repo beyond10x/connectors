@@ -540,6 +540,8 @@ commands:
         source: {kind: option, long: connector}
       - field: instance
         source: {kind: option, long: instance}
+      - field: connection
+        source: {kind: option, long: connection}
       - field: family
         source: {kind: option, long: family}
       - field: limit
@@ -557,6 +559,8 @@ commands:
         source: {kind: option, long: connector}
       - field: instance
         source: {kind: option, long: instance}
+      - field: connection
+        source: {kind: option, long: connection}
       - field: operation
         source: {kind: option, long: operation}
   - path: [operations, invoke]

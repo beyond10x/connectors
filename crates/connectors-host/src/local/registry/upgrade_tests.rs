@@ -18,6 +18,7 @@ fn upgraded() -> Binding {
 
 fn validated(subject: &str, now: u64) -> ValidatedBaseline {
     ValidatedBaseline {
+        binding: None,
         identity: ExternalIdentity {
             kind: "fixture-account".into(),
             subject: subject.into(),

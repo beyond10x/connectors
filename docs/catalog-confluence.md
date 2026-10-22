@@ -337,7 +337,9 @@ The refusal leaves the connection in the `stale` state, which `connections list`
 provider refused its credential, and no read is admitted on it until a reconnect publishes a new
 one. A token with these answers reads Confluence through `confluence-v1`, whose access read is the
 v1 space list. A token whose v2 reads answer `200` can stay on `confluence`; `spaces.list`,
-`space.get` and `content.search` are served by `confluence-v1` only.
+`space.get` and `content.search` are served by `confluence-v1` only. One instance can also
+choose between the two each time it validates: see
+[One instance for either API](#one-instance-for-either-api).
 
 ### 1. Add the `confluence-v1` instance
 
@@ -418,6 +420,101 @@ $ connectors connections list --connector confluence --instance work
 failure: {"code":"not_found","kind":"operational","next_action":"check_configuration","stage":"admission"}
 ```
 
+## One instance for either API
+
+An instance of `confluence` or `confluence-v1` reads through one API, so the token decides which
+connector to configure. One instance can instead bind its operations, each time it validates, to
+the API its credential reads: REST v2 when the v2 access read answers, REST v1 when v2 refuses
+that read with `401` and `scope does not match` and the v1 access read answers. An id means the
+same read under either API, so a caller asks for `page.get` and receives the page through the
+API the connection is bound to. The pairing is configuration, the `bindings` member of
+[the catalog provider guide](local-catalog-provider.md#alternative-bindings); the provider
+names no Confluence API.
+
+### 1. Write the native configuration
+
+Such an instance is pinned: write its native configuration as
+[the catalog provider guide](local-catalog-provider.md#configure-the-provider) describes, with
+`provider` `confluence`, your site's `/wiki` root as `api_base`, the shipped `atlassian.basic`
+profile of [Authentication](#authentication) as `auth`, with its v2 access read, and the shipped
+`providers/confluence/operations.json`. Then add this member, which names REST v1 as the
+alternative, with its shipped selection set and the v1 space list as its access read:
+
+```json
+{
+  "bindings": {
+    "id": "v2",
+    "next": {"status": 401, "reason": "scope does not match"},
+    "alternatives": [
+      {
+        "id": "v1",
+        "provider": "confluence-v1",
+        "operations_file": "/absolute/path/adapters/catalog/providers/confluence-v1/operations.json",
+        "access": {"path": "rest/api/space", "query": {"limit": "1"}}
+      }
+    ]
+  }
+}
+```
+
+Every read of both selection sets is a read, and a configuration with bindings serves no write.
+
+### 2. Bind it to the CLI
+
+Pin the instance as [Bind the provider to the local CLI](local-catalog-provider.md#bind-the-provider-to-the-local-cli)
+shows, as its own instance beside any `confluence.work` or `confluence-v1.work`, for example
+`[connectors.confluence.instances.either]` with the alias `confluence-either`. Its
+`permissions.operations` names the ids of both bindings: `content.search`, `page.comments`,
+`page.get`, `pages.changed`, `space.get`, `space.pages` and `spaces.list`. An instance that
+existed before keeps its connections; the new one is connected on its own.
+
+### 3. Connect and read
+
+Connect with the credential document the other instances use. The connection names the binding
+its validation selected, `"binding": "v1"` or `"binding": "v2"`:
+
+```sh
+connectors connections connect --connector confluence --instance either \
+  --profile atlassian.basic --credential-file ~/private/atlassian.json
+```
+
+Describe the operations through that connection with `--connection`, and take `--schema` and
+`--revision` from it: without `--connection` the instance is described by its first binding,
+v2. An id the bound API does not serve, such as `spaces.list` on a v2-bound connection, is
+`not_found` before any request.
+
+```sh
+connectors operations list --connector confluence --instance either --connection "$connection"
+connectors operations describe --connector confluence --instance either \
+  --connection "$connection" --operation page.get
+connectors operations invoke --connector confluence --instance either \
+  --connection "$connection" --operation page.get \
+  --schema "$schema" --revision "$revision" --input-json '{"id":"1001"}'
+```
+
+The input follows the bound API: `page.get` takes `body-format` under v2 and `expand` under v1,
+as the description's schema says.
+
+When v2 and v1 both refuse, nothing connects, and the `insufficient_scope` refusal names both
+answers: `binding v2 answered 401 (Unauthorized; scope does not match); binding v1 answered 403`.
+A wrong password is refused at the identity read, and no other API is tried.
+
+### 4. When the token changes
+
+Each validation starts again from v2. A `connections revalidate` that finds v2 answering a token
+whose scopes were extended binds the connection to v2 and says so:
+`"rebound": {"from": "v1", "to": "v2"}`. A read whose revision was described under the earlier
+binding is then `stale_description`; describe again with `--connection`.
+
+```sh
+connectors connections revalidate --connector confluence --instance either \
+  --connection "$connection" --expected-revision "$connection_revision"
+```
+
+Verified against a local HTTPS fixture only (`adapters/catalog/tests/confluence_binding.rs`):
+each binding's probes and reads, the refusals above, and the connect, describe, invoke and
+rebind through the CLI. No live Confluence site has been read through such an instance.
+
 ## Limits
 
 - Verified against a local HTTPS fixture only
@@ -427,6 +524,9 @@ failure: {"code":"not_found","kind":"operational","next_action":"check_configura
   `pages.changed` walk that stops at the cutoff while a further page is still
   linked. No live Confluence Cloud site has been read, and the identity read has
   not been run against one.
+- [One instance for either API](#one-instance-for-either-api) needs a pinned native
+  configuration: the shipped declarations name no bindings, so an instance configured by its
+  name alone reads through the one API of its connector.
 - The engine parses and re-serialises the body, so it is returned as equal JSON,
   not as Confluence's exact bytes.
 - The cursor is sent as given. Take it from `_links.next` percent-decoded, or the

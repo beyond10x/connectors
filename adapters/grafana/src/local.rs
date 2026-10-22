@@ -172,6 +172,7 @@ impl Local {
             .map_err(|_| Failure::InvalidConfiguration)?;
         let descriptor = adapter.descriptor();
         let bootstrap = Bootstrap {
+            bindings: None,
             credential_revision: None,
             executable: None,
             instance: config.instance,
@@ -252,6 +253,7 @@ impl connectors_host::local::runtime::Adapter for Local {
         }
         .map_err(native_failure)?;
         Ok(Baseline {
+            binding: None,
             // The probe's body is not read; the subject is the configured connection
             // (identity source `configuration`, see auth.rs).
             identity: registry::ExternalIdentity {
