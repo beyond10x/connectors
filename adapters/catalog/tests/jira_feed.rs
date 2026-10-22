@@ -899,7 +899,9 @@ async fn issues_sharing_one_millisecond_are_bounded_by_the_watermark_ceiling() {
         refusal,
         Some((
             ErrorCode::Unavailable,
-            "the watermark would exceed its ceiling; too many items share one instant".into()
+            "the watermark would exceed its ceiling; the container id is too long or too many \
+             items share one instant"
+                .into()
         ))
     );
     assert_eq!(returned, expected[..200]);
