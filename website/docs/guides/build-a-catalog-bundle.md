@@ -20,6 +20,7 @@ and compares it with the committed one. Run it from the repository root after
 mkdir -p target/try/bundles
 target/debug/connectors-build catalog --provider gitlab \
   --source adapters/gitlab/upstream/openapi_v3.yaml \
+  --amendments adapters/gitlab/upstream/openapi_v3.amendments.json \
   --directory target/try/bundles --auth-profile gitlab.pat \
   | jq '{provider, source_sha256, openapi, info_version, inventoried, unsupported}'
 ```
@@ -35,8 +36,9 @@ target/debug/connectors-build catalog --provider gitlab \
 }
 ```
 
-The command prints a coverage report; `jq` keeps its summary. All 1,847 operations of the pinned
-GitLab document are inventoried. The 67 it names as unsupported are array query parameters the
+The command prints a coverage report; `jq` keeps its summary. `--amendments` applies the cited
+corrections the committed GitLab bundle carries (see below); without it the bundle differs from
+the committed one. All 1,847 operations of the pinned GitLab document are inventoried. The 67 it names as unsupported are array query parameters the
 source serialises with `explode: false`; each is sent as the one value a caller gives. The full
 report lists every reason with the operations it affects.
 
@@ -59,7 +61,7 @@ jq '.entries[] | {provider, operations, unsupported, bundle_sha256}' target/try/
   "provider": "gitlab",
   "operations": 1847,
   "unsupported": 67,
-  "bundle_sha256": "89090cc0a41c921afe9fc2d93480a493a33731e8017a1232fac32aa5478a3788"
+  "bundle_sha256": "79ce6c959045d173c45d206eaf0bfd8dcdf9ba87215df4654ff207733865025c"
 }
 ```
 

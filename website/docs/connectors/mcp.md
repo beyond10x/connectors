@@ -31,8 +31,10 @@ binding, with its approval source and business key, exists.
 
 ## Prerequisites at the provider
 
-None can be stated: which provider connection an inbound MCP caller may use, and whether
-Connectors spawns an MCP server as a child process, are both undecided.
+None can be stated until a binding exists. The two questions that withheld it are decided: an
+inbound MCP caller is the configured owner, one principal, so no caller-to-connection assignment
+is modelled; and Connectors owns one pinned, supervised outbound stdio server process per
+session. Neither decision is implemented.
 
 ## Enable the connector and add an instance
 
@@ -68,5 +70,6 @@ uncertain rotating refresh cannot be exchanged again.
 ## Limits
 
 - No runtime, no configuration schema, no launch handler and no conformance scenarios.
-- Two decision blockers withhold review of the MCP contracts; the
-  [README](https://github.com/beyond10x/connectors#where-the-project-stands) names them.
+- The two decision blockers that withheld review of the MCP contracts, on caller-to-connection
+  assignment and on outbound stdio process ownership, are cleared in the planning store
+  (2026-10-06 and 2026-10-03); the contracts epic is still a draft.

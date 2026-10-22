@@ -35,20 +35,55 @@ The walkthrough below builds from source because it also needs the Kubernetes se
 `connectors` command alone, each release page carries `connectors-<version>-<target>.tar.gz` for
 `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin` and
 `aarch64-apple-darwin`, with a `SHA256SUMS` file; releases cut before the binaries workflow
-existed carry source archives only, and there is no Windows binary. Each archive holds two
-binaries, `connectors` and the catalog provider `connectors-catalog-provider` (archives of 0.50.0
-and earlier hold `connectors` alone); the Kubernetes service and the other connectors are built
-from source. Download the archive for your platform and `SHA256SUMS`, check the archive's line
-with `sha256sum -c -` (on macOS `shasum -a 256 -c -`), extract it and put both binaries on your
-`PATH`; the repository's
-[install instructions](https://github.com/beyond10x/connectors#install-a-release-binary) give
-the commands.
+existed
+([`release-binaries.yml`](https://github.com/beyond10x/connectors/blob/main/.github/workflows/release-binaries.yml))
+carry source archives only, and there is no Windows binary. Each archive holds a directory with
+two binaries, `connectors` and the catalog provider `connectors-catalog-provider` (archives of
+0.50.0 and earlier hold `connectors` alone), and `README.md` and `CHANGELOG.md`; the Kubernetes
+service and the other connectors are built from source, as their guides show. A catalog instance
+that pins nothing is served by the `connectors-catalog-provider` next to `connectors`, so keep the
+two binaries in one directory. The Linux binaries are built on Ubuntu 24.04 and need its glibc or
+a newer one.
 
-The macOS binaries are not signed yet. A binary downloaded through a browser carries
-Gatekeeper's quarantine attribute and is refused until you remove it with
-`xattr -d com.apple.quarantine connectors connectors-catalog-provider`; one downloaded with `curl` runs as is. An unsigned
-binary also cannot read login keychain items an earlier build wrote, so credentials are stored
-again after an upgrade.
+On Linux, with the version and target you want, and `bin` a directory on your `PATH`:
+
+```sh
+version=X.Y.Z
+target=x86_64-unknown-linux-gnu
+bin="$HOME/bin"
+base="https://github.com/beyond10x/connectors/releases/download/v$version"
+curl -fsSLO "$base/connectors-$version-$target.tar.gz"
+curl -fsSLO "$base/SHA256SUMS"
+grep " connectors-$version-$target.tar.gz\$" SHA256SUMS | sha256sum -c -
+tar -xzf "connectors-$version-$target.tar.gz"
+mkdir -p "$bin"
+install -m 0755 "connectors-$version-$target/connectors" "$bin/connectors"
+install -m 0755 "connectors-$version-$target/connectors-catalog-provider" "$bin/connectors-catalog-provider"
+"$bin/connectors" --version
+"$bin/connectors-catalog-provider" --version
+```
+
+With `version=0.56.0` it printed:
+
+```text
+connectors-0.56.0-x86_64-unknown-linux-gnu.tar.gz: OK
+connectors 0.56.0
+connectors-catalog-provider 0.56.0
+```
+
+On macOS, use `target=aarch64-apple-darwin` (Apple silicon) or `x86_64-apple-darwin` (Intel),
+and check the archive with `shasum -a 256 -c -` in place of `sha256sum -c -`; the other commands
+are the same. The macOS binaries are not signed yet. A binary downloaded with `curl` runs as is;
+one downloaded through a browser carries Gatekeeper's quarantine attribute and is refused until
+you remove it, from the extracted directory, with
+`xattr -d com.apple.quarantine connectors connectors-catalog-provider`. An unsigned binary also
+cannot read login keychain items that an earlier build of `connectors` wrote, so credentials are
+stored again after an upgrade.
+
+On Windows, build `connectors` from the release tag's source. The CLI and its local host build and
+run on macOS and Windows, each under its own CI job; the guarantees each platform holds only in a
+weaker form are listed under [macOS](./reference/contracts/cli.md#macos-platform-guarantees) and
+[Windows](./reference/contracts/cli.md#windows-platform-guarantees) platform guarantees.
 
 ## Start a service
 
