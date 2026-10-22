@@ -10,7 +10,6 @@ relations:
 - depends_on: story:instances-resolve-through-locked-index
 - depends_on: story:definitions-fixture-copy-removed
 - depends_on: story:definition-reader-feed-extensions
-- depends_on: story:agent-tool-projection
 revision: 2
 ---
 ## Outcome

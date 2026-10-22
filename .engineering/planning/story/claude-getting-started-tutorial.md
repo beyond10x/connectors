@@ -13,6 +13,7 @@ relations:
 - depends_on: story:claude-connects-to-the-mcp-server
 - depends_on: story:mcp-stdio-runtime-branch
 - depends_on: story:definition-reader-feed-extensions
+- depends_on: story:mounted-custody-kind-secret-volume
 scope:
 - confidence: cited
   path: .github/workflows/release-binaries.yml
@@ -30,6 +31,8 @@ scope:
   path: apps/connectors/tests/release_journey.rs
 - confidence: cited
   path: contracts/datasources/feed/v1alpha1/semantics.md
+- confidence: cited
+  path: crates/connectors-build/src/ignored.rs
 - confidence: cited
   path: crates/connectors-docs/src/crates.rs
 - confidence: cited
@@ -114,7 +117,7 @@ scope:
   path: website/docs/reference/contracts/data/feed.md
 - confidence: cited
   path: website/docs/reference/crates.md
-revision: 4
+revision: 5
 ---
 ## Outcome
 
