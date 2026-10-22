@@ -1,19 +1,14 @@
 # Confluence REST v1 binding of datasource.feed/v1alpha1
 
-**Not shipped.** This binding is not in the shipped `confluence-v1` selection
-([providers/confluence-v1/operations.json](../../../providers/confluence-v1/operations.json) has no
-`feed`), so an instance of the `confluence-v1` connector declares neither `feed.containers` nor
-`feed.items`
-(`adapters/catalog/tests/confluence_v1_feed.rs::the_shipped_confluence_v1_selection_declares_no_feed`).
-Every shipped selection round-trips through a connector definition
-(`crates/connectors-catalog/tests/definition_import.rs`), and the connector definition format cannot
-yet carry this declaration: it has no next-link continuation (`url_parameter`), no time query
-(`position` with `query`), no `utc_offsets`, no `url` or `url_base`, and it takes the items'
-container from a path parameter, where this binding names the space in the CQL query. The binding
-stays out of the shipped selection until it does.
+**Shipped.** The shipped `confluence-v1` selection carries this binding as its `feed`
+([providers/confluence-v1/operations.json](../../../providers/confluence-v1/operations.json)), so an
+instance of the `confluence-v1` connector declares `feed.containers` and `feed.items`
+(`adapters/catalog/tests/confluence_v1_feed.rs::the_shipped_confluence_v1_selection_carries_the_page_feed`).
+The `confluence-v1` connector definition lowers to that block
+(`crates/connectors-catalog/tests/definition_feed.rs::the_confluence_page_feed_lowers_to_the_shipped_declaration`).
 
-**Profile:** `confluence-pages/1`. **Status:** declared as data in the test fixture
-[tests/feed/confluence/feed.json](../../../tests/feed/confluence/feed.json) and realized by the
+**Profile:** `confluence-pages/1`. **Status:** declared as data in the shipped selection, equal to
+the test fixture [tests/feed/confluence/feed.json](../../../tests/feed/confluence/feed.json), and realized by the
 catalog engine
 ([contracts/catalog/v1alpha1/semantics.md, section 3.3](../../../../../contracts/catalog/v1alpha1/semantics.md#33-declared-feed-bindings));
 no Rust of its own. Held to the family's `feed-binding` suite in five profile zones by

@@ -1,9 +1,9 @@
 //! story:confluence-feed-binding: a Confluence REST v1 declaration binds
 //! `datasource.feed/v1alpha1` as data (`adapters/catalog/contracts/feed/v1alpha1/confluence-v1.md`),
 //! and the catalog engine reads it over the committed `confluence-v1` bundle. The declaration is
-//! the fixture `tests/feed/confluence/feed.json`, not part of the shipped `confluence-v1`
-//! selection file, which carries no `feed` until the connector definition format every shipped
-//! selection round-trips through can express one. A container is a space the user can view; an
+//! the `feed` of the shipped `confluence-v1` selection file
+//! `providers/confluence-v1/operations.json`, which is the 0.56.0 fixture
+//! `tests/feed/confluence/feed.json` unchanged. A container is a space the user can view; an
 //! item is one of its pages. Every answer here is a Confluence record in the shape of
 //! `tests/feed/confluence/*.json`, taken from the public v1 reference, not recorded from a running
 //! Confluence; the requests the engine sends are recorded and checked. The family's suite runs
@@ -45,8 +45,19 @@ fn recorded(name: &str) -> Value {
         .unwrap()
 }
 
+/// The `feed` of the shipped `confluence-v1` selection.
 fn declaration() -> Value {
-    recorded("feed.json")
+    let selection: Value = serde_json::from_slice(
+        &std::fs::read(
+            root()
+                .join("providers")
+                .join(PROVIDER)
+                .join("operations.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    selection["feed"].clone()
 }
 
 fn engine() -> Engine {
@@ -514,17 +525,17 @@ fn the_confluence_v1_feed_declaration_binds_the_family_under_its_profile() {
     assert!(engine.declarations(&[Effect::Write]).is_empty());
 }
 
-/// The binding is not shipped: neither the `confluence-v1` selection file nor the REST v2
-/// `confluence` one carries a `feed`, and the engine over each declares no read of the family.
-/// The connector definition format every shipped selection round-trips through
-/// (`crates/connectors-catalog/tests/definition_import.rs`) has no next-link parameter, time query
-/// or `utc_offsets` to carry the declaration in
-/// (`adapters/catalog/contracts/feed/v1alpha1/confluence-v1.md`). REST v2 has no time filter for
-/// a feed to resume by at all.
+/// The binding is shipped: the `confluence-v1` selection file carries the declaration as its
+/// `feed`, the 0.56.0 fixture `tests/feed/confluence/feed.json` unchanged, and the engine over the
+/// shipped selection declares the family's two reads under the binding's profile beside the
+/// selected operations. The connector definition lowers to that block
+/// (`crates/connectors-catalog/tests/definition_feed.rs`). The REST v2 `confluence` selection
+/// still carries none, and the engine over it declares no read of the family: REST v2 has no time
+/// filter for a feed to resume by.
 #[test]
-fn the_shipped_confluence_v1_selection_declares_no_feed() {
-    for provider in [PROVIDER, "confluence"] {
-        let shipped: Value = serde_json::from_slice(
+fn the_shipped_confluence_v1_selection_carries_the_page_feed() {
+    let shipped = |provider: &str| -> Value {
+        serde_json::from_slice(
             &std::fs::read(
                 root()
                     .join("providers")
@@ -533,19 +544,50 @@ fn the_shipped_confluence_v1_selection_declares_no_feed() {
             )
             .unwrap(),
         )
-        .unwrap();
-        assert!(shipped.get("feed").is_none(), "{provider}");
-        let selections: Vec<Selection> =
-            serde_json::from_value(shipped["operations"].clone()).unwrap();
-        let bundle = bundle::load(&root().join("generated/bundles"), provider).unwrap();
-        let engine = Engine::new(&bundle, BASE, &selections).unwrap();
-        let declared = engine.declarations(&[Effect::Read]);
-        assert!(!declared.is_empty(), "{provider}");
-        assert!(
-            declared.iter().all(|o| o.contract != FEED_CONTRACT),
-            "{provider}"
-        );
-    }
+        .unwrap()
+    };
+    let v1 = shipped(PROVIDER);
+    assert_eq!(v1.get("feed"), Some(&recorded("feed.json")));
+    let selections: Vec<Selection> = serde_json::from_value(v1["operations"].clone()).unwrap();
+    let feed: Declaration = serde_json::from_value(v1["feed"].clone()).unwrap();
+    let bundle = bundle::load(&root().join("generated/bundles"), PROVIDER).unwrap();
+    let engine = Engine::with_feed(&bundle, BASE, &selections, Some(&feed)).unwrap();
+    let declared = engine.declarations(&[Effect::Read]);
+    let family: Vec<_> = declared
+        .iter()
+        .filter(|o| o.contract == FEED_CONTRACT)
+        .collect();
+    let ids: std::collections::BTreeSet<&str> = family.iter().map(|o| o.id.as_str()).collect();
+    assert_eq!(ids, [CONTAINERS, ITEMS].into());
+    assert!(family.iter().all(|o| o.profile == PROFILE));
+    let selected: Vec<String> = Engine::new(&bundle, BASE, &selections)
+        .unwrap()
+        .declarations(&[Effect::Read])
+        .iter()
+        .map(|o| o.id.clone())
+        .collect();
+    let others: Vec<String> = declared
+        .iter()
+        .filter(|o| o.contract != FEED_CONTRACT)
+        .map(|o| o.id.clone())
+        .collect();
+    assert_eq!(
+        others, selected,
+        "the selected reads are declared as before"
+    );
+
+    let v2 = shipped("confluence");
+    assert!(v2.get("feed").is_none(), "confluence");
+    let selections: Vec<Selection> = serde_json::from_value(v2["operations"].clone()).unwrap();
+    let bundle = bundle::load(&root().join("generated/bundles"), "confluence").unwrap();
+    let declared = Engine::new(&bundle, BASE, &selections)
+        .unwrap()
+        .declarations(&[Effect::Read]);
+    assert!(!declared.is_empty(), "confluence");
+    assert!(
+        declared.iter().all(|o| o.contract != FEED_CONTRACT),
+        "confluence"
+    );
 }
 
 /// `feed.containers` lists the current spaces the user can view, global and personal alike, one
