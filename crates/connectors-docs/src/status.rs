@@ -147,7 +147,7 @@ pub const CAPABILITIES: &[Capability] = &[
         "Stopping an owner after an upgrade",
         "setup owner-stop asks the state directory's running owner, of any build, to drain and exit within 30 seconds, answers no_owner when none runs, and never signals a process.",
         "apps/connectors/tests/local_cli.rs::setup_owner_stop_stops_an_owner_another_build_started_and_a_fresh_owner_serves",
-        "/docs/guides/set-up-the-local-cli#after-an-upgrade",
+        "/docs/guides/upgrade-the-cli#after-an-upgrade",
     ),
     shipped(
         "Local runtime",

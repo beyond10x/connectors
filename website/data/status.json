@@ -61,7 +61,7 @@
     {
       "area": "Local runtime",
       "detail": "setup owner-stop asks the state directory's running owner, of any build, to drain and exit within 30 seconds, answers no_owner when none runs, and never signals a process.",
-      "href": "/docs/guides/set-up-the-local-cli#after-an-upgrade",
+      "href": "/docs/guides/upgrade-the-cli#after-an-upgrade",
       "label": "Stopping an owner after an upgrade",
       "status": "shipped"
     },

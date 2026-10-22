@@ -1,5 +1,42 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The Jira issue feed (`jira-issues/1`) and the Confluence REST v1 page feed
+  (`confluence-pages/1`) ship in their selections: a `jira` or `confluence-v1` instance now has
+  `feed.containers` and `feed.items`. Verified against fixtures only, not live.
+- Jira gains `projects.list` (`searchProjects`) and `project.get` (`getProject`), 17 operations.
+- The connector definition reader accepts a cursor `offset` with a completion condition and
+  `url_parameter`; a time position with a `query` (JQL or CQL `first`/`resume`), `precision`,
+  `page` and `utc_offsets`; and items `url`, `url_base` and `parent`. Each of its rules is refused
+  by name (`feed_cursor_continuation` … `feed_item_pointer`).
+- New guide `website/docs/guides/upgrade-the-cli.md`.
+
+### Changed
+
+- The definition reader refuses a feed whose `first` query names `{since}`
+  (`feed_query_first`), as the catalog engine does when it loads.
+- New refusal `feed_position_parameter`: a feed position's `time`, `query.parameter` or
+  `page.parameter` that the items list does not take as a query parameter is refused when the
+  definition is lowered.
+- README: the custody paragraph names all four platform stores and states that the Kubernetes and
+  SQL services advertise no writes; MCP's two decision blockers are no longer called open.
+- The Zendesk page lists the three approved ticket writes and walks through one.
+- Getting started covers the Windows build from source and links the macOS and Windows platform
+  guarantees.
+- The definition-authoring guide's `auth_library` row states the name rule and the refusal of
+  `use`/`default`.
+- The public-output audit admits the documented default state directory
+  `~/.local/state/connectors` and paths under it, and no other `.local/` path.
+
+### Limitations
+
+- The definition reader still lowers four feed shapes the catalog engine refuses at load (a
+  parameter bound twice, a required page parameter sent only on resume, query keys the operation
+  does not take, a template slot beside a quote); they fail when the instance starts.
+
 ## 0.56.0 — 2026-10-22
 
 ### Added
