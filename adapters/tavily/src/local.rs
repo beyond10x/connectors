@@ -98,6 +98,7 @@ impl Local {
         );
         let descriptor = adapter.descriptor();
         let bootstrap = Bootstrap {
+            bindings: None,
             credential_revision: None,
             executable: None,
             instance: config.instance,
@@ -163,6 +164,7 @@ impl connectors_host::local::runtime::Adapter for Local {
             .await
             .map_err(native_failure)?;
         Ok(Baseline {
+            binding: None,
             // Tavily exposes no account identifier; see auth.rs.
             identity: registry::ExternalIdentity {
                 kind: "tavily.api-key".into(),

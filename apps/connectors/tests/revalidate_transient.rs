@@ -89,6 +89,7 @@ impl runtime::Adapter for Probing {
         }
         let now = connectors_sdk::now_ms();
         Ok(runtime::Baseline {
+            binding: None,
             identity: registry::ExternalIdentity {
                 kind: "fixture.user".into(),
                 subject: "fixture-subject-1".into(),

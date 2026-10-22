@@ -317,6 +317,7 @@ fn disposable_registry_publication_cli_and_retirement_restart() {
         },
     };
     let baseline = |now| registry::ValidatedBaseline {
+        binding: None,
         identity: registry::ExternalIdentity {
             kind: "fixture".into(),
             subject: "one".into(),

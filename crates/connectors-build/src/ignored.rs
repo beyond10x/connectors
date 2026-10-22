@@ -248,6 +248,11 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "cli_journey::invoke_definition::a_definition_moved_to_another_host_connects_fresh_under_a_new_instance_id",
         ) => Some((Disposable, vec![CUSTODY, CLI])),
         (
+            "connectors-catalog-provider",
+            "confluence_binding",
+            "a_v1_bound_connection_reads_the_v1_page_through_the_cli_and_rebinds_on_revalidation",
+        ) => Some((Disposable, vec![CUSTODY, CLI])),
+        (
             "connectors-loki",
             "local_runtime",
             "cli_journey::loki_cli_connects_with_a_bearer_token_and_answers_each_read_on_the_saved_connection",

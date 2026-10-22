@@ -86,6 +86,83 @@ struct AccessProbe {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     query: BTreeMap<String, String>,
 }
+impl AccessProbe {
+    fn usable(&self) -> bool {
+        !segments(&self.path).is_empty()
+            && !self.path.contains('?')
+            && self.query.len() <= 16
+            && self
+                .query
+                .iter()
+                .all(|(k, v)| !k.is_empty() && k.len() <= 128 && v.len() <= 1024)
+    }
+}
+
+/// The alternative descriptions of one instance (`connectors_catalog.binding.Bindings`):
+/// the configuration's own provider, selection set and `auth.access` are the
+/// binding `id`, and each alternative is another bundle and selection set of
+/// the same base, profile and credential. Validation binds to the first whose
+/// access probe answers.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BindingsConfig {
+    id: String,
+    /// The answer that moves validation from the first binding to the first alternative.
+    next: NextAnswer,
+    alternatives: Vec<AlternativeConfig>,
+}
+/// `connectors_catalog.binding.Alternative`.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AlternativeConfig {
+    id: String,
+    /// The bundle loaded from the configuration's `bundle_directory`.
+    provider: String,
+    /// An absolute path to the alternative's reviewed selection set.
+    operations_file: PathBuf,
+    access: AccessProbe,
+    /// Present exactly when another alternative follows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    next: Option<NextAnswer>,
+}
+/// `connectors_catalog.binding.Next`: an access answer with exactly this
+/// status whose admitted reason contains `reason`, compared case-insensitively.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NextAnswer {
+    status: u16,
+    reason: String,
+}
+impl NextAnswer {
+    fn usable(&self) -> bool {
+        (400..=499).contains(&self.status)
+            && !self.reason.trim().is_empty()
+            && self.reason.len() <= 256
+            && !self.reason.chars().any(char::is_control)
+    }
+    /// Whether an access answer of `status` with the admitted `reason` is this one.
+    fn matches(&self, status: u16, reason: Option<&str>) -> bool {
+        status == self.status
+            && reason.is_some_and(|reason| {
+                reason
+                    .to_lowercase()
+                    .contains(&self.reason.trim().to_lowercase())
+            })
+    }
+}
+/// The most alternatives one configuration declares, as the host admits.
+const ALTERNATIVE_BINDINGS: usize = 8;
+
+/// One binding as validation tries it.
+struct Step {
+    id: String,
+    access: AccessProbe,
+    /// The answer that moves on to the next step; `None` on the last.
+    next: Option<NextAnswer>,
+    /// An alternative's engine; `None` for the first binding, whose engine is
+    /// [`Local::engine`].
+    engine: Option<Engine>,
+}
 /// How the protected entry becomes the credential header.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -196,6 +273,11 @@ struct Configuration {
     /// `operations`. The repository ships one per provider it has reviewed.
     #[serde(default)]
     operations_file: Option<PathBuf>,
+    /// The instance's alternative bindings, of which validation selects the
+    /// one the credential can read. Omitted when absent, so a configuration
+    /// without it keeps its revision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bindings: Option<BindingsConfig>,
 }
 
 /// One origin a connection admits besides its API base
@@ -230,6 +312,53 @@ fn read_selection(bytes: &[u8], provider: &str) -> Result<OperationsFile> {
         return Err(Failure::InvalidConfiguration);
     }
     Ok(selection)
+}
+/// The selection set at `path`. A shipped selection set is ordinary repository
+/// content, readable by anyone; only the configuration that names it must be
+/// private.
+fn read_selection_file(path: &Path, provider: &str) -> Result<OperationsFile> {
+    let bytes = std::fs::File::open(path)
+        .map_err(|_| Failure::InvalidConfiguration)
+        .and_then(|file| {
+            filesystem::read_bounded(file, 1024 * 1024).map_err(|_| Failure::InvalidConfiguration)
+        })?;
+    read_selection(&bytes, provider)
+}
+
+/// Whether `bindings` can be followed (`connectors_catalog.binding.Bindings`):
+/// the first binding has its access probe, every id is valid and distinct, a
+/// usable `next` answer stands before every alternative and after none, and
+/// the identity is read from the API, after which the access probes run.
+fn usable_bindings(bindings: &BindingsConfig, config: &Configuration) -> bool {
+    let mut ids = BTreeSet::from([bindings.id.as_str()]);
+    let last = bindings.alternatives.len().saturating_sub(1);
+    config.auth.access.is_some()
+        && config.auth.identity.source != IdentitySource::IdToken
+        && connectors_core::valid_id(&bindings.id)
+        && bindings.next.usable()
+        && (1..=ALTERNATIVE_BINDINGS).contains(&bindings.alternatives.len())
+        && bindings
+            .alternatives
+            .iter()
+            .enumerate()
+            .all(|(index, alternative)| {
+                connectors_core::valid_id(&alternative.id)
+                    && ids.insert(alternative.id.as_str())
+                    && connectors_core::valid_id(&alternative.provider)
+                    && alternative.access.usable()
+                    && match &alternative.next {
+                        None => index == last,
+                        Some(next) => index != last && next.usable(),
+                    }
+            })
+}
+
+/// One alternative binding as the configuration loaded it.
+struct LoadedAlternative {
+    config: AlternativeConfig,
+    engine: Engine,
+    /// Its entry in the configuration revision: content, never paths.
+    revision: Value,
 }
 
 /// What one catalog connector fixes for every instance of it
@@ -403,6 +532,7 @@ fn derived(instance: &Instance<'_>) -> Result<(Configuration, Sources)> {
         auth,
         operations: Vec::new(),
         operations_file: None,
+        bindings: None,
     };
     let sources = Sources {
         bundle,
@@ -856,6 +986,8 @@ pub struct Local {
     /// connection's credential travels to it.
     hosts: BTreeMap<String, (Arc<ScopedHttp>, bool)>,
     engine: Engine,
+    /// The bindings validation tries, in order; empty without bindings.
+    steps: Vec<Step>,
     instance: String,
     auth: AuthConfig,
     oauth: Option<Arc<OAuth>>,
@@ -879,6 +1011,12 @@ impl Local {
                 .operations_file
                 .as_ref()
                 .is_some_and(|path| !path.is_absolute())
+            || config.bindings.as_ref().is_some_and(|bindings| {
+                bindings
+                    .alternatives
+                    .iter()
+                    .any(|alternative| !alternative.operations_file.is_absolute())
+            })
         {
             return Err(Failure::InvalidConfiguration);
         }
@@ -944,14 +1082,11 @@ impl Local {
                 .scopes
                 .as_ref()
                 .is_some_and(|s| segments(&s.path).is_empty())
-            || config.auth.access.as_ref().is_some_and(|a| {
-                segments(&a.path).is_empty()
-                    || a.path.contains('?')
-                    || a.query.len() > 16
-                    || a.query
-                        .iter()
-                        .any(|(k, v)| k.is_empty() || k.len() > 128 || v.len() > 1024)
-            })
+            || config.auth.access.as_ref().is_some_and(|a| !a.usable())
+            || config
+                .bindings
+                .as_ref()
+                .is_some_and(|bindings| !usable_bindings(bindings, &config))
             || config.auth.prefix.as_deref().is_some_and(|prefix| {
                 // One visible-ASCII word of at most 32 bytes, in front of a
                 // token only, and never beside `Bearer `
@@ -999,6 +1134,10 @@ impl Local {
         {
             return Err(Failure::InvalidConfiguration);
         }
+        // A derived configuration declares no bindings: its sources are compiled in.
+        if shipped.is_some() && config.bindings.is_some() {
+            return Err(Failure::InvalidConfiguration);
+        }
         let Sources {
             bundle,
             bundle_sha256,
@@ -1007,18 +1146,7 @@ impl Local {
             Some(sources) => sources,
             None => {
                 let selection = match &config.operations_file {
-                    // A shipped selection set is ordinary repository content,
-                    // readable by anyone; only the configuration that names it
-                    // must be private.
-                    Some(path) => {
-                        let bytes = std::fs::File::open(path)
-                            .map_err(|_| Failure::InvalidConfiguration)
-                            .and_then(|file| {
-                                filesystem::read_bounded(file, 1024 * 1024)
-                                    .map_err(|_| Failure::InvalidConfiguration)
-                            })?;
-                        Some(read_selection(&bytes, &config.provider)?)
-                    }
+                    Some(path) => Some(read_selection_file(path, &config.provider)?),
                     None => None,
                 };
                 let bundle = bundle::load(&config.bundle_directory, &config.provider)
@@ -1132,13 +1260,71 @@ impl Local {
         let engine = Engine::with_feed(&bundle, &document_base, &operations, feed.as_ref())
             .and_then(|engine| engine.with_link_origin(&base))
             .map_err(Failure::from_service)?;
+        // Each alternative binding is another bundle and selection set under
+        // the same base, profile and credential, compiled as the first is.
+        let mut alternatives = Vec::new();
+        for alternative in config.bindings.iter().flat_map(|b| &b.alternatives) {
+            let selection =
+                read_selection_file(&alternative.operations_file, &alternative.provider)?;
+            let bundle = bundle::load(&config.bundle_directory, &alternative.provider)
+                .map_err(Failure::from_service)?;
+            let bundle_sha256 =
+                bundle::read_index(&config.bundle_directory)
+                    .ok()
+                    .and_then(|index| {
+                        index
+                            .find(&alternative.provider)
+                            .map(|e| e.bundle_sha256.clone())
+                    });
+            let engine = Engine::with_feed(
+                &bundle,
+                &document_base,
+                &selection.operations,
+                selection.feed.as_ref(),
+            )
+            .and_then(|engine| engine.with_link_origin(&base))
+            .map_err(Failure::from_service)?;
+            let mut revision = json!({
+                "id": alternative.id,
+                "provider": alternative.provider,
+                "bundle_sha256": bundle_sha256,
+                "source_sha256": bundle.source.source_sha256,
+                "access": alternative.access,
+                "operations": serde_json::to_value(&selection.operations)
+                    .map_err(|_| Failure::Protocol)?,
+            });
+            if let Some(next) = &alternative.next {
+                revision["next"] = serde_json::to_value(next).map_err(|_| Failure::Protocol)?;
+            }
+            if let Some(feed) = &selection.feed {
+                revision["feed"] = serde_json::to_value(feed).map_err(|_| Failure::Protocol)?;
+            }
+            alternatives.push(LoadedAlternative {
+                config: alternative.clone(),
+                engine,
+                revision,
+            });
+        }
+        // A connection bound to one of several descriptions reads only: a
+        // write's approval and audit bind one description, not a choice of them.
+        if config.bindings.is_some()
+            && std::iter::once(&engine)
+                .chain(alternatives.iter().map(|a| &a.engine))
+                .any(|engine| !engine.declarations(&[Effect::Write]).is_empty())
+        {
+            return Err(Failure::InvalidConfiguration);
+        }
         // Every admitted host is a distinct canonical https origin that some
         // selected binary read reaches: the selection names what it may need,
         // the connection decides what it allows. A reached host the connection
         // does not admit is not a load failure, so a connection written before
         // a selection reached it keeps loading; the read that needs it is
-        // refused as `forbidden` before anything is sent there.
-        let reached = engine.reached_hosts();
+        // refused as `forbidden` before anything is sent there. Every binding's
+        // selection counts.
+        let mut reached = engine.reached_hosts();
+        for alternative in &alternatives {
+            reached.extend(alternative.engine.reached_hosts());
+        }
         let mut admitted = BTreeSet::new();
         if config.hosts.len() > ADMITTED_HOSTS
             || config.hosts.iter().any(|host| {
@@ -1184,6 +1370,17 @@ impl Local {
         if !config.hosts.is_empty() {
             effective["hosts"] =
                 serde_json::to_value(&config.hosts).map_err(|_| Failure::Protocol)?;
+        }
+        // Present only when declared, so a configuration without bindings keeps
+        // its revision. Each alternative enters by its content, as the first
+        // binding does above. The bindings stay out of the credential side:
+        // they decide which reads are described, not where the credential goes.
+        if let Some(bindings) = &config.bindings {
+            effective["bindings"] = json!({
+                "id": bindings.id,
+                "next": bindings.next,
+                "alternatives": alternatives.iter().map(|a| a.revision.clone()).collect::<Vec<_>>(),
+            });
         }
         let configuration_revision = connectors_core::digest(&effective);
         let http = Arc::new(
@@ -1293,21 +1490,30 @@ impl Local {
             }
         }
         let credential_revision = connectors_core::digest(&credential_side);
-        let descriptor = |operations: Vec<connectors_core::Operation>| -> Result<String> {
+        // A binding's description names it in its revision, so the revision a
+        // read carries says which binding it was described under. Without
+        // bindings the revision keeps its inputs.
+        let descriptor = |operations: Vec<connectors_core::Operation>,
+                          binding: Option<&str>|
+         -> Result<String> {
+            let mut revision = json!({
+                "configuration_revision": configuration_revision,
+                "operations": operations.iter().map(|o| o.id.clone()).collect::<Vec<_>>(),
+            });
+            if let Some(binding) = binding {
+                revision["binding"] = json!(binding);
+            }
             let descriptor = connectors_core::Descriptor {
                 version: connectors_core::WIRE_VERSION.into(),
                 instance: config.instance.clone(),
                 adapter: "catalog".into(),
-                revision: connectors_core::digest(&json!({
-                    "configuration_revision": configuration_revision,
-                    "operations": operations.iter().map(|o| o.id.clone()).collect::<Vec<_>>(),
-                })),
+                revision: connectors_core::digest(&revision),
                 operations,
                 configuration_schema: json!({"type": "object"}),
             };
             serde_json::to_string(&descriptor).map_err(|_| Failure::Protocol)
         };
-        let requirement = |operation: &connectors_core::Operation| Requirement {
+        let requirement = |engine: &Engine, operation: &connectors_core::Operation| Requirement {
             operation: operation.id.clone(),
             custody: engine.declares_custody(&operation.id),
             profile: config.auth.profile.clone(),
@@ -1317,6 +1523,27 @@ impl Local {
                 Some(Effect::Write) => runtime::Effect::Write,
                 None => runtime::Effect::Unknown,
             },
+        };
+        let first = config.bindings.as_ref().map(|b| b.id.as_str());
+        let bindings = match &config.bindings {
+            None => None,
+            Some(declared) => Some(runtime::Bindings {
+                id: declared.id.clone(),
+                alternatives: alternatives
+                    .iter()
+                    .map(|alternative| {
+                        let reads = alternative.engine.declarations(&[Effect::Read]);
+                        Ok(runtime::AlternativeBinding {
+                            id: alternative.config.id.clone(),
+                            descriptor: descriptor(reads.clone(), Some(&alternative.config.id))?,
+                            requirements: reads
+                                .iter()
+                                .map(|operation| requirement(&alternative.engine, operation))
+                                .collect(),
+                        })
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+            }),
         };
         let reads = engine.declarations(&[Effect::Read]);
         let all = engine.declarations(&[Effect::Read, Effect::Write]);
@@ -1328,21 +1555,46 @@ impl Local {
             protocol: connectors_core::WIRE_VERSION.into(),
             configuration_revision: configuration_revision.clone(),
             provider_authority: base.clone(),
-            descriptor: descriptor(reads.clone())?,
+            descriptor: descriptor(reads.clone(), first)?,
             profiles: vec![profile],
-            requirements: reads.iter().map(requirement).collect(),
+            requirements: reads
+                .iter()
+                .map(|operation| requirement(&engine, operation))
+                .collect(),
+            bindings,
         };
         bootstrap.validate()?;
         let mut bootstrap_v2 = bootstrap.clone();
-        bootstrap_v2.descriptor = descriptor(all.clone())?;
-        bootstrap_v2.requirements = all.iter().map(requirement).collect();
+        bootstrap_v2.descriptor = descriptor(all.clone(), first)?;
+        bootstrap_v2.requirements = all
+            .iter()
+            .map(|operation| requirement(&engine, operation))
+            .collect();
         bootstrap_v2.validate_for(runtime::PrivateProtocol::V2)?;
+        let mut steps = Vec::new();
+        if let (Some(declared), Some(access)) = (&config.bindings, &config.auth.access) {
+            steps.push(Step {
+                id: declared.id.clone(),
+                access: access.clone(),
+                next: Some(declared.next.clone()),
+                engine: None,
+            });
+            for alternative in alternatives {
+                steps.push(Step {
+                    id: alternative.config.id,
+                    access: alternative.config.access,
+                    next: alternative.config.next,
+                    engine: Some(alternative.engine),
+                });
+            }
+        }
         Ok(Self {
             bootstrap,
             bootstrap_v2,
             http,
             hosts,
             engine,
+            steps,
             instance: config.instance,
             auth: config.auth,
             oauth: token_client,
@@ -1396,12 +1648,6 @@ impl Local {
         };
         Ok((oauth, grant, Sha256::digest(document.as_slice()).into()))
     }
-    /// The API port for one request and, for an OAuth profile, the cache key of
-    /// the access token it carries, so a refusal of that token can evict it.
-    async fn authenticated(&self, document: Secret) -> Result<(ScopedHttp, Option<[u8; 32]>)> {
-        let (credential, key) = self.credential(document).await?;
-        Ok((self.with(credential), key))
-    }
     /// The credential value a request carries, derived from the protected
     /// document (the token, the basic header value or an OAuth access token),
     /// and for an OAuth profile the cache key of that access token.
@@ -1442,6 +1688,7 @@ impl Local {
         subject: String,
         granted_scopes: Option<BTreeSet<String>>,
         collected_at_ms: u64,
+        binding: Option<String>,
     ) -> Result<Baseline> {
         Ok(Baseline {
             identity: registry::ExternalIdentity {
@@ -1454,10 +1701,81 @@ impl Local {
             valid_until_ms: collected_at_ms
                 .checked_add(self.auth.evidence_lifetime_ms)
                 .ok_or(Failure::Protocol)?,
+            binding,
         })
     }
-    /// The declared identity read, and the scope read when there is one.
-    async fn probe_identity(&self, http: &ScopedHttp, collected_at_ms: u64) -> Result<Baseline> {
+    /// The access read of one binding: its status and the admitted reason of
+    /// a refusal.
+    async fn access(
+        &self,
+        http: &ScopedHttp,
+        access: &AccessProbe,
+    ) -> Result<(u16, Option<String>)> {
+        let query: Vec<(&str, String)> = access
+            .query
+            .iter()
+            .map(|(name, value)| (name.as_str(), value.clone()))
+            .collect();
+        let response = http
+            .get(&segments(&access.path), &query)
+            .await
+            .map_err(Failure::from_provider)?;
+        let reason = (!(200..=299).contains(&response.status)
+            && response.body.len() <= DOCUMENT_LIMIT)
+            .then(|| connectors_core::reason::from_body(&response.body))
+            .flatten();
+        Ok((response.status, reason))
+    }
+    /// The binding the credential can read (`connectors_catalog.binding`):
+    /// each binding's access read in order, the first answered binds, and a
+    /// refusal moves on only when it is the answer the binding's `next`
+    /// names. Any other refusal stands, as `insufficient_scope` naming every
+    /// answer seen; `derived` is the credential value the reads carried, and a
+    /// reason holding any of it is withheld.
+    async fn select(
+        &self,
+        http: &ScopedHttp,
+        derived: &[u8],
+    ) -> std::result::Result<String, runtime::Refusal> {
+        let mut answers = Vec::new();
+        for step in &self.steps {
+            let (status, reason) = self.access(http, &step.access).await?;
+            if (200..=299).contains(&status) {
+                return Ok(step.id.clone());
+            }
+            let moves_on = step
+                .next
+                .as_ref()
+                .is_some_and(|next| next.matches(status, reason.as_deref()));
+            answers.push(match reason {
+                Some(reason) => format!("binding {} answered {status} ({reason})", step.id),
+                None => format!("binding {} answered {status}", step.id),
+            });
+            if moves_on {
+                continue;
+            }
+            if !matches!(status, 401 | 403) {
+                return Err(probe_failure(status).into());
+            }
+            break;
+        }
+        let reason = connectors_core::reason::admit(&answers.join("; "))
+            .filter(|reason| !connectors_core::reason::carries_value(reason, derived));
+        Err(runtime::Refusal {
+            failure: Failure::InsufficientScope,
+            reason,
+            retry_after_seconds: None,
+        })
+    }
+    /// The declared identity read, the scope read when there is one, and the
+    /// access read, or with bindings the binding the credential can read.
+    /// `derived` is the credential value the reads carry.
+    async fn probe_identity(
+        &self,
+        http: &ScopedHttp,
+        derived: &[u8],
+        collected_at_ms: u64,
+    ) -> std::result::Result<Baseline, runtime::Refusal> {
         let identity_path = self
             .auth
             .identity
@@ -1469,7 +1787,7 @@ impl Local {
             .await
             .map_err(Failure::from_provider)?;
         if response.status != 200 {
-            return Err(probe_failure(response.status));
+            return Err(probe_failure(response.status).into());
         }
         // A configured subject is the instance id: the answer proved the
         // credential and is not read, so its size and shape do not matter.
@@ -1480,7 +1798,7 @@ impl Local {
             (None, IdentitySource::Configuration) => self.instance.clone(),
             (Some(subject_pointer), IdentitySource::Api) => {
                 if response.body.len() > DOCUMENT_LIMIT {
-                    return Err(Failure::Protocol);
+                    return Err(Failure::Protocol.into());
                 }
                 let identity: Value =
                     connectors_core::read_json(&response.body).map_err(|_| Failure::Protocol)?;
@@ -1489,10 +1807,10 @@ impl Local {
                         text.clone()
                     }
                     Some(Value::Number(number)) => number.to_string(),
-                    _ => return Err(Failure::Protocol),
+                    _ => return Err(Failure::Protocol.into()),
                 }
             }
-            _ => return Err(Failure::InvalidConfiguration),
+            _ => return Err(Failure::InvalidConfiguration.into()),
         };
         let granted_scopes = match &self.auth.scopes {
             None => None,
@@ -1502,10 +1820,10 @@ impl Local {
                     .await
                     .map_err(Failure::from_provider)?;
                 if response.status != 200 {
-                    return Err(probe_failure(response.status));
+                    return Err(probe_failure(response.status).into());
                 }
                 if response.body.len() > DOCUMENT_LIMIT {
-                    return Err(Failure::Protocol);
+                    return Err(Failure::Protocol.into());
                 }
                 let document: Value =
                     connectors_core::read_json(&response.body).map_err(|_| Failure::Protocol)?;
@@ -1520,38 +1838,108 @@ impl Local {
                         || scope.len() > 256
                         || !scope.bytes().all(|b| b.is_ascii_graphic())
                     {
-                        return Err(Failure::Protocol);
+                        return Err(Failure::Protocol.into());
                     }
                     granted.insert(scope.to_owned());
                 }
                 if granted.len() > 64 {
-                    return Err(Failure::Protocol);
+                    return Err(Failure::Protocol.into());
                 }
                 if !self.auth.minimum_scopes.is_subset(&granted) {
-                    return Err(Failure::InsufficientScope);
+                    return Err(Failure::InsufficientScope.into());
                 }
                 Some(granted)
             }
         };
-        if let Some(access) = &self.auth.access {
-            let query: Vec<(&str, String)> = access
-                .query
-                .iter()
-                .map(|(name, value)| (name.as_str(), value.clone()))
-                .collect();
-            let response = http
-                .get(&segments(&access.path), &query)
-                .await
-                .map_err(Failure::from_provider)?;
-            match response.status {
-                200..=299 => {}
-                // The credential identified its holder a moment ago; a refusal of
-                // this read is what it may not do, not a credential to repair.
-                401 | 403 => return Err(Failure::InsufficientScope),
-                status => return Err(probe_failure(status)),
+        // The credential identified its holder a moment ago; a refusal of an
+        // access read is what it may not do, not a credential to repair.
+        let binding = if !self.steps.is_empty() {
+            Some(self.select(http, derived).await?)
+        } else {
+            if let Some(access) = &self.auth.access {
+                match self.access(http, access).await?.0 {
+                    200..=299 => {}
+                    401 | 403 => return Err(Failure::InsufficientScope.into()),
+                    status => return Err(probe_failure(status).into()),
+                }
             }
+            None
+        };
+        Ok(self.baseline(subject, granted_scopes, collected_at_ms, binding)?)
+    }
+    /// [`runtime::Adapter::validate_explained`].
+    async fn validate_refusing(
+        &self,
+        profile: &str,
+        document: Secret,
+    ) -> std::result::Result<Baseline, runtime::Refusal> {
+        if profile != self.auth.profile {
+            return Err(Failure::Unsupported.into());
         }
-        self.baseline(subject, granted_scopes, collected_at_ms)
+        let collected_at_ms = connectors_sdk::now_ms();
+        if !self.auth.scheme.is_oauth() {
+            let (credential, _) = self.credential(document).await?;
+            let derived = Zeroizing::new(credential.0.clone());
+            let http = self.with(credential);
+            return self.probe_identity(&http, &derived, collected_at_ms).await;
+        }
+        // Validation always proves the stored entry itself, never a cache, and
+        // caches the fresh access token only once the credential validated.
+        let (oauth, grant, key) = self.oauth_entry(document)?;
+        let result = async {
+            let exchanged = oauth.exchange(&grant).await?;
+            let baseline = match (self.auth.identity.source, &grant) {
+                (IdentitySource::IdToken, Grant::Refresh(entry)) => {
+                    let (subject, scope) = oauth.identity(entry, &exchanged).await?;
+                    if subject.is_empty() || subject.len() > 256 {
+                        return Err(Failure::Protocol.into());
+                    }
+                    let granted = scope_set(&scope)?;
+                    if !self.auth.minimum_scopes.is_subset(&granted) {
+                        return Err(Failure::InsufficientScope.into());
+                    }
+                    self.baseline(subject, Some(granted), collected_at_ms, None)?
+                }
+                (IdentitySource::IdToken, Grant::ClientCredentials(_)) => {
+                    return Err(Failure::InvalidConfiguration.into());
+                }
+                // Refused at load; never reached.
+                (IdentitySource::Configuration, _) => {
+                    return Err(Failure::InvalidConfiguration.into());
+                }
+                (IdentitySource::Api, _) => {
+                    let derived = Zeroizing::new(exchanged.access.as_bytes().to_vec());
+                    let http = self.with(Secret(derived.to_vec()));
+                    self.probe_identity(&http, &derived, collected_at_ms)
+                        .await?
+                }
+            };
+            oauth.store(key, &exchanged);
+            Ok(baseline)
+        }
+        .await;
+        self.evict_refused(
+            Some(key),
+            &result
+                .as_ref()
+                .map(|_| ())
+                .map_err(|refusal: &runtime::Refusal| refusal.failure),
+        );
+        result
+    }
+    /// The engine of `binding`: the first binding's for none and for the
+    /// first, an alternative's for that alternative. The server has checked
+    /// the binding against the bootstrap, so another is stale.
+    fn engine_of(&self, binding: Option<&str>) -> Result<&Engine> {
+        let Some(id) = binding else {
+            return Ok(&self.engine);
+        };
+        let step = self
+            .steps
+            .iter()
+            .find(|step| step.id == id)
+            .ok_or(Failure::StaleDescription)?;
+        Ok(step.engine.as_ref().unwrap_or(&self.engine))
     }
     /// The access token a refused request carried is not used again.
     fn evict_refused<T>(&self, key: Option<[u8; 32]>, result: &Result<T>) {
@@ -1677,49 +2065,18 @@ impl runtime::Adapter for Local {
         }))
     }
     async fn validate(&self, profile: &str, document: Secret) -> Result<Baseline> {
-        if profile != self.auth.profile {
-            return Err(Failure::Unsupported);
-        }
-        let collected_at_ms = connectors_sdk::now_ms();
-        if !self.auth.scheme.is_oauth() {
-            let (http, _) = self.authenticated(document).await?;
-            return self.probe_identity(&http, collected_at_ms).await;
-        }
-        // Validation always proves the stored entry itself, never a cache, and
-        // caches the fresh access token only once the credential validated.
-        let (oauth, grant, key) = self.oauth_entry(document)?;
-        let result = async {
-            let exchanged = oauth.exchange(&grant).await?;
-            let baseline = match (self.auth.identity.source, &grant) {
-                (IdentitySource::IdToken, Grant::Refresh(entry)) => {
-                    let (subject, scope) = oauth.identity(entry, &exchanged).await?;
-                    if subject.is_empty() || subject.len() > 256 {
-                        return Err(Failure::Protocol);
-                    }
-                    let granted = scope_set(&scope)?;
-                    if !self.auth.minimum_scopes.is_subset(&granted) {
-                        return Err(Failure::InsufficientScope);
-                    }
-                    self.baseline(subject, Some(granted), collected_at_ms)?
-                }
-                (IdentitySource::IdToken, Grant::ClientCredentials(_)) => {
-                    return Err(Failure::InvalidConfiguration);
-                }
-                // Refused at load; never reached.
-                (IdentitySource::Configuration, _) => {
-                    return Err(Failure::InvalidConfiguration);
-                }
-                (IdentitySource::Api, _) => {
-                    let http = self.with(Secret(exchanged.access.as_bytes().to_vec()));
-                    self.probe_identity(&http, collected_at_ms).await?
-                }
-            };
-            oauth.store(key, &exchanged);
-            Ok(baseline)
-        }
-        .await;
-        self.evict_refused(Some(key), &result);
-        result
+        self.validate_refusing(profile, document)
+            .await
+            .map_err(|refusal| refusal.failure)
+    }
+    /// With bindings, a credential every binding refuses is refused as
+    /// `insufficient_scope` with a reason naming each binding's answer.
+    async fn validate_explained(
+        &self,
+        profile: &str,
+        document: Secret,
+    ) -> std::result::Result<Baseline, runtime::Refusal> {
+        self.validate_refusing(profile, document).await
     }
     async fn invoke(
         &self,
@@ -1746,6 +2103,43 @@ impl runtime::Adapter for Local {
         input: Value,
         deadline: Instant,
     ) -> std::result::Result<Value, runtime::Refusal> {
+        self.read(
+            &self.engine,
+            operation,
+            partition,
+            document,
+            input,
+            deadline,
+        )
+        .await
+    }
+    /// A read under the binding the connection's evidence selected, by that
+    /// binding's engine: only its own selection's ids and requests.
+    async fn invoke_bound(
+        &self,
+        binding: Option<&str>,
+        operation: &str,
+        partition: &str,
+        document: Secret,
+        input: Value,
+        deadline: Instant,
+    ) -> std::result::Result<Value, runtime::Refusal> {
+        let engine = self.engine_of(binding)?;
+        self.read(engine, operation, partition, document, input, deadline)
+            .await
+    }
+}
+impl Local {
+    /// [`runtime::Adapter::invoke_explained`] by `engine`.
+    async fn read(
+        &self,
+        engine: &Engine,
+        operation: &str,
+        partition: &str,
+        document: Secret,
+        input: Value,
+        deadline: Instant,
+    ) -> std::result::Result<Value, runtime::Refusal> {
         let cached = self.oauth.as_deref().is_some_and(|oauth| {
             document.0.len() <= DOCUMENT_LIMIT
                 && oauth
@@ -1754,22 +2148,28 @@ impl runtime::Adapter for Local {
         });
         let again = cached.then(|| Secret(document.0.clone()));
         let result = self
-            .read_once(operation, partition, document, input.clone(), deadline)
+            .read_once(
+                engine,
+                operation,
+                partition,
+                document,
+                input.clone(),
+                deadline,
+            )
             .await;
         match (result, again) {
             (Err(refusal), Some(document)) if refusal.failure == Failure::InvalidCredential => {
-                self.read_once(operation, partition, document, input, deadline)
+                self.read_once(engine, operation, partition, document, input, deadline)
                     .await
             }
             (result, _) => result,
         }
     }
-}
-impl Local {
     /// One read with the credential the stored entry yields now: the cached
     /// access token while it is usable, otherwise a fresh exchange.
     async fn read_once(
         &self,
+        engine: &Engine,
         operation: &str,
         _partition: &str,
         document: Secret,
@@ -1785,8 +2185,7 @@ impl Local {
         let http = self.http.with_credential(credential.clone());
         let hosts = self.host_ports(&credential);
         let started = Instant::now();
-        let mut result = self
-            .engine
+        let mut result = engine
             .read_reaching(&http, &hosts, &self.instance, operation, input.clone())
             .await;
         // A read is sent once more, and only once, after the delay the
@@ -1800,9 +2199,7 @@ impl Local {
             && let Some(bound) = deadline.checked_sub(RETRY_MARGIN)
         {
             tokio::time::sleep(wait).await;
-            let second = self
-                .engine
-                .read_reaching(&http, &hosts, &self.instance, operation, input);
+            let second = engine.read_reaching(&http, &hosts, &self.instance, operation, input);
             if let Ok(second) =
                 tokio::time::timeout_at(tokio::time::Instant::from_std(bound), second).await
             {

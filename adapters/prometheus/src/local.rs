@@ -130,6 +130,7 @@ impl Local {
         );
         let descriptor = adapter.descriptor();
         let bootstrap = Bootstrap {
+            bindings: None,
             credential_revision: None,
             executable: None,
             instance: config.instance,
@@ -195,6 +196,7 @@ impl connectors_host::local::runtime::Adapter for Local {
             .await
             .map_err(native_failure)?;
         Ok(Baseline {
+            binding: None,
             // Prometheus has no user or account read; the subject is the configured
             // connection (identity source `configuration`, see auth.rs).
             identity: registry::ExternalIdentity {
