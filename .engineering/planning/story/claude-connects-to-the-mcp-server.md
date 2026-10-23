@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:claude-connects-to-the-mcp-server
 kind: story
-status: draft
+status: active
 title: Claude Code connects to connectors as a local stdio MCP server
 summary: claude mcp add registers connectors server --transport stdio; tools/list holds the admitted reads, tools/call reads through the owner
 relations:
@@ -38,7 +38,10 @@ scope:
   path: website/docs/connectors/mcp.md
 - confidence: cited
   path: website/docs/status.md
-revision: 8
+revision: 10
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-23T17:49:18Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":7}}}
+- {from: "proposed", to: "active", at: "2026-10-23T17:49:18Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":7}}}
 ---
 ## Outcome
 

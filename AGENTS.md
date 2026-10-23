@@ -169,6 +169,15 @@ description, a selected contract or model, or a shipped capability regenerates t
 status item names the test that holds it (`crates/connectors-docs/src/status.rs`). Every
 command a page shows is run in the tree and its output pasted from that run.
 
+A fixture recorded from a real MCP client (for example a headless `claude -p` session) runs
+with the client's tool set limited to the MCP server's tools (`--tools`, not only
+`--allowedTools`), and with an isolated `HOME` and Connectors configuration that hold no live
+credentials, so the client cannot reach a live provider through any other tool. On 2026-10-23
+a client limited only by `--allowedTools` fell back to the shell after a refused call and read a
+live provider through the operator's own configuration. Before a recording enters the tree, check
+it for local paths, account emails and session or organization ids, and run `b10x-gates scan-text`
+on it.
+
 ## Cutting a release
 
 For the current provider delivery, cut a release at each verified, usable batch
