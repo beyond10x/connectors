@@ -4,7 +4,8 @@
 //! instance; these files keep the fixtures that ran its configuration, and the
 //! revisions they digest to, as they were. `<page>.<n>.json` is the `n`th
 //! configuration `docs/<page>.md` showed; `<page>.write-values.json` holds the
-//! values a write instance changed in the page's read configuration.
+//! values a legacy write instance changed in the page's read configuration,
+//! from before one instance per account.
 #![allow(dead_code)]
 
 use std::{fs, path::Path};

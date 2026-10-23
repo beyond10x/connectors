@@ -68,8 +68,9 @@ const GMAIL_SCOPE: &str = "https://www.googleapis.com/auth/gmail.readonly";
 /// The scope the two draft writes and the send's preflight read need, per the
 /// pinned document. Of the eight reads it covers only `users.getProfile`.
 const COMPOSE_SCOPE: &str = "https://www.googleapis.com/auth/gmail.compose";
-/// The instance id of the guide's write instance.
-const WRITE_INSTANCE: &str = "google-gmail-write";
+/// The instance id of the legacy write instance the guide showed before one
+/// instance per account (`hand_written`).
+const LEGACY_WRITE_INSTANCE: &str = "google-gmail-write";
 /// The `auth_uri` Google writes into a downloaded installed-app client file;
 /// the client-file connect compares the profile's `authorize_url` with it
 /// byte for byte.
@@ -728,7 +729,7 @@ fn guide_cites_the_draft_writes_the_compose_scope_and_the_one_instance() {
     for stale in [
         "Writes use a separate instance",
         "connections repair",
-        format!("`{WRITE_INSTANCE}`").as_str(),
+        format!("`{LEGACY_WRITE_INSTANCE}`").as_str(),
     ] {
         assert!(!flat.contains(stale), "the guide still says {stale}");
     }
@@ -739,9 +740,10 @@ fn guide_cites_the_draft_writes_the_compose_scope_and_the_one_instance() {
 fn documented_config() -> Value {
     serde_json::from_str(&hand_written::blocks("catalog-google-gmail.md")[0]).unwrap()
 }
-/// The write configuration the guide showed: its read configuration with the
-/// write values it listed applied (`hand_written`).
-fn documented_write_config() -> Value {
+/// The legacy write configuration the guide showed before one instance per
+/// account: its read configuration with the write values it listed applied
+/// (`hand_written`).
+fn legacy_write_config() -> Value {
     let values: Value = serde_json::from_str(&hand_written::file(
         "catalog-google-gmail.write-values.json",
     ))
@@ -753,13 +755,13 @@ fn documented_write_config() -> Value {
     config
 }
 
-/// The hand-written write instance asks for the compose scope and nothing that
+/// The legacy write instance asks for the compose scope and nothing that
 /// reads the mailbox, and keeps the read block's `authorize_url`, which must be
 /// the client file's `auth_uri` for `connections connect` to accept the file.
 #[test]
-fn guide_documents_the_write_instance() {
-    let config = documented_write_config();
-    assert_eq!(config["instance"], WRITE_INSTANCE);
+fn the_legacy_write_instance_asks_for_the_compose_scope() {
+    let config = legacy_write_config();
+    assert_eq!(config["instance"], LEGACY_WRITE_INSTANCE);
     assert_eq!(config["auth"]["minimum_scopes"], json!([COMPOSE_SCOPE]));
     assert_eq!(
         config["auth"]["requested_scopes"],
@@ -952,10 +954,10 @@ impl Provider {
     fn new() -> Self {
         Self::with(documented_config(), GMAIL_SCOPE)
     }
-    /// The guide's write instance against the fixture, whose token route
+    /// The legacy write instance against the fixture, whose token route
     /// grants the compose scope.
-    fn writer() -> Self {
-        Self::with(documented_write_config(), COMPOSE_SCOPE)
+    fn legacy_writer() -> Self {
+        Self::with(legacy_write_config(), COMPOSE_SCOPE)
     }
     /// `config` against the fixture, whose token route grants `granted`.
     fn with(mut config: Value, granted: &'static str) -> Self {
@@ -1640,7 +1642,7 @@ fn write(
 /// document is refused where the owner decodes it.
 #[test]
 fn each_write_without_an_approval_is_refused_before_any_request() {
-    let provider = Provider::writer();
+    let provider = Provider::legacy_writer();
     let mut v1 = Child::spawn(&provider.selection()).unwrap();
     let mut v2 = Child::spawn(&provider.write_selection()).unwrap();
     let described = v2.bootstrap().descriptor().unwrap();
@@ -1786,7 +1788,7 @@ fn subject(child: &Child, operation: &str, input: &Value) -> approvals::Subject 
 /// the input it was issued for, and that write sends exactly its body.
 #[test]
 fn a_write_approved_for_a_different_input_is_refused() {
-    let provider = Provider::writer();
+    let provider = Provider::legacy_writer();
     let mut child = Child::spawn(&provider.write_selection()).unwrap();
     let key = approval_key();
     let signer = approvals::Signer::from_seed(
@@ -1829,7 +1831,7 @@ fn a_write_approved_for_a_different_input_is_refused() {
 /// the body unchanged, without `messageId`.
 #[test]
 fn users_drafts_send_of_a_changed_draft_fails_the_preflight_and_sends_nothing() {
-    let provider = Provider::writer();
+    let provider = Provider::legacy_writer();
     let mut child = Child::spawn(&provider.write_selection()).unwrap();
     let operation = "users.drafts.send";
     let [_, (_, current)] = write_inputs();
@@ -1926,7 +1928,7 @@ fn users_drafts_send_refuses_a_body_beyond_the_draft_id() {
                "properties": {"id": {"type": ["string", "integer", "boolean"]}},
                "required": ["id"], "additionalProperties": false})
     );
-    let provider = Provider::writer();
+    let provider = Provider::legacy_writer();
     let mut child = Child::spawn(&provider.write_selection()).unwrap();
     let [_, (operation, current)] = write_inputs();
     for extra in [
@@ -1955,7 +1957,7 @@ fn users_drafts_send_refuses_a_body_beyond_the_draft_id() {
 /// what a send pins — returned.
 #[test]
 fn users_drafts_create_sends_one_post_with_its_body_and_no_preflight() {
-    let provider = Provider::writer();
+    let provider = Provider::legacy_writer();
     let mut child = Child::spawn(&provider.write_selection()).unwrap();
     let [(operation, input), _] = write_inputs();
     let result = write(&mut child, operation, &input).unwrap();
@@ -1974,26 +1976,26 @@ fn users_drafts_create_sends_one_post_with_its_body_and_no_preflight() {
     );
 }
 
-/// The guide's write instance names the compose scope in `minimum_scopes`: a
+/// The legacy write instance names the compose scope in `minimum_scopes`: a
 /// refresh token granted only the read-only scope refuses validation as
 /// insufficient scope, and one granted the compose scope validates. The
 /// read-only grant still validates the guide's read configuration.
 #[test]
-fn gmail_write_config_requires_compose_scope() {
+fn the_legacy_write_config_requires_the_compose_scope() {
     let deadline = || connectors_sdk::now_ms() + 30_000;
-    let read_only = Provider::with(documented_write_config(), GMAIL_SCOPE);
+    let read_only = Provider::with(legacy_write_config(), GMAIL_SCOPE);
     let mut child = Child::spawn(&read_only.selection()).unwrap();
     assert!(
         matches!(
             child.validate(PROFILE, &secret(), deadline()),
             Err(Failure::InsufficientScope)
         ),
-        "a read-only grant validated the write instance"
+        "a read-only grant validated the legacy write instance"
     );
     assert_eq!(read_only.requests().len(), 1, "one token exchange");
     assert_eq!(read_only.requests()[0].1, "/token");
 
-    let compose = Provider::writer();
+    let compose = Provider::legacy_writer();
     let mut child = Child::spawn(&compose.selection()).unwrap();
     child.validate(PROFILE, &secret(), deadline()).unwrap();
 
@@ -2002,14 +2004,15 @@ fn gmail_write_config_requires_compose_scope() {
     child.validate(PROFILE, &secret(), deadline()).unwrap();
 }
 
-/// The guide's route to a write-capable connection: its write instance,
-/// `google-gmail-write`, starts its own acquisition beside an existing
-/// read-only connection. The guide's reason repair cannot widen the read
-/// connection holds: the compose scope changes the configuration revision and
-/// the profile, both part of the binding, and the read instance reconfigured
-/// for writes is refused a new acquisition while the read one exists.
+/// A pinned installation's legacy write instance, from before one instance per
+/// account, `google-gmail-write`, starts its own acquisition beside an existing
+/// read-only connection. The reason the guide then gave, that repair cannot
+/// widen the read connection, holds: the compose scope changes the
+/// configuration revision and the profile, both part of the binding, and the
+/// read instance reconfigured for writes is refused a new acquisition while
+/// the read one exists.
 #[test]
-fn the_documented_write_instance_starts_a_fresh_acquisition() {
+fn a_legacy_write_instance_starts_a_fresh_acquisition() {
     let scratch = tempfile::tempdir().unwrap();
     let directory = scratch.path().join("private");
     filesystem::directory(&directory, true, true).unwrap();
@@ -2021,8 +2024,8 @@ fn the_documented_write_instance_starts_a_fresh_acquisition() {
         print_bootstrap(&path).binding(PROFILE).unwrap()
     };
     let read = bootstrap("read.json", documented_config());
-    let write = bootstrap("write.json", documented_write_config());
-    let mut widened = documented_write_config();
+    let write = bootstrap("write.json", legacy_write_config());
+    let mut widened = legacy_write_config();
     widened["instance"] = documented_config()["instance"].clone();
     let widened = bootstrap("widened.json", widened);
 
@@ -2034,11 +2037,11 @@ fn the_documented_write_instance_starts_a_fresh_acquisition() {
     let registry = registry::Registry::new(&state);
     let now = connectors_sdk::now_ms();
     registry.begin(&read, now).unwrap();
-    assert_eq!(write.instance_id, WRITE_INSTANCE);
+    assert_eq!(write.instance_id, LEGACY_WRITE_INSTANCE);
     assert_ne!(write.instance_id, read.instance_id);
     registry
         .begin(&write, now + 1)
-        .unwrap_or_else(|failure| panic!("the write instance was refused: {failure:?}"));
+        .unwrap_or_else(|failure| panic!("the legacy write instance was refused: {failure:?}"));
     assert_eq!(widened.instance_id, read.instance_id);
     let read = serde_json::to_value(&read).unwrap();
     let widened_value = serde_json::to_value(&widened).unwrap();

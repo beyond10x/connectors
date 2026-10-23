@@ -236,17 +236,17 @@ fn canonical(relative: &str) -> PathBuf {
     root().join(relative).canonicalize().unwrap()
 }
 
-/// The guide's route to a write-capable connection: a second instance,
-/// `google-slides-write`, whose configuration is the read configuration with
-/// the guide's write values applied, connected afresh with `connections
-/// connect`. Beside an existing read-only connection, that instance starts a
-/// fresh acquisition. The guide's reason repair cannot widen the read
-/// connection holds: the write scopes change the configuration revision (the
+/// A pinned installation's legacy write instance, from before one instance per
+/// account, `google-slides-write`, whose configuration is the read
+/// configuration with the old guide's write values applied, connected afresh
+/// with `connections connect`. Beside an existing read-only connection, that
+/// instance starts a fresh acquisition. The reason the guide then gave, that
+/// repair cannot widen the read connection, holds: the write scopes change the configuration revision (the
 /// provider digests `auth`, `adapters/catalog/src/local.rs:703`) and the
 /// profile, both part of the binding, and the same instance reconfigured for
 /// writes is refused a new acquisition while the read one exists.
 #[test]
-fn the_documented_write_instance_starts_a_fresh_acquisition() {
+fn a_legacy_write_instance_starts_a_fresh_acquisition() {
     let scratch = tempfile::tempdir().unwrap();
     let directory = scratch.path().join("private");
     filesystem::directory(&directory, true, true).unwrap();
@@ -284,13 +284,13 @@ fn the_documented_write_instance_starts_a_fresh_acquisition() {
     let now = connectors_sdk::now_ms();
     // The operator's existing read-only connection.
     registry.begin(&read, now).unwrap();
-    // The documented route: the write instance starts its own acquisition.
+    // A legacy write instance starts its own acquisition.
     assert_eq!(write.instance_id, "google-slides-write");
     assert_ne!(write.instance_id, read.instance_id);
     registry
         .begin(&write, now + 1)
-        .unwrap_or_else(|failure| panic!("the write instance was refused: {failure:?}"));
-    // Not the route: the read instance itself reconfigured for writes.
+        .unwrap_or_else(|failure| panic!("the legacy write instance was refused: {failure:?}"));
+    // The read instance itself reconfigured for writes.
     assert_eq!(widened.instance_id, read.instance_id);
     let read = serde_json::to_value(&read).unwrap();
     let widened_value = serde_json::to_value(&widened).unwrap();
