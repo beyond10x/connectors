@@ -64,7 +64,7 @@ result envelope does not make native query/continuation semantics shared.
 | SQL | [Read profiles](sql/contracts/reads/v1alpha1/semantics.md) for PostgreSQL and MySQL, [ESS](sql/spec/ess/system.yaml); declaration, native runtime and tests live in sql/ |
 | Tavily | [Websearch profile `tavily/2026-10`](tavily/contracts/websearch/v1alpha1/semantics.md), pinned OpenAPI in tavily/upstream/, [ESS](tavily/spec/ess/system.yaml); native runtime and tests in tavily/; see [the Tavily guide](../docs/local-tavily.md) |
 | [Catalog](catalog/design.md) | Optional catalog adapter design |
-| [MCP](mcp/design.md) | [Pinned specification revisions](mcp/contracts/protocol/v1alpha1/evidence/20260912/specification-sources.md), [ESS](mcp/spec/ess/system.yaml); protocol contracts and transport/capability profile selection remain unauthored |
+| [MCP](mcp/design.md) | [Pinned specification revisions](mcp/contracts/protocol/v1alpha1/evidence/20260912/specification-sources.md), [ESS](mcp/spec/ess/system.yaml), selected directional contracts and native naming/framing components; complete inbound/outbound runtime remains unfinished |
 
 Each authored native model lives in `spec/ess` with namespace
 `connectors_<owner>.<domain>`. Shared ESS includes none of these roots and imports

@@ -1,7 +1,8 @@
 # MCP inbound capability projection — server/v1alpha1
 
-Status: authored contract and document-only cases; no runtime MCP projection is
-implemented or proved here. Owner: `story:mcp-inbound-capability-projection`.
+Status: authored full projection and document-only cases; the production
+[read-only tools subset](../../../../../docs/local-mcp-stdio.md) has process tests.
+Resources, prompts and mutations remain unfinished. Owner: `story:mcp-inbound-capability-projection`.
 [Local binding](semantics.md) owns the single configured owner, stdio admission,
 framing, cancellation, supervision and selected revisions. The
 [selection matrix](../../protocol/v1alpha1/selection.md) selects inbound tools,

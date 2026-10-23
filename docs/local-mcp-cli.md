@@ -1,21 +1,21 @@
 # MCP through the local CLI: selected intent
 
-**MCP runtime unavailable.** This guide selects a future local command spelling;
-it is not an executable MCP walkthrough. The current CLI has no `server` command,
-MCP instance configuration, MCP connection profile or MCP operation binding.
-[Compatibility metadata](../apps/connectors/spec/compatibility.json) remains
-`mcp: deferred`. The [authored inventory](../adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.json)
+**Inbound read-only tools run on Linux.** Use the [production stdio guide](local-mcp-stdio.md)
+for supported declarations, configuration, calls and limitations. This document
+retains the broader selected intent; resources, prompts, mutations and outbound
+MCP remain unfinished, so [compatibility metadata](../apps/connectors/spec/compatibility.json)
+remains `mcp: deferred`. The [authored inventory](../adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.json)
 is static documentation, not CLI output or a runtime discovery endpoint.
 
 Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
 
 For working provider journeys today, use the [catalog provider](local-catalog-provider.md),
 [Kubernetes](local-kubernetes-cli.md) or [guarded GitLab merge](local-gitlab-merge.md)
-guide. Those paths do not provide MCP support.
+guide. MCP exposes only operations meeting the runtime guide's complete binding.
 
-## Inbound stdio: selected intent, runtime unavailable
+## Inbound stdio: launch
 
-The exact intended launch is:
+The production launch is:
 
 ```text
 connectors --config CONFIG --state-dir STATE_DIR server --transport stdio
@@ -42,14 +42,14 @@ Their per-request metadata versus initialization obligations remain those of the
 local binding. Process startup alone is neither protocol initialization nor a
 grant to execute an operation.
 
-**Unavailable step:** configure the MCP projection and launch that command from
-your client. No complete MCP configuration schema or launch handler is selected
-by this guide. Do not paste an invented instance table into a working installation.
+Configure the MCP projection and launch that command from your client using the
+[runtime guide](local-mcp-stdio.md). The native configuration shape below is
+validated by the library and the protected owner's projection policy.
 Multi-caller/tenant-to-Connection assignment and cloud placement remain unresolved.
 The local single-owner intent does not close either decision.
 
-**Unavailable step:** discover and invoke through the running server. Once an
-executable binding exists, [projection](../adapters/mcp/contracts/server/v1alpha1/projection.md)
+The tools subset can discover and invoke through the running server.
+The full [projection](../adapters/mcp/contracts/server/v1alpha1/projection.md)
 requires implemented, fully bound, enabled, selected and metadata-admitted
 operations. `tools/list`, `resources/list` and `prompts/list` expose only those
 operations; empty eligibility gives an empty list, while unavailable admission
@@ -57,6 +57,68 @@ policy gives a refusal. Discovery neither probes credentials nor grants executio
 Resources and prompts remain read-only. Mutation advertisement remains withheld
 until the complete [mutation/replay binding](../adapters/mcp/contracts/server/v1alpha1/mutations.md)
 exists, including its protected approval source and explicit business key.
+
+## Local projection configuration
+
+The production stdio entry and the protected owner read this configuration. Its
+location appends `.mcp-stdio.json` to `CONFIG`: `/private/config.toml` would use
+`/private/config.toml.mcp-stdio.json`. The application must admit an owner-only
+regular file without following symlinks, bounded to 1 MiB. Missing or invalid input
+is a refusal, never an implicit empty catalog. Generic owner configuration stays
+unchanged; there is no extra server flag or default exposure.
+
+The [generated native types](../adapters/mcp/generated/configuration-types/types.rs)
+define the closed JSON shape. `format` is `connectors-mcp-local/1`; `exposures` is
+an explicit array, possibly empty. Every exposure requires `adapter_alias` (the
+configured instance's alias), `operation_ref`, `connection_ref`, a nonempty unique
+`families` array drawn from `tools`, `resources`, `prompts`, and boolean `enabled`.
+At most 1,000 exposures are accepted. An alias/operation pair occurs only once, so
+two connection selections cannot compete for one advertised identity. These
+selectors refer to existing host configuration and metadata; parsing creates no
+connection or authority.
+
+`limits` requires unsigned integer JSON tokens in these ranges:
+
+| Member | Range |
+|---|---|
+| `frame_octets` | 256–1,048,576, including newline |
+| `response_octets` | 1,024–33,554,432, including all representations and framing |
+| `concurrent_requests` | 1–16 |
+| `request_milliseconds` | 1–120,000 |
+
+The native response ceiling allows space for an 8 MiB owner service envelope in
+both structured content and escaped JSON text. Each operation must still fit its
+complete selected binding before advertisement and dispatch. These limits cannot
+extend the shared two-second lease or five-second teardown bounds.
+
+An exposure may select `approval_file`, an absolute bounded private path. It is
+never advertised or accepted from MCP input. Discovery does not open it or infer
+that it contains valid proof. Only an admitted new mutation may read it through
+the existing protected-source path; an admitted replay does not read or spend it.
+Duplicate or unknown JSON members, explicit null instead of a path, invalid
+selectors and conflicting families refuse configuration.
+
+Configuration is read anew for every admitted list page and invocation.
+Selection, enablement or target changes invalidate affected projection revisions;
+the serialized owner repeats or fences selection at dispatch. A startup-only
+snapshot does not satisfy this contract. The tools family is served; the
+resources and prompts families remain unfinished.
+
+The owner also reads `CONFIG.operation-curation.json`, the separate
+[protected operation curation](../contracts/service/local-operation-curation.md).
+Its complete metadata is pinned to the executable selection and the exact original
+cached bootstrap. Curation changes invalidate the projection revision, and current
+metadata permissions filter both operations and their metadata. Missing policy
+refuses; missing operation curation supplies no defaults. Curation alone does not
+establish native profile support or enforce a declared execution limit.
+
+The catalog executable implements the explicit
+[private bounded-read binding](../contracts/cli/v1alpha1/private-bounded-read.md).
+It carries the original monotonic execution deadline and shares one provider
+cutoff across OAuth exchange and business HTTP. Existing private selections do
+not upgrade automatically. The owner selects and enforces this binding from
+admitted operation metadata, including complete public-envelope byte limits,
+before a read is advertised through MCP.
 
 ## Outbound HTTP: current generic grammar, MCP binding unresolved
 

@@ -1,0 +1,47 @@
+domain: connectors_mcp.local_server
+summary: Explicit local deployment projection inputs, not caller or credential ownership.
+types:
+  # The selected inbound families in the existing selection/projection contracts.
+  - name: connectors_mcp.local_server.Family
+    kind: enum
+    variants: [tools, resources, prompts]
+  # One configured projection of an existing host operation. The adapter alias
+  # resolves through the ordinary owner configuration; instance/adapter identity
+  # comes from its admitted descriptor, never from an MCP request. connection_ref
+  # selects an existing host Connection for that operation. This is immutable
+  # deployment input, not a relation on McpCaller or McpInboundSession, and creates
+  # no Connection or cascading ownership. No secret bytes/locator are admitted.
+  - name: connectors_mcp.local_server.Exposure
+    kind: struct
+    fields:
+      - {name: adapter_alias, type: String}
+      - {name: operation_ref, type: String}
+      - {name: connection_ref, type: String}
+      - {name: families, type: "List<connectors_mcp.local_server.Family>"}
+      - {name: enabled, type: Boolean}
+      # Local owner configuration only. Never projected into MCP metadata or
+      # passed as caller authority. The existing protected-file reader opens
+      # this only for an admitted candidate attempt that needs proof. Retained
+      # replay does not read or spend it. Its presence selects a binding, not
+      # evidence that the file exists, is valid or authorizes this invocation.
+      - {name: approval_file, type: "Optional<String>"}
+  # Runtime validates every positive ceiling and the supported format before
+  # exposing capabilities. A decoded structural carrier alone grants nothing.
+  # Exact lease <=2000ms and cleanup <=5000ms are fixed shared requirements,
+  # not configurable relaxations. Native configuration cannot set caller UID.
+  - name: connectors_mcp.local_server.Limits
+    kind: struct
+    fields:
+      - {name: frame_octets, type: Integer}
+      - {name: response_octets, type: Integer}
+      - {name: concurrent_requests, type: Integer}
+      - {name: request_milliseconds, type: Integer}
+  - name: connectors_mcp.local_server.Configuration
+    kind: struct
+    fields:
+      - {name: format, type: String}
+      - {name: exposures, type: "List<connectors_mcp.local_server.Exposure>"}
+      - {name: limits, type: connectors_mcp.local_server.Limits}
+# UNMAPPED: cloud caller-to-Connection assignment remains its existing blocker.
+# These inputs are only for the single configured owner. They do not model a
+# durable MCP caller, session, snapshot, provider credential or rotating alias.

@@ -170,14 +170,15 @@ all selected revision/family pairs, exact target/credential isolation, independe
 policy and revocation races, safe audit acknowledgement, wrapping/escaping byte
 bounds, real deadline exhaustion, partial/lost replies and non-redispatch.
 
-All eight unresolved native relations in
-[state.yaml](../../../spec/ess/domains/state.yaml) stay unresolved: server binding
-to ServiceConfiguration, Connection, capability snapshot, credential custody and
-supervised OS process; outbound session to server binding; inbound session to
-caller; and caller to Connection. This document selects no identity, cardinality,
-persistence or deletion ownership for them. The caller-assignment and outbound
-stdio ownership blockers remain open. Contract guard success is no runtime
-conformance claim and resolves none of those relations.
+Seven native relations in [state.yaml](../../../spec/ess/domains/state.yaml) remain
+unresolved: server binding to ServiceConfiguration, Connection, capability snapshot
+and credential custody; general outbound HTTP/session binding lifetime; inbound
+session to caller; and caller to Connection. This document selects no identity,
+cardinality, persistence or deletion ownership for those mappings. The operator's
+2026-10-03 stdio decision separately resolves the supervised-process subset: one
+pinned process per outbound session, with its selected-server reference. The
+caller-assignment blocker remains open. Contract guard success is no runtime
+conformance claim and does not implement the newly selected stdio binding.
 
 | Case | Inbound | Outbound | Family | Obligation | Outcome |
 |---|---|---|---|---|---|
