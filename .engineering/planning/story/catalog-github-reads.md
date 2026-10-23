@@ -2,8 +2,10 @@
 format: aep.planning-md/3
 id: story:catalog-github-reads
 kind: story
-status: draft
+status: active
 title: 'GitHub reads through the catalog provider: what waits on the user, and public repository metadata'
+relations:
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
   path: adapters/README.md
@@ -37,13 +39,16 @@ scope:
   path: docs/catalog-github.md
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 23
+revision: 27
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-23T12:24:51Z", actor: "human:timo", revision: 24}
+- {from: "proposed", to: "active", at: "2026-10-23T12:24:51Z", actor: "human:timo", revision: 25}
 ---
 ## Outcome
 
 The assistant repository reads, through the Connectors CLI like the gitlab, jira and slack catalog providers, what waits on the authenticated GitHub user: review requests, assigned issues and pull requests, and notifications. Read only: no write, no mark-as-read.
 
-The same provider serves a second consumer that reads public repository metadata: organization repositories, one repository, its releases, its README and single files as text. One read-only provider serves both, so auth and paging are built once.
+The same provider serves a second consumer that reads public repository metadata: organization repositories, one repository, its releases, its README and single files as text. The `github` provider's read operations serve both, so auth and paging are built once; writes, when added, join the same provider.
 
 ## Source
 
@@ -98,3 +103,11 @@ github/rest-api-description release `v2.1.0` (2022-10-25, the newest release tag
   `conn-github-reads`, unbuilt since 2026-10-17; it is held as `dirty.patch` in that tree's
   `worktree archive`. The adversary's 6 cases are in `adapters/catalog/tests/github_reads_adversary.rs`.
 - Next: build and test fix pass 1 as a unit of the wave after 20261022, then a pull request.
+
+## Delivery
+
+Decided 2026-10-23 (approval-record:github-reads-option-a-20261023):
+
+- Branch `unit/github-reads` (396a146f8) is superseded. It is kept unmerged and will not merge. Its fix pass 1 edits live in the managed tree `conn-github-reads`.
+- Engine part, F1: a 403 or 429 with `Retry-After` is `rate_limited`, in connectors branch `unit/catalog-retry-after`, tested in `adapters/catalog/tests/engine.rs::a_secondary_rate_limit_with_requests_left_is_rate_limited`.
+- Provider part, the 10 reads with F2 and F5: one `connectors/github.yaml` in connectors-definitions, https://github.com/beyond10x/connectors-definitions/pull/9. Writes join the same file later; there is no separate read provider.

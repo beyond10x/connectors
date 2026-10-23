@@ -2,16 +2,20 @@
 format: aep.planning-md/3
 id: story:definitions-release-index
 kind: story
-status: draft
+status: implemented
 title: connectors-definitions publishes a tagged release whose index.json names every file SHA-256 and the commit
 relations:
 - decomposes: epic:catalog-connectors-only-in-definitions
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-23T12:37:09Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"review_outcome":2}}}
+- {from: "proposed", to: "active", at: "2026-10-23T12:37:09Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"review_outcome":2}}}
+- {from: "active", to: "implemented", at: "2026-10-23T12:43:11Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":2}}}
 ---
 ## Outcome
 
-A tag pushed to `beyond10x/connectors-definitions` publishes the three things the installer
+A tag pushed to `beyond10x/connectors-definitions` from 0.3.0 on publishes the three things the installer
 fetches, and the first such tag exists:
 
 1. the tag itself;
@@ -78,7 +82,7 @@ All paths are in `beyond10x/connectors-definitions`.
 
 ## Acceptance
 
-- The first tag of `beyond10x/connectors-definitions` has a release asset and an `index.json`
+- The first tag of `beyond10x/connectors-definitions` that publishes an index (0.3.0; 0.1.0 and 0.2.0 predate this story and stay without one) has a release asset and an `index.json`
   whose entries match the SHA-256 of every file under `connectors/`, `auth/` and `upstream/` in a
   checkout of that tag, and whose commit is the tagged commit.
 - At that tagged commit, `connectors/jira.yaml` carries the present checks of pull request 4:

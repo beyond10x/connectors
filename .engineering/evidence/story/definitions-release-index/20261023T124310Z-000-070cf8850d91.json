@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-23T12:43:10Z",
+  "actor": "human:timo",
+  "artifact": "story:definitions-release-index",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "beyond10x/connectors-definitions release 0.3.0 (run 39955186613, tag commit 3658573f48979b346c9ab4303cc8033b43c8c954): index.json schema urn:beyond10x:connectors-definitions-index:1, 141 files; sha256sum -c of every entry against the extracted tarball passed; index file set equals the tarball file set; 67 files under connectors/, auth/, upstream/ of a clone of tag 0.3.0 byte-equal to the tarball; connectors/jira.yaml:83 and :97 carry the pull request 4 present checks",
+    "reference": "https://github.com/beyond10x/connectors-definitions/releases/tag/0.3.0"
+  }
+}

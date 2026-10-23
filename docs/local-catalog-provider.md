@@ -756,7 +756,10 @@ The complete configuration used against the sandbox is
   `retry_after_seconds` comes from `Retry-After` when the answer carries one,
   and otherwise is the number of seconds from now to the Unix time the `reset`
   header names (none for a time already past or a value that is not whole
-  seconds). Every other `403` keeps the classification `rate_limit_reasons`
+  seconds). A `403` or `429` that carries `Retry-After` is `rate_limited`
+  too, whatever its `remaining` header says, with the delay `Retry-After`
+  names: a secondary limit, such as GitHub's, answers so while requests are
+  left. Every other `403` keeps the classification `rate_limit_reasons`
   or its status gives. A read answered so is sent once more only under the
   rule in [Limits](#limits); a reset an hour away is never waited for. A header
   name that is empty or not an HTTP token, or the same name twice without
