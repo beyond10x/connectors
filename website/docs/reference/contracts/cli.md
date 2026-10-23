@@ -97,6 +97,7 @@ management wire payload or a persistent record.
 | `approvals policy-set` | local policy coordinator | `ApprovalPolicySetInput` → `ApprovalPolicyResult` | no / no |
 | `approvals prepare` | local subject coordinator | `ApprovalPrepareInput` → `ApprovalPrepareResult` | no / no |
 | `approvals issue` | local issuer coordinator | `ApprovalIssueInput` → `ApprovalIssueResult` | no / no |
+| `list` | the shipped connector declarations and, when one exists, the configuration's `[connectors]` table ([listing connectors](#listing-connectors)) | inputless Context → `ConnectorListResult` | no / no |
 | `instances list` | configured inventory | `AdapterListInput` → `AdapterListResult` | no / no |
 | `instances describe` | configured inventory and selected cached metadata | `AdapterDescribeInput` → `AdapterDescribeResult` | no / no |
 | `instances status` | existing lifecycle owner observation | `AdapterStatusInput` → `AdapterStatusResult` | no / no |
@@ -696,6 +697,36 @@ one refuses as `invalid_input` at `arguments`, and `--connection` chooses.
 `connections status` keeps requiring `--connection` or `--acquisition`. Under
 `--output json` each of these refusals is the one failure envelope on standard
 error.
+
+### Listing connectors
+
+`list` answers which connectors this build can serve. It has one row per
+connector whose declaration the build ships (`connectors.declarations.Connector`,
+compiled into the binary from the declarations the generic HTTP implementation
+releases with it), in connector id order: its `id`, the auth profile ids it
+declares in `profiles`, in declaration order, and in `instances` the names of the
+instances the configuration lists under `[connectors.<id>.instances]`, in name
+order. Connectors served by their own executables ship no declaration in the
+binary and have no row. No row names an implementation.
+
+It needs no configuration and no state directory: only the configuration path
+is resolved, and with no file at that path, or no resolvable path, every row's
+`instances` is empty and the command succeeds. A file that exists is read and
+checked as every other command reads it (owner-only, at most 1 MiB, the closed
+`connectors-local` envelope, its format, its names and selectors, its pins and
+aliases), and a file refused there is refused as for every other command,
+naming its rule. The one difference is that an unpinned instance is not
+derived: it is checked as a derivation checks it before the catalog provider
+starts and then listed, so nothing is started, and what only the provider
+answers (whether it ships the connector, which profiles it declares, and so
+whether the instance gets an entry that counts toward the 64-entry limit and
+that a consumer, `default_adapter` or custody target may name) is not checked:
+such a name is accepted. `list` never refuses a file every other command
+accepts. Legacy `[adapters.<alias>]` entries are not
+connector instances and are not listed; `instances list` lists every
+configured entry. Under `--output human` the rows are a table with the columns
+`CONNECTOR`, `PROFILES` and `INSTANCES`, `-` where a row has none; under
+`--output json` they are the result envelope.
 
 ### Migrating adapter entries
 

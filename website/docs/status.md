@@ -9,7 +9,7 @@ custom_edit_url: null
 
 # Status
 
-As of 2026-10-16: 66 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. A release page carries the source archives and Linux and macOS binaries of `connectors` and `connectors-catalog-provider`; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
+As of 2026-10-16: 67 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. A release page carries the source archives and Linux and macOS binaries of `connectors` and `connectors-catalog-provider`; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
 
 ## Service boundary
 
@@ -34,6 +34,7 @@ As of 2026-10-16: 66 capabilities are shipped, 3 are decided and 5 are planned. 
 | [Saved connections](./concepts/local-runtime.md) | ● shipped | connections connect validates a credential and keeps it in Secret Service custody; revalidate, reconnect and revoke manage it, and an unanswered revalidation is outcome_unknown. |
 | [Unattended reads](./concepts/local-runtime.md) | ● shipped | A connection connected or revalidated once keeps serving reads across any number of evidence lifetimes: a read on lapsed evidence recollects it once from custody, with no re-entry, before it is served. |
 | [Connector instances](./guides/set-up-the-local-cli.md#configure-instances) | ● shipped | A connectors-local/5 configuration enables connectors by name and names their instances; an instance that pins nothing is derived from the catalog provider installed beside the CLI. |
+| [Listing connectors](./reference/cli.md) | ● shipped | connectors list prints every connector the CLI ships a declaration for, with its auth profiles and configured instances, without a configuration file and without starting a process. |
 | [Selecting an instance](./reference/cli.md) | ● shipped | --connector and --instance select one instance; the deprecated --adapter reaches the same instance and says it is deprecated once. |
 | [Renamed commands](./reference/cli.md) | ● shipped | instances replaces the adapters group and connections reconnect replaces connections repair; each old name runs as its new one and says it is deprecated once. |
 | [Stale connections](./concepts/local-runtime.md#saved-connections) | ● shipped | A connection whose stored credential the provider refused is Stale until connections reconnect publishes a new credential under the same reference. |

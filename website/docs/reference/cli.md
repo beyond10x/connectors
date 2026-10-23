@@ -55,6 +55,7 @@ Every grouped command accepts these, anywhere on the command line.
 | [`connectors instances list`](#connectors-instances-list) | List configured instances; `adapters list` is its deprecated name |
 | [`connectors instances status`](#connectors-instances-status) | Observe the lifecycle owner of the process that serves one instance; `adapters status` is its deprecated name |
 | [`connectors instances stop`](#connectors-instances-stop) | Stop only the exact owned incarnation of the process that serves one instance; `adapters stop` is its deprecated name |
+| [`connectors list`](#connectors-list) | List every connector this build ships, with its auth profiles and the instances the configuration names; needs no configuration and starts no process |
 | [`connectors operations describe`](#connectors-operations-describe) | Inspect an operation and its exact schema identity |
 | [`connectors operations invoke`](#connectors-operations-invoke) | Invoke once under selected schema, revision and current admission |
 | [`connectors operations list`](#connectors-operations-list) | List operations from selected cached metadata |
@@ -516,6 +517,14 @@ connectors instances stop [OPTIONS] --expected-revision <field:expected_revision
 | `--expected-revision <field:expected_revision>` | yes | none | any |  |
 | `--host-incarnation <field:host_incarnation>` | yes | none | any |  |
 | `--child-incarnation <field:child_incarnation>` | yes | none | any |  |
+
+## `connectors list`
+
+List every connector this build ships, with its auth profiles and the instances the configuration names; needs no configuration and starts no process
+
+```text
+connectors list [OPTIONS]
+```
 
 ## `connectors operations describe`
 
