@@ -2,12 +2,14 @@
 format: aep.planning-md/3
 id: decision-blocker:custody-file-delivery-widens-custody
 kind: decision-blocker
-status: open
+status: cleared
 title: Nobody has decided whether a custody credential may be delivered to an owner-only file
 relations:
 - blocks: story:custody-credential-file-delivery
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 5
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-23T20:45:34Z", actor: "human:timo", revision: 5}
 ---
 ## Question
 
@@ -28,3 +30,16 @@ Recommended: A, scoped to one connection per delivery and refused for mounted cu
 Decider: operator
 
 Credential custody is on the operator never-list, so only the operator decides this (directing session, 2026-10-23). It is row 41 of the operator queue.
+
+## Decision
+
+Decided 2026-10-23 by the operator, option A. The directing session `b10x-chef-orchestrator` relayed the answer verbatim with its date: "A A" (A for this blocker, A for decision-blocker:mcp-tool-call-without-revision). Its instruction for this item:
+
+> custody-file-delivery-widens-custody, A. An architecture decision records the file delivery path: approval, exact path, 0600, atomic write, revision-guarded overwrite, and a receipt of path and revision only. It amends the two records, and then the story is scoped and implemented. Use your recommendation's scope: one connection per delivery, refused for mounted custody. The threat model is written and reviewed before the code.
+
+What follows from it:
+
+- An architecture decision records the delivery path and amends the accepted outcome of story:openrouter-management-provider and the mounted-secret custody threat model.
+- Scope: one connection per delivery; a delivery from mounted custody is refused.
+- The threat model for the delivery is written and reviewed before any code of story:custody-credential-file-delivery.
+- The story is then scoped and implemented in wave C.
