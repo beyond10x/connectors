@@ -2,7 +2,8 @@
 //! guarded writes classified across the provider's answers.
 use connectors_catalog::{bundle::Bundle, ingest, inventory};
 use connectors_catalog_provider::{
-    Check, Effect, Engine, Expectation, Guard, Postflight, Preflight, ResponseKind, Selection,
+    Check, Effect, Engine, Expectation, Guard, Postflight, Preflight, RateLimitHeaders,
+    ResponseKind, Selection,
 };
 use connectors_core::{ErrorCode, Result};
 use connectors_sdk::{
@@ -2595,6 +2596,69 @@ async fn a_429_without_a_readable_retry_after_names_no_delay() {
     let (error, _) = refused_read(unavailable).await;
     assert_eq!(error.code, ErrorCode::Unavailable);
     assert_eq!(error.retry_after_seconds, None);
+}
+
+/// A `status` answer carrying the declared rate-limit headers and, when
+/// named, a `Retry-After`.
+fn throttled(status: u16, remaining: &str, retry_after: Option<&str>) -> HttpResponse {
+    let mut headers = BTreeMap::from([
+        ("x-ratelimit-remaining".to_owned(), remaining.to_owned()),
+        ("x-ratelimit-reset".to_owned(), "1".to_owned()),
+    ]);
+    if let Some(value) = retry_after {
+        headers.insert("retry-after".to_owned(), value.to_owned());
+    }
+    HttpResponse {
+        status,
+        headers,
+        body: serde_json::to_vec(&json!({"message": "slow down"})).unwrap(),
+    }
+}
+
+async fn throttled_read(answer: HttpResponse) -> (connectors_core::Error, usize) {
+    let mut selections = selections();
+    selections[0].rate_limit_headers = Some(RateLimitHeaders {
+        remaining: "x-ratelimit-remaining".into(),
+        reset: "x-ratelimit-reset".into(),
+    });
+    let engine = Engine::new(&bundle(), "/api/v4", &selections).unwrap();
+    let http = reads(vec![answer]);
+    let error = engine
+        .read(
+            http.as_ref(),
+            "fixture",
+            "merge_requests.list",
+            json!({"id": "org/project"}),
+        )
+        .await
+        .expect_err("a 403 or 429 is a refusal");
+    let calls = http.calls.lock().unwrap().len();
+    (error, calls)
+}
+
+/// Under declared rate-limit headers, a `403` or `429` carrying `Retry-After`
+/// is `rate_limited` with that delay even while `remaining` says requests are
+/// left: a secondary limit answers so. A `403` with requests left and no
+/// `Retry-After` stays `forbidden`, and a spent `remaining` is still
+/// `rate_limited` without one.
+#[tokio::test]
+async fn a_secondary_rate_limit_with_requests_left_is_rate_limited() {
+    for (answer, delay) in [
+        (throttled(403, "4987", Some("60")), Some(60)),
+        (throttled(429, "4986", Some("30")), Some(30)),
+        (throttled(403, "0", Some("5")), Some(5)),
+        (throttled(403, "0", None), None),
+    ] {
+        let status = answer.status;
+        let (error, calls) = throttled_read(answer).await;
+        assert_eq!(error.code, ErrorCode::RateLimited, "{status}");
+        assert_eq!(error.retry_after_seconds, delay, "{status}");
+        assert_eq!(calls, 1, "{status}");
+    }
+    let (error, calls) = throttled_read(throttled(403, "4987", None)).await;
+    assert_eq!(error.code, ErrorCode::Forbidden);
+    assert_eq!(error.retry_after_seconds, None);
+    assert_eq!(calls, 1);
 }
 
 /// story:catalog-honours-retry-after: a write answered `429` is sent once
