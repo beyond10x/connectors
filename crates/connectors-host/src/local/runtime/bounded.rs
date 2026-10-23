@@ -213,7 +213,7 @@ pub(super) fn serve_read(
     channel::write(channel, &reply, None, &document, until)
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     #[test]
@@ -265,5 +265,17 @@ mod tests {
         assert_eq!(invalid.until().unwrap_err(), Failure::Timeout);
         value["unreviewed"] = serde_json::json!(true);
         assert!(serde_json::from_value::<ReadBudget>(value).is_err());
+    }
+}
+
+#[cfg(all(test, not(unix)))]
+mod unsupported_tests {
+    use super::*;
+    #[test]
+    fn a_budget_cannot_start_off_unix() {
+        assert_eq!(
+            ReadBudget::start(40_000, 30_000, 262_144, 4_194_304).unwrap_err(),
+            Failure::Unsupported
+        );
     }
 }
