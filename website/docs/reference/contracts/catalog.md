@@ -117,6 +117,7 @@ Status to safe `ErrorCode` for **generic reads only** (base vocabulary in `crate
 | 2xx under a selection's declared success envelope whose success member is `false` | the code the envelope's refusals give the body's error name, else its `otherwise` code (`InvalidInput`, `Unauthorized`, `Forbidden`, `NotFound`, `RateLimited` with `retry_after_seconds` from `Retry-After`, or `Internal`); never a success |
 | 2xx under a declared success envelope that is not a JSON object or whose success member is absent or not a boolean | `UpstreamProtocol` |
 | 403 or 429 under a selection's declared rate-limit headers whose `remaining` header is exactly `0` | `RateLimited`, `retry_after_seconds` from `Retry-After` when present, else the seconds from now to the Unix time its `reset` header names (absent for a time already past or a value that is not whole seconds) |
+| 403 or 429 under a selection's declared rate-limit headers that carries `Retry-After`, whatever its `remaining` header says (a secondary limit) | `RateLimited`, `retry_after_seconds` from `Retry-After` (absent for a value that names no delay) |
 | 2xx under a selection's declared embedded text: a file longer than its `max_bytes`, by the declared size or once decoded | `Capacity` |
 | 2xx under a declared embedded text whose decoded bytes are not UTF-8 or hold a NUL byte | `Unsupported` |
 | 2xx under a declared embedded text that is not a JSON object, or whose encoding is not `base64` or whose content is absent or not base64 | `UpstreamProtocol` |

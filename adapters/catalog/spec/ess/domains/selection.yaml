@@ -332,8 +332,11 @@ types:
   # header is exactly `0` is `rate_limited`, for a read and for a write's definite refusal,
   # whatever its body; its `reset` header, a Unix time in whole seconds, names the wait as
   # `retry_after_seconds` (the seconds from now to that time, none for a time already past),
-  # unless the answer also carries `Retry-After`, which is read first. Every other `403` keeps the
-  # classification `rate_limit_reasons` or its status gives. What the engine refuses when the
+  # unless the answer also carries `Retry-After`, which is read first. A `403` or `429` answer
+  # that carries `Retry-After` is `rate_limited` too, whatever its `remaining` header says (a
+  # secondary limit, such as GitHub's, answers so with requests left), its wait the delay
+  # `Retry-After` names. Every other `403` keeps the classification `rate_limit_reasons` or its
+  # status gives. What the engine refuses when the
   # selection loads beyond these invariants (a header name that is not a token, or the same
   # header twice without regard to case) is stated in the owner and pinned by the engine's tests.
   - name: connectors_catalog.selection.RateLimitHeaders

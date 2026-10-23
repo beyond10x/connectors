@@ -8,7 +8,7 @@ relations:
 - decomposes: epic:catalog-connectors-only-in-definitions
 - serves: vision:independent-contract-adapters
 - depends_on: story:definitions-release-index
-revision: 3
+revision: 4
 ---
 ## Outcome
 
@@ -54,6 +54,8 @@ format version and an unmet feature are each a refusal by name. Epic step 1.
   run on its own (inferred).
 - The reference lowerer is `crates/connectors-catalog/src/definition.rs` (`lower()`, ADR D3).
   When installed definitions are lowered is not decided by this story.
+
+- The published index, from connectors-definitions 0.3.0 on (`spec/domains/release.yaml` there): `schema` (`urn:beyond10x:connectors-definitions-index:1`, the format version D5 refuses when unknown), `tag`, `commit`, `features` (sorted; at 0.3.0 `embedded_text`, `query_fixed`, `query_folds`, `rate_limit_headers`, the names an unmet feature refuses), `asset` {`name`, `sha256`} and `files` [{`path`, `sha256`, `size`}], one entry per regular file of the asset, sorted by byte order, paths relative without the tarball prefix. Release assets are never replaced. 0.1.0 and 0.2.0 have no index.
 
 ## Domain relations
 
