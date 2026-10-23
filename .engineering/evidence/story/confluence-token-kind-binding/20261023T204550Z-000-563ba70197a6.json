@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-23T20:45:50Z",
+  "actor": "human:timo",
+  "artifact": "story:confluence-token-kind-binding",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test --locked -p connectors-catalog-provider --test confluence_binding on main 0336f1381: 12 passed, 0 failed, 1 ignored; the ignored CLI journey a_v1_bound_connection_reads_the_v1_page_through_the_cli_and_rebinds_on_revalidation passed in connectors-build ignored --family disposable; CI after 9201b1177: macOS host and CLI 30 runs, Linux repository gate 31 runs, 0 failures of the story tests (run ids in story:ci-timing-flakes-20261018, CI runs after the change)",
+    "reference": "approval-record:wave-20261023-closeout"
+  }
+}

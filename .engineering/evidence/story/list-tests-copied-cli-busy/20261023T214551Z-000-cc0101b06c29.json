@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-23T21:45:51Z",
+  "actor": "human:timo",
+  "artifact": "story:list-tests-copied-cli-busy",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "stress.sh on Linux, 20 cores each held by a nice 19 busy loop: adversary_list_connectors 200 passed, 0 failed of 200 (load 38.89); list_connectors 200 passed, 0 failed of 200 (load 43.76); neither file calls fs::copy or fs::write on a path it later executes (grep)",
+    "reference": "approval-record:wave-20261023-closeout"
+  }
+}

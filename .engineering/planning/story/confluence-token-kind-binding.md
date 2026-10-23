@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:confluence-token-kind-binding
 kind: story
-status: active
+status: implemented
 title: A Confluence connection binds v1 or v2 by probing its token once
 relations:
 - decomposes: epic:fluxplane-plugin-parity
@@ -24,10 +24,11 @@ scope:
   path: ess/domains/cli.yaml
 - confidence: cited
   path: ess/domains/credential_evidence.yaml
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-15T08:46:55Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-15T08:46:56Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-23T20:45:58Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Outcome
 
