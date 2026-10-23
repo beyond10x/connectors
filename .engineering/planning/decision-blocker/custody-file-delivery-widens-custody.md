@@ -7,7 +7,7 @@ title: Nobody has decided whether a custody credential may be delivered to an ow
 relations:
 - blocks: story:custody-credential-file-delivery
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 2
 ---
 ## Question
 
@@ -24,3 +24,7 @@ mounted-secret custody threat model admits no value in any output.
 | B | Keep custody closed: the consumer reads keys through Connectors instead (an invoke that proxies the upstream call, or a consumer launch that hands the credential to a child process). | The consumer has to change how it reads upstream credentials. |
 
 Recommended: A, scoped to one connection per delivery and refused for mounted custody.
+
+Decider: timo
+
+Credential custody is on the operator never-list, so only Timo decides this (directing session, 2026-10-23). It is Timo queue row 41.
