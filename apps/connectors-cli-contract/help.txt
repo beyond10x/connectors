@@ -7,6 +7,7 @@ Commands:
   approvals    
   connections  
   instances    
+  list         List every connector this build ships, with its auth profiles and the instances the configuration names; needs no configuration and starts no process
   operations   
   setup        
   completions  Emit shell completions

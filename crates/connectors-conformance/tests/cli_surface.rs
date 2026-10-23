@@ -90,7 +90,7 @@ fn refusal(output: &ProcessOutput, exit: i32) -> Value {
 }
 
 #[test]
-fn the_selected_inventory_has_thirty_one_grouped_commands_and_explicit_runtime_obligations() {
+fn the_selected_inventory_has_thirty_two_commands_and_explicit_runtime_obligations() {
     let plan = connectors_cli_contract::plan();
     let actual: BTreeSet<_> = plan
         .commands
@@ -98,6 +98,7 @@ fn the_selected_inventory_has_thirty_one_grouped_commands_and_explicit_runtime_o
         .map(|command| command.path.join(" "))
         .collect();
     let expected: BTreeSet<_> = [
+        "list",
         "setup init",
         "setup check",
         "setup checkpoints-enable",
@@ -1194,7 +1195,7 @@ fn no_alias_or_path_replaces_another_command() {
             reached += 1;
         }
     }
-    assert_eq!(reached, 36);
+    assert_eq!(reached, 37);
     // What the check refuses, the generated tree would hide: an alias onto
     // `connections list` replaces that command without a word.
     let mut colliding = plan.clone();

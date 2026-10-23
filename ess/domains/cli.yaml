@@ -1103,6 +1103,23 @@ types:
       - {name: backup_path, type: "Optional<String>"}
       - {name: configuration, type: "String"}
       - {name: entries, type: "List<connectors.cli.MigrateEntry>"}
+  # `connectors list` (story:cli-lists-available-connectors;
+  # contracts/cli/v1alpha1/semantics.md §3, "Listing connectors"): one row per
+  # connector this build ships a declaration for (connectors.declarations.Connector),
+  # in id order. id is its connector id, profiles the auth profile ids it
+  # declares in declaration order, and instances the names of its instances the
+  # configuration lists under `[connectors.<id>.instances]`, empty when there is
+  # no configuration or none is listed. No row names an implementation.
+  - name: connectors.cli.ConnectorSummary
+    kind: struct
+    fields:
+      - {name: id, type: "String"}
+      - {name: profiles, type: "List<String>"}
+      - {name: instances, type: "List<String>"}
+  - name: connectors.cli.ConnectorListResult
+    kind: struct
+    fields:
+      - {name: connectors, type: "List<connectors.cli.ConnectorSummary>"}
   - name: connectors.cli.AdapterListInput
     kind: struct
     fields:
