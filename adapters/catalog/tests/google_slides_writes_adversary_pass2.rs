@@ -1,5 +1,5 @@
-//! Adversary pass 2 against the guarded Google Slides writes: the corrected
-//! guide's write-instance route, and the `batchUpdate` request kinds whose
+//! Adversary pass 2 against the guarded Google Slides writes: the legacy
+//! write instance of the guide before one instance per account, and the `batchUpdate` request kinds whose
 //! effect the guide and the selection's description characterise. Driven
 //! through the engine against a scripted provider and from the guide's own
 //! JSON blocks. No network, no credential.
@@ -143,11 +143,11 @@ async fn batch_update(requests: Value, acknowledgement: Value) -> (WriteOutcome<
 /// on `impl/cli-oauth-loopback-acquisition` 839cb135c). Google's installed
 /// client file carries `https://accounts.google.com/o/oauth2/auth`; that
 /// branch's own guide says so and moved `docs/local-catalog-provider.md`'s
-/// example to it. The write instance the guide prescribes is the read block
-/// with the write values applied, so it inherits the read block's
-/// `authorize_url`.
+/// example to it. The legacy write instance the guide showed before one
+/// instance per account is the read block with the write values applied, so
+/// it inherits the read block's `authorize_url`.
 #[test]
-fn the_documented_write_instance_can_connect_from_the_google_client_file() {
+fn a_legacy_write_instance_can_connect_from_the_google_client_file() {
     const GOOGLE_CLIENT_FILE_AUTH_URI: &str = "https://accounts.google.com/o/oauth2/auth";
     let mut config = guide_block("\"provider\": \"google-slides\"");
     let values = guide_block("\"instance\": \"google-slides-write\"");
@@ -160,7 +160,7 @@ fn the_documented_write_instance_can_connect_from_the_google_client_file() {
     );
     assert_eq!(
         config["auth"]["authorize_url"], GOOGLE_CLIENT_FILE_AUTH_URI,
-        "the write instance's authorize_url differs from the auth_uri of Google's client file, \
+        "the legacy write instance's authorize_url differs from the auth_uri of Google's client file, \
          so `connections connect` with that file is refused before consent"
     );
     // The one instance the guide now configures uses the declared profile,

@@ -8,15 +8,15 @@ summary: Read HubSpot contacts, companies, deals and other CRM objects for one a
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: architecture-decision-record:declarative-http-provider-runtime
-revision: 1
+revision: 3
 ---
 ## Outcome
 
 The local `connectors` CLI reads HubSpot CRM records (contacts, companies, deals and the other
 standard objects) for one HubSpot account through the catalog provider, the way it reads GitLab,
 Jira and Confluence today (`docs/local-catalog-provider.md`): a pinned OpenAPI source, a reviewed
-read-only selection set, `operations describe` / `operations invoke`. Requested by the operator on
-2026-09-30. Writes are out of scope for this epic.
+selection set of reads, `operations describe` / `operations invoke`. Requested by the operator on
+2026-09-30. Writes are out of scope for this epic; when they come, they join the same `hubspot` connector.
 
 ## Findings (2026-09-30)
 

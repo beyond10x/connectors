@@ -15,8 +15,9 @@
 //! and only ever compared, never printed. No live credential and no network.
 //!
 //! The three event writes run through the same child over private protocol
-//! two, under the guide's write instance: the host's prepare and commit, the
-//! declared `events.get` preflight that compares the pinned `etag`, and the
+//! two, under the legacy write instance the guide showed before one instance
+//! per account: the host's prepare and commit, the declared `events.get`
+//! preflight that compares the pinned `etag`, and the
 //! exact request and body. The approval binding is exercised with the host's
 //! own approval signer and verifier against a subject built from the child's
 //! descriptor; the signing key is the public RFC 8032 section 7.1 test vector,
@@ -480,7 +481,7 @@ fn guide_documents_time_windows_sync_tokens_and_the_full_sync_reset() {
 }
 
 /// The configuration the guide showed before connectors were declared
-/// (`hand_written`): the read-only one, or the write instance's, which also
+/// (`hand_written`): the read-only one, or the legacy write instance's, which also
 /// asks for the write scope.
 fn documented(write: bool) -> Value {
     let blocks = hand_written::blocks("catalog-google-calendar.md");
@@ -922,7 +923,7 @@ struct Provider {
 fn read_grant() -> String {
     format!("openid {CALENDAR_SCOPE}")
 }
-/// The grant of the write instance's consent: the read scope and the write
+/// The grant of the legacy write instance's consent: the read scope and the write
 /// scope.
 fn write_grant() -> String {
     format!("openid {CALENDAR_SCOPE} {WRITE_SCOPE}")
@@ -932,7 +933,7 @@ impl Provider {
     fn new() -> Self {
         Self::with(documented_config(), read_grant(), None)
     }
-    /// The guide's write instance, over private protocol two, whose token
+    /// The legacy write instance, over private protocol two, whose token
     /// route grants `grant`.
     fn writes(grant: &str) -> Self {
         Self::with(

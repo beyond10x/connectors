@@ -16,7 +16,7 @@ scope:
   path: adapters/catalog/tests/google_slides.rs
 - confidence: inferred
   path: docs/catalog-google-slides.md
-revision: 9
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-30T15:35:20Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":5}}}
 - {from: "proposed", to: "active", at: "2026-09-30T15:35:21Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":5}}}
@@ -44,7 +44,7 @@ refused without an approval under the existing write model (`docs/local-catalog-
 - `slides_write_config_requires_presentations_scope`: an instance whose `minimum_scopes` includes
   `https://www.googleapis.com/auth/presentations` refuses validation when the token response grants
   only `presentations.readonly` (the existing `minimum_scopes` check, `adapters/catalog/src/local.rs:514-516`).
-- `docs/catalog-google-slides.md` routes writes through a separate write instance connected with `connections connect`, and says `connections repair` cannot add a scope (the configuration revision and profile are part of the connection binding; decided 2026-09-30 from review-result:adversary-google-slides-writes-pass-1, F1).
+- `docs/catalog-google-slides.md` says `connections repair` cannot add a scope (the configuration revision and profile are part of the connection binding; decided 2026-09-30 from review-result:adversary-google-slides-writes-pass-1, F1).
 
 Create operations carry no guard: the existing guard model needs a preflight and compares by
 equality only (`adapters/catalog/src/lib.rs:34-38,308-313`), and nothing exists to compare before a
