@@ -810,7 +810,8 @@ pub struct EmbeddedText {
 /// The headers by which a provider says its rate limit is spent
 /// (`connectors_catalog.selection.RateLimitHeaders`): a `403` or `429` whose
 /// `remaining` header is exactly `0` is `rate_limited`, waiting until the Unix
-/// time `reset` names unless `Retry-After` says otherwise. A write answered
+/// time `reset` names unless `Retry-After` says otherwise; one carrying
+/// `Retry-After` is `rate_limited` whatever `remaining` says. A write answered
 /// `429` stays unconfirmed: only its `403` is a definite refusal.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -3041,13 +3042,18 @@ fn trimmed_header<'a>(response: &'a HttpResponse, name: &str) -> Option<&'a str>
     header(response, name).map(|value| value.trim_matches([' ', '\t']))
 }
 
-/// A `403` or `429` whose declared `remaining` header is exactly `0`, as the
+/// A `403` or `429` under declared rate-limit headers whose `remaining` header
+/// is exactly `0`, or which carries `Retry-After` whatever `remaining` says (a
+/// secondary limit, such as GitHub's, answers so with requests left), as the
 /// `rate_limited` refusal it is: its wait from `Retry-After` when the answer
 /// carries one, else the seconds until the Unix time `reset` names.
 fn spent(response: &HttpResponse, headers: Option<&RateLimitHeaders>) -> Option<Error> {
     let headers = headers?;
-    if !matches!(response.status, 403 | 429) || trimmed_header(response, &headers.remaining)? != "0"
-    {
+    if !matches!(response.status, 403 | 429) {
+        return None;
+    }
+    let exhausted = trimmed_header(response, &headers.remaining) == Some("0");
+    if !exhausted && header(response, "retry-after").is_none() {
         return None;
     }
     let reset = || {
