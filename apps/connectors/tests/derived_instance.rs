@@ -61,15 +61,27 @@ impl Installation {
     }
 
     fn run(&self, args: &[&str]) -> Output {
-        Command::new(self.root.path().join("bin/connectors"))
-            .env_clear()
-            .args(["--output", "json", "--config"])
-            .arg(self.root.path().join("config/config.toml"))
-            .arg("--state-dir")
-            .arg(self.root.path().join("state"))
-            .args(args)
-            .output()
-            .unwrap()
+        let run = || {
+            Command::new(self.root.path().join("bin/connectors"))
+                .env_clear()
+                .args(["--output", "json", "--config"])
+                .arg(self.root.path().join("config/config.toml"))
+                .arg("--state-dir")
+                .arg(self.root.path().join("state"))
+                .args(args)
+                .output()
+        };
+        // The copied CLI can be briefly busy (ETXTBSY) while a concurrent test
+        // thread forks; that is not the behaviour under test.
+        for _ in 0..50 {
+            match run() {
+                Err(error) if error.raw_os_error() == Some(26) => {
+                    std::thread::sleep(std::time::Duration::from_millis(100))
+                }
+                output => return output.unwrap(),
+            }
+        }
+        run().unwrap()
     }
 
     fn configure(&self, body: &str) {
