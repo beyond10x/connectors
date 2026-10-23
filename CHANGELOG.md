@@ -32,6 +32,9 @@
 
 ### Changed
 
+- Under a selection's declared `rate_limit_headers`, a `403` or `429` that carries `Retry-After`
+  is now `rate_limited` with that delay, whatever its `remaining` header says. A secondary limit,
+  such as GitHub's, answers so while requests are left; before, it was `forbidden`.
 - On macOS and Windows a valid `connectors server --transport stdio` launch exits 1 with
   `mcp_unavailable`; `--help` still prints the launch grammar.
 - The definition reader refuses a feed whose `first` query names `{since}`
