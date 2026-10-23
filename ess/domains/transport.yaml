@@ -1,6 +1,27 @@
 domain: connectors.transport
-summary: Bounded private HTTP transport observations without credential or dispatch authority.
+summary: Bounded private transport values without credential or dispatch authority.
 types:
+  - name: connectors.transport.PrivateReadBudget
+    kind: struct
+    fields:
+      - {name: deadline_ticks, type: Integer}
+      - {name: execution_ms, type: Integer}
+      - {name: provider_ms, type: Integer}
+      - {name: input_bytes, type: Integer}
+      - {name: result_bytes, type: Integer}
+    invariants:
+      - execution_ms: {gte: 1, lte: 40000}
+      - provider_ms: {gte: 1, lte: 30000}
+      - input_bytes: {gte: 1, lte: 262144}
+      - result_bytes: {gte: 1, lte: 4194304}
+    # Explicit connectors-private/3 read binding only (contracts/cli/v1alpha1/
+    # private-bounded-read.md). deadline_ticks is this Linux boot's CLOCK_MONOTONIC
+    # nanoseconds, never a wall-clock timestamp. Validation never clips values.
+    # ESS-LIMIT: provider_ms <= execution_ms has a fact path on the right-hand side,
+    # so it is not declared; crates/connectors-host/src/local/runtime/bounded.rs
+    # refuses a budget that breaks it. The owner checks the whole public envelope
+    # separately; these byte values are remaining private payload allowances. No
+    # admission or native support proof.
   - name: connectors.transport.HttpResponsePrefix
     kind: struct
     fields:

@@ -24,6 +24,9 @@ pub(super) enum Task {
         schema: String,
         revision: String,
         document: Vec<u8>,
+        governed: bool,
+        projection_revision: Option<String>,
+        budget: Option<runtime::ReadBudget>,
     },
     Write {
         connection: String,
@@ -49,6 +52,49 @@ pub(super) enum Task {
         revision: String,
         profile: String,
     },
+}
+impl Task {
+    /// The original cutoff of a bounded governed read, which every wait the
+    /// job meets keeps; `None` for every other task. A budget outside a
+    /// governed read is refused.
+    fn bounded_until(&self) -> Result<Option<Instant>> {
+        match self {
+            Self::Invoke {
+                budget: Some(budget),
+                governed: true,
+                ..
+            } => Ok(Some(budget.until()?)),
+            Self::Invoke {
+                budget: Some(_), ..
+            } => Err(Code::Unsupported.into()),
+            _ => Ok(None),
+        }
+    }
+    /// The job's cutoff: a bounded read's budget, otherwise its wall deadline.
+    fn until(&self, wall_deadline: u64) -> Result<Instant> {
+        match self.bounded_until()? {
+            Some(until) => Ok(until),
+            None => until(wall_deadline),
+        }
+    }
+}
+
+/// `mutex`, awaited no longer than a bounded read's `deadline`. Without one it
+/// is an ordinary lock.
+fn lock_before<T>(mutex: &Mutex<T>, deadline: Option<Instant>) -> Result<MutexGuard<'_, T>> {
+    let Some(until) = deadline else {
+        return mutex.lock().map_err(|_| Code::Unavailable.into());
+    };
+    loop {
+        approval_issuance::check(until)?;
+        match mutex.try_lock() {
+            Ok(guard) => return Ok(guard),
+            Err(TryLockError::Poisoned(_)) => return Err(Code::Unavailable.into()),
+            Err(TryLockError::WouldBlock) => std::thread::sleep(
+                CONTROL_RETRY.min(until.saturating_duration_since(Instant::now())),
+            ),
+        }
+    }
 }
 /// The explicit resume actions of contracts/cli/v1alpha1/semantics.md:282-285:
 /// connect/repair (an explicit `Ensure`), revalidate and invoke clear a stop's
@@ -177,6 +223,8 @@ pub(super) enum Output {
     Bootstrap(runtime::Bootstrap, u64),
     Baseline(runtime::Baseline),
     Value(Value),
+    /// A governed read's result, exactly as the adapter wrote it.
+    Document(Vec<u8>),
     Write(mutation::Delivery),
 }
 struct Job {
@@ -281,10 +329,11 @@ struct Launches {
 }
 struct Permit<'a>(&'a Launches);
 impl Launches {
-    fn acquire(&self, deadline: u64) -> Result<Permit<'_>> {
-        let mut active = self.active.lock().map_err(|_| Code::Unavailable)?;
+    fn acquire(&self, deadline: Instant) -> Result<Permit<'_>> {
+        let mut active = lock_before(&self.active, Some(deadline))?;
         while *active >= 4 {
-            let duration = until(deadline)?.saturating_duration_since(Instant::now());
+            approval_issuance::check(deadline)?;
+            let duration = deadline.saturating_duration_since(Instant::now());
             let (guard, timeout) = self
                 .wake
                 .wait_timeout(active, duration)
@@ -309,12 +358,13 @@ impl Drop for Permit<'_> {
 /// How often a request whose instance's control lock is held tries it again.
 const CONTROL_RETRY: Duration = Duration::from_millis(5);
 /// An instance's control lock, awaited no longer than the request's own
-/// `deadline` (`timeout`) and not once the pool has stopped (`unavailable`).
+/// `cutoff` (`timeout`; a bounded read's budget, otherwise its deadline) and
+/// not once the pool has stopped (`unavailable`).
 /// `std::sync::Mutex` has no timed lock, so the lock is tried again every
 /// [`CONTROL_RETRY`].
 fn lock_until<'a>(
     control: &'a Mutex<lifecycle::Control>,
-    deadline: u64,
+    cutoff: Instant,
     stopped: &AtomicBool,
 ) -> Result<MutexGuard<'a, lifecycle::Control>> {
     loop {
@@ -326,7 +376,10 @@ fn lock_until<'a>(
         if stopped.load(Ordering::SeqCst) {
             return Err(Code::Unavailable.into());
         }
-        let left = until(deadline)?.saturating_duration_since(Instant::now());
+        let left = cutoff.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err(Code::Timeout.into());
+        }
         std::thread::sleep(left.min(CONTROL_RETRY));
     }
 }
@@ -348,6 +401,8 @@ pub(super) struct Pool {
     /// recollections alike: a revalidation of the same key joins the one in
     /// flight instead of queueing behind it (contracts/cli/v1alpha1/owner.md).
     revalidations: Flights,
+    /// What admits a governed read's operation (`governed::ReadPolicy`).
+    read_policy: Arc<dyn ReadPolicy>,
 }
 /// The revalidations in flight, by instance, connection and semantic
 /// revision. Shared with the workers, whose jobs keep their entries listed.
@@ -501,14 +556,34 @@ impl Pool {
     /// A pool whose workers hold no handle to it: its custody step finds none.
     #[cfg(test)]
     pub fn new(paths: Arc<Paths>, incarnation: String) -> Self {
-        Self::with_handle(paths, incarnation, Weak::new())
+        Self::with_handle(
+            paths,
+            incarnation,
+            Weak::new(),
+            Arc::new(governed::UnboundReadPolicy),
+        )
     }
     /// [`Pool::new`], shared, its workers holding a handle to it.
+    #[cfg(test)]
     pub fn shared(paths: Arc<Paths>, incarnation: String) -> Arc<Self> {
-        Arc::new_cyclic(|this| Self::with_handle(paths, incarnation, this.clone()))
+        Self::shared_with_read_policy(paths, incarnation, Arc::new(governed::UnboundReadPolicy))
     }
-    fn with_handle(paths: Arc<Paths>, incarnation: String, this: Weak<Pool>) -> Self {
+    /// [`Pool::shared`], its governed reads admitted by `read_policy`.
+    pub fn shared_with_read_policy(
+        paths: Arc<Paths>,
+        incarnation: String,
+        read_policy: Arc<dyn ReadPolicy>,
+    ) -> Arc<Self> {
+        Arc::new_cyclic(|this| Self::with_handle(paths, incarnation, this.clone(), read_policy))
+    }
+    fn with_handle(
+        paths: Arc<Paths>,
+        incarnation: String,
+        this: Weak<Pool>,
+        read_policy: Arc<dyn ReadPolicy>,
+    ) -> Self {
         Self {
+            read_policy,
             workers: Mutex::new(BTreeMap::new()),
             paths,
             launches: Arc::new(Launches::default()),
@@ -528,16 +603,17 @@ impl Pool {
         deadline: u64,
         flight: Option<Arc<Flight>>,
     ) -> Result<(mpsc::Receiver<Result<Output>>, Dispatch)> {
-        until(deadline)?;
-        let (sender, control, queued) = self.admit(adapter)?;
+        let cutoff = task.until(deadline)?;
+        let bounded_until = task.bounded_until()?;
+        let (sender, control, queued) = self.admit(adapter, bounded_until)?;
         // A write holds its instance's control lock through its native commit
         // (`mutation::execution::execute`). The wait is this instance's alone:
         // `workers` is released, so no other instance's request waits with it.
-        let mut control = lock_until(&control, deadline, &self.stopped)?;
+        let mut control = lock_until(&control, cutoff, &self.stopped)?;
         if self.stopped.load(Ordering::SeqCst) {
             return Err(Code::Unavailable.into());
         }
-        until(deadline)?;
+        task.until(deadline)?;
         if control.stopping
             && control
                 .child
@@ -576,15 +652,18 @@ impl Pool {
     /// else, so that `workers` is never held while a control lock is awaited.
     /// The request counts as queued from here, so the owner never reads one
     /// that waits on its instance's control lock as idle.
+    /// A bounded read awaits `workers` no longer than its budget
+    /// (`bounded_until`).
     fn admit(
         &self,
         adapter: &Adapter,
+        bounded_until: Option<Instant>,
     ) -> Result<(
         mpsc::SyncSender<Work>,
         Arc<Mutex<lifecycle::Control>>,
         JobQueued,
     )> {
-        let mut workers = self.workers.lock().map_err(|_| Code::Unavailable)?;
+        let mut workers = lock_before(&self.workers, bounded_until)?;
         if self.stopped.load(Ordering::SeqCst) {
             return Err(Code::Unavailable.into());
         }
@@ -608,11 +687,19 @@ impl Pool {
             let instance = adapter.instance_id.clone();
             let pool = self.this.clone();
             let flights = self.revalidations.clone();
+            let read_policy = self.read_policy.clone();
             let thread = std::thread::Builder::new()
                 .name("connectors-adapter-owner".into())
                 .spawn(move || {
                     worker(
-                        paths, launches, shared, stopped, activity, instance, receiver, pool,
+                        (paths, read_policy),
+                        launches,
+                        shared,
+                        stopped,
+                        activity,
+                        instance,
+                        receiver,
+                        pool,
                         flights,
                     )
                 })
@@ -689,9 +776,10 @@ impl Pool {
         }
     }
     fn run_job(&self, alias: &str, adapter: &Adapter, task: Task, deadline: u64) -> Result<Output> {
+        let cutoff = task.until(deadline)?;
         let (receiver, dispatch) = self.send(alias, adapter, task, deadline, None)?;
         receiver
-            .recv_timeout(until(deadline)?.saturating_duration_since(Instant::now()))
+            .recv_timeout(cutoff.saturating_duration_since(Instant::now()))
             .map_err(|e| match e {
                 // A read its worker already dispatched: the request may have
                 // reached the provider, so its deadline is the provider's.
@@ -894,7 +982,7 @@ impl Pool {
 // One argument per piece of state the worker thread shares with its pool.
 #[allow(clippy::too_many_arguments)]
 fn worker(
-    paths: Arc<Paths>,
+    (paths, read_policy): (Arc<Paths>, Arc<dyn ReadPolicy>),
     launches: Arc<Launches>,
     control: Arc<Mutex<lifecycle::Control>>,
     stopped: Arc<AtomicBool>,
@@ -944,11 +1032,12 @@ fn worker(
             if let Some(answer) = job.reply.answered() {
                 return answer.map(Output::Value);
             }
-            until(job.deadline)?;
+            job.task.until(job.deadline)?;
+            let bounded_until = job.task.bounded_until()?;
             if stopped.load(Ordering::SeqCst) {
                 return Err(Code::Unavailable.into());
             }
-            let mut guard = control.lock().map_err(|_| Code::Unavailable)?;
+            let mut guard = lock_before(&control, bounded_until)?;
             if let Some(active) = child.as_mut()
                 && !active.running()?
             {
@@ -958,6 +1047,36 @@ fn worker(
                 guard.stopping = false;
             }
             guard.check(job.epoch)?;
+            // A governed read is admitted against current configuration and
+            // policy before it launches or reaches any adapter process.
+            if let Task::Invoke {
+                connection,
+                operation,
+                schema,
+                revision,
+                document,
+                governed: true,
+                projection_revision,
+                budget,
+            } = &job.task
+            {
+                let input = std::str::from_utf8(document).map_err(|_| Code::InvalidInput)?;
+                governed::bounded::resolve(
+                    &paths,
+                    &job.alias,
+                    &approval_issuance::Request {
+                        connection,
+                        operation,
+                        schema,
+                        revision,
+                        input,
+                    },
+                    projection_revision
+                        .as_deref()
+                        .map(|revision| (read_policy.as_ref(), revision)),
+                    *budget,
+                )?;
+            }
             let (config, current) = selected(&paths, &job.alias)?;
             if current.instance_id != job.adapter.instance_id {
                 return Err(Code::LifecycleConflict.into());
@@ -1081,10 +1200,10 @@ fn worker(
                 epoch: job.epoch,
             };
             if child.is_none() {
-                child = Some(launch.run(job.deadline)?);
+                child = Some(launch.run(job.deadline, bounded_until)?);
                 selection = current.selection();
             }
-            until(job.deadline)?;
+            let execution_until = job.task.until(job.deadline)?;
             let active = child.as_mut().ok_or(Code::Unavailable)?;
             match job.task {
                 Task::ObserveWrite { .. } => Err(Code::OutcomeUnknown.into()),
@@ -1203,7 +1322,19 @@ fn worker(
                     schema: expected_schema,
                     revision,
                     document,
+                    governed,
+                    projection_revision,
+                    budget,
                 } => {
+                    // A governed read names its own refusals for a connection
+                    // that is not ready or lacks a scope.
+                    let refused = |error: registry::Failure| -> Error {
+                        if governed {
+                            governed::registry_error(error)
+                        } else {
+                            error.into()
+                        }
+                    };
                     // The description the caller read names its binding by
                     // its revision; the read runs under that binding's view
                     // only if its captured evidence selected it.
@@ -1227,8 +1358,14 @@ fn worker(
                         return Err(Code::Forbidden.into());
                     }
                     runtime::channel::depth(&document)?;
-                    let value: Value =
-                        connectors_core::read_json(&document).map_err(|_| Code::InvalidInput)?;
+                    // A governed read keeps every admitted number exactly and
+                    // refuses a duplicate member (`connectors_core::json`).
+                    let value: Value = if governed {
+                        connectors_core::json::decode(&document, 64)
+                            .map_err(|_| Code::InvalidInput)?
+                    } else {
+                        connectors_core::read_json(&document).map_err(|_| Code::InvalidInput)?
+                    };
                     connectors_sdk::validate(
                         &bootstrap
                             .descriptor()?
@@ -1240,6 +1377,21 @@ fn worker(
                     .map_err(|_| Code::InvalidInput)?;
                     let registry = registry::Registry::with_system_clock(&paths.state);
                     let binding = bootstrap.binding(&requirement.profile)?;
+                    if budget.is_some() {
+                        approval_issuance::check(execution_until)?;
+                    }
+                    // A bounded read's recollection and executable follow-up
+                    // end by its budget's original cutoff, never by the longer
+                    // request deadline.
+                    let read_deadline = match bounded_until {
+                        Some(cutoff) => {
+                            let left = cutoff.saturating_duration_since(Instant::now());
+                            job.deadline.min(connectors_sdk::now_ms().saturating_add(
+                                u64::try_from(left.as_millis()).unwrap_or(u64::MAX),
+                            ))
+                        }
+                        None => job.deadline,
+                    };
                     let capture = || {
                         registry.capture_read(
                             &binding,
@@ -1258,7 +1410,7 @@ fn worker(
                     let lapses_early = |captured: &registry::ReadUse| {
                         let now = connectors_sdk::now_ms();
                         let window = (captured.evidence_lifetime_ms() / 2)
-                            .min(job.deadline.saturating_sub(now));
+                            .min(read_deadline.saturating_sub(now));
                         captured.expires_at_ms() < now.saturating_add(window)
                     };
                     let captured = match capture() {
@@ -1278,9 +1430,9 @@ fn worker(
                                 &registry,
                                 &binding,
                                 &connection,
-                                job.deadline,
+                                read_deadline,
                                 || {
-                                    let guard = control.lock().map_err(|_| Code::Unavailable)?;
+                                    let guard = lock_before(&control, bounded_until)?;
                                     guard.check(job.epoch)?;
                                     if stopped.load(Ordering::SeqCst) {
                                         return Err(Code::Unavailable.into());
@@ -1289,12 +1441,12 @@ fn worker(
                                 },
                                 |material| {
                                     revalidate_with_retries(
-                                        job.deadline,
+                                        read_deadline,
                                         || {
                                             let result = active.validate(
                                                 &requirement.profile,
                                                 material,
-                                                job.deadline,
+                                                read_deadline,
                                             );
                                             (result, active.running().unwrap_or(false))
                                         },
@@ -1303,7 +1455,7 @@ fn worker(
                                     )
                                 },
                             )?;
-                            capture()?
+                            capture().map_err(refused)?
                         }
                         // Only the evidence lapsed, or is about to, for an
                         // intact credential: recollect it once from the
@@ -1339,7 +1491,7 @@ fn worker(
                                     {
                                         now + (early.expires_at_ms() - now) / 2
                                     }
-                                    _ => job.deadline,
+                                    _ => read_deadline,
                                 };
                                 let expires = bound.min(now.saturating_add(30_000));
                                 let recollection = registry.capture_recollection(
@@ -1418,7 +1570,7 @@ fn worker(
                                     if let Some(early) = early {
                                         registry.cancel_read(early, connectors_sdk::now_ms())?;
                                     }
-                                    capture()?
+                                    capture().map_err(refused)?
                                 }
                                 (Err(error), None) => return Err(error),
                                 (Err(error), Some(early)) => {
@@ -1440,7 +1592,7 @@ fn worker(
                                     // process; the read is served by a new one,
                                     // launched within that evidence.
                                     if !active.running()? {
-                                        match launch.run(early.expires_at_ms()) {
+                                        match launch.run(early.expires_at_ms(), bounded_until) {
                                             Ok(new) => *active = new,
                                             Err(error) => {
                                                 registry
@@ -1453,7 +1605,7 @@ fn worker(
                                 }
                             }
                         }
-                        other => other?,
+                        other => other.map_err(refused)?,
                     };
                     // Evidence that selected another binding than the one the
                     // caller described, a recollection's rebinding among
@@ -1465,9 +1617,19 @@ fn worker(
                     }
                     let version = captured.version();
                     let selection = config.selection();
-                    let material =
+                    // A bounded read gives up its custody answer once its
+                    // budget's cutoff passes.
+                    let material = if budget.is_some() {
+                        custody::Store::read_for_until(
+                            version,
+                            &selection,
+                            &paths.state,
+                            execution_until,
+                        )
+                    } else {
                         custody::Store::open_for(version.scope(), &selection, &paths.state)
-                            .and_then(|store| store.read(version));
+                            .and_then(|store| store.read(version))
+                    };
                     let material = match material {
                         Ok(value) => value,
                         Err(e) => {
@@ -1479,6 +1641,9 @@ fn worker(
                                 )?;
                             }
                             registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                            if budget.is_some() {
+                                approval_issuance::check(execution_until)?;
+                            }
                             return Err(super::read_error(&selection, e));
                         }
                     };
@@ -1491,9 +1656,17 @@ fn worker(
                         {
                             return Err(Code::LifecycleConflict.into());
                         }
-                        if !latest.permissions.operations.contains(&operation)
-                            || !latest.permissions.profiles.contains(&requirement.profile)
-                        {
+                        // A governed read whose operation was withdrawn is
+                        // no longer granted.
+                        if !latest.permissions.operations.contains(&operation) {
+                            return Err(if governed {
+                                Code::NotGranted
+                            } else {
+                                Code::Forbidden
+                            }
+                            .into());
+                        }
+                        if !latest.permissions.profiles.contains(&requirement.profile) {
                             return Err(Code::Forbidden.into());
                         }
                         Ok(())
@@ -1502,13 +1675,43 @@ fn worker(
                         registry.cancel_read(captured, connectors_sdk::now_ms())?;
                         return Err(error);
                     }
-                    let guard = control.lock().map_err(|_| Code::Unavailable)?;
-                    if let Err(error) = guard.check(job.epoch).and_then(|_| {
-                        if stopped.load(Ordering::SeqCst) {
-                            Err(Code::Unavailable.into())
-                        } else {
-                            Ok(())
+                    let guard = match lock_before(&control, bounded_until) {
+                        Ok(guard) => guard,
+                        Err(error) => {
+                            registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                            return Err(error);
                         }
+                    };
+                    if let Err(error) = guard.check(job.epoch).and_then(|_| {
+                        if budget.is_some() {
+                            approval_issuance::check(execution_until)?;
+                        }
+                        if stopped.load(Ordering::SeqCst) {
+                            return Err(Code::Unavailable.into());
+                        }
+                        // The final fence: a governed read is admitted once
+                        // more against current configuration and policy
+                        // immediately before it is dispatched.
+                        if governed {
+                            let input =
+                                std::str::from_utf8(&document).map_err(|_| Code::InvalidInput)?;
+                            governed::bounded::resolve(
+                                &paths,
+                                &job.alias,
+                                &approval_issuance::Request {
+                                    connection: &connection,
+                                    operation: &operation,
+                                    schema: &expected_schema,
+                                    revision: &revision,
+                                    input,
+                                },
+                                projection_revision
+                                    .as_deref()
+                                    .map(|revision| (read_policy.as_ref(), revision)),
+                                budget,
+                            )?;
+                        }
+                        Ok(())
                     }) {
                         registry.cancel_read(captured, connectors_sdk::now_ms())?;
                         return Err(error);
@@ -1519,17 +1722,43 @@ fn worker(
                         registry.cancel_read(captured, connectors_sdk::now_ms())?;
                         return Err(error);
                     }
-                    let dispatched = registry.dispatch_read(captured, connectors_sdk::now_ms())?;
+                    let dispatched = registry
+                        .dispatch_read(captured, connectors_sdk::now_ms())
+                        .map_err(refused)?;
                     drop(guard);
-                    let result = active.invoke_bound(
-                        described.as_deref(),
-                        &operation,
-                        &revision,
-                        &partition,
-                        &material,
-                        &document,
-                        deadline,
-                    );
+                    let result = if let Some(budget) = budget {
+                        // The provider call keeps the budget's original
+                        // cutoff, constrained by the evidence's expiry.
+                        until(deadline)
+                            .map_err(|_| runtime::Failure::Timeout)
+                            .and_then(|until| budget.constrain(until))
+                            .and_then(|budget| {
+                                active.invoke_bounded(
+                                    &operation, &revision, &partition, &material, &document, budget,
+                                )
+                            })
+                            .map_err(runtime::Refusal::from)
+                    } else if governed {
+                        active.invoke_lossless(
+                            described.as_deref(),
+                            &operation,
+                            &revision,
+                            &partition,
+                            &material,
+                            &document,
+                            deadline,
+                        )
+                    } else {
+                        active.invoke_bound(
+                            described.as_deref(),
+                            &operation,
+                            &revision,
+                            &partition,
+                            &material,
+                            &document,
+                            deadline,
+                        )
+                    };
                     // The provider refused the stored credential as unauthorized
                     // (a refresh token answered `invalid_grant`, a token or basic
                     // entry answered 401): the connection is Stale until a
@@ -1544,6 +1773,9 @@ fn worker(
                             registry.refuse_read(dispatched, connectors_sdk::now_ms())?
                         }
                         _ => registry.release_read(dispatched, connectors_sdk::now_ms())?,
+                    }
+                    if governed {
+                        return result.map(Output::Document).map_err(Error::from);
                     }
                     read_answer(&job.alias, &operation, &revision, result?).map(Output::Value)
                 }
@@ -1572,16 +1804,19 @@ struct Launch<'a> {
 }
 impl Launch<'_> {
     /// Launches the configured adapter process by `deadline` and records it
-    /// as the instance's child, under this job's epoch.
-    fn run(&self, deadline: u64) -> Result<runtime::Child> {
+    /// as the instance's child, under this job's epoch. A bounded read
+    /// launches by its budget's original cutoff instead (`bounded`), and
+    /// awaits the control lock no longer.
+    fn run(&self, deadline: u64, bounded: Option<Instant>) -> Result<runtime::Child> {
         {
-            let mut guard = self.control.lock().map_err(|_| Code::Unavailable)?;
+            let mut guard = lock_before(self.control, bounded)?;
             guard.check(self.epoch)?;
             guard.starting = true;
         }
-        let _permit = self.launches.acquire(deadline)?;
-        let new = runtime::Child::spawn_until(self.current, until(deadline)?)?;
-        let mut guard = self.control.lock().map_err(|_| Code::Unavailable)?;
+        let cutoff = bounded.map_or_else(|| until(deadline), Ok)?;
+        let _permit = self.launches.acquire(cutoff)?;
+        let new = runtime::Child::spawn_until(self.current, cutoff)?;
+        let mut guard = lock_before(self.control, bounded)?;
         guard.check(self.epoch)?;
         if self.stopped.load(Ordering::SeqCst) {
             return Err(Code::Unavailable.into());
@@ -1899,6 +2134,9 @@ mod maintenance_tests {
                 schema: text(),
                 revision: text(),
                 document: Vec::new(),
+                governed: false,
+                projection_revision: None,
+                budget: None,
             },
             Task::Write {
                 connection: text(),
@@ -2015,6 +2253,9 @@ mod suppression_tests {
                 schema: text(),
                 revision: text(),
                 document: Vec::new(),
+                governed: false,
+                projection_revision: None,
+                budget: None,
             },
             Task::Write {
                 connection: text(),
@@ -2055,6 +2296,82 @@ mod suppression_tests {
         for task in &passive {
             assert!(!resumes_suppression(task));
         }
+    }
+}
+
+#[cfg(test)]
+mod bounded_queue_tests {
+    use super::*;
+    #[test]
+    fn bounded_queue_wait_uses_original_cutoff_and_opens_no_state() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Arc::new(Paths {
+            config: root.path().join("absent-config"),
+            state: root.path().join("unopened-state"),
+        });
+        let pool = Pool::new(paths.clone(), "owner".into());
+        let adapter = Adapter {
+            credential_revision: None,
+            instance_id: "fixture".into(),
+            adapter_id: "fixture".into(),
+            configuration_revision: "config".into(),
+            protocol: "v1alpha1".into(),
+            private_protocol: Some(runtime::PrivateProtocol::V3),
+            permissions: Default::default(),
+            startup: Default::default(),
+            restart: Default::default(),
+            executable: crate::local::config::Executable {
+                path: root.path().join("unopened-executable"),
+                sha256: "0".repeat(64),
+                args: vec![],
+            },
+        };
+        let held = pool.workers.lock().unwrap();
+        let (ready, started) = mpsc::channel();
+        std::thread::scope(|scope| {
+            let work = scope.spawn(|| {
+                let budget = runtime::ReadBudget::start(20000, 15000, 65536, 4194304)
+                    .unwrap()
+                    .constrain(Instant::now() + Duration::from_millis(100))
+                    .unwrap();
+                let before = Instant::now();
+                ready.send(()).unwrap();
+                let result = pool.run(
+                    "fixture",
+                    &adapter,
+                    Task::Invoke {
+                        connection: "connection".into(),
+                        operation: "item.read".into(),
+                        schema: "schema".into(),
+                        revision: "revision".into(),
+                        document: b"{}".to_vec(),
+                        governed: true,
+                        projection_revision: Some("projection".into()),
+                        budget: Some(budget),
+                    },
+                    connectors_sdk::now_ms() + 30_000,
+                );
+                (result, before.elapsed())
+            });
+            started.recv().unwrap();
+            std::thread::sleep(Duration::from_millis(600));
+            drop(held);
+            let (result, elapsed) = work.join().unwrap();
+            assert!(matches!(
+                result,
+                Err(Error {
+                    code: Code::Timeout,
+                    ..
+                })
+            ));
+            assert!(
+                elapsed < Duration::from_millis(400),
+                "queue restarted or ignored its budget: {elapsed:?}"
+            );
+        });
+        assert!(!paths.state.exists());
+        assert!(pool.workers.lock().unwrap().is_empty());
+        pool.shutdown().unwrap();
     }
 }
 
@@ -2490,6 +2807,9 @@ mod dispatch_wait_tests {
             schema: "schema".into(),
             revision: "revision".into(),
             document: b"{}".to_vec(),
+            governed: false,
+            projection_revision: None,
+            budget: None,
         }
     }
 
@@ -2738,6 +3058,9 @@ mod pool_lock_tests {
             schema: "schema".into(),
             revision: "revision".into(),
             document: b"{}".to_vec(),
+            governed: false,
+            projection_revision: None,
+            budget: None,
         }
     }
 

@@ -134,6 +134,23 @@ with `connectors-build catalog`; see [the catalog provider guide](local-catalog-
 There is no v2 adapter generator: `connectors-spec` compiles `connectors.adapter/v1`
 documents and holds the pinned ESS toolchain record.
 
+Shared public operation metadata and protected curation types come from
+`ess/domains/service_wire.yaml`. Regenerate them with
+`cargo run --locked --offline -p connectors-build -- service-metadata`; add
+`--check` to compare without replacing output. The repository gate performs this
+comparison. The generated package under `crates/connectors-core/generated/operation-types`
+owns structural serialization; the core metadata codec checks cross-field rules.
+The protected owner binds curation to the exact executable selection and cached
+bootstrap before returning a coherent metadata/revision snapshot.
+Neither check proves a receiver enforces the declared execution limits or admits
+an operation, and neither changes the closed legacy operation codec.
+
+The native MCP launch grammar, local server configuration types and the shared
+session supervision projection under `adapters/mcp/generated/` come from
+`adapters/mcp/spec/` and `ess/domains/sessions.yaml`. Regenerate them with
+`cargo run --locked --offline -p connectors-build -- mcp-bindings`; `--check`
+compares, and the repository gate performs that comparison.
+
 Each internal adapter's default `service` feature adds its standalone executable and host
 wiring. To embed only its contract implementation, disable default features:
 
@@ -215,10 +232,14 @@ provisioning cases also require a private `CONNECTORS_K8S_KUBECONFIG` file and
 `/usr/bin/kubectl`. CLI journeys need custody and the production CLI; native
 PostgreSQL future-drop cancellation needs only its database observation fixture.
 Selecting `live` authorizes those existing tests;
-the runner does not provision sandboxes. The `deferred` family contains the known
-CLI contract invariant limitation and can be explicitly run to observe its
-current result. Subprocess helpers are always excluded from top-level execution;
-their owning parent tests invoke them.
+the runner does not provision sandboxes. The `deferred` family holds the cases
+that record a known gap; [`ignored.rs`](../crates/connectors-build/src/ignored.rs)
+lists them, and each one's ignore reason names its limitation or follow-up story.
+They cover CLI contract invariants that ESS does not carry, a required catalog
+body key given as null, a required query parameter given as an empty string, and
+an owner bounded read that outlives a lost MCP stdio session. Select the family
+explicitly to observe their current result. Subprocess helpers are always
+excluded from top-level execution; their owning parent tests invoke them.
 
 The two catalog settlement-failure cases additionally require Linux x86_64 with
 seccomp `USER_NOTIF` and the supported notification ABI. The runner queries those

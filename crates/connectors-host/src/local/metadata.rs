@@ -3,6 +3,7 @@
 use super::{Failure, Release, Result, filesystem as fs};
 #[cfg(test)]
 mod checkpoint_tests;
+pub(super) mod deadline;
 mod er;
 #[cfg(test)]
 mod metamorphic_tests;
@@ -573,6 +574,12 @@ impl Metadata {
         self.er.as_ref().is_some_and(er::opened_from_checkpoint)
     }
 
+    /// [`Metadata::authority_at`] with both the authority read and the handle
+    /// release inside the original cutoff.
+    pub(super) fn authority_at_until(path: &Path, until: Instant) -> Result<uuid::Uuid> {
+        deadline::within(until, || Self::authority_at(path))
+    }
+
     /// Inspection never creates a database, migrates it, writes to it (not even
     /// an open checkpoint), or interprets absence as an empty authoritative
     /// registry.
@@ -1013,8 +1020,9 @@ impl Metadata {
         )
         .map_err(unavailable)?;
         // SQLite's own write lock is waited on for the same bound as the lifecycle
-        // lock; see `WAIT_BOUND` for why neither is two seconds.
-        connection.busy_timeout(WAIT_BOUND).map_err(unavailable)?;
+        // lock; see `WAIT_BOUND` for why neither is two seconds. Inside a
+        // bounded admission (`deadline::within`) the wait ends at its cutoff.
+        deadline::configure(&connection)?;
         connection
             .pragma_update(None, "trusted_schema", false)
             .map_err(unavailable)?;
@@ -1325,9 +1333,10 @@ fn lifecycle_lock(directory: &std::fs::File) -> Result<std::fs::File> {
 }
 
 fn acquire_lifecycle_lock(file: &std::fs::File) -> Result<()> {
-    let deadline = Instant::now() + lifecycle_lock_wait();
+    let deadline = deadline::cutoff(lifecycle_lock_wait());
     #[cfg(unix)]
     loop {
+        self::deadline::check()?;
         // SAFETY: file owns the live descriptor. Dropping it releases the lock.
         let result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_NB | libc::LOCK_EX) };
         if result == 0 {
@@ -1337,16 +1346,22 @@ fn acquire_lifecycle_lock(file: &std::fs::File) -> Result<()> {
         if kind != std::io::ErrorKind::WouldBlock || Instant::now() >= deadline {
             return Err(Failure::MetadataUnavailable);
         }
-        std::thread::sleep(Duration::from_millis(5));
+        std::thread::sleep(
+            Duration::from_millis(5).min(deadline.saturating_duration_since(Instant::now())),
+        );
     }
     // Windows: an exclusive `LockFileEx` on the whole lock file through its
     // handle, released when the handle closes.
     #[cfg(windows)]
     loop {
+        self::deadline::check()?;
         match file.try_lock() {
             Ok(()) => return Ok(()),
             Err(std::fs::TryLockError::WouldBlock) if Instant::now() < deadline => {
-                std::thread::sleep(Duration::from_millis(5));
+                std::thread::sleep(
+                    Duration::from_millis(5)
+                        .min(deadline.saturating_duration_since(Instant::now())),
+                );
             }
             Err(_) => return Err(Failure::MetadataUnavailable),
         }

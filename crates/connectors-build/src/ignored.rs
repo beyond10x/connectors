@@ -150,6 +150,7 @@ fn classify(suite: &Suite, name: &str) -> Entry {
                 Some((Disposable, vec![CHROME]))
             }
             "local::keyring::custody::tests::disposable_secret_service_restart_and_failures"
+            | "local::owner::governed::tests::final_fence::withdrawal_at_final_dispatch_prevents_real_child_invocation"
             | "local::keyring::custody::tests::custody_neither_reads_nor_changes_the_default_alias"
             | "local::keyring::custody::tests::disposable_changed_keyring_format_is_refused_before_transfer"
             | "local::approval_keys::tests::durable_key_management_with_qualified_custody"
@@ -393,6 +394,11 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "connectors-catalog-provider",
             "slack_adversary",
             "an_empty_user_or_email_sends_nothing",
+        )
+        | (
+            "connectors",
+            "adversary_local_mcp_server",
+            "adversary_a_lost_session_leaves_no_provider_read_open",
         ) => Some((Deferred, vec![])),
         _ => None,
     };
