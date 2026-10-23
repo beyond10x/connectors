@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0570-mcp-stdio-list-feeds
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.57.0: stdio MCP server, connectors list, Jira and Confluence feeds, Retry-After as rate_limited'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 4
+revision: 6
 transitions:
 - {from: "draft", to: "active", at: "2026-10-23T16:05:28Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":1}}}
+- {from: "active", to: "implemented", at: "2026-10-23T17:46:12Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":2}}}
 ---
 ## Outcome
 
@@ -52,3 +53,8 @@ These are the limitations the CHANGELOG's 0.57.0 section states:
   - The gate printed "gate: all checks passed".
 - After the gate, `apps/connectors/tests/derived_instance.rs` gained an ETXTBSY retry on the CLI launch (main's Rust gate on `25ed378a2` failed once at line 72 with "Text file busy"). On the final tree `cargo test -p connectors --test derived_instance` passed 3 of 3 and its clippy with `-D warnings` was clean.
 - `target/debug/connectors --version` printed `connectors 0.57.0`.
+
+## Release verification
+
+- The release check first failed on remote branch names that contain a connector's name. The orchestrator decided (option B) that the check no longer counts the connector names it covers in this repository's branch names; every other term still counts.
+- The merged branch `unit/slack` (head `5734d7ced`, an ancestor of `main`) was deleted through the bot under that decision. The unmerged branch `request/channel-scoped-slack-replies` stays.
