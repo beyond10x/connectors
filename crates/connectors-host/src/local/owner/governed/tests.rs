@@ -2,6 +2,7 @@ use super::*;
 use crate::local::{config, registry};
 use std::{cell::Cell, collections::BTreeSet, sync::atomic::Ordering, time::Duration};
 
+#[cfg(unix)]
 mod bounded_reads;
 #[cfg(target_os = "linux")]
 mod final_fence;

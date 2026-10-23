@@ -2299,7 +2299,7 @@ mod suppression_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod bounded_queue_tests {
     use super::*;
     #[test]
