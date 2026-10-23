@@ -76,6 +76,8 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     super::upstream_redaction::run(root)?;
     super::release_binaries::run(root)?;
     super::cli::run(root, ess, true)?;
+    super::mcp::run(root, ess, true)?;
+    super::service_metadata::run(root, ess, true)?;
     // The website build's examples step, without its WASM build: a target refusing the
     // example model fails here rather than only in `npm run build`.
     super::docs::synthesize_examples(root, ess, &temp.path().join("examples"))?;
@@ -167,6 +169,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "sql",
         "tavily",
         "catalog-provider",
+        "mcp",
     ] {
         let package = format!("connectors-{adapter}");
         execute(command(None)?.args([
@@ -197,6 +200,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             "connectors-grafana",
             "connectors-kubernetes",
             "connectors-loki",
+            "connectors-mcp",
             "connectors-prometheus",
             "connectors-sql",
             "connectors-tavily",
@@ -251,6 +255,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             "connectors-client",
             "connectors-contracts",
             "connectors-core",
+            "connectors-mcp",
             "connectors-sdk",
         ] {
             execute(

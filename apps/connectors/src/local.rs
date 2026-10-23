@@ -50,6 +50,7 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
 /// service commands, which the generated tree does not carry.
 fn help_output(mut stdout: String, root: bool) -> connectors_cli_contract::ProcessOutput {
     if root {
+        stdout.push_str("\nNative integration commands (use COMMAND --help for options):\n  server    Serve admitted read-only MCP tools over stdio\n");
         stdout.push_str("\nExplicit service commands (use COMMAND --help for options):\n");
         for (name, summary) in connectors::compat::SUMMARIES {
             stdout.push_str(&format!("  {name:<8}  {summary}\n"));
@@ -280,7 +281,9 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         NotFound => ("admission", "check_configuration", false),
         LifecycleConflict => ("admission", "retry_status", false),
         Revoked => ("admission", "create_connection", false),
-        NotGranted | IdentityMismatch => ("admission", "repair_connection", false),
+        NotGranted | IdentityMismatch | ConnectionNotReady | InsufficientScope => {
+            ("admission", "repair_connection", false)
+        }
         Unavailable => ("readiness", "retry_status", false),
         Timeout | Capacity => ("admission", "retry_explicitly", false),
         StaleCursor => ("observation", "retry_explicitly", false),

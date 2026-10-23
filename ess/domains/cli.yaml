@@ -1704,7 +1704,7 @@ commands:
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
     # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:940) and the host
-    # removal path (er.rs:4445-4447) only expires Active cursors. The error name is
+    # removal path (er.rs:4441-4443) only expires Active cursors. The error name is
     # the decision; no source names one.
 
 events:

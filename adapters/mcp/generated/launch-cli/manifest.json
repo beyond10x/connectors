@@ -1,0 +1,19 @@
+{
+  "binary": "connectors-mcp-launch",
+  "files": [
+    "Cargo.toml",
+    "README.md",
+    "binding.json",
+    "completions/connectors-mcp-launch.bash",
+    "help.txt",
+    "src/lib.rs",
+    "src/main.rs",
+    "src/runtime.rs",
+    "src/wire.rs"
+  ],
+  "format": "ess-cli-artifacts/1",
+  "obligations": [
+    "handler:local-server: implement the owner-qualified callable and its declared result/error contract"
+  ],
+  "package": "connectors-mcp-launch-cli-contract"
+}

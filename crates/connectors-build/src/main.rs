@@ -24,10 +24,12 @@ mod ignored;
 #[cfg(test)]
 mod jira_feed_conformance;
 mod live_read_loop;
+mod mcp;
 mod metadata_conformance;
 mod metadata_entities;
 mod platform_gated;
 mod release_binaries;
+mod service_metadata;
 mod source_hashes;
 mod upstream_redaction;
 
@@ -53,6 +55,16 @@ enum Action {
     LiveReadLoop(live_read_loop::Options),
     /// Generate or compare the selected local CLI contract fixture.
     Cli {
+        #[arg(long)]
+        check: bool,
+    },
+    /// Generate or compare MCP launch, configuration and shared session projections.
+    McpBindings {
+        #[arg(long)]
+        check: bool,
+    },
+    /// Generate or compare shared public operation metadata types.
+    ServiceMetadata {
         #[arg(long)]
         check: bool,
     },
@@ -351,6 +363,12 @@ fn execute(args: Args) -> Result<()> {
     let ess = connectors_spec::toolchain::resolve(args.ess.as_deref())?;
     if let Action::Cli { check } = args.command {
         return cli::run(&root, &ess, check);
+    }
+    if let Action::McpBindings { check } = args.command {
+        return mcp::run(&root, &ess, check);
+    }
+    if let Action::ServiceMetadata { check } = args.command {
+        return service_metadata::run(&root, &ess, check);
     }
     if let Action::Examples = args.command {
         check_ess(&ess)?;

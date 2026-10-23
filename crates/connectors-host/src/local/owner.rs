@@ -1,6 +1,7 @@
 //! Owner-side composition for the production local CLI. Provider libraries never
 //! receive this authority, the metadata database, or a credential resolver.
 pub mod approval_issuance;
+mod governed;
 mod lifecycle;
 mod maintenance;
 pub mod mutation;
@@ -13,6 +14,7 @@ use super::{
     keyring::custody,
     registry, runtime,
 };
+pub use governed::{ProjectionMetadata, ReadPolicy};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
@@ -22,7 +24,8 @@ use std::{
 #[cfg(test)]
 pub(crate) use transport::bound_allocator;
 pub use transport::{
-    Capture, Client, OwnerStop, WriteClient, enable_checkpoints, serve, stop_owner,
+    Capture, Client, OwnerStop, WriteClient, enable_checkpoints, serve, serve_with_read_policy,
+    stop_owner,
 };
 
 const VERSION: &str = "connectors-owner/1";
@@ -47,6 +50,8 @@ pub enum Code {
     LifecycleConflict,
     Revoked,
     NotGranted,
+    ConnectionNotReady,
+    InsufficientScope,
     IdentityMismatch,
     Unavailable,
     Timeout,
@@ -1056,6 +1061,33 @@ enum Request {
         operation: String,
         schema: String,
         revision: String,
+        deadline_ms: u64,
+    },
+    GovernedRead {
+        adapter: String,
+        connection: String,
+        operation: String,
+        schema: String,
+        revision: String,
+        deadline_ms: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        projection_revision: Option<String>,
+    },
+    BoundedRead {
+        adapter: String,
+        connection: String,
+        operation: String,
+        schema: String,
+        revision: String,
+        projection_revision: String,
+        budget: runtime::ReadBudget,
+    },
+    GovernedDescribe {
+        adapter: String,
+        deadline_ms: u64,
+    },
+    ProjectedDescribe {
+        adapter: String,
         deadline_ms: u64,
     },
     Status {
