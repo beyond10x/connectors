@@ -13,13 +13,31 @@ scope:
 - confidence: cited
   path: CHANGELOG.md
 - confidence: cited
+  path: adapters/catalog/contracts/feed/v1alpha1/confluence-v1.md
+- confidence: cited
+  path: adapters/catalog/contracts/feed/v1alpha1/jira.md
+- confidence: cited
   path: adapters/catalog/providers/confluence-v1/operations.json
 - confidence: cited
   path: adapters/catalog/providers/jira/operations.json
 - confidence: cited
+  path: adapters/catalog/tests/confluence_binding.rs
+- confidence: cited
   path: adapters/catalog/tests/confluence_v1_feed.rs
 - confidence: cited
+  path: adapters/catalog/tests/connector_declarations.rs
+- confidence: cited
+  path: adapters/catalog/tests/gateway_prefix.rs
+- confidence: cited
+  path: adapters/catalog/tests/jira.rs
+- confidence: cited
   path: adapters/catalog/tests/jira_feed.rs
+- confidence: cited
+  path: contracts/catalog/v1alpha1/semantics.md
+- confidence: cited
+  path: contracts/datasources/feed/v1alpha1/semantics.md
+- confidence: cited
+  path: crates/connectors-build/src/catalog_feed_conformance.rs
 - confidence: cited
   path: crates/connectors-build/src/confluence_feed_conformance.rs
 - confidence: cited
@@ -50,7 +68,7 @@ scope:
   path: website/docs/connectors/jira.md
 - confidence: cited
   path: website/docs/status.md
-revision: 9
+revision: 12
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-22T09:48:11Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":6}}, executor: "agent:connectors-session", correlation: "wave-20261022"}
 - {from: "proposed", to: "active", at: "2026-10-22T09:48:11Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":6}}, executor: "agent:connectors-session", correlation: "wave-20261022"}
@@ -93,13 +111,14 @@ enforces each one:
 1. A cursor names exactly one of `next`, `last` and `offset`.
 2. `url_parameter` appears only beside `next`.
 3. A position names exactly one of `time` and `query`.
-4. `first` holds `{container}` exactly once.
+4. `first` holds `{container}` exactly once and `{since}` never (the engine's load rule, `adapters/catalog/src/feed.rs:524-526`).
 5. `resume` holds `{container}` and `{since}` exactly once each.
 6. A query position is at `minute` precision.
 7. Items with a query position name no container parameter.
 8. `utc_offsets` lies within -1439..1439 and `least` is not above `greatest`.
 9. `utc_offsets` needs `page`.
 10. `url`, `url_base` and `parent` are JSON pointers.
+11. A position's `time`, `query.parameter` and `page.parameter` are query parameters of the items operation (`feed_position_parameter`; the engine binds them at load).
 
 ## Ownership
 

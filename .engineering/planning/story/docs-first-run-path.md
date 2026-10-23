@@ -14,6 +14,10 @@ scope:
 - confidence: cited
   path: README.md
 - confidence: cited
+  path: contracts/cli/v1alpha1/semantics.md
+- confidence: cited
+  path: crates/connectors-build/src/docs.rs
+- confidence: cited
   path: crates/connectors-docs/src/vocabulary.rs
 - confidence: cited
   path: docs/local-catalog-provider.md
@@ -21,6 +25,10 @@ scope:
   path: docs/local-clock.md
 - confidence: cited
   path: website/docs/concepts
+- confidence: cited
+  path: website/docs/connectors/mcp.md
+- confidence: cited
+  path: website/docs/connectors/zendesk.md
 - confidence: cited
   path: website/docs/examples/contract-exercises.mdx
 - confidence: cited
@@ -37,7 +45,7 @@ scope:
   path: website/docs/guides/upgrade-the-cli.md
 - confidence: cited
   path: website/docs/index.md
-revision: 35
+revision: 37
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-22T09:48:11Z", actor: "human:timo", revision: 34, decided_on: {"recorded":{"review_outcome":5}}, executor: "agent:connectors-session", correlation: "wave-20261022"}
 - {from: "proposed", to: "active", at: "2026-10-22T09:48:11Z", actor: "human:timo", revision: 35, decided_on: {"recorded":{"review_outcome":5}}, executor: "agent:connectors-session", correlation: "wave-20261022"}

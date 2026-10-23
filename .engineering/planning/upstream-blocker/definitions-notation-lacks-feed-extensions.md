@@ -2,12 +2,14 @@
 format: aep.planning-md/3
 id: upstream-blocker:definitions-notation-lacks-feed-extensions
 kind: upstream-blocker
-status: open
+status: cleared
 title: The definitions notation cannot express the Jira and Confluence feeds
 relations:
 - blocks: story:jira-feed-binding
 - blocks: story:confluence-feed-binding
-revision: 3
+revision: 5
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-22T12:29:16Z", actor: "human:timo", revision: 4, executor: "agent:connectors-session", correlation: "wave-20261022"}
 ---
 # The definitions notation cannot express the Jira and Confluence feeds
 
@@ -47,3 +49,7 @@ rules are stated in that domain's summary only, so this repository's reader must
 What remains here: `definition.rs` and `import.rs` carry the fields and the rules, and the Jira and
 Confluence definitions carry their feed blocks, so the two feeds can move into the shipped
 selections with `definition_import` green. Wave 20261021 ships them fixture-backed.
+
+## Cleared
+
+Cleared 2026-10-22 by wave 20261022 U1 (story:definition-reader-feed-extensions). The reader lowers the Jira and Confluence v1 feeds of connectors-definitions 536945d. Merged into `wave/20261022` as `f1089f007` (unit commit `b132826b8`).
