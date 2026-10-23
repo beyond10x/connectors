@@ -10,8 +10,9 @@ projection. The remaining failure matrix and sandbox acceptance are open; the
 transport port alone does not admit a provider write.
 
 The host configuration format `connectors-local/2` adds an adapter
-`private_protocol` selection, exactly `connectors-private/1` or
-`connectors-private/2`; it is required in this format. `setup init` writes this
+`private_protocol` selection, exactly `connectors-private/1`,
+`connectors-private/2` or the read-only `connectors-private/3`
+([bounded reads](private-bounded-read.md)); it is required in this format. `setup init` writes this
 format. The existing `connectors-local/1` reader retains its fields and implicit
 private version one. It refuses the new field. Public service `protocol = "v1alpha1"` keeps its
 existing meaning in both formats. No automatic configuration rewrite occurs.

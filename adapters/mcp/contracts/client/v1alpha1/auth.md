@@ -29,8 +29,11 @@ for the selected remote MCP server, and credentials used by that server for its
 underlying provider. Never substitute or forward one for another. A discovered
 endpoint, annotation, prompt, capability advertisement or previous connection
 cannot authorize a new audience, account, issuer or credential selection.
-Outbound stdio remains held by `decision-blocker:mcp-outbound-stdio-process-ownership`;
-HTTP OAuth requirements do not select an environment or child-process owner.
+Outbound stdio ownership was resolved by
+`decision-blocker:mcp-outbound-stdio-process-ownership` on 2026-10-03. Its environment
+and credential binding remain part of `story:mcp-outbound-stdio-runtime`; these HTTP
+OAuth requirements do not supply them. The `stdio-held` cases below continue to refuse
+stdio through this HTTP-only authorization profile until its own binding is authored.
 
 ## Selected HTTP authorization requirements
 

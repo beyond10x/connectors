@@ -430,6 +430,27 @@
       }
     },
     {
+      "id": "valid-ConnectorListResult-1",
+      "type": "connectors.cli.ConnectorListResult",
+      "valid": true,
+      "value": {
+        "connectors": [
+          {"id": "fixture-forge", "profiles": ["fixture.token"], "instances": ["work"]},
+          {"id": "fixture-mail", "profiles": ["fixture.oauth", "fixture.basic"], "instances": []}
+        ]
+      }
+    },
+    {
+      "id": "invalid-connector-list-missing-instances",
+      "type": "connectors.cli.ConnectorListResult",
+      "valid": false,
+      "value": {
+        "connectors": [
+          {"id": "fixture-forge", "profiles": ["fixture.token"]}
+        ]
+      }
+    },
+    {
       "id": "valid-AdapterListInput-3",
       "type": "connectors.cli.AdapterListInput",
       "valid": true,

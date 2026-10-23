@@ -290,6 +290,29 @@ fn validate_walkthrough_fixtures(descriptor: &Value, fixture: &Value) -> Result<
     Ok(())
 }
 
+/// The local CLI's default state directory as the setup guide names it to a reader
+/// (`connectors-host` `Paths::resolve`). Rooted at `~/`, it names no user and no repository.
+const DEFAULT_STATE_DIRECTORY: &[u8] = b"~/.local/state/connectors";
+
+/// Whether the `.local/` at `at` is that of [`DEFAULT_STATE_DIRECTORY`] or of a path under it.
+/// Only the byte after the directory's last name is read, since the site's markup may split the
+/// rest of the path from it; a byte that continues the name (`connectors-old`, `connectors.d`)
+/// names another directory.
+fn default_state_directory(bytes: &[u8], at: usize) -> bool {
+    let Some(rest) = at.checked_sub(2).map(|start| &bytes[start..]) else {
+        return false;
+    };
+    if !rest.starts_with(DEFAULT_STATE_DIRECTORY) {
+        return false;
+    }
+    let name = |b: &u8| b.is_ascii_alphanumeric() || *b == b'-' || *b == b'_';
+    match &rest[DEFAULT_STATE_DIRECTORY.len()..] {
+        [b'.', next, ..] => !name(next),
+        [next, ..] => !name(next),
+        [] => true,
+    }
+}
+
 /// Inspect bytes as well as text: WASM can embed diagnostic source paths.
 pub fn audit(directory: &Path) -> Result<()> {
     let files = super::tree(directory)?;
@@ -306,7 +329,10 @@ pub fn audit(directory: &Path) -> Result<()> {
         ] {
             if bytes
                 .windows(forbidden.len())
-                .any(|window| window == forbidden.as_bytes())
+                .enumerate()
+                .any(|(at, window)| {
+                    window == forbidden.as_bytes() && !default_state_directory(bytes, at)
+                })
             {
                 return Err(
                     format!("private path marker {forbidden:?} in public output {name}").into(),
@@ -408,5 +434,43 @@ mod tests {
         )
         .unwrap();
         audit(dir.path()).unwrap();
+    }
+    /// The local CLI guide names the default state directory `~/.local/state/connectors`
+    /// (`connectors-host` `Paths::resolve`). A `~/`-rooted path names no user and no
+    /// repository, so that directory and any path under it pass however the site's markup
+    /// splits them; every other `.local/` is still refused.
+    #[test]
+    fn public_audit_admits_the_default_state_directory_and_paths_under_it_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let page = dir.path().join("set-up.js");
+        for admitted in [
+            &b"Use ~/.local/state/connectors."[..],
+            b"~/.local/state/connectors/owner.sock",
+            b"<code>~/.local/state/connectors</code>/owner.sock",
+            b"(0,o.jsx)(n.code,{children:\"~/.local/state/connectors\"}),\"/owner.sock\"",
+            b"\"~/.local/state/connectors\\/owner.sock\"",
+        ] {
+            fs::write(&page, admitted).unwrap();
+            if let Err(refusal) = audit(dir.path()) {
+                panic!("{}: {refusal}", String::from_utf8_lossy(admitted));
+            }
+        }
+        for refused in [
+            &b"cd .local/tmp/build"[..],
+            b"a bare .local/ path",
+            b"~/.local/state/connectors and .local/tmp",
+            b"$HOME/.local/state/connectors",
+            b"~/.local/bin/connectors",
+            b"~/.local/state/other",
+            b"~/.local/state/connectors-old",
+        ] {
+            fs::write(&page, refused).unwrap();
+            let refusal = audit(dir.path()).expect_err(&String::from_utf8_lossy(refused));
+            assert!(
+                refusal.to_string().contains("\".local/\""),
+                "{}: {refusal}",
+                String::from_utf8_lossy(refused)
+            );
+        }
     }
 }

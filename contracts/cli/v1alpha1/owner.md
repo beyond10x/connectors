@@ -112,6 +112,18 @@ validates the separately transferred document through the exact adapter, and the
 uses the existing guarded custody/publication coordinator. Lost acknowledgement
 is unknown and can be resolved only through status, without replay.
 
+An explicit same-build connection may carry the caller's original monotonic
+deadline through metadata inspection, owner startup and every identification
+retry. Expiry before admission opens no state. Metadata lifecycle-lock, cached
+authority mutex, SQLite busy and bridge waits use that cutoff; nested inspection
+can shorten it but cannot extend it, and leaving the inspection scope restores
+ordinary waits. This does not change uncertain-write retirement or its retained
+lifecycle-lock proof. On Linux the Unix connection is nonblocking and refuses a
+full accept queue as `capacity`: it is neither a connected stream nor permission
+to start another owner. Socket ownership, peer credentials, challenge and
+exact-build checks remain required before this connection port returns an
+admitted client.
+
 A `reuse` request (`connectors.cli.LocalOwnerReuseRequest`,
 `{"kind":"reuse","adapter":…,"source":…,"connection":…,"expected_revision":…,"profile":…}`,
 story:invoke-definition-reuse-credential) carries no document and no material: it
@@ -179,6 +191,12 @@ Each child lives on a retained worker thread for the Linux parent-death signal;
 startup is coalesced per instance and at most four launches run concurrently.
 Per-owner connections and work queues are bounded, and original request deadlines
 are never reset by queueing, startup, capture or provider work.
+
+The explicit same-build `bounded_read` request additionally carries a required
+projection revision and the original monotonic budget. Its declaration selection,
+whole-envelope limits and custody cutoff are specified in the
+[bounded read binding](private-bounded-read.md#owner-selection). Existing request
+shapes keep their meaning; a private/3 child refuses ordinary legacy invocation.
 
 CLI reply reads check cancellation while waiting, including an incomplete frame;
 the bounded polling interval never resets the original deadline or replays a

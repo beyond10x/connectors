@@ -37,6 +37,11 @@ operations:
     op: getCreateIssueMetaIssueTypeId
     paging: offset
     description: List the fields one issue type takes when an issue is created in one project, by project id or key and the issue type's id from issue.create_meta, one page per call of at most 200; each field carries fieldId, name, required, schema and allowedValues, and the walk ends when startAt plus the page's fields reaches total
+  projects.list:
+    op: searchProjects
+    paging: offset-last
+    description: List the projects the account can see, one page per call; action=view narrows to those it can browse, status=live leaves out archived and trashed ones, and the walk ends on a page with isLast true
+  project.get: {op: getProject, description: Read one project by id or key}
   users.search:
     op: findUsers
     paging: offset-empty
@@ -133,6 +138,43 @@ operations:
         mismatch: conflict
       after: {read: {read: issue.get}, absent: true}
     description: "Delete one issue by key while its fields.updated is updated_stamp, read from issue.get. The provider reads the issue first and refuses before any write when it is absent, and as conflict when its key or fields.updated differs; it reads the issue again after Jira's 204: only a 404 there proves it gone, so an issue still found or a read that fails leaves the effect unknown. deleteSubtasks is withheld, so Jira refuses an issue with subtasks (400)"
+datasources:
+  issues:
+    kind: feed
+    profile: jira-issues/1
+    capabilities:
+      deletions: not-observed
+      kind: fixed-word
+      revision: update-time
+      visibility: all-private
+    containers:
+      list: projects.list
+      lookup: project.get
+      query: {action: view, orderBy: key, status: live}
+      cursor: {parameter: startAt, offset: {complete: {pointer: /isLast, equals: true}}}
+      records: /values
+      id: /id
+      name: /name
+      kind_word: project
+    items:
+      list: issues.search
+      query: {fields: "summary,created,updated,creator"}
+      position:
+        query:
+          parameter: jql
+          language: jql
+          first: "project = {container} ORDER BY updated ASC"
+          resume: "project = {container} AND updated >= {since} ORDER BY updated ASC"
+          utc_offsets: {least: -720, greatest: 840}
+        precision: minute
+        page: {parameter: nextPageToken, next: /nextPageToken}
+      records: /issues
+      id: /id
+      revision: /fields/updated
+      created_at: /fields/created
+      updated_at: /fields/updated
+      author: {id: /fields/creator/accountId, display_name: /fields/creator/displayName}
+      body: {pointer: /fields/summary, representation: text/plain}
 references:
   issue:
     match:

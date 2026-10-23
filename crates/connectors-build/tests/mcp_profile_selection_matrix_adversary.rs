@@ -214,28 +214,22 @@ fn every_protocol_version_the_archives_tell_a_peer_to_assume_is_dispositioned() 
 
 // ── Case 2 ──────────────────────────────────────────────────────────────────────────
 
-/// A `deferred` row's blocker names, in its own record, the feature the row defers.
+/// A decision-backed row's record names the feature it is deciding.
 ///
-/// The matrix claims exactly this standard for itself: "Two rows are deferred against
-/// open blockers and two beside them are not, and the difference is cited rather than
-/// inferred", and "the reason is in each blocker's own text rather than inferred here".
-/// `mcp_profile_selection_matrix.rs` checks only that a row naming a blocker defers — it
-/// never opens the blocker, so a row can defer a feature the blocker says nothing about
-/// and stay green.
+/// This applies after resolution too: an unrelated cleared decision cannot authorize
+/// a feature any more than an unrelated open blocker can justify deferring it. The
+/// companion selection case checks the actual lifecycle status and disposition.
 ///
 /// The whole blocker record is searched, not just its "What this stops" section, so a
-/// failure here means the blocker never mentions the deferred feature anywhere at all.
+/// failure here means the record never mentions the selected feature anywhere at all.
 #[test]
-fn every_deferred_row_rests_on_a_blocker_whose_own_record_names_that_feature() {
+fn every_decision_backed_row_names_a_record_that_reaches_its_feature() {
     let blocker = regex::Regex::new(r"decision-blocker:([a-z0-9][a-z0-9-]*)").unwrap();
     let planning = repository_root().join(".engineering/planning/decision-blocker");
 
     let mut unreached = Vec::new();
     let mut checked = 0usize;
     for row in rows() {
-        if row.disposition != "deferred" {
-            continue;
-        }
         for capture in blocker.captures_iter(&row.reason) {
             let id = capture[1].to_string();
             let record = planning.join(format!("{id}.md"));
@@ -264,12 +258,13 @@ fn every_deferred_row_rests_on_a_blocker_whose_own_record_names_that_feature() {
             checked += 1;
             if !normalised.contains(&feature) {
                 unreached.push(format!(
-                    "selection.md:{} `{}` ({}) is deferred against \
+                    "selection.md:{} `{}` ({}, {}) cites \
                      `decision-blocker:{id}`, but that record never names {feature:?} — \
                      the string appears 0 times in {}",
                     row.line,
                     row.key,
                     row.direction,
+                    row.disposition,
                     record.display()
                 ));
             }
@@ -277,12 +272,12 @@ fn every_deferred_row_rests_on_a_blocker_whose_own_record_names_that_feature() {
     }
     assert!(
         checked > 0,
-        "no deferred row names a decision-blocker; this case proves nothing"
+        "no row names a decision-blocker; this case proves nothing"
     );
     assert!(
         unreached.is_empty(),
-        "{} of {checked} blocker-backed deferrals rest on a blocker that does not reach \
-         the deferred feature:\n  {}",
+        "{} of {checked} decision-backed rows cite a record that does not reach \
+         the selected feature:\n  {}",
         unreached.len(),
         unreached.join("\n  ")
     );

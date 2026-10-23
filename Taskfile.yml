@@ -1,0 +1,8 @@
+version: '3'
+
+tasks:
+  install:
+    desc: Install connectors and connectors-catalog-provider from this checkout
+    cmds:
+      - cargo install --locked --path apps/connectors
+      - cargo install --locked --path adapters/catalog --features service

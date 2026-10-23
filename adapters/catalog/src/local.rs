@@ -31,6 +31,20 @@ pub const OPERATIONS_FORMAT: &str = "connectors-catalog-operations/1";
 /// A connector declaration, `providers/<name>/connector.json`.
 pub const DECLARATION_FORMAT: &str = "connectors-catalog-connector/1";
 const DOCUMENT_LIMIT: usize = 64 * 1024;
+/// The longest provider interval a bounded read may take; its own, possibly
+/// shorter cutoff bounds it further.
+const PROVIDER_BUDGET_LIMIT: Duration = Duration::from_secs(30);
+
+fn bounded_http(http: ScopedHttp, until: Option<Instant>) -> Result<ScopedHttp> {
+    match until {
+        // `until` was selected once for the whole native sequence. The maximum
+        // duration here cannot extend that original, possibly shorter cutoff.
+        Some(until) => http
+            .with_provider_budget(PROVIDER_BUDGET_LIMIT, until)
+            .map_err(Failure::from_service),
+        None => Ok(http),
+    }
+}
 
 /// Where the subject of a credential comes from.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -750,6 +764,15 @@ impl OAuth {
     /// One refresh-token or client-credentials grant. Every refusal is a code;
     /// no answer text, status line or credential reaches it.
     async fn exchange(&self, grant: &Grant) -> Result<Exchanged> {
+        self.exchange_until(grant, None).await
+    }
+    /// [`Self::exchange`] inside a bounded read's provider cutoff, when there is one.
+    async fn exchange_until(&self, grant: &Grant, until: Option<Instant>) -> Result<Exchanged> {
+        let bounded = until
+            .map(|until| self.http.with_provider_budget(PROVIDER_BUDGET_LIMIT, until))
+            .transpose()
+            .map_err(Failure::from_service)?;
+        let http = bounded.as_ref().unwrap_or(&self.http);
         let sent = Instant::now();
         let segments: Vec<&str> = self.path.iter().map(String::as_str).collect();
         let form: Vec<(&str, &[u8])> = match grant {
@@ -772,8 +795,7 @@ impl OAuth {
                 ),
             ],
         };
-        let response = self
-            .http
+        let response = http
             .post_form(&segments, &form)
             .await
             .map_err(Failure::from_provider)?;
@@ -1627,6 +1649,30 @@ impl Local {
             })
             .collect()
     }
+    /// [`Self::host_ports`], each port inside a bounded read's provider
+    /// cutoff when there is one.
+    fn host_ports_until(
+        &self,
+        credential: &Arc<dyn Credential>,
+        until: Option<Instant>,
+    ) -> Result<BTreeMap<String, Arc<dyn connectors_sdk::AuthenticatedHttp>>> {
+        let Some(until) = until else {
+            return Ok(self.host_ports(credential));
+        };
+        self.hosts
+            .iter()
+            .map(|(origin, (port, carries))| {
+                let port = if *carries {
+                    bounded_http(port.with_credential(credential.clone()), Some(until))?
+                } else {
+                    port.with_provider_budget(PROVIDER_BUDGET_LIMIT, until)
+                        .map_err(Failure::from_service)?
+                };
+                let port: Arc<dyn connectors_sdk::AuthenticatedHttp> = Arc::new(port);
+                Ok((origin.clone(), port))
+            })
+            .collect()
+    }
     /// The bounded protected document, taken out of the caller's buffer.
     fn document(mut document: Secret) -> Result<Zeroizing<Vec<u8>>> {
         let document = Zeroizing::new(std::mem::take(&mut document.0));
@@ -1654,6 +1700,15 @@ impl Local {
     /// document (the token, the basic header value or an OAuth access token),
     /// and for an OAuth profile the cache key of that access token.
     async fn credential(&self, document: Secret) -> Result<(Secret, Option<[u8; 32]>)> {
+        self.credential_until(document, None).await
+    }
+    /// [`Self::credential`], its token exchange inside a bounded read's
+    /// provider cutoff when there is one.
+    async fn credential_until(
+        &self,
+        document: Secret,
+        until: Option<Instant>,
+    ) -> Result<(Secret, Option<[u8; 32]>)> {
         let credential = match self.auth.scheme {
             Scheme::Token => {
                 let document = Self::document(document)?;
@@ -1675,7 +1730,7 @@ impl Local {
                 let access = match oauth.cached(&key) {
                     Some(access) => access,
                     None => {
-                        let exchanged = oauth.exchange(&grant).await?;
+                        let exchanged = oauth.exchange_until(&grant, until).await?;
                         oauth.store(key, &exchanged);
                         exchanged.access
                     }
@@ -2036,6 +2091,34 @@ impl runtime::Adapter for Local {
     }
     fn bootstrap_v2(&self) -> Result<Bootstrap> {
         Ok(self.bootstrap_v2.clone())
+    }
+    fn bootstrap_v3(&self) -> Result<Bootstrap> {
+        Ok(self.bootstrap.clone())
+    }
+    /// A read under the first binding, every provider request of it, the
+    /// token exchange included, inside the budget's one provider cutoff. A
+    /// rate-limited answer is not waited for: the budget leaves no second
+    /// request time of its own.
+    async fn invoke_bounded(
+        &self,
+        operation: &str,
+        _partition: &str,
+        document: Secret,
+        input: Value,
+        budget: runtime::ReadBudget,
+    ) -> Result<Value> {
+        let until = budget.provider_until()?;
+        let (credential, key) = self.credential_until(document, Some(until)).await?;
+        let credential: Arc<dyn Credential> = Arc::new(Fixed(credential));
+        let http = bounded_http(self.http.with_credential(credential.clone()), Some(until))?;
+        let hosts = self.host_ports_until(&credential, Some(until))?;
+        let result = self
+            .engine
+            .read_reaching(&http, &hosts, &self.instance, operation, input)
+            .await
+            .map_err(Failure::from_provider);
+        self.evict_refused(key, &result);
+        result
     }
     async fn prepare_write(
         &self,

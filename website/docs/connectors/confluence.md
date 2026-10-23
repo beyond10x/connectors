@@ -25,7 +25,7 @@ out here. A command that needs an Atlassian account is shown without output.
 | Configured as | Reads |
 |---|---|
 | `confluence` | `pages.changed`, `space.pages`, `page.get`, `page.comments` |
-| `confluence-v1` | `spaces.list`, `space.get`, `space.pages`, `pages.changed`, `page.get`, `page.comments`, `content.search` |
+| `confluence-v1` | `spaces.list`, `space.get`, `space.pages`, `pages.changed`, `page.get`, `page.comments`, `content.search`, and the page feed's `feed.containers` and `feed.items` |
 
 Neither connector writes.
 
@@ -128,6 +128,8 @@ writes its configuration.
 - `pages.changed` has no updated-since parameter: stop the walk at the first item older than your
   cutoff.
 - Take a cursor from `_links.next` percent-decoded, or it is encoded twice.
-- The REST v1 page feed (`adapters/catalog/contracts/feed/v1alpha1/confluence-v1.md`) is held
-  only over a test fixture; no instance has `feed.containers` or `feed.items` yet.
+- The REST v1 page feed (`adapters/catalog/contracts/feed/v1alpha1/confluence-v1.md`), profile
+  `confluence-pages/1`, is served over REST v1 only: by `confluence-v1`, or by a pinned instance
+  whose connection binds REST v1. It is verified against fixtures written from the v1 reference,
+  not a live Confluence, and the CQL `lastmodified` precision and order are not established.
 - The shipped declarations carry no `bindings`, so only a pinned instance binds either API.

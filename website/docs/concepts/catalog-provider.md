@@ -8,26 +8,10 @@ source: adapters/catalog/src/lib.rs, adapters/catalog/providers/gitlab/connector
 
 # The catalog provider
 
-`connectors-catalog-provider` is one executable that serves the connectors of many HTTP APIs.
-Four inputs decide what it does:
-
-1. **A bundle**, compiled from a pinned API document by `connectors-build catalog`. It carries the
-   document's whole operation inventory and its SHA-256, and building it again gives the same
-   bytes ([build a catalog bundle](../guides/build-a-catalog-bundle.md)).
-2. **A selection set**, reviewed and shipped per connector under
-   `adapters/catalog/providers/<catalog provider>/operations.json`. Each entry exposes one source
-   operation under a local id (`issues.list`, `merge_request.merge`) with its effect (read or
-   write) and, for a write, an optional guard.
-3. **A connector declaration**, `connector.json` beside the selection: the connector's name, its
-   provider, its default endpoint, the auth profiles it declares and the selection it serves.
-   Every catalog connector but Slack ships one.
-4. **An instance** of that connector in the local configuration: its name and, optionally, its
-   endpoint and description. Every credential is kept out of it
-   ([set up the local CLI](../guides/set-up-the-local-cli.md)).
-
-One engine binds each request from the selection, sends it, and classifies the answer. A read is
-one bound request; a write is one POST, PUT, PATCH or DELETE under the host's approval, audit and
-attempt controls.
+`connectors-catalog-provider` serves each catalog connector from a bundle compiled from its pinned
+API document ([build a catalog bundle](../guides/build-a-catalog-bundle.md)) and a reviewed
+selection of its operations; the connector's page under [Connectors](../connectors/index.md)
+lists them.
 
 ## Writes and their guards
 
@@ -41,19 +25,6 @@ its whole input. A guard is data in the selection, not code:
 
 No corrective request is ever sent. A write that carries no guard, such as GitLab `issue.create`,
 is sent once as approved; the same input approved and sent again creates a second issue.
-
-## What it serves
-
-| Connectors | Source | Operations | Verified against |
-|---|---|---|---|
-| GitLab | pinned OpenAPI v4 document | reads across projects, repositories, pipelines and merge requests; issue and merge-request writes; the merge-request feed | a live GitLab |
-| Jira Cloud | pinned platform REST v3 | issue search by JQL, one issue, comments, changelogs, transitions, a project's creatable issue types, user search, attachment content; a guarded transition run | a live Jira through the API gateway (search); local fixtures (the rest) |
-| Confluence Cloud | pinned REST v2 | changed pages, a space's pages, one page, comments | local fixtures |
-| HubSpot CRM | pinned CRM Objects `2026-09` | records of one object type, one record | local fixtures |
-| Zendesk Support | pinned Support API, redacted | tickets, users and organizations changed since a time, one of each, comments | a live account |
-| Google Drive, Slides, Calendar, Gmail | Discovery documents projected to OpenAPI | reads and guarded writes; no direct message send | local fixtures |
-| Runpod | pinned REST API v1 | create, list and terminate pods | a local fixture |
-| Slack | Swagger 2.0 projected to OpenAPI 3.1.0 | conversation list, history and replies, users, the workspace, files and their content; message posting, editing and deleting, and direct messages, under approval; message search with a user token | a local fixture |
 
 Each connector's page in the repository gives its configuration, auth profiles and
 limits; the [catalog reference](../reference/adapters/catalog/index.md) links them.
@@ -70,5 +41,3 @@ limits; the [catalog reference](../reference/adapters/catalog/index.md) links th
   followed only to an origin the selection names and the connection admits.
 - It never retries a write, and retries a read only once, when the provider's `Retry-After` fits
   the deadline.
-- The catalog index service (listing and locating precompiled bundles) is specified and not
-  implemented; configured connectors need no index.

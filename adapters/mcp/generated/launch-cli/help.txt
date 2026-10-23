@@ -1,0 +1,22 @@
+Local MCP stdio binding over admitted Connectors operations
+
+Usage: connectors-mcp-launch [OPTIONS] <COMMAND>
+
+Commands:
+  server       Serve MCP on stdin and stdout as the admitted local owner
+  completions  Emit shell completions
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+      --config <global_config>
+          
+
+      --state-dir <global_state>
+          
+
+      --output <global_output>
+          [default: human]
+          [possible values: human, json]
+
+  -h, --help
+          Print help

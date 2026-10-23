@@ -23,7 +23,7 @@ out here. A command that needs an Atlassian account is shown without output.
 
 | Reads | Writes |
 |---|---|
-| `issues.search`, `issue.get`, `issue.comments`, `issue.changelog`, `issue.transitions`, `issue.create_meta`, `issue.create_meta.fields`, `users.search`, `attachment.content` | `issue.transition.run`, guarded: it reads the issue and the transition first and sends nothing unless the issue is in the status you named and the transition leads to the status you named; it reads the issue again afterwards. `issue.create`, `issue.comment.add` and `issue.link.add` read the project or issues first; `issue.edit` and `issue.delete` send nothing unless the issue's `fields.updated` is the stamp you read, and are read again afterwards |
+| `issues.search`, `issue.get`, `issue.comments`, `issue.changelog`, `issue.transitions`, `issue.create_meta`, `issue.create_meta.fields`, `projects.list`, `project.get`, `users.search`, `attachment.content`, and the issue feed's `feed.containers` and `feed.items` | `issue.transition.run`, guarded: it reads the issue and the transition first and sends nothing unless the issue is in the status you named and the transition leads to the status you named; it reads the issue again afterwards. `issue.create`, `issue.comment.add` and `issue.link.add` read the project or issues first; `issue.edit` and `issue.delete` send nothing unless the issue's `fields.updated` is the stamp you read, and are read again afterwards |
 
 ## Prerequisites at the provider
 
@@ -160,5 +160,6 @@ connectors connections reconnect --connector jira --instance work \
   `rate_limited` with `retry_after_seconds` when the retry does not fit.
 - `attachment.content` reads at most 2 MiB.
 - The OAuth gateway form is not verified live, and the provider does not refresh an OAuth token.
-- The issue feed (`adapters/catalog/contracts/feed/v1alpha1/jira.md`) is held only over a test
-  fixture; no instance has `feed.containers` or `feed.items` yet.
+- The issue feed (`adapters/catalog/contracts/feed/v1alpha1/jira.md`), profile `jira-issues/1`,
+  is verified against fixtures written from the pinned document in every profile zone from
+  UTC-12:00 to UTC+14:00, not against a live Jira.

@@ -188,6 +188,27 @@ impl Store {
             .map(|material| Secret(material.into_vec()))
     }
 
+    /// Read one admitted version through the binding `selection` names, within
+    /// the original execution cutoff `until`. The cutoff is checked before the
+    /// binding is opened and after the read; it does not interrupt a binding
+    /// call already in progress. Material read after the cutoff is dropped.
+    pub fn read_for_until(
+        version: Version,
+        selection: &Selection,
+        state: &Path,
+        until: std::time::Instant,
+    ) -> Result<Secret> {
+        if std::time::Instant::now() >= until {
+            return Err(Failure::Unavailable);
+        }
+        let result =
+            Self::open_for(version.scope(), selection, state).and_then(|store| store.read(version));
+        if std::time::Instant::now() >= until {
+            return Err(Failure::Unavailable);
+        }
+        result
+    }
+
     /// Recovery of a staged signing key only. Readback alone never converts a
     /// credential version into publication authority. The owner validates the
     /// seed's public key while the physical writer lock excludes retirement.

@@ -10,6 +10,7 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:mcp-stdio-runtime-branch
 - depends_on: story:docs-first-run-path
+- depends_on: story:definition-reader-feed-extensions
 scope:
 - confidence: cited
   path: CHANGELOG.md
@@ -21,6 +22,8 @@ scope:
   path: apps/connectors/tests/claude_mcp_journey.rs
 - confidence: cited
   path: apps/connectors/tests/compatibility.rs
+- confidence: cited
+  path: apps/connectors/tests/fixtures/claude-code/jira-search.json
 - confidence: cited
   path: apps/connectors/tests/fixtures/claude-code/session.expected.jsonl
 - confidence: cited
@@ -35,7 +38,7 @@ scope:
   path: website/docs/connectors/mcp.md
 - confidence: cited
   path: website/docs/status.md
-revision: 4
+revision: 8
 ---
 ## Outcome
 
@@ -48,9 +51,10 @@ a recorded session. The support claims move from planned to shipped.
 
 ## Ownership
 
-- story:mcp-stdio-runtime-branch owns the server: the generic `tools/list`, `tools/call`,
-  refusal and stdout tests (its acceptance, `.engineering/planning/story/mcp-stdio-runtime-branch.md:44-45`).
-  This story depends on it and repeats none of those tests.
+- story:mcp-stdio-runtime-branch owns the server and its generic scenarios in
+  `apps/connectors/tests/local_mcp_server.rs`: `stdio_lists_and_calls_an_admitted_read_on_2026_07_28`,
+  `…_on_2025_11_25`, the four omitted-or-refused classes with no provider request, and
+  `stdout_carries_only_json_rpc_frames`. This story depends on it and repeats none of those tests.
 - This story owns what is specific to Claude Code and the claims:
   - the recorded Claude Code handshake;
   - the `claude mcp add` spelling;
@@ -62,13 +66,18 @@ a recorded session. The support claims move from planned to shipped.
   - Depends on story:mcp-stdio-runtime-branch and story:docs-first-run-path. That story moves the
     README install text; this story then adds the support-table row (`onboarding.rs` reads the
     README support table).
+  - Depends on story:definition-reader-feed-extensions: its feed block adds 2 reads to the Jira
+    selection (`adapters/catalog/src/lib.rs:1579-1597`), so the `tools/list` this story records is
+    taken after it lands.
   - story:claude-getting-started-tutorial depends on this story, links `mcp.md` and edits neither
     the support table nor `onboarding.rs`. This story does not wait for the tutorial or for
     story:instances-resolve-through-locked-index.
-  - The `compatibility.json` flip is this story's. If the runtime branch carries it, the runtime
-    story leaves it out when it re-lands.
+  - The `compatibility.json` flip is this story's; the runtime story keeps `deferred`.
 - Writes are not listed. Mutation tools stay unavailable (`adapters/mcp/contracts/server/v1alpha1/projection.md:157`,
   `mutations.md:3-4`), and this story asserts their absence, not an approval path.
+- The closing report of this story asks b10x-chef-orchestrator for connectors-definitions
+  `connectors/jira-agent.yaml`, `connectors/slack-agent.yaml` and the `agent` rule, as listed in
+  upstream-blocker:definitions-lack-agent-projections; story:agent-tool-projection waits on them.
 
 ## Scope
 
@@ -80,8 +89,12 @@ a recorded session. The support claims move from planned to shipped.
   per request in `session.jsonl`, written from the wire forms of
   `adapters/mcp/contracts/server/v1alpha1/projection.md` and reviewed in the pull request.
 - `apps/connectors/tests/claude_mcp_journey.rs` (new): starts the release-profile `connectors`
-  binary with the `claude mcp add` arguments. Its configuration points the Jira instance at the
-  recorded fixture server the runtime story's tests use.
+  binary with the `claude mcp add` arguments, under the `mounted_secret` binding in the jail of
+  `apps/connectors/tests/support/mounted.rs`. The Jira instance's `base_url` is a loopback
+  listener the test serves, answering `GET /rest/api/3/search/jql` with
+  `apps/connectors/tests/fixtures/claude-code/jira-search.json` (new), as
+  `apps/connectors/tests/revalidate_transient.rs` serves its provider. Runs in `cargo test`, not
+  `#[ignore]`d.
 - `website/docs/connectors/mcp.md`: the `:::caution[Planned]` box goes; the page gains the
   registration line and the recorded session. `getting-started.md` is not edited here; the
   tutorial links this page when it lands.

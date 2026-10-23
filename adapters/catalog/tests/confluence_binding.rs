@@ -59,7 +59,7 @@ const V1_SPACE: &str = "/wiki/rest/api/space/DOCS?";
 const V1_FEED: &str = "/wiki/rest/api/content/search?cql=space+%3D+%22DOCS%22+and+type+%3D+page+order+by+lastmodified+asc&expand=history%2Cversion&limit=10";
 /// The feed's two reads, which only the v1 binding serves, and only with the feed declared.
 const FEED_IDS: [&str; 2] = ["feed.containers", "feed.items"];
-/// The v2 and v1 ids the shipped selection sets serve.
+/// The v2 and v1 ids the shipped selection sets select; the v1 set also declares the feed.
 const V2_IDS: [&str; 4] = ["page.comments", "page.get", "pages.changed", "space.pages"];
 const V1_IDS: [&str; 7] = [
     "content.search",
@@ -356,7 +356,7 @@ impl Provider {
     }
     /// This instance's configuration with the v1 alternative's selection set carrying the
     /// Confluence v1 feed declaration (`tests/feed/confluence/feed.json`) beside the shipped
-    /// operations, as the shipped selection will once it can carry one.
+    /// operations, as the shipped selection does.
     fn with_v1_feed(&self) -> PathBuf {
         let mut selection: Value = serde_json::from_slice(
             &fs::read(root_path("providers/confluence-v1/operations.json")).unwrap(),
@@ -467,7 +467,10 @@ fn the_bootstrap_carries_each_binding_with_its_own_operations() {
     assert_eq!(ids(&bootstrap.bound(None).unwrap()), V2_IDS);
     assert_eq!(ids(&bootstrap.bound(Some("v2")).unwrap()), V2_IDS);
     let v1 = bootstrap.bound(Some("v1")).unwrap();
-    assert_eq!(ids(&v1), V1_IDS);
+    // The shipped v1 selection declares the page feed, so its two reads are the v1 binding's too.
+    let mut v1_ids: Vec<&str> = V1_IDS.iter().chain(&FEED_IDS).copied().collect();
+    v1_ids.sort();
+    assert_eq!(ids(&v1), v1_ids);
     assert!(v1.bindings.is_none(), "a bound view names no alternatives");
     v1.validate().unwrap();
     // Each binding is its own description: a revision of one is stale for the other.

@@ -15,7 +15,7 @@ Rendered from [`contracts/datasources/feed/v1alpha1/semantics.md`](https://githu
 
 :::
 
-**Status:** proposed. One binding is implemented: GitLab, profile `gitlab-merge-requests/1` (`adapters/catalog/contracts/feed/v1alpha1/gitlab.md`), checked against recorded provider shapes. A Jira binding, profile `jira-issues/1` (`adapters/catalog/contracts/feed/v1alpha1/jira.md`), is declared only in a test fixture and is not shipped. A Confluence REST v1 binding, profile `confluence-pages/1` (`adapters/catalog/contracts/feed/v1alpha1/confluence-v1.md`), is declared only in a test fixture and is not shipped.
+**Status:** proposed. Three bindings are shipped: GitLab, profile `gitlab-merge-requests/1` (`adapters/catalog/contracts/feed/v1alpha1/gitlab.md`), checked against recorded provider shapes. A Jira binding, profile `jira-issues/1` (`adapters/catalog/contracts/feed/v1alpha1/jira.md`), is declared in the shipped Jira selection. A Confluence REST v1 binding, profile `confluence-pages/1` (`adapters/catalog/contracts/feed/v1alpha1/confluence-v1.md`), is declared in the shipped `confluence-v1` selection.
 
 ## Shared contract and adapter ownership
 

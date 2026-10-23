@@ -871,7 +871,7 @@ answer.
 drain and exit and waits up to 30 seconds for it; it answers `"disposition": "stopped"`, or
 `"no_owner"` when none runs, and never signals a process
 ([owner contract](../contracts/cli/v1alpha1/owner.md#stopping-an-owner),
-[CLI guide](../website/docs/guides/set-up-the-local-cli.md#after-an-upgrade)). An idle owner also
+[upgrade guide](../website/docs/guides/upgrade-the-cli.md#after-an-upgrade)). An idle owner also
 exits by itself after 10 minutes with no connected client and no work in flight. The next command
 that needs an owner starts one from the current build:
 

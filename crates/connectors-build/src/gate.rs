@@ -76,6 +76,8 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     super::upstream_redaction::run(root)?;
     super::release_binaries::run(root)?;
     super::cli::run(root, ess, true)?;
+    super::mcp::run(root, ess, true)?;
+    super::service_metadata::run(root, ess, true)?;
     // The website build's examples step, without its WASM build: a target refusing the
     // example model fails here rather than only in `npm run build`.
     super::docs::synthesize_examples(root, ess, &temp.path().join("examples"))?;
@@ -167,6 +169,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "sql",
         "tavily",
         "catalog-provider",
+        "mcp",
     ] {
         let package = format!("connectors-{adapter}");
         execute(command(None)?.args([
@@ -197,6 +200,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             "connectors-grafana",
             "connectors-kubernetes",
             "connectors-loki",
+            "connectors-mcp",
             "connectors-prometheus",
             "connectors-sql",
             "connectors-tavily",
@@ -251,6 +255,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             "connectors-client",
             "connectors-contracts",
             "connectors-core",
+            "connectors-mcp",
             "connectors-sdk",
         ] {
             execute(
@@ -325,12 +330,10 @@ const AUTHORED_DIRECTORIES: &[&str] = &[
     // against the shared IR is a real check.
     //
     // The outbound directory beside it is deliberately absent. Those files are
-    // `mcp-outbound-lifecycle/1`, a format this repository defined and ESS does not
-    // know — and ESS refuses an unknown key rather than ignoring it, so collecting
-    // them here fails the gate on every one of them. They are held by
-    // `mcp_outbound_connection_lifecycle`'s own package-scoped cases instead, which is
-    // a weaker guarantee than the shared IR gives the inbound set, and saying so here
-    // is the point: adding the directory would turn a stated gap into a broken gate.
+    // `mcp-outbound-lifecycle/1`, a scenario type this repository defined. ESS refuses
+    // a foreign scenario type by design, so they stay out of the shared IR for good and
+    // are held by `mcp_outbound_connection_lifecycle`'s own package-scoped cases.
+    // Adding the directory here would fail the gate on every one of them.
     "adapters/mcp/contracts/server/v1alpha1/scenarios",
 ];
 

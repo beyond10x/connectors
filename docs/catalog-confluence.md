@@ -172,14 +172,21 @@ Atlassian ESS model names both sets (`ConfluenceV1Read`, `ConfluenceV2Read` in
 - **`page.comments`** takes the content `id`; `location=footer` limits it to
   footer comments, and `expand=body.storage` adds their bodies.
 
-The set declares no page feed. A `datasource.feed/v1alpha1` binding under
-profile `confluence-pages/1` is specified in
-[confluence-v1.md](../adapters/catalog/contracts/feed/v1alpha1/confluence-v1.md)
-and held to the family's suite over a test fixture, but it is not in the shipped
-selection, so `feed.containers` and `feed.items` are not `confluence-v1`
-operations: the connector definition format the shipped selections round-trip
-through cannot carry it yet. Only REST v1 can serve it; REST v2 lists pages with
-no time filter to resume by.
+The set also declares the page feed, a `datasource.feed/v1alpha1` binding under
+profile `confluence-pages/1` specified in
+[confluence-v1.md](../adapters/catalog/contracts/feed/v1alpha1/confluence-v1.md),
+as its `feed` block, so a `confluence-v1` instance has `feed.containers` and
+`feed.items` beside the selected operations. A container is a space `getSpaces`
+lists, looked up by `getSpace`; an item is one of its pages, read by
+`searchContentByCQL`, resumed by a `lastmodified >=` CQL query and continued by
+the cursor of `_links.next`. The block is the one the `confluence-v1` connector
+definition lowers to (`crates/connectors-catalog/tests/definition_feed.rs`), and
+it is held to the family's suite
+(`crates/connectors-build/src/confluence_feed_conformance.rs`,
+`adapters/catalog/tests/confluence_v1_feed.rs`) against fixtures written from the
+v1 reference, not a live Confluence. Only REST v1 can serve it; REST v2 lists
+pages with no time filter to resume by, so a connection bound to REST v2 is
+refused the feed by name before anything is sent.
 
 The `confluence-v1` connector
 ([`adapters/catalog/providers/confluence-v1/connector.json`](../adapters/catalog/providers/confluence-v1/connector.json))
