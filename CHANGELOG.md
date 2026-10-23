@@ -13,6 +13,12 @@
   `page` and `utc_offsets`; and items `url`, `url_base` and `parent`. Each of its rules is refused
   by name (`feed_cursor_continuation` … `feed_item_pointer`).
 - New guide `website/docs/guides/upgrade-the-cli.md`.
+- `connectors list` prints every connector the CLI ships a declaration for, one row each, with its
+  auth profiles and the names of its configured instances; `--output json` prints the same rows.
+  It needs no configuration file and starts no process. Connectors served by their own
+  executables (Kubernetes, SQL and the others without a shipped declaration) have no row yet.
+- `Taskfile.yml` with `task install`, which runs `cargo install --locked` for `connectors` and
+  `connectors-catalog-provider` from the checkout.
 
 ### Changed
 

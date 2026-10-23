@@ -186,6 +186,13 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Local runtime",
+        "Listing connectors",
+        "connectors list prints every connector the CLI ships a declaration for, with its auth profiles and configured instances, without a configuration file and without starting a process.",
+        "apps/connectors/tests/list_connectors.rs::a_configured_instance_is_named_on_its_connectors_row_and_nothing_is_started",
+        "/docs/reference/cli",
+    ),
+    shipped(
+        "Local runtime",
         "Selecting an instance",
         "--connector and --instance select one instance; the deprecated --adapter reaches the same instance and says it is deprecated once.",
         "apps/connectors/tests/connector_instance_selectors.rs::both_selectors_reach_one_instance_and_only_the_alias_is_deprecated",

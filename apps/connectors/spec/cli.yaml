@@ -85,6 +85,11 @@ callables:
     input: connectors.cli.SetupMigrateInput
     result: connectors.cli.SetupMigrateResult
     errors: {failure: connectors.cli.Failure}
+  connectors-list:
+    target: {kind: local, owner: connectors.cli, action: connectors-list}
+    input: null
+    result: connectors.cli.ConnectorListResult
+    errors: {failure: connectors.cli.Failure}
   adapters-list:
     target: {kind: local, owner: connectors.cli, action: adapters-list}
     input: connectors.cli.AdapterListInput
@@ -359,6 +364,11 @@ commands:
     arguments:
       - field: mode
         source: {kind: option, long: mode}
+  - path: [list]
+    aliases: []
+    callable: connectors-list
+    about: List every connector this build ships, with its auth profiles and the instances the configuration names; needs no configuration and starts no process
+    arguments: []
   - path: [instances, list]
     aliases: [[adapters, list]]
     callable: adapters-list
