@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-23T17:46:05Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0570-mcp-stdio-list-feeds",
+  "kind": "release-plan",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "release v0.57.0: annotated tag add3e63f9 by b10x-bot[bot] on db71d7aac (merge of #204, tree equals the CI-green head 366dac00a), release page by b10x-bot[bot] and Latest, the four archives and SHA256SUMS on the page, sha256sum -c OK for 4 of 4, verify-release exit 0",
+    "reference": "https://github.com/beyond10x/connectors/releases/tag/v0.57.0"
+  }
+}
