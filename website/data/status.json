@@ -102,6 +102,13 @@
     },
     {
       "area": "Local runtime",
+      "detail": "connectors list prints every connector the CLI ships a declaration for, with its auth profiles and configured instances, without a configuration file and without starting a process.",
+      "href": "/docs/reference/cli",
+      "label": "Listing connectors",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
       "detail": "--connector and --instance select one instance; the deprecated --adapter reaches the same instance and says it is deprecated once.",
       "href": "/docs/reference/cli",
       "label": "Selecting an instance",
