@@ -19,6 +19,22 @@ fn private_file(path: &Path, bytes: &[u8], mode: u32) {
     fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
 }
 
+/// Puts `source` at `destination`, mode 0700, through a `cp` child: this
+/// process never holds a file it will execute open for writing. The tests run
+/// on parallel threads and each run forks; a child forked while this process
+/// held the file open keeps that descriptor until its own exec, and an exec of
+/// the file meanwhile fails with `ETXTBSY`. `cp` has exited, and closed the
+/// file, when this returns.
+fn install(source: &Path, destination: &Path) {
+    let status = Command::new("cp")
+        .arg(source)
+        .arg(destination)
+        .status()
+        .unwrap();
+    assert!(status.success(), "cp: {status}");
+    fs::set_permissions(destination, fs::Permissions::from_mode(0o700)).unwrap();
+}
+
 /// A copy of the CLI and, beside it, a stand-in catalog provider that records
 /// every start.
 struct Installation {
@@ -32,17 +48,19 @@ impl Installation {
         fs::create_dir(&bin).unwrap();
         fs::set_permissions(&bin, fs::Permissions::from_mode(0o700)).unwrap();
         let cli = bin.join("connectors");
-        fs::copy(env!("CARGO_BIN_EXE_connectors"), &cli).unwrap();
-        fs::set_permissions(&cli, fs::Permissions::from_mode(0o700)).unwrap();
+        install(Path::new(env!("CARGO_BIN_EXE_connectors")), &cli);
+        let staged = root.path().join("provider.staged");
         private_file(
-            &bin.join("connectors-catalog-provider"),
+            &staged,
             format!(
                 "#!/bin/sh\nprintf 'started\\n' >> '{}'\nexit 1\n",
                 root.path().join("started").display()
             )
             .as_bytes(),
-            0o700,
+            0o600,
         );
+        install(&staged, &bin.join("connectors-catalog-provider"));
+        fs::remove_file(&staged).unwrap();
         Self { root }
     }
 
@@ -212,8 +230,8 @@ fn with_real_provider() -> Installation {
         .root
         .path()
         .join("bin/connectors-catalog-provider");
-    fs::copy(real_provider(), &beside).unwrap();
-    fs::set_permissions(&beside, fs::Permissions::from_mode(0o700)).unwrap();
+    fs::remove_file(&beside).unwrap();
+    install(&real_provider(), &beside);
     installation
 }
 
