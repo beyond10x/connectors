@@ -564,7 +564,7 @@ impl Pool {
         )
     }
     /// [`Pool::new`], shared, its workers holding a handle to it.
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     pub fn shared(paths: Arc<Paths>, incarnation: String) -> Arc<Self> {
         Self::shared_with_read_policy(paths, incarnation, Arc::new(governed::UnboundReadPolicy))
     }
