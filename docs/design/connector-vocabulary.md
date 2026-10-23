@@ -29,10 +29,10 @@ engine, the Slack credential binary) and of the running process that serves an i
 
 ## Why
 
-The vocabulary in use today gives one word several meanings and has none for what a user means by
-"connect to Google":
+History. On 2026-10-16, before this decision, the vocabulary in use gave one word several meanings
+and had none for what a user means by "connect to Google":
 
-| Today | Meaning | Where |
+| Then | Meaning | Where |
 |---|---|---|
 | adapter | the implementation of a contract (`catalog`) | `docs/design.md:138`; `adapter_id` in `crates/connectors-host/src/local/config.rs:270` |
 | adapter | the configuration alias passed as `--adapter gmail-write` | `[adapters.<alias>]`, `config.rs:24` |
@@ -41,11 +41,13 @@ The vocabulary in use today gives one word several meanings and has none for wha
 | provider | one API of a company (`google-gmail`), not the company | `provider` in `adapters/catalog/src/local.rs:173` |
 | profile | an auth method (`google.oauth`) and a contract subset | `ess/domains/auth_bindings.yaml` `ProfileDeclaration`; `docs/design.md:137` |
 
-The Google guides then configure two instances per API, a read instance and a write instance with a
-wider scope, because a connection's scopes cannot be widened in place (the record of wave
+The Google guides then configured two instances per API, a read instance and a write instance with a
+wider scope, because a connection's scopes could not be widened in place (the record of wave
 `wave-20260930c-google-oauth-discovery`, README line 38, in history at commit `6498a881c`). Four
-Google APIs with reads and writes are eight instances, eight consents and, while the OAuth app is
-in *Testing*, eight weekly re-consents (`docs/catalog-google-oauth.md:113-120`).
+Google APIs with reads and writes were eight instances, eight consents and, while the OAuth app is
+in *Testing*, eight weekly re-consents (`docs/catalog-google-oauth.md:113-120` at that time). The
+decision ended that pair: one instance per account, whose consent requests every scope the
+connector's operations need (ADR Consequences); the guides follow it since `584cb42f2`.
 
 ## What changes
 

@@ -114,6 +114,16 @@ libraries independent of its siblings.
 Composition owns concrete pairings. The [adapter boundary gate](adapters/README.md#boundary-gate)
 checks these boundaries; do not add exceptions merely to pass it.
 
+One connector per service: its read and write operations live in the same
+definition. Never split a service into a per-direction provider, connector,
+definition file, bundle or read and write instance pair. A write added later joins
+the existing definition. The decision is
+[ADR connector-vocabulary](.engineering/planning/architecture-decision-record/connector-vocabulary.md)
+(line 56, "One instance per account replaces the read and write instance pair"); the
+operator restated it on 2026-10-23: "we dont split providers into $P-(read|write)".
+A story or epic id may end in `-reads` or `-writes`, because it names work; a
+provider, connector, file or bundle name never does.
+
 Implement executable project tooling and example behavior in Rust. TypeScript and
 React may implement the planned website's presentation and Docusaurus integration.
 Do not add Python helpers. Do not import historical implementation constraints
