@@ -7,7 +7,7 @@ title: Nobody has decided whether a custody credential may be delivered to an ow
 relations:
 - blocks: story:custody-credential-file-delivery
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 ---
 ## Question
 
@@ -25,6 +25,6 @@ mounted-secret custody threat model admits no value in any output.
 
 Recommended: A, scoped to one connection per delivery and refused for mounted custody.
 
-Decider: timo
+Decider: operator
 
-Credential custody is on the operator never-list, so only Timo decides this (directing session, 2026-10-23). It is Timo queue row 41.
+Credential custody is on the operator never-list, so only the operator decides this (directing session, 2026-10-23). It is row 41 of the operator queue.

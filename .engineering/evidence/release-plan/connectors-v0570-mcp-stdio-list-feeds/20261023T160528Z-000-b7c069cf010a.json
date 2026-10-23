@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-23T16:05:28Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0570-mcp-stdio-list-feeds",
+  "kind": "release-plan",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv (ESS 0.67.0, aep 0.71.3) on release/0.57.0 before the derived_instance.rs ETXTBSY retry: 30 steps exit 0, 3142 passed, 0 failed, 148 ignored, gate: all checks passed; then on the final tree cargo test -p connectors --test derived_instance 3 passed, its clippy -D warnings clean, target/debug/connectors --version printed connectors 0.57.0",
+    "reference": "https://github.com/beyond10x/connectors/tree/release/0.57.0"
+  }
+}
