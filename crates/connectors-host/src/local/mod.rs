@@ -23,6 +23,7 @@ pub mod oauth;
 mod oauth_adversary_pass2_tests;
 #[cfg(test)]
 mod oauth_adversary_tests;
+pub mod operation_curation;
 pub mod owner;
 pub mod protected;
 pub mod registry;
@@ -34,6 +35,10 @@ pub mod service;
 pub(crate) mod test_executable;
 #[cfg(test)]
 mod test_streams;
+/// The owner socket's nonblocking connect; Linux only, where an `AF_UNIX`
+/// connect to a full accept queue would otherwise wait unbounded.
+#[cfg(target_os = "linux")]
+mod unix;
 
 /// Closed, credential-free local failures. Never include OS, parser or DB text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -18,6 +18,9 @@ use std::{
     process::{Command, Stdio},
 };
 
+/// How a read decodes the result a child wrote.
+type Decode = fn(&[u8]) -> Result<serde_json::Value>;
+
 /// Owned process, never reconstructed from a PID or readiness file. It is not
 /// Send: its spawning thread must remain alive for the Linux parent-death lease.
 /// On macOS the process is an [`artifact::ExactChild`]: signalled only under
@@ -357,16 +360,53 @@ impl Child {
         input: &[u8],
         deadline_ms: u64,
     ) -> std::result::Result<Vec<u8>, Refusal> {
+        self.read(
+            binding,
+            (operation, revision, partition),
+            secret,
+            (input, deadline_ms),
+            |bytes| connectors_core::read_json(bytes).map_err(|_| Failure::Protocol),
+        )
+    }
+    /// [`Child::invoke_bound`] for a governed read: the result keeps every
+    /// admitted JSON number exactly as the child wrote it and a duplicate
+    /// member is refused (`connectors_core::json`). Authorization remains the
+    /// owner's, exactly as for `invoke`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn invoke_lossless(
+        &mut self,
+        binding: Option<&str>,
+        operation: &str,
+        revision: &str,
+        partition: &str,
+        secret: &Secret,
+        input: &[u8],
+        deadline_ms: u64,
+    ) -> std::result::Result<Vec<u8>, Refusal> {
+        self.read(
+            binding,
+            (operation, revision, partition),
+            secret,
+            (input, deadline_ms),
+            |bytes| connectors_core::json::decode(bytes, 64).map_err(|_| Failure::Protocol),
+        )
+    }
+    fn read(
+        &mut self,
+        binding: Option<&str>,
+        (operation, revision, partition): (&str, &str, &str),
+        secret: &Secret,
+        (input, deadline_ms): (&[u8], u64),
+        decode: Decode,
+    ) -> std::result::Result<Vec<u8>, Refusal> {
         let mut reason = None;
         let mut delay = None;
         self.dispatch(
             binding,
-            operation,
-            revision,
-            partition,
+            (operation, revision, partition),
             secret,
             input,
-            deadline_ms,
+            (deadline_ms, decode),
             &mut reason,
             &mut delay,
         )
@@ -380,15 +420,17 @@ impl Child {
     fn dispatch(
         &mut self,
         binding: Option<&str>,
-        operation: &str,
-        revision: &str,
-        partition: &str,
+        (operation, revision, partition): (&str, &str, &str),
         secret: &Secret,
         input: &[u8],
-        deadline_ms: u64,
+        (deadline_ms, decode): (u64, Decode),
         reason: &mut Option<String>,
         delay: &mut Option<u64>,
     ) -> Result<Vec<u8>> {
+        // A bounded-read child answers only `invoke_bounded`.
+        if self.protocol == PrivateProtocol::V3 {
+            return Err(Failure::Unsupported);
+        }
         if input.len() > INPUT_LIMIT || !connectors_core::valid_id(partition) {
             return Err(Failure::InvalidInput);
         }
@@ -424,8 +466,7 @@ impl Child {
             Reply::Success { request_id } if request_id == id => {
                 let checked = (|| {
                     channel::depth(&frame.document)?;
-                    let value = connectors_core::read_json(&frame.document)
-                        .map_err(|_| Failure::Protocol)?;
+                    let value = decode(&frame.document)?;
                     let operation = descriptor
                         .operation(operation)
                         .map_err(Failure::from_service)?;
@@ -458,6 +499,92 @@ impl Child {
                 Err(Failure::Protocol)
             }
         }
+    }
+    /// Explicit read transport only. Caller supplies current admission and the
+    /// original budget established before admission; no new interval starts here.
+    pub fn invoke_bounded(
+        &mut self,
+        operation: &str,
+        revision: &str,
+        partition: &str,
+        secret: &Secret,
+        input: &[u8],
+        budget: ReadBudget,
+    ) -> Result<Vec<u8>> {
+        if self.protocol != PrivateProtocol::V3 {
+            return Err(Failure::Unsupported);
+        }
+        if !self.live {
+            return Err(Failure::Unavailable);
+        }
+        let until = budget.until()?;
+        if input.len() > budget.input_bytes() || !connectors_core::valid_id(partition) {
+            return Err(Failure::InvalidInput);
+        }
+        let descriptor = self.bootstrap.descriptor()?;
+        if descriptor.revision != revision {
+            return Err(Failure::StaleDescription);
+        }
+        let requirement = self
+            .bootstrap
+            .requirements
+            .iter()
+            .find(|r| r.operation == operation)
+            .ok_or(Failure::NotFound)?;
+        if requirement.effect != Effect::Read {
+            return Err(Failure::Unsupported);
+        }
+        let declaration = descriptor
+            .operation(operation)
+            .map_err(Failure::from_service)?;
+        let value = connectors_core::json::decode(input, 64).map_err(|_| Failure::InvalidInput)?;
+        connectors_sdk::validate(&declaration.input_schema, &value)
+            .map_err(Failure::from_service)?;
+        let id = uuid::Uuid::new_v4().to_string();
+        let result = channel::write(
+            &mut self.channel,
+            &bounded::ReadRequest::InvokeBounded {
+                request_id: id.clone(),
+                operation: operation.into(),
+                revision: revision.into(),
+                partition: partition.into(),
+                budget,
+            },
+            Some(secret),
+            input,
+            until,
+        )
+        .and_then(|_| {
+            channel::read::<Reply>(&mut self.channel, until, false, budget.result_bytes())
+        })
+        .and_then(|frame| match frame.control {
+            Reply::Success { request_id } if request_id == id => {
+                let value = connectors_core::json::decode(&frame.document, 64)
+                    .map_err(|_| Failure::Protocol)?;
+                connectors_sdk::validate(&declaration.output_schema, &value)
+                    .map_err(|_| Failure::Protocol)?;
+                budget.until()?;
+                Ok(frame.document)
+            }
+            Reply::Failed {
+                request_id,
+                code,
+                reason: None,
+                retry_after_seconds: None,
+            } if request_id == id && frame.document.is_empty() => Err(code),
+            _ => Err(Failure::Protocol),
+        });
+        if matches!(
+            result,
+            Err(Failure::Timeout
+                | Failure::ProviderTimeout
+                | Failure::Interrupted
+                | Failure::Protocol
+                | Failure::Unavailable)
+        ) {
+            self.terminate();
+        }
+        result
     }
     /// Prepare on this exact child without writing. The returned borrow occupies
     /// it through commit/cancel and keeps the original monotonic deadline. The
@@ -922,13 +1049,22 @@ executable: None,
         else {
             panic!("expected hello")
         };
+        let mut selected = bootstrap();
+        if matches!(
+            mode.as_str(),
+            "fixture-mode-lossless" | "fixture-mode-duplicate"
+        ) {
+            let mut descriptor = selected.descriptor().unwrap();
+            descriptor.operations[0].output_schema = serde_json::json!({"type":"object"});
+            selected.descriptor = serde_json::to_string(&descriptor).unwrap();
+        }
         channel::write(
             &mut stream,
             &Reply::Ready {
                 version,
                 nonce,
                 child_incarnation,
-                bootstrap: bootstrap(),
+                bootstrap: selected,
             },
             None,
             &[],
@@ -1061,6 +1197,15 @@ executable: None,
             "fixture-mode-json" => (request_id, b"{\"value\":}".as_slice()),
             "fixture-mode-schema" => (request_id, br#"{"value":"wrong-type"}"#.as_slice()),
             "fixture-mode-identity" => ("another-request".into(), br#"{"value":true}"#.as_slice()),
+            "fixture-mode-lossless" => {
+                assert_eq!(request.document, br#"{"n":1844674407370955161701}"#);
+                (
+                    request_id,
+                    br#"{"n":1844674407370955161701,"huge":1e400,"$serde_json::private::Number":"literal"}"#
+                        .as_slice(),
+                )
+            }
+            "fixture-mode-duplicate" => (request_id, br#"{"n":1,"n":2}"#.as_slice()),
             _ => panic!("unknown fixture mode"),
         };
         channel::write(
@@ -1073,6 +1218,35 @@ executable: None,
         .unwrap();
         // The parent must kill and reap this exact child after the bad reply.
         std::thread::sleep(Duration::from_secs(30));
+    }
+
+    #[test]
+    fn governed_child_transport_preserves_numbers_and_refuses_duplicate_keys() {
+        for mode in ["lossless", "duplicate"] {
+            let mut child = fixture_child(&format!("fixture-mode-{mode}"));
+            let result = child
+                .invoke_lossless(
+                    None,
+                    "read",
+                    "fixture-descriptor",
+                    "partition",
+                    &Secret(b"fictional".to_vec()),
+                    br#"{"n":1844674407370955161701}"#,
+                    connectors_sdk::now_ms() + 2000,
+                )
+                .map_err(|refusal| refusal.failure);
+            if mode == "lossless" {
+                assert_eq!(
+                    result.unwrap(),
+                    br#"{"n":1844674407370955161701,"huge":1e400,"$serde_json::private::Number":"literal"}"#
+                );
+                assert!(child.live);
+            } else {
+                assert_eq!(result, Err(Failure::Protocol));
+                assert!(!child.live);
+                assert!(child.process.try_wait().unwrap().is_some());
+            }
+        }
     }
 
     #[test]

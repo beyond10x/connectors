@@ -382,7 +382,9 @@ const FILED_EDGES: &[(&str, &str)] = &[
 /// model could not read from an existing `ess/1` document or the pinned specification
 /// carried as an explicit `UNMAPPED:` comment rather than a chosen cardinality".
 ///
-/// Eight of the ten census rows are relations no source answers. Six carry `UNMAPPED:`.
+/// In the original 2026-09-12 finding, eight census rows had no source answer.
+/// The 2026-10-03 stdio decision now resolves one; read each decision's actual status.
+/// Originally six carried `UNMAPPED:`.
 /// Two carry `FILED:` and a blocker id and no `UNMAPPED:` anywhere they are named, and
 /// the census guard was written to that second vocabulary — `Verdict::Filed` wants the
 /// blocker id — rather than to the sentence the story is accepted against, so nothing
@@ -398,6 +400,15 @@ fn every_relation_no_source_answers_carries_the_marker_the_acceptance_names() {
     let text = read(STATE);
     let mut unmarked = Vec::new();
     for (edge, blocker) in FILED_EDGES {
+        let id = blocker.strip_prefix("decision-blocker:").unwrap();
+        let record = read(&format!(".engineering/planning/decision-blocker/{id}.md"));
+        let header: serde_yaml_ng::Value =
+            serde_yaml_ng::from_str(record.split("---").nth(1).unwrap()).unwrap();
+        let marker = match header["status"].as_str() {
+            Some("open") => UNMAPPED,
+            Some("cleared") => "RESOLVED",
+            other => panic!("unexpected decision status for {blocker}: {other:?}"),
+        };
         let sites: Vec<(usize, &str)> = text
             .lines()
             .enumerate()
@@ -407,9 +418,9 @@ fn every_relation_no_source_answers_carries_the_marker_the_acceptance_names() {
             !sites.is_empty(),
             "census edge `{edge}` is named nowhere in {STATE}"
         );
-        if !sites.iter().any(|(_, line)| line.contains(UNMAPPED)) {
+        if !sites.iter().any(|(_, line)| line.contains(marker)) {
             unmarked.push(format!(
-                "`{edge}` at {} carries only `{blocker}`",
+                "`{edge}` at {} does not carry its current `{marker}` verdict for `{blocker}`",
                 sites
                     .iter()
                     .map(|(index, _)| format!("{STATE}:{}", index + 1))

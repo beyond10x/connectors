@@ -45,7 +45,8 @@ executable arguments.
 
 Setup writes `connectors-local/2`, and the parser still accepts an existing
 `connectors-local/1` configuration. Every legacy `[adapters.<alias>]` entry in version two
-requires `private_protocol`, exactly `connectors-private/1` or `connectors-private/2`.
+requires `private_protocol`, exactly `connectors-private/1`, `connectors-private/2` or
+`connectors-private/3`.
 Version one refuses that field and keeps its implicit private version one;
 loading never rewrites a file. An explicit
 selection changes the executable selection digest and requires fresh admission.
@@ -53,6 +54,12 @@ Private version two supplies a bounded prepare/commit/cancel transport port with
 one-use pending writes. Production GitLab does not select it yet: approval issuance
 and the host write coordinator must be integrated first. See the
 [private mutation binding](../contracts/cli/v1alpha1/private-mutations.md).
+Private version three supplies explicit [bounded native reads](../contracts/cli/v1alpha1/private-bounded-read.md)
+in the catalog executable. The same-build owner has a bounded projected read port
+that checks exact curated limits, complete service envelopes and the original
+deadline through queueing, custody and dispatch; the [stdio MCP server](local-mcp-stdio.md)
+is its caller. Ordinary legacy invocation is refused on that selection, and it
+supplies no writes.
 
 A `connectors-local/5` file configures instances under `[connectors]`, in the terms of the
 [vocabulary](../README.md#vocabulary): `[connectors.<connector>.instances.<instance>]`. An
