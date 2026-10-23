@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:definition-reader-feed-extensions
 kind: story
-status: draft
+status: active
 title: The definition reader lowers the Jira and Confluence feeds of connectors-definitions 536945d
 summary: definition.rs and import.rs accept offset, url_parameter, a query position, utc_offsets, url and url_base; both feeds move into the shipped selections
 relations:
@@ -13,13 +13,31 @@ scope:
 - confidence: cited
   path: CHANGELOG.md
 - confidence: cited
+  path: adapters/catalog/contracts/feed/v1alpha1/confluence-v1.md
+- confidence: cited
+  path: adapters/catalog/contracts/feed/v1alpha1/jira.md
+- confidence: cited
   path: adapters/catalog/providers/confluence-v1/operations.json
 - confidence: cited
   path: adapters/catalog/providers/jira/operations.json
 - confidence: cited
+  path: adapters/catalog/tests/confluence_binding.rs
+- confidence: cited
   path: adapters/catalog/tests/confluence_v1_feed.rs
 - confidence: cited
+  path: adapters/catalog/tests/connector_declarations.rs
+- confidence: cited
+  path: adapters/catalog/tests/gateway_prefix.rs
+- confidence: cited
+  path: adapters/catalog/tests/jira.rs
+- confidence: cited
   path: adapters/catalog/tests/jira_feed.rs
+- confidence: cited
+  path: contracts/catalog/v1alpha1/semantics.md
+- confidence: cited
+  path: contracts/datasources/feed/v1alpha1/semantics.md
+- confidence: cited
+  path: crates/connectors-build/src/catalog_feed_conformance.rs
 - confidence: cited
   path: crates/connectors-build/src/confluence_feed_conformance.rs
 - confidence: cited
@@ -41,12 +59,19 @@ scope:
 - confidence: cited
   path: docs/catalog-jira.md
 - confidence: cited
+  path: website/data/status.json
+- confidence: cited
   path: website/docs/connectors/confluence.md
+- confidence: cited
+  path: website/docs/connectors/index.md
 - confidence: cited
   path: website/docs/connectors/jira.md
 - confidence: cited
   path: website/docs/status.md
-revision: 4
+revision: 12
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-22T09:48:11Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":6}}, executor: "agent:connectors-session", correlation: "wave-20261022"}
+- {from: "proposed", to: "active", at: "2026-10-22T09:48:11Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":6}}, executor: "agent:connectors-session", correlation: "wave-20261022"}
 ---
 ## Outcome
 
@@ -86,13 +111,14 @@ enforces each one:
 1. A cursor names exactly one of `next`, `last` and `offset`.
 2. `url_parameter` appears only beside `next`.
 3. A position names exactly one of `time` and `query`.
-4. `first` holds `{container}` exactly once.
+4. `first` holds `{container}` exactly once and `{since}` never (the engine's load rule, `adapters/catalog/src/feed.rs:524-526`).
 5. `resume` holds `{container}` and `{since}` exactly once each.
 6. A query position is at `minute` precision.
 7. Items with a query position name no container parameter.
 8. `utc_offsets` lies within -1439..1439 and `least` is not above `greatest`.
 9. `utc_offsets` needs `page`.
 10. `url`, `url_base` and `parent` are JSON pointers.
+11. A position's `time`, `query.parameter` and `page.parameter` are query parameters of the items operation (`feed_position_parameter`; the engine binds them at load).
 
 ## Ownership
 
@@ -130,8 +156,9 @@ blocks are in them; the pinned connectors-definitions release already carries bo
 - `the_jira_issue_feed_lowers_to_the_shipped_declaration`: `jira.yaml` at `536945d` lowers to the
   `feed` in `adapters/catalog/providers/jira/operations.json`, equal to the 0.56.0 fixture
   `adapters/catalog/tests/feed/jira/feed.json`.
-- `the_confluence_page_feed_lowers_to_the_shipped_declaration`: the same for
-  `confluence-v1.yaml`.
+- `the_confluence_page_feed_lowers_to_the_shipped_declaration`: `confluence-v1.yaml` at `536945d`
+  lowers to the `feed` in `adapters/catalog/providers/confluence-v1/operations.json`, equal to the
+  0.56.0 fixture `adapters/catalog/tests/feed/confluence/feed.json`.
 - One refusal per rule, in order:
   1. `a_cursor_naming_none_of_next_last_offset_is_refused`
   2. `a_cursor_naming_two_of_next_last_offset_is_refused`

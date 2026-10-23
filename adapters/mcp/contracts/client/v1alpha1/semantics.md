@@ -543,9 +543,9 @@ therefore not a cancellation at all: where it leaves the request is section 10's
 and the answer is one of that section's three.
 
 This document states the cancellation signal for the Streamable HTTP transport and for no
-other. Outbound stdio is held by
-`decision-blocker:mcp-outbound-stdio-process-ownership`, whose section below says what
-that means; the two remaining outbound families the selection matrix names are refused
+other. Outbound stdio ownership was resolved by
+`decision-blocker:mcp-outbound-stdio-process-ownership`; its separate delivery story is
+named below. The two remaining outbound families the selection matrix names are refused
 there under no blocker at all, and this document states nothing about any of the three.
 
 A late answer may still arrive for a cancelled request; the client **SHOULD** ignore it on
@@ -694,17 +694,19 @@ duplicate an uncertain business effect."
 This section is the only place in this document where those words appear, and the case
 `no_state_is_answered_by_sending_the_request_again` enforces that.
 
-## Outbound stdio is held, not specified here
+## Outbound stdio is selected, not specified here
 
-`decision-blocker:mcp-outbound-stdio-process-ownership` is open: nobody has decided
-whether Connectors spawns an MCP server as a child process, and the model carries the
-same edge unread as `UNMAPPED: McpServerBinding -> supervised OS process`. The selection
-matrix dispositions `transport:stdio` outbound as `deferred` for exactly that reason.
+`decision-blocker:mcp-outbound-stdio-process-ownership` was cleared by the operator on
+2026-10-03: Connectors owns one explicitly configured pinned server process per outbound
+stdio session and supervises its cleanup. The native model records that association.
+The selection matrix dispositions `transport:stdio` outbound as `supported` for
+delivery; that is not implemented transport support.
 
 This document therefore specifies the Streamable HTTP profile only. Nothing here states a
 framing, a cancellation signal, a shutdown sequence or a process lifecycle for outbound
-stdio, and no outcome above may be read as covering it. A specification of that transport
-answers the blocker's question by existing, so it waits for the answer.
+stdio, and no outcome above may be read as covering it. The separate
+`story:mcp-outbound-stdio-runtime` owns the required native lifecycle specification and
+actual-process acceptance before that transport is advertised as implemented.
 
 The inbound direction is not held by that blocker and is not this document's:
 `story:mcp-inbound-local-binding` owns it.

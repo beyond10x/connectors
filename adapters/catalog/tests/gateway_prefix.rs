@@ -157,7 +157,8 @@ fn refusal(config: &Value) -> String {
 /// `issue.transition.run` compared `/transitions/0/isAvailable` as a JSON
 /// boolean, and again when the guards of `issue.create` and
 /// `issue.comment.add` required the new `id` (and the issue's `key`) present
-/// after the write.
+/// after the write, and again when it gained `projects.list`, `project.get`
+/// and the issue `feed`.
 const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
@@ -168,8 +169,8 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "catalog-jira.md",
         "jira",
-        "f2d35e119d0477214256f059f36f051584cc5c837fd39b8385f2377a54b76215",
-        "dfa6ec1812374e7b897b85ac58f52c2eb253463a9fa14d1bcd60cb5ef525051b",
+        "e52d459b1888a782c6b3d9dd2e39e17f26e88ab0694964370368ba34031d9fff",
+        "dffb974880505f1da2a2a943b605841096792ee98be3b29b5846349b225a4a66",
     ),
     // The Confluence guide declares an `access` probe since #102, which is part of
     // its configuration and so of its revision.

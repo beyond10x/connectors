@@ -437,8 +437,9 @@ sha256sum target/release/connectors-catalog-provider
 ```
 
 Release archives after 0.50.0 carry both binaries for each target
-([install a release binary](../README.md#install-a-release-binary)); with one installed, use its
-`connectors` and `connectors-catalog-provider` wherever this guide names `target/release/…`.
+([install a release binary](https://beyond10x.github.io/connectors/docs/getting-started#or-install-a-release-binary));
+with one installed, use its `connectors` and `connectors-catalog-provider` wherever this guide
+names `target/release/…`.
 
 ```json
 {

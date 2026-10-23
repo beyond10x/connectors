@@ -260,13 +260,18 @@ The names a hand-written file meets most:
 |---|---|
 | `malformed`, `unknown_field`, `wrong_schema` | not the schema's shape, a key it does not name, or another `schema` |
 | `source_hash_mismatch`, `source_not_gzip`, `source_outside_root` | the vendored document does not hash to `source.sha256`, is not `<name>.gz`, or lies outside the tree |
+| `source_kind` | a source that names other than one document, a `projection` where none is taken or none where one is, or a document of another kind |
+| `source_too_large` | a vendored document that decompresses past 64 MiB |
 | `unknown_operation`, `no_operation` | an `op` the document has no operation for, or none given |
 | `effect_required` | a method other than `GET` without `effect` |
 | `write_method` | `effect: write` on a method other than `POST`, `PUT`, `PATCH` or `DELETE`, or with no `op` |
 | `undeclared_variable` | a variable in `base_url` or an OAuth URL that `config` does not declare |
 | `auth_default`, `auth_incomplete`, `auth_misplaced`, `provider_id` | the profile rules above |
+| `auth_library`, `auth_profile_missing` | `auth_library`: a profile's `use` is not a plain lowercase name of `a-z`, `0-9` and `-`; `auth/<name>.yaml` under the definitions root, which that name resolves to, cannot be read or is not a `urn:beyond10x:connectors-auth:1` file; or the profile it supplies carries `use` or `default`, which only a connector's profile may. `auth_profile_missing`: that file has no profile of the same id |
+| `auth_lifetime` | a profile's `evidence_lifetime_ms` outside 1 to 300,000 |
 | `unreadable` | a file the definition names (the document or its amendments) is missing or cannot be opened |
 | `body_type` | a body notation outside the table above, two body keys naming one path (`x` and `/x`) or one inside another (`/a` and `/a/b`), or a guard reading a body key the body does not admit or fixes |
+| `body_enum` | a `body_enums` entry other than distinct non-empty values of a key `body` declares as a `string` the caller sends |
 | `unknown_guard_read`, `guard_parameter` | a guard read or binding the file cannot resolve |
 | `unknown_paging`, `ambiguous_paging`, `paging_parameter` | a paging style the file does not declare, more than one that matches, or one whose parameters the operation lacks |
 

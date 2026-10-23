@@ -34,6 +34,9 @@ _connectors() {
             connectors,instances)
                 cmd="connectors__subcmd__instances"
                 ;;
+            connectors,list)
+                cmd="connectors__subcmd__list"
+                ;;
             connectors,operations)
                 cmd="connectors__subcmd__operations"
                 ;;
@@ -219,6 +222,9 @@ _connectors() {
                 ;;
             connectors__subcmd__help,instances)
                 cmd="connectors__subcmd__help__subcmd__instances"
+                ;;
+            connectors__subcmd__help,list)
+                cmd="connectors__subcmd__help__subcmd__list"
                 ;;
             connectors__subcmd__help,operations)
                 cmd="connectors__subcmd__help__subcmd__operations"
@@ -431,7 +437,7 @@ _connectors() {
 
     case "${cmd}" in
         connectors)
-            opts="-h --config --state-dir --output --help adapters approvals connections instances operations setup completions help"
+            opts="-h --config --state-dir --output --help adapters approvals connections instances list operations setup completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2081,7 +2087,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__help)
-            opts="adapters approvals connections instances operations setup completions help"
+            opts="adapters approvals connections instances list operations setup completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2570,6 +2576,20 @@ _connectors() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
+        connectors__subcmd__help__subcmd__list)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
         connectors__subcmd__help__subcmd__operations)
             opts="describe invoke list"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
@@ -2961,6 +2981,32 @@ _connectors() {
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__list)
+            opts="-h --config --state-dir --output --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
                 --config)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0

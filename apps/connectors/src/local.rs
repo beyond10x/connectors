@@ -15,7 +15,9 @@ mod approvals;
 mod checkpoints;
 mod connections;
 mod cursor;
+mod declarations;
 mod definition;
+mod list;
 mod migrate;
 mod operations;
 mod owner_stop;
@@ -48,6 +50,7 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
 /// service commands, which the generated tree does not carry.
 fn help_output(mut stdout: String, root: bool) -> connectors_cli_contract::ProcessOutput {
     if root {
+        stdout.push_str("\nNative integration commands (use COMMAND --help for options):\n  server    Serve admitted read-only MCP tools over stdio\n");
         stdout.push_str("\nExplicit service commands (use COMMAND --help for options):\n");
         for (name, summary) in connectors::compat::SUMMARIES {
             stdout.push_str(&format!("  {name:<8}  {summary}\n"));
@@ -72,6 +75,14 @@ fn run_selected(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
         Some(&mut session::NativeValidator(session.clone())),
     );
     session.borrow_mut().finish(&mut output);
+    // `list` under `--output human` is a table, not the result's JSON text.
+    if output.exit_code == 0
+        && let Some(("connectors-list", context)) = session.borrow().selected()
+        && context.output == connectors_cli_contract::OutputMode::Human
+        && let Some(table) = list::human(&output.stdout)
+    {
+        output.stdout = table;
+    }
     // A consumer ran: stdout and stderr were its own, and its exit status is
     // the launch's. No envelope follows it.
     if let Some(code) = session.borrow().launched {
@@ -270,7 +281,9 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         NotFound => ("admission", "check_configuration", false),
         LifecycleConflict => ("admission", "retry_status", false),
         Revoked => ("admission", "create_connection", false),
-        NotGranted | IdentityMismatch => ("admission", "repair_connection", false),
+        NotGranted | IdentityMismatch | ConnectionNotReady | InsufficientScope => {
+            ("admission", "repair_connection", false)
+        }
         Unavailable => ("readiness", "retry_status", false),
         Timeout | Capacity => ("admission", "retry_explicitly", false),
         StaleCursor => ("observation", "retry_explicitly", false),
@@ -446,12 +459,12 @@ fn configuration_preflight(
 ) -> Option<connectors_cli_contract::ProcessOutput> {
     use connectors_cli_contract::OutputMode;
     let (callable, context) = session.selected()?;
-    // None reads the configuration: `setup init` writes it, and
+    // None reads the configuration: `setup init` writes it,
     // `setup checkpoints-enable` and `setup owner-stop` act on the state
-    // directory alone.
+    // directory alone, and `list` needs none.
     if matches!(
         callable,
-        "setup-init" | "setup-checkpoints-enable" | "setup-owner-stop"
+        "setup-init" | "setup-checkpoints-enable" | "setup-owner-stop" | "connectors-list"
     ) {
         return None;
     }
@@ -518,6 +531,9 @@ fn resolved(call: &Invocation<'_>) -> Result<Paths, HandlerReply> {
 }
 
 fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
+    if call.callable == "connectors-list" {
+        return list::execute(call);
+    }
     let paths = resolved(call)?;
     if call.callable == "setup-checkpoints-enable" {
         return checkpoints::execute(call, &paths);

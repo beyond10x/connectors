@@ -1,11 +1,9 @@
 # MCP inbound local binding — `server/v1alpha1`
 
-**Status:** an authored contract, not an implementation. No MCP message has been spoken
-by this repository, no executable is added here, and no `server` command exists in the
-generated CLI binding yet — `apps/connectors/spec/cli.yaml` carries no such command path
-and `apps/connectors/spec/compatibility.json` records `"mcp": "deferred"`. This document
-says what the selected inbound binding *does*; the command surface that exposes it is
-`story:mcp-cli-journey-discovery-contract`.
+**Status:** authored full binding; a production read-only tools subset now runs via
+the separate generated native launch grammar. See the [runtime guide](../../../../../docs/local-mcp-stdio.md)
+for exact support, process evidence and remaining work. The grouped CLI binding
+is unchanged. This contract is broader than the implemented subset.
 
 Owner: `story:mcp-inbound-local-binding`, decomposing `epic:mcp-contracts`. It reads three
 landed inputs and adds nothing to them: the

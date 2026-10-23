@@ -1,16 +1,14 @@
 # Jira binding of datasource.feed/v1alpha1
 
-**Not shipped.** This binding is not in the shipped Jira selection
-([providers/jira/operations.json](../../../providers/jira/operations.json) has no `feed`), so an
-instance of the Jira connector declares neither `feed.containers` nor `feed.items`
-(`adapters/catalog/tests/jira_feed.rs::the_shipped_jira_selection_declares_no_feed`). Every
-shipped selection round-trips through a connector definition
-(`crates/connectors-catalog/tests/definition_import.rs`), and the connector definition format cannot
-yet carry this declaration: it has no offset listing (`cursor.offset`), no time query (`position` with `query`)
-and no `utc_offsets`. The binding stays out of the shipped selection until it does.
+**Shipped.** The shipped Jira selection carries this binding as its `feed`
+([providers/jira/operations.json](../../../providers/jira/operations.json)), so an instance of the
+Jira connector declares `feed.containers` and `feed.items`
+(`adapters/catalog/tests/jira_feed.rs::the_shipped_jira_selection_carries_the_issue_feed`). The
+`jira` connector definition lowers to that block
+(`crates/connectors-catalog/tests/definition_feed.rs::the_jira_issue_feed_lowers_to_the_shipped_declaration`).
 
-**Profile:** `jira-issues/1`. **Status:** declared as data in the test fixture
-[tests/feed/jira/feed.json](../../../tests/feed/jira/feed.json) and realized by the catalog engine
+**Profile:** `jira-issues/1`. **Status:** declared as data in the shipped selection, equal to the
+test fixture [tests/feed/jira/feed.json](../../../tests/feed/jira/feed.json), and realized by the catalog engine
 ([contracts/catalog/v1alpha1/semantics.md, section 3.3](../../../../../contracts/catalog/v1alpha1/semantics.md#33-declared-feed-bindings));
 no Rust of its own. Held to the family's `feed-binding` suite in five profile zones by
 `crates/connectors-build/src/jira_feed_conformance.rs`, with the result under

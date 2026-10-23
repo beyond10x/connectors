@@ -1,5 +1,63 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The Jira issue feed (`jira-issues/1`) and the Confluence REST v1 page feed
+  (`confluence-pages/1`) ship in their selections: a `jira` or `confluence-v1` instance now has
+  `feed.containers` and `feed.items`. Verified against fixtures only, not live.
+- Jira gains `projects.list` (`searchProjects`) and `project.get` (`getProject`), 17 operations.
+- The connector definition reader accepts a cursor `offset` with a completion condition and
+  `url_parameter`; a time position with a `query` (JQL or CQL `first`/`resume`), `precision`,
+  `page` and `utc_offsets`; and items `url`, `url_base` and `parent`. Each of its rules is refused
+  by name (`feed_cursor_continuation` … `feed_item_pointer`).
+- New guide `website/docs/guides/upgrade-the-cli.md`.
+- `connectors list` prints every connector the CLI ships a declaration for, one row each, with its
+  auth profiles and the names of its configured instances; `--output json` prints the same rows.
+  It needs no configuration file and starts no process. Connectors served by their own
+  executables (Kubernetes, SQL and the others without a shipped declaration) have no row yet.
+- `Taskfile.yml` with `task install`, which runs `cargo install --locked` for `connectors` and
+  `connectors-catalog-provider` from the checkout.
+- `connectors server --transport stdio` (Linux) is a local MCP server that offers admitted read-only
+  operations as tools, for protocols `2026-07-28` and `2025-11-25`, through the protected local
+  owner, credential custody and bounded reads. It is configured with `CONFIG.mcp-stdio.json`
+  (`connectors-mcp-local/1`) and `CONFIG.operation-curation.json`
+  (`connectors-operation-curation/1`). A request and its reply follow the request's own time budget
+  across lease renewals; a cancelled call frees its request slot. After stdin closes, a request
+  that has not yet reached the owner gets `unavailable`, and replies to requests already at the
+  owner are written while the lease live at the close lasts.
+- Private protocol `connectors-private/3` adds bounded-read execution (`invoke_bounded` with a read
+  budget). `connectors-private/1` and `/2` are unchanged.
+
+### Changed
+
+- On macOS and Windows a valid `connectors server --transport stdio` launch exits 1 with
+  `mcp_unavailable`; `--help` still prints the launch grammar.
+- The definition reader refuses a feed whose `first` query names `{since}`
+  (`feed_query_first`), as the catalog engine does when it loads.
+- New refusal `feed_position_parameter`: a feed position's `time`, `query.parameter` or
+  `page.parameter` that the items list does not take as a query parameter is refused when the
+  definition is lowered.
+- README: the custody paragraph names all four platform stores and states that the Kubernetes and
+  SQL services advertise no writes; MCP's two decision blockers are no longer called open.
+- The Zendesk page lists the three approved ticket writes and walks through one.
+- Getting started covers the Windows build from source and links the macOS and Windows platform
+  guarantees.
+- The definition-authoring guide's `auth_library` row states the name rule and the refusal of
+  `use`/`default`.
+- The public-output audit admits the documented default state directory
+  `~/.local/state/connectors` and paths under it, and no other `.local/` path.
+
+### Limitations
+
+- The definition reader still lowers four feed shapes the catalog engine refuses at load (a
+  parameter bound twice, a required page parameter sent only on resume, query keys the operation
+  does not take, a template slot beside a quote); they fail when the instance starts.
+- The stdio MCP server offers no resources, prompts, subscriptions, mutations or outbound MCP, and
+  the MCP status stays `deferred`. When a session is lost, a bounded read already at the provider
+  runs to its own budget instead of being cancelled.
+
 ## 0.56.0 — 2026-10-22
 
 ### Added

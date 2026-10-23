@@ -21,7 +21,7 @@ use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
     future::Future,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Mutex,
     task::{Context, Poll, Waker},
 };
@@ -856,8 +856,9 @@ fn shipped() -> Vec<(PathBuf, Value)> {
         .collect()
 }
 
-/// Every provider binding held as a fixture until the shipped selection can carry it, in name
-/// order: `adapters/catalog/tests/feed/<provider>/feed.json`, as a selection file would hold it.
+/// Every provider binding held as a fixture, in name order:
+/// `adapters/catalog/tests/feed/<provider>/feed.json`, as a selection file would hold it. Each is
+/// now carried verbatim by its shipped selection's `feed`.
 fn fixture_bindings() -> Vec<(PathBuf, Value)> {
     let mut paths: Vec<PathBuf> = std::fs::read_dir(directory())
         .expect("feed fixtures")
@@ -914,14 +915,16 @@ fn every_declared_feed_is_a_value_of_the_catalog_feed_model() {
         "no shipped provider declares a feed, so none is checked here"
     );
     let bindings = fixture_bindings();
-    let named: BTreeSet<String> = bindings
-        .iter()
-        .filter_map(|(path, _)| Some(path.parent()?.file_name()?.to_str()?.to_owned()))
-        .collect();
-    assert!(
-        named.contains("confluence") && named.contains("jira"),
-        "{named:?}"
-    );
+    let named: Vec<&Path> = bindings.iter().map(|(path, _)| path.as_path()).collect();
+    assert_eq!(named.len(), 2, "{named:?}");
+    for (path, binding) in &bindings {
+        assert!(
+            shipped
+                .iter()
+                .any(|(_, raw)| raw["feed"] == binding["feed"]),
+            "{path:?}: no shipped selection carries this binding"
+        );
+    }
     for (path, raw) in fixtures.chain(bindings).chain(shipped) {
         let errors: Vec<String> = validator
             .iter_errors(&raw["feed"])

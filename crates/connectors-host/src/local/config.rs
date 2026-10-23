@@ -65,10 +65,21 @@ struct ConfigInput {
     consumers: BTreeMap<String, Consumer>,
     connectors: Option<BTreeMap<String, ConnectorTable>>,
 }
+/// How an unpinned instance of a `connectors-local/5` file is admitted.
+#[derive(Clone, Copy)]
+enum Derivation<'a> {
+    /// Its entry is derived from the installation; with none, nothing derives
+    /// it and it refuses the file.
+    From(Option<&'a Installation>),
+    /// It is checked as a derivation checks it before the provider starts, and
+    /// listed without an entry: no process is started (`connectors list`).
+    Deferred,
+}
+
 impl Config {
     fn assemble(
         input: ConfigInput,
-        installation: Option<&Installation>,
+        installation: Derivation<'_>,
     ) -> std::result::Result<Self, Refusal> {
         let mut config = Self {
             format: input.format,
@@ -93,7 +104,7 @@ impl Config {
 impl TryFrom<ConfigInput> for Config {
     type Error = &'static str;
     fn try_from(input: ConfigInput) -> std::result::Result<Self, Self::Error> {
-        let config = Self::assemble(input, Installation::installed().as_ref())
+        let config = Self::assemble(input, Derivation::From(Installation::installed().as_ref()))
             .map_err(|_| "invalid local configuration")?;
         config
             .validate()
@@ -560,6 +571,21 @@ impl InstanceTable {
         name: &str,
         installation: &Installation,
     ) -> Result<(Instance, Option<Adapter>)> {
+        let (mut instance, args) = self.underived(connector, name)?;
+        match installation.derive(&instance.alias, args, instance.profile.is_some())? {
+            Derived::Entry(adapter) => Ok((instance, Some(*adapter))),
+            Derived::Awaiting(profiles) => {
+                instance.awaiting_profile = Some(profiles);
+                Ok((instance, None))
+            }
+        }
+    }
+
+    /// The instance `name` of the connector `connector` as [`Self::derived`]
+    /// admits it before the provider is started, and the arguments the
+    /// provider would be started with: everything a derivation checks except
+    /// what only the provider answers.
+    fn underived(self, connector: &str, name: &str) -> Result<(Instance, Vec<String>)> {
         // `<connector>.<instance>` stays unambiguous: neither name has a `.`.
         let plain = |value: &str| {
             !value.is_empty()
@@ -590,7 +616,7 @@ impl InstanceTable {
         if let Some(profile) = &self.profile {
             args.extend(["--profile".to_owned(), profile.clone()]);
         }
-        let mut instance = Instance {
+        let instance = Instance {
             description: self.description,
             endpoint: self.endpoint,
             alias: format!("{connector}.{name}"),
@@ -598,13 +624,7 @@ impl InstanceTable {
             profile: self.profile,
             awaiting_profile: None,
         };
-        match installation.derive(&instance.alias, args, instance.profile.is_some())? {
-            Derived::Entry(adapter) => Ok((instance, Some(*adapter))),
-            Derived::Awaiting(profiles) => {
-                instance.awaiting_profile = Some(profiles);
-                Ok((instance, None))
-            }
-        }
+        Ok((instance, args))
     }
 
     /// The table written for a derived instance: its own keys, no pin.
@@ -711,17 +731,24 @@ impl Config {
     fn admit_instances(
         &mut self,
         tables: BTreeMap<String, ConnectorTable>,
-        installation: Option<&Installation>,
+        installation: Derivation<'_>,
     ) -> std::result::Result<BTreeMap<String, Connector>, Refusal> {
         let mut connectors = BTreeMap::new();
         for (name, table) in tables {
             let mut instances = BTreeMap::new();
             for (instance_name, table) in table.instances {
+                let unpinned = table.unpinned() && self.format == "connectors-local/5";
                 let (instance, adapter) = match installation {
-                    Some(installation)
-                        if table.unpinned() && self.format == "connectors-local/5" =>
-                    {
+                    Derivation::From(Some(installation)) if unpinned => {
                         table.derived(&name, &instance_name, installation)?
+                    }
+                    Derivation::Deferred if unpinned => {
+                        let (instance, _) = table.underived(&name, &instance_name)?;
+                        // The entry a derivation would insert under this alias.
+                        if self.adapters.contains_key(&instance.alias) {
+                            return Err(Failure::InvalidConfiguration.into());
+                        }
+                        (instance, None)
                     }
                     _ => table
                         .pinned()
@@ -819,6 +846,37 @@ pub struct Selected<'a> {
 }
 
 impl Config {
+    /// The connector name, instance name and alias of each instance admitted
+    /// under [`Derivation::Deferred`]: derived, awaiting no profile, and
+    /// without the entry a derivation would have put under its alias. A
+    /// configuration read any other way has none, so every rule that consults
+    /// this behaves for it exactly as without it.
+    fn deferred(&self) -> impl Iterator<Item = (&str, &str, &str)> {
+        self.connectors
+            .iter()
+            .flatten()
+            .flat_map(|(connector, table)| {
+                table
+                    .instances
+                    .iter()
+                    .map(move |(name, instance)| (connector.as_str(), name.as_str(), instance))
+            })
+            .filter(|(_, _, instance)| {
+                instance.derived
+                    && instance.awaiting_profile.is_none()
+                    && !self.adapters.contains_key(&instance.alias)
+            })
+            .map(|(connector, name, instance)| (connector, name, instance.alias.as_str()))
+    }
+
+    /// Whether `alias` names an entry, or the entry a deferred derivation
+    /// would put under it. A deferred entry's own contents (its profiles and
+    /// permissions) are the provider's answer and are not known here.
+    fn names_entry(&self, alias: &str) -> bool {
+        self.adapters.contains_key(alias)
+            || self.deferred().any(|(_, _, deferred)| deferred == alias)
+    }
+
     /// The connector and instance names of the entry under `alias`: those of
     /// the `[connectors]` instance that names the alias or, for a legacy
     /// `[adapters.<alias>]` entry no instance names, its `adapter_id` and its
@@ -887,18 +945,26 @@ impl Config {
         if !self
             .adapters
             .keys()
-            .all(|alias| named.insert(self.names(alias)))
+            .map(|alias| self.names(alias))
+            .chain(
+                self.deferred()
+                    .map(|(connector, name, _)| Some((connector, name))),
+            )
+            .all(|names| named.insert(names))
         {
             return Err(Failure::InvalidConfiguration.into());
         }
         if let Some(default) = &self.default_instance {
-            let admitted = default
-                .split_once('/')
-                .is_some_and(|(connector, instance)| selector(connector) && selector(instance));
+            let pair = default.split_once('/');
+            let admitted =
+                pair.is_some_and(|(connector, instance)| selector(connector) && selector(instance));
             if !admitted
                 || self.default_adapter.is_some()
                 || self.format != "connectors-local/5"
-                || self.select(Selector::Default).is_none()
+                || (self.select(Selector::Default).is_none()
+                    && !self
+                        .deferred()
+                        .any(|(connector, name, _)| Some((connector, name)) == pair))
             {
                 return Err(Failure::InvalidConfiguration.into());
             }
@@ -1047,30 +1113,41 @@ pub struct Paths {
 
 impl Paths {
     pub fn resolve(config: Option<&Path>, state: Option<&Path>) -> Result<Self> {
-        let default = |variable: &str, home_suffix: &str, leaf: &str| -> Result<PathBuf> {
-            let base = if let Some(value) = std::env::var_os(variable).filter(|v| !v.is_empty()) {
-                PathBuf::from(value)
-            } else {
-                PathBuf::from(std::env::var_os("HOME").ok_or(Failure::InvalidConfiguration)?)
-                    .join(home_suffix)
-            };
-            fs::validate_path(&base)?;
-            Ok(base.join(leaf))
-        };
-        let config = match config {
-            Some(path) => path.to_owned(),
-            None => default("XDG_CONFIG_HOME", ".config", "connectors/config.toml")?,
-        };
+        let config = Self::config(config)?;
         let state = match state {
             Some(path) => path.to_owned(),
-            None => default("XDG_STATE_HOME", ".local/state", "connectors")?,
+            None => Self::default("XDG_STATE_HOME", ".local/state", "connectors")?,
         };
-        fs::validate_path(&config)?;
         fs::validate_path(&state)?;
-        if config.file_name().is_none() || state.file_name().is_none() {
+        if state.file_name().is_none() {
             return Err(Failure::InvalidConfiguration);
         }
         Ok(Self { config, state })
+    }
+
+    /// The configuration file's path as [`Paths::resolve`] resolves it,
+    /// without a state directory (`connectors list` needs none).
+    pub fn config(config: Option<&Path>) -> Result<PathBuf> {
+        let config = match config {
+            Some(path) => path.to_owned(),
+            None => Self::default("XDG_CONFIG_HOME", ".config", "connectors/config.toml")?,
+        };
+        fs::validate_path(&config)?;
+        if config.file_name().is_none() {
+            return Err(Failure::InvalidConfiguration);
+        }
+        Ok(config)
+    }
+
+    fn default(variable: &str, home_suffix: &str, leaf: &str) -> Result<PathBuf> {
+        let base = if let Some(value) = std::env::var_os(variable).filter(|v| !v.is_empty()) {
+            PathBuf::from(value)
+        } else {
+            PathBuf::from(std::env::var_os("HOME").ok_or(Failure::InvalidConfiguration)?)
+                .join(home_suffix)
+        };
+        fs::validate_path(&base)?;
+        Ok(base.join(leaf))
     }
 }
 
@@ -1394,7 +1471,7 @@ impl Config {
         path: &Path,
         installation: Option<&Installation>,
     ) -> std::result::Result<Self, Refusal> {
-        Self::parse_with(&Self::text_at(path)?, installation)
+        Self::parse_with(&Self::text_at(path)?, Derivation::From(installation))
     }
 
     /// Read like [`Config::read`], with the text the configuration was read
@@ -1402,8 +1479,32 @@ impl Config {
     /// replaces the file only while it still holds it.
     pub fn read_source(path: &Path) -> std::result::Result<(Self, String), Refusal> {
         let text = Self::text_at(path)?;
-        let config = Self::parse_with(&text, Installation::installed().as_ref())?;
+        let config = Self::parse_with(&text, Derivation::From(Installation::installed().as_ref()))?;
         Ok((config, text))
+    }
+
+    /// The instance names of each connector the configuration at `path` lists
+    /// under `[connectors]`, by connector (`connectors list`). The file is
+    /// read and checked exactly as [`Config::read`] reads it, every refusal
+    /// included, except that an unpinned instance is not derived: it is
+    /// checked as a derivation checks it before the catalog provider starts
+    /// and listed without an entry, so no process is started. What only the
+    /// provider answers (whether it ships the connector, which profiles it
+    /// declares, and so whether the instance's entry exists, counts toward the
+    /// entry limit and holds what a consumer, `default_adapter` or custody
+    /// target expects of it) is not checked, and is accepted: this never
+    /// refuses a file [`Config::read`] accepts. Legacy `[adapters.<alias>]`
+    /// entries are not listed.
+    pub fn listed_instances(
+        path: &Path,
+    ) -> std::result::Result<BTreeMap<String, Vec<String>>, Refusal> {
+        let config = Self::parse_with(&Self::text_at(path)?, Derivation::Deferred)?;
+        Ok(config
+            .connectors
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(connector, table)| (connector, table.instances.into_keys().collect()))
+            .collect())
     }
 
     /// Decode, assemble and check configuration `text` exactly as
@@ -1412,13 +1513,10 @@ impl Config {
         if text.len() > CONFIG_LIMIT {
             return Err(Refusal::Rule(Rule::ConfigTooLarge));
         }
-        Self::parse_with(text, Installation::installed().as_ref())
+        Self::parse_with(text, Derivation::From(Installation::installed().as_ref()))
     }
 
-    fn parse_with(
-        text: &str,
-        installation: Option<&Installation>,
-    ) -> std::result::Result<Self, Refusal> {
+    fn parse_with(text: &str, installation: Derivation<'_>) -> std::result::Result<Self, Refusal> {
         // Decode the closed envelope without its embedded validation, so the
         // refusal below can name its rule instead of collapsing into serde's.
         let input: ConfigInput = toml::from_str(text).map_err(|_| Failure::InvalidConfiguration)?;
@@ -1526,7 +1624,7 @@ impl Config {
             || self
                 .default_adapter
                 .as_ref()
-                .is_some_and(|alias| !self.adapters.contains_key(alias))
+                .is_some_and(|alias| !self.names_entry(alias))
         {
             return Err(Failure::InvalidConfiguration.into());
         }
@@ -1568,14 +1666,17 @@ impl Config {
         for (alias, entry) in &self.adapters {
             for (operation, target) in &entry.permissions.custody {
                 let held = self.adapters.get(&target.adapter);
+                // A deferred target's profiles and custody are the provider's.
+                let deferred = held.is_none() && self.names_entry(&target.adapter);
                 if self.format == "connectors-local/1"
                     || !entry.permissions.operations.contains(operation)
                     || &target.adapter == alias
                     || !selector(&target.profile)
-                    || held.is_none_or(|held| {
-                        !held.permissions.profiles.contains(&target.profile)
-                            || !held.permissions.custody.is_empty()
-                    })
+                    || (!deferred
+                        && held.is_none_or(|held| {
+                            !held.permissions.profiles.contains(&target.profile)
+                                || !held.permissions.custody.is_empty()
+                        }))
                 {
                     return Err(Failure::InvalidConfiguration.into());
                 }
@@ -1588,7 +1689,7 @@ impl Config {
                     .permissions
                     .connections
                     .iter()
-                    .any(|alias| !self.adapters.contains_key(alias))
+                    .any(|alias| !self.names_entry(alias))
                 || consumer.pass_env.len() > 64
                 || consumer.pass_env.iter().any(|prefix| {
                     prefix.is_empty()

@@ -5,6 +5,7 @@
 //! `[connectors.<connector>.instances.<alias>]`, carrying every pin. The new
 //! file is read back before anything is written, and an entry that reads back
 //! with any other value is not migrated, naming the field.
+use super::declarations::CATALOG;
 use super::*;
 use connectors_host::local::{
     config::{Adapter, CONFIG_LIMIT},
@@ -15,28 +16,6 @@ use std::{
     ffi::OsStr,
     path::Path,
 };
-
-/// The connector declarations the catalog provider ships
-/// (`adapters/catalog/providers/<provider>/connector.json`), compiled in: the
-/// provider and this binary are released together. `tests/setup_migrate.rs`
-/// holds this list to every provider directory of the tree.
-const DECLARATIONS: &[&str] = &[
-    include_str!("../../../../adapters/catalog/providers/confluence/connector.json"),
-    include_str!("../../../../adapters/catalog/providers/confluence-v1/connector.json"),
-    include_str!("../../../../adapters/catalog/providers/gitlab/connector.json"),
-    include_str!("../../../../adapters/catalog/providers/google-calendar/connector.json"),
-    include_str!("../../../../adapters/catalog/providers/google-drive/connector.json"),
-    include_str!("../../../../adapters/catalog/providers/google-gmail/connector.json"),
-    include_str!("../../../../adapters/catalog/providers/google-slides/connector.json"),
-    include_str!("../../../../adapters/catalog/providers/hubspot/connector.json"),
-    include_str!("../../../../adapters/catalog/providers/jira/connector.json"),
-    include_str!("../../../../adapters/catalog/providers/opsgenie/connector.json"),
-    include_str!("../../../../adapters/catalog/providers/runpod/connector.json"),
-    include_str!("../../../../adapters/catalog/providers/zendesk/connector.json"),
-];
-
-/// The catalog's implementation id, the only one a declaration maps today.
-const CATALOG: &str = "catalog";
 
 /// The entry fields a migrated entry must read back with unchanged, in the
 /// order a difference is named (`connectors.cli.MigrateField`).
@@ -216,7 +195,7 @@ fn connector_of(adapter: &Adapter) -> Result<String, Kept> {
     if adapter.adapter_id != CATALOG {
         return Err(Kept::Reason("implementation_unmapped"));
     }
-    let declarations = declarations();
+    let declarations = declarations::all();
     let args = &adapter.executable.args;
     if let Some(named) = option(args, "--connector") {
         return declarations
@@ -249,15 +228,6 @@ fn connector_of(adapter: &Adapter) -> Result<String, Kept> {
         .as_str()
         .map(str::to_owned)
         .ok_or(Kept::Reason("connector_undeclared"))
-}
-
-/// The shipped catalog declarations.
-fn declarations() -> Vec<Value> {
-    DECLARATIONS
-        .iter()
-        .filter_map(|text| serde_json::from_str::<Value>(text).ok())
-        .filter(|declaration| declaration["adapter_id"] == CATALOG)
-        .collect()
 }
 
 /// The value of `--<name> <value>` or `--<name>=<value>` in `args`.

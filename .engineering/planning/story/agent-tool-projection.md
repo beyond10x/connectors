@@ -10,19 +10,14 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:claude-connects-to-the-mcp-server
 - depends_on: story:definition-reader-feed-extensions
+- depends_on: story:instances-resolve-through-locked-index
 scope:
 - confidence: cited
   path: CHANGELOG.md
 - confidence: cited
-  path: adapters/catalog/providers/jira/agent-operations.json
-- confidence: cited
-  path: adapters/catalog/providers/slack/agent-operations.json
-- confidence: cited
   path: apps/connectors/tests/claude_mcp_journey.rs
 - confidence: cited
   path: apps/connectors/tests/fixtures/claude-code/jira-full-tools.json
-- confidence: cited
-  path: crates/connectors-build/src/main.rs
 - confidence: cited
   path: crates/connectors-catalog/src/definition.rs
 - confidence: cited
@@ -35,7 +30,7 @@ scope:
   path: crates/connectors-catalog/tests/fixtures/definitions/connectors/slack-agent.yaml
 - confidence: cited
   path: website/docs/connectors/mcp.md
-revision: 4
+revision: 11
 ---
 ## Outcome
 
@@ -95,11 +90,11 @@ Every operation id comes from the shipped selections (`adapters/catalog/provider
 ## Scope
 
 - `crates/connectors-catalog/src/definition.rs`, `import.rs`: carry `agent` and enforce the rule.
-- `crates/connectors-catalog/tests/fixtures/definitions/connectors/{jira-agent,slack-agent}.yaml`:
-  vendored from the connectors-definitions commit that clears the blocker, as `slack-user.yaml` is.
-- `adapters/catalog/providers/jira/agent-operations.json` and
-  `adapters/catalog/providers/slack/agent-operations.json` (new): the shipped selections,
-  registered where `slack/user-operations.json` is (`crates/connectors-build/src/main.rs:831`).
+- The committed connectors-definitions lock that story:definitions-pin-covers-catalog creates (its path is not fixed yet): moved to the
+  release whose `main` commit clears the upstream blocker. After
+  story:instances-resolve-through-locked-index the binary embeds that release, so `jira-agent` and
+  `slack-agent` resolve by connector name. This story adds no file under
+  `adapters/catalog/providers/` and none to the vendored definitions copy.
 - `apps/connectors/tests/fixtures/claude-code/jira-full-tools.json` (new): the `tools/list`
   result of an instance of the full `jira` selection, recorded at this story's base before any
   change, and reviewed in the pull request.
@@ -113,9 +108,10 @@ Every operation id comes from the shipped selections (`adapters/catalog/provider
 - Depends on story:claude-connects-to-the-mcp-server (the server and `claude_mcp_journey.rs`).
 - Depends on story:definition-reader-feed-extensions: both change `definition.rs` and `import.rs`,
   and that story changes the Jira selection this story measures against.
-- story:definitions-fixture-copy-removed and story:catalog-provider-data-removed depend on this
-  story. They delete the vendored copy and `adapters/catalog/providers/` with the two new files in
-  them; the definitions then come from the pinned release.
+- Depends on story:instances-resolve-through-locked-index: the agent definitions arrive through
+  the embedded release, the `slack-agent` instance resolves by connector name, and this story
+  writes nothing into the directories story:definitions-fixture-copy-removed and
+  story:catalog-provider-data-removed delete. Neither deletion story depends on this one.
 
 ## Acceptance (named conformance scenarios)
 
@@ -125,9 +121,9 @@ Every operation id comes from the shipped selections (`adapters/catalog/provider
 - `an_agent_definition_with_nine_operations_is_refused`
 - `an_agent_definition_without_a_description_is_refused`
 - `an_agent_definition_naming_a_write_is_refused`
-- `the_jira_and_slack_agent_definitions_lower_to_the_shipped_selections`: the vendored
-  `jira-agent.yaml` lowers to `adapters/catalog/providers/jira/agent-operations.json`, and
-  `slack-agent.yaml` to `adapters/catalog/providers/slack/agent-operations.json`.
+- `the_jira_and_slack_agent_definitions_lower_to_their_selections`:
+  `jira-agent` and `slack-agent` from the embedded release lower to selections of exactly the 3
+  and 4 operations the upstream blocker names, each with its definition's description.
 
 `apps/connectors/tests/claude_mcp_journey.rs`, each server started with the `claude mcp add`
 arguments of `mcp.md` and its instance's `base_url` pointed at recorded answers:

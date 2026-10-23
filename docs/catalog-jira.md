@@ -2,11 +2,12 @@
 
 The catalog provider reads Jira Cloud issues by JQL or one by key, their comments
 and their changelog, the transitions open on an issue, the issue types a project
-can create and the fields each takes, users and an attachment's content; it runs
+can create and the fields each takes, the projects the account can see, users and
+an attachment's content, and serves an issue feed over them; it runs
 one transition on an issue, and creates, edits, comments on, links and deletes
 issues, from the pinned Jira Cloud platform REST v3 OpenAPI document. Nothing here is
 Jira-specific code: the pinned document is compiled into a bundle, a reviewed
-selection set exposes nine reads and six guarded writes, and the engine described in
+selection set exposes eleven reads, an issue feed and six guarded writes, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Connection, approval and invocation work as described there; this page
 configures the `jira` connector and covers what differs for Jira. Connector,
@@ -36,7 +37,7 @@ fresh run would not reproduce byte for byte.
 ## The shipped selection set
 
 [`adapters/catalog/providers/jira/operations.json`](../adapters/catalog/providers/jira/operations.json)
-exposes nine reads and six writes: `issue.transition.run`, guarded as
+exposes eleven reads and six writes: `issue.transition.run`, guarded as
 [Running a transition](#running-a-transition) describes, and `issue.create`,
 `issue.comment.add`, `issue.edit`, `issue.link.add` and `issue.delete`, guarded as
 [Issue writes](#issue-writes) describes. `adapters/catalog/tests/jira.rs` pins this exact id list and each id's
@@ -44,12 +45,18 @@ exposes nine reads and six writes: `issue.transition.run`, guarded as
 source operation that moved, fails the gate. The bundle refuses at load any
 `operation_id` the pinned document lacks.
 
-The set declares no issue feed. A `datasource.feed/v1alpha1` binding under
-profile `jira-issues/1` is specified in
-[jira.md](../adapters/catalog/contracts/feed/v1alpha1/jira.md) and held to the
-family's suite over a test fixture, but it is not in the shipped selection, so
-`feed.containers` and `feed.items` are not Jira operations: the connector
-definition format the shipped selections round-trip through cannot carry it yet.
+The set also declares the issue feed, a `datasource.feed/v1alpha1` binding under
+profile `jira-issues/1` specified in
+[jira.md](../adapters/catalog/contracts/feed/v1alpha1/jira.md), as its `feed`
+block, so a Jira instance has `feed.containers` and `feed.items` beside the
+selected operations. A container is a project `searchProjects` lists (the same
+operation as `projects.list`), looked up by `getProject`; an item is one of its
+issues, read by `searchAndReconsileIssuesUsingJql` and resumed by an
+`updated >=` JQL query. The block is the one the `jira` connector definition
+lowers to (`crates/connectors-catalog/tests/definition_feed.rs`), and it is held
+to the family's suite (`crates/connectors-build/src/jira_feed_conformance.rs`,
+`adapters/catalog/tests/jira_feed.rs`) against fixtures written from the pinned
+document, not a live Jira.
 
 Every list returns one page per call. The provider returns `status`, `body` and
 `provenance`; `body` is Jira's page unchanged, and the paging fields that decide
@@ -64,6 +71,8 @@ the end of a walk are in it.
 | `issue.transitions` | `getTransitions` | `GET /rest/api/3/issue/{issueIdOrKey}/transitions` | none | one issue per call | none |
 | `issue.create_meta` | `getCreateIssueMetaIssueTypes` | `GET /rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes` | `startAt`, `maxResults` | `startAt + len(issueTypes) >= total` | none |
 | `issue.create_meta.fields` | `getCreateIssueMetaIssueTypeId` | `GET /rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes/{issueTypeId}` | `startAt`, `maxResults` | `startAt + len(fields) >= total` | none |
+| `projects.list` | `searchProjects` | `GET /rest/api/3/project/search` | `startAt`, `maxResults` | `isLast: true` | none |
+| `project.get` | `getProject` | `GET /rest/api/3/project/{projectIdOrKey}` | none | one project per call | none |
 | `users.search` | `findUsers` | `GET /rest/api/3/user/search` | `startAt`, `maxResults` | an empty page | none |
 | `attachment.content` | `getAttachmentContent` | `GET /rest/api/3/attachment/content/{id}` | none | one attachment per call | none; see [Attachment content](#attachment-content) |
 
@@ -349,7 +358,7 @@ enabled = true
 endpoint = "https://your-domain.atlassian.net/rest/api/3"
 ```
 
-The bundle, the fifteen operations, the profile and the provider executable are
+The bundle, the seventeen operations, the profile and the provider executable are
 derived from the shipped connector:
 
 ```console
@@ -425,7 +434,7 @@ An OAuth 2.0 (3LO) access token is sent as a bearer token, under a profile the
 The credential document is `{"token": "<access token>"}`, sent as
 `Authorization: Bearer <access token>`. The provider does not refresh an OAuth
 token; connect again when it expires. The token must carry the read scopes the
-nine reads and `myself` need, and the write scopes the six writes need; Atlassian names them per
+eleven reads, the feed and `myself` need, and the write scopes the six writes need; Atlassian names them per
 operation.
 
 ## Limits

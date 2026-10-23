@@ -37,7 +37,7 @@ scope:
   path: docs/catalog-github.md
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 22
+revision: 23
 ---
 ## Outcome
 
@@ -90,3 +90,11 @@ Paging stays caller-driven (`page`, `per_page`); the end condition (a short page
 ## Pinned source (2026-10-17)
 
 github/rest-api-description release `v2.1.0` (2022-10-25, the newest release tag), `api.github.com.yaml`, 8,380,323 bytes before redaction. Its examples carry a real address and example `ghu_`/`ghs_` tokens, so it is pinned redacted. Specification step: commit `4e0bb26e8` on unit/github-reads.
+
+## Implementation state (2026-10-23)
+
+- Branch `unit/github-reads` at `396a146f8`, pushed, no pull request.
+- Fix pass 1 (adversary findings F1, F2, F5) is written and uncommitted in managed tree
+  `conn-github-reads`, unbuilt since 2026-10-17; it is held as `dirty.patch` in that tree's
+  `worktree archive`. The adversary's 6 cases are in `adapters/catalog/tests/github_reads_adversary.rs`.
+- Next: build and test fix pass 1 as a unit of the wave after 20261022, then a pull request.

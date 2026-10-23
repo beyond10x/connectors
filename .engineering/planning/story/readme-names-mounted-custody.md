@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:readme-names-mounted-custody
 kind: story
-status: draft
+status: archived
 title: The README names the mounted-secret custody binding
 summary: README.md:199-203 says one fixed binding per platform; mounted_secret is selectable on Linux
 relations:
@@ -15,7 +15,9 @@ scope:
   path: README.md
 - confidence: cited
   path: crates/connectors-docs/src/vocabulary.rs
-revision: 2
+revision: 3
+transitions:
+- {from: "draft", to: "archived", at: "2026-10-22T09:32:23Z", actor: "human:timo", revision: 3, executor: "agent:connectors-session", correlation: "claude-plan-r4-20261022"}
 ---
 ## Outcome
 

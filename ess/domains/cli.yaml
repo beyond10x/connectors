@@ -1103,6 +1103,23 @@ types:
       - {name: backup_path, type: "Optional<String>"}
       - {name: configuration, type: "String"}
       - {name: entries, type: "List<connectors.cli.MigrateEntry>"}
+  # `connectors list` (story:cli-lists-available-connectors;
+  # contracts/cli/v1alpha1/semantics.md §3, "Listing connectors"): one row per
+  # connector this build ships a declaration for (connectors.declarations.Connector),
+  # in id order. id is its connector id, profiles the auth profile ids it
+  # declares in declaration order, and instances the names of its instances the
+  # configuration lists under `[connectors.<id>.instances]`, empty when there is
+  # no configuration or none is listed. No row names an implementation.
+  - name: connectors.cli.ConnectorSummary
+    kind: struct
+    fields:
+      - {name: id, type: "String"}
+      - {name: profiles, type: "List<String>"}
+      - {name: instances, type: "List<String>"}
+  - name: connectors.cli.ConnectorListResult
+    kind: struct
+    fields:
+      - {name: connectors, type: "List<connectors.cli.ConnectorSummary>"}
   - name: connectors.cli.AdapterListInput
     kind: struct
     fields:
@@ -1526,7 +1543,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:936, docs/local-connection-registry.md:222-223;
+    # contracts/cli/v1alpha1/semantics.md:967, docs/local-connection-registry.md:222-223;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1686,8 +1703,8 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:940) and the host
-    # removal path (er.rs:4445-4447) only expires Active cursors. The error name is
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:971) and the host
+    # removal path (er.rs:4441-4443) only expires Active cursors. The error name is
     # the decision; no source names one.
 
 events:

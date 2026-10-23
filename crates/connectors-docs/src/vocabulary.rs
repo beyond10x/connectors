@@ -369,6 +369,78 @@ mod tests {
     #[test]
     fn the_readme_agents_and_site_speak_the_vocabulary() {
         let root = repository_root();
+        let files = vocabulary_set(&root);
+        assert!(files.len() > 10, "{files:?}");
+        let problems = check(&root, &files, Options::default()).unwrap();
+        assert!(problems.is_empty(), "{problems:#?}");
+    }
+
+    /// Credential custody has more than one binding on Linux: the Secret Service, and the
+    /// read-only `mounted_secret` binding a `[custody]` table selects for a container with no
+    /// keyring (`contracts/auth/custody/v1alpha1/semantics.md` §5.2). The README names it and
+    /// links its guide, and no file of the checked set says there is one binding per platform.
+    #[test]
+    fn the_readme_names_every_custody_binding() {
+        let root = repository_root();
+        let readme = std::fs::read_to_string(root.join("README.md")).unwrap();
+        let gaps = custody_gaps(&readme);
+        assert!(gaps.is_empty(), "README.md lacks {gaps:?}");
+        let saying: Vec<_> = vocabulary_set(&root)
+            .into_iter()
+            .filter(|file| {
+                let text = std::fs::read_to_string(file).unwrap();
+                text.split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" ")
+                    .to_ascii_lowercase()
+                    .contains("one binding per platform")
+            })
+            .collect();
+        assert!(
+            saying.is_empty(),
+            "these files say \"one binding per platform\": {saying:?}"
+        );
+    }
+
+    /// The custody bindings of each platform that `README.md` must name: on Linux the Secret
+    /// Service or `mounted_secret` with its guide, on macOS the login keychain, on Windows the
+    /// Credential Manager.
+    const CUSTODY_BINDINGS: [&str; 4] = [
+        "Secret Service",
+        "`mounted_secret`",
+        "login keychain",
+        "Credential Manager",
+    ];
+
+    /// What a README text leaves out of [`CUSTODY_BINDINGS`] and the mounted-secret guide link.
+    fn custody_gaps(readme: &str) -> Vec<&'static str> {
+        let flat = readme.split_whitespace().collect::<Vec<_>>().join(" ");
+        let mut gaps: Vec<_> = CUSTODY_BINDINGS
+            .into_iter()
+            .filter(|binding| !flat.contains(binding))
+            .collect();
+        if !flat.contains("](docs/local-mounted-secret-custody.md") {
+            gaps.push("](docs/local-mounted-secret-custody.md");
+        }
+        gaps
+    }
+
+    #[test]
+    fn a_readme_without_any_one_platform_binding_fails_the_custody_check() {
+        let readme = std::fs::read_to_string(repository_root().join("README.md")).unwrap();
+        let flat = readme.split_whitespace().collect::<Vec<_>>().join(" ");
+        let passed: Vec<_> = CUSTODY_BINDINGS
+            .into_iter()
+            .filter(|binding| custody_gaps(&flat.replace(binding, "")).is_empty())
+            .collect();
+        assert!(
+            passed.is_empty(),
+            "a README without each of {passed:?} still passes the custody check"
+        );
+    }
+
+    /// The files of [`the_readme_agents_and_site_speak_the_vocabulary`].
+    fn vocabulary_set(root: &Path) -> Vec<PathBuf> {
         let mut files: Vec<_> = [
             "README.md",
             "AGENTS.md",
@@ -393,8 +465,6 @@ mod tests {
             pages.sort();
             files.extend(pages);
         }
-        assert!(files.len() > 10, "{files:?}");
-        let problems = check(&root, &files, Options::default()).unwrap();
-        assert!(problems.is_empty(), "{problems:#?}");
+        files
     }
 }

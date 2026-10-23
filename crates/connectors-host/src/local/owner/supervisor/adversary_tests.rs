@@ -31,6 +31,9 @@ fn read() -> Task {
         schema: "schema".into(),
         revision: "revision".into(),
         document: b"{}".to_vec(),
+        governed: false,
+        projection_revision: None,
+        budget: None,
     }
 }
 

@@ -27,23 +27,5 @@ Describe stays on `GET /v1/describe`, and the request carries that descriptor's 
 
 Retained audit observations are held in memory and are lost when the host restarts.
 
-## From Rust
-
-`connectors_client::Client::invoke_v1alpha2` selects this binding and returns the result value
-with the optional `MutationObservation`; a failure keeps the `mutation` when the host recorded an
-attempt. The client never falls back to `/v1/invoke`: an older service that does not serve the
-route is reported as `unsupported`. `Client::invoke` and the `connectors invoke` command stay on
-the unchanged `/v1/invoke` binding. Since 0.35.0 `AttemptRecord.connection_ref` is optional,
-which breaks callers that read it as required.
-
-## What is still a specification
-
-The rest of the governed service, with verified caller context, tenant and grant admission and
-[delegated approval](../reference/contracts/delegation.md), is specified and not implemented. The
-[governed service contract](../reference/contracts/governed-service.md) and the
-[compatibility contract](../reference/contracts/compatibility.md) say which routes and codecs
-exist and which are proposed. The [mutations contract](../reference/contracts/mutations.md) owns
-the attempt, idempotency and outcome-unknown rules every write follows.
-
 The [advanced contract exercises](/docs/examples/contract-exercises) let you lose a response and
 watch the attempt stay uncertain, in a fictional in-memory model.

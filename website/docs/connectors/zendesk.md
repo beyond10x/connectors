@@ -1,8 +1,8 @@
 ---
 title: Zendesk
 sidebar_position: 9
-description: Read Zendesk Support tickets, comments, users and organizations, with an OAuth client or an API token.
-lede: One Zendesk instance per account reads tickets, users and organizations through incremental exports; it declares two auth profiles, so the instance names the one it uses.
+description: Read Zendesk Support tickets, comments, users and organizations with an OAuth client or an API token, and update a ticket or add a private note or draft reply under approval.
+lede: One Zendesk instance per account reads tickets, users and organizations through incremental exports and changes a ticket only under an issued approval; it declares two auth profiles, so the instance names the one it uses.
 source: docs/catalog-zendesk.md, adapters/catalog/providers/zendesk/connector.json, adapters/catalog/providers/zendesk/operations.json, adapters/catalog/tests/zendesk.rs
 connectors: "zendesk"
 ---
@@ -23,7 +23,7 @@ out here. A command that needs a Zendesk account is shown without output.
 
 | Reads | Writes |
 |---|---|
-| `tickets.incremental`, `ticket.show`, `ticket.comments`, `users.incremental`, `user.show`, `organizations.incremental`, `organization.show` | none |
+| `tickets.incremental`, `ticket.show`, `ticket.comments`, `users.incremental`, `user.show`, `organizations.incremental`, `organization.show` | `ticket.update`, `ticket.note` and `ticket.draft_reply`, each `effect: write` and run only under an issued approval. Each reads the ticket first and sends nothing unless its `updated_at` is the stamp you read, and then sends `safe_update`, so Zendesk refuses a ticket changed in between; both are refused as `service_failure` with `service_code: conflict`. `ticket.update` sets `group_id`, `tags` (replacing the whole set), `priority` or `type`; `ticket.note` adds a private note; `ticket.draft_reply` adds a private note whose first line marks it as a draft reply, and nothing reaches the requester |
 
 The incremental exports take `start_time` in Unix seconds and return what changed since.
 
@@ -90,7 +90,51 @@ Send the answer's `after_cursor` as `cursor` until `end_of_stream` is `true`.
 
 ## A first guarded write
 
-The connector has no write, so nothing here needs an approval. Changing a ticket is not offered.
+The writes are verified with `zendesk.basic` only: the `zendesk.oauth` profile requests the
+scope `read`, which does not cover a write. Name `profile = "zendesk.basic"` on the instance and
+connect with an API token of an agent allowed to update the ticket.
+
+Once per instance, create the signing key (`connectors approvals key-init --connector zendesk
+--instance support`) and add an `[approval_clock]` table to the configuration
+([the approval clock](https://github.com/beyond10x/connectors/blob/main/docs/local-clock.md)).
+Publish a policy naming the writes:
+
+```sh
+printf '{"operations":["ticket.update","ticket.note","ticket.draft_reply"]}\n' > policy.json
+connectors approvals policy-set --connector zendesk --instance support --input-file policy.json
+```
+
+Read the ticket with `ticket.show` and pin its `ticket.updated_at` as `updated_stamp` in
+`note.json`:
+
+```json
+{"ticket_id": 101, "body": {"ticket": {"comment": {"body": "Checked the billing history."}, "updated_stamp": "2025-09-16T10:00:00Z"}}}
+```
+
+Take the schema and revision of `ticket.note` from `operations describe`, then prepare, issue and
+invoke:
+
+```sh
+subject_sha256=$(connectors --output json approvals prepare --connector zendesk --instance support \
+  --connection "$connection" --operation ticket.note \
+  --schema "$schema" --revision "$revision" --input-file note.json \
+  | jq -r .result.preparation.subject_sha256)
+connectors approvals clock-check --connector zendesk --instance support
+connectors approvals issue --connector zendesk --instance support \
+  --connection "$connection" --operation ticket.note \
+  --schema "$schema" --revision "$revision" --input-file note.json \
+  --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-note-101.json"
+connectors operations invoke --connector zendesk --instance support --connection "$connection" \
+  --operation ticket.note --schema "$schema" --revision "$revision" \
+  --input-file note.json --approval-file "$HOME/private/proof-note-101.json" \
+  --idempotency-key note-101
+```
+
+A ticket changed since the read is refused with `service_code: conflict`; read it again and prepare a new
+approval, since the approval binds the whole input, the stamp included. A note sent twice is two
+notes. A write whose answer is lost is `outcome_unknown` and is never sent again. The
+[full guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-zendesk.md#writes)
+lists each write's input and guard.
 
 ## Reconnect when the connection is Stale
 
