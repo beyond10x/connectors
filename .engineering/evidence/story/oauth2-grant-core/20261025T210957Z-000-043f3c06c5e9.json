@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-25T21:09:57Z",
+  "actor": "human:timo",
+  "artifact": "story:oauth2-grant-core",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:plan-critic-acceptance-subscription-oauth2-r1",
+    "reference": ".local/drafts",
+    "review": "review-result:plan-critic-acceptance-subscription-oauth2-r1",
+    "outcome": "fixed"
+  }
+}
