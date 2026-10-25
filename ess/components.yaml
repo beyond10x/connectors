@@ -15,6 +15,8 @@ components:
         - connectors.credential_evidence
         - connectors.clock
         - connectors.cli
+        - connectors.refresh
+        - connectors.oauth2
     accepts:
       commands:
         - connectors.declarations.RecordServiceConfiguration
@@ -78,6 +80,16 @@ components:
         - connectors.cli.ExpireConnectionListCursor
         - connectors.cli.RecordStoreWriter
         - connectors.cli.RaiseStoreWriter
+        - connectors.refresh.ReserveRefresh
+        - connectors.refresh.AuthorizeExchange
+        - connectors.refresh.FenceReserved
+        - connectors.refresh.StoreResponse
+        - connectors.refresh.QuarantineRefresh
+        - connectors.refresh.RecoverStoredResponse
+        - connectors.refresh.PublishRefresh
+        - connectors.refresh.DiscardCandidate
+        - connectors.oauth2.DeclareAuthorizationServer
+        - connectors.oauth2.IssueAccessToken
   - component: feed-binding
     summary: Any adapter that binds datasource.feed/v1alpha1; a fixture binding realises it for conformance, its Provider commands seeding the source it reads.
     owns:
