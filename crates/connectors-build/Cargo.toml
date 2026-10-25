@@ -33,3 +33,4 @@ syn = { version = "2.0.119", features = ["full"] }
 async-trait.workspace = true
 connectors-core.workspace = true
 connectors-sdk.workspace = true
+connectors-oauth2 = { path = "../connectors-oauth2" }

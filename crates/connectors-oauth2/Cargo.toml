@@ -1,0 +1,22 @@
+[package]
+name = "connectors-oauth2"
+description = "Provider-neutral OAuth 2.0 client: the authorization-code grant with PKCE, the device grant, the code and refresh exchanges and the loopback and pasted-code redirect receivers, over a transport the host supplies."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+base64.workspace = true
+getrandom = "0.3"
+httpdate = "1.0.3"
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+subtle.workspace = true
+url.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+rcgen = "0.14"
+rustls.workspace = true
