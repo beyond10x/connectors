@@ -26,3 +26,4 @@ domains:
   - connectors.auth_bindings
   - connectors.cli
   - connectors.transport
+  - connectors.oauth2
