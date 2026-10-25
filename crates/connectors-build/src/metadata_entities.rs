@@ -41,6 +41,9 @@ const DEFINITIONS: &[&str] = &[
     "connectors.idempotency.KeyReservation",
     "connectors.local_approval_policy.LocalApprovalPolicy",
     "connectors.mutations.AttemptRecord",
+    "connectors.oauth2.AccessTokenIssue",
+    "connectors.oauth2.AuthorizationServer",
+    "connectors.refresh.RefreshAttempt",
 ];
 
 /// The shared specification's documents, as the lowering and the mutation audit read them.

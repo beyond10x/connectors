@@ -1076,6 +1076,61 @@ mod tests {
         }
     }
 
+    /// `story:oauth2-refresh-metadata-authority`: the local metadata authority owns
+    /// `connectors.refresh` and `connectors.oauth2`. The suite the gate step synthesizes holds a
+    /// scenario for every outcome of their ten commands, and each one passes against the
+    /// committed definitions.
+    #[test]
+    fn every_refresh_and_oauth2_outcome_passes_against_the_committed_definitions() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let loaded = metadata_entities::load(&root).unwrap();
+        let ir = mutate::compile(loaded.documents.clone(), &loaded.sources).unwrap();
+        let model: Value = serde_json::from_str(&ir.to_canonical_json()).unwrap();
+        let commands: Vec<(&String, &Value)> = model["commands"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .filter(|(name, _)| {
+                name.starts_with("connectors.refresh.") || name.starts_with("connectors.oauth2.")
+            })
+            .collect();
+        assert_eq!(commands.len(), 10, "the two domains declare ten commands");
+        let expected: BTreeSet<String> = commands
+            .iter()
+            .flat_map(|(command, declaration)| {
+                declaration["outcomes"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(move |outcome| {
+                        format!("{command}/outcome/{}", outcome["name"].as_str().unwrap())
+                    })
+            })
+            .collect();
+
+        let out = tempfile::tempdir().unwrap();
+        let suite = emit_suite(&ir, mutate::BASELINE_DIR, out.path()).unwrap();
+        let text =
+            std::fs::read_to_string(out.path().join(&suite.dir).join(mutate::SUITE_FILE)).unwrap();
+        let authority = Authority::load(&root).unwrap();
+        let (report, _) = run_suite(&authority, &text).unwrap();
+        let statuses = report.statuses();
+        let unpassed: Vec<(&String, Option<&&str>)> = expected
+            .iter()
+            .map(|scenario| (scenario, statuses.get(scenario)))
+            .filter(|(_, status)| *status != Some(&"passed"))
+            .collect();
+        assert!(
+            unpassed.is_empty(),
+            "outcomes without a passing scenario (status None: not in the suite): {unpassed:#?}"
+        );
+        let counts = report.counts();
+        assert_eq!(
+            counts.passed, counts.total,
+            "every scenario of the suite passes"
+        );
+    }
+
     #[test]
     fn unknown_fixture_is_an_error_not_a_default() {
         let error = fixture_values(&contract("no-such-fixture")).unwrap_err();
