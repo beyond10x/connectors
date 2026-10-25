@@ -21,9 +21,10 @@ const POLL: Duration = Duration::from_millis(20);
 
 /// The loopback redirect receiver of `loopback_any_port` and `loopback_fixed_port`. It listens
 /// on `127.0.0.1` only. The first connection to complete a request head for the redirect path
-/// decides the flow; a head for another path is answered 404 and decides nothing. A connection
-/// that sends no complete head within 2 s, or a head over 64 KiB, is dropped unanswered; at most
-/// 64 connections are read at once.
+/// decides the flow; a head for another path is answered 404 and decides nothing; a head
+/// completed after the decision is answered 400. A connection that sends no complete head
+/// within 2 s, or a head over 64 KiB, is dropped unanswered; at most 64 connections are read at
+/// once.
 #[derive(Debug)]
 pub struct LoopbackReceiver {
     listener: TcpListener,
@@ -90,15 +91,18 @@ impl LoopbackReceiver {
     /// absent or wrong is [`Failure::StateMismatch`], one with `error=access_denied`
     /// [`Failure::AccessDenied`], another error [`Failure::Rejected`], one without a code
     /// [`Failure::InvalidResponse`], each answered 400. Requests completed alongside or after
-    /// the deciding one are answered 400 and change nothing. Cancellation and the timeout are
-    /// read every 20 ms. The listener closes when this returns.
+    /// the deciding one are answered 400 and change nothing: a connection accepted before the
+    /// decision whose head completes after it is answered by a thread that ends once each such
+    /// connection is answered, closed or past the 2 s and 64 KiB limits. Cancellation and the
+    /// timeout are read every 20 ms; a timeout past what the clock can hold waits for the
+    /// redirect or the cancellation. The listener closes when this returns.
     pub fn receive(
         self,
         authorization: &Authorization,
         timeout: Duration,
         cancellation: &Cancellation,
     ) -> Result<AuthorizationCode, Failure> {
-        let deadline = Instant::now() + timeout;
+        let deadline = Instant::now().checked_add(timeout);
         let mut loopback = Loopback {
             listener: self.listener,
             pending: Vec::new(),
@@ -107,7 +111,7 @@ impl LoopbackReceiver {
             if cancellation.is_cancelled() {
                 return Err(Failure::Cancelled);
             }
-            if Instant::now() >= deadline {
+            if deadline.is_some_and(|deadline| Instant::now() >= deadline) {
                 return Err(Failure::Timeout);
             }
             let mut decided = None;
@@ -130,7 +134,10 @@ impl LoopbackReceiver {
                 }
             }
             match decided {
-                Some(outcome) => return outcome,
+                Some(outcome) => {
+                    loopback.drain();
+                    return outcome;
+                }
                 None => std::thread::sleep(POLL),
             }
         }
@@ -239,7 +246,7 @@ impl Loopback {
     /// reads the new connections. Returns the request line of every connection whose head is
     /// complete, in the order the connections were accepted.
     fn poll(&mut self) -> Result<Vec<Complete>, Failure> {
-        let mut complete = self.read();
+        let mut complete = read(&mut self.pending);
         loop {
             match self.listener.accept() {
                 Ok((stream, _)) => {
@@ -258,33 +265,62 @@ impl Loopback {
                 Err(_) => return Err(Failure::Unavailable),
             }
         }
-        complete.extend(self.read());
+        complete.extend(read(&mut self.pending));
         Ok(complete)
     }
 
-    fn read(&mut self) -> Vec<Complete> {
-        let mut complete = Vec::new();
-        let mut chunk = Zeroizing::new([0_u8; 4096]);
-        for mut pending in std::mem::take(&mut self.pending) {
-            let (mut open, mut done) = (true, false);
-            while open && !done && pending.seen < HEAD_LIMIT {
-                let room = (HEAD_LIMIT - pending.seen).min(chunk.len());
-                match pending.stream.read(&mut chunk[..room]) {
-                    Ok(0) => open = false,
-                    Ok(read) => done = pending.take(&chunk[..read]),
-                    Err(error) if error.kind() == ErrorKind::Interrupted => {}
-                    Err(error) if error.kind() == ErrorKind::WouldBlock => break,
-                    Err(_) => open = false,
+    /// Closes the listener, and answers 400 to each connection still reading its head once
+    /// the head completes, on a thread of its own. The thread accepts nothing, and ends when the
+    /// last such connection is answered, closes, or reaches the idle or head limit: at most 2 s
+    /// after the decision.
+    fn drain(self) {
+        let Self {
+            listener,
+            mut pending,
+        } = self;
+        drop(listener);
+        if pending.is_empty() {
+            return;
+        }
+        // A thread that cannot be spawned leaves these connections unanswered, as before.
+        let _ = std::thread::Builder::new().spawn(move || {
+            loop {
+                for (stream, _) in read(&mut pending) {
+                    answer(stream, Answer::Refused);
                 }
+                if pending.is_empty() {
+                    return;
+                }
+                std::thread::sleep(POLL);
             }
-            if done {
-                complete.push((pending.stream, pending.line));
-            } else if open && pending.seen < HEAD_LIMIT && pending.accepted.elapsed() < IDLE {
-                self.pending.push(pending);
+        });
+    }
+}
+
+/// Reads what has arrived on each connection in `pending`. Returns those whose head is now
+/// complete and keeps those still open, under the head limit and within the idle limit.
+fn read(pending: &mut Vec<Pending>) -> Vec<Complete> {
+    let mut complete = Vec::new();
+    let mut chunk = Zeroizing::new([0_u8; 4096]);
+    for mut connection in std::mem::take(pending) {
+        let (mut open, mut done) = (true, false);
+        while open && !done && connection.seen < HEAD_LIMIT {
+            let room = (HEAD_LIMIT - connection.seen).min(chunk.len());
+            match connection.stream.read(&mut chunk[..room]) {
+                Ok(0) => open = false,
+                Ok(read) => done = connection.take(&chunk[..read]),
+                Err(error) if error.kind() == ErrorKind::Interrupted => {}
+                Err(error) if error.kind() == ErrorKind::WouldBlock => break,
+                Err(_) => open = false,
             }
         }
-        complete
+        if done {
+            complete.push((connection.stream, connection.line));
+        } else if open && connection.seen < HEAD_LIMIT && connection.accepted.elapsed() < IDLE {
+            pending.push(connection);
+        }
     }
+    complete
 }
 
 /// The path of a request line, without its query.

@@ -32,7 +32,7 @@ pub trait Waiter {
 }
 
 /// Sleeps the calling thread, and returns [`Failure::Cancelled`] within 50 ms of the
-/// cancellation.
+/// cancellation. A duration past what the clock can hold waits until the cancellation.
 #[derive(Clone, Debug)]
 pub struct ThreadWaiter {
     cancellation: Cancellation,
@@ -49,16 +49,17 @@ const SLICE: Duration = Duration::from_millis(50);
 
 impl Waiter for ThreadWaiter {
     fn wait(&self, duration: Duration) -> Result<(), Failure> {
-        let deadline = Instant::now() + duration;
+        let deadline = Instant::now().checked_add(duration);
         loop {
             if self.cancellation.is_cancelled() {
                 return Err(Failure::Cancelled);
             }
             let now = Instant::now();
-            if now >= deadline {
+            let left = deadline.map_or(SLICE, |deadline| deadline.saturating_duration_since(now));
+            if left.is_zero() {
                 return Ok(());
             }
-            std::thread::sleep((deadline - now).min(SLICE));
+            std::thread::sleep(left.min(SLICE));
         }
     }
 }
