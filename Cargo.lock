@@ -599,6 +599,7 @@ dependencies = [
  "connectors-catalog",
  "connectors-catalog-provider",
  "connectors-core",
+ "connectors-oauth2",
  "connectors-sdk",
  "connectors-spec",
  "entity-core 0.30.3",
@@ -931,6 +932,23 @@ version = "0.0.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "connectors-oauth2"
+version = "0.57.0"
+dependencies = [
+ "base64 0.23.1",
+ "getrandom 0.3.4",
+ "httpdate",
+ "rcgen",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "subtle",
+ "url",
+ "zeroize",
 ]
 
 [[package]]
