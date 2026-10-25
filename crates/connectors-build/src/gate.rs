@@ -69,8 +69,9 @@ fn docs_check(root: &Path, temp: &Path, ess: &Path) -> Result<Command> {
 const OAUTH2: &str = "connectors-oauth2";
 
 /// The gate step that keeps `connectors-oauth2` free of every other `connectors-*` package:
-/// its normal dependency tree may name no `connectors-` package but itself, so the host,
-/// client, adapters and shared contracts can all build on it and it on none of them.
+/// its normal dependency tree, for every target and with every feature, may name no
+/// `connectors-` package but itself, so the host, client, adapters and shared contracts can all
+/// build on it and it on none of them.
 fn oauth2_boundary(root: &Path, temp: &Path, ess: &Path) -> Result<()> {
     let output = super::run(cargo(root, temp, ess, None)?.args([
         "tree",
@@ -78,6 +79,9 @@ fn oauth2_boundary(root: &Path, temp: &Path, ess: &Path) -> Result<()> {
         "--offline",
         "--edges",
         "normal",
+        "--target",
+        "all",
+        "--all-features",
         "--prefix",
         "none",
         "-p",
@@ -798,9 +802,13 @@ mod oauth2_boundary_tests {
         process::Command,
     };
 
+    /// `connectors-host` as a path dependency.
+    const HOST: &str = "connectors-host = { path = \"../connectors-host\" }\n";
+
     /// A workspace of two empty packages, `connectors-oauth2` and `connectors-host`, the first
-    /// depending on the second when `adds_host`, with its lockfile generated offline.
-    fn workspace(adds_host: bool) -> tempfile::TempDir {
+    /// with `dependencies` (manifest tables) after its package table, with its lockfile
+    /// generated offline.
+    fn workspace(dependencies: &str) -> tempfile::TempDir {
         let root = tempfile::tempdir().unwrap();
         let write = |path: &str, text: &str| {
             let path = root.path().join(path);
@@ -811,15 +819,10 @@ mod oauth2_boundary_tests {
             "Cargo.toml",
             "[workspace]\nresolver = \"2\"\nmembers = [\"connectors-oauth2\", \"connectors-host\"]\n",
         );
-        let dependency = if adds_host {
-            "connectors-host = { path = \"../connectors-host\" }\n"
-        } else {
-            ""
-        };
         write(
             "connectors-oauth2/Cargo.toml",
             &format!(
-                "[package]\nname = \"connectors-oauth2\"\nversion = \"0.0.0\"\nedition = \"2021\"\n\n[dependencies]\n{dependency}"
+                "[package]\nname = \"connectors-oauth2\"\nversion = \"0.0.0\"\nedition = \"2021\"\n\n{dependencies}"
             ),
         );
         write("connectors-oauth2/src/lib.rs", "");
@@ -842,13 +845,28 @@ mod oauth2_boundary_tests {
         oauth2_boundary(root, temp.path(), Path::new("/ess")).map_err(|error| error.to_string())
     }
 
-    #[test]
-    fn the_oauth2_boundary_refuses_a_manifest_that_adds_connectors_host() {
-        assert_eq!(check(workspace(false).path()), Ok(()));
-        let refused = check(workspace(true).path()).unwrap_err();
+    fn assert_refused(dependencies: &str) {
+        let refused = check(workspace(dependencies).path()).unwrap_err();
         assert!(
             refused.contains("connectors-oauth2") && refused.contains("connectors-host"),
-            "{refused}"
+            "{dependencies}: {refused}"
+        );
+    }
+
+    #[test]
+    fn the_oauth2_boundary_refuses_a_manifest_that_adds_connectors_host() {
+        assert_eq!(check(workspace("").path()), Ok(()));
+        assert_refused(&format!("[dependencies]\n{HOST}"));
+    }
+
+    /// A dependency for another platform, or behind a feature, is still a dependency: the step
+    /// reads every target and every feature, not the build host's default set.
+    #[test]
+    fn the_oauth2_boundary_sees_target_specific_and_feature_gated_dependencies() {
+        let other = if cfg!(windows) { "unix" } else { "windows" };
+        assert_refused(&format!("[target.'cfg({other})'.dependencies]\n{HOST}"));
+        assert_refused(
+            "[dependencies]\nconnectors-host = { path = \"../connectors-host\", optional = true }\n\n[features]\nhost = [\"dep:connectors-host\"]\n",
         );
     }
 

@@ -1,6 +1,6 @@
 use crate::{
     ClientKind, DeviceAuthorization, DeviceDialect, DialectContext, Failure, GrantType, Granted,
-    Refreshed, RequestEncoding, Secret, ServerDeclaration, Transport, Waiter,
+    Refreshed, RequestEncoding, Rotation, Secret, ServerDeclaration, Transport, Waiter,
     declaration::https,
     pkce::{pkce_challenge, random},
     token::{self, Answer, TokenResponse, is_token, require},
@@ -19,6 +19,8 @@ const DEVICE_GRANT: &str = "urn:ietf:params:oauth:grant-type:device_code";
 const DEFAULT_INTERVAL: Duration = Duration::from_secs(5);
 /// What RFC 8628 §3.5 `slow_down` adds to the interval, for this and every later poll.
 const SLOW_DOWN: Duration = Duration::from_secs(5);
+/// The longest polling interval a server may name; a longer one is refused.
+const MAX_INTERVAL: u64 = 600;
 
 /// One client of one authorization server: a validated declaration, the client id, the secret
 /// of a confidential client, and the transport every request goes through.
@@ -214,7 +216,10 @@ impl<T: Transport> Client<T> {
 
     /// Exchanges `refresh_token` for a new access token (RFC 6749 §6), in the declaration's
     /// `refresh_encoding`. `granted_scopes` are the grant's current scopes, kept when the
-    /// response omits `scope`; a response without `refresh_token` keeps the one sent.
+    /// response omits `scope`; a response without `refresh_token` keeps the one sent. Under a
+    /// `rotating` declaration a different refresh token replaces the one sent; under
+    /// `non_rotating` it is [`Failure::UnexpectedRotation`] and nothing of the response is
+    /// returned.
     pub fn refresh(
         &self,
         refresh_token: &Secret,
@@ -234,19 +239,21 @@ impl<T: Transport> Client<T> {
             )
             .map_err(Answer::failure)?;
         let response = TokenResponse::parse(&body)?;
+        let rotated = response.refresh_token.as_ref().is_some_and(|new| {
+            !bool::from(
+                new.expose()
+                    .as_bytes()
+                    .ct_eq(refresh_token.expose().as_bytes()),
+            )
+        });
+        if rotated && self.declaration.rotation == Rotation::NonRotating {
+            return Err(Failure::UnexpectedRotation);
+        }
         let scopes = response.scopes.unwrap_or_else(|| granted_scopes.to_vec());
         require(&self.declaration.required_scopes, &scopes)?;
-        let (refresh_token, rotated) = match response.refresh_token {
-            Some(new) => {
-                let rotated = !bool::from(
-                    new.expose()
-                        .as_bytes()
-                        .ct_eq(refresh_token.expose().as_bytes()),
-                );
-                (new, rotated)
-            }
-            None => (refresh_token.clone(), false),
-        };
+        let refresh_token = response
+            .refresh_token
+            .unwrap_or_else(|| refresh_token.clone());
         Ok(Refreshed {
             access_token: response.access_token,
             refresh_token,
@@ -257,6 +264,8 @@ impl<T: Transport> Client<T> {
     }
 
     /// Starts a device grant at the declaration's `device_authorization_url` (RFC 8628 §3.1).
+    /// A response whose `interval` exceeds 600 s or its own `expires_in` is
+    /// [`Failure::InvalidResponse`].
     pub fn device_authorize(&self) -> Result<DeviceAuthorization, Failure> {
         let url = self
             .declaration
@@ -292,6 +301,9 @@ impl<T: Transport> Client<T> {
                 .as_deref()
                 .is_some_and(|uri| https(uri).is_none())
             || body.expires_in == 0
+            || body
+                .interval
+                .is_some_and(|seconds| seconds > MAX_INTERVAL || seconds > body.expires_in)
         {
             return Err(Failure::InvalidResponse);
         }
@@ -327,13 +339,13 @@ impl<T: Transport> Client<T> {
         ];
         fields.extend(self.secret_field());
         loop {
-            if waited + interval > device.expires_in
-                || device.issued.elapsed() + interval > device.expires_in
+            if waited.saturating_add(interval) > device.expires_in
+                || device.issued.elapsed().saturating_add(interval) > device.expires_in
             {
                 return Err(Failure::ExpiredToken);
             }
             waiter.wait(interval)?;
-            waited += interval;
+            waited = waited.saturating_add(interval);
             match self.post(
                 &self.declaration.token_url,
                 self.declaration.request_encoding,
@@ -341,7 +353,7 @@ impl<T: Transport> Client<T> {
             ) {
                 Ok(body) => return self.granted(&body),
                 Err(Answer::Pending) => {}
-                Err(Answer::SlowDown) => interval += SLOW_DOWN,
+                Err(Answer::SlowDown) => interval = interval.saturating_add(SLOW_DOWN),
                 Err(Answer::Failed(failure)) => return Err(failure),
             }
         }

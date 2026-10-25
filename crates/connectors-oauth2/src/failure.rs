@@ -35,6 +35,9 @@ pub enum Failure {
     InvalidResponse,
     /// The declaration or the client's credentials cannot be used as given.
     InvalidDeclaration,
+    /// A refresh under a `non_rotating` declaration answered with a refresh token other than
+    /// the one sent. Nothing of that response is returned.
+    UnexpectedRotation,
 }
 
 impl Failure {
@@ -53,6 +56,7 @@ impl Failure {
             Self::Rejected => "rejected",
             Self::InvalidResponse => "invalid_response",
             Self::InvalidDeclaration => "invalid_declaration",
+            Self::UnexpectedRotation => "unexpected_rotation",
         }
     }
 }

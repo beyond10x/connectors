@@ -1,10 +1,11 @@
+use std::fmt;
 use zeroize::Zeroizing;
 
 /// The largest response body the crate reads from any endpoint, in bytes.
 pub const RESPONSE_LIMIT: usize = 64 * 1024;
 
-/// One HTTPS `POST` the crate asks its transport to send.
-#[derive(Debug)]
+/// One HTTPS `POST` the crate asks its transport to send. Its `Debug` shows the body's length
+/// only, so a transport that logs the request logs no code, verifier, token or secret.
 pub struct Request<'a> {
     /// An `https` URL; the crate never asks for anything else.
     pub url: &'a str,
@@ -16,6 +17,17 @@ pub struct Request<'a> {
     /// The response body bound: the transport reads at most `limit + 1` bytes of it, so the
     /// crate can tell an oversized body from one at the bound.
     pub limit: usize,
+}
+
+impl fmt::Debug for Request<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Request")
+            .field("url", &self.url)
+            .field("content_type", &self.content_type)
+            .field("body_len", &self.body.len())
+            .field("limit", &self.limit)
+            .finish()
+    }
 }
 
 /// What the server answered.
