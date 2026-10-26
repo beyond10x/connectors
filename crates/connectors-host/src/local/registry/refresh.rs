@@ -208,6 +208,10 @@ pub enum Reservation {
     /// ([`RETAINED`]), retired ones until their deletion: nothing is reserved
     /// and nothing may be sent.
     Full,
+    /// The connection no longer publishes the generation the caller read
+    /// before it asked: a refresh or a repair replaced it, and nothing is
+    /// reserved. Only a reservation that names a generation answers this.
+    Moved,
 }
 
 /// What `connectors.refresh.AuthorizeExchange` decided.
@@ -426,11 +430,15 @@ fn publish(
 
 impl Registry {
     /// `connectors.refresh.ReserveRefresh` on the connection's active
-    /// generation, unless an attempt already holds or consumed it.
+    /// generation, unless an attempt already holds or consumed it. With
+    /// `expected`, the generation the caller decided on, it reserves only
+    /// while that generation is still the active one, in the same transaction
+    /// that reserves ([`Reservation::Moved`] otherwise).
     pub(in crate::local) fn reserve_refresh(
         &self,
         connection: &str,
         owner: &str,
+        expected: Option<&str>,
         now: u64,
     ) -> Result<Reservation> {
         self.transaction_ledger(now, |tx, authority, _, ledger| {
@@ -462,6 +470,9 @@ impl Registry {
             else {
                 return Err(Failure::NotReady);
             };
+            if expected.is_some_and(|expected| expected != source.as_str()) {
+                return Ok(Reservation::Moved);
+            }
             let mut held = ledger
                 .attempts
                 .iter()
