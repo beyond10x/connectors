@@ -63,12 +63,13 @@ entities:
         target: connectors.credentials.CredentialGeneration
         cardinality: one
         via: candidate_generation_id
-    # The optional carrier makes this relation zero-or-one until response storage.
+    # The optional carrier makes this relation zero-or-one until response storage:
+    # ReserveRefresh records none and StoreResponse records the candidate.
     # An attempt outlives its source being superseded; this is not ownership.
-    # ESS-LIMIT: current owner/fence metadata after recovery and state-dependent
-    # candidate assignment. Their atomic joins are obligations below, not a claim
-    # made by the initial-owner fields or the typed optional reference. ESS 0.36 has
-    # no multi-record transaction and no crash-recovery construct.
+    # ESS-LIMIT: current owner/fence metadata after recovery. RecoverStoredResponse
+    # names a new owner that no field records, and the initial-owner fields make no
+    # claim about it. Its atomic joins are obligations below. Checked against ESS
+    # 0.36, which had no multi-record transaction and no crash-recovery construct.
     lifecycle:
       initial: Reserved
       states: [Reserved, Authorized, ResponseStored, Recovering, Published, Fenced, Uncertain, Discarded]
@@ -115,6 +116,12 @@ commands:
         when: decision == allow
         creates: connectors.refresh.RefreshAttempt
         instance: attempt_id
+        sets:
+          source_generation_id: input.source_generation_id
+          initial_owner: input.owner
+          initial_ownership_token: input.ownership_token
+          expected_binding_revision: input.expected_binding_revision
+          candidate_generation_id: {cleared: true}
         emits: [connectors.refresh.RefreshReserved]
         payload:
           connectors.refresh.RefreshReserved:
@@ -178,6 +185,8 @@ commands:
         when: decision == allow
         moves: connectors.refresh.RefreshAttempt.store_response
         instance: attempt_id
+        sets:
+          candidate_generation_id: input.candidate_generation_id
         emits: [connectors.refresh.RefreshResponseStored]
         payload:
           connectors.refresh.RefreshResponseStored:
@@ -309,7 +318,8 @@ views:
 # non-replayable send authorization, real lease expiry and fencing, crash-safe
 # durability, immutable byte capture and candidate binding, current F05 evidence,
 # identity/scope comparisons, linearizable active-reference/revocation update,
-# field assignment, transport invocation and prevention of provider-client retries.
-# ESS checks declaration shape and lifecycle causation, not those algorithms: ESS
-# 0.36 has no cross-record uniqueness, multi-record transaction, lease/trusted-time,
-# durable-storage, byte-capture or transport construct.
+# transport invocation and prevention of provider-client retries. ESS checks
+# declaration shape, lifecycle causation and the fields each outcome sets, not
+# those algorithms. Checked against ESS 0.36, which had no cross-record
+# uniqueness, multi-record transaction, lease/trusted-time, durable-storage,
+# byte-capture or transport construct.

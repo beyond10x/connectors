@@ -131,7 +131,9 @@ commands:
     # serialization: current when the published generation's access token stays
     # valid for longer than the declaration's refresh_lead_seconds; refreshed
     # when connectors.refresh published a new generation for this call. Every
-    # refusal issues nothing and records nothing.
+    # refusal issues nothing and records nothing. refresh_attempt_id names the
+    # attempt that published that generation: a refreshed issue requires it, and
+    # a current one is refused it and records none (unavailable answers both).
     input:
       - {name: decision, type: connectors.oauth2.IssueDecision}
       - {name: connection_ref, type: String}
@@ -142,19 +144,22 @@ commands:
       - {name: delivery, type: connectors.oauth2.Delivery}
     outcomes:
       - name: issued-current
-        when: decision == current
+        when:
+          all: [decision == current, missing(refresh_attempt_id)]
         creates: connectors.oauth2.AccessTokenIssue
         instance: issue_ref
         sets:
           connection_ref: input.connection_ref
           generation_id: input.generation_id
+          refresh_attempt_id: {cleared: true}
           expires_at: input.expires_at
           scopes: input.scopes
           delivery: input.delivery
         emits: [connectors.oauth2.AccessTokenIssued]
         payload: {connectors.oauth2.AccessTokenIssued: {issue_ref: {generated: true}, refreshed: false}}
       - name: issued-refreshed
-        when: decision == refreshed
+        when:
+          all: [decision == refreshed, defined(refresh_attempt_id)]
         creates: connectors.oauth2.AccessTokenIssue
         instance: issue_ref
         sets:
