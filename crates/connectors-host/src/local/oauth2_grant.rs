@@ -803,6 +803,7 @@ mod tests {
             "grant_types": ["device_code"],
             "sources": [],
             "state_in_exchange": false,
+            "scope_in_refresh": false,
         }))
         .unwrap()
     }

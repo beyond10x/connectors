@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+- Catalog connector `claude-subscription` (provider Anthropic): the Claude Code sign-in as two
+  `oauth2_grant` profiles, `claude.subscription` (loopback redirect) and
+  `claude.subscription-pasted` (pasted `code#state`), with JSON exchange and refresh and
+  `connections token` issuing the access token. For the operator's own Claude plan only; the guide
+  quotes the provider's terms. No client id ships: an instance is pinned and configures
+  `oauth2_client_id`, and one without it is refused as `InvalidConfiguration`. One read,
+  `account.profile`. Verified against a local fake
+  authorization server only, not live.
+
 ### Changed
 
 - ESS 0.68.0 (from 0.67.0). No user-visible effect: the specification stays at its

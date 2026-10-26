@@ -6,8 +6,8 @@ summary: The identity probe of a catalog provider's authentication profile, the 
 # shared credential model (connectors.credentials), and `kind` is its `kind`.
 #
 # The profile, not the probe, constrains which source a scheme may use (`Profile` below for
-# `configuration`): `id_token` belongs to an `oauth2_refresh` profile only, and a profile with
-# `minimum_scopes` and an `api` source also declares a scope read.
+# `configuration`): `id_token` belongs to an `oauth2_refresh` or `oauth2_grant` profile only,
+# and a profile with `minimum_scopes` and an `api` source also declares a scope read.
 
 types:
   # Where the subject comes from. An absent `source` is `api`, so configurations written before
@@ -42,7 +42,7 @@ types:
   # How the profile's credential is sent; an absent `scheme` is `token`.
   - name: connectors_catalog.identity.Scheme
     kind: enum
-    variants: [token, basic, oauth2_refresh, oauth2_client_credentials]
+    variants: [token, basic, oauth2_refresh, oauth2_client_credentials, oauth2_grant]
 
   # The part of an authentication profile (`auth`) that decides what its identity may be, and
   # the word its token is sent behind.
@@ -68,6 +68,7 @@ types:
     invariants:
       - any: [{not: {identity.source: configuration}}, {not: {scheme: oauth2_refresh}}]
       - any: [{not: {identity.source: configuration}}, {not: {scheme: oauth2_client_credentials}}]
+      - any: [{not: {identity.source: configuration}}, {not: {scheme: oauth2_grant}}]
       - any: [{not: defined(prefix)}, {not: {bearer: true}}]
       - any: [{not: defined(prefix)}, {not: defined(scheme)}, {scheme: token}]
       - any: [{not: defined(prefix)}, {all: [prefix.utf8_bytes >= 1, prefix.utf8_bytes <= 32]}]
