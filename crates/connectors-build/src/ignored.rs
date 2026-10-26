@@ -170,7 +170,12 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "local::runtime::launch::tests::disposable_consumer_launch_delivers_fd3_and_refuses_by_code"
             | "local::owner::refresh::tests::launch::launch_oauth2_grant_hands_only_the_access_token"
             | "local::owner::refresh::tests::launch::launch_oauth2_grant_refreshes_inside_lead_time"
-            | "local::owner::refresh::tests::launch::launch_static_profile_is_unchanged" => {
+            | "local::owner::refresh::tests::launch::launch_static_profile_is_unchanged"
+            | "local::owner::refresh::tests::launch::adversary::adversary_launch_refresh_needing_reauthorization_names_repair_connection"
+            | "local::owner::refresh::tests::launch::adversary::adversary_launch_rate_limited_refresh_answers_retry_after"
+            | "local::owner::refresh::tests::launch::adversary::adversary_two_concurrent_launches_exchange_once"
+            | "local::owner::refresh::tests::launch::adversary::adversary_configuration_changed_during_the_issue_is_lifecycle_conflict"
+            | "local::owner::refresh::tests::launch::adversary::adversary_launch_inside_the_lead_after_evidence_lapsed_refreshes" => {
                 Some((Disposable, vec![CUSTODY, CLI]))
             }
             _ => None,
