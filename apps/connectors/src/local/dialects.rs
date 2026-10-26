@@ -3,7 +3,8 @@
 //! profile runs RFC 8628 against its declaration's `device_authorization_url`,
 //! unless a dialect is registered here for that profile id: then the dialect
 //! runs, and the code and verifier it returns are exchanged at the token
-//! endpoint like any other code. This build registers none.
+//! endpoint like any other code. This build registers the ChatGPT sign-in's
+//! device flow for `chatgpt.subscription` (story:chatgpt-subscription-connector).
 use connectors_host::local::{
     oauth2_grant::{self, Grant},
     owner,
@@ -94,11 +95,15 @@ pub(super) struct Dialects(BTreeMap<String, Box<dyn DeviceDialect>>);
 impl Dialects {
     /// The dialects this build composes.
     pub(super) fn composed() -> Self {
-        Self::default()
+        let mut dialects = Self::default();
+        dialects.register(
+            connectors_catalog_provider::chatgpt::PROFILE,
+            Box::new(connectors_catalog_provider::chatgpt::CodexDevice::default()),
+        );
+        dialects
     }
 
     /// Registers `dialect` for the profile `profile`, replacing any other.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn register(&mut self, profile: &str, dialect: Box<dyn DeviceDialect>) {
         self.0.insert(profile.to_owned(), dialect);
     }
@@ -300,6 +305,13 @@ mod tests {
         ] {
             assert_eq!(switch_shorthand(args(unchanged)), args(unchanged));
         }
+    }
+
+    #[test]
+    fn the_chatgpt_subscription_profile_has_its_device_dialect() {
+        let composed = Dialects::composed();
+        assert!(composed.lookup("chatgpt.subscription").is_some());
+        assert!(composed.lookup(PROFILE).is_none());
     }
 
     #[test]

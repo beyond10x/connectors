@@ -4,6 +4,14 @@
 
 ### Added
 
+- The `chatgpt` connector (provider OpenAI, catalog provider) signs in with a ChatGPT
+  subscription as the Codex CLI does, profile `chatgpt.subscription`: browser with PKCE on
+  `127.0.0.1:1455`, or `connections connect --device` through the ChatGPT device sign-in. It
+  refreshes with JSON and rotation, names the connection by the ChatGPT account id from the
+  `id_token`, serves `connections token --reveal` and one read, `models.list`. No client id
+  ships: an instance is pinned with its own `oauth2_client_id`, and a derived one is refused as
+  `InvalidConfiguration`. Verified against a local fixture only, not live. Guide
+  `website/docs/connectors/chatgpt.md`.
 - Catalog connector `claude-subscription` (provider Anthropic): the Claude Code sign-in as two
   `oauth2_grant` profiles, `claude.subscription` (loopback redirect) and
   `claude.subscription-pasted` (pasted `code#state`), with JSON exchange and refresh and

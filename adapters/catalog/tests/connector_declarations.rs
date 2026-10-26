@@ -136,7 +136,7 @@ fn documented() -> Vec<(String, Value)> {
         }
     }
     // A guide page of the website that shows a native configuration: a pinned instance of a
-    // connector that cannot be derived (`claude-subscription`, whose client id is configuration).
+    // connector that cannot be derived because its client id is the instance's configuration.
     let mut pages: Vec<PathBuf> = fs::read_dir(root().join("../../website/docs/connectors"))
         .unwrap()
         .map(|entry| entry.unwrap().path())
@@ -257,6 +257,7 @@ fn every_catalog_provider_but_slack_and_openrouter_ships_one_declaration() {
         connectors,
         [
             "calendar",
+            "chatgpt",
             "claude-subscription",
             "confluence",
             "confluence-v1",
@@ -423,11 +424,13 @@ fn every_declared_profile_derives_what_its_hand_written_configuration_derives() 
         }
     }
     // Twelve connectors, Zendesk with two profiles: a lane that finds no
-    // declaration checks nothing and must not pass. Claude's two profiles are refused.
+    // declaration checks nothing and must not pass. ChatGPT's one profile and Claude's two
+    // are refused.
     assert_eq!(checked.len(), 13, "{checked:?}");
     assert_eq!(
         refused,
         [
+            "chatgpt chatgpt.subscription",
             "claude-subscription claude.subscription",
             "claude-subscription claude.subscription-pasted"
         ]

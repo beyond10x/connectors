@@ -570,6 +570,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "connectors-catalog",
+ "connectors-catalog-provider",
  "connectors-cli-contract",
  "connectors-client",
  "connectors-core",
