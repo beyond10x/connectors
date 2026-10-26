@@ -195,9 +195,7 @@ pub struct Grant<'a> {
 /// the capture's: the grant ends 45 s before it, and after 240 s at most.
 pub fn run(profile: &Profile, grant: Grant<'_>, expires_at_ms: u64) -> Result<Secret> {
     let declaration = profile.grant().ok_or(Code::InvalidInput)?.clone();
-    let deadline_ms = connectors_sdk::now_ms()
-        .saturating_add(FLOW_TIMEOUT.as_millis() as u64)
-        .min(expires_at_ms.saturating_sub(COMPLETION_RESERVE_MS));
+    let deadline_ms = grant_deadline(connectors_sdk::now_ms(), expires_at_ms);
     let declared = |grant_type| declaration.grant_types.contains(&grant_type);
     if (grant.device && grant.dialect.is_none() && !declared(GrantType::DeviceCode))
         || (!grant.device && !declared(GrantType::AuthorizationCode))
@@ -211,7 +209,7 @@ pub fn run(profile: &Profile, grant: Grant<'_>, expires_at_ms: u64) -> Result<Se
         // A public client given a secret, or a confidential one given none:
         // the protected source is what does not fit.
         .map_err(|_| Code::ProtectedEntryUnavailable)?;
-    let waiter = Until(deadline_ms);
+    let waiter = Until::new(deadline_ms);
     let granted = if grant.device {
         device_grant(
             &client,
@@ -225,8 +223,29 @@ pub fn run(profile: &Profile, grant: Grant<'_>, expires_at_ms: u64) -> Result<Se
     } else {
         code_grant(&client, deadline_ms, trust.as_deref())
     }
-    .map_err(refusal)?;
+    .map_err(|failure| device_refusal(failure, &waiter))?;
     entry(client.client_id(), &granted, transport.sent_ms())
+}
+
+/// The end of a grant that starts at `now_ms` inside a capture window ending
+/// at `expires_at_ms`: 240 s on, and at least 45 s before the window ends. In
+/// the owner's 300 s entry window that is 240 s, the "about 4 minutes" the
+/// ChatGPT guide gives the person to enter a device code.
+fn grant_deadline(now_ms: u64, expires_at_ms: u64) -> u64 {
+    now_ms
+        .saturating_add(FLOW_TIMEOUT.as_millis() as u64)
+        .min(expires_at_ms.saturating_sub(COMPLETION_RESERVE_MS))
+}
+
+/// [`refusal`], except that a device grant whose server asked a poll interval
+/// that leaves no poll inside the window is `unsupported`, not the person's
+/// `timeout`: the server, not the person, ended it, and the same command ends
+/// the same way.
+fn device_refusal(failure: Failure, waiter: &Until) -> Error {
+    match failure {
+        Failure::Timeout if waiter.unfit() => Code::Unsupported.into(),
+        failure => refusal(failure),
+    }
 }
 
 /// A device grant: the dialect registered for the profile when there is one,
@@ -339,24 +358,60 @@ fn pasted_line(deadline_ms: u64) -> std::result::Result<connectors_oauth2::Secre
 }
 
 /// Waits between device polls until the grant's deadline, and ends at once
-/// when the person interrupts.
-struct Until(u64);
+/// when the person interrupts. A wait that would end past the deadline ends
+/// at once as [`Failure::Timeout`]; when no wait ended before it, the server's
+/// poll interval leaves no poll inside the window, which [`Until::unfit`]
+/// tells.
+struct Until {
+    deadline_ms: u64,
+    now: fn() -> u64,
+    sleep: fn(Duration),
+    /// A wait ended at its end, so a poll could follow it.
+    waited: std::cell::Cell<bool>,
+    /// A wait that would have ended past the deadline came before any other
+    /// ended.
+    unfit: std::cell::Cell<bool>,
+}
+
+impl Until {
+    fn new(deadline_ms: u64) -> Self {
+        Self::clocked(deadline_ms, connectors_sdk::now_ms, std::thread::sleep)
+    }
+
+    /// An `Until` on the clock `now` that sleeps with `sleep`.
+    fn clocked(deadline_ms: u64, now: fn() -> u64, sleep: fn(Duration)) -> Self {
+        Self {
+            deadline_ms,
+            now,
+            sleep,
+            waited: std::cell::Cell::new(false),
+            unfit: std::cell::Cell::new(false),
+        }
+    }
+
+    /// Whether the grant's first wait would have ended past the deadline.
+    fn unfit(&self) -> bool {
+        self.unfit.get()
+    }
+}
 
 impl Waiter for Until {
     fn wait(&self, duration: Duration) -> std::result::Result<(), Failure> {
-        let end = connectors_sdk::now_ms().saturating_add(duration.as_millis() as u64);
-        if end > self.0 {
+        let end = (self.now)().saturating_add(duration.as_millis() as u64);
+        if end > self.deadline_ms {
+            self.unfit.set(!self.waited.get());
             return Err(Failure::Timeout);
         }
         loop {
             if protected::cancellation().is_err() {
                 return Err(Failure::Cancelled);
             }
-            let now = connectors_sdk::now_ms();
+            let now = (self.now)();
             if now >= end {
+                self.waited.set(true);
                 return Ok(());
             }
-            std::thread::sleep(Duration::from_millis(end - now).min(SLICE));
+            (self.sleep)(Duration::from_millis(end - now).min(SLICE));
         }
     }
 }
@@ -855,8 +910,153 @@ mod tests {
 
     #[test]
     fn a_wait_past_the_deadline_times_out_at_once() {
-        let waiter = Until(connectors_sdk::now_ms() + 1_000);
+        let waiter = Until::new(connectors_sdk::now_ms() + 1_000);
         assert_eq!(waiter.wait(Duration::from_secs(5)), Err(Failure::Timeout));
+        assert!(waiter.unfit());
         assert_eq!(waiter.wait(Duration::from_millis(1)), Ok(()));
+        // A wait past the deadline after one that ended is the person's
+        // timeout, not an interval that does not fit.
+        assert_eq!(waiter.wait(Duration::from_secs(5)), Err(Failure::Timeout));
+        assert!(!waiter.unfit());
+    }
+
+    /// Moves [`clock`] on by `duration`: the fake sleep of a fake-clock
+    /// [`Until`].
+    fn advance(duration: Duration) {
+        CLOCK.with(|now| now.set(now.get() + duration.as_millis() as u64));
+    }
+
+    /// The device endpoints of a server that asks to be polled every
+    /// `interval` seconds and answers every poll as pending, and the times on
+    /// [`clock`] of the polls it was sent: RFC 8628 at the declaration's
+    /// endpoints, and [`Polling`]'s at `/dialect/poll`.
+    struct Pending {
+        interval: u64,
+        polls: std::cell::RefCell<Vec<u64>>,
+    }
+
+    impl Pending {
+        fn new(interval: u64) -> Self {
+            Self {
+                interval,
+                polls: std::cell::RefCell::default(),
+            }
+        }
+    }
+
+    impl Transport for Pending {
+        fn post(&self, request: &Request<'_>) -> std::result::Result<Response, TransportError> {
+            let (status, body) = if request.url.ends_with("/device/code") {
+                (
+                    200,
+                    serde_json::json!({
+                        "device_code": "fixture-unit-device",
+                        "user_code": "FIXT-0001",
+                        "verification_uri": "https://localhost/fixture/device",
+                        "expires_in": 900,
+                        "interval": self.interval,
+                    }),
+                )
+            } else if request.url.ends_with("/dialect/poll") {
+                self.polls.borrow_mut().push(clock());
+                (403, serde_json::json!({}))
+            } else {
+                self.polls.borrow_mut().push(clock());
+                (400, serde_json::json!({"error": "authorization_pending"}))
+            };
+            Ok(Response {
+                status,
+                retry_after: None,
+                body: Zeroizing::new(serde_json::to_vec(&body).unwrap()),
+            })
+        }
+    }
+
+    /// A device dialect that, like the ChatGPT one, waits its interval before
+    /// each poll and takes a 403 as pending.
+    struct Polling(Duration);
+
+    impl DeviceDialect for Polling {
+        fn authorize(
+            &self,
+            context: &connectors_oauth2::DialectContext<'_>,
+        ) -> std::result::Result<connectors_oauth2::DialectGrant, Failure> {
+            loop {
+                context.waiter.wait(self.0)?;
+                let answer = context
+                    .transport
+                    .post(&Request {
+                        url: "https://localhost/fixture/dialect/poll",
+                        content_type: "application/json",
+                        body: b"{}",
+                        limit: 1024,
+                    })
+                    .map_err(|_| Failure::Unavailable)?;
+                if answer.status != 403 {
+                    return Err(Failure::Rejected);
+                }
+            }
+        }
+    }
+
+    /// Runs the device grant against [`Pending`] at `interval` seconds, in a
+    /// grant that starts as the owner's 300 s entry window opens, on
+    /// [`clock`]: the start, the refusal and the times of the polls.
+    fn pending_grant(interval: u64, dialect: bool) -> (u64, Error, Vec<u64>) {
+        let start = clock();
+        let server = Pending::new(interval);
+        let client = Client::new(device_declaration(), None, None, &server).unwrap();
+        let polling = Polling(Duration::from_secs(interval));
+        let waiter = Until::clocked(grant_deadline(start, start + 300_000), clock, advance);
+        let failure = device_grant(
+            &client,
+            dialect.then_some(&polling as &dyn DeviceDialect),
+            &waiter,
+            &mut |_| {},
+        )
+        .unwrap_err();
+        let polls = server.polls.borrow().clone();
+        (start, device_refusal(failure, &waiter), polls)
+    }
+
+    /// The grant's window in the owner's 300 s entry window is 240 s, the
+    /// "about 4 minutes" of the ChatGPT guide, and a shorter capture window
+    /// keeps its last 45 s for the owner.
+    #[test]
+    fn the_grant_window_is_four_minutes_inside_the_entry_window() {
+        assert_eq!(grant_deadline(1_000, 301_000), 241_000);
+        assert_eq!(grant_deadline(3_000, 301_000), 243_000);
+        assert_eq!(grant_deadline(1_000, 201_000), 156_000);
+        assert_eq!(grant_deadline(1_000, 0), 0);
+    }
+
+    /// A server that asks to be polled every 241 s leaves no poll inside the
+    /// 240 s window: the grant is refused at once as `unsupported`, before
+    /// any poll, whether RFC 8628 or a dialect runs it.
+    #[test]
+    fn a_poll_interval_longer_than_the_window_is_unsupported_before_any_poll() {
+        for dialect in [false, true] {
+            let (start, error, polls) = pending_grant(241, dialect);
+            assert_eq!(error.code, Code::Unsupported, "dialect {dialect}");
+            assert_eq!(polls, Vec::<u64>::new(), "dialect {dialect}");
+            assert_eq!(clock(), start, "dialect {dialect}: no wait");
+        }
+    }
+
+    /// At a 5 s interval the grant keeps polling for the person until the
+    /// window's last 10 s at the earliest, and only then ends as `timeout`.
+    #[test]
+    fn a_normal_interval_polls_into_the_window_s_last_ten_seconds() {
+        for dialect in [false, true] {
+            let (start, error, polls) = pending_grant(5, dialect);
+            assert_eq!(error.code, Code::Timeout, "dialect {dialect}");
+            let last = *polls.last().unwrap();
+            assert!(
+                last >= start + 230_000 && last <= start + 240_000,
+                "dialect {dialect}: the last poll {} ms after the start",
+                last - start
+            );
+            assert_eq!(polls.len(), 48, "dialect {dialect}");
+        }
     }
 }

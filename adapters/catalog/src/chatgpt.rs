@@ -12,10 +12,15 @@
 //! 2. the person enters the user code at `{issuer}/codex/device`;
 //! 3. `POST {issuer}/api/accounts/deviceauth/token` with the JSON
 //!    `{"device_auth_id","user_code"}`, every interval, answers 403 or 404
-//!    while the person has not decided, for at most 15 minutes, then
+//!    while the person has not decided, then
 //!    `authorization_code` and `code_verifier`;
 //! 4. the core exchanges that code at the token endpoint with the redirect URI
 //!    `{issuer}/deviceauth/callback`, like any other code.
+//!
+//! The waiter the dialect is given bounds the wait: it refuses a wait past the
+//! grant's deadline, 240 s under the CLI, and the dialect ends with that
+//! refusal. Its own bound, the 15 minutes the Codex CLI waits, only ends a
+//! wait no deadline bounds.
 //!
 //! The device id, the code and the verifier are [`Secret`]s; a failure is one
 //! [`Failure`] code and carries no text the server wrote.
@@ -33,7 +38,9 @@ pub const DEVICE_PAGE: &str = "/codex/device";
 const USER_CODE: &str = "/api/accounts/deviceauth/usercode";
 const POLL: &str = "/api/accounts/deviceauth/token";
 const CALLBACK: &str = "/deviceauth/callback";
-/// How long the Codex CLI waits for the person (`device_code_auth.rs`).
+/// How long the Codex CLI waits for the person (`device_code_auth.rs`): the
+/// bound of a waiter without a deadline. The host's waiter refuses a wait past
+/// the grant's deadline long before.
 const MAX_WAIT: Duration = Duration::from_secs(15 * 60);
 /// The polling interval when the server names none, or zero.
 const DEFAULT_INTERVAL: Duration = Duration::from_secs(5);
@@ -373,7 +380,10 @@ mod tests {
     }
 
     /// Runs the dialect against `fake`, recording what it showed.
-    fn run(fake: &Fake, waits: &Waits) -> (Result<DialectGrant, Failure>, Vec<(String, String)>) {
+    fn run(
+        fake: &Fake,
+        waits: &dyn Waiter,
+    ) -> (Result<DialectGrant, Failure>, Vec<(String, String)>) {
         let shown = Rc::new(RefCell::new(Vec::new()));
         let recorder = shown.clone();
         let dialect = CodexDevice::showing(Box::new(move |code: &str, page: &str| {
@@ -450,8 +460,44 @@ mod tests {
         assert_eq!(waits.0.borrow().len(), 2);
     }
 
+    /// Never waits, and refuses a wait that would end past `end` of the waits'
+    /// sum, as the host's grant deadline does.
+    struct Deadline {
+        end: Duration,
+        waited: Cell<Duration>,
+    }
+
+    impl Waiter for Deadline {
+        fn wait(&self, duration: Duration) -> Result<(), Failure> {
+            let waited = self.waited.get() + duration;
+            if waited > self.end {
+                return Err(Failure::Timeout);
+            }
+            self.waited.set(waited);
+            Ok(())
+        }
+    }
+
+    /// The grant's deadline, not the dialect's own 15 minutes, ends the wait:
+    /// at the server's 3 s interval the dialect polls until the 240 s deadline
+    /// the waiter holds and ends with the waiter's refusal.
     #[test]
-    fn the_wait_ends_after_fifteen_minutes() {
+    fn the_wait_ends_at_the_deadline_the_waiter_holds() {
+        let fake = Fake::new(u32::MAX);
+        let waiter = Deadline {
+            end: Duration::from_secs(240),
+            waited: Cell::new(Duration::ZERO),
+        };
+        let (result, shown) = run(&fake, &waiter);
+        assert_eq!(result.unwrap_err(), Failure::Timeout);
+        assert_eq!(shown.len(), 1);
+        assert_eq!(waiter.waited.get(), Duration::from_secs(240));
+        assert_eq!(fake.sent.borrow().len(), 1 + 80);
+    }
+
+    /// A waiter without a deadline: the Codex CLI's 15 minutes end the wait.
+    #[test]
+    fn without_a_deadline_the_wait_ends_after_fifteen_minutes() {
         let fake = Fake::new(u32::MAX);
         let waits = Waits::default();
         let (result, _) = run(&fake, &waits);
