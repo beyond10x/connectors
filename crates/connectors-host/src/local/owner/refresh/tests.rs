@@ -333,6 +333,7 @@ impl Connected {
                 "grant_types": ["authorization_code"],
                 "sources": ["https://localhost/fixture-authorization-server"],
                 "state_in_exchange": false,
+                "scope_in_refresh": false,
             }))
             .unwrap()
         });

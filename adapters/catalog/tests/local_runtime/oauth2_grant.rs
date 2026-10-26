@@ -590,6 +590,7 @@ pub(super) fn declaration(port: u16, redirect: Redirect) -> Value {
         "grant_types": ["authorization_code", "device_code"],
         "sources": ["https://localhost/fixture-authorization-server"],
         "state_in_exchange": false,
+        "scope_in_refresh": false,
     })
 }
 
