@@ -203,6 +203,7 @@ mod tests {
             "grant_types": ["device_code"],
             "sources": ["https://localhost/fixture-authorization-server"],
             "state_in_exchange": false,
+            "scope_in_refresh": false,
         }))
         .unwrap();
         Client::new(declaration, None, None, transport).unwrap()
