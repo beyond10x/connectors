@@ -1,6 +1,14 @@
 {
   "entries": [
     {
+      "provider": "chatgpt",
+      "file_name": "chatgpt.bundle.json",
+      "bundle_sha256": "ced69d50138d49585261e4a8a7d0ec3b746585e56be3addc0b6f8739592d0385",
+      "source_sha256": "cf00908798fb7c58f2de5d4b21589db59c1c95e4703d49a8851f422155d31479",
+      "operations": 1,
+      "unsupported": 0
+    },
+    {
       "provider": "claude-subscription",
       "file_name": "claude-subscription.bundle.json",
       "bundle_sha256": "1ec3794834ffa73d82ce96ad88853407c9de30cd9bd5b4b6dd0d06b0bdfa7987",

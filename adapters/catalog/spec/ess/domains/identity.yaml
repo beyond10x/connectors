@@ -13,7 +13,9 @@ types:
   # Where the subject comes from. An absent `source` is `api`, so configurations written before
   # the field existed keep their revision.
   # - `api`: the answer of the read at `path`, at the JSON pointer `subject_pointer`.
-  # - `id_token`: the `sub` of the token answer's `id_token` (or of `tokeninfo`); no read.
+  # - `id_token`: the `sub` of the token answer's `id_token` (or of `tokeninfo`); no read. Under
+  #   `oauth2_grant`, `subject_pointer` may name another string claim of the `id_token` instead,
+  #   such as ChatGPT's account id (`Profile` below).
   # - `configuration`: the read at `path` must answer 200 and proves the credential; its body is
   #   not read, and the subject is the configured instance id. For a provider whose API names no
   #   account or user, so the subject is the configured connection, not a provider account.
@@ -28,7 +30,8 @@ types:
       - {name: path, type: "Optional<String>"}
       # The identity kind recorded beside the subject, such as `gitlab.user`.
       - {name: kind, type: String}
-      # An RFC 6901 pointer into the identity read's answer; `api` only.
+      # An RFC 6901 pointer into the identity read's answer under `api`, or into the `id_token`'s
+      # claims under an `oauth2_grant` profile's `id_token`.
       - {name: subject_pointer, type: "Optional<String>"}
       - {name: source, type: "Optional<connectors_catalog.identity.Source>"}
     invariants:
@@ -36,7 +39,6 @@ types:
       - any: [{source: id_token}, defined(path)]
       - any: [{source: id_token}, {source: configuration}, defined(subject_pointer)]
       - any: [{not: {source: id_token}}, {not: defined(path)}]
-      - any: [{not: {source: id_token}}, {not: defined(subject_pointer)}]
       - any: [{not: {source: configuration}}, {not: defined(subject_pointer)}]
 
   # How the profile's credential is sent; an absent `scheme` is `token`.
@@ -73,3 +75,4 @@ types:
       - any: [{not: defined(prefix)}, {not: defined(scheme)}, {scheme: token}]
       - any: [{not: defined(prefix)}, {all: [prefix.utf8_bytes >= 1, prefix.utf8_bytes <= 32]}]
       - any: [{not: defined(prefix)}, {not: {prefix: {contains: " "}}}]
+      - any: [{not: {identity.source: id_token}}, {not: defined(identity.subject_pointer)}, {scheme: oauth2_grant}]

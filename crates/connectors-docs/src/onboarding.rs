@@ -642,6 +642,7 @@ fn provider_name(id: &str) -> String {
     match id {
         "gitlab" => "GitLab".to_owned(),
         "hubspot" => "HubSpot".to_owned(),
+        "openai" => "OpenAI".to_owned(),
         other => {
             let mut chars = other.chars();
             chars.next().map_or_else(String::new, |first| {

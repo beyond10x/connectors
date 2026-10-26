@@ -25,9 +25,18 @@ use std::path::Path;
 /// pinned upstream; it describes only the shipped reads and has no gap.
 /// OpenRouter's 2 are one write whose own `servers` override the document's and
 /// `listInterns`'s `status` array (`explode: false`); no shipped read is among them.
+/// The ChatGPT source is authored here too: the one models read the Codex CLI makes, with no
+/// gap.
 /// The Claude subscription source is authored here too: the one read behind its
 /// identity probe, with no gap.
-const SOURCES: [(&str, &str, Option<&str>, &str, usize); 15] = [
+const SOURCES: [(&str, &str, Option<&str>, &str, usize); 16] = [
+    (
+        "chatgpt",
+        "providers/chatgpt/chatgpt-codex-backend.yaml",
+        None,
+        "chatgpt.subscription",
+        0,
+    ),
     (
         "claude-subscription",
         "providers/claude-subscription/claude-oauth-profile.yaml",

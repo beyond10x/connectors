@@ -396,6 +396,10 @@ struct DocumentedAuth {
     authorize_url: Option<String>,
     #[serde(default)]
     requested_scopes: Vec<String>,
+    /// An `oauth2_grant` profile's server declaration (`connectors.oauth2`), which the
+    /// definition notation has no field for: a connector declaring one is not imported.
+    #[serde(default)]
+    oauth2: Option<serde::de::IgnoredAny>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -662,6 +666,9 @@ struct Configured {
     /// Definition name → the config variable the declaration's default
     /// endpoint defaults, and its value.
     defaults: BTreeMap<String, (String, String)>,
+    /// Definition name → the OAuth2 grant profile its declaration carries, which keeps it
+    /// from being imported.
+    grants: BTreeMap<String, String>,
 }
 
 /// Take a definition's connector id, base URL and profiles from its declaration.
@@ -757,6 +764,7 @@ fn configured(connectors: &Path) -> Result<Configured, Failure> {
         default: BTreeMap::new(),
         id: BTreeMap::new(),
         defaults: BTreeMap::new(),
+        grants: BTreeMap::new(),
     };
     for selection in &selections {
         let mut profiles = IndexMap::new();
@@ -773,6 +781,16 @@ fn configured(connectors: &Path) -> Result<Configured, Failure> {
             }
         }
         if let Some(declared) = declared(connectors, selection)? {
+            if let Some(grant) = declared
+                .profiles
+                .iter()
+                .find(|block| block.oauth2.is_some())
+            {
+                configured
+                    .grants
+                    .insert(selection.name.clone(), grant.profile.clone());
+                continue;
+            }
             declare(&mut configured, &selection.name, declared)?;
             profiles = configured
                 .profiles
@@ -1944,6 +1962,11 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
 
     // The configuration the guides document.
     let configured = configured(connectors)?;
+    if let Some(profile) = configured.grants.get(&name) {
+        return Err(Failure::Malformed(format!(
+            "`{name}` declares the OAuth2 grant profile `{profile}`, which the definition notation has no field for"
+        )));
+    }
     let libraries = libraries(&configured);
     let profiles = configured.profiles.get(&name).ok_or_else(|| {
         Failure::NotFound(format!(

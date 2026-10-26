@@ -164,6 +164,12 @@ fn every_documented_identity_probe_is_a_value_of_the_catalog_identity_model() {
             identity["source"] != "configuration" || ["token", "basic"].contains(&scheme),
             "{guide}: a configured subject under `{scheme}`"
         );
+        assert!(
+            identity["source"] != "id_token"
+                || identity.get("subject_pointer").is_none()
+                || scheme == "oauth2_grant",
+            "{guide}: an id_token claim pointer under `{scheme}`"
+        );
         // The prefix invariants, checked by hand as the subject one is.
         if let Some(prefix) = auth.get("prefix") {
             let prefix = prefix.as_str().unwrap_or_default();

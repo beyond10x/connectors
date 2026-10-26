@@ -9,6 +9,7 @@ license.workspace = true
 [dependencies]
 base64.workspace = true
 connectors-catalog = { path = "../../crates/connectors-catalog" }
+connectors-catalog-provider = { path = "../../adapters/catalog" }
 connectors-core.workspace = true
 connectors-sdk.workspace = true
 connectors-client.workspace = true
