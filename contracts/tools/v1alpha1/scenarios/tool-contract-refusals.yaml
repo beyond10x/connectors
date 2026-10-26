@@ -1,0 +1,87 @@
+# Each refusal is the publisher's decision (ess/domains/tool_contracts.yaml, ESS-LIMIT): an
+# operation without a profile, a schema tool-contract/1 cannot type, a risk under the floor its
+# effects and consequences set, an instance name outside [a-z][a-z0-9-]*. None records a contract.
+type: ess-scenario/1
+domain: connectors.tool_contracts
+scenario: tool-contract-refusals
+summary: 'Every refused publish answers its own error, records no contract and announces nothing.'
+timeline:
+- at: '2026-10-26T10:00:00Z'
+  command: connectors.tool_contracts.PublishToolContract
+  input:
+    decision: profile_missing
+    instance: search-a
+    descriptor_revision: r1
+    toolset: connector-search-a
+    version: v1alpha1
+    digest: d1
+    operations:
+    - {operation: websearch.search, name: search, omit: []}
+  outcome: profile-missing
+  error:
+    name: connectors.tool_contracts.ProfileMissing
+  no_events:
+  - connectors.tool_contracts.ToolContractPublished
+- at: '2026-10-26T10:00:01Z'
+  command: connectors.tool_contracts.PublishToolContract
+  input:
+    decision: schema_unrepresentable
+    instance: search-a
+    descriptor_revision: r1
+    toolset: connector-search-a
+    version: v1alpha1
+    digest: d2
+    operations: []
+  outcome: schema-unrepresentable
+  error:
+    name: connectors.tool_contracts.SchemaUnrepresentable
+  no_events:
+  - connectors.tool_contracts.ToolContractPublished
+- at: '2026-10-26T10:00:02Z'
+  command: connectors.tool_contracts.PublishToolContract
+  input:
+    decision: risk_below_floor
+    instance: search-a
+    descriptor_revision: r1
+    toolset: connector-search-a
+    version: v1alpha1
+    digest: d3
+    operations: []
+  outcome: risk-below-floor
+  error:
+    name: connectors.tool_contracts.RiskBelowFloor
+  no_events:
+  - connectors.tool_contracts.ToolContractPublished
+- at: '2026-10-26T10:00:03Z'
+  command: connectors.tool_contracts.PublishToolContract
+  input:
+    decision: profile_invalid
+    instance: search-a
+    descriptor_revision: r1
+    toolset: connector-search-a
+    version: v1alpha1
+    digest: d5
+    operations: []
+  outcome: profile-invalid
+  error:
+    name: connectors.tool_contracts.ProfileInvalid
+  no_events:
+  - connectors.tool_contracts.ToolContractPublished
+- at: '2026-10-26T10:00:04Z'
+  command: connectors.tool_contracts.PublishToolContract
+  input:
+    decision: name_invalid
+    instance: Search.A
+    descriptor_revision: r1
+    toolset: connector-Search.A
+    version: v1alpha1
+    digest: d4
+    operations: []
+  outcome: name-invalid
+  error:
+    name: connectors.tool_contracts.NameInvalid
+  no_events:
+  - connectors.tool_contracts.ToolContractPublished
+assert:
+- view: connectors.tool_contracts.ToolContracts
+  counts: {at_most: 0}

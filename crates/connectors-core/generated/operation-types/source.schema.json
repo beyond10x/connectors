@@ -277,7 +277,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-ess-provenance": {
     "contract_digest": "slice-sha256/2:fa0f2759122a9bbc9b98fab49e2f589d1d649e403f0cecb0abceb4d8fc44fe0f",
-    "source_digest": "ee80e0eac854a5fc727358cf7045ed0c5835f0d97054091a2ee49a55b518c8f4",
+    "source_digest": "503006db7344c6fb103bd0dff091b4eadab55220141fd343b9c57f98f554790a",
     "specification_version": "v1",
     "system": "connectors"
   }

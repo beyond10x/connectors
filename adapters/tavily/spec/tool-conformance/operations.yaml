@@ -1,0 +1,138 @@
+# tool-conformance/1 suite for adapters/tavily/generated/tool-contract.yaml, run by
+# crates/connectors-tool-contracts/tests/tavily_conformance.rs against the adapter's own invoke.
+# Each route is a local fake of the provider's API, served by the runner on loopback.
+format: tool-conformance/1
+toolset: connector-tavily
+version: v1alpha1
+scenarios:
+  - name: search-answers-results
+    fixture:
+      serve:
+        /search:
+          headers: {Content-Type: application/json}
+          body: '{"query":"q","results":[{"url":"https://a.example/1","title":"One","content":"first","score":0.9}]}'
+    calls:
+      - operation: connector-tavily.search
+        input: {query: q, max_results: 1}
+        holds: [effects, determinism, bounds, output]
+        expect:
+          outcome: ok
+          output:
+            results:
+              - url: https://a.example/1
+                title: One
+                description: first
+                content: first
+                content_truncated: false
+                score: '0.9'
+            complete: true
+            truncation: []
+            provenance: {instance: tavily, profile: tavily/2026-10}
+          files:
+            .serve/_search.jsonl: {$lines: 1}
+      - operation: connector-tavily.search
+        input: {query: q, max_results: 1}
+        holds: [idempotency]
+        expect:
+          outcome: ok
+          output:
+            results: [{url: https://a.example/1}]
+            complete: true
+          files:
+            .serve/_search.jsonl: {$lines: 2}
+
+  - name: search-reports-a-short-answer
+    fixture:
+      serve:
+        /search:
+          headers: {Content-Type: application/json}
+          body: '{"query":"q","results":[{"url":"https://a.example/1","content":"first"}]}'
+    call:
+      operation: connector-tavily.search
+      input: {query: q, max_results: 3, content: none}
+    expect:
+      outcome: ok
+      output:
+        results: [{url: https://a.example/1, content: {$absent: true}, description: first}]
+        complete: false
+        truncation: [provider_limit]
+
+  - name: fetch-answers-pages
+    fixture:
+      serve:
+        /extract:
+          headers: {Content-Type: application/json}
+          body: '{"results":[{"url":"https://a.example/1","title":"One","raw_content":"# One"}],"failed_results":[{"url":"https://a.example/2"}]}'
+    calls:
+      - operation: connector-tavily.fetch
+        input: {urls: ["https://a.example/1", "https://a.example/2"]}
+        holds: [effects, idempotency, determinism, bounds, subjects, output]
+        expect:
+          outcome: ok
+          output:
+            pages:
+              - {url: https://a.example/1, title: One, content: '# One', content_truncated: false}
+            failed:
+              - {url: https://a.example/2, reason: provider_refused}
+            complete: true
+            truncation: []
+          files:
+            .serve/_extract.jsonl: {$lines: 1}
+
+  - name: crawl-answers-pages
+    fixture:
+      serve:
+        /crawl:
+          headers: {Content-Type: application/json}
+          body: '{"base_url":"https://a.example","results":[{"url":"https://a.example/","raw_content":"home"},{"url":"https://a.example/a","raw_content":"a"}]}'
+    calls:
+      - operation: connector-tavily.crawl
+        input: {url: https://a.example/, limit: 2}
+        holds: [effects, idempotency, determinism, bounds, subjects, output]
+        expect:
+          outcome: ok
+          output:
+            pages:
+              - {url: https://a.example/, title: {$absent: true}, content: home}
+              - {url: https://a.example/a, content: a}
+            failed: []
+            complete: false
+            truncation: [result_limit]
+          files:
+            .serve/_crawl.jsonl: {$lines: 1}
+
+  - name: upstream-refusal-is-connector-failed
+    fixture:
+      serve:
+        /search:
+          status: 401
+          headers: {Content-Type: application/json}
+          body: '{"detail":{"error":"Unauthorized: missing or invalid API key."}}'
+    call:
+      operation: connector-tavily.search
+      input: {query: q, max_results: 1}
+    expect:
+      error: connector.Failed
+      output: {code: unauthorized}
+
+  - name: plan-limit-is-capacity
+    fixture:
+      serve:
+        /crawl:
+          status: 432
+          headers: {Content-Type: application/json}
+          body: '{}'
+    call:
+      operation: connector-tavily.crawl
+      input: {url: https://a.example/, limit: 1}
+    expect:
+      error: connector.Failed
+      output: {code: capacity}
+
+  - name: input-outside-schema-is-invalid-input
+    call:
+      operation: connector-tavily.search
+      input: {query: q, max_results: 0}
+    expect:
+      error: connector.Failed
+      output: {code: invalid_input}
