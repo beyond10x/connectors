@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.58.0 — 2026-10-26
+
+No breaking changes.
 
 ### Added
 
@@ -39,8 +41,17 @@
 
 ### Changed
 
-- ESS 0.68.0 (from 0.67.0). No user-visible effect: the specification stays at its
-  current format, and the regenerated types differ only in the generator version they name.
+- ESS 0.69.2 (from 0.67.0). No user-visible effect: the specification stays at its current
+  format. The regenerated types name their enum variants after their wire values instead of
+  `V0`, `V1` …, and their manifests take compatible version ranges; both crates are internal.
+
+### Limitations
+
+- The ChatGPT and Claude subscription sign-ins and refreshes are verified against a local fake
+  authorization server only, never live. Neither connector ships a client id.
+- A device sign-in waits about 4 minutes, inside the 300 s acquisition entry window; the user
+  code is shown before a poll interval that does not fit that window is refused.
+- The Google consent flow does not yet use the OAuth2 core.
 
 ## 0.57.0 — 2026-10-23
 

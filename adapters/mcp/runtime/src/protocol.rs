@@ -53,9 +53,10 @@ impl Protocol {
         }
         let method = value["method"].as_str().ok_or_else(invalid)?;
         if !object.contains_key("id") {
-            if method == "notifications/initialized" && matches!(self.legacy, Some(LegacyPhase::V0))
+            if method == "notifications/initialized"
+                && matches!(self.legacy, Some(LegacyPhase::Initialization))
             {
-                self.legacy = Some(LegacyPhase::V1);
+                self.legacy = Some(LegacyPhase::Operation);
             }
             return Ok(Route::Notification);
         }
@@ -78,9 +79,9 @@ impl Protocol {
             }
             let close = version != LEGACY;
             self.legacy = Some(if close {
-                LegacyPhase::V2
+                LegacyPhase::Shutdown
             } else {
-                LegacyPhase::V0
+                LegacyPhase::Initialization
             });
             return Ok(Route::Reply {
                 close,
@@ -89,10 +90,10 @@ impl Protocol {
             });
         }
         let primary = match self.legacy {
-            Some(LegacyPhase::V1) => false,
+            Some(LegacyPhase::Operation) => false,
             // Between the initialize response and `notifications/initialized`
             // the 2025-11-25 lifecycle leaves a client only pings.
-            Some(LegacyPhase::V0) if method == "ping" => false,
+            Some(LegacyPhase::Initialization) if method == "ping" => false,
             Some(_) => return Err(invalid()),
             None => {
                 let version = params["_meta"][VERSION].as_str().ok_or_else(params_error)?;
