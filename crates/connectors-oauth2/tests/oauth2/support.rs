@@ -370,6 +370,7 @@ pub fn declaration(server: Option<&FakeServer>) -> ServerDeclaration {
         grant_types: vec![GrantType::AuthorizationCode, GrantType::DeviceCode],
         sources: vec!["https://example.test/oauth2-reference".to_owned()],
         state_in_exchange: false,
+        scope_in_refresh: false,
     }
 }
 
