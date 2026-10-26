@@ -8,10 +8,15 @@
 //! under the private publication fence, the old version retired).
 //!
 //! Callers that find another caller's attempt on the same source wait for its
-//! outcome and send nothing. At owner start, [`Refresher::recover`] resolves
-//! the attempts a past owner left: an authorized exchange without a stored
-//! response becomes `uncertain` and its connection Stale; a stored response is
-//! published without a request.
+//! outcome and send nothing. An exchange the token endpoint refused with HTTP
+//! 429, or whose request never left (the connection, name resolution or TLS
+//! handshake failed), is released and the connection left as it was. A
+//! connection whose custody holds as many versions as it may retain is
+//! refused before anything is reserved. At owner start, [`Refresher::recover`]
+//! resolves the attempts a past owner left: an authorized exchange without a
+//! stored response becomes `uncertain` and its connection Stale; a stored
+//! response whose access token is still valid is published without a request,
+//! an expired one discarded and its connection marked Stale.
 //!
 //! The entry point is [`Refresher::refresh_connection`]; the caller-facing
 //! trigger is `connections token` (story:connections-token-issues-an-access-token).
@@ -20,7 +25,8 @@ use crate::local::{
     keyring::custody,
     oauth, oauth2_grant,
     registry::{
-        self, Failure, Lost, Publication, RefreshTicket, Registry, Reservation, ValidatedBaseline,
+        self, Authorization, Failure, Lost, Publication, RefreshTicket, Registry, Reservation,
+        ValidatedBaseline,
     },
 };
 use connectors_oauth2::{Client, Failure as GrantFailure, Granted, Secret as GrantSecret};
@@ -53,6 +59,10 @@ pub enum Outcome {
     RateLimited {
         retry_after_ms: Option<u64>,
     },
+    /// The token endpoint could not be reached and no byte of the request
+    /// left (name resolution, connection or TLS handshake failed): the
+    /// exchange is released and the connection unchanged.
+    Unavailable,
 }
 
 impl Outcome {
@@ -65,6 +75,7 @@ impl Outcome {
             Self::CustodyUnavailable => "custody_unavailable",
             Self::Uncertain => "uncertain",
             Self::RateLimited { .. } => "rate_limited",
+            Self::Unavailable => "unavailable",
         }
     }
 }
@@ -247,6 +258,7 @@ impl Refresher {
                 Reservation::Stale | Reservation::Consumed => {
                     return Ok(Outcome::ReauthorizationRequired);
                 }
+                Reservation::Full => return Ok(Outcome::CustodyUnavailable),
                 Reservation::Lead(ticket) => {
                     let attempt = ticket.attempt().to_owned();
                     let outcome = self.lead(ticket);
@@ -294,14 +306,15 @@ impl Refresher {
         let Lost::Stored(candidate) = self.registry.resolve_lost_refresh(attempt, now())? else {
             return Ok(());
         };
-        // Its evidence is the stored response's, collected when it was stored.
+        // Recovery rechecks the stored response: read back from custody now,
+        // its access token's expiry decides whether it is still current.
         let entry = self
             .custody
             .read(candidate.version())
             .ok()
             .and_then(|material| Entry::read(&material))
             .ok_or(Failure::CustodyUnavailable)?;
-        let collected = candidate.acknowledged_at_ms();
+        let collected = now();
         let baseline = ValidatedBaseline {
             identity: candidate.identity().clone(),
             granted_scopes: Some(entry.scopes.into_iter().collect()),
@@ -340,15 +353,18 @@ impl Refresher {
             self.registry.fence_refresh(&ticket, now())?;
             return Ok(Outcome::CustodyUnavailable);
         }
-        let client = oauth2_grant::Https::new(self.trust.as_deref())
-            .ok()
-            .and_then(|https| Client::new(declaration, Some(&entry.client_id), None, https).ok());
-        let Some(client) = client else {
+        let Ok(https) = oauth2_grant::Https::new(self.trust.as_deref()) else {
             self.registry.fence_refresh(&ticket, now())?;
             return Ok(Outcome::Uncertain);
         };
-        if !self.registry.authorize_refresh(&ticket, now())? {
+        let Ok(client) = Client::new(declaration, Some(&entry.client_id), None, &https) else {
+            self.registry.fence_refresh(&ticket, now())?;
             return Ok(Outcome::Uncertain);
+        };
+        match self.registry.authorize_refresh(&ticket, now())? {
+            Authorization::Authorized => {}
+            Authorization::Moved => return Ok(Outcome::Uncertain),
+            Authorization::Full => return Ok(Outcome::CustodyUnavailable),
         }
         let sent_at = now();
         let response = client.refresh(refresh_token, &entry.scopes);
@@ -366,6 +382,12 @@ impl Refresher {
                     retry_after_ms: retry_after
                         .map(|delay| u64::try_from(delay.as_millis()).unwrap_or(u64::MAX)),
                 });
+            }
+            // No byte of the request left (§4.1, the other exception): the
+            // source token cannot have been consumed.
+            Err(_) if !https.may_have_sent() => {
+                self.registry.release_refresh(&ticket, now())?;
+                return Ok(Outcome::Unavailable);
             }
             Err(failure) => {
                 let outcome = match failure {

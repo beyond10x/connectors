@@ -8,9 +8,11 @@ mod reuse;
 mod revalidation;
 mod use_and_retirement;
 pub use observation::{ObservedAcquisition, ObservedConnection, Page, PageOptions, State};
+#[cfg(test)]
+pub(in crate::local) use refresh::RETAINED_BOUND;
 pub use refresh::{
-    Lost, PreparedRefresh, Publication, RecoveryCandidate, RefreshTicket, Reservation,
-    StoredRefresh,
+    Authorization, Lost, PreparedRefresh, Publication, RecoveryCandidate, RefreshTicket,
+    Reservation, StoredRefresh,
 };
 pub use reuse::{ReuseCandidate, ReuseGuard, ReuseSource};
 pub use revalidation::{Revalidation, RevalidationDispatch};
