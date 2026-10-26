@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:ci-timing-flakes-20261018
 kind: story
-status: active
+status: implemented
 title: Four tests failed on CI under load on 2026-10-18 without a change causing them
 refs:
 - provider: github
@@ -32,10 +32,11 @@ scope:
   path: crates/connectors-host/src/local/oauth.rs
 - confidence: cited
   path: crates/connectors-host/src/local/owner/transport.rs
-revision: 10
+revision: 12
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-19T21:36:33Z", actor: "human:timo", revision: 6}
 - {from: "proposed", to: "active", at: "2026-10-19T21:36:33Z", actor: "human:timo", revision: 7}
+- {from: "active", to: "implemented", at: "2026-10-23T20:45:59Z", actor: "human:timo", revision: 12, decided_on: {"recorded":{"test_result":2,"review_outcome":1,"verification":1}}}
 ---
 ## Defect
 
@@ -137,3 +138,20 @@ Not done, so the story stays active:
   request (review-result:wave-20261019-post0540-u4-adversary-1, finding 2).
 - "An operator can tell a missing plugin from a busy one" moved to
   story:exec-plugin-busy-reaches-the-operator.
+
+## CI runs after the change (recorded 2026-10-23)
+
+Every completed, non-cancelled run of `macos-host.yml` and `rust-gate.yml` created after the merge of wave 20261019-post0540 into `main` (`9201b1177`, 2026-10-20T03:10Z), read with `gh run list` and `gh run view --log` on 2026-10-23.
+
+| job | runs that ran the tests | each of the story's tests that job runs reported `ok` | `FAILED` lines for the four tests |
+|---|---|---|---|
+| macOS "host and CLI" | 30 | the transport and oauth tests, 30 of 30 | 0 |
+| Linux repository gate | 31 | all four, 31 of 31 | 0 |
+
+macOS run 39918212761 (PR head `5b647963e`, 2026-10-23) failed at its clippy step on a compile error that `4a2646bc8` fixed; no test ran in it. Six runs of each workflow were cancelled before their tests finished. The macOS job does not run the two Kubernetes exec tests; they run in the Linux gate.
+
+macOS run ids: 39362858325 39401801061 39406844139 39408743876 39414455491 39418872472 39432076220 39728541014 39733507912 39738214531 39743582053 39748364572 39749153505 39754687483 39760985042 39766024936 39926635535 39937230529 39943283679 39949605761 39962346430 39965593281 39970497575 39972033131 39978616586 39983955961 39991148611 39997882523 40004358988 40004469187 
+
+Linux gate run ids: 39362858339 39401801053 39406844133 39408743936 39414455442 39418872423 39432076386 39728541027 39733507867 39738214383 39743581994 39748364439 39749153397 39754687343 39760985051 39766025021 39918212799 39926635504 39937230304 39943283073 39949605770 39962346477 39965593121 39970497699 39972032514 39978616351 39983955881 39991148557 39997882592 40004359189 40004469191 
+
+The owner socket is bound through `listen` (`crates/connectors-host/src/local/owner/transport.rs:1518`), which links it into place with `std::fs::hard_link` (:1527) on every unix target. The transport test above, which starts owners through that path, passed in each of the 30 macOS runs, so the macOS hard link (review-result:wave-20261019-post0540-u4-adversary-1, finding 2) has run there 30 times. That it ran is read from the code path; no run logged the link itself.

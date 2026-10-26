@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:jira-feed-binding
 kind: story
-status: active
+status: implemented
 title: Jira binds the feed family
 relations:
 - decomposes: epic:generic-datasource-feeds
@@ -33,10 +33,11 @@ scope:
   path: crates/connectors-build/src/main.rs
 - confidence: inferred
   path: crates/connectors-docs/src/status.rs
-revision: 7
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-06T19:55:09Z", actor: "agent:claude", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-06T19:55:09Z", actor: "agent:claude", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-23T20:45:57Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1,"review_outcome":2}}}
 ---
 ## Outcome
 
