@@ -882,6 +882,7 @@ pub(super) fn binding() -> Binding {
             minimum_scopes: BTreeSet::from(["read".to_owned()]),
             evidence_lifetime_ms: 60_000,
             declaration: None,
+            oauth2: None,
         },
     }
 }

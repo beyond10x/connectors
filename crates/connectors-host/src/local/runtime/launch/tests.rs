@@ -508,6 +508,7 @@ fn publish(
             minimum_scopes: BTreeSet::new(),
             evidence_lifetime_ms: 60_000,
             declaration: None,
+            oauth2: None,
         },
     };
     let clock = connectors_sdk::now_ms;

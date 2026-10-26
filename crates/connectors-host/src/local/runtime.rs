@@ -466,21 +466,77 @@ pub struct Profile {
     pub minimum_scopes: BTreeSet<String>,
     pub evidence_lifetime_ms: u64,
     pub fields: Vec<EntryField>,
-    /// Present only for a profile whose material is acquired by OAuth consent;
+    /// Present only for a profile whose material the CLI acquires by OAuth;
     /// omitted otherwise, so every other profile keeps its bytes and revision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acquisition: Option<Acquisition>,
 }
-/// Where a CLI obtains an OAuth profile's protected entry: the consent and
-/// token endpoints and the scopes it requests. Nonsecret metadata only.
+/// How a CLI obtains an OAuth profile's protected entry. Nonsecret metadata
+/// only. Each shape is the object it always was, so a profile keeps its bytes
+/// and revision: the consent of
+/// `architecture-decision-record:oauth-material-as-static-entry`, or an
+/// `oauth2_grant` profile's authorization server
+/// (`architecture-decision-record:oauth2-grants-and-access-token-issue`).
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Acquisition {
+    Consent(Consent),
+    Grant(Grant),
+}
+/// The consent and token endpoints and the scopes it requests, for Google's
+/// installed-client consent.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Acquisition {
+pub struct Consent {
     pub authorize_url: String,
     pub token_url: String,
     pub scopes: BTreeSet<String>,
 }
+/// The authorization server whose grant the CLI runs for an `oauth2_grant`
+/// profile (`connectors.oauth2.ServerDeclaration`). Its client id is always
+/// present: the declaration's, else the instance configuration's.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Grant {
+    /// Written without its absent members, the form the metadata authority
+    /// records in a cached bootstrap
+    /// (`connectors.cli.PrivateProfileAcquisition.oauth2`).
+    #[serde(serialize_with = "without_absent")]
+    pub oauth2: connectors_oauth2::ServerDeclaration,
+}
+fn without_absent<S: serde::Serializer>(
+    declaration: &connectors_oauth2::ServerDeclaration,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    let mut value = serde_json::to_value(declaration).map_err(serde::ser::Error::custom)?;
+    if let Some(object) = value.as_object_mut() {
+        object.retain(|_, member| !member.is_null());
+    }
+    value.serialize(serializer)
+}
 impl Acquisition {
+    /// The consent, for a consent-acquired profile.
+    pub fn consent(&self) -> Option<&Consent> {
+        match self {
+            Self::Consent(consent) => Some(consent),
+            Self::Grant(_) => None,
+        }
+    }
+    /// The authorization server, for an `oauth2_grant` profile.
+    pub fn grant(&self) -> Option<&connectors_oauth2::ServerDeclaration> {
+        match self {
+            Self::Consent(_) => None,
+            Self::Grant(grant) => Some(&grant.oauth2),
+        }
+    }
+    fn bounded(&self) -> bool {
+        match self {
+            Self::Consent(consent) => consent.bounded(),
+            Self::Grant(grant) => grant_declaration(&grant.oauth2),
+        }
+    }
+}
+impl Consent {
     /// Both endpoints https with a host and at most 2048 bytes; 1 to 64 scopes,
     /// each 1 to 256 printable ASCII bytes without whitespace.
     fn bounded(&self) -> bool {
@@ -499,6 +555,10 @@ impl Acquisition {
     }
 }
 impl Profile {
+    /// The authorization server of an `oauth2_grant` profile.
+    pub fn grant(&self) -> Option<&connectors_oauth2::ServerDeclaration> {
+        self.acquisition.as_ref().and_then(Acquisition::grant)
+    }
     pub fn registry_profile(&self) -> registry::StaticProfile {
         registry::StaticProfile {
             id: self.id.clone(),
@@ -510,6 +570,7 @@ impl Profile {
             // What the adapter digested into `revision`, so a lifetime-only
             // change can be proved (`StaticProfile::same_authentication`).
             declaration: serde_json::to_value(self).ok(),
+            oauth2: self.grant().cloned(),
         }
     }
 }
@@ -737,6 +798,7 @@ impl Bootstrap {
                     .acquisition
                     .as_ref()
                     .is_some_and(|acquisition| !acquisition.bounded())
+                || (profile.grant().is_some() && profile.scheme != "http_bearer")
             {
                 return Err(Failure::Protocol);
             }
@@ -822,6 +884,20 @@ fn bounded(value: &str, max: usize) -> bool {
 }
 fn scopes(value: &BTreeSet<String>) -> bool {
     value.len() <= 64 && value.iter().all(|v| bounded(v, 256))
+}
+/// The largest `oauth2` declaration a profile carries, as JSON.
+const GRANT_DECLARATION_LIMIT: usize = 16 * 1024;
+/// An `oauth2_grant` profile's declaration a CLI can run: valid
+/// (`ServerDeclaration::validate`), with at least one grant, its client id
+/// resolved, and bounded.
+fn grant_declaration(declaration: &connectors_oauth2::ServerDeclaration) -> bool {
+    declaration.validate().is_ok()
+        && !declaration.grant_types.is_empty()
+        && declaration
+            .client_id
+            .as_deref()
+            .is_some_and(|id| bounded(id, 256))
+        && serde_json::to_vec(declaration).is_ok_and(|bytes| bytes.len() <= GRANT_DECLARATION_LIMIT)
 }
 
 #[derive(Serialize, Deserialize)]

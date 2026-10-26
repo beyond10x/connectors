@@ -19,6 +19,10 @@ pub struct Granted {
     /// The granted scopes: the response's `scope`, or the requested scopes when it sent none
     /// (RFC 6749 §5.1).
     pub scopes: Vec<String>,
+    /// The OpenID Connect `id_token` the response carried, unverified: a caller that reads its
+    /// claims relies on having received it directly from the token endpoint over TLS (OpenID
+    /// Connect Core 1.0 §3.1.3.7 item 6).
+    pub id_token: Option<Secret>,
 }
 
 /// The tokens a refresh exchange returned.
@@ -187,6 +191,8 @@ pub(crate) struct TokenResponse {
     pub(crate) expires_in: Duration,
     /// The response's `scope`, when it sent one.
     pub(crate) scopes: Option<Vec<String>>,
+    /// The response's `id_token`, when it sent one.
+    pub(crate) id_token: Option<Secret>,
 }
 
 impl TokenResponse {
@@ -200,6 +206,7 @@ impl TokenResponse {
             expires_in: Option<u64>,
             refresh_token: Option<Secret>,
             scope: Option<String>,
+            id_token: Option<Secret>,
         }
         let body: Body = serde_json::from_slice(body).map_err(|_| Failure::InvalidResponse)?;
         let access_token = body
@@ -217,10 +224,10 @@ impl TokenResponse {
             .filter(|&seconds| seconds > 0)
             .map(Duration::from_secs)
             .ok_or(Failure::InvalidResponse)?;
-        if body
-            .refresh_token
-            .as_ref()
-            .is_some_and(|token| !is_token(token.expose()))
+        if [&body.refresh_token, &body.id_token]
+            .into_iter()
+            .flatten()
+            .any(|token| !is_token(token.expose()))
         {
             return Err(Failure::InvalidResponse);
         }
@@ -235,6 +242,7 @@ impl TokenResponse {
                     .map(str::to_owned)
                     .collect()
             }),
+            id_token: body.id_token,
         })
     }
 }

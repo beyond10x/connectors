@@ -19,6 +19,7 @@ pub mod keyring;
 pub mod metadata;
 pub mod mutations;
 pub mod oauth;
+pub mod oauth2_grant;
 #[cfg(test)]
 mod oauth_adversary_pass2_tests;
 #[cfg(test)]

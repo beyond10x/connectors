@@ -17,6 +17,7 @@ mod connections;
 mod cursor;
 mod declarations;
 mod definition;
+mod dialects;
 mod list;
 mod migrate;
 mod operations;
@@ -25,7 +26,7 @@ mod select;
 mod session;
 
 pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
-    let args = migrate::shorthand(args);
+    let args = dialects::device_shorthand(migrate::shorthand(args));
     // Help is no envelope and runs no command: it says nothing more on standard
     // error, under a deprecated name too; the help itself marks that name.
     if let Some(help) = connectors::help::render(&args) {
