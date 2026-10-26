@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-26T12:53:49Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0580-oauth2-subscriptions",
+  "kind": "release-plan",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "v0.58.0 on efd333444 (merge of #210, bot|GitHub): release page by b10x-bot[bot], Latest, 5 assets; sha256sum -c SHA256SUMS OK for the 4 archives",
+    "reference": "v0.58.0"
+  }
+}
