@@ -1059,7 +1059,7 @@ mod tests {
 
     /// `story:oauth2-refresh-metadata-authority`: the local metadata authority owns
     /// `connectors.refresh` and `connectors.oauth2`. The suite the gate step synthesizes holds a
-    /// scenario for every outcome of their ten commands, and each one passes against the
+    /// scenario for every outcome of their eleven commands, and each one passes against the
     /// committed definitions.
     #[test]
     fn every_refresh_and_oauth2_outcome_passes_against_the_committed_definitions() {
@@ -1075,7 +1075,11 @@ mod tests {
                 name.starts_with("connectors.refresh.") || name.starts_with("connectors.oauth2.")
             })
             .collect();
-        assert_eq!(commands.len(), 10, "the two domains declare ten commands");
+        assert_eq!(
+            commands.len(),
+            11,
+            "the two domains declare eleven commands"
+        );
         let expected: BTreeSet<String> = commands
             .iter()
             .flat_map(|(command, declaration)| {

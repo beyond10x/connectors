@@ -79,9 +79,9 @@ It references at most one [`connectors.credentials.CredentialGeneration`](./conn
 
 No invariant is declared, so nothing here constrains an instance at rest.
 
-Its state is a `connectors.refresh.RefreshAttempt.State`, one of `Authorized`, `Discarded`, `Fenced`, `Published`, `Recovering`, `Reserved`, `ResponseStored` and `Uncertain`. That enum is synthesised from the lifecycle rather than declared beside it, so the states a view's filter compares and the states drawn below cannot disagree.
+Its state is a `connectors.refresh.RefreshAttempt.State`, one of `Authorized`, `Discarded`, `Fenced`, `Published`, `Recovering`, `Released`, `Reserved`, `ResponseStored` and `Uncertain`. That enum is synthesised from the lifecycle rather than declared beside it, so the states a view's filter compares and the states drawn below cannot disagree.
 
-An instance is created in `Reserved`. `Discarded`, `Fenced`, `Published` and `Uncertain` are terminal, so an instance may rest there forever. That is declared rather than inferred from having no way out: an entity that cannot leave a state is either finished or stuck, and only its author knows which.
+An instance is created in `Reserved`. `Discarded`, `Fenced`, `Published`, `Released` and `Uncertain` are terminal, so an instance may rest there forever. That is declared rather than inferred from having no way out: an entity that cannot leave a state is either finished or stuck, and only its author knows which.
 
 ```mermaid
 stateDiagram-v2
@@ -90,6 +90,7 @@ stateDiagram-v2
     Reserved --> Fenced: fence (FenceReserved)
     Authorized --> ResponseStored: store_response (StoreResponse)
     Authorized --> Uncertain: quarantine (QuarantineRefresh)
+    Authorized --> Released: release (ReleaseRateLimited)
     ResponseStored --> Recovering: recover_response (RecoverStoredResponse)
     Recovering --> Published: publish (PublishRefresh)
     ResponseStored --> Published: publish (PublishRefresh)
@@ -98,6 +99,7 @@ stateDiagram-v2
     Discarded --> [*]
     Fenced --> [*]
     Published --> [*]
+    Released --> [*]
     Uncertain --> [*]
 ```
 
@@ -107,6 +109,7 @@ Each move is taken by a declared command outcome, and a move nothing takes is re
 - `fence` — taken by `connectors.refresh.FenceReserved` on its `fenced` outcome
 - `store_response` — taken by `connectors.refresh.StoreResponse` on its `stored` outcome
 - `quarantine` — taken by `connectors.refresh.QuarantineRefresh` on its `uncertain` outcome
+- `release` — taken by `connectors.refresh.ReleaseRateLimited` on its `released` outcome
 - `recover_response` — taken by `connectors.refresh.RecoverStoredResponse` on its `recovered` outcome
 - `publish` — taken by `connectors.refresh.PublishRefresh` on its `published` outcome
 - `discard` — taken by `connectors.refresh.DiscardCandidate` on its `discarded` outcome
@@ -124,6 +127,7 @@ Illegal transitions are illegal by absence: no rule forbids them, there is simpl
 - `Discarded` may not become `Fenced`
 - `Discarded` may not become `Published`
 - `Discarded` may not become `Recovering`
+- `Discarded` may not become `Released`
 - `Discarded` may not become `Reserved`
 - `Discarded` may not become `ResponseStored`
 - `Discarded` may not become `Uncertain`
@@ -131,6 +135,7 @@ Illegal transitions are illegal by absence: no rule forbids them, there is simpl
 - `Fenced` may not become `Discarded`
 - `Fenced` may not become `Published`
 - `Fenced` may not become `Recovering`
+- `Fenced` may not become `Released`
 - `Fenced` may not become `Reserved`
 - `Fenced` may not become `ResponseStored`
 - `Fenced` may not become `Uncertain`
@@ -138,21 +143,33 @@ Illegal transitions are illegal by absence: no rule forbids them, there is simpl
 - `Published` may not become `Discarded`
 - `Published` may not become `Fenced`
 - `Published` may not become `Recovering`
+- `Published` may not become `Released`
 - `Published` may not become `Reserved`
 - `Published` may not become `ResponseStored`
 - `Published` may not become `Uncertain`
 - `Recovering` may not become `Authorized`
 - `Recovering` may not become `Fenced`
+- `Recovering` may not become `Released`
 - `Recovering` may not become `Reserved`
 - `Recovering` may not become `ResponseStored`
 - `Recovering` may not become `Uncertain`
+- `Released` may not become `Authorized`
+- `Released` may not become `Discarded`
+- `Released` may not become `Fenced`
+- `Released` may not become `Published`
+- `Released` may not become `Recovering`
+- `Released` may not become `Reserved`
+- `Released` may not become `ResponseStored`
+- `Released` may not become `Uncertain`
 - `Reserved` may not become `Discarded`
 - `Reserved` may not become `Published`
 - `Reserved` may not become `Recovering`
+- `Reserved` may not become `Released`
 - `Reserved` may not become `ResponseStored`
 - `Reserved` may not become `Uncertain`
 - `ResponseStored` may not become `Authorized`
 - `ResponseStored` may not become `Fenced`
+- `ResponseStored` may not become `Released`
 - `ResponseStored` may not become `Reserved`
 - `ResponseStored` may not become `Uncertain`
 - `Uncertain` may not become `Authorized`
@@ -160,6 +177,7 @@ Illegal transitions are illegal by absence: no rule forbids them, there is simpl
 - `Uncertain` may not become `Fenced`
 - `Uncertain` may not become `Published`
 - `Uncertain` may not become `Recovering`
+- `Uncertain` may not become `Released`
 - `Uncertain` may not become `Reserved`
 - `Uncertain` may not become `ResponseStored`
 
@@ -210,7 +228,7 @@ It has four outcomes.
 
 **`source-unavailable`** — The default branch, taken when no other outcome's condition matched. No entity in this specification changes. It reports `connectors.refresh.SourceUnavailable`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies no other outcome's condition.
 
-**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Authorized`, `Discarded`, `Fenced`, `Published`, `Recovering`, `ResponseStored` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
+**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Authorized`, `Discarded`, `Fenced`, `Published`, `Recovering`, `Released`, `ResponseStored` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
 
 ### `DiscardCandidate`
 
@@ -224,7 +242,7 @@ It has two outcomes.
 
 **`discarded`** — The default branch, taken when no other outcome's condition matched. It moves a `connectors.refresh.RefreshAttempt` from `Recovering` and `ResponseStored` to `Discarded`, along the declared move `discard`. The instance is the one named by the input field `attempt_id`. It emits `connectors.refresh.RefreshCandidateDiscarded`. A test reaches it by constructing an input that satisfies no other outcome's condition.
 
-**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Authorized`, `Discarded`, `Fenced`, `Published`, `Reserved` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
+**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Authorized`, `Discarded`, `Fenced`, `Published`, `Released`, `Reserved` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
 
 ### `FenceReserved`
 
@@ -238,7 +256,7 @@ It has two outcomes.
 
 **`fenced`** — The default branch, taken when no other outcome's condition matched. It moves a `connectors.refresh.RefreshAttempt` from `Reserved` to `Fenced`, along the declared move `fence`. The instance is the one named by the input field `attempt_id`. It emits `connectors.refresh.ReservedOwnerFenced`. A test reaches it by constructing an input that satisfies no other outcome's condition.
 
-**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Authorized`, `Discarded`, `Fenced`, `Published`, `Recovering`, `ResponseStored` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
+**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Authorized`, `Discarded`, `Fenced`, `Published`, `Recovering`, `Released`, `ResponseStored` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
 
 ### `PublishRefresh`
 
@@ -260,7 +278,7 @@ It has four outcomes.
 
 **`publication-refused`** — The default branch, taken when no other outcome's condition matched. No entity in this specification changes. It reports `connectors.refresh.PublicationRefused`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies no other outcome's condition.
 
-**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Authorized`, `Discarded`, `Fenced`, `Published`, `Reserved` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
+**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Authorized`, `Discarded`, `Fenced`, `Published`, `Released`, `Reserved` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
 
 ### `QuarantineRefresh`
 
@@ -274,7 +292,7 @@ It has two outcomes.
 
 **`uncertain`** — The default branch, taken when no other outcome's condition matched. It moves a `connectors.refresh.RefreshAttempt` from `Authorized` to `Uncertain`, along the declared move `quarantine`. The instance is the one named by the input field `attempt_id`. It emits `connectors.refresh.RefreshUncertain`. A test reaches it by constructing an input that satisfies no other outcome's condition.
 
-**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Discarded`, `Fenced`, `Published`, `Recovering`, `Reserved`, `ResponseStored` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
+**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Discarded`, `Fenced`, `Published`, `Recovering`, `Released`, `Reserved`, `ResponseStored` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
 
 ### `RecoverStoredResponse`
 
@@ -290,7 +308,23 @@ It has two outcomes.
 
 **`recovered`** — The default branch, taken when no other outcome's condition matched. It moves a `connectors.refresh.RefreshAttempt` from `ResponseStored` to `Recovering`, along the declared move `recover_response`. The instance is the one named by the input field `attempt_id`. It emits `connectors.refresh.StoredResponseRecovered`. A test reaches it by constructing an input that satisfies no other outcome's condition.
 
-**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Authorized`, `Discarded`, `Fenced`, `Published`, `Recovering`, `Reserved` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
+**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Authorized`, `Discarded`, `Fenced`, `Published`, `Recovering`, `Released`, `Reserved` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
+
+### `ReleaseRateLimited`
+
+`connectors.refresh.ReleaseRateLimited`.
+
+It takes:
+
+- `attempt_id` — `connectors.refresh.RefreshAttemptId`
+- `owner` — `String`
+- `ownership_token` — `connectors.refresh.OwnershipToken`
+
+It has two outcomes.
+
+**`released`** — The default branch, taken when no other outcome's condition matched. It moves a `connectors.refresh.RefreshAttempt` from `Authorized` to `Released`, along the declared move `release`. The instance is the one named by the input field `attempt_id`. It emits `connectors.refresh.RefreshReleased`. A test reaches it by constructing an input that satisfies no other outcome's condition.
+
+**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Discarded`, `Fenced`, `Published`, `Recovering`, `Released`, `Reserved`, `ResponseStored` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
 
 ### `ReserveRefresh`
 
@@ -328,7 +362,7 @@ It has three outcomes.
 
 **`ownership-conflict`** — The default branch, taken when no other outcome's condition matched. No entity in this specification changes. It reports `connectors.refresh.OwnershipConflict`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies no other outcome's condition.
 
-**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Discarded`, `Fenced`, `Published`, `Recovering`, `Reserved`, `ResponseStored` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
+**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Discarded`, `Fenced`, `Published`, `Recovering`, `Released`, `Reserved`, `ResponseStored` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
 
 ## Events
 
@@ -366,6 +400,18 @@ It carries:
 - `candidate_generation_id` — `connectors.credentials.CredentialGenerationId`
 
 Emitted by `connectors.refresh.PublishRefresh` on its `published` outcome.
+
+Nothing in this system reacts to it.
+
+### `RefreshReleased`
+
+`connectors.refresh.RefreshReleased`.
+
+It carries:
+
+- `attempt_id` — `connectors.refresh.RefreshAttemptId`
+
+Emitted by `connectors.refresh.ReleaseRateLimited` on its `released` outcome.
 
 Nothing in this system reacts to it.
 
@@ -470,6 +516,8 @@ Reported by `connectors.refresh.QuarantineRefresh` on its `wrong-state` outcome.
 
 Reported by `connectors.refresh.RecoverStoredResponse` on its `wrong-state` outcome.
 
+Reported by `connectors.refresh.ReleaseRateLimited` on its `wrong-state` outcome.
+
 Reported by `connectors.refresh.StoreResponse` on its `wrong-state` outcome.
 
 ### `SourceUnavailable`
@@ -485,4 +533,4 @@ Reported by `connectors.refresh.ReserveRefresh` on its `source-unavailable` outc
 
 ---
 
-Generated from connectors v1 · model digest `93b96cede56156a3a7704e19c1999930a79c3136854f914ba28b234b0936df07` · contract digest `slice-sha256/2:aee7b55ecb8ecdac58df8b39b9667c2edf7eba68f6e406026c53ad9d35500b50`. Do not edit this file; change the specification and regenerate it with `ess generate`.
+Generated from connectors v1 · model digest `9c2fd53cd63f988f8b6f57e10a7ab2f8265314a558d1d5c1b55b419a4313703a` · contract digest `slice-sha256/2:50d901c0a4a10874a0127ce5854b2deb72a2314a464e088dc11e3f7e5b1dbad9`. Do not edit this file; change the specification and regenerate it with `ess generate`.

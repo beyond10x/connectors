@@ -29,6 +29,15 @@ use std::time::Instant;
 use std::{collections::BTreeMap, num::NonZeroU16, path::Path, time::Duration};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
+mod ledger;
+pub(super) use ledger::attempts as refresh_attempts;
+#[cfg(test)]
+pub(super) use ledger::recorded_commands as recorded_refresh_commands;
+pub(in crate::local) use ledger::{
+    ACQUISITION as REFRESH_ACQUISITION, Attempt as RefreshAttempt, AttemptState as RefreshState,
+    Step as LedgerStep, insert_acquisition as insert_refresh_acquisition,
+};
+
 /// Visible projection rows keyed by entity and identity: lifecycle state and fields.
 type ProjectionRows = BTreeMap<(String, String), (String, Map<String, Value>)>;
 
@@ -1078,6 +1087,9 @@ fn capture_rows(connection: &Connection, level: i64) -> Result<Vec<RowImage>> {
             .collect::<std::result::Result<Vec<_>, _>>()
             .map_err(unavailable)?;
         for row in rows {
+            if ledger::acquisition_row(row.table, &row.fields) {
+                continue;
+            }
             let server = match row.table {
                 "registry_profiles" => authorization_server(&row)?,
                 _ => None,
@@ -2873,6 +2885,9 @@ fn build_projection(authority_id: uuid::Uuid, er: &ErAuthority) -> Result<Connec
             insert_row(&connection, table, row, &er.baseline, level)?;
         }
     }
+    if level >= 2 {
+        ledger::project_acquisitions(&connection, &er.baseline)?;
+    }
     connection
         .pragma_update(None, "foreign_keys", true)
         .map_err(unavailable)?;
@@ -3653,20 +3668,28 @@ pub(super) enum PersistMode {
     RuntimeStateOnly,
 }
 
+/// Records `connection`'s change since `er`'s baseline, and with it the refresh
+/// ledger's `staged` transitions, which only a standard write records.
 pub(super) fn persist(
     er: &mut ErAuthority,
     connection: &Connection,
     mode: PersistMode,
+    staged: &[LedgerStep],
 ) -> Result<()> {
     // A refused or uncertain batch leaves the baseline unproven; such a
     // handle is never reopened.
     er.reusable = false;
-    persist_batch(er, connection, mode)?;
+    persist_batch(er, connection, mode, staged)?;
     er.reusable = true;
     Ok(())
 }
 
-fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMode) -> Result<()> {
+fn persist_batch(
+    er: &mut ErAuthority,
+    connection: &Connection,
+    mode: PersistMode,
+    staged: &[LedgerStep],
+) -> Result<()> {
     let (admitted_registry_use, concurrent_observation, runtime_state_only, prepared_observation) =
         match mode {
             PersistMode::Standard {
@@ -3676,6 +3699,10 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
             PersistMode::PreparedObservation => (false, false, false, true),
             PersistMode::RuntimeStateOnly => (false, false, true, false),
         };
+    if !staged.is_empty() && (runtime_state_only || prepared_observation || concurrent_observation)
+    {
+        return Err(Failure::MetadataUnavailable);
+    }
     let level: i64 = connection
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .map_err(unavailable)?;
@@ -3701,8 +3728,9 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         // table. Reject any attempt to use this path for a registry clock
         // or another owner's row before preparing an authored batch.
         let changed_non_runtime = er.baseline.keys().chain(desired.keys()).any(|key| {
-            if writer_key(key) {
-                // The writer marker has no SQL row; only this batch changes it.
+            if writer_key(key) || ledger::key(key) {
+                // Neither the writer marker nor a refresh attempt has an SQL
+                // row; only a batch's own actions change them.
                 return false;
             }
             let changed = match (er.baseline.get(key), desired.get(key)) {
@@ -3723,7 +3751,7 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         // The two admitted observation callers may only persist their
         // registry clock. This check also covers additions and removals.
         let changed_non_clock = reference.keys().chain(desired.keys()).any(|key| {
-            if writer_key(key) {
+            if writer_key(key) || ledger::key(key) {
                 return false;
             }
             let changed = match (reference.get(key), desired.get(key)) {
@@ -3751,7 +3779,7 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
     // Recorded expiries of transient subjects whose SQL rows disappeared.
     let mut expiries = Vec::new();
     for (key, current) in reference {
-        if writer_key(key) {
+        if writer_key(key) || ledger::key(key) {
             continue;
         }
         match desired.get(key) {
@@ -3820,6 +3848,14 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
             }
         }
     }
+    // The refresh ledger's transitions commit with the SQL change they were
+    // staged beside, in this same batch.
+    actions.extend(ledger::actions(
+        reference,
+        &runtime_registry,
+        &commands,
+        staged,
+    )?);
     if prepared_observation && !reference.keys().any(registry_clock_key) {
         return Err(Failure::MetadataUnavailable);
     }
@@ -4580,6 +4616,12 @@ fn command_arguments(
                 | "connectors.execution_audit.AcknowledgeAnchor"
                 | "connectors.execution_audit.LinkAnchorAttempt"
                 | "connectors.execution_audit.AppendFinalObservation"
+                // The refresh coordinator commits these only beside the SQL
+                // change its own successful decision made (`ledger`).
+                | "connectors.refresh.ReserveRefresh"
+                | "connectors.refresh.AuthorizeExchange"
+                | "connectors.refresh.StoreResponse"
+                | "connectors.refresh.PublishRefresh"
         );
         if !records_successful_owner_decision {
             return Err(Failure::MetadataUnavailable);
@@ -4678,6 +4720,7 @@ fn identity_field(entity: &str) -> Option<&'static str> {
         "connectors.approval_issuers.ApprovalIssuer" => Some("issuer_id"),
         "connectors.approval_issuers.ApprovalSigningKey" => Some("key_id"),
         "connectors.local_approval_policy.LocalApprovalPolicy" => Some("policy_id"),
+        ledger::ENTITY => Some("attempt_id"),
         _ => None,
     }
 }
