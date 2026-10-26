@@ -1412,6 +1412,15 @@ pub fn serve_with_read_policy(paths: Paths, read_policy: Arc<dyn ReadPolicy>) ->
     // process exit, including unwinding or any early return with live threads.
     // CLOEXEC prevents native children from inheriting it.
     std::mem::forget(lifetime);
+    // story:owner-rotating-refresh: the refreshes a past owner left unfinished
+    // are resolved before the first request. One that cannot be resolved now
+    // stays recorded and holds its source until a later owner resolves it.
+    let _ = refresh::Refresher::new(
+        &owner.paths.state,
+        config.selection(),
+        owner.incarnation.clone(),
+    )
+    .recover();
     let recovery = maintenance::Background::start(owner.paths.clone(), owner.pool.clone())?;
     handle(owner.clone(), startup)?;
     owner.pool.automatic(&config);

@@ -5,6 +5,9 @@ use super::{Failure, Release, Result, filesystem as fs};
 mod checkpoint_tests;
 pub(super) mod deadline;
 mod er;
+pub(in crate::local) use er::{
+    LedgerStep, REFRESH_ACQUISITION, RefreshAttempt, RefreshState, insert_refresh_acquisition,
+};
 #[cfg(test)]
 mod metamorphic_tests;
 use rusqlite::{Connection, OpenFlags, TransactionBehavior};
@@ -301,6 +304,9 @@ pub struct Metadata {
     /// A passive inspection: it reads the store and writes nothing to it, so
     /// returning its verified handle persists no open checkpoint.
     inspection: bool,
+    /// Refresh ledger transitions the next standard persist records beside
+    /// the SQL change they were staged with ([`Metadata::stage_ledger`]).
+    staged: Vec<LedgerStep>,
 }
 
 impl Drop for Metadata {
@@ -799,11 +805,13 @@ impl Metadata {
 
     pub(super) fn persist_prepared_observation(&mut self) -> Result<()> {
         self.require_lifecycle_lock()?;
+        let staged = std::mem::take(&mut self.staged);
         let authority = self.er.as_mut().ok_or(Failure::MetadataUnavailable)?;
         er::persist(
             authority,
             &self.connection,
             er::PersistMode::PreparedObservation,
+            &staged,
         )
     }
 
@@ -811,11 +819,13 @@ impl Metadata {
     /// This named path cannot persist registry-dependent business changes.
     pub(super) fn persist_runtime_state(&mut self) -> Result<()> {
         self.require_lifecycle_lock()?;
+        let staged = std::mem::take(&mut self.staged);
         let authority = self.er.as_mut().ok_or(Failure::MetadataUnavailable)?;
         er::persist(
             authority,
             &self.connection,
             er::PersistMode::RuntimeStateOnly,
+            &staged,
         )
     }
 
@@ -824,17 +834,42 @@ impl Metadata {
         // and its batch. Every write needs the lifecycle lock, so the feed
         // check sees every append that can precede its batch.
         self.require_lifecycle_lock()?;
-        if let Some(authority) = &mut self.er {
-            er::persist(
+        let staged = std::mem::take(&mut self.staged);
+        match &mut self.er {
+            Some(authority) => er::persist(
                 authority,
                 &self.connection,
                 er::PersistMode::Standard {
                     admitted_registry_use,
                     concurrent_observation: self.concurrent_observation,
                 },
-            )?;
+                &staged,
+            ),
+            // Only the recorded authority keeps the refresh ledger.
+            None if !staged.is_empty() => Err(Failure::MetadataUnavailable),
+            None => Ok(()),
         }
-        Ok(())
+    }
+
+    /// The refresh ledger's attempts as this handle's recorded authority
+    /// accounts for them; a store without one keeps no ledger.
+    pub(in crate::local) fn refresh_attempts(&self) -> Result<Vec<RefreshAttempt>> {
+        er::refresh_attempts(self.er.as_ref().ok_or(Failure::MetadataUnavailable)?)
+    }
+
+    /// Stages refresh ledger transitions for the next persist, which records
+    /// them in the batch that records its SQL change.
+    pub(in crate::local) fn stage_ledger(&mut self, steps: Vec<LedgerStep>) {
+        self.staged.extend(steps);
+    }
+
+    /// Each refresh attempt's recorded `connectors.refresh` commands, in order.
+    #[cfg(test)]
+    pub(in crate::local) fn recorded_refresh_commands(
+        path: &Path,
+    ) -> Result<std::collections::BTreeMap<String, Vec<String>>> {
+        let metadata = Self::inspect(path)?;
+        er::recorded_refresh_commands(metadata.er.as_ref().ok_or(Failure::MetadataUnavailable)?)
     }
 
     fn adopt_er(&mut self) -> Result<()> {
@@ -1045,6 +1080,7 @@ impl Metadata {
             lock_released: false,
             pooled: er::holds(&path.join(NAME)),
             inspection: false,
+            staged: Vec::new(),
         })
     }
 
