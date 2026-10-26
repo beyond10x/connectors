@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-23T20:45:50Z",
+  "actor": "human:timo",
+  "artifact": "story:ci-timing-flakes-20261018",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "CI after 9201b1177: macOS host and CLI 30 runs, Linux repository gate 31 runs, 0 failures of the story tests (run ids in story:ci-timing-flakes-20261018, CI runs after the change); read with gh run list and gh run view --log on 2026-10-23",
+    "reference": "https://github.com/beyond10x/connectors/actions/workflows/rust-gate.yml"
+  }
+}
