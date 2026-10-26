@@ -23,6 +23,7 @@ impl Connected {
             &self.binding.adapter_id,
             &self.connection,
             delivery,
+            u64::MAX,
         )
     }
 
@@ -130,6 +131,34 @@ fn owner_issue_within_the_lead_refreshes_once() {
     );
 }
 
+/// The caller's deadline is checked again after the refresh the issue ran:
+/// one that passed meanwhile records no issue and answers `timeout`, while
+/// the refresh it ran stays published for the next issue.
+#[test]
+fn owner_issue_whose_deadline_passes_during_its_refresh_records_nothing() {
+    let server = Server::start(vec![token(Some(ROTATED), Some("read"))]);
+    let connected = Connected::with(&server, "rotating", &["read"], 30_000, true);
+    let refresher = connected.refresher("owner-one", &server);
+    let refused = refresher
+        .issue_access_token(
+            INSTANCE,
+            &connected.binding.adapter_id,
+            &connected.connection,
+            Delivery::Revealed,
+            now(),
+        )
+        .unwrap_err();
+    assert_eq!(refused, Refusal::Deadline);
+    assert_eq!(Error::from(refused).code, Code::Timeout);
+    refreshed_request(&server);
+    assert!(connected.issues().is_empty(), "nothing was delivered");
+    let (attempt, _) = connected.attempt();
+    assert_eq!(attempt.state, RefreshState::Published);
+    let next = connected.issue(&refresher, Delivery::Revealed).unwrap();
+    assert_eq!(next.token.expose(), REFRESHED_ACCESS);
+    assert_eq!(server.requests().len(), 1, "the next issue sent nothing");
+}
+
 #[test]
 fn owner_issue_on_a_stale_connection_refuses_and_records_nothing() {
     let server = Server::start(vec![error(400, "invalid_grant")]);
@@ -206,6 +235,7 @@ fn owner_issue_of_a_revoked_or_unselected_connection_is_refused() {
                 &connected.binding.adapter_id,
                 &connected.connection,
                 Delivery::Revealed,
+                u64::MAX,
             )
             .unwrap_err(),
         Refusal::Registry(Failure::NotFound)
@@ -224,4 +254,199 @@ fn owner_issue_of_a_revoked_or_unselected_connection_is_refused() {
     assert_eq!(Error::from(refused).code, Code::Revoked);
     assert!(server.requests().is_empty());
     assert!(connected.issues().is_empty());
+}
+
+// Adversary cases (wave 20261025-oauth2, unit U5, pass 1).
+
+/// contracts/cli/v1alpha1/semantics.md "Access token issue": a refresh whose
+/// granted scopes no longer cover the profile is refused as `not_granted`
+/// (next action `repair_connection`), as every other owner path maps a scope
+/// refusal. `insufficient_scope` is no `connectors.cli.FailureCode`
+/// (`ess/domains/cli.yaml`), so a `connections token` envelope carrying it
+/// names a code outside the CLI's closed vocabulary.
+#[test]
+fn adversary_owner_issue_whose_refresh_widens_scope_is_not_granted() {
+    let server = Server::start(vec![token(Some(ROTATED), Some("read write"))]);
+    let connected = Connected::with(&server, "rotating", &["read"], 30_000, true);
+    let refresher = connected.refresher("owner-one", &server);
+    let refused = connected.issue(&refresher, Delivery::Revealed).unwrap_err();
+    assert_eq!(refused, Refusal::Refresh(Outcome::InsufficientScope));
+    assert_eq!(server.requests().len(), 1);
+    assert!(connected.issues().is_empty(), "a refusal records nothing");
+    let error = Error::from(refused);
+    assert_eq!(
+        serde_json::to_value(error.code).unwrap(),
+        json!("not_granted"),
+        "the CLI contract's code for a refresh that no longer covers the profile"
+    );
+}
+
+/// How many issues run at once in one trial, and how many trials run.
+const CALLERS: usize = 16;
+const TRIALS: usize = 8;
+
+/// contracts/auth/acquisition/v1alpha1/semantics.md §4.4 item 2: an issue
+/// inside the lead runs the §4.1 sequence "under the same `connectors.refresh`
+/// ledger serialization as every other refresh", and "an issue never runs a
+/// second exchange". The story's design takes the expiry decision under that
+/// serialization. `Registry::issuance` reads the expiry in one transaction
+/// and `refresh_connection` reserves in another, so a caller that read the
+/// expiring generation before another caller's refresh published reserves the
+/// freshly published generation as its source and sends a second exchange
+/// for a token that no longer needed one. Each trial starts `CALLERS` issues
+/// of one connection inside the lead together; the token endpoint must see
+/// exactly one request per trial.
+#[test]
+fn adversary_concurrent_issues_within_the_lead_send_one_exchange() {
+    let mut extra = Vec::new();
+    for trial in 0..TRIALS {
+        let server = Server::start(
+            (0..CALLERS)
+                .map(|_| token(Some(ROTATED), Some("read")))
+                .collect(),
+        );
+        // Valid for 30 s, inside the declared 60 s lead.
+        let connected = Connected::with(&server, "rotating", &["read"], 30_000, true);
+        let refresher = connected.refresher("owner-one", &server);
+        let start = Barrier::new(CALLERS);
+        let issued = std::thread::scope(|scope| {
+            let callers = (0..CALLERS)
+                .map(|caller| {
+                    let (start, connected, refresher) = (&start, &connected, &refresher);
+                    scope.spawn(move || {
+                        start.wait();
+                        // Spread the arrivals across the leader's exchange.
+                        std::thread::sleep(Duration::from_millis(3 * caller as u64));
+                        connected.issue(refresher, Delivery::MetadataOnly)
+                    })
+                })
+                .collect::<Vec<_>>();
+            callers
+                .into_iter()
+                .map(|caller| caller.join().unwrap())
+                .collect::<Vec<_>>()
+        });
+        let requests = server.requests().len();
+        if requests != 1 {
+            let outcomes: Vec<_> = issued
+                .iter()
+                .map(|issue| issue.as_ref().map(|issued| issued.refreshed))
+                .collect();
+            extra.push(format!(
+                "trial {trial}: {requests} exchanges, {} attempts, outcomes {outcomes:?}",
+                connected.attempts().len()
+            ));
+        }
+    }
+    assert!(
+        extra.is_empty(),
+        "one expiring token, one exchange per trial: {extra:#?}"
+    );
+}
+
+/// A published connection of a `confidential` client (`connect` admits one
+/// with its client secret document, `oauth2_grant::grant`) whose access
+/// token expires in `expires_in_ms`, inside the declared 60 s lead.
+fn confidential(server: &Server, expires_in_ms: u64) -> Connected {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("state");
+    crate::local::filesystem::directory(&path, true, true).unwrap();
+    drop(Metadata::initialize(&path).unwrap());
+    let mut binding = registry::fixture_binding(INSTANCE);
+    binding.profile.oauth2 = Some(
+        serde_json::from_value(json!({
+            "authorize_url": "https://localhost/fixture/authorize",
+            "token_url": server.url(),
+            "device_authorization_url": null,
+            "client_id": CLIENT,
+            "client_kind": "confidential",
+            "request_encoding": "form",
+            "refresh_encoding": "form",
+            "redirect_kind": "loopback_any_port",
+            "redirect_uri": null,
+            "authorize_parameters": [],
+            "requested_scopes": ["read"],
+            "required_scopes": ["read"],
+            "rotation": "rotating",
+            "refresh_lead_seconds": 60,
+            "grant_types": ["authorization_code"],
+            "sources": ["https://localhost/fixture-authorization-server"],
+            "state_in_exchange": false,
+        }))
+        .unwrap(),
+    );
+    let registry = Registry::new(&path);
+    let at = now();
+    let entry = serde_json::to_vec(&json!({
+        "client_id": CLIENT,
+        "access_token": ACCESS,
+        "refresh_token": REFRESH,
+        "expires_at_ms": at + expires_in_ms,
+        "scopes": ["read"],
+    }))
+    .unwrap();
+    let acquisition = registry.begin(&binding, at).unwrap();
+    let claim = registry.consume(acquisition, at).unwrap();
+    let baseline = ValidatedBaseline {
+        identity: ExternalIdentity {
+            kind: "fixture-account".into(),
+            subject: "one".into(),
+        },
+        granted_scopes: Some(["read".to_owned()].into_iter().collect()),
+        credential_expires_at_ms: Some(at + expires_in_ms),
+        collected_at_ms: at,
+        valid_until_ms: at + expires_in_ms.min(60_000),
+        binding: None,
+    };
+    let prepared = registry.prepare(&claim, baseline, entry.len(), at).unwrap();
+    let custody = Arc::new(Memory::default());
+    custody
+        .versions
+        .lock()
+        .unwrap()
+        .insert(prepared.version().id(), entry);
+    let receipt = custody::WrittenVersion::fixture(prepared.version());
+    let stored = registry.acknowledge(prepared, receipt, at).unwrap();
+    let connection = registry.publish(stored, at).unwrap();
+    Connected {
+        _root: root,
+        path,
+        binding,
+        connection,
+        custody,
+    }
+}
+
+/// The owner failures contracts/auth/acquisition/v1alpha1/semantics.md §4.4
+/// names for a refused issue.
+const ISSUE_REFUSALS: [Code; 7] = [
+    Code::Forbidden,
+    Code::ServiceFailure,
+    Code::InsufficientScope,
+    Code::NotGranted,
+    Code::Revoked,
+    Code::CustodyUnavailable,
+    Code::Unavailable,
+];
+
+/// An issue inside the lead of a confidential client's connection: the
+/// refresh it needs refuses before any request (`reserve_refresh`: "A
+/// confidential client's secret is not part of the stored entry"), and the
+/// issue answers that as `invalid_input`, which the CLI reports as a usage
+/// error at stage `arguments` for a call whose arguments were right. §4.4
+/// maps every refusal of an issue onto its table; `invalid_input` is not in it.
+#[test]
+fn adversary_owner_issue_of_a_confidential_client_inside_the_lead_is_no_usage_error() {
+    let server = Server::start(Vec::new());
+    let connected = confidential(&server, 30_000);
+    let refresher = connected.refresher("owner-one", &server);
+    let refused = connected.issue(&refresher, Delivery::Revealed).unwrap_err();
+    assert!(server.requests().is_empty());
+    assert!(connected.issues().is_empty(), "a refusal records nothing");
+    let error = Error::from(refused);
+    assert!(
+        ISSUE_REFUSALS.contains(&error.code),
+        "{refused:?} answers {:?}, outside §4.4's refusal table",
+        error.code
+    );
 }

@@ -339,11 +339,13 @@ Each successful issue records one `AccessTokenIssue` naming its delivery
 
 | Refusal | `code` | `next_action` |
 |---|---|---|
-| connection of a profile that is not `oauth2_grant`, or not in the instance's permissions | `forbidden` | `request_permission` |
+| connection of a profile that is not `oauth2_grant`, or not in the instance's permissions; a token inside the lead of a confidential client, which this owner cannot refresh | `forbidden` | `request_permission` |
 | Stale connection, or a refresh the provider refused or left uncertain | `service_failure` | `repair_connection` |
 | a refresh whose granted scopes no longer cover the profile | `not_granted` | `repair_connection` |
 | a refresh the provider answered as revoked | `revoked` | `create_connection` |
 | token endpoint answered `429` | `unavailable`, service code `rate_limited`, `retry_after_seconds` | `retry_explicitly` |
+| token endpoint not reached, nothing sent; a token past its expiry with nothing published in its place | `unavailable` | `retry_status` |
+| the deadline passed before the issue was recorded; a refresh it ran stays published | `timeout` | `retry_explicitly` |
 | custody cannot be read | `custody_unavailable` | `unlock_keyring` |
 
 ## 3. Explicit local TOML configuration

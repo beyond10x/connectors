@@ -126,6 +126,10 @@ pub struct ServerDeclaration {
     /// Whether the code exchange also carries the flow's `state`; a non-standard requirement
     /// of some servers. `false` sends the RFC 6749 §4.1.3 fields only.
     pub state_in_exchange: bool,
+    /// Whether the refresh exchange also carries `scope`, the declared `requested_scopes`
+    /// joined by a space; a non-standard requirement of some servers. `false` sends the
+    /// RFC 6749 §6 fields only.
+    pub scope_in_refresh: bool,
 }
 
 impl ServerDeclaration {
@@ -277,6 +281,7 @@ mod tests {
             "grant_types": ["authorization_code"],
             "sources": [],
             "state_in_exchange": false,
+            "scope_in_refresh": false,
         }))
         .unwrap()
     }

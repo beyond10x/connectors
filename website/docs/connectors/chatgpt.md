@@ -76,6 +76,7 @@ with your client id. Its `auth` is the declared profile as shipped:
       "client_kind": "public",
       "request_encoding": "form",
       "refresh_encoding": "json",
+      "scope_in_refresh": false,
       "redirect_kind": "loopback_fixed_port",
       "redirect_uri": "http://127.0.0.1:1455/auth/callback",
       "authorize_parameters": [

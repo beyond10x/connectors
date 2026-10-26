@@ -1,0 +1,75 @@
+{
+  "format": "connectors-catalog-connector/1",
+  "connector_id": "claude-subscription",
+  "provider_id": "anthropic",
+  "adapter_id": "catalog",
+  "catalog_provider": "claude-subscription",
+  "default_endpoint": "https://api.anthropic.com",
+  "selection": "operations.json",
+  "profiles": [
+    {
+      "profile": "claude.subscription",
+      "scheme": "oauth2_grant",
+      "header": "Authorization",
+      "bearer": true,
+      "label": "Claude subscription sign-in",
+      "identity": {"path": "api/oauth/profile", "kind": "claude.account", "subject_pointer": "/account/uuid"},
+      "minimum_scopes": ["user:inference", "user:profile"],
+      "oauth2": {
+        "authorize_url": "https://claude.com/cai/oauth/authorize",
+        "token_url": "https://platform.claude.com/v1/oauth/token",
+        "device_authorization_url": null,
+        "client_id": null,
+        "client_kind": "public",
+        "request_encoding": "json",
+        "refresh_encoding": "json",
+        "redirect_kind": "loopback_any_port",
+        "redirect_uri": "http://localhost/callback",
+        "authorize_parameters": [{"name": "code", "value": "true"}],
+        "requested_scopes": ["user:profile", "user:inference"],
+        "required_scopes": ["user:profile", "user:inference"],
+        "rotation": "rotating",
+        "refresh_lead_seconds": 300,
+        "grant_types": ["authorization_code"],
+        "sources": [
+          "Claude Code 2.1.310 bundled JavaScript, read 2026-10-25: CLAUDE_AI_AUTHORIZE_URL, TOKEN_URL",
+          "Claude Code 2.1.310: function wVr (authorize extra code=true), async function Tqo (JSON exchange carrying state), async function koe (JSON refresh), function rC (refresh 300000 ms before expiry)"
+        ],
+        "state_in_exchange": true,
+        "scope_in_refresh": true
+      }
+    },
+    {
+      "profile": "claude.subscription-pasted",
+      "scheme": "oauth2_grant",
+      "header": "Authorization",
+      "bearer": true,
+      "label": "Claude subscription sign-in, pasted code",
+      "identity": {"path": "api/oauth/profile", "kind": "claude.account", "subject_pointer": "/account/uuid"},
+      "minimum_scopes": ["user:inference", "user:profile"],
+      "oauth2": {
+        "authorize_url": "https://claude.com/cai/oauth/authorize",
+        "token_url": "https://platform.claude.com/v1/oauth/token",
+        "device_authorization_url": null,
+        "client_id": null,
+        "client_kind": "public",
+        "request_encoding": "json",
+        "refresh_encoding": "json",
+        "redirect_kind": "pasted_code",
+        "redirect_uri": "https://platform.claude.com/oauth/code/callback",
+        "authorize_parameters": [{"name": "code", "value": "true"}],
+        "requested_scopes": ["user:profile", "user:inference"],
+        "required_scopes": ["user:profile", "user:inference"],
+        "rotation": "rotating",
+        "refresh_lead_seconds": 300,
+        "grant_types": ["authorization_code"],
+        "sources": [
+          "Claude Code 2.1.310 bundled JavaScript, read 2026-10-25: CLAUDE_AI_AUTHORIZE_URL, TOKEN_URL, MANUAL_REDIRECT_URL",
+          "Claude Code 2.1.310: function wVr (authorize extra code=true), async function Tqo (JSON exchange carrying state), async function koe (JSON refresh), function rC (refresh 300000 ms before expiry), the pasted line split on # into code and state"
+        ],
+        "state_in_exchange": true,
+        "scope_in_refresh": true
+      }
+    }
+  ]
+}

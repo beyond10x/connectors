@@ -40,6 +40,8 @@ mod basic_auth_adversary;
 mod basic_auth_adversary_pass2;
 #[path = "local_runtime/chatgpt.rs"]
 mod chatgpt;
+#[path = "local_runtime/claude_subscription.rs"]
+mod claude_subscription;
 #[path = "local_runtime/cli_journey.rs"]
 mod cli_journey;
 #[path = "../../../crates/connectors-host/tests/fixtures/clock/server.rs"]

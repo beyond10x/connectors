@@ -258,6 +258,7 @@ fn every_catalog_provider_but_slack_and_openrouter_ships_one_declaration() {
         [
             "calendar",
             "chatgpt",
+            "claude-subscription",
             "confluence",
             "confluence-v1",
             "drive",
@@ -423,9 +424,17 @@ fn every_declared_profile_derives_what_its_hand_written_configuration_derives() 
         }
     }
     // Twelve connectors, Zendesk with two profiles: a lane that finds no
-    // declaration checks nothing and must not pass. ChatGPT's one profile is refused.
+    // declaration checks nothing and must not pass. ChatGPT's one profile and Claude's two
+    // are refused.
     assert_eq!(checked.len(), 13, "{checked:?}");
-    assert_eq!(refused, ["chatgpt chatgpt.subscription"]);
+    assert_eq!(
+        refused,
+        [
+            "chatgpt chatgpt.subscription",
+            "claude-subscription claude.subscription",
+            "claude-subscription claude.subscription-pasted"
+        ]
+    );
 }
 
 /// Scopes the minimality check keeps although every operation that accepts

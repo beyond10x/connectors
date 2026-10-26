@@ -195,9 +195,14 @@ The caller names a connection and a delivery; it cannot ask for a refresh.
    declaration's `refresh_lead_seconds`, it is issued as it is (`current`).
    Otherwise the issue first runs the §4.1 sequence once, under the same
    `connectors.refresh` ledger serialization as every other refresh, and issues
-   the generation that sequence published (`refreshed`). A provider whose fresh
-   token already expires within the lead is issued that token; an issue never
-   runs a second exchange. A refresh that does not publish refuses the issue
+   the generation that sequence published (`refreshed`). The reservation names
+   the generation the issue read, in the transaction that reserves: when
+   another caller's refresh already published a successor, the issue sends
+   nothing and issues the successor. A provider whose fresh token already
+   expires within the lead is issued that token; an issue never runs a second
+   exchange. A token inside the lead that this owner cannot refresh (a
+   confidential client, whose secret the stored entry does not hold) is
+   refused as forbidden. A refresh that does not publish refuses the issue
    with the refresh's safe outcome (§4.1), and a token already past its expiry
    with nothing published in its place is refused as unavailable.
 3. Each successful issue is recorded as one
@@ -207,7 +212,8 @@ The caller names a connection and a delivery; it cannot ask for a refresh.
    published it on a refreshed issue, the expiry, the granted scopes and the
    delivery (`metadata_only`, `revealed` or `library`). The record carries no
    token. When a refresh or a repair replaces the generation between its read
-   and the record, the issue reads it again. A refusal records nothing.
+   and the record, the issue reads it again. An issue whose generation a repair
+   rather than a refresh published is recorded as `current`. A refusal records nothing.
 4. The token leaves the owner only in the transport's secret frame, and only
    for a delivery that carries it (`revealed`, `library`). `metadata_only`
    answers the metadata alone. No log, error, `Debug` or `Display` output names
@@ -216,12 +222,15 @@ The caller names a connection and a delivery; it cannot ask for a refresh.
 | Refusal | Owner failure |
 |---|---|
 | profile not `oauth2_grant`, or not in the instance's permissions | `forbidden` |
+| token inside the lead of a confidential client | `forbidden` |
 | `reauthorization_required` or `uncertain` | `service_failure` |
-| `insufficient_scope` | `insufficient_scope` |
+| `insufficient_scope` | `not_granted` |
 | `invalid_or_revoked` | `revoked` |
 | `custody_unavailable` | `custody_unavailable` |
 | token endpoint `429` | `unavailable` with the `rate_limited` service code and `Retry-After` in whole seconds |
+| `unavailable`: the token endpoint was not reached, nothing was sent | `unavailable` |
 | token expired, nothing published in its place | `unavailable` |
+| the caller's deadline passed before the issue was recorded | `timeout`; the refresh it ran stays published |
 
 ## 5. Ordering, limits
 

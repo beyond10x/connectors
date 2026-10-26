@@ -683,6 +683,7 @@ fn chatgpt_profile_without_client_id_is_invalid_configuration() {
         }
     }
     assert_eq!(carried["refresh_encoding"], "json");
+    assert_eq!(carried["scope_in_refresh"], false);
     assert_eq!(carried["request_encoding"], "form");
     assert_eq!(carried["refresh_lead_seconds"], 300);
     assert_eq!(carried["requested_scopes"].as_array().unwrap().len(), 6);
