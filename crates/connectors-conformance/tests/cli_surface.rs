@@ -563,7 +563,14 @@ fn a_connect_without_a_protected_source_reads_none_and_passes_no_document() {
 fn device_is_a_boolean_option_of_connect_and_reconnect_only() {
     for (args, callable, result) in [
         (
-            &["connections", "connect", "--adapter", "forge", "--profile", "grant"][..],
+            &[
+                "connections",
+                "connect",
+                "--adapter",
+                "forge",
+                "--profile",
+                "grant",
+            ][..],
             "connections-connect",
             "ConnectionConnectResult",
         ),
