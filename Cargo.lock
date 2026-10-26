@@ -576,6 +576,7 @@ dependencies = [
  "connectors-custody",
  "connectors-host",
  "connectors-mcp",
+ "connectors-oauth2",
  "connectors-sdk",
  "hex",
  "libc",
@@ -588,6 +589,7 @@ dependencies = [
  "tokio",
  "toml",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]
@@ -649,6 +651,7 @@ dependencies = [
  "connectors-catalog",
  "connectors-core",
  "connectors-host",
+ "connectors-oauth2",
  "connectors-sdk",
  "entity-core 0.30.3",
  "entity-eventlog",
@@ -805,6 +808,7 @@ dependencies = [
  "connectors-client",
  "connectors-core",
  "connectors-custody",
+ "connectors-oauth2",
  "connectors-sdk",
  "entity-core 0.30.3",
  "entity-eventlog",

@@ -993,7 +993,21 @@ protected file or stdin, each explicitly selected by its own source flag. Under 
 read-only `mounted_secret` binding connect and repair take no source: the owner
 reads the item `<adapter alias>/<profile>` itself, and a source flag is
 `invalid_input` at `arguments`. Under a platform binding a missing source is
-`protected_entry_unavailable` with `next_action = select_protected_source`. Hidden
+`protected_entry_unavailable` with `next_action = select_protected_source`, except
+on an `oauth2_grant` profile of a public client, whose grant runs in the CLI inside
+the capture window and whose token response is the entry
+(`contracts/auth/acquisition/v1alpha1/semantics.md`, the `oauth2_grant` row); a
+confidential client's source is the document `{"client_secret": "…"}`, from which
+its grant runs the same way. The consent address goes to the controlling terminal,
+else to one standard error line `connectors: consent-url <address>`. `--device`
+(`--device true`; a bare `--device` reads as `--device true`) runs the device grant
+instead, RFC 8628 at the declaration's `device_authorization_url` unless the
+composition registers a device dialect for the profile id, and shows
+`connectors: device-code <user_code> <verification_uri>` the same way; on any other
+profile, or under the read-only binding, `--device` is `invalid_input` (such a
+profile given no source under a platform binding is `protected_entry_unavailable`
+first). A grant that fails, times out or is cancelled stores nothing; a missing
+required scope is `not_granted`. Hidden
 terminal requires a trusted controlling TTY; unavailable or conflicting sources
 refuse as a usage/source error and explain safe source selection. No password/token
 argv flag, environment

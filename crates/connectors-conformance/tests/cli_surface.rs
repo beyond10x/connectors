@@ -555,6 +555,74 @@ fn a_connect_without_a_protected_source_reads_none_and_passes_no_document() {
     );
 }
 
+/// story:connect-runs-an-oauth2-grant: `--device` on connect and reconnect
+/// reaches the handler as the Boolean `device` (`ess-cli/1` has no valueless
+/// switch; the production CLI reads a bare `--device` as `--device true`),
+/// reads no protected source, and on any other command is a usage error.
+#[test]
+fn device_is_a_boolean_option_of_connect_and_reconnect_only() {
+    for (args, callable, result) in [
+        (
+            &["connections", "connect", "--adapter", "forge", "--profile", "grant"][..],
+            "connections-connect",
+            "ConnectionConnectResult",
+        ),
+        (
+            &[
+                "connections",
+                "reconnect",
+                "--adapter",
+                "forge",
+                "--connection",
+                "conn-1",
+                "--expected-revision",
+                "rev-1",
+            ],
+            "connections-reconnect",
+            "ConnectionReconnectResult",
+        ),
+    ] {
+        for (value, expected) in [("true", true), ("false", false)] {
+            let mut handler = Recorder::new(fixture(result));
+            let mut sources = InputSources::default();
+            let mut argv = args.to_vec();
+            argv.extend(["--device", value, "--output", "json"]);
+            let output = run(&argv, &mut sources, &mut handler, None);
+            assert_eq!(output.exit_code, 0, "{output:?}");
+            assert!(sources.calls.is_empty());
+            let (called, input, _) = handler.last.unwrap();
+            assert_eq!(called, callable);
+            assert_eq!(input["device"], expected, "{input}");
+        }
+        let mut handler = Recorder::new(fixture(result));
+        let mut sources = InputSources::default();
+        let mut argv = args.to_vec();
+        argv.extend(["--device", "yes", "--output", "json"]);
+        let output = run(&argv, &mut sources, &mut handler, None);
+        assert_ne!(output.exit_code, 0, "{output:?}");
+        assert_eq!(handler.calls, 0);
+    }
+    let mut handler = Recorder::new(json!({}));
+    let mut sources = InputSources::default();
+    let output = run(
+        &[
+            "connections",
+            "status",
+            "--adapter",
+            "forge",
+            "--device",
+            "true",
+            "--output",
+            "json",
+        ],
+        &mut sources,
+        &mut handler,
+        None,
+    );
+    assert_ne!(output.exit_code, 0, "{output:?}");
+    assert_eq!(handler.calls, 0);
+}
+
 #[derive(Default)]
 struct FixtureSchemas {
     phases: Vec<&'static str>,

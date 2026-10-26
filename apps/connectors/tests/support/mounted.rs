@@ -99,11 +99,11 @@ pub fn bootstrap() -> runtime::Bootstrap {
             profile(PROFILE, None),
             profile(
                 OAUTH_PROFILE,
-                Some(runtime::Acquisition {
+                Some(runtime::Acquisition::Consent(runtime::Consent {
                     authorize_url: "https://accounts.fixture.invalid/auth".into(),
                     token_url: "https://accounts.fixture.invalid/token".into(),
                     scopes: BTreeSet::from(["fixture.read".to_owned()]),
-                }),
+                })),
             ),
         ],
         requirements: vec![runtime::Requirement {

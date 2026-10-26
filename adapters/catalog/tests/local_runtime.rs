@@ -44,6 +44,8 @@ mod cli_journey;
 mod clock_fixture;
 #[path = "local_runtime/derived_instance.rs"]
 mod derived_instance;
+#[path = "local_runtime/oauth2_grant.rs"]
+mod oauth2_grant;
 #[path = "local_runtime/oauth2_refresh.rs"]
 mod oauth2_refresh;
 #[path = "local_runtime/oauth2_refresh_adversary.rs"]
