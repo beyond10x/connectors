@@ -734,8 +734,10 @@ struct GrantClaims {
 /// directly from the token endpoint over TLS, which OpenID Connect Core 1.0
 /// §3.1.3.7 item 6 accepts in place of its signature; it must be issued to
 /// `client_id` (items 3 to 5), not expired (item 9) and not issued ahead of
-/// this clock.
-fn grant_subject(id_token: &str, client_id: &str) -> Result<String> {
+/// this clock. The subject is its `sub`, or the string claim at
+/// `subject_pointer` when the profile names one, such as the ChatGPT account
+/// id in the `https://api.openai.com/auth` claim.
+fn grant_subject(id_token: &str, client_id: &str, subject_pointer: Option<&str>) -> Result<String> {
     use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
     let mut parts = id_token.split('.');
     let (Some(_), Some(payload), Some(_), None) =
@@ -743,11 +745,23 @@ fn grant_subject(id_token: &str, client_id: &str) -> Result<String> {
     else {
         return Err(Failure::InvalidCredential);
     };
-    let payload = URL_SAFE_NO_PAD
-        .decode(payload.trim_end_matches('='))
-        .map_err(|_| Failure::InvalidCredential)?;
-    let claims: GrantClaims =
+    let payload = Zeroizing::new(
+        URL_SAFE_NO_PAD
+            .decode(payload.trim_end_matches('='))
+            .map_err(|_| Failure::InvalidCredential)?,
+    );
+    let document: Value =
         serde_json::from_slice(&payload).map_err(|_| Failure::InvalidCredential)?;
+    let subject = match subject_pointer {
+        None => None,
+        Some(pointer) => match document.pointer(pointer) {
+            Some(Value::String(text)) => Some(text.clone()),
+            _ => return Err(Failure::InvalidCredential),
+        },
+    };
+    let claims: GrantClaims =
+        serde_json::from_value(document).map_err(|_| Failure::InvalidCredential)?;
+    let subject = subject.unwrap_or(claims.sub);
     let now = connectors_sdk::now_ms() / 1000;
     let audience = match &claims.aud {
         Audience::One(one) => one == client_id,
@@ -762,12 +776,12 @@ fn grant_subject(id_token: &str, client_id: &str) -> Result<String> {
         || claims
             .iat
             .is_some_and(|iat| iat > now.saturating_add(ISSUED_AT_SKEW_S))
-        || claims.sub.is_empty()
-        || claims.sub.len() > 256
+        || subject.is_empty()
+        || subject.len() > 256
     {
         return Err(Failure::InvalidCredential);
     }
-    Ok(claims.sub)
+    Ok(subject)
 }
 /// The stored entry of either OAuth scheme, as the grant it makes.
 enum Grant {
@@ -1249,11 +1263,15 @@ impl Local {
                             && !grant)
                 }
                 // The token response names the subject and its scopes; an API
-                // probe beside it would be read by nobody.
+                // probe beside it would be read by nobody. An `oauth2_grant`
+                // profile may name its subject by another claim of the
+                // `id_token` than `sub`: `subject_pointer` into its claims.
                 IdentitySource::IdToken => {
                     !matches!(config.auth.scheme, Scheme::OAuth2Refresh | Scheme::OAuth2Grant)
                         || identity.path.is_some()
-                        || identity.subject_pointer.is_some()
+                        || identity.subject_pointer.as_deref().is_some_and(|pointer| {
+                            config.auth.scheme != Scheme::OAuth2Grant || !pointer.starts_with('/')
+                        })
                         || config.auth.scopes.is_some()
                 }
                 // The read proves the credential and names nobody: a pointer
@@ -2242,7 +2260,11 @@ impl Local {
                     .id_token
                     .as_deref()
                     .ok_or(Failure::InvalidCredential)?;
-                let subject = grant_subject(id_token, &entry.client_id)?;
+                let subject = grant_subject(
+                    id_token,
+                    &entry.client_id,
+                    self.auth.identity.subject_pointer.as_deref(),
+                )?;
                 self.baseline(subject, None, collected_at_ms, None)?
             }
             IdentitySource::Api => {

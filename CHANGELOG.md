@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+- The `chatgpt` connector (provider OpenAI, catalog provider) signs in with a ChatGPT
+  subscription as the Codex CLI does, profile `chatgpt.subscription`: browser with PKCE on
+  `127.0.0.1:1455`, or `connections connect --device` through the ChatGPT device sign-in. It
+  refreshes with JSON and rotation, names the connection by the ChatGPT account id from the
+  `id_token`, serves `connections token --reveal` and one read, `models.list`. No client id
+  ships: an instance is pinned with its own `oauth2_client_id`, and a derived one is refused as
+  `InvalidConfiguration`. Verified against a local fixture only, not live. Guide
+  `website/docs/connectors/chatgpt.md`.
+
 ### Changed
 
 - ESS 0.68.0 (from 0.67.0). No user-visible effect: the specification stays at its

@@ -1,0 +1,50 @@
+{
+  "format": "connectors-catalog-connector/1",
+  "connector_id": "chatgpt",
+  "provider_id": "openai",
+  "adapter_id": "catalog",
+  "catalog_provider": "chatgpt",
+  "default_endpoint": "https://chatgpt.com/backend-api/codex",
+  "selection": "operations.json",
+  "profiles": [
+    {
+      "profile": "chatgpt.subscription",
+      "scheme": "oauth2_grant",
+      "header": "Authorization",
+      "bearer": true,
+      "label": "ChatGPT sign-in",
+      "identity": {"source": "id_token", "kind": "chatgpt.account", "subject_pointer": "/https:~1~1api.openai.com~1auth/chatgpt_account_id"},
+      "oauth2": {
+        "authorize_url": "https://auth.openai.com/oauth/authorize",
+        "token_url": "https://auth.openai.com/oauth/token",
+        "device_authorization_url": null,
+        "client_id": null,
+        "client_kind": "public",
+        "request_encoding": "form",
+        "refresh_encoding": "json",
+        "redirect_kind": "loopback_fixed_port",
+        "redirect_uri": "http://127.0.0.1:1455/auth/callback",
+        "authorize_parameters": [
+          {"name": "id_token_add_organizations", "value": "true"},
+          {"name": "codex_cli_simplified_flow", "value": "true"},
+          {"name": "originator", "value": "codex_cli_rs"}
+        ],
+        "requested_scopes": ["openid", "profile", "email", "offline_access", "api.connectors.read", "api.connectors.invoke"],
+        "required_scopes": [],
+        "rotation": "rotating",
+        "refresh_lead_seconds": 300,
+        "grant_types": ["authorization_code"],
+        "sources": [
+          "https://github.com/openai/codex/blob/970111f6cb62cc02fe36a82ea7d71b37a2889c97/codex-rs/login/src/server.rs#L77 (issuer), #L576-L605 and #L708 (authorize and token endpoints), #L597-L601 (scope), #L78-L80 and #L629-L670 (fixed loopback redirect)",
+          "https://github.com/openai/codex/blob/970111f6cb62cc02fe36a82ea7d71b37a2889c97/codex-rs/login/src/oauth/authorization.rs#L20-L36 and codex-rs/login/src/auth/default_client.rs#L42 (authorize extras)",
+          "https://github.com/openai/codex/blob/970111f6cb62cc02fe36a82ea7d71b37a2889c97/codex-rs/login/src/oauth/pkce.rs#L15-L29 (S256)",
+          "https://github.com/openai/codex/blob/970111f6cb62cc02fe36a82ea7d71b37a2889c97/codex-rs/login/src/oauth/client.rs#L79-L95 (form code exchange), #L51-L63 and #L97-L112 (JSON refresh without scope)",
+          "https://github.com/openai/codex/blob/970111f6cb62cc02fe36a82ea7d71b37a2889c97/codex-rs/login/src/auth/manager.rs#L1647-L1690 (rotation), #L214-L215 and #L3300-L3328 (refresh 5 minutes before expiry), #L1784 (the Codex CLI's own client id, not shipped)",
+          "https://github.com/openai/codex/blob/970111f6cb62cc02fe36a82ea7d71b37a2889c97/codex-rs/login/src/token_data.rs#L42-L56 and #L92 (the account id claim of the id_token)",
+          "https://github.com/openai/codex/blob/970111f6cb62cc02fe36a82ea7d71b37a2889c97/codex-rs/login/src/device_code_auth.rs#L66-L218 (the device sign-in, not RFC 8628; adapters/catalog/src/chatgpt.rs)"
+        ],
+        "state_in_exchange": false
+      }
+    }
+  ]
+}
