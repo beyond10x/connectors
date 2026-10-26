@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-26T18:21:31Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0590-tool-contracts",
+  "kind": "release-plan",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "v0.59.0 on 2f30e4cd6 (merge of #212, bot|GitHub): annotated tag by b10x-bot[bot], release page by b10x-bot[bot], Latest, 5 assets; sha256sum -c SHA256SUMS OK for the 4 archives; x86_64 linux binary prints connectors 0.59.0",
+    "reference": "v0.59.0"
+  }
+}
