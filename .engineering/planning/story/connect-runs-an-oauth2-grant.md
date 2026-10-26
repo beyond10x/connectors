@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:connect-runs-an-oauth2-grant
 kind: story
-status: active
+status: implemented
 title: connections connect runs an OAuth2 grant for an oauth2_grant profile and stores the token response
 relations:
 - decomposes: epic:subscription-oauth2-access
@@ -27,10 +27,11 @@ scope:
   path: ess/domains/auth_access.yaml
 - confidence: cited
   path: ess/domains/cli.yaml
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-25T21:11:54Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"review_outcome":3}}}
 - {from: "proposed", to: "active", at: "2026-10-25T21:11:54Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":3}}}
+- {from: "active", to: "implemented", at: "2026-10-26T02:55:28Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1,"review_outcome":4}}}
 ---
 ## Outcome
 
