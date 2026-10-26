@@ -131,7 +131,9 @@ impl<T: Transport> Client<T> {
     /// Starts an authorization-code flow that redirects to `redirect_uri`: draws a fresh PKCE
     /// verifier and `state` and builds the authorize URL: `response_type`, `client_id`,
     /// `redirect_uri`, `scope`, `code_challenge`, `code_challenge_method=S256` and `state`,
-    /// then the declaration's `authorize_parameters` in declared order.
+    /// then the declaration's `authorize_parameters` in declared order. A redirect the declared
+    /// kind does not admit (HTTPS for `pasted_code`, plain loopback HTTP for a receiver) is
+    /// [`Failure::InvalidDeclaration`].
     pub fn begin(&self, redirect_uri: &str) -> Result<Authorization, Failure> {
         let mut url = self
             .declaration
@@ -140,7 +142,9 @@ impl<T: Transport> Client<T> {
             .and_then(https)
             .filter(|_| self.grants(GrantType::AuthorizationCode))
             .ok_or(Failure::InvalidDeclaration)?;
-        url::Url::parse(redirect_uri).map_err(|_| Failure::InvalidDeclaration)?;
+        if !self.declaration.redirect_kind.admits(redirect_uri) {
+            return Err(Failure::InvalidDeclaration);
+        }
         let verifier = random()?;
         let state = random()?;
         {
