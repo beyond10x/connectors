@@ -24,6 +24,11 @@ pub struct ObservedConnection {
     /// The binding the connection's current evidence selected, for an
     /// instance that declares alternative bindings.
     pub binding: Option<String>,
+    /// The scopes and the access token expiry the current evidence of an
+    /// `oauth2_grant` connection recorded (story:connect-runs-an-oauth2-grant);
+    /// `None` for every other connection, whose description keeps its shape.
+    pub granted_scopes: Option<BTreeSet<String>>,
+    pub credential_expires_at_ms: Option<u64>,
 }
 pub struct Page {
     pub connections: Vec<ObservedConnection>,
@@ -327,6 +332,12 @@ fn observe(
         .baseline
         .as_ref()
         .and_then(|baseline| baseline.operation_binding.clone());
+    let grant = row
+        .baseline
+        .as_ref()
+        .filter(|_| row.binding.profile.oauth2.is_some());
+    let granted_scopes = grant.and_then(|baseline| baseline.granted_scopes.clone());
+    let credential_expires_at_ms = grant.and_then(|baseline| baseline.credential_expires_at);
     Ok(ObservedConnection {
         reference: row.reference,
         instance: row.binding.instance_id,
@@ -338,6 +349,8 @@ fn observe(
         valid_until_ms,
         stale,
         binding,
+        granted_scopes,
+        credential_expires_at_ms,
     })
 }
 

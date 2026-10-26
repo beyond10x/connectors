@@ -15,6 +15,7 @@ test-support = []
 
 [dependencies]
 connectors-custody.workspace = true
+connectors-oauth2.workspace = true
 schemars = "1.2"
 connectors-core.workspace = true
 connectors-sdk.workspace = true

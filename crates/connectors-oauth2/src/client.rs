@@ -411,6 +411,7 @@ impl<T: Transport> Client<T> {
             refresh_token: response.refresh_token,
             expires_in: response.expires_in,
             scopes,
+            id_token: response.id_token,
         })
     }
 }

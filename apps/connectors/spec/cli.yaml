@@ -458,6 +458,8 @@ commands:
         source: {kind: option, long: instance}
       - field: profile
         source: {kind: option, long: profile}
+      - field: device
+        source: {kind: option, long: device}
       - field: credential_document
         source: {kind: protected, file: credential-file, stdin: credential-stdin, hidden_tty: credential-prompt}
   - path: [connections, reconnect]
@@ -475,6 +477,8 @@ commands:
         source: {kind: option, long: connection}
       - field: expected_revision
         source: {kind: option, long: expected-revision}
+      - field: device
+        source: {kind: option, long: device}
       - field: credential_document
         source: {kind: protected, file: credential-file, stdin: credential-stdin, hidden_tty: credential-prompt}
   - path: [connections, status]

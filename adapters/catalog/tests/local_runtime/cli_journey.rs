@@ -14,6 +14,8 @@ mod guarded_merge;
 mod invoke_definition;
 #[path = "lifecycle.rs"]
 mod lifecycle;
+#[path = "oauth2_grant_journey.rs"]
+mod oauth2_grant_journey;
 #[path = "owner_guard.rs"]
 mod owner_guard;
 #[path = "reason_cli_adversary.rs"]

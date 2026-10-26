@@ -8713,6 +8713,12 @@
                 "kind": "string"
               }
             },
+            "device": {
+              "kind": "optional",
+              "of": {
+                "kind": "boolean"
+              }
+            },
             "instance": {
               "kind": "optional",
               "of": {
@@ -8745,6 +8751,12 @@
                     "kind": "string"
                   }
                 },
+                "credential_expires_at_ms": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "integer"
+                  }
+                },
                 "external_identity": {
                   "kind": "optional",
                   "of": {
@@ -8756,6 +8768,15 @@
                       "subject": {
                         "kind": "string"
                       }
+                    }
+                  }
+                },
+                "granted_scopes": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "list",
+                    "of": {
+                      "kind": "string"
                     }
                   }
                 },
@@ -9286,6 +9307,12 @@
                     "kind": "string"
                   }
                 },
+                "credential_expires_at_ms": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "integer"
+                  }
+                },
                 "external_identity": {
                   "kind": "optional",
                   "of": {
@@ -9297,6 +9324,15 @@
                       "subject": {
                         "kind": "string"
                       }
+                    }
+                  }
+                },
+                "granted_scopes": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "list",
+                    "of": {
+                      "kind": "string"
                     }
                   }
                 },
@@ -10819,6 +10855,12 @@
                 "kind": "string"
               }
             },
+            "device": {
+              "kind": "optional",
+              "of": {
+                "kind": "boolean"
+              }
+            },
             "expected_revision": {
               "kind": "string"
             },
@@ -10851,6 +10893,12 @@
                     "kind": "string"
                   }
                 },
+                "credential_expires_at_ms": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "integer"
+                  }
+                },
                 "external_identity": {
                   "kind": "optional",
                   "of": {
@@ -10862,6 +10910,15 @@
                       "subject": {
                         "kind": "string"
                       }
+                    }
+                  }
+                },
+                "granted_scopes": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "list",
+                    "of": {
+                      "kind": "string"
                     }
                   }
                 },
@@ -11395,6 +11452,12 @@
                     "kind": "string"
                   }
                 },
+                "credential_expires_at_ms": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "integer"
+                  }
+                },
                 "external_identity": {
                   "kind": "optional",
                   "of": {
@@ -11406,6 +11469,15 @@
                       "subject": {
                         "kind": "string"
                       }
+                    }
+                  }
+                },
+                "granted_scopes": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "list",
+                    "of": {
+                      "kind": "string"
                     }
                   }
                 },
@@ -12513,6 +12585,12 @@
                       "kind": "string"
                     }
                   },
+                  "credential_expires_at_ms": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "integer"
+                    }
+                  },
                   "external_identity": {
                     "kind": "optional",
                     "of": {
@@ -12524,6 +12602,15 @@
                         "subject": {
                           "kind": "string"
                         }
+                      }
+                    }
+                  },
+                  "granted_scopes": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "list",
+                      "of": {
+                        "kind": "string"
                       }
                     }
                   },
@@ -18118,6 +18205,13 @@
           }
         },
         {
+          "field": "device",
+          "source": {
+            "kind": "option",
+            "long": "device"
+          }
+        },
+        {
           "field": "credential_document",
           "source": {
             "kind": "protected",
@@ -18313,6 +18407,13 @@
           "source": {
             "kind": "option",
             "long": "expected-revision"
+          }
+        },
+        {
+          "field": "device",
+          "source": {
+            "kind": "option",
+            "long": "device"
           }
         },
         {
