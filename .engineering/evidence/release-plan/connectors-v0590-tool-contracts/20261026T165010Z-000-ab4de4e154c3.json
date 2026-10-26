@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-26T16:50:10Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0590-tool-contracts",
+  "kind": "release-plan",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv (ESS 0.69.2, aep 0.71.3) on the 0.59.0 tree 1b3089ba5: gate: all checks passed, EXIT=0; 3283 passed, 0 failed, 178 ignored; authored scenarios 18 passed, 34 known failing",
+    "reference": "build/ess-0.69.2"
+  }
+}

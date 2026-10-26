@@ -112,3 +112,14 @@ components:
         - connectors.feed.ItemRevised
         - connectors.feed.ItemRemoved
         - connectors.feed.ItemRestored
+  - component: tool-contract-publisher
+    summary: Publishes an instance's tool-contract/1 document from its descriptor revision and the tool profiles authored beside its adapter; refuses a document it cannot publish whole.
+    owns:
+      domains:
+        - connectors.tool_contracts
+    accepts:
+      commands:
+        - connectors.tool_contracts.PublishToolContract
+    publishes:
+      events:
+        - connectors.tool_contracts.ToolContractPublished

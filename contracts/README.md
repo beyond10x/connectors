@@ -37,6 +37,7 @@ See [CHANGELOG.md](../CHANGELOG.md) for the baseline's implementation boundary.
 | `auth.evidence/v1alpha1` | [auth/evidence/v1alpha1](auth/evidence/v1alpha1/semantics.md) | proposed | value-free readiness and provider-side authorization checks |
 | `sessions/v1alpha1` | [sessions/v1alpha1](sessions/v1alpha1/semantics.md) | proposed | bidirectional sessions: offer, establishment, correlation, lease, revocation, terminal races, duplex transport |
 | `catalog/v1alpha1` | [catalog/v1alpha1](catalog/v1alpha1/semantics.md) | proposed | list/describe/locate pre-compiled adapter bundles with provenance and coverage; optional; grants nothing |
+| `tools/v1alpha1` | [tools/v1alpha1](tools/v1alpha1/semantics.md) | proposed; Tavily publication implemented | one `tool-contract/1` document per instance for its admitted operations, the profile authored beside the adapter, no credential or connection in it; held to `tool-conformance/1` |
 | `operations/v1alpha1` `generic-http` profile (and `datasource.records` `generic-http-page`) | [catalog/v1alpha1](catalog/v1alpha1/semantics.md) §3.2 | proposed | an operation realized from a bundle's request mapping by one generic engine: status, JSON passthrough, provenance, status-to-code table |
 
 The table indexes shared contract families/profiles, not a file or adapter count.
