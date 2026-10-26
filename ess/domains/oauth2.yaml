@@ -1,9 +1,9 @@
 domain: connectors.oauth2
 
-summary: Proposed provider-neutral OAuth 2.0 authorization servers a profile declares, and the access tokens the host issues to a local caller from a stored grant.
+summary: Provider-neutral OAuth 2.0 authorization servers a profile declares, and the access tokens the host issues to a local caller from a stored grant.
 
 # Owner: epic:subscription-oauth2-access. Provider facts (endpoints, client ids,
-# scopes) are adapter declarations under adapters/, never values in this domain.
+# scopes) are adapter declarations in the catalog, never values in this domain.
 # The grant run itself (authorization code with PKCE S256, or a device grant) is
 # one connectors.auth_bindings.Acquisition: its one-use consumption, expiry and
 # publication are that entity's. Rotating refresh is connectors.refresh
