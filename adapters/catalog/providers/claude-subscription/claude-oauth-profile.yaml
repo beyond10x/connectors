@@ -1,0 +1,39 @@
+# The one Claude subscription read this repository describes: the OAuth profile.
+#
+# Written by this repository, in its own words and structure, from the request the published
+# Claude Code 2.1.310 binary makes (read 2026-10-25); no provider document is copied, vendored
+# or fetched to produce it. The `claude-subscription` connector reads this path as its identity
+# probe, and its selection set (operations.json beside this file) serves it as
+# `account.profile`, its only operation.
+# See README.md beside this file.
+openapi: 3.1.0
+info:
+  title: Claude subscription OAuth profile (authored by Connectors)
+  version: "2026-10-25"
+  summary: >-
+    The account read behind the claude-subscription identity probe. Not a provider document;
+    the provider does not endorse it.
+  license:
+    name: MIT OR Apache-2.0
+    identifier: MIT OR Apache-2.0
+servers:
+  - url: https://api.anthropic.com
+paths:
+  /api/oauth/profile:
+    get:
+      operationId: getOAuthProfile
+      summary: The account the access token was issued to.
+      responses:
+        "200":
+          description: The account behind the token.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  account:
+                    type: object
+                    properties:
+                      uuid:
+                        type: string
+                        description: The account's stable identifier.

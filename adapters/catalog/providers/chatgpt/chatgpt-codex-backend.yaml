@@ -1,0 +1,42 @@
+openapi: 3.1.0
+info:
+  title: ChatGPT Codex backend models read (authored by Connectors)
+  version: "2026-10-26"
+  summary: >-
+    The one read of the backend a ChatGPT subscription sign-in is used against that the chatgpt
+    connector serves. Not a provider document; the provider does not endorse it.
+  description: >-
+    Written by this repository from the request the Codex CLI makes at
+    https://github.com/openai/codex/blob/970111f6cb62cc02fe36a82ea7d71b37a2889c97/codex-rs/codex-api/src/endpoint/models.rs#L33-L46
+    under the base at codex-rs/model-provider-info/src/lib.rs#L82; no provider document is
+    copied, vendored or fetched to produce it. Its selection set (operations.json beside it)
+    serves it as models.list, the connector's only operation.
+  license:
+    name: MIT OR Apache-2.0
+    identifier: MIT OR Apache-2.0
+servers:
+  - url: https://chatgpt.com/backend-api/codex
+paths:
+  /models:
+    get:
+      operationId: listModels
+      summary: The models the signed-in account may use.
+      parameters:
+        - name: client_version
+          in: query
+          required: false
+          description: The version of the client asking, which the Codex CLI always sends.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The models.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      type: object

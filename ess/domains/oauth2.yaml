@@ -60,6 +60,8 @@ types:
       - {name: sources, type: "List<String>"}
       # Some servers also require the `state` value in the code exchange body.
       - {name: state_in_exchange, type: Boolean}
+      # Some servers also require the requested scopes in the refresh body.
+      - {name: scope_in_refresh, type: Boolean}
     # Every value is public, nonsecret declaration data with a cited source.
     # PKCE is always S256 (RFC 7636 §4.2) for authorization_code; a declaration
     # cannot turn it off. A confidential client's secret is entered material.

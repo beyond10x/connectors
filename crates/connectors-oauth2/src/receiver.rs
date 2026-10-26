@@ -145,7 +145,7 @@ impl LoopbackReceiver {
 }
 
 /// The code of a pasted `code#state` line for `authorization`. Surrounding whitespace is
-/// ignored; a line without the flow's `state` after its last `#` is
+/// ignored; a line that is not exactly one code, one `#` and the flow's `state` is
 /// [`Failure::StateMismatch`], and an empty code or one with whitespace
 /// [`Failure::InvalidResponse`].
 pub fn pasted_code(
@@ -153,10 +153,10 @@ pub fn pasted_code(
     line: &str,
 ) -> Result<AuthorizationCode, Failure> {
     let line = line.trim();
-    let Some((code, state)) = line.rsplit_once('#') else {
+    let Some((code, state)) = line.split_once('#') else {
         return Err(Failure::StateMismatch);
     };
-    if state.is_empty() || !authorization.state_matches(state) {
+    if state.is_empty() || state.contains('#') || !authorization.state_matches(state) {
         return Err(Failure::StateMismatch);
     }
     if code.is_empty() || !code.bytes().all(|byte| byte.is_ascii_graphic()) {
