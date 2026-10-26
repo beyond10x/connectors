@@ -7,6 +7,15 @@
 //!
 //! A refreshed custody version names its attempt as its acquisition
 //! (`refresh:<attempt>`); its generation's capture is the same reference.
+//!
+//! The private publication fence the reservation saw is recorded but not
+//! required unchanged: authorization, preparation, the custody write and
+//! publication each require the same source generation and binding, a
+//! connection neither revoked nor Stale, and current evidence. Every other
+//! writer of the fence changes one of those (an acquisition publishes a new
+//! generation, a revocation revokes, an upgrade rebinds), except a
+//! same-generation recollection of the evidence, which must not cost an
+//! exchange already on the wire its rotated refresh token.
 use super::{
     Binding, Failure, Registry, Result, ValidatedBaseline, custody, db, encode, host_failure,
     lifecycle::{bump, custody_version, mark_stale, recollected_snapshot, retire},
@@ -20,8 +29,41 @@ use rusqlite::{OptionalExtension, Transaction, params};
 use std::collections::BTreeSet;
 
 /// The custody versions a refreshed connection may retain, retired ones
-/// included until their deletion: an hourly refresh retires 24 a day.
+/// included until their deletion: an hourly refresh retires 24 a day. It is
+/// checked before an exchange is reserved and authorized, never after one was
+/// sent: a response is stored even if a concurrent acquisition filled the
+/// last place meanwhile.
 const RETAINED: i64 = 64;
+
+#[cfg(test)]
+thread_local! {
+    /// The calling thread's retention bound in a test, so that a full
+    /// version history is a few refreshes away.
+    pub(in crate::local) static RETAINED_BOUND: std::cell::Cell<i64> =
+        const { std::cell::Cell::new(RETAINED) };
+}
+
+#[cfg(not(test))]
+fn retained_bound() -> i64 {
+    RETAINED
+}
+
+#[cfg(test)]
+fn retained_bound() -> i64 {
+    RETAINED_BOUND.with(std::cell::Cell::get)
+}
+
+/// Whether `connection`'s custody holds as many versions as it may retain.
+fn full(tx: &Transaction<'_>, connection: &str) -> Result<bool> {
+    let retained: i64 = tx
+        .query_row(
+            "SELECT count(*) FROM registry_materials WHERE connection_ref=?1 AND deleted=0",
+            [connection],
+            |r| r.get(0),
+        )
+        .map_err(db)?;
+    Ok(retained >= retained_bound())
+}
 
 /// The attempts one registry transaction reads and the transitions it stages.
 #[derive(Default)]
@@ -116,7 +158,6 @@ pub struct RefreshTicket {
     owner: String,
     token: String,
     source: String,
-    fence: String,
     version: custody::Version,
     binding: Binding,
     identity: super::ExternalIdentity,
@@ -163,6 +204,23 @@ pub enum Reservation {
     /// publishing a successor (§4.1: it is never reopened); the reservation
     /// marked the connection Stale.
     Consumed,
+    /// The connection's custody holds as many versions as it may retain
+    /// ([`RETAINED`]), retired ones until their deletion: nothing is reserved
+    /// and nothing may be sent.
+    Full,
+}
+
+/// What `connectors.refresh.AuthorizeExchange` decided.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Authorization {
+    /// Durable: the caller sends the one exchange.
+    Authorized,
+    /// The source generation or its binding moved, or the connection was
+    /// revoked or went Stale: the attempt is fenced and nothing may be sent.
+    Moved,
+    /// The version history filled up since the reservation: the attempt is
+    /// fenced and nothing may be sent.
+    Full,
 }
 
 pub struct PreparedRefresh {
@@ -197,8 +255,8 @@ pub enum Publication {
     Revoked,
     /// A repair replaced the source generation meanwhile.
     Superseded,
-    /// The private publication fence moved, the connection went Stale or the
-    /// candidate's evidence is no longer current.
+    /// The binding moved, the connection went Stale or the candidate's
+    /// evidence is not current.
     Refused,
 }
 
@@ -207,11 +265,9 @@ pub struct RecoveryCandidate {
     attempt: String,
     connection: String,
     source: String,
-    fence: String,
     generation: String,
     version_id: String,
     version: custody::Version,
-    acknowledged_at: u64,
     binding: Binding,
     identity: super::ExternalIdentity,
     operation_binding: Option<String>,
@@ -220,9 +276,6 @@ pub struct RecoveryCandidate {
 impl RecoveryCandidate {
     pub fn version(&self) -> custody::Version {
         self.version
-    }
-    pub fn acknowledged_at_ms(&self) -> u64 {
-        self.acknowledged_at
     }
     pub fn evidence_lifetime_ms(&self) -> u64 {
         self.binding.profile.evidence_lifetime_ms
@@ -297,11 +350,12 @@ struct Candidate<'a> {
     attempt: &'a str,
     connection: &'a str,
     source: &'a str,
-    fence: &'a str,
     generation: &'a str,
     version_id: &'a str,
     binding: &'a Binding,
     baseline: &'a ValidatedBaseline,
+    /// When the candidate's bytes were last known in custody: the store's
+    /// acknowledgement, or recovery's read of them.
     acknowledged_at: u64,
 }
 
@@ -319,7 +373,7 @@ fn publish(
         Some(Publication::Revoked)
     } else if row.generation.as_deref() != Some(candidate.source) {
         Some(Publication::Superseded)
-    } else if row.kept.stale || row.fence != candidate.fence || row.binding != *candidate.binding {
+    } else if row.kept.stale || row.binding != *candidate.binding {
         Some(Publication::Refused)
     } else {
         None
@@ -426,13 +480,15 @@ impl Registry {
                 bump(tx, &row.binding.instance_id)?;
                 return Ok(Reservation::Consumed);
             }
+            if full(tx, &row.reference)? {
+                return Ok(Reservation::Full);
+            }
             let ticket = RefreshTicket {
                 attempt: new_id(),
                 connection: row.reference.clone(),
                 owner: owner.to_owned(),
                 token: new_id(),
                 source: source.clone(),
-                fence: row.fence.clone(),
                 version: custody_version(authority, &row.scope_id, material)?,
                 binding: row.binding.clone(),
                 identity: row.identity.clone().ok_or(Failure::MetadataUnavailable)?,
@@ -444,20 +500,19 @@ impl Registry {
                 source_generation: ticket.source.clone(),
                 owner: ticket.owner.clone(),
                 token: ticket.token.clone(),
-                expected_fence: ticket.fence.clone(),
+                expected_fence: row.fence.clone(),
             });
             Ok(Reservation::Lead(Box::new(ticket)))
         })
     }
 
     /// `connectors.refresh.AuthorizeExchange`, durable before the caller may
-    /// send. `false`: the source or the private fence moved, the attempt is
-    /// fenced and nothing may be sent.
+    /// send; otherwise the attempt is fenced and nothing may be sent.
     pub(in crate::local) fn authorize_refresh(
         &self,
         ticket: &RefreshTicket,
         now: u64,
-    ) -> Result<bool> {
+    ) -> Result<Authorization> {
         self.transaction_ledger(now, |tx, _, _, ledger| {
             owned(
                 &ledger.attempt(&ticket.attempt)?,
@@ -468,9 +523,15 @@ impl Registry {
             let current = row.state != "revoked"
                 && !row.kept.stale
                 && row.generation.as_deref() == Some(ticket.source.as_str())
-                && row.fence == ticket.fence
                 && row.binding == ticket.binding;
-            ledger.stage(if current {
+            let decision = if !current {
+                Authorization::Moved
+            } else if full(tx, &row.reference)? {
+                Authorization::Full
+            } else {
+                Authorization::Authorized
+            };
+            ledger.stage(if decision == Authorization::Authorized {
                 LedgerStep::Authorize {
                     attempt: ticket.attempt.clone(),
                     owner: ticket.owner.clone(),
@@ -481,7 +542,7 @@ impl Registry {
                     attempt: ticket.attempt.clone(),
                 }
             });
-            Ok(current)
+            Ok(decision)
         })
     }
 
@@ -528,9 +589,9 @@ impl Registry {
     }
 
     /// `connectors.refresh.ReleaseRateLimited` of the caller's authorized
-    /// exchange the token endpoint refused with HTTP 429 (§4.1, the one
-    /// exception): the source may be reserved again and the connection is
-    /// left as it was.
+    /// exchange the token endpoint refused with HTTP 429, or whose transport
+    /// proved that no byte of the request left (§4.1, the two exceptions):
+    /// the source may be reserved again and the connection is left as it was.
     pub(in crate::local) fn release_refresh(&self, ticket: &RefreshTicket, now: u64) -> Result<()> {
         self.transaction_ledger(now, |tx, _, now, ledger| {
             owned(
@@ -573,7 +634,6 @@ impl Registry {
                 return Err(Failure::Revoked);
             }
             if row.generation.as_deref() != Some(ticket.source.as_str())
-                || row.fence != ticket.fence
                 || row.binding != ticket.binding
             {
                 return Err(Failure::Conflict);
@@ -581,16 +641,6 @@ impl Registry {
             baseline.validate(&row.binding, baseline.collected_at_ms, now)?;
             if row.identity.as_ref() != Some(&baseline.identity) {
                 return Err(Failure::IdentityMismatch);
-            }
-            let retained: i64 = tx
-                .query_row(
-                    "SELECT count(*) FROM registry_materials WHERE connection_ref=?1 AND deleted=0",
-                    [&row.reference],
-                    |r| r.get(0),
-                )
-                .map_err(db)?;
-            if retained >= RETAINED {
-                return Err(Failure::Capacity);
             }
             let acquisition = acquisition(&ticket.attempt);
             let (generation, version_id) = (new_id(), new_id());
@@ -640,7 +690,7 @@ impl Registry {
             let row = Self::connection(tx, &ticket.connection)?;
             if row.state == "revoked"
                 || row.generation.as_deref() != Some(ticket.source.as_str())
-                || row.fence != ticket.fence
+                || row.binding != ticket.binding
                 || prepared.version != custody_version(authority, &row.scope_id, &prepared.version_id)?
             {
                 return Err(Failure::Conflict);
@@ -703,9 +753,9 @@ impl Registry {
         }
     }
 
-    /// `connectors.refresh.PublishRefresh` under the private publication
-    /// fence: the candidate becomes the active generation and custody
-    /// version, the old version is retired. A refusal discards the candidate
+    /// `connectors.refresh.PublishRefresh`: the candidate becomes the active
+    /// generation and custody version under a new private publication fence,
+    /// the old version is retired. A refusal discards the candidate
     /// (`connectors.refresh.DiscardCandidate`).
     pub(in crate::local) fn publish_refresh(
         &self,
@@ -727,7 +777,6 @@ impl Registry {
                     attempt: &ticket.attempt,
                     connection: &ticket.connection,
                     source: &ticket.source,
-                    fence: &ticket.fence,
                     generation: &prepared.generation,
                     version_id: &prepared.version_id,
                     binding: &ticket.binding,
@@ -796,6 +845,8 @@ impl Registry {
                         .query_row("SELECT version_id,acknowledged_at_ms FROM registry_materials WHERE acquisition_ref=?1 AND generation_id=?2",
                             params![acquisition(&found.id), generation], |r| Ok((r.get(0)?, read_optional_time(r, 1)?)))
                         .map_err(db)?;
+                    // A stored response's candidate was acknowledged.
+                    acknowledged_at.ok_or(Failure::MetadataUnavailable)?;
                     let identity: String = tx
                         .query_row(
                             "SELECT expected_identity FROM registry_generations WHERE generation_id=?1",
@@ -808,10 +859,8 @@ impl Registry {
                         version: custody_version(authority, &row.scope_id, &version_id)?,
                         connection,
                         source: found.source_generation.clone(),
-                        fence: found.expected_fence.clone(),
                         generation,
                         version_id,
-                        acknowledged_at: acknowledged_at.ok_or(Failure::MetadataUnavailable)?,
                         operation_binding: row
                             .baseline
                             .as_ref()
@@ -829,8 +878,10 @@ impl Registry {
 
     /// `connectors.refresh.RecoverStoredResponse` then `PublishRefresh`, in
     /// one batch under the recovering `owner`: no request is sent. `baseline`
-    /// is the stored response's evidence; one no longer current discards the
-    /// candidate and marks the connection Stale.
+    /// is the stored response's evidence as recovery rechecked it, collected
+    /// when it read the candidate back from custody; one not current (its
+    /// access token expired) discards the candidate and marks the connection
+    /// Stale.
     pub(in crate::local) fn recover_refresh(
         &self,
         candidate: RecoveryCandidate,
@@ -858,12 +909,11 @@ impl Registry {
                     attempt: &candidate.attempt,
                     connection: &candidate.connection,
                     source: &candidate.source,
-                    fence: &candidate.fence,
                     generation: &candidate.generation,
                     version_id: &candidate.version_id,
                     binding: &candidate.binding,
                     baseline: &baseline,
-                    acknowledged_at: candidate.acknowledged_at,
+                    acknowledged_at: baseline.collected_at_ms,
                 },
                 LedgerStep::Publish {
                     attempt: candidate.attempt.clone(),
