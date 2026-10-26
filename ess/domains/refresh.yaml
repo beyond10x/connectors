@@ -219,8 +219,11 @@ commands:
   - name: connectors.refresh.ReleaseRateLimited
     # CAS with StoreResponse and QuarantineRefresh, by the live owner only: the
     # token endpoint answered the one exchange with HTTP 429, a definitive
-    # refusal that consumed no source token. The source may be reserved again;
-    # nothing else changes. No other negative response releases an exchange.
+    # refusal that consumed no source token, or the transport proved that no
+    # byte of the request left (name resolution, connection or TLS handshake
+    # failed). The name keeps the first case. The source may be reserved again;
+    # nothing else changes. No other negative response or transport failure
+    # releases an exchange.
     input:
       - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
       - {name: owner, type: String}

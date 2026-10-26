@@ -163,7 +163,7 @@ impl From<Refusal> for crate::local::owner::Error {
                     error.retry_after_seconds = retry_after_ms.map(|ms| ms.div_ceil(1000));
                     error
                 }
-                Outcome::Refreshed => Code::Unavailable.into(),
+                Outcome::Refreshed | Outcome::Unavailable => Code::Unavailable.into(),
             },
         }
     }

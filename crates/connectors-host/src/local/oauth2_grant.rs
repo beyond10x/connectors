@@ -53,6 +53,10 @@ const SLICE: Duration = Duration::from_millis(50);
 pub struct Https {
     runtime: tokio::runtime::Runtime,
     client: reqwest::Client,
+    /// The requests this transport was asked to send.
+    asked: AtomicU64,
+    /// Those that failed before any byte of them left.
+    unsent: AtomicU64,
 }
 
 impl Https {
@@ -79,12 +83,26 @@ impl Https {
             .enable_all()
             .build()
             .map_err(|_| Code::Unavailable)?;
-        Ok(Self { runtime, client })
+        Ok(Self {
+            runtime,
+            client,
+            asked: AtomicU64::new(0),
+            unsent: AtomicU64::new(0),
+        })
+    }
+
+    /// Whether a request this transport was asked to send may have reached
+    /// the server. `false` only when none was asked, or each failed while
+    /// its connection was being established (name resolution, TCP connect,
+    /// TLS handshake), before the client writes any byte of the request.
+    pub fn may_have_sent(&self) -> bool {
+        self.asked.load(Ordering::SeqCst) > self.unsent.load(Ordering::SeqCst)
     }
 }
 
 impl Transport for Https {
     fn post(&self, request: &Request<'_>) -> std::result::Result<Response, TransportError> {
+        self.asked.fetch_add(1, Ordering::SeqCst);
         let mut body = Zeroizing::new(Vec::with_capacity(request.body.len()));
         body.extend_from_slice(request.body);
         let limit = request.limit.saturating_add(1);
@@ -97,7 +115,14 @@ impl Transport for Https {
                 .body(reqwest::Body::from(axum::body::Bytes::from_owner(body)))
                 .send()
                 .await
-                .map_err(|_| TransportError)?;
+                .map_err(|error| {
+                    // A connect error is the connector's (DNS, TCP, TLS) or
+                    // the pool checkout's: the request was not written.
+                    if error.is_connect() {
+                        self.unsent.fetch_add(1, Ordering::SeqCst);
+                    }
+                    TransportError
+                })?;
             let status = response.status().as_u16();
             let retry_after = response
                 .headers()
