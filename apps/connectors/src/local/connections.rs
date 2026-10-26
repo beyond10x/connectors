@@ -198,10 +198,13 @@ pub(super) fn launch(call: &Invocation<'_>) -> Result<i32, HandlerReply> {
             owner_failure(error)
         }
     })?;
+    // An `oauth2_grant` launch's issue (consumer-launch.md §9) is refused as
+    // `connections token` is; `service_failure` and a rate-limited
+    // `unavailable` come only from that issue.
     let deadline = connectors_sdk::now_ms() + 30_000;
     let consumer = owner::Client::connect(&paths, true)
         .and_then(|client| client.launch(alias, connection, consumer, deadline))
-        .map_err(owner_failure)?;
+        .map_err(token_failure)?;
     // The consumer's entry selects which of this caller's variables pass.
     consumer
         .run(&extra, std::env::vars_os())
@@ -257,10 +260,11 @@ pub(super) fn token(
     Ok((result, issued.into_token()))
 }
 
-/// `owner_failure` of `connections token`: a refresh that needs
-/// reauthorization or whose outcome is uncertain left the connection Stale,
-/// so only a repair helps; a token endpoint's rate limit is retried
-/// explicitly after its `retry_after_seconds`.
+/// `owner_failure` of an access token issue, for `connections token` and an
+/// `oauth2_grant` launch: a refresh that needs reauthorization or whose
+/// outcome is uncertain left the connection Stale, so only a repair helps; a
+/// token endpoint's rate limit is retried explicitly after its
+/// `retry_after_seconds`.
 fn token_failure(error: owner::Error) -> HandlerReply {
     let repair = error.code == owner::Code::ServiceFailure;
     let rate_limited = error.code == owner::Code::Unavailable

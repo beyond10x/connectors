@@ -893,6 +893,7 @@ fn connected_for(server: &Server, lifetime_ms: u64) -> Connected {
             "grant_types": ["authorization_code"],
             "sources": ["https://localhost/fixture-authorization-server"],
             "state_in_exchange": false,
+            "scope_in_refresh": false,
         }))
         .unwrap(),
     );
@@ -1140,3 +1141,5 @@ fn a_full_version_history_refuses_before_any_request() {
 }
 
 mod issue;
+#[cfg(target_os = "linux")]
+mod launch;

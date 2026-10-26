@@ -23,6 +23,10 @@ pub enum Delivery {
     Revealed,
     /// [`access_token`]: the token is handed to the calling process.
     Library,
+    /// `connections launch` (story:launch-hands-an-oauth2-access-token): the
+    /// owner hands the token to the launched consumer as its credential. Only
+    /// the owner's own launch issues it; an issue request naming it is refused.
+    ConsumerLaunch,
 }
 
 impl Delivery {
@@ -32,6 +36,7 @@ impl Delivery {
             Self::MetadataOnly => "metadata_only",
             Self::Revealed => "revealed",
             Self::Library => "library",
+            Self::ConsumerLaunch => "consumer_launch",
         }
     }
     /// Whether the owner sends the token to the caller.
