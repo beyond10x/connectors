@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:chatgpt-subscription-connector
 kind: story
-status: active
+status: implemented
 title: A ChatGPT plan connects through the Codex sign-in and issues current access tokens
 relations:
 - decomposes: epic:subscription-oauth2-access
@@ -20,10 +20,11 @@ scope:
   path: apps/connectors
 - confidence: cited
   path: website/docs/connectors/chatgpt.md
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-25T21:11:56Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-10-25T21:11:56Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-26T08:39:57Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1,"review_outcome":2}}}
 ---
 ## Outcome
 

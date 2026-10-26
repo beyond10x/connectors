@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:launch-hands-an-oauth2-access-token
 kind: story
-status: active
+status: implemented
 title: connections launch gives a consumer only the current access token of an OAuth2 grant
 relations:
 - decomposes: epic:subscription-oauth2-access
@@ -13,10 +13,11 @@ scope:
   path: contracts/cli/v1alpha1/consumer-launch.md
 - confidence: cited
   path: crates/connectors-host/src/local/owner/transport.rs
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-25T21:11:56Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-25T21:11:56Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-26T08:39:57Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Outcome
 

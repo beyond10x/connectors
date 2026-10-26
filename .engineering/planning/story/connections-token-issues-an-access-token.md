@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:connections-token-issues-an-access-token
 kind: story
-status: active
+status: implemented
 title: connections token and a library call issue a current access token, printed only on request
 relations:
 - decomposes: epic:subscription-oauth2-access
@@ -23,10 +23,11 @@ scope:
   path: ess/domains/cli.yaml
 - confidence: cited
   path: website/docs/reference/cli.md
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-25T21:11:55Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"review_outcome":2}}}
 - {from: "proposed", to: "active", at: "2026-10-25T21:11:55Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":2}}}
+- {from: "active", to: "implemented", at: "2026-10-26T08:39:57Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1,"review_outcome":3}}}
 ---
 ## Outcome
 
