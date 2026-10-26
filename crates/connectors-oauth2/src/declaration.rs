@@ -179,17 +179,28 @@ impl ServerDeclaration {
                 }
             }
             RedirectKind::PastedCode => {
-                if self
+                if !self
                     .redirect_uri
                     .as_deref()
-                    .and_then(|uri| url::Url::parse(uri).ok())
-                    .is_none()
+                    .is_some_and(|uri| self.redirect_kind.admits(uri))
                 {
                     return refused;
                 }
             }
         }
         Ok(())
+    }
+}
+
+impl RedirectKind {
+    /// Whether an authorization of this kind may redirect to `uri`: a pasted
+    /// code's redirect is a remote page and HTTPS like every endpoint; only a
+    /// loopback receiver's own address is plain `http`.
+    pub(crate) fn admits(self, uri: &str) -> bool {
+        match self {
+            Self::PastedCode => is_https(uri),
+            Self::LoopbackAnyPort | Self::LoopbackFixedPort => loopback(uri).is_some(),
+        }
     }
 }
 
@@ -232,4 +243,110 @@ pub(crate) fn loopback(uri: &str) -> Option<url::Url> {
             && url.query().is_none()
             && url.fragment().is_none()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Client, Request, Response, Transport, TransportError};
+
+    struct NoTransport;
+
+    impl Transport for NoTransport {
+        fn post(&self, _request: &Request<'_>) -> Result<Response, TransportError> {
+            Err(TransportError)
+        }
+    }
+
+    fn declared(kind: &str, redirect_uri: Option<&str>) -> ServerDeclaration {
+        serde_json::from_value(serde_json::json!({
+            "authorize_url": "https://localhost/fixture/authorize",
+            "token_url": "https://localhost/fixture/token",
+            "device_authorization_url": null,
+            "client_id": "fixture-unit-client",
+            "client_kind": "public",
+            "request_encoding": "form",
+            "refresh_encoding": "form",
+            "redirect_kind": kind,
+            "redirect_uri": redirect_uri,
+            "authorize_parameters": [],
+            "requested_scopes": ["fixture.read"],
+            "required_scopes": [],
+            "rotation": "rotating",
+            "refresh_lead_seconds": 60,
+            "grant_types": ["authorization_code"],
+            "sources": [],
+            "state_in_exchange": false,
+        }))
+        .unwrap()
+    }
+
+    /// A pasted-code redirect is a remote page the server sends the browser
+    /// to with the code, so it is HTTPS like every other endpoint; the
+    /// loopback receiver's plain `http://127.0.0.1` stays the loopback kinds'
+    /// own.
+    #[test]
+    fn a_pasted_code_redirect_must_be_https() {
+        let https = "https://fixture.invalid/callback";
+        assert_eq!(declared("pasted_code", Some(https)).validate(), Ok(()));
+        for redirect in [
+            Some("http://fixture.invalid/callback"),
+            Some("http://127.0.0.1:4711/callback"),
+            Some("fixture:callback"),
+            Some("https://fixture.invalid/callback#fragment"),
+            None,
+        ] {
+            assert_eq!(
+                declared("pasted_code", redirect).validate(),
+                Err(Failure::InvalidDeclaration),
+                "{redirect:?}"
+            );
+        }
+        let loopback = "http://127.0.0.1:4711/callback";
+        assert_eq!(
+            declared("loopback_fixed_port", Some(loopback)).validate(),
+            Ok(())
+        );
+        assert_eq!(
+            declared(
+                "loopback_fixed_port",
+                Some("https://127.0.0.1:4711/callback")
+            )
+            .validate(),
+            Err(Failure::InvalidDeclaration)
+        );
+    }
+
+    /// The redirect an authorization is begun with is one the declared kind
+    /// can use: HTTPS for a pasted code, plain loopback HTTP for a receiver.
+    #[test]
+    fn begin_takes_only_a_redirect_its_kind_can_use() {
+        let https = "https://fixture.invalid/callback";
+        let loopback = "http://127.0.0.1:4711/callback";
+        let pasted = Client::new(
+            declared("pasted_code", Some(https)),
+            None,
+            None,
+            NoTransport,
+        )
+        .unwrap();
+        assert!(pasted.begin(https).is_ok());
+        for redirect in ["http://fixture.invalid/callback", loopback] {
+            assert_eq!(
+                pasted.begin(redirect).err(),
+                Some(Failure::InvalidDeclaration),
+                "{redirect}"
+            );
+        }
+        let received =
+            Client::new(declared("loopback_any_port", None), None, None, NoTransport).unwrap();
+        assert!(received.begin(loopback).is_ok());
+        for redirect in [https, "http://fixture.invalid/callback"] {
+            assert_eq!(
+                received.begin(redirect).err(),
+                Some(Failure::InvalidDeclaration),
+                "{redirect}"
+            );
+        }
+    }
 }
