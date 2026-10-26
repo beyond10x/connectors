@@ -131,7 +131,8 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "local::runtime::launch::tests::consumer_fixture"
             | "local::runtime::launch::tests::launch_runner_fixture"
             | "local::runtime::launch::tests::review_conformance::reviewing_consumer_fixture"
-            | "local::runtime::launch::tests::review_conformance::reviewing_runner_fixture" => {
+            | "local::runtime::launch::tests::review_conformance::reviewing_runner_fixture"
+            | "local::owner::refresh::tests::launch::launch_consumer_fixture" => {
                 entry.helper = true;
                 return entry;
             }
@@ -166,7 +167,10 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "local::keyring::custody::tests::disposable_registry_publication_cli_and_retirement_restart"
             | "local::owner::approval_issuance::tests::production_cli_approval_issuance_and_restart"
             | "local::approval_keys::tests::production_cli_key_journey"
-            | "local::runtime::launch::tests::disposable_consumer_launch_delivers_fd3_and_refuses_by_code" => {
+            | "local::runtime::launch::tests::disposable_consumer_launch_delivers_fd3_and_refuses_by_code"
+            | "local::owner::refresh::tests::launch::launch_oauth2_grant_hands_only_the_access_token"
+            | "local::owner::refresh::tests::launch::launch_oauth2_grant_refreshes_inside_lead_time"
+            | "local::owner::refresh::tests::launch::launch_static_profile_is_unchanged" => {
                 Some((Disposable, vec![CUSTODY, CLI]))
             }
             _ => None,

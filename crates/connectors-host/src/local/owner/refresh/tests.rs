@@ -1139,3 +1139,5 @@ fn a_full_version_history_refuses_before_any_request() {
 }
 
 mod issue;
+#[cfg(target_os = "linux")]
+mod launch;
