@@ -2,7 +2,7 @@
 title: Claude subscription
 sidebar_position: 13.7
 description: Sign your own Claude plan in once through the Claude Code sign-in, and hand a program a current access token with connections token.
-lede: One pinned instance signs in to your own Claude plan through the Claude Code sign-in, keeps the grant in your platform's secret store and issues a current access token on request, refreshing it within five minutes of its expiry.
+lede: A pinned instance per profile signs in to your own Claude plan through the Claude Code sign-in, keeps the grant in your platform's secret store and issues a current access token on request, refreshing it within five minutes of its expiry.
 source: adapters/catalog/providers/claude-subscription/connector.json, adapters/catalog/providers/claude-subscription/operations.json, adapters/catalog/providers/claude-subscription/README.md, adapters/catalog/tests/local_runtime/claude_subscription.rs, adapters/catalog/tests/local_runtime/claude_subscription_journey.rs
 connectors: "claude-subscription"
 ---
@@ -64,7 +64,7 @@ connector selects no inference operation: what you do with the access token is y
 
 Write the native configuration of the profile you use. `bundle_directory` and `operations_file`
 are absolute paths into your copy of the repository's `adapters/catalog`, and the file is mode
-`600`. For the loopback redirect:
+`600`. For the loopback redirect, `/absolute/path/claude.json`:
 
 ```json
 {
@@ -130,12 +130,14 @@ are absolute paths into your copy of the repository's `adapters/catalog`, and th
 }
 ```
 
-For the pasted code, `auth` is the profile `claude.subscription-pasted`:
+An instance serves the one profile its configuration names, so the pasted code is a second
+instance, `claude.pasted`, whose `auth` is the profile `claude.subscription-pasted`. Write it to
+`/absolute/path/claude-pasted.json`:
 
 ```json
 {
   "format": "connectors-catalog-local/2",
-  "instance": "claude.mine",
+  "instance": "claude.pasted",
   "provider": "claude-subscription",
   "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
   "api_base": "https://api.anthropic.com",
@@ -196,13 +198,16 @@ For the pasted code, `auth` is the profile `claude.subscription-pasted`:
 }
 ```
 
-Print its bootstrap for the configuration revision:
+Print each file's bootstrap for its configuration revision:
 
 ```sh
 connectors-catalog-provider --local-config /absolute/path/claude.json --print-local-bootstrap
+connectors-catalog-provider --local-config /absolute/path/claude-pasted.json --print-local-bootstrap
 ```
 
-Then pin the instance, its executable and that executable's SHA-256 in the CLI configuration:
+Then pin each instance, its executable and that executable's SHA-256 in the CLI configuration.
+Keep the table of the instance whose profile you use; `mine` permits the loopback profile and
+`pasted` the pasted code:
 
 ```toml
 [connectors.claude-subscription]
@@ -226,6 +231,25 @@ operations = ["account.profile"]
 path = "/absolute/path/connectors-catalog-provider"
 sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
 args = ["--local-config", "/absolute/path/claude.json"]
+
+[connectors.claude-subscription.instances.pasted]
+alias = "claude-pasted"
+instance_id = "claude.pasted"
+adapter_id = "catalog"
+configuration_revision = "REPLACE_FROM_BOOTSTRAP"
+protocol = "v1alpha1"
+private_protocol = "connectors-private/2"
+startup = "on-demand"
+restart = "never"
+
+[connectors.claude-subscription.instances.pasted.permissions]
+profiles = ["claude.subscription-pasted"]
+operations = ["account.profile"]
+
+[connectors.claude-subscription.instances.pasted.executable]
+path = "/absolute/path/connectors-catalog-provider"
+sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
+args = ["--local-config", "/absolute/path/claude-pasted.json"]
 ```
 
 ## Connect
@@ -237,9 +261,18 @@ connectors connections connect --connector claude-subscription --instance mine \
 
 The grant runs in the CLI process. It prints the authorization address on your terminal; open it
 in a browser on the same machine and sign in to your Claude account. The provider redirects to the
-listener on `127.0.0.1`, and Connectors exchanges the code. Under `claude.subscription-pasted`
-(`--profile claude.subscription-pasted`), the provider's page shows a `code#state` line instead;
-paste it at the hidden prompt. A line whose `state` is not the flow's own is refused.
+listener on `127.0.0.1`, and Connectors exchanges the code.
+
+For the pasted code, connect the `pasted` instance:
+
+```sh
+connectors connections connect --connector claude-subscription --instance pasted \
+  --profile claude.subscription-pasted
+```
+
+The provider's page shows a `code#state` line instead of redirecting; paste it at the hidden
+prompt. A line whose `state` is not the flow's own, or with more than one `#`, is refused. The
+commands below name `--instance mine`; use `--instance pasted` for a pasted-code connection.
 
 The connection is Live once the profile read with the new access token names the account and the
 grant holds both scopes. The tokens go into your platform's secret store only: no output, no
@@ -296,5 +329,5 @@ connection. The Claude journeys do not run it; the generic grant journey
   Connectors sends no such header, so whether `account.profile` and the identity check are
   answered without it is unknown.
 - One redirect per profile: a failed loopback sign-in does not fall back to the pasted code; run
-  `connect` again with `--profile claude.subscription-pasted`.
+  `connect` again on the `pasted` instance with `--profile claude.subscription-pasted`.
 - Pinned only: no client id ships, so the instance cannot be derived from the declaration.

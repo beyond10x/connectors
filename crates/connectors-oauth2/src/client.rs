@@ -221,10 +221,10 @@ impl<T: Transport> Client<T> {
     /// Exchanges `refresh_token` for a new access token (RFC 6749 §6), in the declaration's
     /// `refresh_encoding`. `granted_scopes` are the grant's current scopes, kept when the
     /// response omits `scope`; a response without `refresh_token` keeps the one sent. With
-    /// `scope_in_refresh` the request also carries the declared `requested_scopes`. Under a
-    /// `rotating` declaration a different refresh token replaces the one sent; under
-    /// `non_rotating` it is [`Failure::UnexpectedRotation`] and nothing of the response is
-    /// returned.
+    /// `scope_in_refresh` the request also carries the declared `requested_scopes`, and no `scope`
+    /// when none is declared. Under a `rotating` declaration a different refresh token replaces
+    /// the one sent; under `non_rotating` it is [`Failure::UnexpectedRotation`] and nothing of the
+    /// response is returned.
     pub fn refresh(
         &self,
         refresh_token: &Secret,
@@ -236,7 +236,7 @@ impl<T: Transport> Client<T> {
             ("refresh_token", refresh_token.expose()),
             ("client_id", self.client_id.as_str()),
         ];
-        if self.declaration.scope_in_refresh {
+        if self.declaration.scope_in_refresh && !scope.is_empty() {
             fields.push(("scope", scope.as_str()));
         }
         fields.extend(self.secret_field());
