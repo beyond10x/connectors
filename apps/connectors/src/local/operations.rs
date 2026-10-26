@@ -546,4 +546,75 @@ mod json_value_tests {
         assert_eq!(data["next_action"], "upgrade", "{data}");
         assert_eq!(data["binary_version"], env!("CARGO_PKG_VERSION"), "{data}");
     }
+
+    /// A connect that brings no protected source under a platform binding
+    /// whose custody is unavailable, decided from the cached description
+    /// without an owner or the adapter: a described profile that is no
+    /// public `oauth2_grant` profile lacks its source; a public grant profile
+    /// needs no source but custody; a profile with no description is not
+    /// known to need none, so it lacks its source too.
+    #[test]
+    fn a_sourceless_connect_is_decided_by_the_cached_description() {
+        let root = tempfile::tempdir().unwrap();
+        let (context, _) = configured(root.path());
+        let (config, state) = (context.config.unwrap(), context.state_dir.unwrap());
+        let absent = root.path().join("absent-secret-service.sock");
+        let text = std::fs::read_to_string(&config)
+            .unwrap()
+            .replacen(
+                "owner_uid",
+                &format!(
+                    "secret_service_socket = {}\nowner_uid",
+                    serde_json::to_string(absent.to_str().unwrap()).unwrap()
+                ),
+                1,
+            )
+            .replace("profiles=['token']", "profiles=['token','grant']");
+        std::fs::write(&config, text).unwrap();
+        let paths = Paths::resolve(Some(&config), Some(&state)).unwrap();
+        let admitted = |profile| {
+            owner::admit_sourceless_grant(&paths, "forge", Some(profile), None, None)
+                .map_err(|error| error.code)
+        };
+        let adapter = Config::load(&config).unwrap().adapters["forge"].clone();
+        let mut described = bootstrap();
+        let mut grant = described.profiles[0].clone();
+        grant.id = "grant".into();
+        grant.acquisition = Some(
+            serde_json::from_value(json!({"oauth2": {
+                "authorize_url": "https://fixture.invalid/authorize",
+                "token_url": "https://fixture.invalid/token",
+                "client_id": "fixture-unit-client",
+                "client_kind": "public",
+                "request_encoding": "form",
+                "refresh_encoding": "form",
+                "redirect_kind": "loopback_any_port",
+                "authorize_parameters": [],
+                "requested_scopes": ["fixture.read"],
+                "required_scopes": [],
+                "rotation": "rotating",
+                "refresh_lead_seconds": 60,
+                "grant_types": ["authorization_code"],
+                "sources": [],
+                "state_in_exchange": false,
+            }}))
+            .unwrap(),
+        );
+        described.profiles.push(grant);
+        runtime::state::State::new(&state)
+            .remember(&adapter.selection(), &described)
+            .unwrap();
+        assert_eq!(admitted("token"), Err(Code::ProtectedEntryUnavailable));
+        assert_eq!(admitted("grant"), Err(Code::CustodyUnavailable));
+        // A profile this adapter may not use lacks its source first.
+        assert_eq!(admitted("other"), Err(Code::ProtectedEntryUnavailable));
+        // The same instance with no description cached.
+        let renamed = std::fs::read_to_string(&config).unwrap().replace(
+            "configuration_revision='cfg-1'",
+            "configuration_revision='cfg-2'",
+        );
+        std::fs::write(&config, renamed).unwrap();
+        assert_eq!(admitted("grant"), Err(Code::ProtectedEntryUnavailable));
+        assert!(!state.join("owner.sock").exists());
+    }
 }
