@@ -908,8 +908,10 @@ pub struct LaunchAdmission {
 /// configured (`not_found`); the consumer lists the adapter (`forbidden`); its
 /// pinned image matches its digest (`invalid_configuration`); the connection is
 /// visible (`not_found`, `revoked`) and its profile granted (`forbidden`); its
-/// evidence is current (`unavailable`); custody is available
-/// (`custody_unavailable`). The binding comes from the saved connection record:
+/// evidence is current (`unavailable`; an `oauth2_grant` connection's lapsed
+/// evidence or expiring access token is admitted, the issue refreshes it);
+/// custody is available (`custody_unavailable`). The binding comes from the
+/// saved connection record:
 /// no adapter starts and no credential is read here.
 pub fn admit_launch(
     paths: &Paths,
@@ -949,14 +951,24 @@ pub fn admit_launch(
         credential_revision: adapter.credential_revision.clone(),
         executable: None,
     };
-    registry
-        .admit_read(
-            &binding,
-            connection,
-            &Default::default(),
-            connectors_sdk::now_ms(),
-        )
-        .map_err(launch_failure)?;
+    let now = connectors_sdk::now_ms();
+    match registry.admit_read(&binding, connection, &Default::default(), now) {
+        Ok(()) => {}
+        // An `oauth2_grant` launch is handed an issued access token, and the
+        // issue refreshes and republishes the evidence of a token that expires
+        // within the lead or has expired (consumer-launch.md §9): lapsed
+        // evidence and such a token are admitted. A Stale connection is not.
+        Err(registry::Failure::EvidenceExpired) if binding.profile.oauth2.is_some() => {}
+        Err(registry::Failure::NotReady)
+            if binding.profile.oauth2.is_some()
+                && registry
+                    .issuance(&binding.instance_id, &binding.adapter_id, connection, now)
+                    .is_ok_and(|issuance| {
+                        matches!(issuance, registry::Issuance::Published(published)
+                            if !published.current(now))
+                    }) => {}
+        Err(error) => return Err(launch_failure(error)),
+    }
     if !custody::available_for(&config.selection()) {
         return Err(Code::CustodyUnavailable.into());
     }

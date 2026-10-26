@@ -1986,7 +1986,12 @@ fn issue_access_token(
         if owner.shutdown.load(Ordering::SeqCst) {
             return Err(Code::Unavailable.into());
         }
-        if !document.is_empty() || deadline_ms > connectors_sdk::now_ms() + ISSUE_DEADLINE_MS {
+        // `consumer_launch` is recorded only by the owner's own launch, which
+        // hands the token to the consumer: no caller may claim it.
+        if !document.is_empty()
+            || deadline_ms > connectors_sdk::now_ms() + ISSUE_DEADLINE_MS
+            || delivery == crate::local::access_token::Delivery::ConsumerLaunch
+        {
             return Err(Code::InvalidInput.into());
         }
         until(deadline_ms)?;
@@ -2912,6 +2917,12 @@ fn reuse(
 /// is repeated, the consumer image is captured before the credential is read,
 /// and the configuration is re-read after it. The read use is held only across
 /// the delivery: the sealed copy is the consumer's from then on.
+///
+/// An `oauth2_grant` connection's consumer gets its current access token alone
+/// (story:launch-hands-an-oauth2-access-token, consumer-launch.md "OAuth2
+/// grants"): the owner issues it as `connections token` does, refreshed first
+/// inside the declaration's lead, recorded as one `AccessTokenIssue` with
+/// delivery `consumer_launch`, in place of reading the stored entry.
 fn launch(
     owner: &Owner,
     stream: &mut channel::Stream,
@@ -2924,6 +2935,52 @@ fn launch(
     let admitted = admit_launch(&owner.paths, alias, connection, consumer)?;
     let deadline = super::until(deadline_ms)?;
     let executable = admitted.consumer.executable.capture(deadline)?;
+    // The configuration, re-read after the credential is read.
+    let unchanged = || -> Result<()> {
+        let (latest_config, latest) = selected(&owner.paths, alias)?;
+        let binding = &admitted.binding;
+        if latest_config.consumers.get(consumer) != Some(&admitted.consumer)
+            || latest_config.selection() != config.selection()
+            || latest.instance_id != binding.instance_id
+            || latest.adapter_id != binding.adapter_id
+            || latest.configuration_revision != binding.configuration_revision
+        {
+            return Err(Code::LifecycleConflict.into());
+        }
+        if !latest.permissions.profiles.contains(&binding.profile.id) {
+            return Err(Code::Forbidden.into());
+        }
+        Ok(())
+    };
+    let deliver = |stream: &mut channel::Stream, credential: &File| -> Result<()> {
+        channel::write(
+            stream,
+            &Reply::Launch {
+                args: admitted.consumer.executable.args.clone(),
+                pass_env: admitted.consumer.pass_env.clone(),
+            },
+            None,
+            &[],
+            deadline,
+        )?;
+        runtime::launch::send(stream, &[&executable, credential], deadline)?;
+        Ok(())
+    };
+    if admitted.binding.profile.oauth2.is_some() {
+        let issued = super::issue_access_token(
+            &owner.paths,
+            &owner.incarnation,
+            alias,
+            connection,
+            crate::local::access_token::Delivery::ConsumerLaunch,
+            deadline_ms,
+        )?;
+        unchanged()?;
+        let credential = runtime::launch::sealed(issued.token.expose().as_bytes())?;
+        drop(issued);
+        deliver(stream, &credential)?;
+        return Ok(json!({}));
+    }
     let registry = registry::Registry::with_system_clock(&owner.paths.state);
     let captured = registry
         .capture_read(
@@ -2952,23 +3009,7 @@ fn launch(
             return Err(super::read_error(&selection, error));
         }
     };
-    let checked: Result<()> = (|| {
-        let (latest_config, latest) = selected(&owner.paths, alias)?;
-        let binding = &admitted.binding;
-        if latest_config.consumers.get(consumer) != Some(&admitted.consumer)
-            || latest_config.selection() != config.selection()
-            || latest.instance_id != binding.instance_id
-            || latest.adapter_id != binding.adapter_id
-            || latest.configuration_revision != binding.configuration_revision
-        {
-            return Err(Code::LifecycleConflict.into());
-        }
-        if !latest.permissions.profiles.contains(&binding.profile.id) {
-            return Err(Code::Forbidden.into());
-        }
-        Ok(())
-    })();
-    if let Err(error) = checked {
+    if let Err(error) = unchanged() {
         registry.cancel_read(captured, connectors_sdk::now_ms())?;
         return Err(error);
     }
@@ -2978,18 +3019,7 @@ fn launch(
     let delivered: Result<()> = (|| {
         let credential = runtime::launch::sealed(&material.0)?;
         drop(material);
-        channel::write(
-            stream,
-            &Reply::Launch {
-                args: admitted.consumer.executable.args.clone(),
-                pass_env: admitted.consumer.pass_env.clone(),
-            },
-            None,
-            &[],
-            deadline,
-        )?;
-        runtime::launch::send(stream, &[&executable, &credential], deadline)?;
-        Ok(())
+        deliver(stream, &credential)
     })();
     registry.release_read(dispatched, connectors_sdk::now_ms())?;
     delivered?;
