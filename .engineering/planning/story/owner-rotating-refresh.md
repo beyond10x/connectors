@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:owner-rotating-refresh
 kind: story
-status: active
+status: implemented
 title: The owner refreshes a rotating OAuth2 grant once per token and publishes a new generation
 relations:
 - decomposes: epic:subscription-oauth2-access
@@ -18,10 +18,11 @@ scope:
   path: crates/connectors-host/Cargo.toml
 - confidence: inferred
   path: crates/connectors-host/src/local/owner
-revision: 7
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-25T21:11:55Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":4}}}
 - {from: "proposed", to: "active", at: "2026-10-25T21:11:55Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":4}}}
+- {from: "active", to: "implemented", at: "2026-10-26T05:11:17Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1,"review_outcome":5}}}
 ---
 ## Outcome
 
