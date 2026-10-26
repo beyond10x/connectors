@@ -322,6 +322,7 @@ connectors connections connect [OPTIONS] --profile <field:profile>
 | `--connector <field:connector>` | no | none | any |  |
 | `--instance <field:instance>` | no | none | any |  |
 | `--profile <field:profile>` | yes | none | any |  |
+| `--device <field:device>` | no | none | any |  |
 | `--credential-file <source:credential_document:file>` | no | none | any |  |
 | `--credential-stdin` | no | `false` | any |  |
 | `--credential-prompt` | no | `false` | any |  |
@@ -389,6 +390,7 @@ connectors connections reconnect [OPTIONS] --expected-revision <field:expected_r
 | `--instance <field:instance>` | no | none | any |  |
 | `--connection <field:connection>` | no | none | any |  |
 | `--expected-revision <field:expected_revision>` | yes | none | any |  |
+| `--device <field:device>` | no | none | any |  |
 | `--credential-file <source:credential_document:file>` | no | none | any |  |
 | `--credential-stdin` | no | `false` | any |  |
 | `--credential-prompt` | no | `false` | any |  |
@@ -408,6 +410,7 @@ connectors connections repair [OPTIONS] --expected-revision <field:expected_revi
 | `--instance <field:instance>` | no | none | any |  |
 | `--connection <field:connection>` | no | none | any |  |
 | `--expected-revision <field:expected_revision>` | yes | none | any |  |
+| `--device <field:device>` | no | none | any |  |
 | `--credential-file <source:credential_document:file>` | no | none | any |  |
 | `--credential-stdin` | no | `false` | any |  |
 | `--credential-prompt` | no | `false` | any |  |

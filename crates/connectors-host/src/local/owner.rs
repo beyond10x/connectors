@@ -1014,6 +1014,15 @@ pub fn connection_value(alias: &str, value: registry::ObservedConnection) -> Val
     if let Some(binding) = value.binding {
         described["binding"] = json!(binding);
     }
+    // Named only for an `oauth2_grant` connection: what its grant granted and
+    // until when its access token is valid, never the token
+    // (`connectors.cli.ConnectionDescription.granted_scopes`).
+    if let Some(scopes) = value.granted_scopes {
+        described["granted_scopes"] = json!(scopes);
+    }
+    if let Some(expires_at_ms) = value.credential_expires_at_ms {
+        described["credential_expires_at_ms"] = json!(expires_at_ms);
+    }
     described
 }
 
@@ -1035,6 +1044,13 @@ enum Request {
         profile: Option<String>,
         connection: Option<String>,
         expected_revision: Option<String>,
+        /// The caller holds no protected source and runs the profile's OAuth2
+        /// grant itself (story:connect-runs-an-oauth2-grant): only an
+        /// `oauth2_grant` profile of a public client is begun, anything else is
+        /// `protected_entry_unavailable` before the registry is written.
+        /// Omitted when false, so every other request keeps its bytes.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        grant: bool,
     },
     Complete,
     /// story:invoke-definition-reuse-credential: a new connection of `adapter`
@@ -1143,7 +1159,7 @@ enum Reply {
     Capture {
         acquisition: String,
         expires_at_ms: u64,
-        profile: runtime::Profile,
+        profile: Box<runtime::Profile>,
     },
     /// The admitted consumer's pinned argv prefix after argv\[0\], and the
     /// environment name prefixes its entry passes.

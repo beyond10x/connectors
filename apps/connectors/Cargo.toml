@@ -13,6 +13,7 @@ connectors-core.workspace = true
 connectors-sdk.workspace = true
 connectors-client.workspace = true
 connectors-host.workspace = true
+connectors-oauth2.workspace = true
 connectors-mcp = { path = "../../adapters/mcp/runtime" }
 connectors_cli_contract.workspace = true
 clap.workspace = true
@@ -33,6 +34,7 @@ rusqlite = { version = "=0.40.2", features = ["bundled"] }
 sha2.workspace = true
 ring = "=0.17.14"
 tempfile.workspace = true
+zeroize.workspace = true
 toml = "1.1"
 connectors-host = { workspace = true, features = ["test-support"] }
 

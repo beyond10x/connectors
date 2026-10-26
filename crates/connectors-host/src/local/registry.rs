@@ -140,6 +140,11 @@ pub struct StaticProfile {
     /// difference (`same_authentication`). `None` on a recorded profile.
     #[serde(skip)]
     pub declaration: Option<serde_json::Value>,
+    /// The authorization server of an `oauth2_grant` profile, recorded with
+    /// the profile record (`connectors.oauth2.DeclareAuthorizationServer`).
+    /// Omitted for every other profile, so its record keeps its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oauth2: Option<connectors_oauth2::ServerDeclaration>,
 }
 impl PartialEq for StaticProfile {
     fn eq(&self, other: &Self) -> bool {
@@ -149,6 +154,7 @@ impl PartialEq for StaticProfile {
             && self.subject == other.subject
             && self.minimum_scopes == other.minimum_scopes
             && self.evidence_lifetime_ms == other.evidence_lifetime_ms
+            && self.oauth2 == other.oauth2
     }
 }
 impl Eq for StaticProfile {}
@@ -324,6 +330,7 @@ pub(super) fn fixture_binding(instance: &str) -> Binding {
             minimum_scopes: BTreeSet::new(),
             evidence_lifetime_ms: 60_000,
             declaration: None,
+            oauth2: None,
         },
         credential_revision: None,
         executable: None,

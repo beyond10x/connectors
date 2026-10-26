@@ -290,6 +290,14 @@ fn description(alias: &str, connection: &ObservedConnection) -> Value {
     if let Some(identity) = &connection.identity {
         value["external_identity"] = json!(identity);
     }
+    // An `oauth2_grant` connection names what its grant granted and until when
+    // its access token is valid, never the token.
+    if let Some(scopes) = &connection.granted_scopes {
+        value["granted_scopes"] = json!(scopes);
+    }
+    if let Some(expires_at_ms) = connection.credential_expires_at_ms {
+        value["credential_expires_at_ms"] = json!(expires_at_ms);
+    }
     value
 }
 pub(super) fn registry_failure(error: registry::Failure) -> HandlerReply {

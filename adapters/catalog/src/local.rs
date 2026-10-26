@@ -197,6 +197,13 @@ enum Scheme {
     /// `Authorization: Bearer`; no refresh token exists.
     #[serde(rename = "oauth2_client_credentials")]
     OAuth2ClientCredentials,
+    /// The CLI runs the grant `oauth2` declares and stores
+    /// `{"client_id","access_token","refresh_token","expires_at_ms","scopes","id_token"}`;
+    /// the access token is sent as `Authorization: Bearer`, and validation
+    /// never calls the token endpoint
+    /// (`architecture-decision-record:oauth2-grants-and-access-token-issue`).
+    #[serde(rename = "oauth2_grant")]
+    OAuth2Grant,
 }
 impl Scheme {
     fn is_token(&self) -> bool {
@@ -255,6 +262,11 @@ struct AuthConfig {
     /// The scopes requested at consent. `scopes` is the granted-scope probe.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     requested_scopes: BTreeSet<String>,
+    /// The authorization server of an `oauth2_grant` profile
+    /// (`connectors.oauth2.ServerDeclaration`), and of no other scheme. Omitted
+    /// otherwise, so existing configuration revisions hold.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    oauth2: Option<connectors_oauth2::ServerDeclaration>,
 }
 fn default_evidence_lifetime() -> u64 {
     60_000
@@ -294,6 +306,11 @@ struct Configuration {
     /// without it keeps its revision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     bindings: Option<BindingsConfig>,
+    /// The client id registered for this instance, for an `oauth2_grant`
+    /// profile whose declaration names none. Given beside one, it must be the
+    /// same. Omitted when absent, so existing configuration revisions hold.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    oauth2_client_id: Option<String>,
 }
 
 /// One origin a connection admits besides its API base
@@ -549,6 +566,7 @@ fn derived(instance: &Instance<'_>) -> Result<(Configuration, Sources)> {
         operations: Vec::new(),
         operations_file: None,
         bindings: None,
+        oauth2_client_id: None,
     };
     let sources = Sources {
         bundle,
@@ -646,6 +664,83 @@ struct ClientEntry {
     client_id: Zeroizing<String>,
     #[serde(deserialize_with = "token")]
     client_secret: Zeroizing<String>,
+}
+/// The `oauth2_grant` profile's protected entry, as the CLI's grant wrote it.
+/// The tokens follow the token rules; the scopes are what the server granted.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GrantEntry {
+    #[serde(deserialize_with = "token")]
+    client_id: Zeroizing<String>,
+    #[serde(deserialize_with = "token")]
+    access_token: Zeroizing<String>,
+    /// Absent when the server issued none. Validation never refreshes, so
+    /// only its form is checked here.
+    #[serde(default, rename = "refresh_token", deserialize_with = "optional_token")]
+    _refresh_token: Option<Zeroizing<String>>,
+    expires_at_ms: u64,
+    scopes: BTreeSet<String>,
+    /// The OpenID Connect `id_token` the token endpoint returned, when it did.
+    #[serde(default, deserialize_with = "optional_token")]
+    id_token: Option<Zeroizing<String>>,
+}
+/// An `id_token`'s audience: one client id or several (OpenID Connect Core
+/// §2).
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Audience {
+    One(String),
+    Many(Vec<String>),
+}
+/// The claims of an `oauth2_grant` entry's `id_token` this profile reads.
+#[derive(Deserialize)]
+struct GrantClaims {
+    aud: Audience,
+    #[serde(default)]
+    azp: Option<String>,
+    sub: String,
+    exp: u64,
+    #[serde(default)]
+    iat: Option<u64>,
+}
+/// The subject of an `oauth2_grant` entry's `id_token`. The CLI received it
+/// directly from the token endpoint over TLS, which OpenID Connect Core 1.0
+/// §3.1.3.7 item 6 accepts in place of its signature; it must be issued to
+/// `client_id` (items 3 to 5), not expired (item 9) and not issued ahead of
+/// this clock.
+fn grant_subject(id_token: &str, client_id: &str) -> Result<String> {
+    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+    let mut parts = id_token.split('.');
+    let (Some(_), Some(payload), Some(_), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return Err(Failure::InvalidCredential);
+    };
+    let payload = URL_SAFE_NO_PAD
+        .decode(payload.trim_end_matches('='))
+        .map_err(|_| Failure::InvalidCredential)?;
+    let claims: GrantClaims =
+        serde_json::from_slice(&payload).map_err(|_| Failure::InvalidCredential)?;
+    let now = connectors_sdk::now_ms() / 1000;
+    let audience = match &claims.aud {
+        Audience::One(one) => one == client_id,
+        Audience::Many(many) => {
+            many.iter().any(|aud| aud == client_id)
+                && (many.len() == 1 || claims.azp.as_deref() == Some(client_id))
+        }
+    };
+    if !audience
+        || claims.azp.as_deref().is_some_and(|azp| azp != client_id)
+        || claims.exp <= now
+        || claims
+            .iat
+            .is_some_and(|iat| iat > now.saturating_add(ISSUED_AT_SKEW_S))
+        || claims.sub.is_empty()
+        || claims.sub.len() > 256
+    {
+        return Err(Failure::InvalidCredential);
+    }
+    Ok(claims.sub)
 }
 /// The stored entry of either OAuth scheme, as the grant it makes.
 enum Grant {
@@ -974,6 +1069,38 @@ fn valid_scopes(scopes: &BTreeSet<String>) -> bool {
             .iter()
             .all(|s| !s.is_empty() && s.len() <= 256 && s.bytes().all(|b| b.is_ascii_graphic()))
 }
+/// An `oauth2_grant` profile's client id: the declaration's, else the one the
+/// instance's configuration registers. Given both, they must be the same;
+/// given neither, there is no client to run the grant as. Each is 1 to 256
+/// visible ASCII bytes.
+fn grant_client_id(declared: Option<&str>, configured: Option<&str>) -> Result<String> {
+    let usable =
+        |id: &str| (1..=256).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_graphic());
+    match (declared, configured) {
+        (Some(id), None) | (None, Some(id)) if usable(id) => Ok(id.to_owned()),
+        (Some(declared), Some(configured)) if declared == configured && usable(declared) => {
+            Ok(declared.to_owned())
+        }
+        _ => Err(Failure::InvalidConfiguration),
+    }
+}
+/// A declaration the CLI can run: valid (HTTPS endpoints, the endpoint each
+/// declared grant needs), declaring at least one grant, each grant once, and
+/// requesting and requiring bounded scope words.
+fn usable_declaration(declaration: &connectors_oauth2::ServerDeclaration) -> bool {
+    let words = |scopes: &[String]| {
+        scopes.len() <= 64
+            && scopes.iter().all(|scope| {
+                (1..=256).contains(&scope.len()) && scope.bytes().all(|b| b.is_ascii_graphic())
+            })
+    };
+    let grants: BTreeSet<_> = declaration.grant_types.iter().map(|g| g.as_str()).collect();
+    declaration.validate().is_ok()
+        && !grants.is_empty()
+        && grants.len() == declaration.grant_types.len()
+        && words(&declaration.requested_scopes)
+        && words(&declaration.required_scopes)
+}
 /// A granted scope set is split on whitespace, so an entry that is empty or
 /// holds whitespace could never be granted.
 fn grantable(scopes: &BTreeSet<String>) -> bool {
@@ -1054,8 +1181,23 @@ impl Local {
     }
     /// `shipped` carries the compiled-in bundle and selection of a derived
     /// configuration; without it they are read from the configuration's paths.
-    fn configure(config: Configuration, shipped: Option<Sources>) -> Result<Self> {
+    fn configure(mut config: Configuration, shipped: Option<Sources>) -> Result<Self> {
         let oauth = config.auth.scheme.is_oauth();
+        // The declaration belongs to `oauth2_grant` alone, which needs one,
+        // and its client id is resolved before anything digests it.
+        let grant = config.auth.scheme == Scheme::OAuth2Grant;
+        if config.auth.oauth2.is_some() != grant || (!grant && config.oauth2_client_id.is_some()) {
+            return Err(Failure::InvalidConfiguration);
+        }
+        if let Some(declaration) = &mut config.auth.oauth2 {
+            declaration.client_id = Some(grant_client_id(
+                declaration.client_id.as_deref(),
+                config.oauth2_client_id.as_deref(),
+            )?);
+            if !usable_declaration(declaration) {
+                return Err(Failure::InvalidConfiguration);
+            }
+        }
         let identity = &config.auth.identity;
         if config.format != FORMAT
             || !connectors_core::valid_id(&config.instance)
@@ -1075,12 +1217,14 @@ impl Local {
                         .as_deref()
                         .is_none_or(|p| segments(p).is_empty())
                         || identity.subject_pointer.is_none()
-                        || (config.auth.scopes.is_none() && !config.auth.minimum_scopes.is_empty())
+                        || (config.auth.scopes.is_none()
+                            && !config.auth.minimum_scopes.is_empty()
+                            && !grant)
                 }
                 // The token response names the subject and its scopes; an API
                 // probe beside it would be read by nobody.
                 IdentitySource::IdToken => {
-                    config.auth.scheme != Scheme::OAuth2Refresh
+                    !matches!(config.auth.scheme, Scheme::OAuth2Refresh | Scheme::OAuth2Grant)
                         || identity.path.is_some()
                         || identity.subject_pointer.is_some()
                         || config.auth.scopes.is_some()
@@ -1093,6 +1237,7 @@ impl Local {
                 // (`connectors_catalog.identity.Profile`).
                 IdentitySource::Configuration => {
                     config.auth.scheme.is_oauth()
+                        || grant
                         || identity
                             .path
                             .as_deref()
@@ -1101,6 +1246,9 @@ impl Local {
                         || (config.auth.scopes.is_none() && !config.auth.minimum_scopes.is_empty())
                 }
             }
+            // A grant entry names the scopes it was granted; a scope read
+            // beside it would be read by nobody.
+            || (grant && config.auth.scopes.is_some())
             || config
                 .auth
                 .scopes
@@ -1148,6 +1296,12 @@ impl Local {
                         || config.auth.token_url.is_none()
                         || config.auth.authorize_url.is_some()
                         || !valid_scopes(&config.auth.requested_scopes)
+                }
+                // Its endpoints and scopes are the declaration's.
+                Scheme::OAuth2Grant => {
+                    !config.auth.header.eq_ignore_ascii_case("authorization")
+                        || !config.auth.bearer
+                        || config.auth.account_label.is_some()
                 }
             }
             || (!oauth
@@ -1230,13 +1384,17 @@ impl Local {
                 return Err(Failure::InvalidConfiguration);
             };
             https_url(authorize_url)?;
-            Some(Acquisition {
+            Some(Acquisition::Consent(runtime::Consent {
                 authorize_url: authorize_url.clone(),
                 token_url: token_url.clone(),
                 scopes: config.auth.requested_scopes.clone(),
-            })
+            }))
         } else {
-            None
+            config
+                .auth
+                .oauth2
+                .clone()
+                .map(|oauth2| Acquisition::Grant(runtime::Grant { oauth2 }))
         };
         let token_client = match &config.auth.token_url {
             Some(token_url) => {
@@ -1473,6 +1631,14 @@ impl Local {
                     field("client_secret", &config.auth.label, 8192),
                 ],
             ),
+            // The CLI runs the grant and writes the entry; what a person
+            // enters is a confidential client's secret, which a public client
+            // has none of.
+            (Scheme::OAuth2Grant, _) => (
+                "http_bearer",
+                "http-bearer",
+                vec![field("client_secret", "OAuth client secret", 8192)],
+            ),
             _ => (
                 "http_bearer",
                 "http-bearer",
@@ -1692,9 +1858,16 @@ impl Local {
             Scheme::OAuth2ClientCredentials => Grant::ClientCredentials(
                 serde_json::from_slice(&document).map_err(|_| Failure::InvalidInput)?,
             ),
-            Scheme::Token | Scheme::Basic => return Err(Failure::InvalidConfiguration),
+            Scheme::Token | Scheme::Basic | Scheme::OAuth2Grant => {
+                return Err(Failure::InvalidConfiguration);
+            }
         };
         Ok((oauth, grant, Sha256::digest(document.as_slice()).into()))
+    }
+    /// An `oauth2_grant` profile's entry.
+    fn grant_entry(document: Secret) -> Result<GrantEntry> {
+        let document = Self::document(document)?;
+        serde_json::from_slice(&document).map_err(|_| Failure::InvalidInput)
     }
     /// The credential value a request carries, derived from the protected
     /// document (the token, the basic header value or an OAuth access token),
@@ -1724,6 +1897,15 @@ impl Local {
                 let entry: BasicEntry =
                     serde_json::from_slice(&document).map_err(|_| Failure::InvalidInput)?;
                 basic_header(&entry)?
+            }
+            // The stored access token, until the expiry the grant recorded;
+            // nothing here refreshes it.
+            Scheme::OAuth2Grant => {
+                let entry = Self::grant_entry(document)?;
+                if entry.expires_at_ms <= connectors_sdk::now_ms() {
+                    return Err(Failure::InvalidCredential);
+                }
+                Secret(entry.access_token.as_bytes().to_vec())
             }
             Scheme::OAuth2Refresh | Scheme::OAuth2ClientCredentials => {
                 let (oauth, grant, key) = self.oauth_entry(document)?;
@@ -1934,6 +2116,9 @@ impl Local {
             return Err(Failure::Unsupported.into());
         }
         let collected_at_ms = connectors_sdk::now_ms();
+        if self.auth.scheme == Scheme::OAuth2Grant {
+            return self.validate_grant(document, collected_at_ms).await;
+        }
         if !self.auth.scheme.is_oauth() {
             let (credential, _) = self.credential(document).await?;
             let derived = Zeroizing::new(credential.0.clone());
@@ -1983,6 +2168,66 @@ impl Local {
                 .map_err(|refusal: &runtime::Refusal| refusal.failure),
         );
         result
+    }
+    /// An `oauth2_grant` entry, proved without refreshing it: issued to this
+    /// profile's client and not expired, holding the minimum and the required
+    /// scopes, and naming its holder by its `id_token` or by the identity read
+    /// with its access token. The entry's scopes and expiry are the evidence's.
+    async fn validate_grant(
+        &self,
+        document: Secret,
+        collected_at_ms: u64,
+    ) -> std::result::Result<Baseline, runtime::Refusal> {
+        let declaration = self
+            .auth
+            .oauth2
+            .as_ref()
+            .ok_or(Failure::InvalidConfiguration)?;
+        let entry = Self::grant_entry(document)?;
+        if entry.scopes.len() > 64
+            || entry.scopes.iter().any(|scope| {
+                scope.is_empty()
+                    || scope.len() > 256
+                    || !scope.bytes().all(|b| b.is_ascii_graphic())
+            })
+        {
+            return Err(Failure::InvalidInput.into());
+        }
+        if declaration.client_id.as_deref() != Some(entry.client_id.as_str())
+            || entry.expires_at_ms <= collected_at_ms
+        {
+            return Err(Failure::InvalidCredential.into());
+        }
+        if !self.auth.minimum_scopes.is_subset(&entry.scopes)
+            || declaration
+                .required_scopes
+                .iter()
+                .any(|scope| !entry.scopes.contains(scope))
+        {
+            return Err(Failure::InsufficientScope.into());
+        }
+        let mut baseline = match self.auth.identity.source {
+            IdentitySource::IdToken => {
+                let id_token = entry
+                    .id_token
+                    .as_deref()
+                    .ok_or(Failure::InvalidCredential)?;
+                let subject = grant_subject(id_token, &entry.client_id)?;
+                self.baseline(subject, None, collected_at_ms, None)?
+            }
+            IdentitySource::Api => {
+                let derived = Zeroizing::new(entry.access_token.as_bytes().to_vec());
+                let http = self.with(Secret(derived.to_vec()));
+                self.probe_identity(&http, &derived, collected_at_ms)
+                    .await?
+            }
+            // Refused at load; never reached.
+            IdentitySource::Configuration => return Err(Failure::InvalidConfiguration.into()),
+        };
+        baseline.granted_scopes = Some(entry.scopes.clone());
+        baseline.credential_expires_at_ms = Some(entry.expires_at_ms);
+        baseline.valid_until_ms = baseline.valid_until_ms.min(entry.expires_at_ms);
+        Ok(baseline)
     }
     /// The engine of `binding`: the first binding's for none and for the
     /// first, an alternative's for that alternative. The server has checked

@@ -440,11 +440,34 @@ impl Client {
         })
     }
     pub fn begin(
+        self,
+        adapter: &str,
+        profile: Option<String>,
+        connection: Option<String>,
+        expected_revision: Option<String>,
+    ) -> Result<Capture> {
+        self.begin_capture(adapter, profile, connection, expected_revision, false)
+    }
+    /// Begins the capture of a caller that holds no protected source and runs
+    /// the profile's OAuth2 grant itself: the owner begins it only for an
+    /// `oauth2_grant` profile of a public client
+    /// (story:connect-runs-an-oauth2-grant).
+    pub fn begin_grant(
+        self,
+        adapter: &str,
+        profile: Option<String>,
+        connection: Option<String>,
+        expected_revision: Option<String>,
+    ) -> Result<Capture> {
+        self.begin_capture(adapter, profile, connection, expected_revision, true)
+    }
+    fn begin_capture(
         mut self,
         adapter: &str,
         profile: Option<String>,
         connection: Option<String>,
         expected_revision: Option<String>,
+        grant: bool,
     ) -> Result<Capture> {
         self.same_build()?;
         let deadline = Instant::now() + Duration::from_secs(40);
@@ -455,6 +478,7 @@ impl Client {
                 profile,
                 connection,
                 expected_revision,
+                grant,
             },
             None,
             &[],
@@ -474,7 +498,7 @@ impl Client {
                     client: self,
                     acquisition,
                     expires_at_ms,
-                    profile,
+                    profile: *profile,
                 })
             }
             Reply::Failed { error } => Err(error),
@@ -2068,6 +2092,7 @@ fn action(
             profile,
             connection,
             expected_revision,
+            grant,
             ..
         } => {
             if !document.is_empty() {
@@ -2145,6 +2170,20 @@ fn action(
             if selection.read_only() && bootstrap.profile(&profile)?.acquisition.is_some() {
                 return Err(Code::CustodyReadOnly.into());
             }
+            // A caller without a protected source runs the grant of an
+            // `oauth2_grant` profile of a public client itself; any other profile
+            // needs the source it did not bring, refused before the registry is
+            // written (story:connect-runs-an-oauth2-grant).
+            if grant
+                && bootstrap
+                    .profile(&profile)?
+                    .grant()
+                    .is_none_or(|declaration| {
+                        declaration.client_kind != connectors_oauth2::ClientKind::Public
+                    })
+            {
+                return Err(Code::ProtectedEntryUnavailable.into());
+            }
             let now = connectors_sdk::now_ms();
             let acquired = match connection {
                 Some(reference) => registry.begin_repair(
@@ -2163,7 +2202,7 @@ fn action(
                     &Reply::Capture {
                         acquisition: reference.clone(),
                         expires_at_ms: expiry,
-                        profile: bootstrap.profile(&profile)?.clone(),
+                        profile: Box::new(bootstrap.profile(&profile)?.clone()),
                     },
                     None,
                     &[],

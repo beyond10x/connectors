@@ -1051,7 +1051,9 @@ fn reuse(
 
 /// `connections connect` of the instance under `profile`, with its protected
 /// entry from the terminal, or from `file` (an OAuth client file becomes the
-/// entry by consent, as for `connections connect --credential-file`); under
+/// entry by consent, as for `connections connect --credential-file`; an
+/// `oauth2_grant` profile's grant runs, with a confidential client's secret
+/// from either source); under
 /// the read-only binding the owner reads the item itself. Answers the
 /// published connection. The answer was given for the entry `adapter`: one
 /// another run recorded over it meanwhile is a conflict to retry, refused
@@ -1080,10 +1082,23 @@ fn connect(
         capture.complete_mounted()
     } else {
         let (acquisition, expires_at_ms) = (capture.acquisition.clone(), capture.expires_at_ms);
-        let secret = match file {
-            Some(path) => protected::file(path, expires_at_ms)
+        // An `oauth2_grant` profile runs its grant here: a public client takes
+        // no source, a confidential one its secret from the file or terminal.
+        let grant = capture
+            .profile
+            .grant()
+            .map(|declaration| declaration.client_kind);
+        let secret = match (file, grant) {
+            (None, Some(connectors_oauth2::ClientKind::Public)) => {
+                super::dialects::granted(&capture, None, false)
+            }
+            (Some(path), Some(_)) => protected::file(path, expires_at_ms)
+                .and_then(|document| super::dialects::granted(&capture, Some(document), false)),
+            (None, Some(_)) => protected::terminal(&capture.profile.fields, expires_at_ms)
+                .and_then(|document| super::dialects::granted(&capture, Some(document), false)),
+            (Some(path), None) => protected::file(path, expires_at_ms)
                 .and_then(|document| oauth::entry(&capture.profile, document, expires_at_ms)),
-            None => protected::terminal(&capture.profile.fields, expires_at_ms),
+            (None, None) => protected::terminal(&capture.profile.fields, expires_at_ms),
         }
         .map_err(|mut error| {
             error.acquisition = Some(acquisition);

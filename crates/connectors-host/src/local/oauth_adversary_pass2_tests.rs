@@ -8,7 +8,7 @@
 //! "the flow returned" apart from "the process exited".
 use super::{
     oauth, registry,
-    runtime::{Acquisition, EntryField, Profile},
+    runtime::{Acquisition, Consent, EntryField, Profile},
 };
 use connectors_sdk::Secret;
 #[cfg(unix)]
@@ -53,11 +53,11 @@ fn profile(token: &str) -> Profile {
                 max_bytes: 8192,
             })
             .collect(),
-        acquisition: Some(Acquisition {
+        acquisition: Some(Acquisition::Consent(Consent {
             authorize_url: AUTHORIZE.into(),
             token_url: token.into(),
             scopes: ["https://www.googleapis.com/auth/drive.readonly".to_owned()].into(),
-        }),
+        })),
     }
 }
 

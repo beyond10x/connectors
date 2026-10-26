@@ -1511,7 +1511,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__connections__subcmd__connect)
-            opts="-h --adapter --connector --instance --profile --credential-file --credential-stdin --credential-prompt --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --profile --device --credential-file --credential-stdin --credential-prompt --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1530,6 +1530,10 @@ _connectors() {
                     return 0
                     ;;
                 --profile)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --device)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1849,7 +1853,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__connections__subcmd__reconnect)
-            opts="-h --adapter --connector --instance --connection --expected-revision --credential-file --credential-stdin --credential-prompt --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --connection --expected-revision --device --credential-file --credential-stdin --credential-prompt --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1872,6 +1876,10 @@ _connectors() {
                     return 0
                     ;;
                 --expected-revision)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --device)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1899,7 +1907,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__connections__subcmd__repair)
-            opts="-h --adapter --connector --instance --connection --expected-revision --credential-file --credential-stdin --credential-prompt --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --connection --expected-revision --device --credential-file --credential-stdin --credential-prompt --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1922,6 +1930,10 @@ _connectors() {
                     return 0
                     ;;
                 --expected-revision)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --device)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
