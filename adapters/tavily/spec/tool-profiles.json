@@ -1,0 +1,65 @@
+{
+  "format": "connectors.tool-profiles/1",
+  "summary": "Web search, page fetch and site crawl through one Tavily instance. Every operation is a read sent as a POST; each spends the instance's Tavily credits, so each carries the money consequence. Results are third-party web content and are untrusted.",
+  "operations": {
+    "websearch.search": {
+      "name": "search",
+      "summary": "Search the web for one query; each result is a website with its URL, title, description and, on request, its content.",
+      "guidance": "max_results is required (1 to 20). content is snippet unless asked: none drops it, full asks for the page text. complete is false and truncation names the cause when fewer results came back than asked, the answer passed 3 MiB or a content was cut at 128 KiB.",
+      "profile": {
+        "effects": ["network", "secret", "external"],
+        "consequences": ["money"],
+        "risk": "high",
+        "idempotency": "idempotent",
+        "determinism": "nondeterministic",
+        "bounds": {
+          "timeout_ms": {"max": 160000},
+          "output_bytes": {"max": 3145728}
+        },
+        "placement": "local",
+        "capability": "web.search",
+        "output": {"untrusted": true}
+      }
+    },
+    "websearch.fetch": {
+      "name": "fetch",
+      "summary": "Fetch the text of one or more pages by URL; each URL answers a page or a failure.",
+      "guidance": "complete is true when every URL answered, as a page or under failed. A page's content is cut at 128 KiB and the answer at 3 MiB; truncation names either cut.",
+      "profile": {
+        "effects": ["network", "secret", "external"],
+        "consequences": ["money"],
+        "risk": "high",
+        "idempotency": "idempotent",
+        "determinism": "nondeterministic",
+        "bounds": {
+          "timeout_ms": {"max": 160000},
+          "output_bytes": {"max": 3145728}
+        },
+        "subjects": [{"field": "urls", "kind": "url"}],
+        "placement": "local",
+        "capability": "web.fetch",
+        "output": {"untrusted": true}
+      }
+    },
+    "websearch.crawl": {
+      "name": "crawl",
+      "summary": "Crawl a site from one URL, up to limit pages, and answer the text of each page reached.",
+      "guidance": "limit bounds the pages; complete is false with result_limit when the crawl reached it. max_depth and max_breadth narrow the walk; select_paths and exclude_paths are regular expressions over the URL path.",
+      "profile": {
+        "effects": ["network", "secret", "external"],
+        "consequences": ["money"],
+        "risk": "high",
+        "idempotency": "idempotent",
+        "determinism": "nondeterministic",
+        "bounds": {
+          "timeout_ms": {"max": 160000},
+          "output_bytes": {"max": 3145728}
+        },
+        "subjects": [{"field": "url", "kind": "url"}],
+        "placement": "local",
+        "capability": "web.crawl",
+        "output": {"untrusted": true}
+      }
+    }
+  }
+}

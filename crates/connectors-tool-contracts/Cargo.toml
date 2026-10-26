@@ -1,0 +1,28 @@
+[package]
+name = "connectors-tool-contracts"
+description = "Publishes an instance's tool-contract/1 document from its descriptor and the tool profiles authored beside its adapter, and serves it as a tool-conformance/1 toolset over the adapter's invoke."
+version.workspace = true
+edition.workspace = true
+rust-version = "1.98"
+license.workspace = true
+
+[[bin]]
+name = "connectors-tool-contracts"
+path = "src/main.rs"
+
+[dependencies]
+b10x-tool-contract = { git = "https://github.com/beyond10x/tools", tag = "0.5.0" }
+connectors-core.workspace = true
+connectors-sdk.workspace = true
+clap.workspace = true
+schemars = "1"
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true
+tokio = { workspace = true, features = ["rt"] }
+
+[dev-dependencies]
+async-trait.workspace = true
+connectors-host.workspace = true
+connectors-tavily = { path = "../../adapters/tavily", default-features = false }
+tempfile.workspace = true

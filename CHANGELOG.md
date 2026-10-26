@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.59.0 — 2026-10-26
+
+No breaking changes.
+
+### Added
+
+- Tool contracts for admitted operations, contract `tools/v1alpha1`: Connectors publishes one
+  `tool-contract/1` document per instance, toolset `connector-<instance>`, one operation per
+  admitted operation, with the profile (effects, consequences, risk, idempotency, determinism,
+  bounds, subjects, placement, capability, output) authored beside the adapter in
+  `adapters/<adapter>/spec/tool-profiles.json`. The format, validator and conformance runner come
+  from the tools crate `b10x-tool-contract` 0.5.0.
+- Crate and command `connectors-tool-contracts`: `publish --descriptor --profiles` prints the
+  contract or the refusals, and `generate [--check]` writes or drift-checks the committed contract
+  of each adapter. It refuses an admitted operation without a profile (a descriptor's provider
+  profile name is not one), an input or output schema `tool-contract/1` cannot represent (named by
+  its schema path), a risk under the profile's effects and consequences, any other validator
+  finding, and a name outside the grammar. Fields the connection fills are listed under `omit`:
+  they leave the published input, and a call that carries one answers
+  `connector.FieldNotAllowed`.
+- The Tavily adapter's contract, `adapters/tavily/generated/tool-contract.yaml`
+  (`connector-tavily.search`, `.fetch`, `.crawl`; risk high, consequence money, untrusted output),
+  held to a `tool-conformance/1` suite of 7 scenarios through the adapter's own invoke over a local
+  fake of the provider's API. Four mutants each fail a scenario. Errors answer `connector.Failed`
+  with a `connector.ErrorCode`.
+- Model domain `connectors.tool_contracts` and authored scenarios under
+  `contracts/tools/v1alpha1/scenarios`, run by the repository gate.
+
+### Changed
+
+- The repository gate drift-checks each published tool contract. `--msrv` leaves
+  `connectors-tool-contracts` out of the Rust 1.91 check, because `b10x-tool-contract` needs
+  Rust 1.98.
+
+### Fixed
+
+- The list tests copy each executable they run into place through a child process, so a test
+  never holds an executable open for writing while another thread forks ("Text file busy" in CI).
+
+### Limitations
+
+- Only the Tavily adapter publishes a contract; the catalog connectors follow in
+  `story:tool-contracts-for-catalog-connectors`. Serving the contract to a tool host through the
+  owner's governed invocation is `story:tool-contract-serving`; the conformance suite calls the
+  adapter directly.
+
 ## 0.58.0 — 2026-10-26
 
 No breaking changes.

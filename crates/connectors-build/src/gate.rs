@@ -192,6 +192,18 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     // Generation fixtures verify the full pinned bundle, reproducibility and refusals.
     execute(command(None)?.args(["build", "--workspace", "--locked", "--offline"]))?;
     execute(command(None)?.args(["test", "--workspace", "--locked", "--offline"]))?;
+    // Each adapter's committed tool contract (contracts/tools/v1alpha1) from its descriptor
+    // and the tool profiles authored beside it.
+    execute(command(None)?.args([
+        "run",
+        "--locked",
+        "--offline",
+        "-p",
+        "connectors-tool-contracts",
+        "--",
+        "generate",
+        "--check",
+    ]))?;
     execute(command(None)?.args([
         "clippy",
         "--workspace",
@@ -343,6 +355,9 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
                 .args([
                     "check",
                     "--workspace",
+                    // It builds on b10x-tool-contract, whose rust-version is 1.98.
+                    "--exclude",
+                    "connectors-tool-contracts",
                     "--all-targets",
                     "--locked",
                     "--offline",
@@ -370,6 +385,7 @@ const AUTHORED_DIRECTORIES: &[&str] = &[
     "contracts/auth/evidence/v1alpha1/scenarios",
     "contracts/auth/connection/v1alpha1/scenarios",
     "contracts/service/v1alpha1/scenarios",
+    "contracts/tools/v1alpha1/scenarios",
     // Inbound only. These are `ess-scenario/1` and ESS owns them, so synthesising them
     // against the shared IR is a real check.
     //
