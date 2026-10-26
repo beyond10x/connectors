@@ -32,6 +32,7 @@ const QUARANTINE: &str = "connectors.refresh.QuarantineRefresh";
 const RELEASE: &str = "connectors.refresh.ReleaseRateLimited";
 const RECOVER: &str = "connectors.refresh.RecoverStoredResponse";
 const PUBLISH: &str = "connectors.refresh.PublishRefresh";
+const DISCARD: &str = "connectors.refresh.DiscardCandidate";
 
 /// One scripted answer of the fake token server.
 struct Reply {
@@ -63,6 +64,15 @@ fn error(status: u16, code: &str) -> Reply {
     Reply {
         status,
         body: json!({"error": code}),
+        retry_after: None,
+    }
+}
+
+/// The server reads the request, then closes the connection unanswered.
+fn dropped() -> Reply {
+    Reply {
+        status: 0,
+        body: Value::Null,
         retry_after: None,
     }
 }
@@ -191,6 +201,9 @@ fn serve(stream: TcpStream, tls: &Arc<rustls::ServerConfig>, shared: &Shared) {
         .unwrap()
         .pop_front()
         .unwrap_or_else(|| error(500, "server_error"));
+    if reply.status == 0 {
+        return;
+    }
     let body = serde_json::to_vec(&reply.body).unwrap();
     let mut out = format!(
         "HTTP/1.1 {} Fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n",
@@ -269,6 +282,11 @@ struct Active {
 
 impl Connected {
     fn new(server: &Server, rotation: &str, scopes: &[&str]) -> Self {
+        Self::at(&server.url(), rotation, scopes)
+    }
+
+    /// A connection whose profile names `token_url` as its token endpoint.
+    fn at(token_url: &str, rotation: &str, scopes: &[&str]) -> Self {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("state");
         crate::local::filesystem::directory(&path, true, true).unwrap();
@@ -277,7 +295,7 @@ impl Connected {
         binding.profile.oauth2 = Some(
             serde_json::from_value(json!({
                 "authorize_url": "https://localhost/fixture/authorize",
-                "token_url": server.url(),
+                "token_url": token_url,
                 "device_authorization_url": null,
                 "client_id": CLIENT,
                 "client_kind": "public",
@@ -339,10 +357,15 @@ impl Connected {
     }
 
     fn refresher(&self, owner: &str, server: &Server) -> Refresher {
+        self.trusting(owner, &server.root)
+    }
+
+    /// A refresher whose only trusted root is the PEM `root`.
+    fn trusting(&self, owner: &str, root: &str) -> Refresher {
         Refresher::fixture(
             Registry::with_system_clock(&self.path),
             owner,
-            server.root.as_bytes(),
+            root.as_bytes(),
             Box::new(self.custody.clone()),
         )
     }
@@ -733,4 +756,362 @@ fn non_rotating_response_with_a_new_refresh_token_is_uncertain() {
     assert_eq!(attempt.state, RefreshState::Uncertain);
     assert_eq!(commands, [RESERVE, AUTHORIZE, QUARANTINE]);
     refreshed_request(&server);
+}
+
+// ------------------------------------------------------------ adversary U4-1
+
+/// Waits, bounded, until the fake server has read `count` requests.
+fn await_requests(server: &Server, count: usize) {
+    let until = Instant::now() + Duration::from_secs(10);
+    while server.requests().len() < count {
+        assert!(
+            Instant::now() < until,
+            "the server never saw request {count}"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+/// §4.1: "At exchange authorization the old generation's refresh authority
+/// is consumed; old-generation dispatch is withheld atomically with that
+/// authorization while refresh is unresolved." A read's evidence
+/// recollection (`Registry::capture_recollection`, run by the supervisor for
+/// any connection whose evidence lapsed or nears its end) that lands while
+/// the one exchange is on the wire must not cost the connection its rotated
+/// refresh token: either the recollection is withheld, or the refresh still
+/// publishes. Here it is neither: the recollection advances the private
+/// publication fence, `prepare_refresh` refuses the response as a conflict,
+/// the rotated token is dropped and the connection goes Stale.
+#[test]
+fn a_read_recollection_during_the_exchange_does_not_burn_the_rotated_token() {
+    let server = Server::delayed(
+        vec![token(Some(ROTATED), Some("read"))],
+        Duration::from_secs(3),
+    );
+    let connected = Connected::new(&server, "rotating", &["read"]);
+    let before = connected.active();
+    let refresher = connected.refresher("owner-one", &server);
+    let (outcome, recollection) = std::thread::scope(|scope| {
+        let refresh = scope.spawn(|| refresher.refresh_connection(&connected.connection));
+        // The exchange is authorized and on the wire.
+        await_requests(&server, 1);
+        let registry = Registry::with_system_clock(&connected.path);
+        let recollection = (|| -> registry::Result<()> {
+            let at = now();
+            let captured = registry.capture_recollection(
+                &connected.binding,
+                &connected.connection,
+                at,
+                at + 20_000,
+            )?;
+            let dispatched = registry.dispatch_revalidation(captured, now())?;
+            let collected = now();
+            registry.finish_revalidation(
+                dispatched,
+                Ok(ValidatedBaseline {
+                    identity: ExternalIdentity {
+                        kind: "fixture-account".into(),
+                        subject: "one".into(),
+                    },
+                    granted_scopes: scopes(&["read"]),
+                    credential_expires_at_ms: None,
+                    collected_at_ms: collected,
+                    valid_until_ms: collected + 30_000,
+                    binding: None,
+                }),
+                now(),
+            )
+        })();
+        (refresh.join().unwrap().unwrap(), recollection)
+    });
+    let described = connected.described();
+    assert_eq!(
+        (outcome, described.state),
+        (Outcome::Refreshed, State::Ready),
+        "the one exchange was sent and answered with a rotated token, yet the \
+         refresh did not publish it (recollection during the exchange: {:?}); \
+         the source token is consumed and the connection needs reauthorization",
+        recollection.err()
+    );
+    let after = connected.active();
+    assert_ne!(after.generation, before.generation);
+    assert_eq!(
+        connected.custody.entry(&after.material)["refresh_token"],
+        ROTATED
+    );
+    refreshed_request(&server);
+}
+
+/// [`Connected::new`] under a profile whose evidence lasts `lifetime_ms`
+/// (60 s is the default every shipped adapter digests, CHANGELOG.md:2053).
+fn connected_for(server: &Server, lifetime_ms: u64) -> Connected {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("state");
+    crate::local::filesystem::directory(&path, true, true).unwrap();
+    drop(Metadata::initialize(&path).unwrap());
+    let mut binding = registry::fixture_binding(INSTANCE);
+    binding.profile.evidence_lifetime_ms = lifetime_ms;
+    binding.profile.oauth2 = Some(
+        serde_json::from_value(json!({
+            "authorize_url": "https://localhost/fixture/authorize",
+            "token_url": server.url(),
+            "device_authorization_url": null,
+            "client_id": CLIENT,
+            "client_kind": "public",
+            "request_encoding": "form",
+            "refresh_encoding": "form",
+            "redirect_kind": "loopback_any_port",
+            "redirect_uri": null,
+            "authorize_parameters": [],
+            "requested_scopes": ["read"],
+            "required_scopes": ["read"],
+            "rotation": "rotating",
+            "refresh_lead_seconds": 60,
+            "grant_types": ["authorization_code"],
+            "sources": ["https://localhost/fixture-authorization-server"],
+            "state_in_exchange": false,
+        }))
+        .unwrap(),
+    );
+    let registry = Registry::new(&path);
+    let at = now();
+    let entry = serde_json::to_vec(&json!({
+        "client_id": CLIENT,
+        "access_token": ACCESS,
+        "refresh_token": REFRESH,
+        "expires_at_ms": at + 3_600_000,
+        "scopes": ["read"],
+    }))
+    .unwrap();
+    let acquisition = registry.begin(&binding, at).unwrap();
+    let claim = registry.consume(acquisition, at).unwrap();
+    let baseline = ValidatedBaseline {
+        identity: ExternalIdentity {
+            kind: "fixture-account".into(),
+            subject: "one".into(),
+        },
+        granted_scopes: scopes(&["read"]),
+        credential_expires_at_ms: Some(at + 3_600_000),
+        collected_at_ms: at,
+        valid_until_ms: at + lifetime_ms,
+        binding: None,
+    };
+    let prepared = registry.prepare(&claim, baseline, entry.len(), at).unwrap();
+    let custody = Arc::new(Memory::default());
+    custody
+        .versions
+        .lock()
+        .unwrap()
+        .insert(prepared.version().id(), entry);
+    let receipt = custody::WrittenVersion::fixture(prepared.version());
+    let stored = registry.acknowledge(prepared, receipt, at).unwrap();
+    let connection = registry.publish(stored, at).unwrap();
+    Connected {
+        _root: root,
+        path,
+        binding,
+        connection,
+        custody,
+    }
+}
+
+/// Acceptance, `stored_response_is_published_after_restart`: "killed after
+/// `StoreResponse`; after restart the candidate is published and no request
+/// is sent", and §4.1 "Recover committed response ... Recover exactly the
+/// recorded candidate, rechecking custody and evidence". The stored response
+/// is durable and its access token valid for an hour, but recovery dates its
+/// evidence from the store acknowledgement (`Refresher::resolve`), so an
+/// owner that restarts later than the profile's evidence lifetime after the
+/// crash (60 s by default; 10 s here) refuses its own durable candidate,
+/// discards the rotated refresh token and marks the connection Stale.
+#[test]
+fn a_stored_response_is_published_by_an_owner_restarting_after_the_evidence_lifetime() {
+    const LIFETIME_MS: u64 = 10_000;
+    let server = Server::start(vec![token(Some(ROTATED), Some("read"))]);
+    let connected = connected_for(&server, LIFETIME_MS);
+    let before = connected.active();
+    let killed = connected
+        .refresher("owner-one", &server)
+        .crashing(Crash::AfterStore);
+    killed.refresh_connection(&connected.connection).unwrap();
+    drop(killed);
+    let (stored, _) = connected.attempt();
+    assert_eq!(stored.state, RefreshState::ResponseStored);
+    // The owner comes back after the evidence lifetime, well inside the
+    // stored access token's hour.
+    std::thread::sleep(Duration::from_millis(LIFETIME_MS + 1_000));
+    let restarted = connected.refresher("owner-two", &server);
+    assert_eq!(restarted.recover().unwrap(), 1);
+    let (attempt, commands) = connected.attempt();
+    let state = connected.described().state;
+    assert_eq!(
+        (attempt.state, state),
+        (RefreshState::Published, State::Ready),
+        "recovery refused the durable stored response ({commands:?}); the \
+         rotated refresh token is discarded and the connection needs \
+         reauthorization although no exchange was lost"
+    );
+    let after = connected.active();
+    assert_eq!(
+        Some(&after.generation),
+        stored.candidate_generation.as_ref()
+    );
+    assert_ne!(after.material, before.material);
+    refreshed_request(&server);
+}
+
+// ------------------------------------------------------------ fix round 1
+
+/// A root no fixture server presents.
+fn unrelated_root() -> String {
+    rcgen::generate_simple_self_signed(vec!["localhost".to_owned()])
+        .unwrap()
+        .cert
+        .pem()
+}
+
+/// The one attempt was released and the connection is as it was: Ready,
+/// the same generation, version and fence, nothing retired.
+fn released_unchanged(connected: &Connected, before: &Active) {
+    assert_eq!(connected.active(), *before, "the connection is unchanged");
+    assert!(!connected.retired(&before.material));
+    assert_eq!(connected.described().state, State::Ready);
+    let (attempt, commands) = connected.attempt();
+    assert_eq!(attempt.state, RefreshState::Released);
+    assert_eq!(attempt.candidate_generation, None);
+    assert_eq!(commands, [RESERVE, AUTHORIZE, RELEASE]);
+}
+
+/// A token endpoint nothing listens on refuses the connection before any
+/// byte of the request leaves: the exchange is released as a 429's is.
+#[test]
+fn a_refused_connection_releases_the_exchange() {
+    let port = TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let connected = Connected::at(
+        &format!("https://localhost:{port}/token"),
+        "rotating",
+        &["read"],
+    );
+    let before = connected.active();
+    let outcome = connected
+        .trusting("owner-one", &unrelated_root())
+        .refresh_connection(&connected.connection)
+        .unwrap();
+    assert_eq!(outcome, Outcome::Unavailable);
+    released_unchanged(&connected, &before);
+}
+
+/// A server whose certificate the owner does not trust fails the TLS
+/// handshake before any byte of the request leaves: the exchange is
+/// released, and the next refresh under the right root sends the one
+/// exchange and publishes.
+#[test]
+fn an_untrusted_token_server_releases_the_exchange() {
+    let server = Server::start(vec![token(Some(ROTATED), Some("read"))]);
+    let connected = Connected::new(&server, "rotating", &["read"]);
+    let before = connected.active();
+    let outcome = connected
+        .trusting("owner-one", &unrelated_root())
+        .refresh_connection(&connected.connection)
+        .unwrap();
+    assert_eq!(outcome, Outcome::Unavailable);
+    assert!(
+        server.requests().is_empty(),
+        "no request reached the server"
+    );
+    released_unchanged(&connected, &before);
+
+    let outcome = connected
+        .refresher("owner-one", &server)
+        .refresh_connection(&connected.connection)
+        .unwrap();
+    assert_eq!(outcome, Outcome::Refreshed);
+    refreshed_request(&server);
+    let after = connected.active();
+    assert_ne!(after.generation, before.generation);
+    assert_eq!(
+        connected.custody.entry(&after.material)["refresh_token"],
+        ROTATED
+    );
+}
+
+/// A connection the server closes after it read the request may have
+/// consumed the refresh token: uncertain, quarantined, the connection Stale.
+#[test]
+fn a_connection_dropped_after_the_request_is_uncertain() {
+    let server = Server::start(vec![dropped()]);
+    let connected = Connected::new(&server, "rotating", &["read"]);
+    let before = connected.active();
+    let outcome = connected
+        .refresher("owner-one", &server)
+        .refresh_connection(&connected.connection)
+        .unwrap();
+    assert_eq!(outcome, Outcome::Uncertain);
+    assert_eq!(connected.described().state, State::Stale);
+    assert_eq!(connected.active().generation, before.generation);
+    let (attempt, commands) = connected.attempt();
+    assert_eq!(attempt.state, RefreshState::Uncertain);
+    assert_eq!(commands, [RESERVE, AUTHORIZE, QUARANTINE]);
+    refreshed_request(&server);
+}
+
+/// At recovery the stored response's access token decides: one that
+/// expired while no owner ran is discarded and the connection goes Stale.
+/// Nothing is sent.
+#[test]
+fn an_expired_stored_response_is_discarded_at_recovery() {
+    let mut short = token(Some(ROTATED), Some("read"));
+    short.body["expires_in"] = json!(2);
+    let server = Server::start(vec![short]);
+    let connected = Connected::new(&server, "rotating", &["read"]);
+    let before = connected.active();
+    let killed = connected
+        .refresher("owner-one", &server)
+        .crashing(Crash::AfterStore);
+    killed.refresh_connection(&connected.connection).unwrap();
+    drop(killed);
+    assert_eq!(connected.attempt().0.state, RefreshState::ResponseStored);
+    std::thread::sleep(Duration::from_millis(2_500));
+    let restarted = connected.refresher("owner-two", &server);
+    assert_eq!(restarted.recover().unwrap(), 1);
+    let (attempt, commands) = connected.attempt();
+    assert_eq!(attempt.state, RefreshState::Discarded);
+    assert_eq!(commands, [RESERVE, AUTHORIZE, STORE, RECOVER, DISCARD]);
+    assert_eq!(connected.described().state, State::Stale);
+    assert_eq!(connected.active().generation, before.generation);
+    refreshed_request(&server);
+}
+
+/// A connection whose custody holds as many versions as it may retain
+/// refuses the refresh before reserving it: no request, nothing recorded,
+/// the connection unchanged.
+#[test]
+fn a_full_version_history_refuses_before_any_request() {
+    registry::RETAINED_BOUND.with(|bound| bound.set(2));
+    let server = Server::start(vec![
+        token(Some(ROTATED), Some("read")),
+        token(Some("fixture-refresh-token-three"), Some("read")),
+    ]);
+    let connected = Connected::new(&server, "rotating", &["read"]);
+    let refresher = connected.refresher("owner-one", &server);
+    assert_eq!(
+        refresher.refresh_connection(&connected.connection).unwrap(),
+        Outcome::Refreshed
+    );
+    // The active version and the retired source, not yet deleted.
+    let full = connected.active();
+    assert_eq!(
+        refresher.refresh_connection(&connected.connection).unwrap(),
+        Outcome::CustodyUnavailable
+    );
+    assert_eq!(connected.active(), full, "the connection is unchanged");
+    assert_eq!(connected.described().state, State::Ready);
+    refreshed_request(&server);
+    let (attempt, commands) = connected.attempt();
+    assert_eq!(attempt.state, RefreshState::Published);
+    assert_eq!(commands, [RESERVE, AUTHORIZE, STORE, PUBLISH]);
 }
