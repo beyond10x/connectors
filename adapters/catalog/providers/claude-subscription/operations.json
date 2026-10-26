@@ -1,0 +1,8 @@
+{
+  "format": "connectors-catalog-operations/1",
+  "provider": "claude-subscription",
+  "operations": [
+    {"id": "account.profile", "operation_id": "getOAuthProfile", "effect": "read",
+     "description": "Read the account the connection's access token was issued to: the same read the identity probe makes"}
+  ]
+}

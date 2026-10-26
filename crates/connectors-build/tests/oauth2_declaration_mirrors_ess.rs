@@ -251,6 +251,7 @@ fn full_declaration() -> ServerDeclaration {
         grant_types: vec![GrantType::AuthorizationCode, GrantType::DeviceCode],
         sources: vec!["https://example.test/reference".into()],
         state_in_exchange: true,
+        scope_in_refresh: true,
     }
 }
 
@@ -271,4 +272,40 @@ fn server_declaration_and_its_enums_mirror_the_compiled_specification() {
     assert_enum(&ir, "RequestEncoding", RequestEncoding::ALL);
     assert_enum(&ir, "RedirectKind", RedirectKind::ALL);
     assert_enum(&ir, "Rotation", Rotation::ALL);
+}
+
+/// Every `oauth2` block a shipped catalog declaration holds is a `ServerDeclaration`, the type
+/// the test above holds to the specification: it reads, validates and writes back as the same
+/// JSON, so it names every field and no other. The Claude subscription profiles are among
+/// them, each with no client id (story:claude-subscription-connector).
+#[test]
+fn every_shipped_oauth2_block_is_a_server_declaration_of_the_specification() {
+    let providers = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../adapters/catalog/providers");
+    let mut declarations: Vec<PathBuf> = std::fs::read_dir(&providers)
+        .unwrap()
+        .map(|entry| entry.unwrap().path().join("connector.json"))
+        .filter(|path| path.is_file())
+        .collect();
+    declarations.sort();
+    let mut found = Vec::new();
+    for path in declarations {
+        let declaration: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        for profile in declaration["profiles"].as_array().unwrap() {
+            let Some(block) = profile.get("oauth2") else {
+                continue;
+            };
+            let id = profile["profile"].as_str().unwrap();
+            let read: ServerDeclaration = serde_json::from_value(block.clone())
+                .unwrap_or_else(|error| panic!("{id}: {error}"));
+            assert!(read.validate().is_ok(), "{id}: refused by validate");
+            assert_eq!(&serde_json::to_value(&read).unwrap(), block, "{id}");
+            found.push((id.to_owned(), read.client_id.is_none()));
+        }
+    }
+    for id in ["claude.subscription", "claude.subscription-pasted"] {
+        assert!(
+            found.contains(&(id.to_owned(), true)),
+            "{id} is not shipped without a client id: {found:?}"
+        );
+    }
 }

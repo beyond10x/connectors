@@ -597,6 +597,7 @@ mod json_value_tests {
                 "grant_types": ["authorization_code"],
                 "sources": [],
                 "state_in_exchange": false,
+                "scope_in_refresh": false,
             }}))
             .unwrap(),
         );

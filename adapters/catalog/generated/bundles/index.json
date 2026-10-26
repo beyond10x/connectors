@@ -1,6 +1,14 @@
 {
   "entries": [
     {
+      "provider": "claude-subscription",
+      "file_name": "claude-subscription.bundle.json",
+      "bundle_sha256": "1ec3794834ffa73d82ce96ad88853407c9de30cd9bd5b4b6dd0d06b0bdfa7987",
+      "source_sha256": "51f10283f9fd1087777d4a1e2f2b90fc7b680fd23fac0dd431a1d723fd53fa4d",
+      "operations": 1,
+      "unsupported": 0
+    },
+    {
       "provider": "confluence",
       "file_name": "confluence.bundle.json",
       "bundle_sha256": "1bffcc5c89c4c16ef63064bb70b4335cf34937d5841c81860d30cc561d572752",
