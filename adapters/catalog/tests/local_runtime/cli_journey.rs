@@ -8,6 +8,8 @@ use std::{
     time::Instant,
 };
 
+#[path = "chatgpt_journey.rs"]
+mod chatgpt_journey;
 #[path = "guarded_merge.rs"]
 mod guarded_merge;
 #[path = "invoke_definition.rs"]

@@ -15,6 +15,7 @@ Every connector you can configure, with its provider, how many reads and writes 
 
 | Onboarding page | Provider | Reads | Writes | Auth profiles | Instances | Listed from |
 |---|---|---|---|---|---|---|
+| [ChatGPT](./chatgpt.md) `chatgpt` | Openai | 1 | 0 | `chatgpt.subscription` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/chatgpt/connector.json) |
 | [Confluence](./confluence.md) `confluence` | Atlassian | 4 | 0 | `atlassian.basic` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/confluence/connector.json) |
 | [Confluence](./confluence.md) `confluence-v1` | Atlassian | 7 | 0 | `atlassian.basic` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/confluence-v1/connector.json) |
 | [GitLab](./gitlab.md) `gitlab` | GitLab | 32 | 21 | `gitlab.pat` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/gitlab/connector.json) |
