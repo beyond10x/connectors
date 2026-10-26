@@ -90,7 +90,7 @@ fn refusal(output: &ProcessOutput, exit: i32) -> Value {
 }
 
 #[test]
-fn the_selected_inventory_has_thirty_two_commands_and_explicit_runtime_obligations() {
+fn the_selected_inventory_has_thirty_three_commands_and_explicit_runtime_obligations() {
     let plan = connectors_cli_contract::plan();
     let actual: BTreeSet<_> = plan
         .commands
@@ -114,6 +114,7 @@ fn the_selected_inventory_has_thirty_two_commands_and_explicit_runtime_obligatio
         "connections reconnect",
         "connections revalidate",
         "connections launch",
+        "connections token",
         "connections status",
         "connections revoke",
         "operations list",
@@ -553,6 +554,154 @@ fn a_connect_without_a_protected_source_reads_none_and_passes_no_document() {
         input.get("credential_document").is_none_or(Value::is_null),
         "{input}"
     );
+}
+
+/// story:connect-runs-an-oauth2-grant: `--device` on connect and reconnect
+/// reaches the handler as the Boolean `device` (`ess-cli/1` has no valueless
+/// switch; the production CLI reads a bare `--device` as `--device true`),
+/// reads no protected source, and on any other command is a usage error.
+#[test]
+fn device_is_a_boolean_option_of_connect_and_reconnect_only() {
+    for (args, callable, result) in [
+        (
+            &[
+                "connections",
+                "connect",
+                "--adapter",
+                "forge",
+                "--profile",
+                "grant",
+            ][..],
+            "connections-connect",
+            "ConnectionConnectResult",
+        ),
+        (
+            &[
+                "connections",
+                "reconnect",
+                "--adapter",
+                "forge",
+                "--connection",
+                "conn-1",
+                "--expected-revision",
+                "rev-1",
+            ],
+            "connections-reconnect",
+            "ConnectionReconnectResult",
+        ),
+    ] {
+        for (value, expected) in [("true", true), ("false", false)] {
+            let mut handler = Recorder::new(fixture(result));
+            let mut sources = InputSources::default();
+            let mut argv = args.to_vec();
+            argv.extend(["--device", value, "--output", "json"]);
+            let output = run(&argv, &mut sources, &mut handler, None);
+            assert_eq!(output.exit_code, 0, "{output:?}");
+            assert!(sources.calls.is_empty());
+            let (called, input, _) = handler.last.unwrap();
+            assert_eq!(called, callable);
+            assert_eq!(input["device"], expected, "{input}");
+        }
+        let mut handler = Recorder::new(fixture(result));
+        let mut sources = InputSources::default();
+        let mut argv = args.to_vec();
+        argv.extend(["--device", "yes", "--output", "json"]);
+        let output = run(&argv, &mut sources, &mut handler, None);
+        assert_ne!(output.exit_code, 0, "{output:?}");
+        assert_eq!(handler.calls, 0);
+    }
+    let mut handler = Recorder::new(json!({}));
+    let mut sources = InputSources::default();
+    let output = run(
+        &[
+            "connections",
+            "status",
+            "--adapter",
+            "forge",
+            "--device",
+            "true",
+            "--output",
+            "json",
+        ],
+        &mut sources,
+        &mut handler,
+        None,
+    );
+    assert_ne!(output.exit_code, 0, "{output:?}");
+    assert_eq!(handler.calls, 0);
+}
+
+/// story:connections-token-issues-an-access-token: `connections token` reads
+/// `--reveal` as a boolean, takes no source and answers its typed result,
+/// which names no token; the CLI rewrites a bare `--reveal` before parsing.
+#[test]
+fn token_reads_reveal_as_a_boolean_and_answers_its_metadata() {
+    let result = json!({
+        "connection": "conn-1",
+        "expires_at": "2026-10-26T12:00:00Z",
+        "scopes": ["read"],
+        "refreshed": false,
+        "issue": "issue-1",
+    });
+    let base = [
+        "connections",
+        "token",
+        "--adapter",
+        "forge",
+        "--connection",
+        "conn-1",
+        "--output",
+        "json",
+    ];
+    for (extra, expected) in [
+        (&[][..], Value::Null),
+        (&["--reveal", "true"][..], json!(true)),
+        (&["--reveal", "false"][..], json!(false)),
+    ] {
+        let mut handler = Recorder::new(result.clone());
+        let mut sources = InputSources::default();
+        let output = run(
+            &[&base[..], extra].concat(),
+            &mut sources,
+            &mut handler,
+            None,
+        );
+        assert_eq!(output.exit_code, 0, "{output:?}");
+        assert!(sources.calls.is_empty());
+        let (called, input, _) = handler.last.unwrap();
+        assert_eq!(called, "connections-token");
+        assert_eq!(
+            input.get("reveal").cloned().unwrap_or(Value::Null),
+            expected,
+            "{input}"
+        );
+        assert_eq!(
+            serde_json::from_str::<Value>(&output.stdout).unwrap()["result"],
+            result
+        );
+    }
+    let mut handler = Recorder::new(result.clone());
+    let output = run(
+        &[&base[..], &["--reveal", "yes"]].concat(),
+        &mut InputSources::default(),
+        &mut handler,
+        None,
+    );
+    assert_ne!(output.exit_code, 0, "{output:?}");
+    assert_eq!(handler.calls, 0);
+    // A result that carried anything beyond the issue's metadata is refused.
+    let mut handler = Recorder::new(json!({
+        "connection": "conn-1",
+        "expires_at": "2026-10-26T12:00:00Z",
+        "scopes": ["read"],
+        "refreshed": false,
+        "issue": "issue-1",
+        "access_token": "fictional-access-token",
+    }));
+    let output = run(&base, &mut InputSources::default(), &mut handler, None);
+    assert_ne!(output.exit_code, 0, "{output:?}");
+    assert!(!output.stdout.contains("fictional-access-token"));
+    assert!(!output.stderr.contains("fictional-access-token"));
 }
 
 #[derive(Default)]
@@ -995,7 +1144,7 @@ fn every_adapter_command_also_selects_by_connector_and_instance() {
             );
         }
     }
-    assert_eq!(selecting.len(), 25, "{selecting:?}");
+    assert_eq!(selecting.len(), 26, "{selecting:?}");
     for (name, callable) in &plan.callables {
         assert!(names_selection(&callable.result.shape), "{name}");
     }
@@ -1195,7 +1344,7 @@ fn no_alias_or_path_replaces_another_command() {
             reached += 1;
         }
     }
-    assert_eq!(reached, 37);
+    assert_eq!(reached, 38);
     // What the check refuses, the generated tree would hide: an alias onto
     // `connections list` replaces that command without a word.
     let mut colliding = plan.clone();

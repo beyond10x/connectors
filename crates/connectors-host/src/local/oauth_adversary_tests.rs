@@ -7,7 +7,7 @@
 //! means the redirect was accepted and a `400` or silence means it was not.
 use super::{
     oauth, registry,
-    runtime::{Acquisition, EntryField, Profile},
+    runtime::{Acquisition, Consent, EntryField, Profile},
 };
 use connectors_sdk::Secret;
 #[cfg(unix)]
@@ -48,11 +48,11 @@ fn profile() -> Profile {
                 max_bytes: 8192,
             })
             .collect(),
-        acquisition: Some(Acquisition {
+        acquisition: Some(Acquisition::Consent(Consent {
             authorize_url: AUTHORIZE.into(),
             token_url: TOKEN.into(),
             scopes: ["https://www.googleapis.com/auth/drive.readonly".to_owned()].into(),
-        }),
+        })),
     }
 }
 

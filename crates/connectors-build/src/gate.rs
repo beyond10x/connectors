@@ -65,6 +65,48 @@ fn docs_check(root: &Path, temp: &Path, ess: &Path) -> Result<Command> {
     Ok(cmd)
 }
 
+/// The provider-neutral OAuth 2.0 client library.
+const OAUTH2: &str = "connectors-oauth2";
+
+/// The gate step that keeps `connectors-oauth2` free of every other `connectors-*` package:
+/// its normal dependency tree, for every target and with every feature, may name no
+/// `connectors-` package but itself, so the host, client, adapters and shared contracts can all
+/// build on it and it on none of them.
+fn oauth2_boundary(root: &Path, temp: &Path, ess: &Path) -> Result<()> {
+    let output = super::run(cargo(root, temp, ess, None)?.args([
+        "tree",
+        "--locked",
+        "--offline",
+        "--edges",
+        "normal",
+        "--target",
+        "all",
+        "--all-features",
+        "--prefix",
+        "none",
+        "-p",
+        OAUTH2,
+    ]))?;
+    let tree = String::from_utf8(output.stdout)?;
+    let mut forbidden: Vec<&str> = tree
+        .lines()
+        .filter_map(|line| line.split_whitespace().next())
+        .filter(|name| name.starts_with("connectors-") && *name != OAUTH2)
+        .collect();
+    forbidden.sort_unstable();
+    forbidden.dedup();
+    if !forbidden.is_empty() {
+        return Err(format!("{OAUTH2} depends on forbidden {}", forbidden.join(", ")).into());
+    }
+    if !tree
+        .lines()
+        .any(|line| line.split_whitespace().next() == Some(OAUTH2))
+    {
+        return Err(format!("cargo tree did not list {OAUTH2}").into());
+    }
+    Ok(())
+}
+
 pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     connectors_spec::v2::check_ess(ess)?;
     super::metadata_entities::run(root, true)?;
@@ -215,6 +257,8 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         }
         println!("gate: {package} library boundary holds; exit=0");
     }
+    oauth2_boundary(root, temp.path(), ess)?;
+    println!("gate: {OAUTH2} library boundary holds; exit=0");
     let output = super::run(command(None)?.args([
         "tree",
         "--locked",
@@ -745,6 +789,91 @@ mod tests {
         let args: Vec<_> = command.get_args().collect();
         assert_eq!(args.first(), Some(&OsStr::new("+1.88.0")));
         assert_eq!(args.get(1), Some(&OsStr::new("--config")));
+    }
+}
+
+/// The `connectors-oauth2` boundary step run by Cargo itself, against a scratch workspace whose
+/// manifests are the case and against this repository.
+#[cfg(test)]
+mod oauth2_boundary_tests {
+    use super::oauth2_boundary;
+    use std::{
+        path::{Path, PathBuf},
+        process::Command,
+    };
+
+    /// `connectors-host` as a path dependency.
+    const HOST: &str = "connectors-host = { path = \"../connectors-host\" }\n";
+
+    /// A workspace of two empty packages, `connectors-oauth2` and `connectors-host`, the first
+    /// with `dependencies` (manifest tables) after its package table, with its lockfile
+    /// generated offline.
+    fn workspace(dependencies: &str) -> tempfile::TempDir {
+        let root = tempfile::tempdir().unwrap();
+        let write = |path: &str, text: &str| {
+            let path = root.path().join(path);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        write(
+            "Cargo.toml",
+            "[workspace]\nresolver = \"2\"\nmembers = [\"connectors-oauth2\", \"connectors-host\"]\n",
+        );
+        write(
+            "connectors-oauth2/Cargo.toml",
+            &format!(
+                "[package]\nname = \"connectors-oauth2\"\nversion = \"0.0.0\"\nedition = \"2021\"\n\n{dependencies}"
+            ),
+        );
+        write("connectors-oauth2/src/lib.rs", "");
+        write(
+            "connectors-host/Cargo.toml",
+            "[package]\nname = \"connectors-host\"\nversion = \"0.0.0\"\nedition = \"2021\"\n",
+        );
+        write("connectors-host/src/lib.rs", "");
+        let status = Command::new("cargo")
+            .current_dir(root.path())
+            .args(["generate-lockfile", "--offline"])
+            .status()
+            .unwrap();
+        assert!(status.success(), "cargo generate-lockfile: {status}");
+        root
+    }
+
+    fn check(root: &Path) -> Result<(), String> {
+        let temp = tempfile::tempdir().unwrap();
+        oauth2_boundary(root, temp.path(), Path::new("/ess")).map_err(|error| error.to_string())
+    }
+
+    fn assert_refused(dependencies: &str) {
+        let refused = check(workspace(dependencies).path()).unwrap_err();
+        assert!(
+            refused.contains("connectors-oauth2") && refused.contains("connectors-host"),
+            "{dependencies}: {refused}"
+        );
+    }
+
+    #[test]
+    fn the_oauth2_boundary_refuses_a_manifest_that_adds_connectors_host() {
+        assert_eq!(check(workspace("").path()), Ok(()));
+        assert_refused(&format!("[dependencies]\n{HOST}"));
+    }
+
+    /// A dependency for another platform, or behind a feature, is still a dependency: the step
+    /// reads every target and every feature, not the build host's default set.
+    #[test]
+    fn the_oauth2_boundary_sees_target_specific_and_feature_gated_dependencies() {
+        let other = if cfg!(windows) { "unix" } else { "windows" };
+        assert_refused(&format!("[target.'cfg({other})'.dependencies]\n{HOST}"));
+        assert_refused(
+            "[dependencies]\nconnectors-host = { path = \"../connectors-host\", optional = true }\n\n[features]\nhost = [\"dep:connectors-host\"]\n",
+        );
+    }
+
+    #[test]
+    fn the_repository_oauth2_crate_holds_its_boundary() {
+        let root: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        assert_eq!(check(&root), Ok(()));
     }
 }
 

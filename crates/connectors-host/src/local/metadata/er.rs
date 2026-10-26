@@ -29,6 +29,19 @@ use std::time::Instant;
 use std::{collections::BTreeMap, num::NonZeroU16, path::Path, time::Duration};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
+mod ledger;
+#[cfg(test)]
+pub(in crate::local) use ledger::RecordedIssue;
+pub(super) use ledger::attempts as refresh_attempts;
+#[cfg(test)]
+pub(super) use ledger::recorded_commands as recorded_refresh_commands;
+#[cfg(test)]
+pub(super) use ledger::recorded_issues;
+pub(in crate::local) use ledger::{
+    ACQUISITION as REFRESH_ACQUISITION, Attempt as RefreshAttempt, AttemptState as RefreshState,
+    IssueRecord, Step as LedgerStep, insert_acquisition as insert_refresh_acquisition,
+};
+
 /// Visible projection rows keyed by entity and identity: lifecycle state and fields.
 type ProjectionRows = BTreeMap<(String, String), (String, Map<String, Value>)>;
 
@@ -796,6 +809,11 @@ fn definition_bundle() -> Result<DefinitionBundle> {
 /// one subject per store, never projected to SQL.
 const WRITER_ENTITY: &str = "connectors.cli.StoreWriter";
 const WRITER_ID: &str = "s:store";
+/// The authorization server an `oauth2_grant` profile record declares
+/// (`connectors.oauth2.DeclareAuthorizationServer`). It has no table of its
+/// own: the declaration is kept in the profile record's `oauth2` member, and
+/// the server shares that record's identity.
+const SERVER_ENTITY: &str = "connectors.oauth2.AuthorizationServer";
 
 fn writer_key(key: &(String, String)) -> bool {
     key.0 == WRITER_ENTITY
@@ -1073,7 +1091,15 @@ fn capture_rows(connection: &Connection, level: i64) -> Result<Vec<RowImage>> {
             .collect::<std::result::Result<Vec<_>, _>>()
             .map_err(unavailable)?;
         for row in rows {
+            if ledger::acquisition_row(row.table, &row.fields) {
+                continue;
+            }
+            let server = match row.table {
+                "registry_profiles" => authorization_server(&row)?,
+                _ => None,
+            };
             images.push(domain_row(connection, table, row)?);
+            images.extend(server);
         }
     }
     Ok(images)
@@ -1442,6 +1468,66 @@ fn local_static_profile(mut value: Value) -> Result<Value> {
     let object = value.as_object_mut().ok_or(Failure::MetadataUnavailable)?;
     let id = object.remove("id").ok_or(Failure::MetadataUnavailable)?;
     object.insert("profile_id".into(), id);
+    // The authorization server is its own subject ([`authorization_server`]).
+    object.remove("oauth2");
+    Ok(value)
+}
+
+/// The `connectors.oauth2.AuthorizationServer` of a profile record whose
+/// static profile declares one (an `oauth2_grant` profile): created with the
+/// record by `DeclareAuthorizationServer` and immutable with it, under the
+/// record's identity. Absent members of the declaration are omitted.
+fn authorization_server(raw: &RawRow) -> Result<Option<RowImage>> {
+    let id = text_field(raw, "profile_key")?;
+    let mut declaration = parse_json(text_field(raw, "declaration")?)?;
+    let Some(server) = declaration
+        .as_object_mut()
+        .ok_or(Failure::MetadataUnavailable)?
+        .remove("oauth2")
+    else {
+        return Ok(None);
+    };
+    let mut server = match server {
+        Value::Object(server) => server,
+        _ => return Err(Failure::MetadataUnavailable),
+    };
+    server.retain(|_, value| !value.is_null());
+    Ok(Some(RowImage {
+        entity: SERVER_ENTITY.into(),
+        id: format!("s:{id}"),
+        revision: 1,
+        lifecycle_state: "Declared".into(),
+        fields: Map::from_iter([
+            ("server_ref".to_owned(), json!(id)),
+            ("profile_record_ref".to_owned(), json!(id)),
+            ("declaration".to_owned(), Value::Object(server)),
+        ]),
+    }))
+}
+
+/// The static profile the registry records for the profile record `profile`,
+/// as its row and every binding under it carry it: the record's
+/// `local_static_profile` under the key `id`, with the declaration of the
+/// authorization server recorded for that record, if any, as `oauth2`.
+fn recorded_static_profile(
+    profile: &RowImage,
+    all: &BTreeMap<(String, String), RowImage>,
+) -> Result<Value> {
+    let mut value = domain(profile, "local_static_profile")?.clone();
+    let object = value.as_object_mut().ok_or(Failure::MetadataUnavailable)?;
+    let id = object
+        .remove("profile_id")
+        .ok_or(Failure::MetadataUnavailable)?;
+    object.insert("id".into(), id);
+    if let Some(server) = all.get(&(SERVER_ENTITY.to_owned(), profile.id.clone())) {
+        let declaration: connectors_oauth2::ServerDeclaration =
+            serde_json::from_value(domain(server, "declaration")?.clone())
+                .map_err(|_| Failure::MetadataUnavailable)?;
+        object.insert(
+            "oauth2".into(),
+            serde_json::to_value(declaration).map_err(|_| Failure::MetadataUnavailable)?,
+        );
+    }
     Ok(value)
 }
 
@@ -2803,6 +2889,9 @@ fn build_projection(authority_id: uuid::Uuid, er: &ErAuthority) -> Result<Connec
             insert_row(&connection, table, row, &er.baseline, level)?;
         }
     }
+    if level >= 2 {
+        ledger::project_acquisitions(&connection, &er.baseline)?;
+    }
     connection
         .pragma_update(None, "foreign_keys", true)
         .map_err(unavailable)?;
@@ -2937,14 +3026,7 @@ fn projection_fields(
             copy_domain(row, &mut raw, "adapter_id", "adapter_id")?;
             copy_domain(row, &mut raw, "profile_id", "profile_ref")?;
             copy_domain(row, &mut raw, "declaration_revision", "revision")?;
-            let mut declaration = domain(row, "local_static_profile")?.clone();
-            let object = declaration
-                .as_object_mut()
-                .ok_or(Failure::MetadataUnavailable)?;
-            let profile_id = object
-                .remove("profile_id")
-                .ok_or(Failure::MetadataUnavailable)?;
-            object.insert("id".into(), profile_id);
+            let declaration = recorded_static_profile(row, all)?;
             let declaration: crate::local::registry::StaticProfile =
                 serde_json::from_value(declaration).map_err(|_| Failure::MetadataUnavailable)?;
             put(
@@ -3174,14 +3256,7 @@ fn connection_projection(
         "profile_record_ref",
         domain(row, "profile_record_ref")?,
     )?;
-    let mut static_profile = domain(profile, "local_static_profile")?.clone();
-    let object = static_profile
-        .as_object_mut()
-        .ok_or(Failure::MetadataUnavailable)?;
-    let profile_id = object
-        .remove("profile_id")
-        .ok_or(Failure::MetadataUnavailable)?;
-    object.insert("id".into(), profile_id);
+    let static_profile = recorded_static_profile(profile, all)?;
     let configuration_revision = match row.fields.get("configuration_revision") {
         Some(kept) if kept != domain(instance, "revision")? => kept,
         Some(_) => return Err(Failure::MetadataUnavailable),
@@ -3597,20 +3672,28 @@ pub(super) enum PersistMode {
     RuntimeStateOnly,
 }
 
+/// Records `connection`'s change since `er`'s baseline, and with it the refresh
+/// ledger's `staged` transitions, which only a standard write records.
 pub(super) fn persist(
     er: &mut ErAuthority,
     connection: &Connection,
     mode: PersistMode,
+    staged: &[LedgerStep],
 ) -> Result<()> {
     // A refused or uncertain batch leaves the baseline unproven; such a
     // handle is never reopened.
     er.reusable = false;
-    persist_batch(er, connection, mode)?;
+    persist_batch(er, connection, mode, staged)?;
     er.reusable = true;
     Ok(())
 }
 
-fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMode) -> Result<()> {
+fn persist_batch(
+    er: &mut ErAuthority,
+    connection: &Connection,
+    mode: PersistMode,
+    staged: &[LedgerStep],
+) -> Result<()> {
     let (admitted_registry_use, concurrent_observation, runtime_state_only, prepared_observation) =
         match mode {
             PersistMode::Standard {
@@ -3620,6 +3703,10 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
             PersistMode::PreparedObservation => (false, false, false, true),
             PersistMode::RuntimeStateOnly => (false, false, true, false),
         };
+    if !staged.is_empty() && (runtime_state_only || prepared_observation || concurrent_observation)
+    {
+        return Err(Failure::MetadataUnavailable);
+    }
     let level: i64 = connection
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .map_err(unavailable)?;
@@ -3645,8 +3732,9 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         // table. Reject any attempt to use this path for a registry clock
         // or another owner's row before preparing an authored batch.
         let changed_non_runtime = er.baseline.keys().chain(desired.keys()).any(|key| {
-            if writer_key(key) {
-                // The writer marker has no SQL row; only this batch changes it.
+            if writer_key(key) || ledger::key(key) {
+                // Neither the writer marker nor a refresh attempt has an SQL
+                // row; only a batch's own actions change them.
                 return false;
             }
             let changed = match (er.baseline.get(key), desired.get(key)) {
@@ -3667,7 +3755,7 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         // The two admitted observation callers may only persist their
         // registry clock. This check also covers additions and removals.
         let changed_non_clock = reference.keys().chain(desired.keys()).any(|key| {
-            if writer_key(key) {
+            if writer_key(key) || ledger::key(key) {
                 return false;
             }
             let changed = match (reference.get(key), desired.get(key)) {
@@ -3695,7 +3783,7 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
     // Recorded expiries of transient subjects whose SQL rows disappeared.
     let mut expiries = Vec::new();
     for (key, current) in reference {
-        if writer_key(key) {
+        if writer_key(key) || ledger::key(key) {
             continue;
         }
         match desired.get(key) {
@@ -3764,6 +3852,14 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
             }
         }
     }
+    // The refresh ledger's transitions commit with the SQL change they were
+    // staged beside, in this same batch.
+    actions.extend(ledger::actions(
+        reference,
+        &runtime_registry,
+        &commands,
+        staged,
+    )?);
     if prepared_observation && !reference.keys().any(registry_clock_key) {
         return Err(Failure::MetadataUnavailable);
     }
@@ -4219,6 +4315,7 @@ fn create_command(row: &RowImage) -> Result<&'static str> {
             Ok("connectors.declarations.RecordServiceConfiguration")
         }
         "connectors.auth_bindings.AuthProfile" => Ok("connectors.auth_bindings.RecordProfile"),
+        SERVER_ENTITY => Ok("connectors.oauth2.DeclareAuthorizationServer"),
         "connectors.auth_bindings.Connection" => Ok("connectors.auth_bindings.AllocateConnection"),
         "connectors.auth_bindings.Acquisition" => Ok("connectors.auth_bindings.BeginAcquisition"),
         "connectors.auth_bindings.CustodyVersion" => {
@@ -4464,6 +4561,7 @@ fn creation_stages(desired: &RowImage, admitted_registry_use: bool) -> Result<Ve
         "connectors.clock.LocalClockFloor" => "Recorded",
         "connectors.declarations.ServiceConfiguration" => "Declared",
         "connectors.auth_bindings.AuthProfile" => "Declared",
+        SERVER_ENTITY => "Declared",
         "connectors.auth_bindings.Connection" => "Live",
         "connectors.auth_bindings.Acquisition" => "Pending",
         "connectors.auth_bindings.CustodyVersion" => "Candidate",
@@ -4501,7 +4599,17 @@ fn command_arguments(
         .get("input")
         .ok_or(Failure::MetadataUnavailable)?;
     let mut candidates = next.fields.clone();
-    if input_schema.properties.contains_key("decision") {
+    if binding.name == "connectors.oauth2.IssueAccessToken" {
+        // The owner's own decision (`ledger::issue_action`): `current` or
+        // `refreshed`, each recorded only beside the issue it decided; a
+        // refusal records nothing.
+        if !matches!(
+            candidates.get("decision").and_then(Value::as_str),
+            Some("current" | "refreshed")
+        ) {
+            return Err(Failure::MetadataUnavailable);
+        }
+    } else if input_schema.properties.contains_key("decision") {
         // These commands are reached only after the corresponding trusted host
         // owner has completed its admission/custody/audit predicate and committed
         // the exact SQL change being recorded. Refused and unavailable host
@@ -4522,6 +4630,12 @@ fn command_arguments(
                 | "connectors.execution_audit.AcknowledgeAnchor"
                 | "connectors.execution_audit.LinkAnchorAttempt"
                 | "connectors.execution_audit.AppendFinalObservation"
+                // The refresh coordinator commits these only beside the SQL
+                // change its own successful decision made (`ledger`).
+                | "connectors.refresh.ReserveRefresh"
+                | "connectors.refresh.AuthorizeExchange"
+                | "connectors.refresh.StoreResponse"
+                | "connectors.refresh.PublishRefresh"
         );
         if !records_successful_owner_decision {
             return Err(Failure::MetadataUnavailable);
@@ -4604,6 +4718,7 @@ fn identity_field(entity: &str) -> Option<&'static str> {
         "connectors.clock.LocalClockFloor" => Some("owner"),
         "connectors.declarations.ServiceConfiguration" => Some("instance_id"),
         "connectors.auth_bindings.AuthProfile" => Some("profile_record_ref"),
+        SERVER_ENTITY => Some("server_ref"),
         "connectors.auth_bindings.Connection" => Some("connection_ref"),
         "connectors.auth_bindings.Acquisition" => Some("acquisition_ref"),
         "connectors.auth_bindings.CustodyVersion" => Some("version_ref"),
@@ -4619,6 +4734,8 @@ fn identity_field(entity: &str) -> Option<&'static str> {
         "connectors.approval_issuers.ApprovalIssuer" => Some("issuer_id"),
         "connectors.approval_issuers.ApprovalSigningKey" => Some("key_id"),
         "connectors.local_approval_policy.LocalApprovalPolicy" => Some("policy_id"),
+        ledger::ENTITY => Some("attempt_id"),
+        ledger::ISSUE_ENTITY => Some("issue_ref"),
         _ => None,
     }
 }
@@ -4749,6 +4866,8 @@ fn visible_rows(rows: &BTreeMap<(String, String), RowImage>) -> ProjectionRows {
             TABLES
                 .iter()
                 .any(|table| table.entity == row.entity && projects(table, row))
+                // Captured from its profile record's row (`authorization_server`).
+                || row.entity == SERVER_ENTITY
         })
         .map(|(key, row)| {
             (
@@ -7892,6 +8011,133 @@ mod tests {
         let (_, stale) = step(&mut authority, &live, "Stale");
         let (command, _) = step(&mut authority, &stale, "Revoked");
         assert_eq!(command, "connectors.auth_bindings.RevokeConnection");
+    }
+
+    /// story:connect-runs-an-oauth2-grant: the profile record of an
+    /// `oauth2_grant` profile is recorded with one
+    /// `connectors.oauth2.AuthorizationServer`, created by
+    /// `DeclareAuthorizationServer` under the record's identity and carrying
+    /// the declaration, which the record's `local_static_profile` does not. A
+    /// reconnect under the same record declares nothing again, the store
+    /// reopens to the same subjects, and the description names the granted
+    /// scopes and the access token expiry.
+    #[test]
+    fn an_oauth2_grant_profile_record_declares_its_authorization_server_once() {
+        use crate::local::{
+            keyring::custody,
+            metadata::Metadata,
+            registry::{self, ExternalIdentity, Registry, State, ValidatedBaseline},
+        };
+        const NOW: u64 = 1_789_056_000_000;
+        let baseline = |now: u64| ValidatedBaseline {
+            binding: None,
+            identity: ExternalIdentity {
+                kind: "fixture-account".into(),
+                subject: "one".into(),
+            },
+            granted_scopes: Some(std::collections::BTreeSet::from(["read".into()])),
+            credential_expires_at_ms: Some(now + 3_600_000),
+            collected_at_ms: now,
+            valid_until_ms: now + 60_000,
+        };
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("state");
+        crate::local::filesystem::directory(&path, true, true).unwrap();
+        drop(Metadata::initialize(&path).unwrap());
+        let mut binding = registry::fixture_binding("fixture-instance");
+        binding.profile.oauth2 = Some(
+            serde_json::from_value(json!({
+                "authorize_url": "https://localhost/fixture/authorize",
+                "token_url": "https://localhost/fixture/token",
+                "device_authorization_url": null,
+                "client_id": "fixture-client",
+                "client_kind": "public",
+                "request_encoding": "form",
+                "refresh_encoding": "form",
+                "redirect_kind": "loopback_any_port",
+                "redirect_uri": null,
+                "authorize_parameters": [],
+                "requested_scopes": ["read"],
+                "required_scopes": ["read"],
+                "rotation": "rotating",
+                "refresh_lead_seconds": 60,
+                "grant_types": ["authorization_code"],
+                "sources": ["https://localhost/fixture-authorization-server"],
+                "state_in_exchange": false,
+                "scope_in_refresh": false,
+            }))
+            .unwrap(),
+        );
+        let registry = Registry::new(&path);
+        let acquisition = registry.begin(&binding, NOW).unwrap();
+        let claim = registry.consume(acquisition, NOW).unwrap();
+        let prepared = registry.prepare(&claim, baseline(NOW), 12, NOW).unwrap();
+        let receipt = custody::WrittenVersion::fixture(prepared.version());
+        let stored = registry.acknowledge(prepared, receipt, NOW).unwrap();
+        let reference = registry.publish(stored, NOW).unwrap();
+        let described = registry
+            .describe(
+                "fixture-instance",
+                &binding.adapter_id,
+                &binding.configuration_revision,
+                &reference,
+                NOW,
+                true,
+            )
+            .unwrap();
+        assert_eq!(described.state, State::Ready);
+        assert_eq!(
+            described.granted_scopes,
+            Some(std::collections::BTreeSet::from(["read".to_owned()]))
+        );
+        assert_eq!(described.credential_expires_at_ms, Some(NOW + 3_600_000));
+        let servers = || {
+            let metadata = Metadata::inspect(&path).unwrap();
+            let facts = snapshot_facts(metadata.er.as_ref().unwrap());
+            let profiles = facts
+                .iter()
+                .filter(|(entity, ..)| entity == "connectors.auth_bindings.AuthProfile")
+                .cloned()
+                .collect::<Vec<_>>();
+            let servers = facts
+                .into_iter()
+                .filter(|(entity, ..)| entity == SERVER_ENTITY)
+                .collect::<Vec<_>>();
+            (profiles, servers)
+        };
+        let (profiles, recorded) = servers();
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(recorded.len(), 1);
+        let (_, id, state, fields) = &recorded[0];
+        let record = &profiles[0].3["profile_record_ref"];
+        assert_eq!(id, &profiles[0].1);
+        assert_eq!(state, "Declared");
+        assert_eq!(&fields["profile_record_ref"], record);
+        assert_eq!(&fields["server_ref"], record);
+        assert_eq!(
+            fields["declaration"]["token_url"],
+            "https://localhost/fixture/token"
+        );
+        assert!(fields["declaration"].get("redirect_uri").is_none());
+        assert!(
+            profiles[0].3["local_static_profile"]
+                .get("oauth2")
+                .is_none()
+        );
+
+        let revision = described.revision;
+        let later = NOW + 1;
+        let acquisition = registry
+            .begin_repair(&binding, &reference, &revision, later)
+            .unwrap();
+        let claim = registry.consume(acquisition, later).unwrap();
+        let prepared = registry
+            .prepare(&claim, baseline(later), 12, later)
+            .unwrap();
+        let receipt = custody::WrittenVersion::fixture(prepared.version());
+        let stored = registry.acknowledge(prepared, receipt, later).unwrap();
+        assert_eq!(registry.publish(stored, later).unwrap(), reference);
+        assert_eq!(servers(), (profiles, recorded));
     }
 
     /// story:stale-connection-reconnect-candidate: a reconnect allocates its

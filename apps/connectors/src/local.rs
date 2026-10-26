@@ -17,6 +17,7 @@ mod connections;
 mod cursor;
 mod declarations;
 mod definition;
+mod dialects;
 mod list;
 mod migrate;
 mod operations;
@@ -25,7 +26,7 @@ mod select;
 mod session;
 
 pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
-    let args = migrate::shorthand(args);
+    let args = dialects::switch_shorthand(migrate::shorthand(args));
     // Help is no envelope and runs no command: it says nothing more on standard
     // error, under a deprecated name too; the help itself marks that name.
     if let Some(help) = connectors::help::render(&args) {
@@ -89,6 +90,18 @@ fn run_selected(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
         output = connectors_cli_contract::ProcessOutput {
             exit_code: code,
             stdout: String::new(),
+            stderr: String::new(),
+        };
+    }
+    // `connections token --reveal` issued a token: standard output is the
+    // token and one newline, in every output mode, and nothing else is written.
+    let revealed = session.borrow_mut().revealed.take();
+    if let Some(token) = revealed
+        && output.exit_code == 0
+    {
+        output = connectors_cli_contract::ProcessOutput {
+            exit_code: 0,
+            stdout: format!("{}\n", token.expose()),
             stderr: String::new(),
         };
     }
@@ -184,6 +197,11 @@ impl LocalHandler {
             connections::launch(call).map(|code| {
                 self.0.borrow_mut().launched = Some(code);
                 json!({"consumer":call.input["consumer"],"exit_code":code})
+            })
+        } else if call.callable == "connections-token" {
+            connections::token(call).map(|(result, token)| {
+                self.0.borrow_mut().revealed = token;
+                result
             })
         } else if call.callable == "connections-revalidate" {
             self.0

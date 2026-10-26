@@ -19,7 +19,7 @@ types:
     variants: [http_bearer, http_basic, http_signing, mtls, socket_peer, exec_plugin, sip_digest, session_authority, none, parent]
   - name: connectors.auth_access.AcquisitionFlow
     kind: enum
-    variants: [static_config, static_entry, oauth2_authorization_code, oauth2_client_credentials, oauth2_password, workload_identity, exec_plugin, host_issued]
+    variants: [static_config, static_entry, oauth2_authorization_code, oauth2_device_code, oauth2_client_credentials, oauth2_password, workload_identity, exec_plugin, host_issued]
   - name: connectors.auth_access.CapabilityName
     kind: enum
     variants: [http-bearer, http-basic, http-signing, http-anonymous, mtls-client-identity, socket-peer, exec-credential-plugin, sip-credential-lease, session-authority, inbound-verifier, mediated-http]

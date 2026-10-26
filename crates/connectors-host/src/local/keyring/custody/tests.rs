@@ -314,6 +314,7 @@ fn disposable_registry_publication_cli_and_retirement_restart() {
             minimum_scopes: BTreeSet::new(),
             evidence_lifetime_ms: 60_000,
             declaration: None,
+            oauth2: None,
         },
     };
     let baseline = |now| registry::ValidatedBaseline {

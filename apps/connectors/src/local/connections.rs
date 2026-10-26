@@ -198,24 +198,98 @@ pub(super) fn launch(call: &Invocation<'_>) -> Result<i32, HandlerReply> {
             owner_failure(error)
         }
     })?;
+    // An `oauth2_grant` launch's issue (consumer-launch.md §9) is refused as
+    // `connections token` is; `service_failure` and a rate-limited
+    // `unavailable` come only from that issue.
     let deadline = connectors_sdk::now_ms() + 30_000;
     let consumer = owner::Client::connect(&paths, true)
         .and_then(|client| client.launch(alias, connection, consumer, deadline))
-        .map_err(owner_failure)?;
+        .map_err(token_failure)?;
     // The consumer's entry selects which of this caller's variables pass.
     consumer
         .run(&extra, std::env::vars_os())
         .map_err(|error| owner_failure(owner::Error::from(error)))
 }
 
+/// `connections token` (story:connections-token-issues-an-access-token): the
+/// owner issues a current access token of the selected `oauth2_grant`
+/// connection, refreshed first when it expires within the declaration's
+/// `refresh_lead_seconds`, through the library call a Rust caller makes
+/// (`connectors_host::local::access_token`). Without `--reveal` the owner
+/// sends no token and the result is the issue's metadata; with it the token
+/// is returned beside that result for `run_selected` to print alone.
+pub(super) fn token(
+    call: &Invocation<'_>,
+) -> Result<(Value, Option<connectors_oauth2::Secret>), HandlerReply> {
+    use connectors_host::local::access_token::{self, Delivery};
+    let paths = resolved(call)?;
+    Config::read(&paths.config).map_err(configuration_refusal)?;
+    let text = |field| {
+        call.input[field]
+            .as_str()
+            .ok_or_else(|| failure("invalid_input", "arguments", "none", true))
+    };
+    let (alias, connection) = (text("adapter")?, text("connection")?);
+    let delivery = if call.input.get("reveal").and_then(Value::as_bool) == Some(true) {
+        Delivery::Revealed
+    } else {
+        Delivery::MetadataOnly
+    };
+    let client = owner::Client::connect(&paths, true).map_err(token_failure)?;
+    if !client.is_same_build() {
+        return Err(owner_failure(owner::Code::OwnerBuildMismatch.into()));
+    }
+    let issued = access_token::issue(client, alias, connection, delivery).map_err(token_failure)?;
+    let expires_at = i64::try_from(issued.expires_at_ms())
+        .ok()
+        .and_then(|ms| {
+            time::OffsetDateTime::from_unix_timestamp_nanos(i128::from(ms) * 1_000_000).ok()
+        })
+        .and_then(|at| {
+            at.format(&time::format_description::well_known::Rfc3339)
+                .ok()
+        })
+        .ok_or_else(|| owner_failure(owner::Code::Unavailable.into()))?;
+    let result = json!({
+        "connection": issued.connection(),
+        "expires_at": expires_at,
+        "scopes": issued.scopes(),
+        "refreshed": issued.refreshed(),
+        "issue": issued.issue(),
+    });
+    Ok((result, issued.into_token()))
+}
+
+/// `owner_failure` of an access token issue, for `connections token` and an
+/// `oauth2_grant` launch: a refresh that needs reauthorization or whose
+/// outcome is uncertain left the connection Stale, so only a repair helps; a
+/// token endpoint's rate limit is retried explicitly after its
+/// `retry_after_seconds`.
+fn token_failure(error: owner::Error) -> HandlerReply {
+    let repair = error.code == owner::Code::ServiceFailure;
+    let rate_limited = error.code == owner::Code::Unavailable
+        && error.service_code == Some(connectors_core::ErrorCode::RateLimited);
+    let mut reply = owner_failure(error);
+    if let HandlerReply::Error { data, .. } = &mut reply {
+        if repair {
+            data["next_action"] = json!("repair_connection");
+        } else if rate_limited {
+            data["stage"] = json!("dispatch");
+            data["next_action"] = json!("retry_explicitly");
+        }
+    }
+    reply
+}
+
 /// The commands that select one existing connection and take `--connection`
 /// optionally. `connections reconnect` selects it before any handler runs
 /// (`held_one`).
-const SELECTING: [&str; 4] = [
+const SELECTING: [&str; 5] = [
     "connections-describe",
     "connections-revalidate",
     "connections-revoke",
     "connections-launch",
+    "connections-token",
 ];
 
 /// story:connect-refused-while-instance-holds-connection: `--connection` may be
@@ -289,6 +363,14 @@ fn description(alias: &str, connection: &ObservedConnection) -> Value {
         "valid_until_ms":connection.valid_until_ms,"source":"authority","stale":connection.stale});
     if let Some(identity) = &connection.identity {
         value["external_identity"] = json!(identity);
+    }
+    // An `oauth2_grant` connection names what its grant granted and until when
+    // its access token is valid, never the token.
+    if let Some(scopes) = &connection.granted_scopes {
+        value["granted_scopes"] = json!(scopes);
+    }
+    if let Some(expires_at_ms) = connection.credential_expires_at_ms {
+        value["credential_expires_at_ms"] = json!(expires_at_ms);
     }
     value
 }

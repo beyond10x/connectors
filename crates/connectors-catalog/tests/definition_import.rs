@@ -109,6 +109,13 @@ const SHIPPED: [Shipped; 15] = [
     },
 ];
 
+/// The shipped selections of a connector whose profile is an OAuth2 grant, by definition name:
+/// the definition notation has no field for its server declaration, so it is refused by name.
+const GRANTS: &[(&str, &str)] = &[
+    ("chatgpt", "chatgpt/operations.json"),
+    ("claude-subscription", "claude-subscription/operations.json"),
+];
+
 fn shipped(name: &str) -> &'static Shipped {
     SHIPPED.iter().find(|s| s.name == name).unwrap()
 }
@@ -340,6 +347,7 @@ macro_rules! connectors {
             }
             files.sort();
             let mut covered: Vec<String> = SHIPPED.iter().map(|s| s.selection.to_owned()).collect();
+            covered.extend(GRANTS.iter().map(|(_, selection)| (*selection).to_owned()));
             covered.sort();
             assert_eq!(files, covered);
             for name in names {
@@ -507,6 +515,36 @@ fn an_import_refuses_a_name_its_selection_does_not_derive() {
         "{message}"
     );
     assert!(!root.join("connectors/zendesk.yaml").exists());
+}
+
+/// A connector whose profile is an OAuth2 grant is refused by name and writes nothing; every
+/// other shipped selection still imports (the cases above).
+#[test]
+fn a_grant_connector_is_refused_by_name() {
+    for (name, selection) in GRANTS {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("definitions");
+        std::fs::create_dir_all(&root).unwrap();
+        let catalog = selection.split('/').next().unwrap();
+        let failure = import::import(&import::Request {
+            connectors: &repository(),
+            catalog,
+            selection: Some(
+                &repository()
+                    .join("adapters/catalog/providers")
+                    .join(selection),
+            ),
+            definitions: &root,
+            name: Some(name),
+        })
+        .expect_err("a grant connector is not imported");
+        let message = failure.to_string();
+        assert!(
+            message.contains("OAuth2 grant") && message.contains(name),
+            "{message}"
+        );
+        assert!(!root.join(format!("connectors/{name}.yaml")).exists());
+    }
 }
 
 #[test]
