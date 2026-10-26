@@ -8,6 +8,8 @@ use std::{
     time::Instant,
 };
 
+#[path = "chatgpt_adversary.rs"]
+mod chatgpt_adversary;
 #[path = "chatgpt_journey.rs"]
 mod chatgpt_journey;
 #[path = "claude_subscription_journey.rs"]

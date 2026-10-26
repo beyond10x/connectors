@@ -10,8 +10,10 @@
   refreshes with JSON and rotation, names the connection by the ChatGPT account id from the
   `id_token`, serves `connections token --reveal` and one read, `models.list`. No client id
   ships: an instance is pinned with its own `oauth2_client_id`, and a derived one is refused as
-  `InvalidConfiguration`. Verified against a local fixture only, not live. Guide
-  `website/docs/connectors/chatgpt.md`.
+  `InvalidConfiguration`. The device sign-in waits 240 s, inside the owner's 300 s entry window,
+  not the Codex CLI's 15 minutes; a server poll interval that leaves no poll inside that window
+  ends any `--device` grant at once as `unsupported`, not `timeout`. Verified against a local
+  fixture only, not live. Guide `website/docs/connectors/chatgpt.md`.
 - Catalog connector `claude-subscription` (provider Anthropic): the Claude Code sign-in as two
   `oauth2_grant` profiles, `claude.subscription` (loopback redirect) and
   `claude.subscription-pasted` (pasted `code#state`), with JSON exchange and refresh and

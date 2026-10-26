@@ -1486,7 +1486,11 @@ receives may have been dispatched and reports `outcome_unknown`.
 An HTTP 429 stays `service_failure` with
 `service_code = rate_limited`, and with `retry_after_seconds` when the provider
 named a delay. `unsupported` is always `admission`: every
-source of it is raised before dispatch.
+source of it is raised before dispatch, with one exception: a device grant
+whose authorization server names a poll interval longer than the sign-in
+window is refused as `unsupported` after the device authorization request and
+before any poll, because only that response names the interval. Nothing is
+stored and no token was requested.
 
 **Revalidation retries.** `connections revalidate` sends its validation (the
 adapter's identity probe, a read) again when the attempt failed transiently,

@@ -267,6 +267,8 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "cli_journey::chatgpt_journey::chatgpt_connect_browser_journey"
             | "cli_journey::chatgpt_journey::chatgpt_connect_device_journey"
             | "cli_journey::chatgpt_journey::chatgpt_token_refreshes_with_json_and_rotates"
+            | "cli_journey::chatgpt_adversary::adversary_chatgpt_device_sign_in_refuses_an_interval_longer_than_the_window_before_any_poll"
+            | "cli_journey::chatgpt_adversary::adversary_chatgpt_device_sign_in_keeps_polling_at_a_normal_interval"
             | "cli_journey::claude_subscription_journey::claude_connect_loopback_journey"
             | "cli_journey::claude_subscription_journey::claude_connect_pasted_code_journey"
             | "cli_journey::claude_subscription_journey::claude_token_refreshes_with_json"
