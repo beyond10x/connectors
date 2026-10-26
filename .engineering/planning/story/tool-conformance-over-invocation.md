@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:tool-conformance-over-invocation
 kind: story
-status: active
+status: implemented
 title: The Tavily contract's implementation passes tool-conformance/1 through the adapter's invoke
 summary: AdapterToolset over connectors_sdk::Adapter, a served fake provider, scenarios and mutants
 relations:
@@ -18,10 +18,11 @@ scope:
   path: crates/connectors-tool-contracts/src/toolset.rs
 - confidence: inferred
   path: crates/connectors-tool-contracts/tests/tavily_conformance.rs
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-26T15:33:29Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-26T15:33:33Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-26T16:50:01Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

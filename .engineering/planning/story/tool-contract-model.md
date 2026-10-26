@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:tool-contract-model
 kind: story
-status: active
+status: implemented
 title: The shared model has a typed tool contract and its publication refusals
 summary: ESS domain connectors.tool_contracts, component tool-contract-publisher and authored scenarios
 relations:
@@ -21,10 +21,11 @@ scope:
   path: ess/system.yaml
 - confidence: inferred
   path: website/docs/reference/contracts
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-26T15:33:28Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-26T15:33:33Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-26T16:50:00Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

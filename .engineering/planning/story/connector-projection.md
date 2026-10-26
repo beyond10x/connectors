@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:connector-projection
 kind: story
-status: active
+status: implemented
 title: An instance's descriptor and its authored profiles publish one tool-contract/1 document
 summary: 'Moved from tools by ADR 0103 decision 5: profiles and omit beside the adapter, publish, Tavily contract drift-checked'
 refs:
@@ -27,10 +27,11 @@ scope:
   path: crates/connectors-tool-contracts
 - confidence: inferred
   path: website/docs/reference
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-26T15:33:28Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-26T15:33:33Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-26T16:50:01Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

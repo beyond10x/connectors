@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-26T16:49:57Z",
+  "actor": "human:timo",
+  "artifact": "story:tool-contract-model",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv (ESS 0.69.2, aep 0.71.3) on 1b3089ba5: gate: all checks passed, EXIT=0; 3283 passed, 0 failed, 178 ignored; authored scenarios 18 passed, 34 known failing; tool_contracts/authored tool-contract-published and tool-contract-refusals passed",
+    "reference": "contracts/tools/v1alpha1/scenarios"
+  }
+}
