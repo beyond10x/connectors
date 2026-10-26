@@ -804,13 +804,15 @@ pub fn admit_revalidation(
 /// of the instance `alias` (story:connections-token-issues-an-access-token).
 /// Only a visible, unrevoked connection whose profile the instance admits and
 /// declares an authorization server (`oauth2_grant`) is issued from; any other
-/// profile is `forbidden`. A refusal issues and records nothing.
+/// profile is `forbidden`. A refusal issues and records nothing, and so does
+/// an issue whose `deadline_ms` passed before it was recorded (`timeout`).
 pub(crate) fn issue_access_token(
     paths: &Paths,
     incarnation: &str,
     alias: &str,
     connection: &str,
     delivery: super::access_token::Delivery,
+    deadline_ms: u64,
 ) -> Result<refresh::issue::Issued> {
     let (config, adapter) = selected(paths, alias)?;
     let binding = registry::Registry::new(&paths.state).recorded_binding(
@@ -832,6 +834,7 @@ pub(crate) fn issue_access_token(
             &adapter.adapter_id,
             connection,
             delivery,
+            deadline_ms,
         )
         .map_err(Error::from)
 }

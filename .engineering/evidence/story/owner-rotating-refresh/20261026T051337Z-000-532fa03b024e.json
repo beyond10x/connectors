@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-26T05:13:37Z",
+  "actor": "human:timo",
+  "artifact": "story:owner-rotating-refresh",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "CORRECTION of the 49822857b record: that gate exited 1, not all checks passed; 2 local_cli capacity timing tests failed under load average 18 (a_same_build_owner_at_its_client_limit_answers_capacity_not_another_build, adversary2_the_build_probe_against_an_owner_at_capacity_reports_capacity); rerun of local_cli capacity twice: 3 passed each; the full gate is rerun at wave close",
+    "reference": "wave/20261025-oauth2@49822857b"
+  }
+}

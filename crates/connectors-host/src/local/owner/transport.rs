@@ -1996,6 +1996,7 @@ fn issue_access_token(
             adapter,
             connection,
             delivery,
+            deadline_ms,
         )
     })();
     let (reply, document, secret) = match issued {

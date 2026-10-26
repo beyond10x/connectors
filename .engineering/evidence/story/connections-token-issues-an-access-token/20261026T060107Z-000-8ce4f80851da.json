@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-26T06:01:07Z",
+  "actor": "human:timo",
+  "artifact": "story:connections-token-issues-an-access-token",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:adversary-connections-token-issues-an-access-token-pass-1",
+    "reference": "impl/oauth2-token@273076a2f",
+    "review": "review-result:adversary-connections-token-issues-an-access-token-pass-1",
+    "outcome": "fixed"
+  }
+}
