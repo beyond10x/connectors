@@ -294,10 +294,20 @@ launches exactly as before, with its stored document verbatim.
   refused before the issue, and an issue the owner refuses, record none; an
   issue already recorded when the configuration re-read or the delivery then
   fails stays recorded.
-- **Refusals.** Admission is section 2's, lapsed evidence included. An issue
-  the owner refuses answers the owner failure of §4.4's refusal table
-  (for example `service_failure` with `next_action: repair_connection` when a
-  refresh needs reauthorization); no consumer runs.
+- **Admission.** Admission is section 2's with one difference: the evidence
+  step admits a connection whose evidence lapsed, or whose access token
+  expires within the lead or has expired, because the issue refreshes that
+  token and republishes its evidence, as `connections token` does on the same
+  state. A revoked or Stale connection, a profile the instance does not
+  permit, a binding conflict and a connection with no published generation
+  are refused as section 2 states.
+- **Refusals.** An issue the owner refuses answers the owner failure of
+  §4.4's refusal table, with the next action `connections token` names:
+  `service_failure` with `next_action: repair_connection` when a refresh needs
+  reauthorization or its outcome is uncertain, and `unavailable` with service
+  code `rate_limited`, `next_action: retry_explicitly` and its
+  `retry_after_seconds` when the token endpoint answered `429`. No consumer
+  runs.
 - **No re-issue.** The token is issued once, at launch. A consumer that outlives
   its expiry is not given another; it is launched again.
 
@@ -306,4 +316,5 @@ Verification: `local::owner::refresh::tests::launch` in
 disposable Secret Service and a fake token server on loopback
 (`launch_oauth2_grant_hands_only_the_access_token`,
 `launch_oauth2_grant_refreshes_inside_lead_time`,
-`launch_static_profile_is_unchanged`; opt-in, family `disposable`).
+`launch_static_profile_is_unchanged`, and the cases of its `adversary`
+module; opt-in, family `disposable`).

@@ -388,3 +388,285 @@ fn launch_static_profile_is_unchanged() {
         "a static launch issues nothing"
     );
 }
+
+/// Adversary, wave 20261025-oauth2 unit U6, pass 1: cases driven from
+/// consumer-launch.md §9 and the story's outcome.
+mod adversary {
+    use super::*;
+
+    /// The declaration [`Launching::granted`] publishes under: public client,
+    /// `refresh_lead_seconds` 60.
+    fn declaration(server: &Server) -> connectors_oauth2::ServerDeclaration {
+        serde_json::from_value(json!({
+            "authorize_url": "https://localhost/fixture/authorize",
+            "token_url": server.url(),
+            "device_authorization_url": null,
+            "client_id": CLIENT,
+            "client_kind": "public",
+            "request_encoding": "form",
+            "refresh_encoding": "form",
+            "redirect_kind": "loopback_any_port",
+            "redirect_uri": null,
+            "authorize_parameters": [],
+            "requested_scopes": ["read"],
+            "required_scopes": ["read"],
+            "rotation": "rotating",
+            "refresh_lead_seconds": 60,
+            "grant_types": ["authorization_code"],
+            "sources": ["https://localhost/fixture-authorization-server"],
+            "state_in_exchange": false,
+            "scope_in_refresh": false,
+        }))
+        .unwrap()
+    }
+
+    /// A published grant whose access token expires `expires_in_ms` from
+    /// now and whose evidence lasts `evidence_ms`, the profile's
+    /// `evidence_lifetime_ms`: the shape a shipped grant has (catalog evidence
+    /// 60 s by default, at most 300 s; access tokens live far longer).
+    fn granted_with_evidence(
+        launching: &Launching,
+        server: &Server,
+        expires_in_ms: u64,
+        evidence_ms: u64,
+    ) -> String {
+        let binding = Binding {
+            credential_revision: None,
+            executable: None,
+            instance_id: INSTANCE.into(),
+            adapter_id: "fixture-adapter".into(),
+            configuration_revision: "cfg-1".into(),
+            provider_authority: "https://fixture.invalid".into(),
+            profile: registry::StaticProfile {
+                id: PROFILE.into(),
+                revision: "profile-1".into(),
+                purpose: registry::Purpose::DelegatedUser,
+                subject: registry::Subject::User,
+                minimum_scopes: BTreeSet::new(),
+                evidence_lifetime_ms: evidence_ms,
+                declaration: None,
+                oauth2: Some(declaration(server)),
+            },
+        };
+        let registry = Registry::new(&launching.paths.state);
+        let acquisition = registry.begin(&binding, now()).unwrap();
+        let claim = registry.consume(acquisition, now()).unwrap();
+        let at = now();
+        let entry = serde_json::to_vec(&json!({
+            "client_id": CLIENT,
+            "access_token": ACCESS,
+            "refresh_token": REFRESH,
+            "expires_at_ms": at + expires_in_ms,
+            "scopes": ["read"],
+        }))
+        .unwrap();
+        let baseline = ValidatedBaseline {
+            binding: None,
+            identity: ExternalIdentity {
+                kind: "fixture-account".into(),
+                subject: "one".into(),
+            },
+            granted_scopes: Some(BTreeSet::from(["read".to_owned()])),
+            credential_expires_at_ms: Some(at + expires_in_ms),
+            collected_at_ms: at,
+            valid_until_ms: at + evidence_ms.min(expires_in_ms),
+        };
+        let material = Secret(entry);
+        let prepared = registry
+            .prepare(&claim, baseline, material.0.len(), at)
+            .unwrap();
+        let store =
+            custody::Store::open_at(prepared.version().scope(), Some(&launching.fixture.socket))
+                .unwrap();
+        registry
+            .store_and_publish(prepared, &material, &store, now)
+            .unwrap()
+    }
+
+    /// The `failure` envelope's `data` a refused launch wrote to stderr.
+    fn refusal(output: &Output) -> Value {
+        serde_json::from_slice::<Value>(&output.stderr)
+            .map(|value| value["error"]["data"].clone())
+            .unwrap_or_else(|_| json!({"unparsed_stderr_bytes": output.stderr.len()}))
+    }
+
+    fn consumer_ran(output: &Output) -> bool {
+        contains(&output.stdout, b"CONSUMER ")
+    }
+
+    /// Waits, bounded, until the fake server has read `count` requests.
+    fn until_requests(server: &Server, count: usize) {
+        let until = Instant::now() + Duration::from_secs(20);
+        while server.requests().len() < count {
+            assert!(Instant::now() < until, "the server saw no request");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    /// §9 "Refusals": a refresh the launch needed that answers `invalid_grant`
+    /// is `service_failure` with `next_action: repair_connection`, and no
+    /// consumer runs; the connection is then Stale and the next launch sends
+    /// nothing. `connections token` names `repair_connection` for the same
+    /// refusal (`token_failure`); `connections launch` maps the owner's error
+    /// through the generic `owner_failure`.
+    #[test]
+    #[ignore = "requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI"]
+    fn adversary_launch_refresh_needing_reauthorization_names_repair_connection() {
+        let server = Server::start(vec![error(400, "invalid_grant")]);
+        let launching = Launching::new(&server.root);
+        let connection = launching.granted(&server, 30_000);
+        let first = launching.launch(&connection);
+        let second = launching.launch(&connection);
+        for output in [&first, &second] {
+            assert!(!consumer_ran(output), "a consumer ran: {}", output.status);
+            for secret in [ACCESS, REFRESH] {
+                assert!(!contains(&output.stderr, secret.as_bytes()));
+                assert!(!contains(&output.stdout, secret.as_bytes()));
+            }
+        }
+        assert_eq!(server.requests().len(), 1, "the Stale launch sent nothing");
+        assert!(launching.issues().is_empty(), "a refusal records nothing");
+        let (first, second) = (refusal(&first), refusal(&second));
+        assert_eq!(first["code"], "service_failure", "{first}");
+        assert_eq!(second["next_action"], "repair_connection", "{second}");
+        assert_eq!(
+            first["next_action"], "repair_connection",
+            "consumer-launch.md §9: a refresh that needs reauthorization names repair_connection: {first}"
+        );
+    }
+
+    /// §4.4's refusal table, which §9 points at: a token endpoint `429` is
+    /// `unavailable` with service code `rate_limited` and its `Retry-After`
+    /// in whole seconds; no consumer runs and nothing is recorded.
+    #[test]
+    #[ignore = "requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI"]
+    fn adversary_launch_rate_limited_refresh_answers_retry_after() {
+        let server = Server::start(vec![Reply {
+            status: 429,
+            body: json!({"error": "rate_limited"}),
+            retry_after: Some("7"),
+        }]);
+        let launching = Launching::new(&server.root);
+        let connection = launching.granted(&server, 30_000);
+        let output = launching.launch(&connection);
+        assert!(!consumer_ran(&output), "a consumer ran: {}", output.status);
+        let data = refusal(&output);
+        assert_eq!(data["code"], "unavailable", "{data}");
+        assert_eq!(data["service_code"], "rate_limited", "{data}");
+        assert_eq!(data["retry_after_seconds"], 7, "{data}");
+        assert!(launching.issues().is_empty(), "a refusal records nothing");
+    }
+
+    /// Two launches of one grant inside the lead, the second arriving while
+    /// the first one's exchange is in flight: one refresh request, both
+    /// consumers get the refreshed token, two `consumer_launch` issues.
+    #[test]
+    #[ignore = "requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI"]
+    fn adversary_two_concurrent_launches_exchange_once() {
+        let server = Server::delayed(
+            vec![token(Some(ROTATED), Some("read"))],
+            Duration::from_secs(3),
+        );
+        let launching = Launching::new(&server.root);
+        let connection = launching.granted(&server, 30_000);
+        let secrets = [REFRESH, ROTATED];
+        let (first, second) = std::thread::scope(|scope| {
+            let first = scope.spawn(|| launching.delivered(&connection, &secrets));
+            until_requests(&server, 1);
+            let second = scope.spawn(|| launching.delivered(&connection, &secrets));
+            (first.join().unwrap(), second.join().unwrap())
+        });
+        assert_delivered(&first, REFRESHED_ACCESS.as_bytes(), "the refreshed token");
+        assert_delivered(&second, REFRESHED_ACCESS.as_bytes(), "the refreshed token");
+        assert_eq!(server.requests().len(), 1, "one exchange for two launches");
+        let issues = launching.issues();
+        assert_eq!(issues.len(), 2, "one issue per launch");
+        for issue in &issues {
+            assert_eq!(issue.fields["delivery"], json!("consumer_launch"));
+        }
+    }
+
+    /// §9 "Issue in place of the read" then the re-read: a configuration that
+    /// changes while the launch's refresh is in flight is
+    /// `lifecycle_conflict`, no consumer runs, and the issue already recorded
+    /// stays recorded (D3). Catches a launch that drops the re-read after the
+    /// issue; nothing else in the suite does.
+    #[test]
+    #[ignore = "requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI"]
+    fn adversary_configuration_changed_during_the_issue_is_lifecycle_conflict() {
+        let server = Server::delayed(
+            vec![token(Some(ROTATED), Some("read"))],
+            Duration::from_secs(3),
+        );
+        let launching = Launching::new(&server.root);
+        let connection = launching.granted(&server, 30_000);
+        let output = std::thread::scope(|scope| {
+            let launched = scope.spawn(|| launching.launch(&connection));
+            until_requests(&server, 1);
+            let text = std::fs::read_to_string(&launching.paths.config).unwrap();
+            let changed = text.replacen(
+                "[consumers.probe.executable]",
+                "[consumers.probe]\npass_env=['ADVERSARY_']\n[consumers.probe.executable]",
+                1,
+            );
+            assert_ne!(text, changed);
+            let staged = launching.paths.config.with_extension("adversary");
+            std::fs::write(&staged, changed).unwrap();
+            // The configuration stays owner-only, as the original is.
+            let permissions = std::fs::metadata(&launching.paths.config)
+                .unwrap()
+                .permissions();
+            std::fs::set_permissions(&staged, permissions).unwrap();
+            std::fs::rename(&staged, &launching.paths.config).unwrap();
+            launched.join().unwrap()
+        });
+        assert!(!consumer_ran(&output), "a consumer ran: {}", output.status);
+        let data = refusal(&output);
+        assert_eq!(data["code"], "lifecycle_conflict", "{data}");
+        let issues = launching.issues();
+        assert_eq!(issues.len(), 1, "the recorded issue stays recorded");
+        assert_launch_issue(&issues[0], &connection, true);
+    }
+
+    /// The story's outcome: the consumer gets a currently valid access token,
+    /// refreshed first when it expires within the lead. A shipped grant's
+    /// evidence (at most 300 s, catalog default 60 s) lapses long before its
+    /// access token enters the lead, so the launch is refused at readiness
+    /// while `connections token` on the same connection refreshes and issues.
+    #[test]
+    #[ignore = "requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI"]
+    fn adversary_launch_inside_the_lead_after_evidence_lapsed_refreshes() {
+        let server = Server::start(vec![
+            token(Some(ROTATED), Some("read")),
+            token(Some(ROTATED), Some("read")),
+        ]);
+        let launching = Launching::new(&server.root);
+        let connection = granted_with_evidence(&launching, &server, 30_000, 1_000);
+        std::thread::sleep(Duration::from_millis(1_500));
+        let launched = launching.launch(&connection);
+        let token = std::process::Command::new(&launching.cli)
+            .env_clear()
+            .env("CONNECTORS_TEST_OAUTH_FOLLOW", &launching.trust)
+            .args(["--output", "json", "--config"])
+            .arg(&launching.paths.config)
+            .arg("--state-dir")
+            .arg(&launching.paths.state)
+            .args(["connections", "token", "--adapter", ALIAS])
+            .args(["--connection", &connection])
+            .stdin(std::process::Stdio::null())
+            .output()
+            .unwrap();
+        assert_eq!(
+            token.status.code(),
+            Some(0),
+            "connections token refreshes the same state: {}",
+            refusal(&token)
+        );
+        assert_eq!(
+            launched.status.code(),
+            Some(CONSUMER_EXIT),
+            "the launch was refused where connections token refreshed: {}",
+            refusal(&launched)
+        );
+    }
+}
