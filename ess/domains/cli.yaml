@@ -381,14 +381,18 @@ types:
       - {name: evidence_lifetime_ms, type: Integer}
       - {name: fields, type: "List<connectors.cli.PrivateEntryField>"}
       - {name: acquisition, type: "Optional<connectors.cli.PrivateProfileAcquisition>"}
-  # Present only for a profile whose entry is acquired by OAuth consent; the
-  # authorize and token endpoints and the requested scopes, all nonsecret.
+  # Present only for a profile whose entry is acquired by OAuth, in exactly one of
+  # two forms, all nonsecret: OAuth consent for a static entry names the authorize
+  # and token endpoints and the requested scopes; an oauth2_grant profile names only
+  # oauth2, the authorization server it declares, without its absent members
+  # (story:connect-runs-an-oauth2-grant).
   - name: connectors.cli.PrivateProfileAcquisition
     kind: struct
     fields:
-      - {name: authorize_url, type: String}
-      - {name: token_url, type: String}
-      - {name: scopes, type: "List<String>"}
+      - {name: authorize_url, type: "Optional<String>"}
+      - {name: token_url, type: "Optional<String>"}
+      - {name: scopes, type: "Optional<List<String>>"}
+      - {name: oauth2, type: "Optional<connectors.oauth2.ServerDeclaration>"}
   - name: connectors.cli.PrivateOperationEffect
     kind: enum
     variants: [read, write, unknown]
@@ -887,6 +891,11 @@ types:
       # The binding the connection's current evidence selected, for an instance that
       # declares alternative bindings; absent otherwise.
       - {name: binding, type: "Optional<String>"}
+      # For an oauth2_grant connection, the scopes its current evidence recorded as granted
+      # and the expiry of its access token in Unix milliseconds; absent for every other
+      # connection. Never the token (story:connect-runs-an-oauth2-grant).
+      - {name: granted_scopes, type: "Optional<List<String>>"}
+      - {name: credential_expires_at_ms, type: "Optional<Integer>"}
   # Public projection of the existing acquisition owner: Pending/Completing -> pending,
   # Completed -> completed, Failed/Expired -> failed. The safe reason is present
   # exactly when failed; a yielded connection is present exactly when completed.
@@ -1214,8 +1223,13 @@ types:
   # EPHEMERAL LOCAL ACTION ONLY: protected source fills credential_document; never persist/log/serialize into public management, results or recording evidence.
   # Under the read-only mounted_secret binding connect and repair take no protected source: the
   # owner reads the item <adapter alias>/<profile> itself, and a source is invalid_input
-  # at arguments. Under a platform binding a missing source is protected_entry_unavailable
-  # (contracts/cli/v1alpha1/semantics.md §2).
+  # at arguments. Under a platform binding a missing source is protected_entry_unavailable,
+  # except for an oauth2_grant profile of a public client, whose grant runs in the CLI and
+  # whose token response is the entry; a confidential client's source is its client secret
+  # (contracts/cli/v1alpha1/semantics.md §2 and §5). device (--device, bare --device is
+  # --device true) runs the device grant of an oauth2_grant profile, through the device
+  # dialect registered for its profile id when there is one; on any other profile, or
+  # under the read-only binding, it is invalid_input.
   - name: connectors.cli.ConnectionConnectInput
     kind: struct
     fields:
@@ -1223,6 +1237,7 @@ types:
       - {name: connector, type: "Optional<String>"}
       - {name: instance, type: "Optional<String>"}
       - {name: profile, type: "String"}
+      - {name: device, type: "Optional<Boolean>"}
       - {name: credential_document, type: "Optional<String>"}
   - name: connectors.cli.ConnectionConnectResult
     kind: struct
@@ -1230,6 +1245,7 @@ types:
       - {name: connection, type: "connectors.cli.ConnectionDescription"}
       - {name: acquisition, type: "Optional<String>"}
   # EPHEMERAL LOCAL ACTION ONLY: credential_document bypasses ordinary management projection and reaches separately bound trusted completion.
+  # device is as on connectors.cli.ConnectionConnectInput.
   - name: connectors.cli.ConnectionReconnectInput
     kind: struct
     fields:
@@ -1238,6 +1254,7 @@ types:
       - {name: instance, type: "Optional<String>"}
       - {name: connection, type: "Optional<String>"}
       - {name: expected_revision, type: "String"}
+      - {name: device, type: "Optional<Boolean>"}
       - {name: credential_document, type: "Optional<String>"}
   - name: connectors.cli.ConnectionReconnectResult
     kind: struct
@@ -1287,6 +1304,31 @@ types:
     fields:
       - {name: consumer, type: "String"}
       - {name: exit_code, type: "Integer"}
+  # Selectors and reveal (--reveal, bare --reveal is --reveal true). The owner issues the
+  # published access token of an oauth2_grant connection, refreshing it first when it expires
+  # within the declaration's refresh_lead_seconds; the caller cannot ask for a refresh, so
+  # nothing here names validity (connectors.oauth2.IssueAccessToken). Without reveal no output
+  # stream carries the token; with it, standard output is the token and one newline and
+  # nothing else, and no envelope is written. Standard error never carries it.
+  - name: connectors.cli.ConnectionTokenInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
+      - {name: connection, type: "Optional<String>"}
+      - {name: reveal, type: "Optional<Boolean>"}
+  # The issue's metadata, never the token: expires_at is RFC 3339, refreshed says a refresh
+  # published the token for this call, and issue names the recorded
+  # connectors.oauth2.AccessTokenIssue.
+  - name: connectors.cli.ConnectionTokenResult
+    kind: struct
+    fields:
+      - {name: connection, type: "String"}
+      - {name: expires_at, type: "String"}
+      - {name: scopes, type: "List<String>"}
+      - {name: refreshed, type: "Boolean"}
+      - {name: issue, type: "String"}
   # Exactly one selector required by the binding; Optional alone does not enforce exclusivity.
   - name: connectors.cli.ConnectionStatusInput
     kind: struct
@@ -1543,7 +1585,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:967, docs/local-connection-registry.md:222-223;
+    # contracts/cli/v1alpha1/semantics.md:998, docs/local-connection-registry.md:222-223;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1703,8 +1745,8 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:971) and the host
-    # removal path (er.rs:4441-4443) only expires Active cursors. The error name is
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1002) and the host
+    # removal path (er.rs:4538-4540) only expires Active cursors. The error name is
     # the decision; no source names one.
 
 events:

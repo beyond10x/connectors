@@ -33,6 +33,8 @@ pub(super) struct Session {
     pub cancelled: bool,
     /// The exit code of a consumer `connections launch` ran.
     pub launched: Option<i32>,
+    /// The access token `connections token --reveal` issued, printed alone.
+    pub revealed: Option<connectors_oauth2::Secret>,
 }
 impl Session {
     pub fn new(args: &[OsString]) -> Shared {
@@ -76,6 +78,7 @@ impl Session {
                 "connection",
                 "expected_revision",
                 "operation",
+                "device",
             ] {
                 if let Ok(Some(value)) = leaf.try_get_one::<String>(&format!("field:{field}")) {
                     selectors[field] = json!(value);
@@ -97,6 +100,7 @@ impl Session {
             mutation_deadline,
             cancelled: false,
             launched: None,
+            revealed: None,
         }))
     }
     /// The preparsed callable and its context, when the arguments parsed.
@@ -193,6 +197,7 @@ impl Session {
         if Config::load(&paths.config)?.selection().read_only() {
             return Err(Code::InvalidInput.into());
         }
+        let device = selection.selectors.get("device").and_then(Value::as_str) == Some("true");
         let text = |key| selection.selectors.get(key).and_then(Value::as_str);
         let alias = super::select::alias_at(&selection.selectors, &paths)?;
         let alias = alias.as_str();
@@ -210,17 +215,38 @@ impl Session {
             connection,
             text("expected_revision").map(str::to_owned),
         )?;
+        // An `oauth2_grant` profile's source is a confidential client's secret,
+        // with which its grant runs here; `--device` names that grant's flow and
+        // belongs to no other profile.
+        let grant = capture.profile.grant().is_some();
+        let granted = |document: Secret| -> owner::Result<Secret> {
+            if grant {
+                super::dialects::granted(&capture, Some(document), device)
+            } else {
+                Ok(document)
+            }
+        };
+        if device && !grant {
+            let mut error = owner::Error::from(Code::InvalidInput);
+            error.acquisition = Some(capture.acquisition.clone());
+            return Err(error);
+        }
         let result = match source {
             // Google's client file under an OAuth-acquired profile becomes the
             // entry by consent; every other file is submitted as it is.
             ProtectedSource::File(path) => {
                 protected::file(&path, capture.expires_at_ms).and_then(|document| {
-                    oauth::entry(&capture.profile, document, capture.expires_at_ms)
+                    if grant {
+                        granted(document)
+                    } else {
+                        oauth::entry(&capture.profile, document, capture.expires_at_ms)
+                    }
                 })
             }
-            ProtectedSource::Stdin => protected::stdin(capture.expires_at_ms),
+            ProtectedSource::Stdin => protected::stdin(capture.expires_at_ms).and_then(granted),
             ProtectedSource::HiddenTty => {
                 protected::terminal(&capture.profile.fields, capture.expires_at_ms)
+                    .and_then(granted)
             }
             _ => unreachable!(),
         };
@@ -237,7 +263,12 @@ impl Session {
     /// `connections connect` or `reconnect` with no protected source. Under the
     /// read-only `mounted_secret` binding the owner reads the item
     /// `<adapter alias>/<profile>` itself and no bytes pass through this
-    /// process; under a platform binding a source is required.
+    /// process. Under a platform binding only an `oauth2_grant` profile of a
+    /// public client takes none: its grant runs here and its token response is
+    /// the entry. Any other profile is `protected_entry_unavailable`, before
+    /// custody, an owner or the adapter is reached when the cached description
+    /// names its kind (`owner::admit_sourceless_grant`), and otherwise by the
+    /// owner before the registry is written.
     pub fn complete_without_source(&mut self, call: &Invocation<'_>) -> owner::Result<Value> {
         self.signals()?;
         let selection = self.selection.as_ref().ok_or(Code::InvalidInput)?;
@@ -248,19 +279,42 @@ impl Session {
             call.context.config.as_deref(),
             call.context.state_dir.as_deref(),
         )?;
-        if !Config::load(&paths.config)?.selection().read_only() {
-            return Err(Code::ProtectedEntryUnavailable.into());
+        let read_only = Config::load(&paths.config)?.selection().read_only();
+        let device = call.input.get("device").and_then(Value::as_bool) == Some(true);
+        if read_only && device {
+            return Err(Code::InvalidInput.into());
         }
         let text = |key| call.input.get(key).and_then(Value::as_str);
         let alias = text("adapter").ok_or(Code::InvalidInput)?;
         let connection = reconnected(call.callable, &paths, alias, text("connection"))?;
-        owner::admit_capture(
+        let admit = if read_only {
+            owner::admit_capture
+        } else {
+            owner::admit_sourceless_grant
+        };
+        admit(
             &paths,
             alias,
             text("profile"),
             connection.as_deref(),
             text("expected_revision"),
         )?;
+        if !read_only {
+            let capture = owner::Client::connect(&paths, true)?.begin_grant(
+                alias,
+                text("profile").map(str::to_owned),
+                connection,
+                text("expected_revision").map(str::to_owned),
+            )?;
+            let entry = super::dialects::granted(&capture, None, device).map_err(|mut error| {
+                error.acquisition = Some(capture.acquisition.clone());
+                if error.code == Code::InvalidInput {
+                    error.code = Code::ProtectedEntryUnavailable;
+                }
+                error
+            })?;
+            return capture.complete(&entry);
+        }
         owner::Client::connect(&paths, true)?
             .begin(
                 alias,

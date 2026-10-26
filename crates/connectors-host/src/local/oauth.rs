@@ -11,7 +11,7 @@
 use super::{
     owner::{Code, Error, Result},
     protected,
-    runtime::{Acquisition, Profile},
+    runtime::{Acquisition, Consent, Profile},
 };
 use crate::http::{HttpConfig, ScopedHttp};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -119,7 +119,7 @@ struct Environment<'a> {
 }
 
 fn client_file(profile: &Profile, document: &Secret) -> Option<Installed> {
-    profile.acquisition.as_ref()?;
+    profile.acquisition.as_ref()?.consent()?;
     serde_json::from_slice::<ClientFile>(&document.0)
         .ok()
         .map(|file| file.installed)
@@ -154,6 +154,7 @@ fn acquire(
     let acquisition = profile
         .acquisition
         .as_ref()
+        .and_then(Acquisition::consent)
         .ok_or(Code::ProtectedEntryUnavailable)?;
     let mut fields: Vec<&str> = profile.fields.iter().map(|f| f.name.as_str()).collect();
     fields.sort_unstable();
@@ -201,7 +202,7 @@ fn acquire(
 }
 
 fn authorize_url(
-    acquisition: &Acquisition,
+    acquisition: &Consent,
     client_id: &str,
     redirect_uri: &str,
     state: &str,
@@ -532,7 +533,7 @@ fn answer(mut stream: TcpStream, answer: Answer) {
 /// since the CLI's ordinary output is held until it exits: to the terminal,
 /// or, without one, as the single stderr line `connectors: consent-url <url>`
 /// that a caller can find ahead of the CLI's own output.
-fn present(url: &str) {
+pub(super) fn present(url: &str) {
     let message = format!(
         "Open this address in a browser on this machine to grant access (waiting {} s):\n{url}\n",
         FLOW_TIMEOUT.as_secs()
@@ -650,17 +651,17 @@ fn triple(client_id: &str, client_secret: &str, refresh_token: &str) -> Result<S
 /// for the code exchange. A release build compiles none of this, so no
 /// environment variable can redirect its consent or its trust.
 #[cfg(debug_assertions)]
-mod follow {
+pub(super) mod follow {
     use super::*;
 
-    pub(super) fn trust() -> Result<Option<Vec<u8>>> {
+    pub(in crate::local) fn trust() -> Result<Option<Vec<u8>>> {
         std::env::var_os("CONNECTORS_TEST_OAUTH_FOLLOW")
             .map(|path| std::fs::read(path).map_err(|_| Code::InvalidConfiguration.into()))
             .transpose()
     }
 
     /// Asks the authorize URL, and follows its redirect to the listener.
-    pub(super) fn consent(url: &str, root: &[u8]) {
+    pub(in crate::local) fn consent(url: &str, root: &[u8]) {
         let (url, root) = (url.to_owned(), root.to_vec());
         std::thread::spawn(move || {
             let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
@@ -700,12 +701,12 @@ mod follow {
     }
 }
 #[cfg(not(debug_assertions))]
-mod follow {
-    pub(super) fn trust() -> super::Result<Option<Vec<u8>>> {
+pub(super) mod follow {
+    pub(in crate::local) fn trust() -> super::Result<Option<Vec<u8>>> {
         Ok(None)
     }
 
-    pub(super) fn consent(_url: &str, _root: &[u8]) {}
+    pub(in crate::local) fn consent(_url: &str, _root: &[u8]) {}
 }
 
 #[cfg(test)]
@@ -713,7 +714,7 @@ mod tests {
     use super::*;
     use crate::local::{
         protected, registry,
-        runtime::{Acquisition, EntryField},
+        runtime::{Acquisition, Consent, EntryField},
     };
     #[cfg(unix)]
     use std::process::{Command, Stdio};
@@ -750,11 +751,11 @@ mod tests {
                     max_bytes: 8192,
                 })
                 .collect(),
-            acquisition: Some(Acquisition {
+            acquisition: Some(Acquisition::Consent(Consent {
                 authorize_url: AUTHORIZE.into(),
                 token_url: TOKEN.into(),
                 scopes: [SCOPE.to_owned()].into(),
-            }),
+            })),
         }
     }
 

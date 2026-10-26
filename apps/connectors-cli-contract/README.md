@@ -160,6 +160,14 @@ Callable: `connections-status`. Input: `connectors.cli.ConnectionStatusInput`. R
 
 Error `failure`: `connectors.cli.Failure`.
 
+### `connections token`
+
+Issue a current access token of one OAuth2 connection, printed only with --reveal
+
+Callable: `connections-token`. Input: `connectors.cli.ConnectionTokenInput`. Result: `connectors.cli.ConnectionTokenResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
 ### `instances describe`
 
 Inspect one configured instance and its cached descriptor; `adapters describe` is its deprecated name
@@ -297,6 +305,7 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:connections-revalidate: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-revoke: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-status: implement the owner-qualified callable and its declared result/error contract
+- handler:connections-token: implement the owner-qualified callable and its declared result/error contract
 - handler:connectors-list: implement the owner-qualified callable and its declared result/error contract
 - handler:operations-describe: implement the owner-qualified callable and its declared result/error contract
 - handler:operations-invoke: implement the owner-qualified callable and its declared result/error contract
