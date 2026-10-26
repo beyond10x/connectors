@@ -631,6 +631,65 @@ pub fn admit_capture(
     connection: Option<&str>,
     revision: Option<&str>,
 ) -> Result<String> {
+    let (config, profile) = capture_profile(paths, alias, profile, connection, revision)?;
+    if !custody::available_for(&config.selection()) {
+        return Err(Code::CustodyUnavailable.into());
+    }
+    Ok(profile)
+}
+/// [`admit_capture`] of a `connections connect` or `reconnect` that brings no
+/// protected source under a platform binding. Only an `oauth2_grant` profile
+/// of a public client takes none: its grant runs in the CLI
+/// (contracts/cli/v1alpha1/semantics.md, "Exactly one protected entry
+/// source"); for any other profile a missing source is
+/// `protected_entry_unavailable`, a profile this adapter may not use
+/// included, as it was before any profile could take none. Which kind the
+/// profile is comes from the adapter's cached description, read without
+/// starting an owner or the adapter, so any other profile it describes is
+/// refused before custody is looked at. With no description cached only the
+/// owner can tell, once it has started the adapter, and it refuses any other
+/// profile before the registry is written; it is asked only when custody is
+/// available, since the exception it would establish needs custody too.
+pub fn admit_sourceless_grant(
+    paths: &Paths,
+    alias: &str,
+    profile: Option<&str>,
+    connection: Option<&str>,
+    revision: Option<&str>,
+) -> Result<String> {
+    let missing = || Error::from(Code::ProtectedEntryUnavailable);
+    let (config, profile) = capture_profile(paths, alias, profile, connection, revision).map_err(
+        |error| match error.code {
+            Code::Forbidden => missing(),
+            _ => error,
+        },
+    )?;
+    let public_grant = match cached(paths, alias) {
+        Ok(bootstrap) => Some(bootstrap.profile(&profile).ok().is_some_and(|profile| {
+            profile.grant().is_some_and(|declaration| {
+                declaration.client_kind == connectors_oauth2::ClientKind::Public
+            })
+        })),
+        Err(error) if error.code == Code::DescriptionUnavailable => None,
+        Err(error) => return Err(error),
+    };
+    let custody = custody::available_for(&config.selection());
+    match (public_grant, custody) {
+        (Some(false), _) | (None, false) => Err(missing()),
+        (Some(true), false) => Err(Code::CustodyUnavailable.into()),
+        (_, true) => Ok(profile),
+    }
+}
+/// The profile a capture begins under, admitted as far as the configuration,
+/// the registry and the metadata store decide, with the configuration it was
+/// read from.
+fn capture_profile(
+    paths: &Paths,
+    alias: &str,
+    profile: Option<&str>,
+    connection: Option<&str>,
+    revision: Option<&str>,
+) -> Result<(Config, String)> {
     let (config, adapter) = selected(paths, alias)?;
     let profile = match (profile, connection, revision) {
         (Some(profile), None, None) if connectors_core::valid_id(profile) => profile.to_owned(),
@@ -658,10 +717,7 @@ pub fn admit_capture(
     }
     // Metadata must exist before any private owner startup or protected input.
     super::metadata::Metadata::inspect(&paths.state)?;
-    if !custody::available_for(&config.selection()) {
-        return Err(Code::CustodyUnavailable.into());
-    }
-    Ok(profile)
+    Ok((config, profile))
 }
 /// Admission of a named operation, in the contract's order: an operation the
 /// selected description does not expose is `not_found`, one it exposes but the

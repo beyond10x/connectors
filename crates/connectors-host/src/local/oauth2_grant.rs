@@ -31,7 +31,7 @@ use connectors_sdk::Secret;
 use serde::{Deserialize, Serialize};
 use std::{
     io::Write as _,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
     time::Duration,
 };
 use zeroize::Zeroizing;
@@ -39,8 +39,9 @@ use zeroize::Zeroizing;
 /// What a grant leaves of the capture window for the owner's validation and
 /// storage, which take up to 30 s.
 const COMPLETION_RESERVE_MS: u64 = 45_000;
-/// The largest entry custody holds.
-const ENTRY_LIMIT: usize = 64 * 1024;
+/// The largest grant entry: the most custody holds. The CLI builds no larger
+/// entry, and the adapter reading one bounds each of its fields by it.
+pub const ENTRY_LIMIT: usize = connectors_custody::MAX_BYTES;
 /// How often a wait looks at the person's interruption.
 const SLICE: Duration = Duration::from_millis(50);
 
@@ -122,6 +123,38 @@ impl Transport for Https {
     }
 }
 
+/// A transport that notes the instant before each request it sends. A grant's
+/// last request is the one its tokens answered (the code exchange, the
+/// successful device poll, a dialect's exchange), and the server issued them
+/// no earlier than that request was sent, so their expiry counts from it.
+struct Stamped<T> {
+    inner: T,
+    clock: fn() -> u64,
+    sent_ms: AtomicU64,
+}
+
+impl<T> Stamped<T> {
+    fn new(inner: T, clock: fn() -> u64) -> Self {
+        Self {
+            inner,
+            clock,
+            sent_ms: AtomicU64::new(0),
+        }
+    }
+
+    /// The instant before the last request was sent; 0 before any.
+    fn sent_ms(&self) -> u64 {
+        self.sent_ms.load(Ordering::SeqCst)
+    }
+}
+
+impl<T: Transport> Transport for Stamped<T> {
+    fn post(&self, request: &Request<'_>) -> std::result::Result<Response, TransportError> {
+        self.sent_ms.store((self.clock)(), Ordering::SeqCst);
+        self.inner.post(request)
+    }
+}
+
 /// What the person asked of a grant.
 pub struct Grant<'a> {
     /// `--device`: the device grant instead of the authorization code.
@@ -148,13 +181,14 @@ pub fn run(profile: &Profile, grant: Grant<'_>, expires_at_ms: u64) -> Result<Se
     }
     let secret = grant.document.map(client_secret).transpose()?;
     let trust = oauth::follow::trust()?;
-    let client = Client::new(declaration, None, secret, Https::new(trust.as_deref())?)
+    let transport = Stamped::new(Https::new(trust.as_deref())?, connectors_sdk::now_ms);
+    let client = Client::new(declaration, None, secret, &transport)
         // A public client given a secret, or a confidential one given none:
         // the protected source is what does not fit.
         .map_err(|_| Code::ProtectedEntryUnavailable)?;
     let waiter = Until(deadline_ms);
-    let (granted, issued_at_ms) = if grant.device {
-        let granted = device_grant(
+    let granted = if grant.device {
+        device_grant(
             &client,
             grant.dialect,
             &waiter,
@@ -163,12 +197,11 @@ pub fn run(profile: &Profile, grant: Grant<'_>, expires_at_ms: u64) -> Result<Se
                 None => present_device(device),
             },
         )
-        .map_err(refusal)?;
-        (granted, connectors_sdk::now_ms())
     } else {
-        code_grant(&client, deadline_ms, trust.as_deref()).map_err(refusal)?
-    };
-    entry(client.client_id(), &granted, issued_at_ms)
+        code_grant(&client, deadline_ms, trust.as_deref())
+    }
+    .map_err(refusal)?;
+    entry(client.client_id(), &granted, transport.sent_ms())
 }
 
 /// A device grant: the dialect registered for the profile when there is one,
@@ -191,13 +224,12 @@ pub fn device_grant<T: Transport>(
     }
 }
 
-/// The authorization-code grant over the declared redirect kind, and when its
-/// exchange was sent: the access token was issued no earlier.
+/// The authorization-code grant over the declared redirect kind.
 fn code_grant<T: Transport>(
     client: &Client<T>,
     deadline_ms: u64,
     trust: Option<&[u8]>,
-) -> std::result::Result<(Granted, u64), Failure> {
+) -> std::result::Result<Granted, Failure> {
     let declaration = client.declaration();
     let (authorization, code) = match declaration.redirect_kind {
         RedirectKind::PastedCode => {
@@ -227,8 +259,7 @@ fn code_grant<T: Transport>(
             (authorization, code)
         }
     };
-    let sent_at_ms = connectors_sdk::now_ms();
-    Ok((client.exchange(authorization, code)?, sent_at_ms))
+    client.exchange(authorization, code)
 }
 
 /// The loopback redirect, ended by the deadline or by the person's
@@ -572,6 +603,132 @@ mod tests {
         ));
     }
 
+    thread_local! {
+        static CLOCK: std::cell::Cell<u64> = const { std::cell::Cell::new(1_000_000) };
+    }
+
+    /// The fake clock of [`SlowServer`]'s tests: each answer moves it on.
+    fn clock() -> u64 {
+        CLOCK.with(std::cell::Cell::get)
+    }
+
+    /// An authorization server whose every answer takes 7 s of [`clock`]. Its
+    /// token endpoint answers `authorization_pending` `pending` times, then
+    /// grants a token valid for 600 s, and notes when that granting request
+    /// arrived.
+    struct SlowServer {
+        pending: std::cell::Cell<u32>,
+        granting: std::cell::Cell<Option<u64>>,
+    }
+
+    impl SlowServer {
+        fn new(pending: u32) -> Self {
+            Self {
+                pending: std::cell::Cell::new(pending),
+                granting: std::cell::Cell::new(None),
+            }
+        }
+    }
+
+    impl Transport for SlowServer {
+        fn post(&self, request: &Request<'_>) -> std::result::Result<Response, TransportError> {
+            let arrived = clock();
+            CLOCK.with(|now| now.set(now.get() + 7_000));
+            let (status, body) = if request.url.ends_with("/device/code") {
+                (
+                    200,
+                    serde_json::json!({
+                        "device_code": "fixture-unit-device",
+                        "user_code": "FIXT-0001",
+                        "verification_uri": "https://localhost/fixture/device",
+                        "expires_in": 600,
+                        "interval": 1,
+                    }),
+                )
+            } else if request.url.ends_with("/dialect") {
+                (200, serde_json::json!({}))
+            } else if self.pending.get() > 0 {
+                self.pending.set(self.pending.get() - 1);
+                (400, serde_json::json!({"error": "authorization_pending"}))
+            } else {
+                self.granting.set(Some(arrived));
+                (
+                    200,
+                    serde_json::json!({
+                        "access_token": "fixture-unit-access",
+                        "token_type": "Bearer",
+                        "expires_in": 600,
+                        "scope": "fixture.read",
+                    }),
+                )
+            };
+            Ok(Response {
+                status,
+                retry_after: None,
+                body: Zeroizing::new(serde_json::to_vec(&body).unwrap()),
+            })
+        }
+    }
+
+    /// A waiter that never waits.
+    struct Immediately;
+
+    impl Waiter for Immediately {
+        fn wait(&self, _duration: Duration) -> std::result::Result<(), Failure> {
+            Ok(())
+        }
+    }
+
+    /// A device dialect that makes one request of its own and returns a code.
+    struct Dialect;
+
+    impl DeviceDialect for Dialect {
+        fn authorize(
+            &self,
+            context: &connectors_oauth2::DialectContext<'_>,
+        ) -> std::result::Result<connectors_oauth2::DialectGrant, Failure> {
+            context
+                .transport
+                .post(&Request {
+                    url: "https://localhost/fixture/dialect",
+                    content_type: "application/json",
+                    body: b"{}",
+                    limit: 1024,
+                })
+                .map_err(|_| Failure::Unavailable)?;
+            Ok(connectors_oauth2::DialectGrant {
+                code: connectors_oauth2::Secret::new("fixture-unit-code".into()),
+                verifier: connectors_oauth2::Secret::new("fixture-unit-verifier".into()),
+                redirect_uri: "https://localhost/fixture/dialect/callback".into(),
+            })
+        }
+    }
+
+    /// The access token expires no later than `expires_in` after the request
+    /// that obtained it arrived, however long the answer took: the successful
+    /// RFC 8628 poll after two pending ones, and a dialect's exchange after
+    /// its own request.
+    #[test]
+    fn a_device_grant_expires_from_the_request_that_obtained_the_token() {
+        for (name, pending, dialect) in [
+            ("rfc8628", 2, None),
+            ("dialect", 0, Some(&Dialect as &dyn DeviceDialect)),
+        ] {
+            let server = SlowServer::new(pending);
+            let transport = Stamped::new(&server, clock);
+            let client = Client::new(device_declaration(), None, None, &transport).unwrap();
+            let granted = device_grant(&client, dialect, &Immediately, &mut |_| {}).unwrap();
+            let stored = entry(client.client_id(), &granted, transport.sent_ms()).unwrap();
+            let value: serde_json::Value = serde_json::from_slice(&stored.0).unwrap();
+            let expires_at_ms = value["expires_at_ms"].as_u64().unwrap();
+            let arrived = server.granting.get().unwrap();
+            assert!(
+                expires_at_ms <= arrived + 600_000,
+                "{name}: expires at {expires_at_ms}, the granting request arrived at {arrived}"
+            );
+        }
+    }
+
     #[test]
     fn a_failed_grant_names_the_next_step_and_no_server_text() {
         for (failure, code) in [
@@ -615,27 +772,7 @@ mod tests {
                     })
                 }
             }
-            let declaration = serde_json::from_value(serde_json::json!({
-                "authorize_url": null,
-                "token_url": "https://localhost/fixture/token",
-                "device_authorization_url": "https://localhost/fixture/device/code",
-                "client_id": "fixture-unit-client",
-                "client_kind": "public",
-                "request_encoding": "form",
-                "refresh_encoding": "form",
-                "redirect_kind": "loopback_any_port",
-                "redirect_uri": null,
-                "authorize_parameters": [],
-                "requested_scopes": ["fixture.read"],
-                "required_scopes": [],
-                "rotation": "rotating",
-                "refresh_lead_seconds": 60,
-                "grant_types": ["device_code"],
-                "sources": [],
-                "state_in_exchange": false,
-            }))
-            .unwrap();
-            Client::new(declaration, None, None, Answer)
+            Client::new(device_declaration(), None, None, Answer)
                 .unwrap()
                 .device_authorize()
                 .unwrap()
@@ -644,6 +781,30 @@ mod tests {
             device_line(&device),
             "connectors: device-code FIXT-0001 https://localhost/fixture/device\n"
         );
+    }
+
+    /// A public client's declaration of the device grant alone.
+    fn device_declaration() -> connectors_oauth2::ServerDeclaration {
+        serde_json::from_value(serde_json::json!({
+            "authorize_url": null,
+            "token_url": "https://localhost/fixture/token",
+            "device_authorization_url": "https://localhost/fixture/device/code",
+            "client_id": "fixture-unit-client",
+            "client_kind": "public",
+            "request_encoding": "form",
+            "refresh_encoding": "form",
+            "redirect_kind": "loopback_any_port",
+            "redirect_uri": null,
+            "authorize_parameters": [],
+            "requested_scopes": ["fixture.read"],
+            "required_scopes": [],
+            "rotation": "rotating",
+            "refresh_lead_seconds": 60,
+            "grant_types": ["device_code"],
+            "sources": [],
+            "state_in_exchange": false,
+        }))
+        .unwrap()
     }
 
     #[test]
