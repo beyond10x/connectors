@@ -81,6 +81,7 @@ impl Ledger {
                     RefreshState::ResponseStored
                 }
                 LedgerStep::Quarantine { .. } => RefreshState::Uncertain,
+                LedgerStep::Release { .. } => RefreshState::Released,
                 LedgerStep::Recover { .. } => RefreshState::Recovering,
                 LedgerStep::Publish { .. } => RefreshState::Published,
                 LedgerStep::Discard { .. } | LedgerStep::Reserve { .. } => RefreshState::Discarded,
@@ -400,7 +401,10 @@ impl Registry {
                     lost: open.owner != owner,
                 });
             }
-            if held.any(|attempt| attempt.state != RefreshState::Fenced) {
+            // A fenced or released attempt left the source refreshable.
+            if held.any(|attempt| {
+                !matches!(attempt.state, RefreshState::Fenced | RefreshState::Released)
+            }) {
                 mark_stale(tx, &row)?;
                 bump(tx, &row.binding.instance_id)?;
                 return Ok(Reservation::Consumed);
@@ -501,6 +505,27 @@ impl Registry {
             }
             ledger.stage(LedgerStep::Quarantine {
                 attempt: ticket.attempt.clone(),
+            });
+            Ok(())
+        })
+    }
+
+    /// `connectors.refresh.ReleaseRateLimited` of the caller's authorized
+    /// exchange the token endpoint refused with HTTP 429 (§4.1, the one
+    /// exception): the source may be reserved again and the connection is
+    /// left as it was.
+    pub(in crate::local) fn release_refresh(&self, ticket: &RefreshTicket, now: u64) -> Result<()> {
+        self.transaction_ledger(now, |tx, _, now, ledger| {
+            owned(
+                &ledger.attempt(&ticket.attempt)?,
+                ticket,
+                RefreshState::Authorized,
+            )?;
+            retire_candidate(tx, &ticket.attempt, now)?;
+            ledger.stage(LedgerStep::Release {
+                attempt: ticket.attempt.clone(),
+                owner: ticket.owner.clone(),
+                token: ticket.token.clone(),
             });
             Ok(())
         })

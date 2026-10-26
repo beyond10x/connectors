@@ -49,7 +49,7 @@ pub enum Outcome {
     InvalidOrRevoked,
     CustodyUnavailable,
     Uncertain,
-    /// HTTP 429: the connection is unchanged.
+    /// HTTP 429: the exchange is released and the connection unchanged.
     RateLimited {
         retry_after_ms: Option<u64>,
     },
@@ -358,23 +358,22 @@ impl Refresher {
         }
         let refreshed = match response {
             Ok(refreshed) => refreshed,
+            // A 429 consumed no source token: the exchange is released and
+            // the connection left as it is (§4.1, the one exception).
+            Err(GrantFailure::RateLimited { retry_after }) => {
+                self.registry.release_refresh(&ticket, now())?;
+                return Ok(Outcome::RateLimited {
+                    retry_after_ms: retry_after
+                        .map(|delay| u64::try_from(delay.as_millis()).unwrap_or(u64::MAX)),
+                });
+            }
             Err(failure) => {
-                let (stale, outcome) = match failure {
-                    // A 429 leaves the connection as it is.
-                    GrantFailure::RateLimited { retry_after } => (
-                        false,
-                        Outcome::RateLimited {
-                            retry_after_ms: retry_after
-                                .map(|delay| u64::try_from(delay.as_millis()).unwrap_or(u64::MAX)),
-                        },
-                    ),
-                    GrantFailure::ReauthorizationRequired => {
-                        (true, Outcome::ReauthorizationRequired)
-                    }
-                    GrantFailure::InsufficientScope => (true, Outcome::InsufficientScope),
-                    _ => (true, Outcome::Uncertain),
+                let outcome = match failure {
+                    GrantFailure::ReauthorizationRequired => Outcome::ReauthorizationRequired,
+                    GrantFailure::InsufficientScope => Outcome::InsufficientScope,
+                    _ => Outcome::Uncertain,
                 };
-                self.registry.quarantine_refresh(&ticket, stale, now())?;
+                self.registry.quarantine_refresh(&ticket, true, now())?;
                 return Ok(outcome);
             }
         };

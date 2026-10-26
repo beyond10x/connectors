@@ -85,6 +85,7 @@ components:
         - connectors.refresh.FenceReserved
         - connectors.refresh.StoreResponse
         - connectors.refresh.QuarantineRefresh
+        - connectors.refresh.ReleaseRateLimited
         - connectors.refresh.RecoverStoredResponse
         - connectors.refresh.PublishRefresh
         - connectors.refresh.DiscardCandidate
