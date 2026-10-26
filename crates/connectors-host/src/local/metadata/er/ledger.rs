@@ -36,6 +36,7 @@ pub enum AttemptState {
     Published,
     Fenced,
     Uncertain,
+    Released,
     Discarded,
 }
 
@@ -49,6 +50,7 @@ impl AttemptState {
             "Published" => Self::Published,
             "Fenced" => Self::Fenced,
             "Uncertain" => Self::Uncertain,
+            "Released" => Self::Released,
             "Discarded" => Self::Discarded,
             _ => return Err(Failure::MetadataUnavailable),
         })
@@ -62,6 +64,7 @@ impl AttemptState {
             Self::Published => "Published",
             Self::Fenced => "Fenced",
             Self::Uncertain => "Uncertain",
+            Self::Released => "Released",
             Self::Discarded => "Discarded",
         }
     }
@@ -69,7 +72,7 @@ impl AttemptState {
     pub fn terminal(self) -> bool {
         matches!(
             self,
-            Self::Published | Self::Fenced | Self::Uncertain | Self::Discarded
+            Self::Published | Self::Fenced | Self::Uncertain | Self::Discarded | Self::Released
         )
     }
 }
@@ -116,6 +119,11 @@ pub enum Step {
     Quarantine {
         attempt: String,
     },
+    Release {
+        attempt: String,
+        owner: String,
+        token: String,
+    },
     Recover {
         attempt: String,
         owner: String,
@@ -140,6 +148,7 @@ impl Step {
             | Self::Fence { attempt }
             | Self::Store { attempt, .. }
             | Self::Quarantine { attempt }
+            | Self::Release { attempt, .. }
             | Self::Recover { attempt, .. }
             | Self::Publish { attempt, .. }
             | Self::Discard { attempt } => attempt,
@@ -171,6 +180,11 @@ impl Step {
                 &[S::Authorized],
                 S::Uncertain,
             ),
+            Self::Release { .. } => (
+                "connectors.refresh.ReleaseRateLimited",
+                &[S::Authorized],
+                S::Released,
+            ),
             Self::Recover { .. } => (
                 "connectors.refresh.RecoverStoredResponse",
                 &[S::ResponseStored],
@@ -196,6 +210,7 @@ impl Step {
             Self::Reserve { owner, token, .. }
             | Self::Authorize { owner, token, .. }
             | Self::Store { owner, token, .. }
+            | Self::Release { owner, token, .. }
             | Self::Publish { owner, token, .. } => {
                 input.insert("owner".into(), json!(owner));
                 input.insert("ownership_token".into(), json!(token));

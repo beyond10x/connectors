@@ -72,13 +72,14 @@ entities:
     # 0.36, which had no multi-record transaction and no crash-recovery construct.
     lifecycle:
       initial: Reserved
-      states: [Reserved, Authorized, ResponseStored, Recovering, Published, Fenced, Uncertain, Discarded]
-      terminal: [Published, Fenced, Uncertain, Discarded]
+      states: [Reserved, Authorized, ResponseStored, Recovering, Published, Fenced, Uncertain, Released, Discarded]
+      terminal: [Published, Fenced, Uncertain, Released, Discarded]
       transitions:
         - {name: authorize, from: [Reserved], to: Authorized}
         - {name: fence, from: [Reserved], to: Fenced}
         - {name: store_response, from: [Authorized], to: ResponseStored}
         - {name: quarantine, from: [Authorized], to: Uncertain}
+        - {name: release, from: [Authorized], to: Released}
         - {name: recover_response, from: [ResponseStored], to: Recovering}
         - {name: publish, from: [ResponseStored, Recovering], to: Published}
         - {name: discard, from: [ResponseStored, Recovering], to: Discarded}
@@ -100,8 +101,9 @@ errors:
 commands:
   - name: connectors.refresh.ReserveRefresh
     # Atomic per-source index acquisition, conditional on the current binding,
-    # non-revocation and no previously authorized exchange for this source. A
-    # Fenced pre-authorization attempt alone permits a new reservation.
+    # non-revocation and no unreleased authorized exchange for this source. A
+    # source whose prior attempts are all Fenced or Released permits a new
+    # reservation.
     input:
       - {name: decision, type: connectors.refresh.ReservationDecision}
       - {name: source_generation_id, type: connectors.credentials.CredentialGenerationId}
@@ -214,6 +216,26 @@ commands:
       - name: wrong-state
         wrong_state: true
         error: connectors.refresh.RefreshStateConflict
+  - name: connectors.refresh.ReleaseRateLimited
+    # CAS with StoreResponse and QuarantineRefresh, by the live owner only: the
+    # token endpoint answered the one exchange with HTTP 429, a definitive
+    # refusal that consumed no source token. The source may be reserved again;
+    # nothing else changes. No other negative response releases an exchange.
+    input:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+      - {name: owner, type: String}
+      - {name: ownership_token, type: connectors.refresh.OwnershipToken}
+    outcomes:
+      - name: released
+        moves: connectors.refresh.RefreshAttempt.release
+        instance: attempt_id
+        emits: [connectors.refresh.RefreshReleased]
+        payload:
+          connectors.refresh.RefreshReleased:
+            attempt_id: input.attempt_id
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.refresh.RefreshStateConflict
   - name: connectors.refresh.RecoverStoredResponse
     # Fence the old publication owner and grant a new publication-only owner.
     # This cannot call the provider, authorize exchange or replace the candidate.
@@ -292,6 +314,9 @@ events:
       - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
       - {name: candidate_generation_id, type: connectors.credentials.CredentialGenerationId}
   - name: connectors.refresh.RefreshUncertain
+    fields:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+  - name: connectors.refresh.RefreshReleased
     fields:
       - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
   - name: connectors.refresh.StoredResponseRecovered

@@ -29,6 +29,7 @@ const RESERVE: &str = "connectors.refresh.ReserveRefresh";
 const AUTHORIZE: &str = "connectors.refresh.AuthorizeExchange";
 const STORE: &str = "connectors.refresh.StoreResponse";
 const QUARANTINE: &str = "connectors.refresh.QuarantineRefresh";
+const RELEASE: &str = "connectors.refresh.ReleaseRateLimited";
 const RECOVER: &str = "connectors.refresh.RecoverStoredResponse";
 const PUBLISH: &str = "connectors.refresh.PublishRefresh";
 
@@ -403,14 +404,25 @@ impl Connected {
 
     /// The one attempt the ledger holds, and its recorded commands.
     fn attempt(&self) -> (crate::local::metadata::RefreshAttempt, Vec<String>) {
+        let mut attempts = self.attempts();
+        assert_eq!(attempts.len(), 1, "one refresh attempt");
+        attempts.remove(0)
+    }
+
+    /// Every attempt the ledger holds, each with its recorded commands.
+    fn attempts(&self) -> Vec<(crate::local::metadata::RefreshAttempt, Vec<String>)> {
         let attempts = Metadata::inspect(&self.path)
             .unwrap()
             .refresh_attempts()
             .unwrap();
-        assert_eq!(attempts.len(), 1, "one refresh attempt");
         let mut recorded = Metadata::recorded_refresh_commands(&self.path).unwrap();
-        let commands = recorded.remove(&attempts[0].id).unwrap();
-        (attempts[0].clone(), commands)
+        attempts
+            .into_iter()
+            .map(|attempt| {
+                let commands = recorded.remove(&attempt.id).unwrap();
+                (attempt, commands)
+            })
+            .collect()
     }
 }
 
@@ -573,7 +585,7 @@ fn invalid_grant_marks_the_connection_stale() {
 fn rate_limited_changes_nothing() {
     let mut limited = error(429, "slow_down");
     limited.retry_after = Some("30");
-    let server = Server::start(vec![limited]);
+    let server = Server::start(vec![limited, token(Some(ROTATED), Some("read"))]);
     let connected = Connected::new(&server, "rotating", &["read"]);
     let before = connected.active();
     let described = connected.described();
@@ -601,9 +613,40 @@ fn rate_limited_changes_nothing() {
         connected.custody.entry(&before.material)["refresh_token"],
         REFRESH
     );
-    let (_, commands) = connected.attempt();
-    assert_eq!(commands, [RESERVE, AUTHORIZE, QUARANTINE]);
     refreshed_request(&server);
+
+    // The 429 released the source: the next refresh sends one request and
+    // publishes, as if the limited exchange had never been authorized.
+    let outcome = connected
+        .refresher("owner-one", &server)
+        .refresh_connection(&connected.connection)
+        .unwrap();
+    assert_eq!(outcome, Outcome::Refreshed);
+    let requests = server.requests();
+    assert_eq!(requests.len(), 2, "the second refresh sent one request");
+    assert_eq!(requests[1]["grant_type"], "refresh_token");
+    assert_eq!(requests[1]["refresh_token"], REFRESH);
+    let after = connected.active();
+    assert_ne!(after.generation, before.generation);
+    assert!(connected.retired(&before.material));
+    assert_eq!(
+        connected.custody.entry(&after.material)["refresh_token"],
+        ROTATED
+    );
+    assert_eq!(connected.described().state, State::Ready);
+    let mut attempts = connected.attempts();
+    attempts.sort_by_key(|(attempt, _)| attempt.state != RefreshState::Released);
+    let [
+        (released, released_commands),
+        (published, published_commands),
+    ] = <[_; 2]>::try_from(attempts).unwrap();
+    assert_eq!(released.state, RefreshState::Released);
+    assert_eq!(released.source_generation, before.generation);
+    assert_eq!(released.candidate_generation, None);
+    assert_eq!(released_commands, [RESERVE, AUTHORIZE, RELEASE]);
+    assert_eq!(published.state, RefreshState::Published);
+    assert_eq!(published.source_generation, before.generation);
+    assert_eq!(published_commands, [RESERVE, AUTHORIZE, STORE, PUBLISH]);
 }
 
 #[test]
