@@ -6,7 +6,9 @@ use connectors_catalog_provider::{Effect, Engine, Selection, feed};
 use connectors_host::{
     http::{HttpConfig, ScopedHttp},
     local::{
-        filesystem, registry,
+        filesystem,
+        oauth2_grant::ENTRY_LIMIT,
+        registry,
         runtime::{
             self, Acquisition, Baseline, Bootstrap, EntryField, Failure, Profile, Requirement,
             Result,
@@ -586,16 +588,34 @@ struct ProtectedEntry {
 fn token<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> std::result::Result<Zeroizing<String>, D::Error> {
-    let value = Zeroizing::new(String::deserialize(deserializer)?);
-    if value.is_empty() || value.len() > 8192 || !value.bytes().all(|b| b.is_ascii_graphic()) {
-        return Err(serde::de::Error::custom("invalid protected field"));
-    }
-    Ok(value)
+    bounded_token(deserializer, 8192)
 }
 fn optional_token<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> std::result::Result<Option<Zeroizing<String>>, D::Error> {
     token(deserializer).map(Some)
+}
+/// A field of an `oauth2_grant` entry ([`GrantEntry`]).
+fn grant_token<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Zeroizing<String>, D::Error> {
+    bounded_token(deserializer, ENTRY_LIMIT)
+}
+fn optional_grant_token<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<Zeroizing<String>>, D::Error> {
+    grant_token(deserializer).map(Some)
+}
+/// 1 to `limit` bytes of visible ASCII: no space, no control character.
+fn bounded_token<'de, D: Deserializer<'de>>(
+    deserializer: D,
+    limit: usize,
+) -> std::result::Result<Zeroizing<String>, D::Error> {
+    let value = Zeroizing::new(String::deserialize(deserializer)?);
+    if value.is_empty() || value.len() > limit || !value.bytes().all(|b| b.is_ascii_graphic()) {
+        return Err(serde::de::Error::custom("invalid protected field"));
+    }
+    Ok(value)
 }
 /// The basic profile's protected entry. The same token rules apply; the account
 /// may be any printable text without a colon, which basic cannot carry.
@@ -666,22 +686,29 @@ struct ClientEntry {
     client_secret: Zeroizing<String>,
 }
 /// The `oauth2_grant` profile's protected entry, as the CLI's grant wrote it.
-/// The tokens follow the token rules; the scopes are what the server granted.
+/// Its strings are tokens of visible ASCII, each bounded only by the entry the
+/// CLI builds them into (`oauth2_grant::ENTRY_LIMIT`), not by the token rules:
+/// a token endpoint's tokens, an OpenID Connect `id_token` above all, may be
+/// longer than a token a person enters. The scopes are what the server granted.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct GrantEntry {
-    #[serde(deserialize_with = "token")]
+    #[serde(deserialize_with = "grant_token")]
     client_id: Zeroizing<String>,
-    #[serde(deserialize_with = "token")]
+    #[serde(deserialize_with = "grant_token")]
     access_token: Zeroizing<String>,
     /// Absent when the server issued none. Validation never refreshes, so
     /// only its form is checked here.
-    #[serde(default, rename = "refresh_token", deserialize_with = "optional_token")]
+    #[serde(
+        default,
+        rename = "refresh_token",
+        deserialize_with = "optional_grant_token"
+    )]
     _refresh_token: Option<Zeroizing<String>>,
     expires_at_ms: u64,
     scopes: BTreeSet<String>,
     /// The OpenID Connect `id_token` the token endpoint returned, when it did.
-    #[serde(default, deserialize_with = "optional_token")]
+    #[serde(default, deserialize_with = "optional_grant_token")]
     id_token: Option<Zeroizing<String>>,
 }
 /// An `id_token`'s audience: one client id or several (OpenID Connect Core
@@ -1864,9 +1891,12 @@ impl Local {
         };
         Ok((oauth, grant, Sha256::digest(document.as_slice()).into()))
     }
-    /// An `oauth2_grant` profile's entry.
-    fn grant_entry(document: Secret) -> Result<GrantEntry> {
-        let document = Self::document(document)?;
+    /// An `oauth2_grant` profile's entry, no larger than the CLI builds one.
+    fn grant_entry(mut document: Secret) -> Result<GrantEntry> {
+        let document = Zeroizing::new(std::mem::take(&mut document.0));
+        if document.len() > ENTRY_LIMIT {
+            return Err(Failure::InvalidInput);
+        }
         serde_json::from_slice(&document).map_err(|_| Failure::InvalidInput)
     }
     /// The credential value a request carries, derived from the protected

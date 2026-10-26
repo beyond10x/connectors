@@ -262,8 +262,10 @@ impl Session {
     /// `<adapter alias>/<profile>` itself and no bytes pass through this
     /// process. Under a platform binding only an `oauth2_grant` profile of a
     /// public client takes none: its grant runs here and its token response is
-    /// the entry; the owner refuses any other profile as
-    /// `protected_entry_unavailable` before the registry is written.
+    /// the entry. Any other profile is `protected_entry_unavailable`, before
+    /// custody, an owner or the adapter is reached when the cached description
+    /// names its kind (`owner::admit_sourceless_grant`), and otherwise by the
+    /// owner before the registry is written.
     pub fn complete_without_source(&mut self, call: &Invocation<'_>) -> owner::Result<Value> {
         self.signals()?;
         let selection = self.selection.as_ref().ok_or(Code::InvalidInput)?;
@@ -282,23 +284,19 @@ impl Session {
         let text = |key| call.input.get(key).and_then(Value::as_str);
         let alias = text("adapter").ok_or(Code::InvalidInput)?;
         let connection = reconnected(call.callable, &paths, alias, text("connection"))?;
-        let admitted = owner::admit_capture(
+        let admit = if read_only {
+            owner::admit_capture
+        } else {
+            owner::admit_sourceless_grant
+        };
+        admit(
             &paths,
             alias,
             text("profile"),
             connection.as_deref(),
             text("expected_revision"),
-        );
+        )?;
         if !read_only {
-            // A profile this adapter may not use is refused as the missing
-            // source first, as it was before any profile could take none.
-            admitted.map_err(|error| {
-                if error.code == Code::Forbidden {
-                    Code::ProtectedEntryUnavailable.into()
-                } else {
-                    error
-                }
-            })?;
             let capture = owner::Client::connect(&paths, true)?.begin_grant(
                 alias,
                 text("profile").map(str::to_owned),
@@ -314,7 +312,6 @@ impl Session {
             })?;
             return capture.complete(&entry);
         }
-        admitted?;
         owner::Client::connect(&paths, true)?
             .begin(
                 alias,
