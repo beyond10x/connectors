@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:oauth2-grant-core
 kind: story
-status: active
+status: implemented
 title: A provider-neutral OAuth2 client library runs code+PKCE, device, exchange and refresh grants
 relations:
 - decomposes: epic:subscription-oauth2-access
@@ -22,10 +22,11 @@ scope:
   path: crates/connectors-oauth2
 - confidence: cited
   path: website/docs/reference/crates.md
-revision: 8
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-25T21:11:53Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":2}}}
 - {from: "proposed", to: "active", at: "2026-10-25T21:11:54Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":2}}}
+- {from: "active", to: "implemented", at: "2026-10-26T01:30:38Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":3}}}
 ---
 ## Outcome
 

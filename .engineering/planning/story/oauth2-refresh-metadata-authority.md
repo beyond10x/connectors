@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:oauth2-refresh-metadata-authority
 kind: story
-status: active
+status: implemented
 title: The metadata authority owns the refresh ledger and the OAuth2 domain
 relations:
 - decomposes: epic:subscription-oauth2-access
@@ -16,10 +16,11 @@ scope:
   path: ess/components.yaml
 - confidence: inferred
   path: website/docs/reference/contracts/model
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-25T21:11:54Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"review_outcome":2}}}
 - {from: "proposed", to: "active", at: "2026-10-25T21:11:54Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":2}}}
+- {from: "active", to: "implemented", at: "2026-10-26T01:30:38Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1,"review_outcome":3}}}
 ---
 ## Outcome
 
