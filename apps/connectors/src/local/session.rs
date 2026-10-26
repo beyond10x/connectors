@@ -33,6 +33,8 @@ pub(super) struct Session {
     pub cancelled: bool,
     /// The exit code of a consumer `connections launch` ran.
     pub launched: Option<i32>,
+    /// The access token `connections token --reveal` issued, printed alone.
+    pub revealed: Option<connectors_oauth2::Secret>,
 }
 impl Session {
     pub fn new(args: &[OsString]) -> Shared {
@@ -98,6 +100,7 @@ impl Session {
             mutation_deadline,
             cancelled: false,
             launched: None,
+            revealed: None,
         }))
     }
     /// The preparsed callable and its context, when the arguments parsed.

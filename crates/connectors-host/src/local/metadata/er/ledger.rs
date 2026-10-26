@@ -22,8 +22,15 @@ pub(in crate::local) const ENTITY: &str = "connectors.refresh.RefreshAttempt";
 /// attempt's id.
 pub(in crate::local) const ACQUISITION: &str = "refresh:";
 
+/// `connectors.oauth2.AccessTokenIssue`, one per issued access token
+/// (story:connections-token-issues-an-access-token). Recorded beside the
+/// ledger in the same batch and, like an attempt, never projected to SQL.
+pub(in crate::local) const ISSUE_ENTITY: &str = "connectors.oauth2.AccessTokenIssue";
+const ISSUE: &str = "connectors.oauth2.IssueAccessToken";
+
+/// Whether `key` is a subject only a staged step records: an attempt or an issue.
 pub(super) fn key(key: &(String, String)) -> bool {
-    key.0 == ENTITY
+    key.0 == ENTITY || key.0 == ISSUE_ENTITY
 }
 
 /// `connectors.refresh.RefreshAttempt.State`.
@@ -138,6 +145,23 @@ pub enum Step {
     Discard {
         attempt: String,
     },
+    /// One access token issue: `connectors.oauth2.IssueAccessToken`, which
+    /// moves no attempt.
+    Issue(Box<IssueRecord>),
+}
+
+/// What one `AccessTokenIssue` records; never the token.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IssueRecord {
+    pub issue: String,
+    pub connection: String,
+    pub generation: String,
+    /// The attempt that published `generation`, on a refreshed issue.
+    pub refresh_attempt: Option<String>,
+    pub expires_at_ms: u64,
+    pub scopes: Vec<String>,
+    /// `connectors.oauth2.Delivery`.
+    pub delivery: String,
 }
 
 impl Step {
@@ -152,13 +176,16 @@ impl Step {
             | Self::Recover { attempt, .. }
             | Self::Publish { attempt, .. }
             | Self::Discard { attempt } => attempt,
+            Self::Issue(issue) => &issue.issue,
         }
     }
 
-    /// The command, the states it moves from and the state it moves to.
-    fn transition(&self) -> (&'static str, &'static [AttemptState], AttemptState) {
+    /// The command, the states it moves from and the state it moves to; none
+    /// for an issue, which moves no attempt.
+    fn transition(&self) -> Option<(&'static str, &'static [AttemptState], AttemptState)> {
         use AttemptState as S;
-        match self {
+        Some(match self {
+            Self::Issue(_) => return None,
             Self::Reserve { .. } => ("connectors.refresh.ReserveRefresh", &[], S::Reserved),
             Self::Authorize { .. } => (
                 "connectors.refresh.AuthorizeExchange",
@@ -200,7 +227,7 @@ impl Step {
                 &[S::ResponseStored, S::Recovering],
                 S::Discarded,
             ),
-        }
+        })
     }
 
     /// The command input this step supplies beyond the record's own fields.
@@ -219,7 +246,10 @@ impl Step {
                 input.insert("new_owner".into(), json!(owner));
                 input.insert("new_ownership_token".into(), json!(token));
             }
-            Self::Fence { .. } | Self::Quarantine { .. } | Self::Discard { .. } => {}
+            Self::Fence { .. }
+            | Self::Quarantine { .. }
+            | Self::Discard { .. }
+            | Self::Issue(_) => {}
         }
         input
     }
@@ -268,12 +298,17 @@ pub(super) fn actions(
     let mut current: BTreeMap<String, RowImage> = BTreeMap::new();
     let mut actions = Vec::new();
     for step in steps {
+        let Some((command, from, to)) = step.transition() else {
+            if let Step::Issue(issue) = step {
+                actions.push(issue_action(baseline, registry, commands, issue)?);
+            }
+            continue;
+        };
         let id = format!("s:{}", step.attempt());
         let before = current
             .get(step.attempt())
             .or_else(|| baseline.get(&(ENTITY.to_owned(), id.clone())))
             .cloned();
-        let (command, from, to) = step.transition();
         let next = match (step, before) {
             (
                 Step::Reserve {
@@ -346,6 +381,47 @@ pub(super) fn actions(
     Ok(actions)
 }
 
+/// The create of one `AccessTokenIssue`. Its decision is `refreshed` when a
+/// refresh attempt published the issued generation for this call, else
+/// `current`; the model refuses either without the matching attempt.
+fn issue_action(
+    baseline: &Baseline,
+    registry: &Registry,
+    commands: &BTreeMap<String, CommandEntry>,
+    issue: &IssueRecord,
+) -> Result<BatchAction> {
+    let id = format!("s:{}", issue.issue);
+    if baseline.contains_key(&(ISSUE_ENTITY.to_owned(), id.clone())) {
+        return Err(Failure::MetadataUnavailable);
+    }
+    let expires_at =
+        i64::try_from(issue.expires_at_ms).map_err(|_| Failure::MetadataUnavailable)?;
+    let mut fields = Map::new();
+    fields.insert("issue_ref".into(), json!(issue.issue));
+    fields.insert("connection_ref".into(), json!(issue.connection));
+    fields.insert("generation_id".into(), json!(issue.generation));
+    if let Some(attempt) = &issue.refresh_attempt {
+        fields.insert("refresh_attempt_id".into(), json!(attempt));
+    }
+    fields.insert("expires_at".into(), super::timestamp_value(expires_at)?);
+    fields.insert("scopes".into(), json!(issue.scopes));
+    fields.insert("delivery".into(), json!(issue.delivery));
+    let mut carrier = RowImage {
+        entity: ISSUE_ENTITY.into(),
+        id,
+        revision: 1,
+        lifecycle_state: "Issued".into(),
+        fields,
+    };
+    let decision = if issue.refresh_attempt.is_some() {
+        "refreshed"
+    } else {
+        "current"
+    };
+    carrier.fields.insert("decision".into(), json!(decision));
+    create_action(registry, commands, &carrier, ISSUE)
+}
+
 /// The `registry_acquisitions` row of the custody version a refresh stored:
 /// completed, owned by nothing, expiring at once. Its values follow from the
 /// version alone, so a projection rebuilt from the recorded versions inserts
@@ -413,7 +489,7 @@ pub(in crate::local::metadata) fn recorded_commands(
     use entity_core::DecisionCommand;
     use entity_store::asynchronous::RecordedEntry;
     let mut commands = BTreeMap::new();
-    for (entity, id) in er.baseline.keys().filter(|subject| key(subject)) {
+    for (entity, id) in er.baseline.keys().filter(|subject| subject.0 == ENTITY) {
         let history = super::read_history(&er.facade, entity, id)?;
         let mut names = Vec::new();
         for record in &history.records {
@@ -443,4 +519,59 @@ pub(in crate::local::metadata) fn recorded_commands(
         );
     }
     Ok(commands)
+}
+
+/// One recorded `AccessTokenIssue`: its fields, the commands its history
+/// records and the events they emitted, by type with their payloads.
+#[cfg(test)]
+#[derive(Clone, Debug)]
+pub struct RecordedIssue {
+    pub issue: String,
+    pub fields: Map<String, Value>,
+    pub commands: Vec<String>,
+    pub events: Vec<(String, Value)>,
+}
+
+/// Every `AccessTokenIssue` `er` accounts for, read from its subject history.
+#[cfg(test)]
+pub(in crate::local::metadata) fn recorded_issues(er: &ErAuthority) -> Result<Vec<RecordedIssue>> {
+    use entity_store::asynchronous::RecordedEntry;
+    let mut issues = Vec::new();
+    for row in er
+        .baseline
+        .values()
+        .filter(|row| row.entity == ISSUE_ENTITY)
+    {
+        let history = super::read_history(&er.facade, &row.entity, &row.id)?;
+        let mut commands = Vec::new();
+        let mut events = Vec::new();
+        for record in &history.records {
+            let RecordedEntry::Decision(commit) = &record.entry else {
+                continue;
+            };
+            commands.push(
+                commit
+                    .envelope
+                    .record_id
+                    .strip_prefix("connectors-")
+                    .and_then(|rest| rest.get(..rest.len().checked_sub(37)?))
+                    .ok_or(Failure::MetadataUnavailable)?
+                    .to_owned(),
+            );
+            for event in &commit.envelope.record.events {
+                events.push((event.event_type.clone(), event.payload.clone()));
+            }
+        }
+        issues.push(RecordedIssue {
+            issue: row
+                .id
+                .strip_prefix("s:")
+                .ok_or(Failure::MetadataUnavailable)?
+                .to_owned(),
+            fields: row.fields.clone(),
+            commands,
+            events,
+        });
+    }
+    Ok(issues)
 }

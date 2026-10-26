@@ -727,6 +727,85 @@ impl Client {
         })();
         answer.unwrap_or_else(|error| Err(lost(error)))
     }
+    /// Ask the owner for a current access token of `connection`
+    /// (story:connections-token-issues-an-access-token). Unlike every other
+    /// request it is answered to a caller of another build: a library caller
+    /// links its own. The token arrives in the reply's secret frame, only for
+    /// a delivery that hands it out.
+    pub fn issue_access_token(
+        mut self,
+        adapter: &str,
+        connection: &str,
+        delivery: crate::local::access_token::Delivery,
+        deadline_ms: u64,
+    ) -> Result<crate::local::access_token::AccessToken> {
+        crate::local::protected::cancellation()?;
+        let deadline = until(deadline_ms)?;
+        let answer = (|| {
+            channel::write(
+                &mut self.stream,
+                &Request::IssueAccessToken {
+                    adapter: adapter.into(),
+                    connection: connection.into(),
+                    delivery,
+                    deadline_ms,
+                },
+                None,
+                &[],
+                deadline,
+            )?;
+            channel::read_with_cancel::<Reply>(
+                &mut self.stream,
+                deadline + ANSWER_GRACE,
+                delivery.carries_token(),
+                runtime::RESULT_LIMIT,
+                Some(&|| {
+                    crate::local::protected::cancellation()
+                        .map_err(|_| runtime::Failure::Interrupted)
+                }),
+            )
+            .map_err(Error::from)
+        })();
+        let frame = answer.map_err(lost)?;
+        match frame.control {
+            Reply::Success => {}
+            Reply::Failed { error } if frame.document.is_empty() && frame.secret.0.is_empty() => {
+                return Err(error);
+            }
+            _ => return Err(Code::Unavailable.into()),
+        }
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Issued {
+            connection: String,
+            expires_at_ms: u64,
+            scopes: Vec<String>,
+            refreshed: bool,
+            issue: String,
+        }
+        let issued: Issued =
+            connectors_core::read_json(&frame.document).map_err(|_| Code::Unavailable)?;
+        let token = if delivery.carries_token() {
+            let token = std::str::from_utf8(&frame.secret.0)
+                .ok()
+                .filter(|token| !token.is_empty())
+                .ok_or(Code::Unavailable)?;
+            Some(connectors_oauth2::Secret::new(token.to_owned()))
+        } else {
+            None
+        };
+        if issued.connection != connection {
+            return Err(Code::Unavailable.into());
+        }
+        Ok(crate::local::access_token::AccessToken {
+            connection: issued.connection,
+            token,
+            expires_at_ms: issued.expires_at_ms,
+            scopes: issued.scopes,
+            refreshed: issued.refreshed,
+            issue: issued.issue,
+        })
+    }
     /// Ask the owner for an admitted consumer launch. Its reply carries the
     /// consumer's pinned argv; the captured image and the sealed credential
     /// follow as descriptors, which this process hands to the consumer unread.
@@ -1262,12 +1341,16 @@ fn spawn(
     if let Some(directory) = &installation {
         command.env(crate::local::config::INSTALLATION, directory);
     }
-    // A test build ties the owner to the process a harness names (owner.md);
-    // with the installation directory above, it is all of the CLI's environment the
-    // owner receives.
+    // A test build ties the owner to the process a harness names (owner.md),
+    // and hands it the follow hook's trust root (`oauth::follow`), so the
+    // owner's refresh trusts the fixture authorization server the CLI's grant
+    // trusted; with the installation directory above, they are all of the
+    // CLI's environment the owner receives. A release build compiles neither.
     #[cfg(debug_assertions)]
-    if let Some(parent) = std::env::var_os(super::tether::PARENT) {
-        command.env(super::tether::PARENT, parent);
+    for name in [super::tether::PARENT, "CONNECTORS_TEST_OAUTH_FOLLOW"] {
+        if let Some(value) = std::env::var_os(name) {
+            command.env(name, value);
+        }
     }
     // SAFETY: the hook uses only async-signal-safe syscalls and scalar fds. This
     // process intentionally outlives the CLI and starts a separate session.
@@ -1837,6 +1920,20 @@ fn exchange(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
         false,
         runtime::INPUT_LIMIT,
     )?;
+    if let Request::IssueAccessToken {
+        adapter,
+        connection,
+        delivery,
+        deadline_ms,
+    } = frame.control
+    {
+        return issue_access_token(
+            owner,
+            stream,
+            (&adapter, &connection, delivery, deadline_ms),
+            &frame.document,
+        );
+    }
     let shutdown = matches!(frame.control, Request::Shutdown { .. });
     // A bounded read is served only to a caller of this exact build, and its
     // reply is written by the budget's original cutoff.
@@ -1870,6 +1967,67 @@ fn exchange(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     written?;
     Ok(())
 }
+/// The owner's answer to `Request::IssueAccessToken`: the issue's metadata as
+/// the document and, only for a delivery that hands it out, the access token
+/// as the secret frame. Served to a caller of any build, so a library caller
+/// that links another build is answered too.
+fn issue_access_token(
+    owner: &Owner,
+    stream: &mut channel::Stream,
+    (adapter, connection, delivery, deadline_ms): (
+        &str,
+        &str,
+        crate::local::access_token::Delivery,
+        u64,
+    ),
+    document: &[u8],
+) -> Result<()> {
+    let issued = (|| {
+        if owner.shutdown.load(Ordering::SeqCst) {
+            return Err(Code::Unavailable.into());
+        }
+        if !document.is_empty() || deadline_ms > connectors_sdk::now_ms() + ISSUE_DEADLINE_MS {
+            return Err(Code::InvalidInput.into());
+        }
+        until(deadline_ms)?;
+        super::issue_access_token(
+            &owner.paths,
+            &owner.incarnation,
+            adapter,
+            connection,
+            delivery,
+            deadline_ms,
+        )
+    })();
+    let (reply, document, secret) = match issued {
+        Ok(issued) => {
+            let document = serde_json::to_vec(&json!({
+                "connection": issued.connection,
+                "expires_at_ms": issued.expires_at_ms,
+                "scopes": issued.scopes,
+                "refreshed": issued.refreshed,
+                "issue": issued.issue,
+            }))
+            .map_err(|_| Code::Unavailable)?;
+            let secret = delivery
+                .carries_token()
+                .then(|| Secret(issued.token.expose().as_bytes().to_vec()));
+            (Reply::Success, document, secret)
+        }
+        Err(error) => (Reply::Failed { error }, Vec::new(), None),
+    };
+    channel::write(
+        stream,
+        &reply,
+        secret.as_ref(),
+        &document,
+        Instant::now() + Duration::from_secs(5),
+    )?;
+    Ok(())
+}
+/// The furthest an issue's deadline may lie: a refresh it waits for may take
+/// the token endpoint's own time beside another caller's.
+const ISSUE_DEADLINE_MS: u64 = 120_000;
 fn exchange_write(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     let frame = channel::read::<WriteRequest>(
         stream,

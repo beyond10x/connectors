@@ -51,6 +51,7 @@ Every grouped command accepts these, anywhere on the command line.
 | [`connectors connections revalidate`](#connectors-connections-revalidate) | Revalidate the saved credential without re-entry |
 | [`connectors connections revoke`](#connectors-connections-revoke) | Commit terminal local revocation under the current fence |
 | [`connectors connections status`](#connectors-connections-status) | Observe exactly one connection or acquisition |
+| [`connectors connections token`](#connectors-connections-token) | Issue a current access token of one OAuth2 connection, printed only with --reveal |
 | [`connectors instances describe`](#connectors-instances-describe) | Inspect one configured instance and its cached descriptor; `adapters describe` is its deprecated name |
 | [`connectors instances list`](#connectors-instances-list) | List configured instances; `adapters list` is its deprecated name |
 | [`connectors instances status`](#connectors-instances-status) | Observe the lifecycle owner of the process that serves one instance; `adapters status` is its deprecated name |
@@ -462,6 +463,22 @@ connectors connections status [OPTIONS]
 | `--instance <field:instance>` | no | none | any |  |
 | `--connection <field:connection>` | no | none | any |  |
 | `--acquisition <field:acquisition>` | no | none | any |  |
+
+## `connectors connections token`
+
+Issue a current access token of one OAuth2 connection, printed only with --reveal
+
+```text
+connectors connections token [OPTIONS]
+```
+
+| Argument | Required | Default | Values | Meaning |
+|---|---|---|---|---|
+| `--adapter <ALIAS>` | no | none | any | Deprecated: the alias of a configured entry; select with --connector and --instance |
+| `--connector <field:connector>` | no | none | any |  |
+| `--instance <field:instance>` | no | none | any |  |
+| `--connection <field:connection>` | no | none | any |  |
+| `--reveal <field:reveal>` | no | none | any |  |
 
 ## `connectors instances describe`
 

@@ -800,6 +800,44 @@ pub fn admit_revalidation(
     )?;
     Ok(profile)
 }
+/// The owner's issue of a current access token of `connection`, a connection
+/// of the instance `alias` (story:connections-token-issues-an-access-token).
+/// Only a visible, unrevoked connection whose profile the instance admits and
+/// declares an authorization server (`oauth2_grant`) is issued from; any other
+/// profile is `forbidden`. A refusal issues and records nothing, and so does
+/// an issue whose `deadline_ms` passed before it was recorded (`timeout`).
+pub(crate) fn issue_access_token(
+    paths: &Paths,
+    incarnation: &str,
+    alias: &str,
+    connection: &str,
+    delivery: super::access_token::Delivery,
+    deadline_ms: u64,
+) -> Result<refresh::issue::Issued> {
+    let (config, adapter) = selected(paths, alias)?;
+    let binding = registry::Registry::new(&paths.state).recorded_binding(
+        &adapter.instance_id,
+        &adapter.adapter_id,
+        connection,
+    )?;
+    if binding.profile.oauth2.is_none()
+        || !adapter.permissions.profiles.contains(&binding.profile.id)
+    {
+        return Err(Code::Forbidden.into());
+    }
+    if !custody::available_for(&config.selection()) {
+        return Err(Code::CustodyUnavailable.into());
+    }
+    refresh::Refresher::new(&paths.state, config.selection(), incarnation.to_owned())
+        .issue_access_token(
+            &adapter.instance_id,
+            &adapter.adapter_id,
+            connection,
+            delivery,
+            deadline_ms,
+        )
+        .map_err(Error::from)
+}
 /// The configured binding of a saved connection's profile. A profile the
 /// configured adapter no longer declares (its `auth.profile` id changed) is a
 /// changed binding, refused as a read refuses one (`create_connection`): a new
@@ -1185,6 +1223,16 @@ enum Request {
         adapter: String,
         connection: String,
         consumer: String,
+        deadline_ms: u64,
+    },
+    /// story:connections-token-issues-an-access-token: a current access token
+    /// of an `oauth2_grant` connection, refreshed first when it expires within
+    /// the declaration's `refresh_lead_seconds`. The success reply carries the
+    /// token in its secret frame only when `delivery` hands it out.
+    IssueAccessToken {
+        adapter: String,
+        connection: String,
+        delivery: super::access_token::Delivery,
         deadline_ms: u64,
     },
     Stop {

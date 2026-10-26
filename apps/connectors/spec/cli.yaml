@@ -145,6 +145,11 @@ callables:
     input: connectors.cli.ConnectionLaunchInput
     result: connectors.cli.ConnectionLaunchResult
     errors: {failure: connectors.cli.Failure}
+  connections-token:
+    target: {kind: local, owner: connectors.cli, action: connections-token}
+    input: connectors.cli.ConnectionTokenInput
+    result: connectors.cli.ConnectionTokenResult
+    errors: {failure: connectors.cli.Failure}
   connections-revoke:
     target: {kind: local, owner: connectors.cli, action: connections-revoke}
     input: connectors.cli.ConnectionRevokeInput
@@ -528,6 +533,21 @@ commands:
         source: {kind: option, long: consumer}
       - field: args
         source: {kind: option, long: args}
+  - path: [connections, token]
+    aliases: []
+    callable: connections-token
+    about: Issue a current access token of one OAuth2 connection, printed only with --reveal
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
+      - field: connection
+        source: {kind: option, long: connection}
+      - field: reveal
+        source: {kind: option, long: reveal}
   - path: [connections, revoke]
     aliases: []
     callable: connections-revoke
