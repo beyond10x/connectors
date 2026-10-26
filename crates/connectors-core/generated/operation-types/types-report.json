@@ -8,7 +8,7 @@
     "contract_digest": "slice-sha256/2:fa0f2759122a9bbc9b98fab49e2f589d1d649e403f0cecb0abceb4d8fc44fe0f",
     "projection_digest": "e683bc76e199c272863f9f9fe74e34c06490e66b363645a606420485d20939bb"
   },
-  "generator_version": "0.68.0",
+  "generator_version": "0.69.2",
   "target": "rust",
   "configuration": {
     "language": "rust",

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-26T11:44:25Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0580-oauth2-subscriptions",
+  "kind": "release-plan",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv (ESS 0.69.2, aep 0.71.3) on the 0.58.0 tree: gate: all checks passed, EXIT=0; 3265 passed, 0 failed, 178 ignored; authored scenarios 16 passed, 34 known failing",
+    "reference": "build/ess-0.69.2"
+  }
+}

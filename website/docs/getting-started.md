@@ -23,7 +23,7 @@ target/debug/connectors --version
 ```
 
 ```text
-connectors 0.57.0
+connectors 0.58.0
 ```
 
 Ordinary builds read checked-in generated Rust and need no ESS. Cargo downloads dependencies on
