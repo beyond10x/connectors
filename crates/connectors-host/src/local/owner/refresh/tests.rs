@@ -282,17 +282,39 @@ struct Active {
 
 impl Connected {
     fn new(server: &Server, rotation: &str, scopes: &[&str]) -> Self {
-        Self::at(&server.url(), rotation, scopes)
+        Self::with(server, rotation, scopes, 3_600_000, true)
     }
 
     /// A connection whose profile names `token_url` as its token endpoint.
     fn at(token_url: &str, rotation: &str, scopes: &[&str]) -> Self {
+        Self::build(token_url, rotation, scopes, 3_600_000, true)
+    }
+
+    /// A connection whose access token expires `expires_in_ms` from now; with
+    /// `grant` false its profile declares no authorization server.
+    fn with(
+        server: &Server,
+        rotation: &str,
+        scopes: &[&str],
+        expires_in_ms: u64,
+        grant: bool,
+    ) -> Self {
+        Self::build(&server.url(), rotation, scopes, expires_in_ms, grant)
+    }
+
+    fn build(
+        token_url: &str,
+        rotation: &str,
+        scopes: &[&str],
+        expires_in_ms: u64,
+        grant: bool,
+    ) -> Self {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("state");
         crate::local::filesystem::directory(&path, true, true).unwrap();
         drop(Metadata::initialize(&path).unwrap());
         let mut binding = registry::fixture_binding(INSTANCE);
-        binding.profile.oauth2 = Some(
+        binding.profile.oauth2 = grant.then(|| {
             serde_json::from_value(json!({
                 "authorize_url": "https://localhost/fixture/authorize",
                 "token_url": token_url,
@@ -312,15 +334,15 @@ impl Connected {
                 "sources": ["https://localhost/fixture-authorization-server"],
                 "state_in_exchange": false,
             }))
-            .unwrap(),
-        );
+            .unwrap()
+        });
         let registry = Registry::new(&path);
         let at = now();
         let entry = serde_json::to_vec(&json!({
             "client_id": CLIENT,
             "access_token": ACCESS,
             "refresh_token": REFRESH,
-            "expires_at_ms": at + 3_600_000,
+            "expires_at_ms": at + expires_in_ms,
             "scopes": scopes,
         }))
         .unwrap();
@@ -332,9 +354,9 @@ impl Connected {
                 subject: "one".into(),
             },
             granted_scopes: Some(scopes.iter().map(|scope| (*scope).to_owned()).collect()),
-            credential_expires_at_ms: Some(at + 3_600_000),
+            credential_expires_at_ms: Some(at + expires_in_ms),
             collected_at_ms: at,
-            valid_until_ms: at + 60_000,
+            valid_until_ms: at + expires_in_ms.min(60_000),
             binding: None,
         };
         let prepared = registry.prepare(&claim, baseline, entry.len(), at).unwrap();
@@ -1115,3 +1137,5 @@ fn a_full_version_history_refuses_before_any_request() {
     assert_eq!(attempt.state, RefreshState::Published);
     assert_eq!(commands, [RESERVE, AUTHORIZE, STORE, PUBLISH]);
 }
+
+mod issue;

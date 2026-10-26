@@ -94,7 +94,7 @@ Managed-flow sequence (specializes `docs/design.md:543-549`; static_config follo
 
 ### 4.1 Refresh exclusion, authorization and recovery
 
-Refresh is triggered only through the selected auth profile's separately admitted maintenance policy (`auth.evidence`, expiry near) or an explicitly supported execution binding permitting a provider `401`; it is never caller-invocable. Neither trigger grants business redispatch by itself. The **host coordinator and its metadata binding** own cross-replica exclusion and the durable refresh ledger. Custody owns only immutable sensitive versions. A custody CAS or an expiring lease alone cannot authorize an exchange (`docs/design.md:596-600`). For `oauth2_grant` the owner runs this sequence through the `connectors.refresh` ledger.
+Refresh is triggered only through the selected auth profile's separately admitted maintenance policy (`auth.evidence`, expiry near), an issue-time expiry check (an [access token issue](#44-access-token-issue) whose published token expires within the profile's refresh lead) or an explicitly supported execution binding permitting a provider `401`; it is never caller-invocable. Neither trigger grants business redispatch by itself. The **host coordinator and its metadata binding** own cross-replica exclusion and the durable refresh ledger. Custody owns only immutable sensitive versions. A custody CAS or an expiring lease alone cannot authorize an exchange (`docs/design.md:596-600`). For `oauth2_grant` the owner runs this sequence through the `connectors.refresh` ledger.
 
 The serialization key is one host-private `CredentialGeneration` from [the shared ESS model](../../../../ess/domains/credentials.yaml): an immutable material capture bound to an instance, connection, profile and provider authority, with an expected external identity. It is neither a secret-derived identifier, a file path, nor a custody version. Capturing bytes does not validate identity. A refresh result receives a new generation even if the account is unchanged; validation and dispatch obey [evidence](../../evidence/v1alpha1/semantics.md). The host must prevent the same rotating refresh material from entering two independently refreshable generations or connection bindings. Repeated observations/restarts reuse the existing private capture association where the material is unchanged; aliases that cannot be established safely are refused. UUID uniqueness alone cannot prevent duplicate use of the same token.
 
@@ -181,6 +181,57 @@ separate binding obligation. [auth_bindings.yaml](../../../../ess/domains/auth_b
 models causal lifecycle/references; [verification](../../../../docs/evidence/README.md "git show history/evidence-2026-10:docs/evidence/model-auth-closure-20260909/verification.md")
 separates model checks from actual atomic correlation/publication execution.
 
+### 4.4 Access token issue
+
+The owner issues an access token of an `oauth2_grant` connection to a local
+caller: `connections token` ([CLI](../../../cli/v1alpha1/semantics.md#access-token-issue))
+or the library function `connectors_host::local::access_token::access_token`.
+The caller names a connection and a delivery; it cannot ask for a refresh.
+
+1. The issue reads the connection's published generation. A Stale connection is
+   refused as `reauthorization_required` without a request; a profile that is
+   not `oauth2_grant` is refused as forbidden.
+2. While the published access token stays valid for longer than the
+   declaration's `refresh_lead_seconds`, it is issued as it is (`current`).
+   Otherwise the issue first runs the §4.1 sequence once, under the same
+   `connectors.refresh` ledger serialization as every other refresh, and issues
+   the generation that sequence published (`refreshed`). The reservation names
+   the generation the issue read, in the transaction that reserves: when
+   another caller's refresh already published a successor, the issue sends
+   nothing and issues the successor. A provider whose fresh token already
+   expires within the lead is issued that token; an issue never runs a second
+   exchange. A token inside the lead that this owner cannot refresh (a
+   confidential client, whose secret the stored entry does not hold) is
+   refused as forbidden. A refresh that does not publish refuses the issue
+   with the refresh's safe outcome (§4.1), and a token already past its expiry
+   with nothing published in its place is refused as unavailable.
+3. Each successful issue is recorded as one
+   `connectors.oauth2.AccessTokenIssue` (`IssueAccessToken`,
+   [ESS](../../../../ess/domains/oauth2.yaml)) in the transaction of the
+   connection's refresh ledger: the issued generation, the refresh attempt that
+   published it on a refreshed issue, the expiry, the granted scopes and the
+   delivery (`metadata_only`, `revealed` or `library`). The record carries no
+   token. When a refresh or a repair replaces the generation between its read
+   and the record, the issue reads it again. An issue whose generation a repair
+   rather than a refresh published is recorded as `current`. A refusal records nothing.
+4. The token leaves the owner only in the transport's secret frame, and only
+   for a delivery that carries it (`revealed`, `library`). `metadata_only`
+   answers the metadata alone. No log, error, `Debug` or `Display` output names
+   the token.
+
+| Refusal | Owner failure |
+|---|---|
+| profile not `oauth2_grant`, or not in the instance's permissions | `forbidden` |
+| token inside the lead of a confidential client | `forbidden` |
+| `reauthorization_required` or `uncertain` | `service_failure` |
+| `insufficient_scope` | `not_granted` |
+| `invalid_or_revoked` | `revoked` |
+| `custody_unavailable` | `custody_unavailable` |
+| token endpoint `429` | `unavailable` with the `rate_limited` service code and `Retry-After` in whole seconds |
+| `unavailable`: the token endpoint was not reached, nothing was sent | `unavailable` |
+| token expired, nothing published in its place | `unavailable` |
+| the caller's deadline passed before the issue was recorded | `timeout`; the refresh it ran stays published |
+
 ## 5. Ordering, limits
 
 | Concern | Rule |
@@ -229,6 +280,7 @@ separates model checks from actual atomic correlation/publication execution.
 | `CredentialSet` | defined in custody; custody version is not refresh identity |
 | `RefreshAttempt` | [ESS](../../../../ess/domains/refresh.yaml): `Reserved → Authorized → ResponseStored → Published`, pre-authorization fencing, stored-response recovery, terminal uncertainty/discard; exactly one source-generation reference |
 | `CredentialGeneration` | [shared ESS](../../../../ess/domains/credentials.yaml): host-private immutable capture; expected identity, not verified evidence |
+| `AccessTokenIssue` | [ESS](../../../../ess/domains/oauth2.yaml): one `Issued` record per access token issue under §4.4, naming its generation, its refresh attempt when it refreshed, and its delivery; never the token |
 | Typed coordinator decisions | Trusted transient values selected inside the atomic operation; never caller authority or reusable approval |
 | Trusted UI and callback host identity | UNMAPPED |
 

@@ -12,25 +12,26 @@ use connectors_oauth2::DeviceDialect;
 use connectors_sdk::Secret;
 use std::{collections::BTreeMap, ffi::OsString};
 
-/// A bare `--device` is `--device true`: `ess-cli/1` has no valueless switch
-/// source. Only the arguments of `connections connect`, `reconnect` or its
-/// deprecated name `repair` before a first `--` are rewritten, and a
-/// `--device` already followed by `true` or `false` is left as it is.
-pub(super) fn device_shorthand(args: Vec<OsString>) -> Vec<OsString> {
-    if !matches!(
-        command(&args).as_slice(),
-        ["connections", "connect" | "reconnect" | "repair"]
-    ) {
-        return args;
-    }
+/// A bare `--device` is `--device true`, and a bare `--reveal` is `--reveal
+/// true`: `ess-cli/1` has no valueless switch source. Only the arguments of
+/// `connections connect`, `reconnect` or its deprecated name `repair`
+/// (`--device`), and of `connections token` (`--reveal`), before a first `--`
+/// are rewritten, and a switch already followed by `true` or `false` is left
+/// as it is.
+pub(super) fn switch_shorthand(args: Vec<OsString>) -> Vec<OsString> {
+    let switch = match command(&args).as_slice() {
+        ["connections", "connect" | "reconnect" | "repair"] => "--device",
+        ["connections", "token"] => "--reveal",
+        _ => return args,
+    };
     let mut rewritten = Vec::with_capacity(args.len() + 1);
     let mut trailing = false;
     let mut rest = args.into_iter().peekable();
     while let Some(arg) = rest.next() {
-        let switch = !trailing && arg.to_str() == Some("--device");
+        let bare = !trailing && arg.to_str() == Some(switch);
         trailing |= arg.to_str() == Some("--");
         rewritten.push(arg);
-        if switch
+        if bare
             && !matches!(
                 rest.peek().and_then(|next| next.to_str()),
                 Some("true" | "false")
@@ -215,7 +216,7 @@ mod tests {
     fn a_bare_device_switch_reads_true_on_connect_and_reconnect_only() {
         for verb in ["connect", "reconnect", "repair"] {
             assert_eq!(
-                device_shorthand(args(&[
+                switch_shorthand(args(&[
                     "c",
                     "--output",
                     "json",
@@ -234,7 +235,7 @@ mod tests {
                 ])
             );
             assert_eq!(
-                device_shorthand(args(&[
+                switch_shorthand(args(&[
                     "c",
                     "connections",
                     verb,
@@ -261,7 +262,42 @@ mod tests {
             &["c", "connections", "status", "--device"],
             &["c", "operations", "invoke", "--device"],
         ] {
-            assert_eq!(device_shorthand(args(unchanged)), args(unchanged));
+            assert_eq!(switch_shorthand(args(unchanged)), args(unchanged));
+        }
+    }
+
+    #[test]
+    fn a_bare_reveal_switch_reads_true_on_token_only() {
+        assert_eq!(
+            switch_shorthand(args(&["c", "connections", "token", "--reveal"])),
+            args(&["c", "connections", "token", "--reveal", "true"])
+        );
+        assert_eq!(
+            switch_shorthand(args(&[
+                "c",
+                "connections",
+                "token",
+                "--reveal",
+                "--connection",
+                "x"
+            ])),
+            args(&[
+                "c",
+                "connections",
+                "token",
+                "--reveal",
+                "true",
+                "--connection",
+                "x"
+            ])
+        );
+        for unchanged in [
+            &["c", "connections", "token", "--reveal", "false"][..],
+            &["c", "connections", "token", "--device"],
+            &["c", "connections", "connect", "--reveal"],
+            &["c", "connections", "token", "--", "--reveal"],
+        ] {
+            assert_eq!(switch_shorthand(args(unchanged)), args(unchanged));
         }
     }
 

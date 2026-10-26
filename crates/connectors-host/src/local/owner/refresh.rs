@@ -245,20 +245,34 @@ impl Refresher {
     /// Refreshes `connection` once: this caller sends the one exchange, or
     /// waits for the caller that does.
     pub fn refresh_connection(&self, connection: &str) -> registry::Result<Outcome> {
+        self.refresh_generation(connection, None)
+    }
+
+    /// [`Self::refresh_connection`] of the generation `expected`, when the
+    /// caller decided on that generation: once the connection publishes
+    /// another, nothing is reserved or sent and the caller is answered
+    /// `Refreshed`, to read the successor.
+    pub(crate) fn refresh_generation(
+        &self,
+        connection: &str,
+        expected: Option<&str>,
+    ) -> registry::Result<Outcome> {
         // A lost attempt is resolved once, then the source is reserved again.
         for _ in 0..2 {
-            let reservation = match self
-                .registry
-                .reserve_refresh(connection, &self.owner, now())
-            {
-                Err(Failure::Revoked) => return Ok(Outcome::InvalidOrRevoked),
-                other => other?,
-            };
+            let reservation =
+                match self
+                    .registry
+                    .reserve_refresh(connection, &self.owner, expected, now())
+                {
+                    Err(Failure::Revoked) => return Ok(Outcome::InvalidOrRevoked),
+                    other => other?,
+                };
             match reservation {
                 Reservation::Stale | Reservation::Consumed => {
                     return Ok(Outcome::ReauthorizationRequired);
                 }
                 Reservation::Full => return Ok(Outcome::CustodyUnavailable),
+                Reservation::Moved => return Ok(Outcome::Refreshed),
                 Reservation::Lead(ticket) => {
                     let attempt = ticket.attempt().to_owned();
                     let outcome = self.lead(ticket);
@@ -493,6 +507,8 @@ impl Refresher {
         })
     }
 }
+
+pub mod issue;
 
 #[cfg(test)]
 mod tests;

@@ -92,8 +92,24 @@ impl Ledger {
             .ok_or(Failure::NotFound)
     }
 
-    /// Stages `step` and applies it to the attempts this transaction sees.
-    fn stage(&mut self, step: LedgerStep) {
+    /// The attempt that published `generation`, if a refresh did.
+    pub(super) fn published(&self, generation: &str) -> Option<&str> {
+        self.attempts
+            .iter()
+            .find(|attempt| {
+                attempt.state == RefreshState::Published
+                    && attempt.candidate_generation.as_deref() == Some(generation)
+            })
+            .map(|attempt| attempt.id.as_str())
+    }
+
+    /// Stages `step` and applies it to the attempts this transaction sees. An
+    /// access token issue is recorded beside them and changes none.
+    pub(super) fn stage(&mut self, step: LedgerStep) {
+        if matches!(step, LedgerStep::Issue(_)) {
+            self.staged.push(step);
+            return;
+        }
         if let LedgerStep::Reserve {
             attempt,
             source_generation,
@@ -127,6 +143,7 @@ impl Ledger {
                 LedgerStep::Recover { .. } => RefreshState::Recovering,
                 LedgerStep::Publish { .. } => RefreshState::Published,
                 LedgerStep::Discard { .. } | LedgerStep::Reserve { .. } => RefreshState::Discarded,
+                LedgerStep::Issue(_) => attempt.state,
             };
         }
         self.staged.push(step);
@@ -191,6 +208,10 @@ pub enum Reservation {
     /// ([`RETAINED`]), retired ones until their deletion: nothing is reserved
     /// and nothing may be sent.
     Full,
+    /// The connection no longer publishes the generation the caller read
+    /// before it asked: a refresh or a repair replaced it, and nothing is
+    /// reserved. Only a reservation that names a generation answers this.
+    Moved,
 }
 
 /// What `connectors.refresh.AuthorizeExchange` decided.
@@ -409,11 +430,15 @@ fn publish(
 
 impl Registry {
     /// `connectors.refresh.ReserveRefresh` on the connection's active
-    /// generation, unless an attempt already holds or consumed it.
+    /// generation, unless an attempt already holds or consumed it. With
+    /// `expected`, the generation the caller decided on, it reserves only
+    /// while that generation is still the active one, in the same transaction
+    /// that reserves ([`Reservation::Moved`] otherwise).
     pub(in crate::local) fn reserve_refresh(
         &self,
         connection: &str,
         owner: &str,
+        expected: Option<&str>,
         now: u64,
     ) -> Result<Reservation> {
         self.transaction_ledger(now, |tx, authority, _, ledger| {
@@ -445,6 +470,9 @@ impl Registry {
             else {
                 return Err(Failure::NotReady);
             };
+            if expected.is_some_and(|expected| expected != source.as_str()) {
+                return Ok(Reservation::Moved);
+            }
             let mut held = ledger
                 .attempts
                 .iter()
