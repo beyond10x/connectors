@@ -5,8 +5,11 @@ use super::{Failure, Release, Result, filesystem as fs};
 mod checkpoint_tests;
 pub(super) mod deadline;
 mod er;
+#[cfg(test)]
+pub(in crate::local) use er::RecordedIssue;
 pub(in crate::local) use er::{
-    LedgerStep, REFRESH_ACQUISITION, RefreshAttempt, RefreshState, insert_refresh_acquisition,
+    IssueRecord, LedgerStep, REFRESH_ACQUISITION, RefreshAttempt, RefreshState,
+    insert_refresh_acquisition,
 };
 #[cfg(test)]
 mod metamorphic_tests;
@@ -870,6 +873,15 @@ impl Metadata {
     ) -> Result<std::collections::BTreeMap<String, Vec<String>>> {
         let metadata = Self::inspect(path)?;
         er::recorded_refresh_commands(metadata.er.as_ref().ok_or(Failure::MetadataUnavailable)?)
+    }
+
+    /// Every recorded `connectors.oauth2.AccessTokenIssue`, with its commands and events.
+    #[cfg(test)]
+    pub(in crate::local) fn recorded_access_token_issues(
+        path: &Path,
+    ) -> Result<Vec<RecordedIssue>> {
+        let metadata = Self::inspect(path)?;
+        er::recorded_issues(metadata.er.as_ref().ok_or(Failure::MetadataUnavailable)?)
     }
 
     fn adopt_er(&mut self) -> Result<()> {

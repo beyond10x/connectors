@@ -552,3 +552,6 @@ fn oauth2_grant_missing_required_scope_stores_nothing() {
     failed(&acquisitions[0]);
     journey.assert_no_material_at_rest();
 }
+
+#[path = "token_journey.rs"]
+mod token_journey;

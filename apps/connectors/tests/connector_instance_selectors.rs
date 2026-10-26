@@ -277,7 +277,7 @@ fn both_selectors_reach_one_instance_and_only_the_alias_is_deprecated() {
     let plan = connectors_cli_contract::plan();
     let (root, schema) = configured("");
     let count = selecting_commands(root.path(), &schema).len();
-    assert_eq!(count, 25);
+    assert_eq!(count, 26);
     let (mut succeeded, mut wrong) = (Vec::new(), Vec::new());
     for index in 0..count {
         // Each run starts from the same configured state, so a command that
