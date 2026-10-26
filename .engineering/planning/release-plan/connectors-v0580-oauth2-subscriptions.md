@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0580-oauth2-subscriptions
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.58.0: OAuth2 grants, connections token, ChatGPT and Claude subscriptions, ESS 0.69.2'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-26T11:44:29Z", actor: "human:timo", revision: 2, decided_on: {"recorded":{"test_result":1}}}
+- {from: "active", to: "implemented", at: "2026-10-26T12:53:49Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":2}}}
 ---
 ## Outcome
 
