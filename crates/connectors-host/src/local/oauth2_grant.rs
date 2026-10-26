@@ -353,7 +353,11 @@ fn client_secret(document: Secret) -> Result<connectors_oauth2::Secret> {
 /// The entry a grant stores, in a buffer sized once so no reallocation leaves
 /// an unzeroized copy behind. The access token expires `expires_in` after
 /// `issued_at_ms`, which is no later than its issue.
-fn entry(client_id: &str, granted: &Granted, issued_at_ms: u64) -> Result<Secret> {
+pub(in crate::local) fn entry(
+    client_id: &str,
+    granted: &Granted,
+    issued_at_ms: u64,
+) -> Result<Secret> {
     #[derive(Serialize)]
     struct Entry<'a> {
         client_id: &'a str,

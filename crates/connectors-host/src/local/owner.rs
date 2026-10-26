@@ -5,6 +5,7 @@ mod governed;
 mod lifecycle;
 mod maintenance;
 pub mod mutation;
+pub mod refresh;
 mod supervisor;
 #[cfg(unix)]
 mod tether;
