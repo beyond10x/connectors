@@ -269,3 +269,52 @@ delivery for each platform (`descriptor_3` on Linux and macOS,
   consumer has exited: those processes end then, though the CLI did not die.
   This differs from Linux, where `PR_SET_PDEATHSIG` covers the consumer alone
   and a process the consumer starts outlives it.
+
+## 9. OAuth2 grants
+
+A connection whose profile is `oauth2_grant` is launched as sections 1–8 state,
+with one change to the delivery of section 3: the consumer receives the
+connection's **current access token**, never the stored entry. Every other profile
+launches exactly as before, with its stored document verbatim.
+
+- **Issue in place of the read.** In place of section 3 step 2's read use and
+  custody read, the owner issues an access token as `connections token` does
+  ([acquisition semantics](../../auth/acquisition/v1alpha1/semantics.md) §4.4,
+  "Access token issue"): under the connection's refresh serialization it issues the
+  published token while it stays valid for longer than the declaration's
+  `refresh_lead_seconds`, and otherwise refreshes it first and issues the
+  refreshed token. The configuration is re-read after the issue, as after the
+  read (`lifecycle_conflict`).
+- **Descriptor 3 holds the bare token.** The credential (descriptor 3; on
+  Windows the inherited handle of section 8) holds the access token's bytes and
+  nothing else: no newline, no JSON, no refresh token, ID token, client data,
+  expiry or scopes. It is sealed and handed over as section 3 states.
+- **One record per launch.** Each launch the owner issues a token for is one
+  `connectors.oauth2.AccessTokenIssue` with delivery `consumer_launch`. A launch
+  refused before the issue, and an issue the owner refuses, record none; an
+  issue already recorded when the configuration re-read or the delivery then
+  fails stays recorded.
+- **Admission.** Admission is section 2's with one difference: the evidence
+  step admits a connection whose evidence lapsed, or whose access token
+  expires within the lead or has expired, because the issue refreshes that
+  token and republishes its evidence, as `connections token` does on the same
+  state. A revoked or Stale connection, a profile the instance does not
+  permit, a binding conflict and a connection with no published generation
+  are refused as section 2 states.
+- **Refusals.** An issue the owner refuses answers the owner failure of
+  §4.4's refusal table, with the next action `connections token` names:
+  `service_failure` with `next_action: repair_connection` when a refresh needs
+  reauthorization or its outcome is uncertain, and `unavailable` with service
+  code `rate_limited`, `next_action: retry_explicitly` and its
+  `retry_after_seconds` when the token endpoint answered `429`. No consumer
+  runs.
+- **No re-issue.** The token is issued once, at launch. A consumer that outlives
+  its expiry is not given another; it is launched again.
+
+Verification: `local::owner::refresh::tests::launch` in
+`crates/connectors-host` drives the production CLI and owner against a
+disposable Secret Service and a fake token server on loopback
+(`launch_oauth2_grant_hands_only_the_access_token`,
+`launch_oauth2_grant_refreshes_inside_lead_time`,
+`launch_static_profile_is_unchanged`, and the cases of its `adversary`
+module; opt-in, family `disposable`).

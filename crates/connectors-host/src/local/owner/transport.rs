@@ -440,11 +440,34 @@ impl Client {
         })
     }
     pub fn begin(
+        self,
+        adapter: &str,
+        profile: Option<String>,
+        connection: Option<String>,
+        expected_revision: Option<String>,
+    ) -> Result<Capture> {
+        self.begin_capture(adapter, profile, connection, expected_revision, false)
+    }
+    /// Begins the capture of a caller that holds no protected source and runs
+    /// the profile's OAuth2 grant itself: the owner begins it only for an
+    /// `oauth2_grant` profile of a public client
+    /// (story:connect-runs-an-oauth2-grant).
+    pub fn begin_grant(
+        self,
+        adapter: &str,
+        profile: Option<String>,
+        connection: Option<String>,
+        expected_revision: Option<String>,
+    ) -> Result<Capture> {
+        self.begin_capture(adapter, profile, connection, expected_revision, true)
+    }
+    fn begin_capture(
         mut self,
         adapter: &str,
         profile: Option<String>,
         connection: Option<String>,
         expected_revision: Option<String>,
+        grant: bool,
     ) -> Result<Capture> {
         self.same_build()?;
         let deadline = Instant::now() + Duration::from_secs(40);
@@ -455,6 +478,7 @@ impl Client {
                 profile,
                 connection,
                 expected_revision,
+                grant,
             },
             None,
             &[],
@@ -474,7 +498,7 @@ impl Client {
                     client: self,
                     acquisition,
                     expires_at_ms,
-                    profile,
+                    profile: *profile,
                 })
             }
             Reply::Failed { error } => Err(error),
@@ -702,6 +726,85 @@ impl Client {
             self.answer(deadline)
         })();
         answer.unwrap_or_else(|error| Err(lost(error)))
+    }
+    /// Ask the owner for a current access token of `connection`
+    /// (story:connections-token-issues-an-access-token). Unlike every other
+    /// request it is answered to a caller of another build: a library caller
+    /// links its own. The token arrives in the reply's secret frame, only for
+    /// a delivery that hands it out.
+    pub fn issue_access_token(
+        mut self,
+        adapter: &str,
+        connection: &str,
+        delivery: crate::local::access_token::Delivery,
+        deadline_ms: u64,
+    ) -> Result<crate::local::access_token::AccessToken> {
+        crate::local::protected::cancellation()?;
+        let deadline = until(deadline_ms)?;
+        let answer = (|| {
+            channel::write(
+                &mut self.stream,
+                &Request::IssueAccessToken {
+                    adapter: adapter.into(),
+                    connection: connection.into(),
+                    delivery,
+                    deadline_ms,
+                },
+                None,
+                &[],
+                deadline,
+            )?;
+            channel::read_with_cancel::<Reply>(
+                &mut self.stream,
+                deadline + ANSWER_GRACE,
+                delivery.carries_token(),
+                runtime::RESULT_LIMIT,
+                Some(&|| {
+                    crate::local::protected::cancellation()
+                        .map_err(|_| runtime::Failure::Interrupted)
+                }),
+            )
+            .map_err(Error::from)
+        })();
+        let frame = answer.map_err(lost)?;
+        match frame.control {
+            Reply::Success => {}
+            Reply::Failed { error } if frame.document.is_empty() && frame.secret.0.is_empty() => {
+                return Err(error);
+            }
+            _ => return Err(Code::Unavailable.into()),
+        }
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Issued {
+            connection: String,
+            expires_at_ms: u64,
+            scopes: Vec<String>,
+            refreshed: bool,
+            issue: String,
+        }
+        let issued: Issued =
+            connectors_core::read_json(&frame.document).map_err(|_| Code::Unavailable)?;
+        let token = if delivery.carries_token() {
+            let token = std::str::from_utf8(&frame.secret.0)
+                .ok()
+                .filter(|token| !token.is_empty())
+                .ok_or(Code::Unavailable)?;
+            Some(connectors_oauth2::Secret::new(token.to_owned()))
+        } else {
+            None
+        };
+        if issued.connection != connection {
+            return Err(Code::Unavailable.into());
+        }
+        Ok(crate::local::access_token::AccessToken {
+            connection: issued.connection,
+            token,
+            expires_at_ms: issued.expires_at_ms,
+            scopes: issued.scopes,
+            refreshed: issued.refreshed,
+            issue: issued.issue,
+        })
     }
     /// Ask the owner for an admitted consumer launch. Its reply carries the
     /// consumer's pinned argv; the captured image and the sealed credential
@@ -1238,12 +1341,16 @@ fn spawn(
     if let Some(directory) = &installation {
         command.env(crate::local::config::INSTALLATION, directory);
     }
-    // A test build ties the owner to the process a harness names (owner.md);
-    // with the installation directory above, it is all of the CLI's environment the
-    // owner receives.
+    // A test build ties the owner to the process a harness names (owner.md),
+    // and hands it the follow hook's trust root (`oauth::follow`), so the
+    // owner's refresh trusts the fixture authorization server the CLI's grant
+    // trusted; with the installation directory above, they are all of the
+    // CLI's environment the owner receives. A release build compiles neither.
     #[cfg(debug_assertions)]
-    if let Some(parent) = std::env::var_os(super::tether::PARENT) {
-        command.env(super::tether::PARENT, parent);
+    for name in [super::tether::PARENT, "CONNECTORS_TEST_OAUTH_FOLLOW"] {
+        if let Some(value) = std::env::var_os(name) {
+            command.env(name, value);
+        }
     }
     // SAFETY: the hook uses only async-signal-safe syscalls and scalar fds. This
     // process intentionally outlives the CLI and starts a separate session.
@@ -1388,6 +1495,15 @@ pub fn serve_with_read_policy(paths: Paths, read_policy: Arc<dyn ReadPolicy>) ->
     // process exit, including unwinding or any early return with live threads.
     // CLOEXEC prevents native children from inheriting it.
     std::mem::forget(lifetime);
+    // story:owner-rotating-refresh: the refreshes a past owner left unfinished
+    // are resolved before the first request. One that cannot be resolved now
+    // stays recorded and holds its source until a later owner resolves it.
+    let _ = refresh::Refresher::new(
+        &owner.paths.state,
+        config.selection(),
+        owner.incarnation.clone(),
+    )
+    .recover();
     let recovery = maintenance::Background::start(owner.paths.clone(), owner.pool.clone())?;
     handle(owner.clone(), startup)?;
     owner.pool.automatic(&config);
@@ -1804,6 +1920,20 @@ fn exchange(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
         false,
         runtime::INPUT_LIMIT,
     )?;
+    if let Request::IssueAccessToken {
+        adapter,
+        connection,
+        delivery,
+        deadline_ms,
+    } = frame.control
+    {
+        return issue_access_token(
+            owner,
+            stream,
+            (&adapter, &connection, delivery, deadline_ms),
+            &frame.document,
+        );
+    }
     let shutdown = matches!(frame.control, Request::Shutdown { .. });
     // A bounded read is served only to a caller of this exact build, and its
     // reply is written by the budget's original cutoff.
@@ -1837,6 +1967,72 @@ fn exchange(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     written?;
     Ok(())
 }
+/// The owner's answer to `Request::IssueAccessToken`: the issue's metadata as
+/// the document and, only for a delivery that hands it out, the access token
+/// as the secret frame. Served to a caller of any build, so a library caller
+/// that links another build is answered too.
+fn issue_access_token(
+    owner: &Owner,
+    stream: &mut channel::Stream,
+    (adapter, connection, delivery, deadline_ms): (
+        &str,
+        &str,
+        crate::local::access_token::Delivery,
+        u64,
+    ),
+    document: &[u8],
+) -> Result<()> {
+    let issued = (|| {
+        if owner.shutdown.load(Ordering::SeqCst) {
+            return Err(Code::Unavailable.into());
+        }
+        // `consumer_launch` is recorded only by the owner's own launch, which
+        // hands the token to the consumer: no caller may claim it.
+        if !document.is_empty()
+            || deadline_ms > connectors_sdk::now_ms() + ISSUE_DEADLINE_MS
+            || delivery == crate::local::access_token::Delivery::ConsumerLaunch
+        {
+            return Err(Code::InvalidInput.into());
+        }
+        until(deadline_ms)?;
+        super::issue_access_token(
+            &owner.paths,
+            &owner.incarnation,
+            adapter,
+            connection,
+            delivery,
+            deadline_ms,
+        )
+    })();
+    let (reply, document, secret) = match issued {
+        Ok(issued) => {
+            let document = serde_json::to_vec(&json!({
+                "connection": issued.connection,
+                "expires_at_ms": issued.expires_at_ms,
+                "scopes": issued.scopes,
+                "refreshed": issued.refreshed,
+                "issue": issued.issue,
+            }))
+            .map_err(|_| Code::Unavailable)?;
+            let secret = delivery
+                .carries_token()
+                .then(|| Secret(issued.token.expose().as_bytes().to_vec()));
+            (Reply::Success, document, secret)
+        }
+        Err(error) => (Reply::Failed { error }, Vec::new(), None),
+    };
+    channel::write(
+        stream,
+        &reply,
+        secret.as_ref(),
+        &document,
+        Instant::now() + Duration::from_secs(5),
+    )?;
+    Ok(())
+}
+/// The furthest an issue's deadline may lie: a refresh it waits for may take
+/// the token endpoint's own time beside another caller's.
+const ISSUE_DEADLINE_MS: u64 = 120_000;
 fn exchange_write(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     let frame = channel::read::<WriteRequest>(
         stream,
@@ -2068,6 +2264,7 @@ fn action(
             profile,
             connection,
             expected_revision,
+            grant,
             ..
         } => {
             if !document.is_empty() {
@@ -2145,6 +2342,20 @@ fn action(
             if selection.read_only() && bootstrap.profile(&profile)?.acquisition.is_some() {
                 return Err(Code::CustodyReadOnly.into());
             }
+            // A caller without a protected source runs the grant of an
+            // `oauth2_grant` profile of a public client itself; any other profile
+            // needs the source it did not bring, refused before the registry is
+            // written (story:connect-runs-an-oauth2-grant).
+            if grant
+                && bootstrap
+                    .profile(&profile)?
+                    .grant()
+                    .is_none_or(|declaration| {
+                        declaration.client_kind != connectors_oauth2::ClientKind::Public
+                    })
+            {
+                return Err(Code::ProtectedEntryUnavailable.into());
+            }
             let now = connectors_sdk::now_ms();
             let acquired = match connection {
                 Some(reference) => registry.begin_repair(
@@ -2163,7 +2374,7 @@ fn action(
                     &Reply::Capture {
                         acquisition: reference.clone(),
                         expires_at_ms: expiry,
-                        profile: bootstrap.profile(&profile)?.clone(),
+                        profile: Box::new(bootstrap.profile(&profile)?.clone()),
                     },
                     None,
                     &[],
@@ -2706,6 +2917,12 @@ fn reuse(
 /// is repeated, the consumer image is captured before the credential is read,
 /// and the configuration is re-read after it. The read use is held only across
 /// the delivery: the sealed copy is the consumer's from then on.
+///
+/// An `oauth2_grant` connection's consumer gets its current access token alone
+/// (story:launch-hands-an-oauth2-access-token, consumer-launch.md "OAuth2
+/// grants"): the owner issues it as `connections token` does, refreshed first
+/// inside the declaration's lead, recorded as one `AccessTokenIssue` with
+/// delivery `consumer_launch`, in place of reading the stored entry.
 fn launch(
     owner: &Owner,
     stream: &mut channel::Stream,
@@ -2718,6 +2935,52 @@ fn launch(
     let admitted = admit_launch(&owner.paths, alias, connection, consumer)?;
     let deadline = super::until(deadline_ms)?;
     let executable = admitted.consumer.executable.capture(deadline)?;
+    // The configuration, re-read after the credential is read.
+    let unchanged = || -> Result<()> {
+        let (latest_config, latest) = selected(&owner.paths, alias)?;
+        let binding = &admitted.binding;
+        if latest_config.consumers.get(consumer) != Some(&admitted.consumer)
+            || latest_config.selection() != config.selection()
+            || latest.instance_id != binding.instance_id
+            || latest.adapter_id != binding.adapter_id
+            || latest.configuration_revision != binding.configuration_revision
+        {
+            return Err(Code::LifecycleConflict.into());
+        }
+        if !latest.permissions.profiles.contains(&binding.profile.id) {
+            return Err(Code::Forbidden.into());
+        }
+        Ok(())
+    };
+    let deliver = |stream: &mut channel::Stream, credential: &File| -> Result<()> {
+        channel::write(
+            stream,
+            &Reply::Launch {
+                args: admitted.consumer.executable.args.clone(),
+                pass_env: admitted.consumer.pass_env.clone(),
+            },
+            None,
+            &[],
+            deadline,
+        )?;
+        runtime::launch::send(stream, &[&executable, credential], deadline)?;
+        Ok(())
+    };
+    if admitted.binding.profile.oauth2.is_some() {
+        let issued = super::issue_access_token(
+            &owner.paths,
+            &owner.incarnation,
+            alias,
+            connection,
+            crate::local::access_token::Delivery::ConsumerLaunch,
+            deadline_ms,
+        )?;
+        unchanged()?;
+        let credential = runtime::launch::sealed(issued.token.expose().as_bytes())?;
+        drop(issued);
+        deliver(stream, &credential)?;
+        return Ok(json!({}));
+    }
     let registry = registry::Registry::with_system_clock(&owner.paths.state);
     let captured = registry
         .capture_read(
@@ -2746,23 +3009,7 @@ fn launch(
             return Err(super::read_error(&selection, error));
         }
     };
-    let checked: Result<()> = (|| {
-        let (latest_config, latest) = selected(&owner.paths, alias)?;
-        let binding = &admitted.binding;
-        if latest_config.consumers.get(consumer) != Some(&admitted.consumer)
-            || latest_config.selection() != config.selection()
-            || latest.instance_id != binding.instance_id
-            || latest.adapter_id != binding.adapter_id
-            || latest.configuration_revision != binding.configuration_revision
-        {
-            return Err(Code::LifecycleConflict.into());
-        }
-        if !latest.permissions.profiles.contains(&binding.profile.id) {
-            return Err(Code::Forbidden.into());
-        }
-        Ok(())
-    })();
-    if let Err(error) = checked {
+    if let Err(error) = unchanged() {
         registry.cancel_read(captured, connectors_sdk::now_ms())?;
         return Err(error);
     }
@@ -2772,18 +3019,7 @@ fn launch(
     let delivered: Result<()> = (|| {
         let credential = runtime::launch::sealed(&material.0)?;
         drop(material);
-        channel::write(
-            stream,
-            &Reply::Launch {
-                args: admitted.consumer.executable.args.clone(),
-                pass_env: admitted.consumer.pass_env.clone(),
-            },
-            None,
-            &[],
-            deadline,
-        )?;
-        runtime::launch::send(stream, &[&executable, &credential], deadline)?;
-        Ok(())
+        deliver(stream, &credential)
     })();
     registry.release_read(dispatched, connectors_sdk::now_ms())?;
     delivered?;

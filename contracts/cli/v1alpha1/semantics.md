@@ -93,6 +93,7 @@ management wire payload or a persistent record.
 | `connections reconnect` | exact existing connection's coordinator | `ConnectionReconnectInput` → `ConnectionReconnectResult` | yes / yes, after admission |
 | `connections revalidate` | exact existing connection's evidence coordinator | `ConnectionRevalidateInput` → `ConnectionRevalidateResult` | yes / yes, after admission |
 | `connections launch` | exact existing connection's read admission and the owner's custody read | `ConnectionLaunchInput` → the consumer's exit status ([consumer launch](consumer-launch.md)) | yes / no |
+| `connections token` | exact existing connection's owner, through its access token issue ([access token issue](#access-token-issue)) | `ConnectionTokenInput` → `ConnectionTokenResult`, or the token alone with `--reveal` | yes / no |
 | `connections status` | safe connection/acquisition observation | `ConnectionStatusInput` → `ConnectionStatusResult` | no / no |
 | `connections revoke` | connection metadata authority | `ConnectionRevokeInput` → `ConnectionRevokeResult` | no / no |
 | `operations list` | selected cached descriptor projection | `OperationListInput` → `OperationListResult` | only to [launch for a description](#launching-for-a-description) |
@@ -316,6 +317,36 @@ Explicit service commands (use COMMAND --help for options):
   invoke    Invoke an explicit service operation
   serve     Run the configured federation service
 ```
+
+### Access token issue
+
+`connections token` asks the selected connection's owner for a current access
+token of an `oauth2_grant` connection, under the issue rules of
+[auth acquisition §4.4](../../auth/acquisition/v1alpha1/semantics.md#44-access-token-issue).
+It takes the instance's one connection when `--connection` is left out, and
+starts the owner when none runs; the owner must be of the same build, or the
+command is refused as `owner_build_mismatch`. It starts no adapter.
+
+Without `--reveal` the result is `ConnectionTokenResult`: the connection, the
+token's expiry as an RFC 3339 instant, its granted scopes, whether this issue
+refreshed it, and the id of the recorded `connectors.oauth2.AccessTokenIssue`.
+Neither output stream carries the token. With `--reveal` (a bare `--reveal`
+reads `--reveal true`) a successful issue writes the access token and one
+newline to standard output, nothing to standard error under `--output json`,
+and no envelope; a refused issue answers its ordinary failure envelope.
+Each successful issue records one `AccessTokenIssue` naming its delivery
+(`metadata_only` or `revealed`); a refusal records none.
+
+| Refusal | `code` | `next_action` |
+|---|---|---|
+| connection of a profile that is not `oauth2_grant`, or not in the instance's permissions; a token inside the lead of a confidential client, which this owner cannot refresh | `forbidden` | `request_permission` |
+| Stale connection, or a refresh the provider refused or left uncertain | `service_failure` | `repair_connection` |
+| a refresh whose granted scopes no longer cover the profile | `not_granted` | `repair_connection` |
+| a refresh the provider answered as revoked | `revoked` | `create_connection` |
+| token endpoint answered `429` | `unavailable`, service code `rate_limited`, `retry_after_seconds` | `retry_explicitly` |
+| token endpoint not reached, nothing sent; a token past its expiry with nothing published in its place | `unavailable` | `retry_status` |
+| the deadline passed before the issue was recorded; a refresh it ran stays published | `timeout` | `retry_explicitly` |
+| custody cannot be read | `custody_unavailable` | `unlock_keyring` |
 
 ## 3. Explicit local TOML configuration
 
@@ -993,7 +1024,21 @@ protected file or stdin, each explicitly selected by its own source flag. Under 
 read-only `mounted_secret` binding connect and repair take no source: the owner
 reads the item `<adapter alias>/<profile>` itself, and a source flag is
 `invalid_input` at `arguments`. Under a platform binding a missing source is
-`protected_entry_unavailable` with `next_action = select_protected_source`. Hidden
+`protected_entry_unavailable` with `next_action = select_protected_source`, except
+on an `oauth2_grant` profile of a public client, whose grant runs in the CLI inside
+the capture window and whose token response is the entry
+(`contracts/auth/acquisition/v1alpha1/semantics.md`, the `oauth2_grant` row); a
+confidential client's source is the document `{"client_secret": "…"}`, from which
+its grant runs the same way. The consent address goes to the controlling terminal,
+else to one standard error line `connectors: consent-url <address>`. `--device`
+(`--device true`; a bare `--device` reads as `--device true`) runs the device grant
+instead, RFC 8628 at the declaration's `device_authorization_url` unless the
+composition registers a device dialect for the profile id, and shows
+`connectors: device-code <user_code> <verification_uri>` the same way; on any other
+profile, or under the read-only binding, `--device` is `invalid_input` (such a
+profile given no source under a platform binding is `protected_entry_unavailable`
+first). A grant that fails, times out or is cancelled stores nothing; a missing
+required scope is `not_granted`. Hidden
 terminal requires a trusted controlling TTY; unavailable or conflicting sources
 refuse as a usage/source error and explain safe source selection. No password/token
 argv flag, environment
@@ -1441,7 +1486,11 @@ receives may have been dispatched and reports `outcome_unknown`.
 An HTTP 429 stays `service_failure` with
 `service_code = rate_limited`, and with `retry_after_seconds` when the provider
 named a delay. `unsupported` is always `admission`: every
-source of it is raised before dispatch.
+source of it is raised before dispatch, with one exception: a device grant
+whose authorization server names a poll interval longer than the sign-in
+window is refused as `unsupported` after the device authorization request and
+before any poll, because only that response names the interval. Nothing is
+stored and no token was requested.
 
 **Revalidation retries.** `connections revalidate` sends its validation (the
 adapter's identity probe, a read) again when the attempt failed transiently,

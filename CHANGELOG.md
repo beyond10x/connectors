@@ -1,11 +1,57 @@
 # Changelog
 
-## Unreleased
+## 0.58.0 — 2026-10-26
+
+No breaking changes.
+
+### Added
+
+- OAuth2 grants for any provider: an `oauth2_grant` profile declares its authorization server, and
+  `connections connect` runs the authorization code grant with PKCE (loopback or pasted code) or,
+  with `--device`, the device grant (RFC 8628, or a dialect a connector registers). The token and
+  refresh token are stored in the connection's custody; nothing is stored when the grant fails.
+- The owner refreshes an `oauth2_grant` connection through the refresh ledger: the exchange is
+  authorized durably before the one request, a stored response survives a crash and is published
+  at the next start without a second request, concurrent callers share one exchange, and an
+  HTTP 429 or a failure before the request left changes nothing.
+- `connections token` hands out a currently valid access token of an `oauth2_grant` connection,
+  refreshing first inside the declaration's refresh lead. It prints only metadata unless
+  `--reveal` is given; standard error never carries a token. Rust callers get the same through
+  `connectors_host::local::access_token::access_token`, whose type redacts the token in `Debug` and `Display`.
+- `connections launch` on an `oauth2_grant` connection puts only the current access token on
+  descriptor 3, never the stored entry or its refresh token.
+- The `chatgpt` connector (provider OpenAI, catalog provider) signs in with a ChatGPT
+  subscription as the Codex CLI does, profile `chatgpt.subscription`: browser with PKCE on
+  `127.0.0.1:1455`, or `connections connect --device` through the ChatGPT device sign-in. It
+  refreshes with JSON and rotation, names the connection by the ChatGPT account id from the
+  `id_token`, serves `connections token --reveal` and one read, `models.list`. No client id
+  ships: an instance is pinned with its own `oauth2_client_id`, and a derived one is refused as
+  `InvalidConfiguration`. The device sign-in waits 240 s, inside the owner's 300 s entry window,
+  not the Codex CLI's 15 minutes; a server poll interval that leaves no poll inside that window
+  ends any `--device` grant at once as `unsupported`, not `timeout`. Verified against a local
+  fixture only, not live. Guide `website/docs/connectors/chatgpt.md`.
+- Catalog connector `claude-subscription` (provider Anthropic): the Claude Code sign-in as two
+  `oauth2_grant` profiles, `claude.subscription` (loopback redirect) and
+  `claude.subscription-pasted` (pasted `code#state`), with JSON exchange and refresh and
+  `connections token` issuing the access token. For the operator's own Claude plan only; the guide
+  quotes the provider's terms. No client id ships: an instance is pinned and configures
+  `oauth2_client_id`, and one without it is refused as `InvalidConfiguration`. One read,
+  `account.profile`. Verified against a local fake
+  authorization server only, not live.
 
 ### Changed
 
-- ESS 0.68.0 (from 0.67.0). No user-visible effect: the specification stays at its
-  current format, and the regenerated types differ only in the generator version they name.
+- ESS 0.69.2 (from 0.67.0). No user-visible effect: the specification stays at its current
+  format. The regenerated types name their enum variants after their wire values instead of
+  `V0`, `V1` …, and their manifests take compatible version ranges; both crates are internal.
+
+### Limitations
+
+- The ChatGPT and Claude subscription sign-ins and refreshes are verified against a local fake
+  authorization server only, never live. Neither connector ships a client id.
+- A device sign-in waits about 4 minutes, inside the 300 s acquisition entry window; the user
+  code is shown before a poll interval that does not fit that window is refused.
+- The Google consent flow does not yet use the OAuth2 core.
 
 ## 0.57.0 — 2026-10-23
 

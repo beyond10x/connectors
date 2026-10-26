@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-25T21:09:57Z",
+  "actor": "human:timo",
+  "artifact": "architecture-decision-record:oauth2-grants-and-access-token-issue",
+  "kind": "architecture-decision-record",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:plan-critic-scope-subscription-oauth2-r1",
+    "reference": ".local/drafts",
+    "review": "review-result:plan-critic-scope-subscription-oauth2-r1",
+    "outcome": "fixed"
+  }
+}

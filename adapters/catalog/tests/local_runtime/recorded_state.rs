@@ -5,7 +5,7 @@ use entity_eventlog::{
     Authority, RecordedProviderFacade,
     sync::{BridgeConfig, CallWait, EventlogRecordedStoreOwner, ShutdownMode, ShutdownOutcome},
 };
-use entity_store::asynchronous::StoreCoverage;
+use entity_store::asynchronous::{RecordedEntry, StoreCoverage};
 use eventlog_core::CaptureLimits;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -118,10 +118,31 @@ impl Reader {
         assert_eq!(snapshot.scope, SCOPE);
         assert_eq!(snapshot.coverage, StoreCoverage::CompleteSnapshot);
         let mut rows = BTreeMap::new();
+        let mut history = BTreeMap::new();
         for subject in snapshot.histories {
             let terminal = subject.terminal;
             assert_eq!(subject.history.subject.entity, terminal.entity);
             assert_eq!(subject.history.subject.id, terminal.id);
+            let transitions: Vec<Transition> = subject
+                .history
+                .records
+                .iter()
+                .filter_map(|record| match &record.entry {
+                    RecordedEntry::Decision(commit) => Some(Transition {
+                        from: commit.envelope.record.from_state.clone(),
+                        to: commit.envelope.record.to_state.clone(),
+                        events: commit
+                            .envelope
+                            .record
+                            .events
+                            .iter()
+                            .map(|event| event.event_type.clone())
+                            .collect(),
+                    }),
+                    RecordedEntry::Observation(_) => None,
+                })
+                .collect();
+            history.insert((terminal.entity.clone(), terminal.id.clone()), transitions);
             let allowed = self.fields.get(&terminal.entity).expect("unknown entity");
             assert!(
                 self.states[&terminal.entity].contains(&terminal.lifecycle_state),
@@ -140,8 +161,18 @@ impl Reader {
         Facts {
             authority: self.authority.clone(),
             rows,
+            history,
         }
     }
+}
+
+/// One recorded decision of a subject: the state it left (none for its
+/// creation), the state it reached and the domain events it emitted.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Transition {
+    pub(super) from: Option<String>,
+    pub(super) to: String,
+    pub(super) events: Vec<String>,
 }
 impl Drop for Reader {
     fn drop(&mut self) {
@@ -163,6 +194,8 @@ impl Drop for Reader {
 pub(super) struct Facts {
     authority: String,
     rows: BTreeMap<(String, String), EntityInstance>,
+    /// Every subject's recorded decisions, in order.
+    history: BTreeMap<(String, String), Vec<Transition>>,
 }
 pub(super) type StoredAttempt = (String, String, Option<i64>, Option<i64>);
 pub(super) type RecoveryState = (String, String, Option<i64>, Option<String>);
@@ -208,6 +241,17 @@ impl Facts {
     }
     fn entities<'a>(&'a self, entity: &'a str) -> impl Iterator<Item = &'a EntityInstance> {
         self.rows.values().filter(move |row| row.entity == entity)
+    }
+    /// The terminal rows of every recorded subject of `entity`.
+    pub(super) fn subjects(&self, entity: &str) -> Vec<&EntityInstance> {
+        self.rows
+            .values()
+            .filter(|row| row.entity == entity)
+            .collect()
+    }
+    /// The recorded decisions of `row`'s subject, in order.
+    pub(super) fn transitions(&self, row: &EntityInstance) -> &[Transition] {
+        &self.history[&(row.entity.clone(), row.id.clone())]
     }
     fn attempt(&self, id: &str) -> &EntityInstance {
         let found: Vec<_> = self

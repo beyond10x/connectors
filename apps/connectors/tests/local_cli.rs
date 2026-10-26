@@ -1635,3 +1635,64 @@ fn a_connected_client_keeps_an_owner_past_its_idle_bound() {
     assert!(exit.success(), "idle exit is clean: {exit}");
     assert!(!state.join("owner.sock").exists());
 }
+
+/// Adversary pass 1 on story:connect-runs-an-oauth2-grant. The case above,
+/// `a_platform_binding_refuses_a_connect_with_no_protected_source`, names a
+/// profile the entry does not permit, so it holds only through the CLI's
+/// remapping of `forbidden`. Here the profile is permitted and is no
+/// `oauth2_grant` profile, so the contract's rule applies unchanged
+/// (`contracts/cli/v1alpha1/semantics.md` §2: "Under a platform binding a
+/// missing source is `protected_entry_unavailable` with `next_action =
+/// select_protected_source`, except on an `oauth2_grant` profile of a public
+/// client"): refused by name before any owner starts, whatever the state of
+/// custody, which here names a Secret Service socket that does not exist.
+#[test]
+fn adversary_a_permitted_profile_with_no_protected_source_is_refused_before_the_owner() {
+    let root = tempfile::tempdir().unwrap();
+    configured_entry(
+        &root,
+        "connectors-local/2",
+        "private_protocol='connectors-private/2'\n",
+    );
+    let config_path = root.path().join("config/config.toml");
+    let absent = root.path().join("absent-secret-service.sock");
+    let config = fs::read_to_string(&config_path).unwrap().replacen(
+        "owner_uid",
+        &format!(
+            "secret_service_socket = {}\nowner_uid",
+            serde_json::to_string(absent.to_str().unwrap()).unwrap()
+        ),
+        1,
+    ) + "[adapters.forge.permissions]\nprofiles=['token']\noperations=[]\n";
+    fs::write(&config_path, config).unwrap();
+    let output = command(
+        &root,
+        &[
+            "connections",
+            "connect",
+            "--adapter",
+            "forge",
+            "--profile",
+            "token",
+        ],
+    );
+    let stopped = command(&root, &["setup", "owner-stop"]);
+    assert!(
+        !root.path().join("state/owner.sock").exists(),
+        "an owner is listening after a refused connect; owner-stop said {stopped:?}"
+    );
+    assert!(output.stdout.is_empty(), "{output:?}");
+    let error: Value = serde_json::from_slice(&output.stderr).unwrap();
+    assert_eq!(
+        (
+            &error["error"]["data"]["code"],
+            &error["error"]["data"]["next_action"]
+        ),
+        (
+            &Value::from("protected_entry_unavailable"),
+            &Value::from("select_protected_source")
+        ),
+        "{error}"
+    );
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+}

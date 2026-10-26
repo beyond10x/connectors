@@ -108,14 +108,19 @@ fn every_documented_identity_probe_is_a_value_of_the_catalog_identity_model() {
             "token",
             "basic",
             "oauth2_refresh",
-            "oauth2_client_credentials"
+            "oauth2_client_credentials",
+            "oauth2_grant"
         ])
     );
     // JSON Schema carries the model's invariants without enforcing them: the profile invariant is
     // checked by hand below, and here only that the model still states it.
     let invariants =
         schema["$defs"]["connectors_catalog.identity.Profile"]["x-ess-invariants"].to_string();
-    for scheme in ["oauth2_refresh", "oauth2_client_credentials"] {
+    for scheme in [
+        "oauth2_refresh",
+        "oauth2_client_credentials",
+        "oauth2_grant",
+    ] {
         assert!(
             invariants.contains(&format!("scheme == {scheme}")),
             "the model no longer refuses a configured subject under `{scheme}`: {invariants}"
@@ -158,6 +163,12 @@ fn every_documented_identity_probe_is_a_value_of_the_catalog_identity_model() {
         assert!(
             identity["source"] != "configuration" || ["token", "basic"].contains(&scheme),
             "{guide}: a configured subject under `{scheme}`"
+        );
+        assert!(
+            identity["source"] != "id_token"
+                || identity.get("subject_pointer").is_none()
+                || scheme == "oauth2_grant",
+            "{guide}: an id_token claim pointer under `{scheme}`"
         );
         // The prefix invariants, checked by hand as the subject one is.
         if let Some(prefix) = auth.get("prefix") {

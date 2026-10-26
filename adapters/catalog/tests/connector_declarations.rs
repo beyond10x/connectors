@@ -104,7 +104,7 @@ fn declarations() -> BTreeMap<String, Value> {
 /// Every native configuration the guides document, as `(page, configuration)`,
 /// with its `/absolute/path/adapters/catalog/` prefix made crate-relative: those
 /// a guide still shows, then those it showed before connectors were declared
-/// (`hand_written`), in the order the guide showed them.
+/// (`hand_written`), in the order the guide showed them, then those a website guide shows.
 fn documented() -> Vec<(String, Value)> {
     let mut found = Vec::new();
     let mut pages: Vec<PathBuf> = fs::read_dir(root().join("../../docs"))
@@ -133,6 +133,35 @@ fn documented() -> Vec<(String, Value)> {
                 }
             }
             found.push((name.to_owned(), config));
+        }
+    }
+    // A guide page of the website that shows a native configuration: a pinned instance of a
+    // connector that cannot be derived because its client id is the instance's configuration.
+    let mut pages: Vec<PathBuf> = fs::read_dir(root().join("../../website/docs/connectors"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "md"))
+        .collect();
+    pages.sort();
+    for page in pages {
+        let name = page.file_name().unwrap().to_str().unwrap();
+        let text = fs::read_to_string(&page).unwrap();
+        for body in text
+            .split("```json\n")
+            .skip(1)
+            .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
+            .filter(|body| body.contains("\"format\": \"connectors-catalog-local/2\""))
+        {
+            let mut config: Value = serde_json::from_str(body).unwrap();
+            for key in ["bundle_directory", "operations_file"] {
+                if let Some(path) = config[key].as_str() {
+                    let relative = path
+                        .strip_prefix("/absolute/path/adapters/catalog/")
+                        .expect("a documented catalog path");
+                    config[key] = json!(relative);
+                }
+            }
+            found.push((format!("website/docs/connectors/{name}"), config));
         }
     }
     found
@@ -228,6 +257,8 @@ fn every_catalog_provider_but_slack_and_openrouter_ships_one_declaration() {
         connectors,
         [
             "calendar",
+            "chatgpt",
+            "claude-subscription",
             "confluence",
             "confluence-v1",
             "drive",
@@ -315,15 +346,37 @@ fn declared_profiles_are_the_documented_ones_with_every_scope() {
 
 /// For every declared connector and profile, the derived configuration's
 /// bootstrap equals that of a hand-written configuration with the
-/// declaration's fields: file paths are not digested.
+/// declaration's fields: file paths are not digested. A grant profile that
+/// ships no client id is refused as invalid configuration instead.
 #[test]
 fn every_declared_profile_derives_what_its_hand_written_configuration_derives() {
     let documented = documented();
     let mut checked = Vec::new();
+    let mut refused = Vec::new();
     for (directory, declaration) in declarations() {
         let connector = declaration["connector_id"].as_str().unwrap();
         for profile in declaration["profiles"].as_array().unwrap() {
             let id = profile["profile"].as_str().unwrap();
+            // A grant profile that ships no client id cannot be derived: the client id is the
+            // instance's configuration, which a derived instance does not carry.
+            if profile["scheme"] == "oauth2_grant" && profile["oauth2"]["client_id"].is_null() {
+                let output = derived(&[
+                    "--connector",
+                    connector,
+                    "--instance",
+                    "fixture",
+                    "--profile",
+                    id,
+                ]);
+                assert!(!output.status.success(), "{connector} {id} derived");
+                assert_eq!(
+                    String::from_utf8_lossy(&output.stderr).trim(),
+                    "InvalidConfiguration",
+                    "{connector} {id}"
+                );
+                refused.push(format!("{connector} {id}"));
+                continue;
+            }
             let endpoint = match declaration["default_endpoint"].as_str() {
                 Some(endpoint) => endpoint.to_owned(),
                 None => documented
@@ -371,8 +424,17 @@ fn every_declared_profile_derives_what_its_hand_written_configuration_derives() 
         }
     }
     // Twelve connectors, Zendesk with two profiles: a lane that finds no
-    // declaration checks nothing and must not pass.
+    // declaration checks nothing and must not pass. ChatGPT's one profile and Claude's two
+    // are refused.
     assert_eq!(checked.len(), 13, "{checked:?}");
+    assert_eq!(
+        refused,
+        [
+            "chatgpt chatgpt.subscription",
+            "claude-subscription claude.subscription",
+            "claude-subscription claude.subscription-pasted"
+        ]
+    );
 }
 
 /// Scopes the minimality check keeps although every operation that accepts
@@ -786,7 +848,12 @@ fn documented_native_configurations_keep_their_revisions() {
     .map(|(key, revision)| (key.to_owned(), revision))
     .collect();
     let mut actual = BTreeMap::new();
-    for (index, (page, mut config)) in documented().into_iter().enumerate() {
+    // A website guide's configuration is newer than declarations: it has no earlier revision.
+    for (index, (page, mut config)) in documented()
+        .into_iter()
+        .filter(|(page, _)| !page.starts_with("website/"))
+        .enumerate()
+    {
         // The trust roots are instance material, digested by their bytes.
         if let Some(object) = config.as_object_mut() {
             object.remove("ca_file");

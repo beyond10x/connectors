@@ -8,12 +8,20 @@ use std::{
     time::Instant,
 };
 
+#[path = "chatgpt_adversary.rs"]
+mod chatgpt_adversary;
+#[path = "chatgpt_journey.rs"]
+mod chatgpt_journey;
+#[path = "claude_subscription_journey.rs"]
+mod claude_subscription_journey;
 #[path = "guarded_merge.rs"]
 mod guarded_merge;
 #[path = "invoke_definition.rs"]
 mod invoke_definition;
 #[path = "lifecycle.rs"]
 mod lifecycle;
+#[path = "oauth2_grant_journey.rs"]
+mod oauth2_grant_journey;
 #[path = "owner_guard.rs"]
 mod owner_guard;
 #[path = "reason_cli_adversary.rs"]

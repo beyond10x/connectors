@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-25T21:09:59Z",
+  "actor": "human:timo",
+  "artifact": "story:owner-rotating-refresh",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:plan-critic-parallel-safety-subscription-oauth2-r1",
+    "reference": ".local/drafts",
+    "review": "review-result:plan-critic-parallel-safety-subscription-oauth2-r1",
+    "outcome": "fixed"
+  }
+}

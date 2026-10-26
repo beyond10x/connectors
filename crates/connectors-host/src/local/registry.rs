@@ -1,12 +1,21 @@
 //! Static-entry connection authority. All records are nonsecret; provider work
 //! and custody I/O happen outside SQLite transactions and handle lifetimes.
 //! See docs/local-connection-registry.md for the binding and acknowledgement map.
+mod issue;
 mod lifecycle;
 mod observation;
+mod refresh;
 mod reuse;
 mod revalidation;
 mod use_and_retirement;
+pub use issue::{Issuance, Issue, Published, Recorded};
 pub use observation::{ObservedAcquisition, ObservedConnection, Page, PageOptions, State};
+#[cfg(test)]
+pub(in crate::local) use refresh::RETAINED_BOUND;
+pub use refresh::{
+    Authorization, Lost, PreparedRefresh, Publication, RecoveryCandidate, RefreshTicket,
+    Reservation, StoredRefresh,
+};
 pub use reuse::{ReuseCandidate, ReuseGuard, ReuseSource};
 pub use revalidation::{Revalidation, RevalidationDispatch};
 pub use use_and_retirement::{DispatchedUse, InvalidCredential, ReadUse, Retirement};
@@ -140,6 +149,11 @@ pub struct StaticProfile {
     /// difference (`same_authentication`). `None` on a recorded profile.
     #[serde(skip)]
     pub declaration: Option<serde_json::Value>,
+    /// The authorization server of an `oauth2_grant` profile, recorded with
+    /// the profile record (`connectors.oauth2.DeclareAuthorizationServer`).
+    /// Omitted for every other profile, so its record keeps its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oauth2: Option<connectors_oauth2::ServerDeclaration>,
 }
 impl PartialEq for StaticProfile {
     fn eq(&self, other: &Self) -> bool {
@@ -149,6 +163,7 @@ impl PartialEq for StaticProfile {
             && self.subject == other.subject
             && self.minimum_scopes == other.minimum_scopes
             && self.evidence_lifetime_ms == other.evidence_lifetime_ms
+            && self.oauth2 == other.oauth2
     }
 }
 impl Eq for StaticProfile {}
@@ -324,6 +339,7 @@ pub(super) fn fixture_binding(instance: &str) -> Binding {
             minimum_scopes: BTreeSet::new(),
             evidence_lifetime_ms: 60_000,
             declaration: None,
+            oauth2: None,
         },
         credential_revision: None,
         executable: None,
@@ -477,7 +493,26 @@ impl Registry {
         migrate: bool,
         action: impl FnOnce(&Transaction<'_>, Uuid, u64) -> Result<T>,
     ) -> Result<T> {
-        self.transaction_inner(now, migrate, false, Observation::None, action)
+        self.transaction_inner(
+            now,
+            migrate,
+            false,
+            Observation::None,
+            false,
+            |tx, a, n, _| action(tx, a, n),
+        )
+    }
+
+    /// A write that also reads and changes the refresh ledger
+    /// (story:owner-rotating-refresh): the attempts are read under the same
+    /// lifecycle lock, and the transitions `action` stages are recorded in the
+    /// batch that records its SQL change, only if it succeeded.
+    fn transaction_ledger<T>(
+        &self,
+        now: u64,
+        action: impl FnOnce(&Transaction<'_>, Uuid, u64, &mut refresh::Ledger) -> Result<T>,
+    ) -> Result<T> {
+        self.transaction_inner(now, false, false, Observation::None, true, action)
     }
 
     // Only these read-only observation closures may be replayed. A batch
@@ -496,7 +531,9 @@ impl Registry {
     ) -> Result<T> {
         let mut observation = Observation::Unlocked;
         for _ in 0..8 {
-            match self.transaction_inner(now, false, false, observation, &action) {
+            match self.transaction_inner(now, false, false, observation, false, |tx, a, n, _| {
+                action(tx, a, n)
+            }) {
                 Err(Failure::ConcurrentRevision) => observation = Observation::Locked,
                 other => return other,
             }
@@ -510,16 +547,25 @@ impl Registry {
         migrate: bool,
         action: impl FnOnce(&Transaction<'_>, Uuid, u64) -> Result<T>,
     ) -> Result<T> {
-        self.transaction_inner(now, migrate, true, Observation::None, action)
+        self.transaction_inner(
+            now,
+            migrate,
+            true,
+            Observation::None,
+            false,
+            |tx, a, n, _| action(tx, a, n),
+        )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn transaction_inner<T>(
         &self,
         now: u64,
         migrate: bool,
         admitted_registry_use: bool,
         observation: Observation,
-        action: impl FnOnce(&Transaction<'_>, Uuid, u64) -> Result<T>,
+        ledger: bool,
+        action: impl FnOnce(&Transaction<'_>, Uuid, u64, &mut refresh::Ledger) -> Result<T>,
     ) -> Result<T> {
         // Established observations validate and close the immutable
         // physical source under the lock, then replay ER outside it.
@@ -537,6 +583,11 @@ impl Registry {
         // acquiring the lock, including on a prepared observation.
         let authority = metadata.authority().map_err(host_failure)?;
         let floor_file = metadata.registry_floor().map_err(host_failure)?;
+        let mut book = if ledger {
+            refresh::Ledger::read(&metadata)?
+        } else {
+            refresh::Ledger::default()
+        };
         let tx = metadata
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -577,12 +628,16 @@ impl Registry {
         // Time observations persist even when the requested semantic action
         // refuses. A savepoint rolls back its work without forgetting the clock.
         tx.execute_batch("SAVEPOINT action").map_err(db)?;
-        let result = action(&tx, authority, now);
+        let result = action(&tx, authority, now, &mut book);
         if result.is_err() {
             tx.execute_batch("ROLLBACK TO action").map_err(db)?;
         }
         tx.execute_batch("RELEASE action").map_err(db)?;
         tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
+        // A refused action's transitions are rolled back with its SQL change.
+        if result.is_ok() {
+            metadata.stage_ledger(book.into_staged());
+        }
         let persisted = if prepared_observation {
             metadata.persist_prepared_observation()
         } else if admitted_registry_use {

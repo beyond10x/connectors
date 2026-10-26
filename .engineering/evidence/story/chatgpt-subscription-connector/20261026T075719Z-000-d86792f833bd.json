@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-26T07:57:19Z",
+  "actor": "human:timo",
+  "artifact": "story:chatgpt-subscription-connector",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:adversary-chatgpt-subscription-connector-pass-1",
+    "reference": "impl/oauth2-chatgpt",
+    "review": "review-result:adversary-chatgpt-subscription-connector-pass-1",
+    "outcome": "fixed"
+  }
+}

@@ -5,7 +5,7 @@ members = ["crates/*", "adapters/catalog", "adapters/grafana", "adapters/kuberne
 exclude = ["apps/connectors-cli-contract", "adapters/mcp/generated/launch-cli", "adapters/mcp/generated/launch-types", "adapters/mcp/generated/configuration-types", "adapters/mcp/generated/supervision", "crates/connectors-core/generated/operation-types"]
 
 [workspace.package]
-version = "0.57.0"
+version = "0.58.0"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
@@ -18,18 +18,19 @@ connectors-sdk = { path = "crates/connectors-sdk" }
 connectors-client = { path = "crates/connectors-client" }
 connectors-host = { path = "crates/connectors-host" }
 connectors-custody = { path = "crates/connectors-custody" }
+connectors-oauth2 = { path = "crates/connectors-oauth2" }
 entity-core = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.3" }
 entity-eventlog = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.3", features = ["sqlite", "sync-bridge"] }
 entity-executor = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.3" }
 entity-store = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.3" }
 eventlog-core = { git = "https://github.com/beyond10x/eventlog", tag = "0.8.3" }
-ess-conformance = { git = "https://github.com/beyond10x/ess", tag = "0.68.0" }
-ess-compiler = { git = "https://github.com/beyond10x/ess", tag = "0.68.0" }
-ess-domain = { git = "https://github.com/beyond10x/ess", tag = "0.68.0" }
-ess-entity-runtime = { git = "https://github.com/beyond10x/ess", tag = "0.68.0" }
-ess-primitives = { git = "https://github.com/beyond10x/ess", tag = "0.68.0" }
-ess-service-contract = { git = "https://github.com/beyond10x/ess", tag = "0.68.0" }
-ess-synth = { git = "https://github.com/beyond10x/ess", tag = "0.68.0" }
+ess-conformance = { git = "https://github.com/beyond10x/ess", tag = "0.69.2" }
+ess-compiler = { git = "https://github.com/beyond10x/ess", tag = "0.69.2" }
+ess-domain = { git = "https://github.com/beyond10x/ess", tag = "0.69.2" }
+ess-entity-runtime = { git = "https://github.com/beyond10x/ess", tag = "0.69.2" }
+ess-primitives = { git = "https://github.com/beyond10x/ess", tag = "0.69.2" }
+ess-service-contract = { git = "https://github.com/beyond10x/ess", tag = "0.69.2" }
+ess-synth = { git = "https://github.com/beyond10x/ess", tag = "0.69.2" }
 async-trait = "0.1"
 axum = "0.8.9"
 base64 = "0.23"
