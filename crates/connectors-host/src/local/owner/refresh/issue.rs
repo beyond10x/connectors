@@ -4,10 +4,13 @@
 //!
 //! The published generation's access token is issued as it is (`current`)
 //! while it stays valid for longer than the declaration's
-//! `refresh_lead_seconds`; otherwise [`Refresher::refresh_connection`] runs
+//! `refresh_lead_seconds`; otherwise [`Refresher::refresh_generation`] runs
 //! first, under the same `connectors.refresh` ledger serialization every
-//! refresh takes, and its published generation is issued (`refreshed`). The
-//! caller cannot ask for a refresh. Each issue is one recorded
+//! refresh takes, and its published generation is issued (`refreshed`). Its
+//! reservation names the generation the issue read, in the transaction that
+//! reserves: a caller whose generation another refresh already replaced
+//! sends nothing and issues the successor. The caller cannot ask for a
+//! refresh. Each issue is one recorded
 //! `connectors.oauth2.AccessTokenIssue`; a refusal records nothing.
 use super::*;
 use crate::local::{
@@ -50,6 +53,11 @@ pub enum Refusal {
     Refresh(Outcome),
     /// The published access token has expired and no refresh replaced it.
     Expired,
+    /// The access token must be refreshed and this owner cannot: a
+    /// confidential client's secret is not part of the stored entry.
+    NotRefreshable,
+    /// The caller's deadline passed before the issue was recorded.
+    Deadline,
 }
 
 /// The stored entry's fields an issue reads (`oauth2_grant::entry`).
@@ -65,13 +73,15 @@ const ROUNDS: usize = 3;
 
 impl Refresher {
     /// Issues a current access token of `connection`, a connection of
-    /// `instance` under `adapter`, for `delivery`.
+    /// `instance` under `adapter`, for `delivery`, unless
+    /// `deadline_ms` (Unix milliseconds) passes before it is recorded.
     pub fn issue_access_token(
         &self,
         instance: &str,
         adapter: &str,
         connection: &str,
         delivery: Delivery,
+        deadline_ms: u64,
     ) -> Result<Issued, Refusal> {
         let mut refreshed = false;
         for _ in 0..ROUNDS {
@@ -89,8 +99,14 @@ impl Refresher {
             // One refresh per call at most: a provider whose fresh token
             // already expires within the lead is issued what it published.
             if !refreshed && !published.current(now()) {
+                if !published.refreshable() {
+                    return Err(Refusal::NotRefreshable);
+                }
+                // The reservation names the generation decided on: once
+                // another caller's refresh published its successor, this
+                // one sends nothing and reads the successor.
                 match self
-                    .refresh_connection(connection)
+                    .refresh_generation(connection, Some(published.generation()))
                     .map_err(Refusal::Registry)?
                 {
                     Outcome::Refreshed => {
@@ -109,6 +125,11 @@ impl Refresher {
             if token.expires_at_ms <= now() {
                 return Err(Refusal::Expired);
             }
+            // A refresh this issue waited for may outlast its caller: an issue
+            // never delivered is not recorded.
+            if now() >= deadline_ms {
+                return Err(Refusal::Deadline);
+            }
             let issue = Issue {
                 connection,
                 generation: published.generation(),
@@ -124,7 +145,7 @@ impl Refresher {
                         token: token.access_token,
                         expires_at_ms: token.expires_at_ms,
                         scopes: token.scopes,
-                        refreshed,
+                        refreshed: recorded.refresh_attempt.is_some(),
                         issue: recorded.issue,
                     });
                 }
@@ -138,7 +159,10 @@ impl Refresher {
 }
 
 /// The owner's failure for a refusal, as `connectors.cli.FailureCode` names
-/// it: `forbidden` for a profile that is not `oauth2_grant`;
+/// it: `forbidden` for a profile that is not `oauth2_grant`, or for a token
+/// inside the lead that this owner cannot refresh (a confidential client);
+/// `not_granted` when a refresh no longer covers the profile's scopes;
+/// `timeout` when the caller's deadline passed before the issue was recorded;
 /// `service_failure` (next action `repair_connection`) when a refresh needs
 /// reauthorization or its outcome is uncertain; `unavailable` when the token
 /// endpoint rate limited it, with its `Retry-After` in whole seconds, or when
@@ -148,13 +172,14 @@ impl From<Refusal> for crate::local::owner::Error {
         use crate::local::owner::{Code, Error};
         match refusal {
             Refusal::Registry(failure) => failure.into(),
-            Refusal::NotGrant => Code::Forbidden.into(),
+            Refusal::NotGrant | Refusal::NotRefreshable => Code::Forbidden.into(),
+            Refusal::Deadline => Code::Timeout.into(),
             Refusal::Expired => Code::Unavailable.into(),
             Refusal::Refresh(outcome) => match outcome {
                 Outcome::ReauthorizationRequired | Outcome::Uncertain => {
                     Code::ServiceFailure.into()
                 }
-                Outcome::InsufficientScope => Code::InsufficientScope.into(),
+                Outcome::InsufficientScope => Code::NotGranted.into(),
                 Outcome::InvalidOrRevoked => Code::Revoked.into(),
                 Outcome::CustodyUnavailable => Code::CustodyUnavailable.into(),
                 Outcome::RateLimited { retry_after_ms } => {

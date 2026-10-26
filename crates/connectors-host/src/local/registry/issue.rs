@@ -29,6 +29,7 @@ pub struct Published {
     version: custody::Version,
     expires_at_ms: Option<u64>,
     lead_ms: u64,
+    refreshable: bool,
 }
 
 impl Published {
@@ -45,6 +46,11 @@ impl Published {
         self.expires_at_ms
             .is_some_and(|expires| expires.saturating_sub(now) > self.lead_ms)
     }
+    /// Whether this owner can refresh it: only a public client's entry holds
+    /// all a refresh sends (a confidential client's secret is not stored).
+    pub fn refreshable(&self) -> bool {
+        self.refreshable
+    }
 }
 
 /// One recorded `AccessTokenIssue`.
@@ -59,7 +65,9 @@ pub struct Recorded {
 pub struct Issue<'a> {
     pub connection: &'a str,
     pub generation: &'a str,
-    /// `refreshed`: a refresh published the generation for this call.
+    /// `refreshed`: this call refreshed, or waited for the refresh that
+    /// published the generation. Recorded as `current` when no refresh
+    /// published it (a repair did).
     pub refreshed: bool,
     pub expires_at_ms: u64,
     pub scopes: &'a [String],
@@ -101,14 +109,18 @@ impl Registry {
                 lead_ms: u64::try_from(declaration.refresh_lead_seconds)
                     .unwrap_or(0)
                     .saturating_mul(1000),
+                refreshable: matches!(
+                    declaration.client_kind,
+                    connectors_oauth2::ClientKind::Public
+                ),
             })))
         })
     }
 
     /// `connectors.oauth2.IssueAccessToken` of `issue.generation`, while the
     /// connection still publishes it: `Conflict` when a refresh or a repair
-    /// replaced it since it was read, or when a refreshed issue's generation
-    /// was not published by a refresh.
+    /// replaced it since it was read. A refreshed issue names the attempt that
+    /// published its generation, when a refresh did.
     pub(in crate::local) fn record_issue(&self, issue: &Issue<'_>, now: u64) -> Result<Recorded> {
         self.transaction_ledger(now, |tx, _, _, ledger| {
             let row = Self::connection(tx, issue.connection)?;
@@ -118,16 +130,10 @@ impl Registry {
             if row.kept.stale || row.generation.as_deref() != Some(issue.generation) {
                 return Err(Failure::Conflict);
             }
-            let refresh_attempt = if issue.refreshed {
-                Some(
-                    ledger
-                        .published(issue.generation)
-                        .ok_or(Failure::Conflict)?
-                        .to_owned(),
-                )
-            } else {
-                None
-            };
+            let refresh_attempt = issue
+                .refreshed
+                .then(|| ledger.published(issue.generation).map(str::to_owned))
+                .flatten();
             let recorded = Recorded {
                 issue: new_id(),
                 refresh_attempt,
