@@ -2,6 +2,7 @@
 //!
 //! These owners do not grant provider access. Custody qualification and the
 //! connection/supervisor coordinators must be bound before credential acquisition.
+pub mod access_token;
 #[cfg(test)]
 mod adversary_w2_tests;
 #[cfg(test)]

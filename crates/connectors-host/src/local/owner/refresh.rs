@@ -472,5 +472,7 @@ impl Refresher {
     }
 }
 
+pub mod issue;
+
 #[cfg(test)]
 mod tests;

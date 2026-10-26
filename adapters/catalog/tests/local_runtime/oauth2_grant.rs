@@ -50,6 +50,12 @@ pub(super) enum Behaviour {
     NarrowScope,
     /// The device code is answered `expired_token` on its first poll.
     DeviceExpired,
+    /// As `Consent`, but the granted access token is valid for 120 s, inside
+    /// the declaration's 300 s `refresh_lead_seconds`; a refresh grants one
+    /// valid for an hour.
+    ShortLived,
+    /// As `ShortLived`, but every refresh is answered `invalid_grant`.
+    RefreshRefused,
 }
 
 /// One consent the fixture granted: its code, the PKCE challenge and the
@@ -87,6 +93,10 @@ struct GrantState {
     consents: Vec<Consent>,
     devices: Vec<Device>,
     issued: u32,
+    /// Refresh requests answered, refused ones included.
+    refreshes: u32,
+    /// Refresh tokens a refresh spent: never accepted again.
+    spent: Vec<String>,
 }
 
 /// What one route answers.
@@ -132,6 +142,8 @@ impl GrantServer {
             consents: Vec::new(),
             devices: Vec::new(),
             issued: 0,
+            refreshes: 0,
+            spent: Vec::new(),
         }));
         let served = state.clone();
         let (address_tx, address_rx) = std::sync::mpsc::channel();
@@ -291,6 +303,11 @@ impl GrantServer {
         self.state.lock().unwrap().issued
     }
 
+    /// How many refresh requests the token endpoint answered.
+    pub(super) fn refreshes(&self) -> u32 {
+        self.state.lock().unwrap().refreshes
+    }
+
     /// The `Authorization` header of every API request, in order.
     pub(super) fn api_authorizations(&self) -> Vec<Option<String>> {
         self.requests()
@@ -331,6 +348,7 @@ fn route_answer(
         ("POST", "/token") => match field(form, "grant_type") {
             Some("authorization_code") => exchange(state, form),
             Some("urn:ietf:params:oauth:grant-type:device_code") => poll(state, form),
+            Some("refresh_token") => refresh(state, form),
             _ => refused("unsupported_grant_type"),
         },
         ("POST", "/device/code") => {
@@ -444,7 +462,8 @@ fn exchange(state: &mut GrantState, form: &[(String, String)]) -> Answer {
         return Answer::Json(400, json!({"error": "invalid_grant"}));
     };
     consent.exchanged = true;
-    grant(state)
+    let expires_in = granted_for(state.behaviour);
+    grant(state, expires_in)
 }
 
 /// One RFC 8628 §3.4 poll.
@@ -466,11 +485,39 @@ fn poll(state: &mut GrantState, form: &[(String, String)]) -> Answer {
         return Answer::Json(400, json!({"error": "authorization_pending"}));
     }
     device.exchanged = true;
-    grant(state)
+    let expires_in = granted_for(state.behaviour);
+    grant(state, expires_in)
 }
 
-/// A token response for a new grant.
-fn grant(state: &mut GrantState) -> Answer {
+/// How long a new grant's access token is valid, in seconds.
+fn granted_for(behaviour: Behaviour) -> u64 {
+    match behaviour {
+        Behaviour::ShortLived | Behaviour::RefreshRefused => 120,
+        _ => 3600,
+    }
+}
+
+/// A rotating refresh of an issued refresh token no refresh spent yet: a new
+/// access and refresh token, valid for an hour. The refresh token it was sent
+/// is spent; anything else is `invalid_grant`, as is every refresh under
+/// `RefreshRefused`.
+fn refresh(state: &mut GrantState, form: &[(String, String)]) -> Answer {
+    state.refreshes += 1;
+    let presented = field(form, "refresh_token").unwrap_or_default().to_owned();
+    let issued = (1..=state.issued).any(|n| presented == format!("{GRANT_REFRESH}{n}"));
+    if state.behaviour == Behaviour::RefreshRefused
+        || field(form, "client_id") != Some(GRANT_CLIENT_ID)
+        || !issued
+        || state.spent.contains(&presented)
+    {
+        return Answer::Json(400, json!({"error": "invalid_grant"}));
+    }
+    state.spent.push(presented);
+    grant(state, 3600)
+}
+
+/// A token response for a new grant, valid for `expires_in` seconds.
+fn grant(state: &mut GrantState, expires_in: u64) -> Answer {
     state.issued += 1;
     let scope = match state.behaviour {
         Behaviour::NarrowScope => GRANT_EXTRA_SCOPE.to_owned(),
@@ -481,7 +528,7 @@ fn grant(state: &mut GrantState) -> Answer {
         json!({
             "access_token": format!("{GRANT_ACCESS}{}", state.issued),
             "token_type": "Bearer",
-            "expires_in": 3600,
+            "expires_in": expires_in,
             "scope": scope,
             "refresh_token": format!("{GRANT_REFRESH}{}", state.issued),
         }),

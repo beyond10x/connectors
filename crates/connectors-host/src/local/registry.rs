@@ -1,12 +1,14 @@
 //! Static-entry connection authority. All records are nonsecret; provider work
 //! and custody I/O happen outside SQLite transactions and handle lifetimes.
 //! See docs/local-connection-registry.md for the binding and acknowledgement map.
+mod issue;
 mod lifecycle;
 mod observation;
 mod refresh;
 mod reuse;
 mod revalidation;
 mod use_and_retirement;
+pub use issue::{Issuance, Issue, Published, Recorded};
 pub use observation::{ObservedAcquisition, ObservedConnection, Page, PageOptions, State};
 pub use refresh::{
     Lost, PreparedRefresh, Publication, RecoveryCandidate, RefreshTicket, Reservation,

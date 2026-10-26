@@ -143,8 +143,35 @@ instead; connect a second account as a second instance.
 Refreshing an OAuth access token is not a state change; only a refused refresh token makes a
 connection Stale, and no retry can renew it. An invoke on a Stale connection answers with the
 next action `repair_connection`, which names `connections reconnect`.
-`connections describe`, `reconnect`, `revalidate`, `launch` and `revoke` take the instance's
-one connection when `--connection` is left out.
+`connections describe`, `reconnect`, `revalidate`, `launch`, `token` and `revoke` take the
+instance's one connection when `--connection` is left out.
+
+### Get an access token
+
+`connections token` issues a current access token of an OAuth2 grant connection. While the
+stored token stays valid for longer than the profile's refresh lead it is issued as it is;
+otherwise the owner refreshes it once first. Without `--reveal` it prints only what was
+issued; the output below is from the loopback test authorization server:
+
+```sh
+connectors connections token --connector <connector> --instance <instance>
+```
+
+```json
+{"connection":"conn_5a032a7ae1bb4576913176e9a9c63403_5872010755134cfeb5a9da9139d99d4f","expires_at":"2026-10-26T04:59:26.453Z","issue":"4d6ad0f2-61d1-4499-95b2-362798145833","refreshed":false,"scopes":["fixture.read","fixture.profile"]}
+```
+
+With `--reveal`, standard output is the token and one newline, for a pipe:
+
+```console
+$ connectors connections token --connector <connector> --instance <instance> --reveal
+fixture-grant-access-1
+```
+
+Every issue is recorded, with its delivery but never the token. A Stale connection, and a
+refresh the provider refuses, answer `repair_connection`; a profile that is not an OAuth2
+grant is `forbidden`. Programs in Rust call `connectors_host::local::access_token::access_token`
+instead, whose value prints no token in `Debug` or `Display`.
 
 ### Move a legacy configuration
 

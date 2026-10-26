@@ -93,6 +93,7 @@ management wire payload or a persistent record.
 | `connections reconnect` | exact existing connection's coordinator | `ConnectionReconnectInput` → `ConnectionReconnectResult` | yes / yes, after admission |
 | `connections revalidate` | exact existing connection's evidence coordinator | `ConnectionRevalidateInput` → `ConnectionRevalidateResult` | yes / yes, after admission |
 | `connections launch` | exact existing connection's read admission and the owner's custody read | `ConnectionLaunchInput` → the consumer's exit status ([consumer launch](consumer-launch.md)) | yes / no |
+| `connections token` | exact existing connection's owner, through its access token issue ([access token issue](#access-token-issue)) | `ConnectionTokenInput` → `ConnectionTokenResult`, or the token alone with `--reveal` | yes / no |
 | `connections status` | safe connection/acquisition observation | `ConnectionStatusInput` → `ConnectionStatusResult` | no / no |
 | `connections revoke` | connection metadata authority | `ConnectionRevokeInput` → `ConnectionRevokeResult` | no / no |
 | `operations list` | selected cached descriptor projection | `OperationListInput` → `OperationListResult` | only to [launch for a description](#launching-for-a-description) |
@@ -316,6 +317,34 @@ Explicit service commands (use COMMAND --help for options):
   invoke    Invoke an explicit service operation
   serve     Run the configured federation service
 ```
+
+### Access token issue
+
+`connections token` asks the selected connection's owner for a current access
+token of an `oauth2_grant` connection, under the issue rules of
+[auth acquisition §4.4](../../auth/acquisition/v1alpha1/semantics.md#44-access-token-issue).
+It takes the instance's one connection when `--connection` is left out, and
+starts the owner when none runs; the owner must be of the same build, or the
+command is refused as `owner_build_mismatch`. It starts no adapter.
+
+Without `--reveal` the result is `ConnectionTokenResult`: the connection, the
+token's expiry as an RFC 3339 instant, its granted scopes, whether this issue
+refreshed it, and the id of the recorded `connectors.oauth2.AccessTokenIssue`.
+Neither output stream carries the token. With `--reveal` (a bare `--reveal`
+reads `--reveal true`) a successful issue writes the access token and one
+newline to standard output, nothing to standard error under `--output json`,
+and no envelope; a refused issue answers its ordinary failure envelope.
+Each successful issue records one `AccessTokenIssue` naming its delivery
+(`metadata_only` or `revealed`); a refusal records none.
+
+| Refusal | `code` | `next_action` |
+|---|---|---|
+| connection of a profile that is not `oauth2_grant`, or not in the instance's permissions | `forbidden` | `request_permission` |
+| Stale connection, or a refresh the provider refused or left uncertain | `service_failure` | `repair_connection` |
+| a refresh whose granted scopes no longer cover the profile | `not_granted` | `repair_connection` |
+| a refresh the provider answered as revoked | `revoked` | `create_connection` |
+| token endpoint answered `429` | `unavailable`, service code `rate_limited`, `retry_after_seconds` | `retry_explicitly` |
+| custody cannot be read | `custody_unavailable` | `unlock_keyring` |
 
 ## 3. Explicit local TOML configuration
 

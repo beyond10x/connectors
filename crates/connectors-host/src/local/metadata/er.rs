@@ -30,12 +30,16 @@ use std::{collections::BTreeMap, num::NonZeroU16, path::Path, time::Duration};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 mod ledger;
+#[cfg(test)]
+pub(in crate::local) use ledger::RecordedIssue;
 pub(super) use ledger::attempts as refresh_attempts;
 #[cfg(test)]
 pub(super) use ledger::recorded_commands as recorded_refresh_commands;
+#[cfg(test)]
+pub(super) use ledger::recorded_issues;
 pub(in crate::local) use ledger::{
     ACQUISITION as REFRESH_ACQUISITION, Attempt as RefreshAttempt, AttemptState as RefreshState,
-    Step as LedgerStep, insert_acquisition as insert_refresh_acquisition,
+    IssueRecord, Step as LedgerStep, insert_acquisition as insert_refresh_acquisition,
 };
 
 /// Visible projection rows keyed by entity and identity: lifecycle state and fields.
@@ -4595,7 +4599,17 @@ fn command_arguments(
         .get("input")
         .ok_or(Failure::MetadataUnavailable)?;
     let mut candidates = next.fields.clone();
-    if input_schema.properties.contains_key("decision") {
+    if binding.name == "connectors.oauth2.IssueAccessToken" {
+        // The owner's own decision (`ledger::issue_action`): `current` or
+        // `refreshed`, each recorded only beside the issue it decided; a
+        // refusal records nothing.
+        if !matches!(
+            candidates.get("decision").and_then(Value::as_str),
+            Some("current" | "refreshed")
+        ) {
+            return Err(Failure::MetadataUnavailable);
+        }
+    } else if input_schema.properties.contains_key("decision") {
         // These commands are reached only after the corresponding trusted host
         // owner has completed its admission/custody/audit predicate and committed
         // the exact SQL change being recorded. Refused and unavailable host
@@ -4721,6 +4735,7 @@ fn identity_field(entity: &str) -> Option<&'static str> {
         "connectors.approval_issuers.ApprovalSigningKey" => Some("key_id"),
         "connectors.local_approval_policy.LocalApprovalPolicy" => Some("policy_id"),
         ledger::ENTITY => Some("attempt_id"),
+        ledger::ISSUE_ENTITY => Some("issue_ref"),
         _ => None,
     }
 }
