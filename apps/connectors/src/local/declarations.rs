@@ -7,6 +7,8 @@
 use serde_json::Value;
 
 const DECLARATIONS: &[&str] = &[
+    include_str!("../../../../adapters/catalog/providers/chatgpt/connector.json"),
+    include_str!("../../../../adapters/catalog/providers/claude-subscription/connector.json"),
     include_str!("../../../../adapters/catalog/providers/confluence/connector.json"),
     include_str!("../../../../adapters/catalog/providers/confluence-v1/connector.json"),
     include_str!("../../../../adapters/catalog/providers/gitlab/connector.json"),

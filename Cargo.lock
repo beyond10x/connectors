@@ -570,12 +570,14 @@ dependencies = [
  "clap",
  "clap_complete",
  "connectors-catalog",
+ "connectors-catalog-provider",
  "connectors-cli-contract",
  "connectors-client",
  "connectors-core",
  "connectors-custody",
  "connectors-host",
  "connectors-mcp",
+ "connectors-oauth2",
  "connectors-sdk",
  "hex",
  "libc",
@@ -588,6 +590,7 @@ dependencies = [
  "tokio",
  "toml",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]
@@ -599,6 +602,7 @@ dependencies = [
  "connectors-catalog",
  "connectors-catalog-provider",
  "connectors-core",
+ "connectors-oauth2",
  "connectors-sdk",
  "connectors-spec",
  "entity-core 0.30.3",
@@ -648,6 +652,7 @@ dependencies = [
  "connectors-catalog",
  "connectors-core",
  "connectors-host",
+ "connectors-oauth2",
  "connectors-sdk",
  "entity-core 0.30.3",
  "entity-eventlog",
@@ -804,6 +809,7 @@ dependencies = [
  "connectors-client",
  "connectors-core",
  "connectors-custody",
+ "connectors-oauth2",
  "connectors-sdk",
  "entity-core 0.30.3",
  "entity-eventlog",
@@ -931,6 +937,23 @@ version = "0.0.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "connectors-oauth2"
+version = "0.57.0"
+dependencies = [
+ "base64 0.23.1",
+ "getrandom 0.3.4",
+ "httpdate",
+ "rcgen",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "subtle",
+ "url",
+ "zeroize",
 ]
 
 [[package]]

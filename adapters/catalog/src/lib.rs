@@ -10,6 +10,8 @@
 //!
 //! A provider may also declare a `datasource.feed/v1alpha1` binding as data; [`feed`] realizes
 //! it over the same bundle, and the engine answers `feed.containers` and `feed.items` from it.
+#[cfg(feature = "service")]
+pub mod chatgpt;
 mod closed;
 pub mod feed;
 

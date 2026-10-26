@@ -9,7 +9,7 @@
 | Field | Value |
 |---|---|
 | Contract | `auth.acquisition/v1alpha1` |
-| Paths | `static_config` (deployment binding, no acquisition session); coordinator flows: `static_entry`, `oauth2_authorization_code`, `oauth2_client_credentials`; reserved here: `oauth2_password`, `workload_identity`, `exec_plugin`, `host_issued` (session authority has its separate [sessions](../../../sessions/v1alpha1/semantics.md) contract) |
+| Paths | `static_config` (deployment binding, no acquisition session); coordinator flows: `static_entry`, `oauth2_authorization_code`, `oauth2_client_credentials`; the CLI grant flows of an `oauth2_grant` profile: `oauth2_authorization_code`, `oauth2_device_code`; reserved here: `oauth2_password`, `workload_identity`, `exec_plugin`, `host_issued` (session authority has its separate [sessions](../../../sessions/v1alpha1/semantics.md) contract) |
 | Parties | host coordinator (shared), provider auth implementation (adapter-owned), trusted user interface, custody |
 
 Design responsibility two of four: establish, refresh, revoke, or repair authorization, owned by a shared coordinator plus the provider auth implementation (`docs/design.md:527`). The coordinator owns lifecycle, state, expiry, concurrency, recovery; the provider implementation owns request construction and response interpretation (`docs/design.md:551`).
@@ -73,6 +73,7 @@ Outcomes of refresh: `refreshed`, `reauthorization_required`, `insufficient_scop
 | `static_config` | Specified deployment binding. Profile declares accepted material/transport shape and admitted validation plan; configuration supplies scoped references, or the explicit no-child-credential binding in profile §4.2. | No auth.begin, acquisition id, protected-entry action, OAuth endpoints, grants, registration or callback. No credential bytes in ordinary configuration/result data. |
 | `static_entry` | Specified protected entry. Profile declares expected entry fields/material shape, identity/grant interpretation and validation plan with sources. Host must bind custody, coordinator and admitted protected UI/ingress. | No OAuth endpoints, OAuth grants, redirect or browser PKCE fields, except the acquisition metadata of the OAuth-acquired non-rotating variant below. Protected form submission alone is not completion/publication. |
 | `static_entry`, OAuth-acquired non-rotating variant | Specified protected entry whose material a trusted local CLI obtains by OAuth consent before submitting it (`architecture-decision-record:oauth-material-as-static-entry`). The profile additionally declares nonsecret acquisition metadata: authorize_url, token_url and requested scopes. The entry is exactly `{client_id, client_secret, refresh_token}`. Inside the capture window the CLI runs an authorization-code grant with a loopback redirect, PKCE S256 and a single-use `state`, then submits the triple through the ordinary static-entry capture; owner, registry and custody are unchanged. The provider exchanges the refresh token for access tokens held in its process memory only. Admitted only where the provider does not rotate refresh tokens: a refresh answer carrying a different refresh_token is refused as an invalid credential and nothing is stored. | No coordinator begin/complete ports, trusted UI channel, host-owned refresh or `RefreshAttempt`; no persisted access token; no rotated material; no consent action in ordinary results. |
+| `static_entry`, `oauth2_grant` profile (flows `oauth2_authorization_code`, `oauth2_device_code`) | Specified protected entry whose material a trusted local CLI obtains by an OAuth 2.0 grant (`architecture-decision-record:oauth2-grants-and-access-token-issue`, `story:connect-runs-an-oauth2-grant`). The profile declares scheme `oauth2_grant` and an `oauth2` block, a `connectors.oauth2.ServerDeclaration` with nonempty unique `grant_types`, HTTPS endpoints (a `pasted_code` redirect included: only a loopback redirect is plain `http`, on `127.0.0.1` or `localhost`) and, for `device_code`, a `device_authorization_url`; the metadata authority records it with `DeclareAuthorizationServer` when the profile is recorded. `client_id` is the declaration's, else the instance configuration's `oauth2_client_id`; neither, or two that differ, is `invalid_configuration` before any network step. A confidential client's secret is the protected source `{"client_secret": "…"}`; a public client takes no source. Inside the capture window the CLI runs the authorization code with PKCE S256 over the declared redirect kind, or with `--device` the device grant (RFC 8628, or the device dialect the composition registers for the profile id), and submits the entry `{client_id, access_token, refresh_token, expires_at_ms, scopes, id_token?}` (at most 64 KiB, the only bound on each of its tokens) through the ordinary static-entry capture. The owner validates it without a refresh: an unexpired access token, the required scopes within the granted scopes, and the identity from the `id_token` the token endpoint returned (OpenID Connect Core 1.0 §3.1.3.7 item 6) or from the declared identity request with the access token. A grant that fails, times out or is cancelled stores nothing. Refused on read-only custody and for credential reuse. | No coordinator begin/complete ports, trusted UI channel or `RefreshAttempt` (refresh is `story:owner-rotating-refresh`); no token, code, verifier or client secret in any result, log, error or terminal line: the consent address and the device user code with its verification address are the only lines shown. |
 | `oauth2_authorization_code` | Specified browser flow. Require nonempty authorize_url and token_url, vendor sources, authorization_code grant, explicit PKCE choice and vendor justification, registration kind and sourced client-auth method/policy, callback binding, token/identity/grant interpretation, validation and refresh policy. Refresh grant only when supported by the cited profile. | No inferred endpoints, token encoding or PKCE from another provider. Registration values remain configuration/custody. |
 | `oauth2_client_credentials` | Specified noninteractive flow. Require nonempty token_url, vendor sources, client_credentials grant, configured confidential registration and declared client-auth/token/identity/grant interpretation and validation. This first profile does not request/accept refresh-token behavior; obtaining another credential set is a new admitted acquisition. | authorize_url, callback/redirect, PKCE, browser action and refresh_token grant are rejected; no trusted browser channel is required. |
 | `oauth2_password`, `workload_identity`, `exec_plugin`, `host_issued` | Reserved in this acquisition contract. Preserve names for reviewed future bindings; reject selection/advertisement as implemented here. Exec/session mechanism constraints elsewhere remain requirements for those future/separate profiles. | No inferred generic auth.begin/completion path or flag-only enablement. |
@@ -93,7 +94,7 @@ Managed-flow sequence (specializes `docs/design.md:543-549`; static_config follo
 
 ### 4.1 Refresh exclusion, authorization and recovery
 
-Refresh is triggered only through the selected auth profile's separately admitted maintenance policy (`auth.evidence`, expiry near) or an explicitly supported execution binding permitting a provider `401`; it is never caller-invocable. Neither trigger grants business redispatch by itself. The **host coordinator and its metadata binding** own cross-replica exclusion and the durable refresh ledger. Custody owns only immutable sensitive versions. A custody CAS or an expiring lease alone cannot authorize an exchange (`docs/design.md:596-600`).
+Refresh is triggered only through the selected auth profile's separately admitted maintenance policy (`auth.evidence`, expiry near), an issue-time expiry check (an [access token issue](#44-access-token-issue) whose published token expires within the profile's refresh lead) or an explicitly supported execution binding permitting a provider `401`; it is never caller-invocable. Neither trigger grants business redispatch by itself. The **host coordinator and its metadata binding** own cross-replica exclusion and the durable refresh ledger. Custody owns only immutable sensitive versions. A custody CAS or an expiring lease alone cannot authorize an exchange (`docs/design.md:596-600`). For `oauth2_grant` the owner runs this sequence through the `connectors.refresh` ledger.
 
 The serialization key is one host-private `CredentialGeneration` from [the shared ESS model](../../../../ess/domains/credentials.yaml): an immutable material capture bound to an instance, connection, profile and provider authority, with an expected external identity. It is neither a secret-derived identifier, a file path, nor a custody version. Capturing bytes does not validate identity. A refresh result receives a new generation even if the account is unchanged; validation and dispatch obey [evidence](../../evidence/v1alpha1/semantics.md). The host must prevent the same rotating refresh material from entering two independently refreshable generations or connection bindings. Repeated observations/restarts reuse the existing private capture association where the material is unchanged; aliases that cannot be established safely are refused. UUID uniqueness alone cannot prevent duplicate use of the same token.
 
@@ -110,7 +111,7 @@ Each attempt has a unique id, a source generation, a current owner and a non-reu
 | Publish | In one metadata transaction compare attempt state, current owner/fence, expected source and private publication fence, exact candidate, current F05 evidence and non-revocation. Replace active version/generation, advance the private publication fence, mark `Published`, and invalidate all old-generation dispatch admissions together. |
 | Revoke or replace binding | Use the same serialized metadata authority as publish/authorize, advance the private publication fence and invalidate outstanding dispatch admissions. Revocation is monotonic for that binding; a stale refresh cannot clear it. Reauthorization creates a new private publication fence and fresh material. |
 
-A successful authorization is the irreversible boundary even when the process dies **before** the network send. After it, uncertainty is conservative: the token may have been consumed. Transport failure, negative-looking provider responses, candidate validation failure, custody failure after exchange, response loss and local commit ambiguity never reopen source authorization. An unusable result requires repair/reauthorization. No retry exception based on alleged provider grace or token reuse is selected here.
+A successful authorization is the irreversible boundary even when the process dies **before** the network send. After it, uncertainty is conservative: the token may have been consumed. Transport failure, negative-looking provider responses, candidate validation failure, custody failure after exchange, response loss and local commit ambiguity never reopen source authorization. The two exceptions: an exchange the token endpoint refused with HTTP `429`, and one whose transport proved that no byte of the request left (name resolution, connection or TLS handshake failed), are released (`connectors.refresh.ReleaseRateLimited`), not quarantined, and their source may be reserved again; no other negative response or transport failure reopens source authorization. An unusable result requires repair/reauthorization. No retry exception based on alleged provider grace or token reuse is selected here.
 
 Publication uses a strict cutoff: once it commits, no admission pinned to the old generation may open a new provider dispatch. A dispatch already opened before the cutoff is not retroactively undone. Pinning preserves the validated bytes; it cannot override known revocation, expiry or invalidation. At exchange authorization the old generation's refresh authority is consumed; old-generation dispatch is withheld atomically with that authorization while refresh is unresolved. Publication makes the new validated generation available; uncertainty leaves refresh and dispatch blocked pending repair.
 
@@ -180,6 +181,60 @@ separate binding obligation. [auth_bindings.yaml](../../../../ess/domains/auth_b
 models causal lifecycle/references; [verification](../../../../docs/evidence/README.md "git show history/evidence-2026-10:docs/evidence/model-auth-closure-20260909/verification.md")
 separates model checks from actual atomic correlation/publication execution.
 
+### 4.4 Access token issue
+
+The owner issues an access token of an `oauth2_grant` connection to a local
+caller: `connections token` ([CLI](../../../cli/v1alpha1/semantics.md#access-token-issue))
+or the library function `connectors_host::local::access_token::access_token`.
+The caller names a connection and a delivery; it cannot ask for a refresh.
+
+1. The issue reads the connection's published generation. A Stale connection is
+   refused as `reauthorization_required` without a request; a profile that is
+   not `oauth2_grant` is refused as forbidden.
+2. While the published access token stays valid for longer than the
+   declaration's `refresh_lead_seconds`, it is issued as it is (`current`).
+   Otherwise the issue first runs the §4.1 sequence once, under the same
+   `connectors.refresh` ledger serialization as every other refresh, and issues
+   the generation that sequence published (`refreshed`). The reservation names
+   the generation the issue read, in the transaction that reserves: when
+   another caller's refresh already published a successor, the issue sends
+   nothing and issues the successor. A provider whose fresh token already
+   expires within the lead is issued that token; an issue never runs a second
+   exchange. A token inside the lead that this owner cannot refresh (a
+   confidential client, whose secret the stored entry does not hold) is
+   refused as forbidden. A refresh that does not publish refuses the issue
+   with the refresh's safe outcome (§4.1), and a token already past its expiry
+   with nothing published in its place is refused as unavailable.
+3. Each successful issue is recorded as one
+   `connectors.oauth2.AccessTokenIssue` (`IssueAccessToken`,
+   [ESS](../../../../ess/domains/oauth2.yaml)) in the transaction of the
+   connection's refresh ledger: the issued generation, the refresh attempt that
+   published it on a refreshed issue, the expiry, the granted scopes and the
+   delivery (`metadata_only`, `revealed`, `library` or `consumer_launch`). The record carries no
+   token. When a refresh or a repair replaces the generation between its read
+   and the record, the issue reads it again. An issue whose generation a repair
+   rather than a refresh published is recorded as `current`. A refusal records nothing.
+4. The token leaves the owner only in the transport's secret frame, and only
+   for a delivery that carries it (`revealed`, `library`), or, for
+   `consumer_launch`, sealed on the launched consumer's descriptor 3
+   ([consumer launch](../../../cli/v1alpha1/consumer-launch.md) §9); only the
+   owner's own launch issues `consumer_launch`. `metadata_only`
+   answers the metadata alone. No log, error, `Debug` or `Display` output names
+   the token.
+
+| Refusal | Owner failure |
+|---|---|
+| profile not `oauth2_grant`, or not in the instance's permissions | `forbidden` |
+| token inside the lead of a confidential client | `forbidden` |
+| `reauthorization_required` or `uncertain` | `service_failure` |
+| `insufficient_scope` | `not_granted` |
+| `invalid_or_revoked` | `revoked` |
+| `custody_unavailable` | `custody_unavailable` |
+| token endpoint `429` | `unavailable` with the `rate_limited` service code and `Retry-After` in whole seconds |
+| `unavailable`: the token endpoint was not reached, nothing was sent | `unavailable` |
+| token expired, nothing published in its place | `unavailable` |
+| the caller's deadline passed before the issue was recorded | `timeout`; the refresh it ran stays published |
+
 ## 5. Ordering, limits
 
 | Concern | Rule |
@@ -228,6 +283,7 @@ separates model checks from actual atomic correlation/publication execution.
 | `CredentialSet` | defined in custody; custody version is not refresh identity |
 | `RefreshAttempt` | [ESS](../../../../ess/domains/refresh.yaml): `Reserved → Authorized → ResponseStored → Published`, pre-authorization fencing, stored-response recovery, terminal uncertainty/discard; exactly one source-generation reference |
 | `CredentialGeneration` | [shared ESS](../../../../ess/domains/credentials.yaml): host-private immutable capture; expected identity, not verified evidence |
+| `AccessTokenIssue` | [ESS](../../../../ess/domains/oauth2.yaml): one `Issued` record per access token issue under §4.4, naming its generation, its refresh attempt when it refreshed, and its delivery; never the token |
 | Typed coordinator decisions | Trusted transient values selected inside the atomic operation; never caller authority or reusable approval |
 | Trusted UI and callback host identity | UNMAPPED |
 

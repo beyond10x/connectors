@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-26T02:34:40Z",
+  "actor": "human:timo",
+  "artifact": "story:connect-runs-an-oauth2-grant",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:adversary-connect-runs-an-oauth2-grant-pass-1",
+    "reference": "impl/oauth2-connect@ab4119878",
+    "review": "review-result:adversary-connect-runs-an-oauth2-grant-pass-1",
+    "outcome": "fixed"
+  }
+}

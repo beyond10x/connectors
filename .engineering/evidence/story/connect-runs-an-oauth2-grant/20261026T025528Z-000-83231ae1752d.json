@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-26T02:55:28Z",
+  "actor": "human:timo",
+  "artifact": "story:connect-runs-an-oauth2-grant",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate (gate: all checks passed); 7 oauth2_grant_journey tests --ignored --exact: 7 passed",
+    "reference": "wave/20261025-oauth2@d6717422b"
+  }
+}

@@ -5,6 +5,7 @@ mod governed;
 mod lifecycle;
 mod maintenance;
 pub mod mutation;
+pub mod refresh;
 mod supervisor;
 #[cfg(unix)]
 mod tether;
@@ -630,6 +631,65 @@ pub fn admit_capture(
     connection: Option<&str>,
     revision: Option<&str>,
 ) -> Result<String> {
+    let (config, profile) = capture_profile(paths, alias, profile, connection, revision)?;
+    if !custody::available_for(&config.selection()) {
+        return Err(Code::CustodyUnavailable.into());
+    }
+    Ok(profile)
+}
+/// [`admit_capture`] of a `connections connect` or `reconnect` that brings no
+/// protected source under a platform binding. Only an `oauth2_grant` profile
+/// of a public client takes none: its grant runs in the CLI
+/// (contracts/cli/v1alpha1/semantics.md, "Exactly one protected entry
+/// source"); for any other profile a missing source is
+/// `protected_entry_unavailable`, a profile this adapter may not use
+/// included, as it was before any profile could take none. Which kind the
+/// profile is comes from the adapter's cached description, read without
+/// starting an owner or the adapter, so any other profile it describes is
+/// refused before custody is looked at. With no description cached only the
+/// owner can tell, once it has started the adapter, and it refuses any other
+/// profile before the registry is written; it is asked only when custody is
+/// available, since the exception it would establish needs custody too.
+pub fn admit_sourceless_grant(
+    paths: &Paths,
+    alias: &str,
+    profile: Option<&str>,
+    connection: Option<&str>,
+    revision: Option<&str>,
+) -> Result<String> {
+    let missing = || Error::from(Code::ProtectedEntryUnavailable);
+    let (config, profile) = capture_profile(paths, alias, profile, connection, revision).map_err(
+        |error| match error.code {
+            Code::Forbidden => missing(),
+            _ => error,
+        },
+    )?;
+    let public_grant = match cached(paths, alias) {
+        Ok(bootstrap) => Some(bootstrap.profile(&profile).ok().is_some_and(|profile| {
+            profile.grant().is_some_and(|declaration| {
+                declaration.client_kind == connectors_oauth2::ClientKind::Public
+            })
+        })),
+        Err(error) if error.code == Code::DescriptionUnavailable => None,
+        Err(error) => return Err(error),
+    };
+    let custody = custody::available_for(&config.selection());
+    match (public_grant, custody) {
+        (Some(false), _) | (None, false) => Err(missing()),
+        (Some(true), false) => Err(Code::CustodyUnavailable.into()),
+        (_, true) => Ok(profile),
+    }
+}
+/// The profile a capture begins under, admitted as far as the configuration,
+/// the registry and the metadata store decide, with the configuration it was
+/// read from.
+fn capture_profile(
+    paths: &Paths,
+    alias: &str,
+    profile: Option<&str>,
+    connection: Option<&str>,
+    revision: Option<&str>,
+) -> Result<(Config, String)> {
     let (config, adapter) = selected(paths, alias)?;
     let profile = match (profile, connection, revision) {
         (Some(profile), None, None) if connectors_core::valid_id(profile) => profile.to_owned(),
@@ -657,10 +717,7 @@ pub fn admit_capture(
     }
     // Metadata must exist before any private owner startup or protected input.
     super::metadata::Metadata::inspect(&paths.state)?;
-    if !custody::available_for(&config.selection()) {
-        return Err(Code::CustodyUnavailable.into());
-    }
-    Ok(profile)
+    Ok((config, profile))
 }
 /// Admission of a named operation, in the contract's order: an operation the
 /// selected description does not expose is `not_found`, one it exposes but the
@@ -743,6 +800,44 @@ pub fn admit_revalidation(
     )?;
     Ok(profile)
 }
+/// The owner's issue of a current access token of `connection`, a connection
+/// of the instance `alias` (story:connections-token-issues-an-access-token).
+/// Only a visible, unrevoked connection whose profile the instance admits and
+/// declares an authorization server (`oauth2_grant`) is issued from; any other
+/// profile is `forbidden`. A refusal issues and records nothing, and so does
+/// an issue whose `deadline_ms` passed before it was recorded (`timeout`).
+pub(crate) fn issue_access_token(
+    paths: &Paths,
+    incarnation: &str,
+    alias: &str,
+    connection: &str,
+    delivery: super::access_token::Delivery,
+    deadline_ms: u64,
+) -> Result<refresh::issue::Issued> {
+    let (config, adapter) = selected(paths, alias)?;
+    let binding = registry::Registry::new(&paths.state).recorded_binding(
+        &adapter.instance_id,
+        &adapter.adapter_id,
+        connection,
+    )?;
+    if binding.profile.oauth2.is_none()
+        || !adapter.permissions.profiles.contains(&binding.profile.id)
+    {
+        return Err(Code::Forbidden.into());
+    }
+    if !custody::available_for(&config.selection()) {
+        return Err(Code::CustodyUnavailable.into());
+    }
+    refresh::Refresher::new(&paths.state, config.selection(), incarnation.to_owned())
+        .issue_access_token(
+            &adapter.instance_id,
+            &adapter.adapter_id,
+            connection,
+            delivery,
+            deadline_ms,
+        )
+        .map_err(Error::from)
+}
 /// The configured binding of a saved connection's profile. A profile the
 /// configured adapter no longer declares (its `auth.profile` id changed) is a
 /// changed binding, refused as a read refuses one (`create_connection`): a new
@@ -813,8 +908,10 @@ pub struct LaunchAdmission {
 /// configured (`not_found`); the consumer lists the adapter (`forbidden`); its
 /// pinned image matches its digest (`invalid_configuration`); the connection is
 /// visible (`not_found`, `revoked`) and its profile granted (`forbidden`); its
-/// evidence is current (`unavailable`); custody is available
-/// (`custody_unavailable`). The binding comes from the saved connection record:
+/// evidence is current (`unavailable`; an `oauth2_grant` connection's lapsed
+/// evidence or expiring access token is admitted, the issue refreshes it);
+/// custody is available (`custody_unavailable`). The binding comes from the
+/// saved connection record:
 /// no adapter starts and no credential is read here.
 pub fn admit_launch(
     paths: &Paths,
@@ -854,14 +951,24 @@ pub fn admit_launch(
         credential_revision: adapter.credential_revision.clone(),
         executable: None,
     };
-    registry
-        .admit_read(
-            &binding,
-            connection,
-            &Default::default(),
-            connectors_sdk::now_ms(),
-        )
-        .map_err(launch_failure)?;
+    let now = connectors_sdk::now_ms();
+    match registry.admit_read(&binding, connection, &Default::default(), now) {
+        Ok(()) => {}
+        // An `oauth2_grant` launch is handed an issued access token, and the
+        // issue refreshes and republishes the evidence of a token that expires
+        // within the lead or has expired (consumer-launch.md §9): lapsed
+        // evidence and such a token are admitted. A Stale connection is not.
+        Err(registry::Failure::EvidenceExpired) if binding.profile.oauth2.is_some() => {}
+        Err(registry::Failure::NotReady)
+            if binding.profile.oauth2.is_some()
+                && registry
+                    .issuance(&binding.instance_id, &binding.adapter_id, connection, now)
+                    .is_ok_and(|issuance| {
+                        matches!(issuance, registry::Issuance::Published(published)
+                            if !published.current(now))
+                    }) => {}
+        Err(error) => return Err(launch_failure(error)),
+    }
     if !custody::available_for(&config.selection()) {
         return Err(Code::CustodyUnavailable.into());
     }
@@ -1014,6 +1121,15 @@ pub fn connection_value(alias: &str, value: registry::ObservedConnection) -> Val
     if let Some(binding) = value.binding {
         described["binding"] = json!(binding);
     }
+    // Named only for an `oauth2_grant` connection: what its grant granted and
+    // until when its access token is valid, never the token
+    // (`connectors.cli.ConnectionDescription.granted_scopes`).
+    if let Some(scopes) = value.granted_scopes {
+        described["granted_scopes"] = json!(scopes);
+    }
+    if let Some(expires_at_ms) = value.credential_expires_at_ms {
+        described["credential_expires_at_ms"] = json!(expires_at_ms);
+    }
     described
 }
 
@@ -1035,6 +1151,13 @@ enum Request {
         profile: Option<String>,
         connection: Option<String>,
         expected_revision: Option<String>,
+        /// The caller holds no protected source and runs the profile's OAuth2
+        /// grant itself (story:connect-runs-an-oauth2-grant): only an
+        /// `oauth2_grant` profile of a public client is begun, anything else is
+        /// `protected_entry_unavailable` before the registry is written.
+        /// Omitted when false, so every other request keeps its bytes.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        grant: bool,
     },
     Complete,
     /// story:invoke-definition-reuse-credential: a new connection of `adapter`
@@ -1114,6 +1237,16 @@ enum Request {
         consumer: String,
         deadline_ms: u64,
     },
+    /// story:connections-token-issues-an-access-token: a current access token
+    /// of an `oauth2_grant` connection, refreshed first when it expires within
+    /// the declaration's `refresh_lead_seconds`. The success reply carries the
+    /// token in its secret frame only when `delivery` hands it out.
+    IssueAccessToken {
+        adapter: String,
+        connection: String,
+        delivery: super::access_token::Delivery,
+        deadline_ms: u64,
+    },
     Stop {
         adapter: String,
         configuration_revision: String,
@@ -1143,7 +1276,7 @@ enum Reply {
     Capture {
         acquisition: String,
         expires_at_ms: u64,
-        profile: runtime::Profile,
+        profile: Box<runtime::Profile>,
     },
     /// The admitted consumer's pinned argv prefix after argv\[0\], and the
     /// environment name prefixes its entry passes.

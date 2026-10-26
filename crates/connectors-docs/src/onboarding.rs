@@ -513,6 +513,14 @@ struct Declaration {
 #[derive(Deserialize)]
 struct Profile {
     profile: String,
+    /// An `oauth2_grant` profile's declaration; one without a `client_id` cannot be derived.
+    #[serde(default)]
+    oauth2: Option<Grant>,
+}
+
+#[derive(Deserialize)]
+struct Grant {
+    client_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -589,6 +597,14 @@ fn rows(root: &Path) -> Result<Vec<Row>> {
         }
         let declaration: Declaration = read_json(root, &relative)?;
         let (reads, writes) = counts(root, &directory, &[declaration.selection.as_str()])?;
+        // A connector whose every profile is a grant shipping no client id has only pinned
+        // instances: the client id is the instance's configuration.
+        let derivable = declaration.profiles.iter().any(|profile| {
+            profile
+                .oauth2
+                .as_ref()
+                .is_none_or(|grant| grant.client_id.is_some())
+        });
         rows.push(Row {
             connector: declaration.connector_id,
             provider: provider_name(&declaration.provider_id),
@@ -599,7 +615,7 @@ fn rows(root: &Path) -> Result<Vec<Row>> {
                 .into_iter()
                 .map(|profile| profile.profile)
                 .collect(),
-            configured: "derived".to_owned(),
+            configured: if derivable { "derived" } else { PINNED }.to_owned(),
             source: Some(relative),
         });
     }
@@ -626,6 +642,7 @@ fn provider_name(id: &str) -> String {
     match id {
         "gitlab" => "GitLab".to_owned(),
         "hubspot" => "HubSpot".to_owned(),
+        "openai" => "OpenAI".to_owned(),
         other => {
             let mut chars = other.chars();
             chars.next().map_or_else(String::new, |first| {

@@ -1,0 +1,214 @@
+domain: connectors.oauth2
+
+summary: Provider-neutral OAuth 2.0 authorization servers a profile declares, and the access tokens the host issues to a local caller from a stored grant.
+
+# Owner: epic:subscription-oauth2-access. Provider facts (endpoints, client ids,
+# scopes) are adapter declarations, never values in this domain.
+# The grant run itself (authorization code with PKCE S256, or a device grant) is
+# one connectors.auth_bindings.Acquisition: its one-use consumption, expiry and
+# publication are that entity's. Rotating refresh is connectors.refresh
+# (RefreshAttempt), and every refreshed material is a new
+# connectors.credentials.CredentialGeneration. No field below holds a token,
+# code, PKCE verifier or state: those live in custody, or in the memory of the
+# process that runs the grant.
+types:
+  - name: connectors.oauth2.GrantType
+    kind: enum
+    variants: [authorization_code, device_code]
+  - name: connectors.oauth2.ClientKind
+    kind: enum
+    variants: [public, confidential]
+  - name: connectors.oauth2.RequestEncoding
+    kind: enum
+    variants: [form, json]
+  - name: connectors.oauth2.RedirectKind
+    kind: enum
+    variants: [loopback_any_port, loopback_fixed_port, pasted_code]
+  - name: connectors.oauth2.Rotation
+    kind: enum
+    variants: [non_rotating, rotating]
+  - name: connectors.oauth2.Delivery
+    kind: enum
+    variants: [metadata_only, revealed, library, consumer_launch]
+  - name: connectors.oauth2.IssueDecision
+    kind: enum
+    variants: [current, refreshed, not_ready, reauthorization_required, refresh_uncertain, rate_limited, unavailable]
+  - name: connectors.oauth2.Parameter
+    kind: struct
+    fields:
+      - {name: name, type: String}
+      - {name: value, type: String}
+  - name: connectors.oauth2.ServerDeclaration
+    kind: struct
+    fields:
+      - {name: authorize_url, type: "Optional<String>"}
+      - {name: token_url, type: String}
+      - {name: device_authorization_url, type: "Optional<String>"}
+      # Absent when the instance's configuration supplies a registered client id.
+      - {name: client_id, type: "Optional<String>"}
+      - {name: client_kind, type: connectors.oauth2.ClientKind}
+      - {name: request_encoding, type: connectors.oauth2.RequestEncoding}
+      - {name: refresh_encoding, type: connectors.oauth2.RequestEncoding}
+      - {name: redirect_kind, type: connectors.oauth2.RedirectKind}
+      - {name: redirect_uri, type: "Optional<String>"}
+      - {name: authorize_parameters, type: "List<connectors.oauth2.Parameter>"}
+      - {name: requested_scopes, type: "List<String>"}
+      - {name: required_scopes, type: "List<String>"}
+      - {name: rotation, type: connectors.oauth2.Rotation}
+      - {name: refresh_lead_seconds, type: Integer}
+      - {name: grant_types, type: "List<connectors.oauth2.GrantType>"}
+      - {name: sources, type: "List<String>"}
+      # Some servers also require the `state` value in the code exchange body.
+      - {name: state_in_exchange, type: Boolean}
+      # Some servers also require the requested scopes in the refresh body.
+      - {name: scope_in_refresh, type: Boolean}
+    # Every value is public, nonsecret declaration data with a cited source.
+    # PKCE is always S256 (RFC 7636 §4.2) for authorization_code; a declaration
+    # cannot turn it off. A confidential client's secret is entered material.
+
+entities:
+  - name: connectors.oauth2.AuthorizationServer
+    identity: {name: server_ref, type: String}
+    fields:
+      - {name: profile_record_ref, type: String}
+      - {name: declaration, type: connectors.oauth2.ServerDeclaration}
+    relations:
+      - {name: auth_profile, kind: references, target: connectors.auth_bindings.AuthProfile, cardinality: one, via: profile_record_ref}
+    lifecycle:
+      initial: Declared
+      states: [Declared]
+      terminal: [Declared]
+    # Immutable with its AuthProfile record: a changed declaration is a new
+    # profile revision and so a new server record.
+
+  - name: connectors.oauth2.AccessTokenIssue
+    identity: {name: issue_ref, type: String}
+    fields:
+      - {name: connection_ref, type: String}
+      - {name: generation_id, type: connectors.credentials.CredentialGenerationId}
+      - {name: refresh_attempt_id, type: "Optional<connectors.refresh.RefreshAttemptId>"}
+      - {name: expires_at, type: Timestamp}
+      - {name: scopes, type: "List<String>"}
+      - {name: delivery, type: connectors.oauth2.Delivery}
+    relations:
+      - {name: connection, kind: references, target: connectors.auth_bindings.Connection, cardinality: one, via: connection_ref}
+      - {name: generation, kind: references, target: connectors.credentials.CredentialGeneration, cardinality: one, via: generation_id}
+      - {name: refresh_attempt, kind: references, target: connectors.refresh.RefreshAttempt, cardinality: one, via: refresh_attempt_id}
+    lifecycle:
+      initial: Issued
+      states: [Issued]
+      terminal: [Issued]
+    # The record of one hand-out: which generation answered, whether a refresh
+    # ran for it, until when the token is valid and how it left the host. The
+    # token itself is never a field.
+
+errors:
+  - name: connectors.oauth2.Unavailable
+  - name: connectors.oauth2.ConnectionNotReady
+    fields: [{name: connection_ref, type: String}]
+  - name: connectors.oauth2.ReauthorizationRequired
+    fields: [{name: connection_ref, type: String}]
+  - name: connectors.oauth2.RefreshUncertain
+    fields: [{name: connection_ref, type: String}]
+  - name: connectors.oauth2.RateLimited
+    fields: [{name: connection_ref, type: String}]
+
+commands:
+  - name: connectors.oauth2.DeclareAuthorizationServer
+    input:
+      - {name: profile_record_ref, type: String}
+      - {name: declaration, type: connectors.oauth2.ServerDeclaration}
+    outcomes:
+      - name: declared
+        creates: connectors.oauth2.AuthorizationServer
+        instance: server_ref
+        sets:
+          profile_record_ref: input.profile_record_ref
+          declaration: input.declaration
+        emits: [connectors.oauth2.AuthorizationServerDeclared]
+        payload: {connectors.oauth2.AuthorizationServerDeclared: {server_ref: {generated: true}}}
+
+  - name: connectors.oauth2.IssueAccessToken
+    # decision is the owner's, taken while it holds the connection's refresh
+    # serialization: current when the published generation's access token stays
+    # valid for longer than the declaration's refresh_lead_seconds; refreshed
+    # when connectors.refresh published a new generation for this call. Every
+    # refusal issues nothing and records nothing. refresh_attempt_id names the
+    # attempt that published that generation: a refreshed issue requires it, and
+    # a current one is refused it and records none (unavailable answers both).
+    input:
+      - {name: decision, type: connectors.oauth2.IssueDecision}
+      - {name: connection_ref, type: String}
+      - {name: generation_id, type: connectors.credentials.CredentialGenerationId}
+      - {name: refresh_attempt_id, type: "Optional<connectors.refresh.RefreshAttemptId>"}
+      - {name: expires_at, type: Timestamp}
+      - {name: scopes, type: "List<String>"}
+      - {name: delivery, type: connectors.oauth2.Delivery}
+    outcomes:
+      - name: issued-current
+        when:
+          all: [decision == current, missing(refresh_attempt_id)]
+        creates: connectors.oauth2.AccessTokenIssue
+        instance: issue_ref
+        sets:
+          connection_ref: input.connection_ref
+          generation_id: input.generation_id
+          refresh_attempt_id: {cleared: true}
+          expires_at: input.expires_at
+          scopes: input.scopes
+          delivery: input.delivery
+        emits: [connectors.oauth2.AccessTokenIssued]
+        payload: {connectors.oauth2.AccessTokenIssued: {issue_ref: {generated: true}, refreshed: false}}
+      - name: issued-refreshed
+        when:
+          all: [decision == refreshed, defined(refresh_attempt_id)]
+        creates: connectors.oauth2.AccessTokenIssue
+        instance: issue_ref
+        sets:
+          connection_ref: input.connection_ref
+          generation_id: input.generation_id
+          refresh_attempt_id: input.refresh_attempt_id
+          expires_at: input.expires_at
+          scopes: input.scopes
+          delivery: input.delivery
+        emits: [connectors.oauth2.AccessTokenIssued]
+        payload: {connectors.oauth2.AccessTokenIssued: {issue_ref: {generated: true}, refreshed: true}}
+      - {name: not-ready, when: decision == not_ready, error: connectors.oauth2.ConnectionNotReady}
+      - {name: reauthorization-required, when: decision == reauthorization_required, error: connectors.oauth2.ReauthorizationRequired}
+      - {name: refresh-uncertain, when: decision == refresh_uncertain, error: connectors.oauth2.RefreshUncertain}
+      - {name: rate-limited, when: decision == rate_limited, error: connectors.oauth2.RateLimited}
+      - {name: unavailable, error: connectors.oauth2.Unavailable}
+
+events:
+  - name: connectors.oauth2.AuthorizationServerDeclared
+    fields: [{name: server_ref, type: String}]
+  - name: connectors.oauth2.AccessTokenIssued
+    fields:
+      - {name: issue_ref, type: String}
+      - {name: refreshed, type: Boolean}
+
+views:
+  - name: connectors.oauth2.AuthorizationServers
+    source: connectors.oauth2.AuthorizationServer
+    consistency: read_your_writes
+    fields:
+      - {name: server_ref, type: String}
+      - {name: profile_record_ref, type: String}
+      - {name: state, type: connectors.oauth2.AuthorizationServer.State}
+  - name: connectors.oauth2.AccessTokenIssues
+    source: connectors.oauth2.AccessTokenIssue
+    consistency: read_your_writes
+    fields:
+      - {name: issue_ref, type: String}
+      - {name: connection_ref, type: String}
+      - {name: generation_id, type: connectors.credentials.CredentialGenerationId}
+      - {name: refresh_attempt_id, type: "Optional<connectors.refresh.RefreshAttemptId>"}
+      - {name: expires_at, type: Timestamp}
+      - {name: delivery, type: connectors.oauth2.Delivery}
+      - {name: state, type: connectors.oauth2.AccessTokenIssue.State}
+
+actors:
+  - name: connectors.oauth2.LocalHost
+    may:
+      - connectors.oauth2.DeclareAuthorizationServer
+      - connectors.oauth2.IssueAccessToken

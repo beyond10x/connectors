@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-26T05:11:16Z",
+  "actor": "human:timo",
+  "artifact": "story:owner-rotating-refresh",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate (gate: all checks passed); 17 refresh tests by exact name",
+    "reference": "wave/20261025-oauth2@49822857b"
+  }
+}

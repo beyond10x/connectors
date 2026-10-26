@@ -8,7 +8,7 @@ license.workspace = true
 
 [features]
 default = ["service"]
-service = ["dep:connectors-host", "dep:clap", "dep:tokio"]
+service = ["dep:connectors-host", "dep:connectors-oauth2", "dep:clap", "dep:tokio"]
 
 [[bin]]
 name = "connectors-catalog-provider"
@@ -20,6 +20,7 @@ connectors-core.workspace = true
 connectors-sdk.workspace = true
 connectors-catalog = { path = "../../crates/connectors-catalog" }
 connectors-host = { workspace = true, optional = true }
+connectors-oauth2 = { workspace = true, optional = true }
 async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true

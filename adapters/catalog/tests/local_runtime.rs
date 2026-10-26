@@ -38,12 +38,20 @@ mod basic_auth;
 mod basic_auth_adversary;
 #[path = "local_runtime/basic_auth_adversary_pass2.rs"]
 mod basic_auth_adversary_pass2;
+#[path = "local_runtime/chatgpt.rs"]
+mod chatgpt;
+#[path = "local_runtime/claude_subscription.rs"]
+mod claude_subscription;
 #[path = "local_runtime/cli_journey.rs"]
 mod cli_journey;
 #[path = "../../../crates/connectors-host/tests/fixtures/clock/server.rs"]
 mod clock_fixture;
 #[path = "local_runtime/derived_instance.rs"]
 mod derived_instance;
+#[path = "local_runtime/oauth2_grant.rs"]
+mod oauth2_grant;
+#[path = "local_runtime/oauth2_grant_adversary.rs"]
+mod oauth2_grant_adversary;
 #[path = "local_runtime/oauth2_refresh.rs"]
 mod oauth2_refresh;
 #[path = "local_runtime/oauth2_refresh_adversary.rs"]

@@ -53,10 +53,40 @@ connection Stale. Then:
 - `connections revoke` ends local use. It does not revoke the token at the provider.
 - `connections launch` hands one connection's credential to a program pinned in the
   configuration, on file descriptor 3, and to nothing else.
+- `connections token` issues a current access token of an OAuth2 grant connection. The owner
+  issues the stored token while it stays valid for longer than the profile's refresh lead, and
+  refreshes it once first otherwise. Each issue is recorded with its delivery, never the token.
 
-`connections describe`, `reconnect`, `revalidate`, `launch` and `revoke` select the instance's
-one connection when `--connection` is left out. A revalidation whose answer never arrives is
-`outcome_unknown`, not a failure.
+`connections describe`, `reconnect`, `revalidate`, `launch`, `token` and `revoke` select the
+instance's one connection when `--connection` is left out. A revalidation whose answer never arrives
+is `outcome_unknown`, not a failure.
+
+### Get an access token
+
+Without `--reveal`, `connections token` prints what it issued and no token. This output is
+from the loopback test authorization server:
+
+```sh
+connectors connections token --connector <connector> --instance <instance>
+```
+
+```json
+{"connection":"conn_5a032a7ae1bb4576913176e9a9c63403_5872010755134cfeb5a9da9139d99d4f","expires_at":"2026-10-26T04:59:26.453Z","issue":"4d6ad0f2-61d1-4499-95b2-362798145833","refreshed":false,"scopes":["fixture.read","fixture.profile"]}
+```
+
+With `--reveal`, standard output is the token and one newline, and nothing else:
+
+```console
+$ connectors connections token --connector <connector> --instance <instance> --reveal
+fixture-grant-access-1
+```
+
+A Stale connection, and a refresh the provider refuses, answer `repair_connection`, which names
+`connections reconnect`; a connection whose profile is not an OAuth2 grant is `forbidden`. A Rust
+program calls `connectors_host::local::access_token::access_token` instead; its value prints no
+token in `Debug` or `Display`. The
+[CLI contract](https://github.com/beyond10x/connectors/blob/main/contracts/cli/v1alpha1/semantics.md#access-token-issue)
+lists every refusal.
 
 ## Approved writes
 

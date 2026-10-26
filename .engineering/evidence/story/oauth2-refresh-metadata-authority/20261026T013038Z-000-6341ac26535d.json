@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-26T01:30:38Z",
+  "actor": "human:timo",
+  "artifact": "story:oauth2-refresh-metadata-authority",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate (gate: all checks passed)",
+    "reference": "wave/20261025-oauth2@5535ec50b"
+  }
+}

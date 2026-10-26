@@ -1,0 +1,8 @@
+{
+  "format": "connectors-catalog-operations/1",
+  "provider": "chatgpt",
+  "operations": [
+    {"id": "models.list", "operation_id": "listModels", "effect": "read",
+     "description": "List the models the signed-in ChatGPT account may use, as the Codex CLI reads them; client_version is the asking client's version"}
+  ]
+}

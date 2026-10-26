@@ -63,21 +63,23 @@ entities:
         target: connectors.credentials.CredentialGeneration
         cardinality: one
         via: candidate_generation_id
-    # The optional carrier makes this relation zero-or-one until response storage.
+    # The optional carrier makes this relation zero-or-one until response storage:
+    # ReserveRefresh records none and StoreResponse records the candidate.
     # An attempt outlives its source being superseded; this is not ownership.
-    # ESS-LIMIT: current owner/fence metadata after recovery and state-dependent
-    # candidate assignment. Their atomic joins are obligations below, not a claim
-    # made by the initial-owner fields or the typed optional reference. ESS 0.36 has
-    # no multi-record transaction and no crash-recovery construct.
+    # ESS-LIMIT: current owner/fence metadata after recovery. RecoverStoredResponse
+    # names a new owner that no field records, and the initial-owner fields make no
+    # claim about it. Its atomic joins are obligations below. Checked against ESS
+    # 0.36, which had no multi-record transaction and no crash-recovery construct.
     lifecycle:
       initial: Reserved
-      states: [Reserved, Authorized, ResponseStored, Recovering, Published, Fenced, Uncertain, Discarded]
-      terminal: [Published, Fenced, Uncertain, Discarded]
+      states: [Reserved, Authorized, ResponseStored, Recovering, Published, Fenced, Uncertain, Released, Discarded]
+      terminal: [Published, Fenced, Uncertain, Released, Discarded]
       transitions:
         - {name: authorize, from: [Reserved], to: Authorized}
         - {name: fence, from: [Reserved], to: Fenced}
         - {name: store_response, from: [Authorized], to: ResponseStored}
         - {name: quarantine, from: [Authorized], to: Uncertain}
+        - {name: release, from: [Authorized], to: Released}
         - {name: recover_response, from: [ResponseStored], to: Recovering}
         - {name: publish, from: [ResponseStored, Recovering], to: Published}
         - {name: discard, from: [ResponseStored, Recovering], to: Discarded}
@@ -99,8 +101,9 @@ errors:
 commands:
   - name: connectors.refresh.ReserveRefresh
     # Atomic per-source index acquisition, conditional on the current binding,
-    # non-revocation and no previously authorized exchange for this source. A
-    # Fenced pre-authorization attempt alone permits a new reservation.
+    # non-revocation and no unreleased authorized exchange for this source. A
+    # source whose prior attempts are all Fenced or Released permits a new
+    # reservation.
     input:
       - {name: decision, type: connectors.refresh.ReservationDecision}
       - {name: source_generation_id, type: connectors.credentials.CredentialGenerationId}
@@ -115,6 +118,12 @@ commands:
         when: decision == allow
         creates: connectors.refresh.RefreshAttempt
         instance: attempt_id
+        sets:
+          source_generation_id: input.source_generation_id
+          initial_owner: input.owner
+          initial_ownership_token: input.ownership_token
+          expected_binding_revision: input.expected_binding_revision
+          candidate_generation_id: {cleared: true}
         emits: [connectors.refresh.RefreshReserved]
         payload:
           connectors.refresh.RefreshReserved:
@@ -178,6 +187,8 @@ commands:
         when: decision == allow
         moves: connectors.refresh.RefreshAttempt.store_response
         instance: attempt_id
+        sets:
+          candidate_generation_id: input.candidate_generation_id
         emits: [connectors.refresh.RefreshResponseStored]
         payload:
           connectors.refresh.RefreshResponseStored:
@@ -201,6 +212,29 @@ commands:
         emits: [connectors.refresh.RefreshUncertain]
         payload:
           connectors.refresh.RefreshUncertain:
+            attempt_id: input.attempt_id
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.refresh.RefreshStateConflict
+  - name: connectors.refresh.ReleaseRateLimited
+    # CAS with StoreResponse and QuarantineRefresh, by the live owner only: the
+    # token endpoint answered the one exchange with HTTP 429, a definitive
+    # refusal that consumed no source token, or the transport proved that no
+    # byte of the request left (name resolution, connection or TLS handshake
+    # failed). The name keeps the first case. The source may be reserved again;
+    # nothing else changes. No other negative response or transport failure
+    # releases an exchange.
+    input:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+      - {name: owner, type: String}
+      - {name: ownership_token, type: connectors.refresh.OwnershipToken}
+    outcomes:
+      - name: released
+        moves: connectors.refresh.RefreshAttempt.release
+        instance: attempt_id
+        emits: [connectors.refresh.RefreshReleased]
+        payload:
+          connectors.refresh.RefreshReleased:
             attempt_id: input.attempt_id
       - name: wrong-state
         wrong_state: true
@@ -285,6 +319,9 @@ events:
   - name: connectors.refresh.RefreshUncertain
     fields:
       - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+  - name: connectors.refresh.RefreshReleased
+    fields:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
   - name: connectors.refresh.StoredResponseRecovered
     fields:
       - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
@@ -309,7 +346,8 @@ views:
 # non-replayable send authorization, real lease expiry and fencing, crash-safe
 # durability, immutable byte capture and candidate binding, current F05 evidence,
 # identity/scope comparisons, linearizable active-reference/revocation update,
-# field assignment, transport invocation and prevention of provider-client retries.
-# ESS checks declaration shape and lifecycle causation, not those algorithms: ESS
-# 0.36 has no cross-record uniqueness, multi-record transaction, lease/trusted-time,
-# durable-storage, byte-capture or transport construct.
+# transport invocation and prevention of provider-client retries. ESS checks
+# declaration shape, lifecycle causation and the fields each outcome sets, not
+# those algorithms. Checked against ESS 0.36, which had no cross-record
+# uniqueness, multi-record transaction, lease/trusted-time, durable-storage,
+# byte-capture or transport construct.

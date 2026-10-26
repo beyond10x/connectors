@@ -131,7 +131,8 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "local::runtime::launch::tests::consumer_fixture"
             | "local::runtime::launch::tests::launch_runner_fixture"
             | "local::runtime::launch::tests::review_conformance::reviewing_consumer_fixture"
-            | "local::runtime::launch::tests::review_conformance::reviewing_runner_fixture" => {
+            | "local::runtime::launch::tests::review_conformance::reviewing_runner_fixture"
+            | "local::owner::refresh::tests::launch::launch_consumer_fixture" => {
                 entry.helper = true;
                 return entry;
             }
@@ -166,7 +167,15 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "local::keyring::custody::tests::disposable_registry_publication_cli_and_retirement_restart"
             | "local::owner::approval_issuance::tests::production_cli_approval_issuance_and_restart"
             | "local::approval_keys::tests::production_cli_key_journey"
-            | "local::runtime::launch::tests::disposable_consumer_launch_delivers_fd3_and_refuses_by_code" => {
+            | "local::runtime::launch::tests::disposable_consumer_launch_delivers_fd3_and_refuses_by_code"
+            | "local::owner::refresh::tests::launch::launch_oauth2_grant_hands_only_the_access_token"
+            | "local::owner::refresh::tests::launch::launch_oauth2_grant_refreshes_inside_lead_time"
+            | "local::owner::refresh::tests::launch::launch_static_profile_is_unchanged"
+            | "local::owner::refresh::tests::launch::adversary::adversary_launch_refresh_needing_reauthorization_names_repair_connection"
+            | "local::owner::refresh::tests::launch::adversary::adversary_launch_rate_limited_refresh_answers_retry_after"
+            | "local::owner::refresh::tests::launch::adversary::adversary_two_concurrent_launches_exchange_once"
+            | "local::owner::refresh::tests::launch::adversary::adversary_configuration_changed_during_the_issue_is_lifecycle_conflict"
+            | "local::owner::refresh::tests::launch::adversary::adversary_launch_inside_the_lead_after_evidence_lapsed_refreshes" => {
                 Some((Disposable, vec![CUSTODY, CLI]))
             }
             _ => None,
@@ -251,6 +260,27 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "cli_journey::a_provider_refusal_reads_dispatch_and_a_host_refusal_reads_admission"
             | "cli_journey::oauth_connect_journey"
             | "cli_journey::oauth_repair_journey"
+            | "cli_journey::oauth2_grant_journey::oauth2_grant_connect_with_loopback_fixed_port"
+            | "cli_journey::oauth2_grant_journey::oauth2_grant_connect_with_pasted_code"
+            | "cli_journey::oauth2_grant_journey::oauth2_grant_connect_with_device_grant"
+            | "cli_journey::oauth2_grant_journey::oauth2_grant_reconnect_replaces_the_entry_on_the_same_connection"
+            | "cli_journey::oauth2_grant_journey::oauth2_grant_state_mismatch_stores_nothing"
+            | "cli_journey::oauth2_grant_journey::oauth2_grant_device_expired_stores_nothing"
+            | "cli_journey::oauth2_grant_journey::oauth2_grant_missing_required_scope_stores_nothing"
+            | "cli_journey::oauth2_grant_journey::token_journey::token_without_reveal_prints_no_token"
+            | "cli_journey::oauth2_grant_journey::token_journey::token_with_reveal_prints_only_the_token"
+            | "cli_journey::oauth2_grant_journey::token_journey::token_within_lead_time_refreshes_once"
+            | "cli_journey::oauth2_grant_journey::token_journey::token_on_a_stale_connection_refuses_with_repair_connection"
+            | "cli_journey::oauth2_grant_journey::token_journey::token_on_a_static_profile_is_forbidden"
+            | "cli_journey::oauth2_grant_journey::token_journey::library_access_token_matches_the_cli"
+            | "cli_journey::chatgpt_journey::chatgpt_connect_browser_journey"
+            | "cli_journey::chatgpt_journey::chatgpt_connect_device_journey"
+            | "cli_journey::chatgpt_journey::chatgpt_token_refreshes_with_json_and_rotates"
+            | "cli_journey::chatgpt_adversary::adversary_chatgpt_device_sign_in_refuses_an_interval_longer_than_the_window_before_any_poll"
+            | "cli_journey::chatgpt_adversary::adversary_chatgpt_device_sign_in_keeps_polling_at_a_normal_interval"
+            | "cli_journey::claude_subscription_journey::claude_connect_loopback_journey"
+            | "cli_journey::claude_subscription_journey::claude_connect_pasted_code_journey"
+            | "cli_journey::claude_subscription_journey::claude_token_refreshes_with_json"
             | "cli_journey::reason_cli_adversary::a_provider_reason_reaches_the_cli_failure_json_and_a_credential_echo_does_not"
             | "cli_journey::retry_after_cli::a_rate_limited_read_is_waited_for_once_or_states_its_delay_in_the_cli_json"
             | "oauth2_refresh::oauth_invalid_grant_reports_repair"

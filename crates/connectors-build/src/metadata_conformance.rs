@@ -11,11 +11,12 @@
 //! required operation-field fulfillments) are supplied as schema-valid placeholders, because the
 //! specification says nothing about them and any valid value conforms.
 //!
-//! `emit` is `ess verify conform mutate --emit` scoped to the `local-metadata-authority`
-//! component: the same mutants, compiled the same way, each suite synthesized with
-//! `synthesize_for` so that it holds only the scenarios this component realises. Mutants whose
-//! site lies in a domain the component does not own are left out, because no implementation in
-//! this repository answers for them. `ess verify conform mutate --collect` scores the result.
+//! `emit` is `ess verify conform mutate --emit --component local-metadata-authority`: it writes
+//! the emission the pinned ESS's own emitter (`mutate::emit_for`) produces, so the manifest is in
+//! the format ESS chose and admits. Each suite holds only the scenarios this component realises;
+//! a mutant another component answers for is recorded out of scope, with no suite, because no
+//! implementation in this repository answers for it. `run-emission` runs every suite against the
+//! committed definitions, and `ess verify conform mutate --collect` scores the result.
 use super::Result;
 use crate::metadata_entities;
 use entity_core::{
@@ -32,11 +33,7 @@ use ess_domain::{command::OutcomeName, name::QualifiedName};
 use ess_entity_runtime::{BoundPresence, BoundSource, CommandBinding, InstanceBinding};
 use ess_primitives::node::Node;
 use serde_json::{Map, Value, json};
-use std::{
-    cell::RefCell,
-    collections::{BTreeMap, BTreeSet},
-    path::Path,
-};
+use std::{cell::RefCell, collections::BTreeMap, path::Path};
 
 const DEFINITIONS: &[u8] =
     include_bytes!("../../connectors-host/src/local/metadata/entity-runtime-definitions.json");
@@ -849,29 +846,7 @@ pub fn run_emission(root: &Path, dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn owned_domains(ir: &ess_compiler::ir::EssIr) -> Result<BTreeSet<String>> {
-    let ir_json: Value = serde_json::from_str(&ir.to_canonical_json())?;
-    let component = ir_json["components"]
-        .as_object()
-        .and_then(|components| {
-            components
-                .values()
-                .find(|component| component["name"] == metadata_entities::COMPONENT)
-        })
-        .ok_or("component not declared")?;
-    Ok(component["owns"]
-        .as_array()
-        .ok_or("component owns no domains")?
-        .iter()
-        .filter_map(|domain| domain.as_str().map(str::to_owned))
-        .collect())
-}
-
-/// The domain a mutant's site lies in: the first two segments of its first qualified name.
-fn site_domain(site: &str) -> String {
-    site.split(['.', '/']).take(2).collect::<Vec<_>>().join(".")
-}
-
+/// The gate's suite: this component's synthesis of `ir`, written under `out/dir`.
 fn emit_suite(ir: &ess_compiler::ir::EssIr, dir: &str, out: &Path) -> Result<EmittedSuite> {
     let synthesis = ess_conformance::synthesize::synthesize_for(ir, metadata_entities::COMPONENT)
         .map_err(|error| error.to_string())?;
@@ -892,106 +867,72 @@ fn emit_suite(ir: &ess_compiler::ir::EssIr, dir: &str, out: &Path) -> Result<Emi
         refused: Some(refused),
         scenarios: synthesis.suite.len(),
         spec_digest: synthesis.suite.provenance.spec_digest.to_string(),
-        // Only in `ess-mutation-manifest/4`; this emitter writes `/2`.
+        // A manifest field; the gate writes no manifest.
         suite_digest: None,
     })
 }
 
-/// The manifest text, refused unless the pinned ESS reader admits it.
+/// Writes ESS's own mutation emission of `classes`, scoped to the component the host implements,
+/// under `out` (which must be absent or empty), and returns its manifest.
 ///
-/// Written as `ess-mutation-manifest/2`: this scoped emitter records each suite's refusals but
-/// does not decide which guard mutants left their outcome unsatisfiable (ESS keeps that analysis
-/// private to its own `emit`), and `/3` is the format that claims it was decided. For the same
-/// reason no mutant carries `identical_answer`, a `/5` field ESS decides privately too, or
-/// `overlap_taken_by`, the `/6` one.
-fn manifest(
-    ir: &ess_compiler::ir::EssIr,
-    baseline: EmittedSuite,
-    mut mutants: Vec<EmittedMutant>,
-) -> Result<String> {
-    mutants.sort_by(|left, right| left.id.cmp(&right.id));
-    let manifest = Manifest {
-        spec_digest: baseline.spec_digest.clone(),
-        baseline,
-        component: None,
-        known_failures: None,
-        format: mutate::MANIFEST_FORMAT_2.to_owned(),
-        mutants,
-        specification: format!("{} {}", ir.system(), ir.version()),
-        unavailable_sites: None,
-    };
-    let text = manifest.to_canonical_json();
-    Manifest::from_json(&text)?;
-    Ok(text)
-}
-
-/// `mutate --emit`, scoped to the component the host implements.
-pub fn emit(root: &Path, out: &Path) -> Result<()> {
+/// `mutate::emit_for` is what `ess verify conform mutate --emit --component` runs: it decides the
+/// manifest format from the mutants it writes, records each suite's digest, which guard mutants
+/// left their outcome unsatisfiable, which answer identically and which overlap, and marks the
+/// mutants and unavailable sites of other components out of scope. Writing its files unchanged
+/// keeps every claim in the manifest one the pinned ESS made itself.
+fn emit_classes(root: &Path, out: &Path, classes: &[MutantClass]) -> Result<Manifest> {
     if out.exists() && std::fs::read_dir(out)?.next().is_some() {
         return Err(format!("{} is not empty", out.display()).into());
     }
     let loaded = metadata_entities::load(root)?;
-    let baseline_ir = mutate::compile(loaded.documents.clone(), &loaded.sources)
-        .map_err(|stillborn| format!("{stillborn:?}"))?;
-    let owned = owned_domains(&baseline_ir)?;
-    let baseline = emit_suite(&baseline_ir, mutate::BASELINE_DIR, out)?;
-    let mut entries = Vec::new();
-    let mut outside = 0usize;
-    for mutant in mutate::mutants(&loaded.documents, MutantClass::ALL) {
-        if !owned.contains(&site_domain(&mutant.mutation.site())) {
-            outside += 1;
-            continue;
+    let emission = mutate::emit_for(
+        &loaded.documents,
+        &loaded.sources,
+        classes,
+        Some(metadata_entities::COMPONENT),
+    )?;
+    for (relative, contents) in &emission.files {
+        let relative = Path::new(relative);
+        if !relative
+            .components()
+            .all(|part| matches!(part, std::path::Component::Normal(_)))
+        {
+            return Err(format!("emission file {} leaves the output", relative.display()).into());
         }
-        let mutated = mutate::apply(&loaded.documents, &mutant.mutation)?;
-        let mut entry = EmittedMutant {
-            change: mutant.change.clone(),
-            class: mutant.class,
-            dir: None,
-            id: mutant.id.clone(),
-            identical_answer: None,
-            overlap_taken_by: None,
-            refusals: None,
-            refused: None,
-            scenarios: None,
-            site: mutant.mutation.site(),
-            spec_digest: None,
-            out_of_scope: false,
-            stillborn: None,
-            unsatisfiable_guard: None,
-            suite_digest: None,
-        };
-        match mutate::compile(mutated, &loaded.sources) {
-            Ok(ir) => {
-                let suite = emit_suite(&ir, &mutant.id, out)?;
-                entry.dir = Some(suite.dir);
-                entry.refusals = Some(suite.refusals);
-                entry.refused = suite.refused;
-                entry.scenarios = Some(suite.scenarios);
-                entry.spec_digest = Some(suite.spec_digest);
-            }
-            Err(stillborn) => entry.stillborn = Some(stillborn),
+        let file = out.join(relative);
+        if let Some(parent) = file.parent() {
+            std::fs::create_dir_all(parent)?;
         }
-        let file = out.join(&mutant.id);
-        std::fs::create_dir_all(&file)?;
-        std::fs::write(
-            file.join(mutate::MUTANT_FILE),
-            format!("{}\n", serde_json::to_string_pretty(&entry)?),
-        )?;
-        entries.push(entry);
+        std::fs::write(&file, contents)?;
     }
-    let text = manifest(&baseline_ir, baseline, entries)?;
-    std::fs::write(out.join(mutate::MANIFEST_FILE), &text)?;
-    let manifest = Manifest::from_json(&text)?;
-    let stillborn = manifest
-        .mutants
-        .iter()
-        .filter(|mutant| mutant.stillborn.is_some())
-        .count();
+    // What `mutate --collect` reads back, read back the same way.
+    Ok(Manifest::from_json(&std::fs::read_to_string(
+        out.join(mutate::MANIFEST_FILE),
+    )?)?)
+}
+
+/// `mutate --emit`, scoped to the component the host implements.
+pub fn emit(root: &Path, out: &Path) -> Result<()> {
+    let manifest = emit_classes(root, out, MutantClass::ALL)?;
+    let count = |keep: fn(&EmittedMutant) -> bool| {
+        manifest
+            .mutants
+            .iter()
+            .filter(|mutant| keep(mutant))
+            .count()
+    };
+    let unavailable = manifest
+        .unavailable_sites
+        .as_ref()
+        .map_or(0, std::vec::Vec::len);
     println!(
-        "emitted {} mutant(s) in {} owned domain(s) ({stillborn} stillborn); {outside} mutant(s) \
-         outside {} not emitted; baseline {} scenario(s)",
+        "emitted {} ({} mutant(s): {} with a suite, {} stillborn, {} outside {}; {unavailable} \
+         unavailable site(s)); baseline {} scenario(s)",
+        manifest.format,
         manifest.mutants.len(),
-        owned.len(),
+        count(|mutant| mutant.dir.is_some()),
+        count(|mutant| mutant.stillborn.is_some()),
+        count(|mutant| mutant.out_of_scope),
         metadata_entities::COMPONENT,
         manifest.baseline.scenarios
     );
@@ -1021,6 +962,7 @@ pub fn gate(root: &Path, out: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
 
     fn contract(name: &str) -> ess_conformance::fixtures::Contract {
         serde_json::from_value(json!({
@@ -1031,18 +973,57 @@ mod tests {
     }
 
     /// `mutate --collect` reads what `emit` writes, so the manifest must be one the pinned ESS
-    /// admits: its format, and each suite's refusals as that format requires them.
+    /// admits: its format for the mutants it holds, and each suite's refusals as that format
+    /// requires them. Its mutants are precedence swaps, a class `ess-mutation-manifest/2` and `/3`
+    /// cannot hold (the six of this component take ESS about 20 s; emit-swap takes minutes, and
+    /// the full-class emission is the mutation audit's), so a manifest in a format too old for
+    /// its mutants is refused here.
     #[test]
     fn emitted_manifest_is_admitted_by_the_pinned_ess() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let classes = [MutantClass::PrecedenceSwap];
+        let out = tempfile::tempdir().unwrap();
+        let admitted = emit_classes(&root, out.path(), &classes).unwrap();
+        assert!(
+            [
+                mutate::MANIFEST_FORMAT_4,
+                mutate::MANIFEST_FORMAT_5,
+                mutate::MANIFEST_FORMAT_6,
+            ]
+            .contains(&admitted.format.as_str()),
+            "{} is not a format that holds these classes",
+            admitted.format
+        );
+        assert_eq!(
+            admitted.component.as_deref(),
+            Some(metadata_entities::COMPONENT)
+        );
+        for class in classes {
+            assert!(
+                admitted
+                    .mutants
+                    .iter()
+                    .any(|mutant| mutant.class == class && mutant.dir.is_some()),
+                "no {class:?} mutant with a suite"
+            );
+        }
+        for mutant in &admitted.mutants {
+            if let Some(dir) = &mutant.dir {
+                let text =
+                    std::fs::read_to_string(out.path().join(dir).join(mutate::SUITE_FILE)).unwrap();
+                let suite = AdmittedSuite::from_json(&text).unwrap();
+                assert_eq!(
+                    mutant.suite_digest.as_deref(),
+                    Some(suite.digest()),
+                    "{} records another suite's digest",
+                    mutant.id
+                );
+            }
+        }
+
         let loaded = metadata_entities::load(&root).unwrap();
         let ir = mutate::compile(loaded.documents.clone(), &loaded.sources).unwrap();
-        let out = tempfile::tempdir().unwrap();
-        let baseline = emit_suite(&ir, mutate::BASELINE_DIR, out.path()).unwrap();
-        let text = manifest(&ir, baseline, Vec::new()).unwrap();
-        let admitted = Manifest::from_json(&text).unwrap();
-
-        // The refusals a synthesis run separate from `emit_suite` reports for the same model.
+        // The refusals a synthesis run separate from `emit` reports for the same model.
         let independent =
             ess_conformance::synthesize::synthesize_for(&ir, metadata_entities::COMPONENT).unwrap();
         let mut expected: Vec<RefusalKey> =
@@ -1074,6 +1055,117 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// `story:oauth2-refresh-metadata-authority`: the local metadata authority owns
+    /// `connectors.refresh` and `connectors.oauth2`. The suite the gate step synthesizes holds a
+    /// scenario for every outcome of their eleven commands, and each one passes against the
+    /// committed definitions.
+    #[test]
+    fn every_refresh_and_oauth2_outcome_passes_against_the_committed_definitions() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let loaded = metadata_entities::load(&root).unwrap();
+        let ir = mutate::compile(loaded.documents.clone(), &loaded.sources).unwrap();
+        let model: Value = serde_json::from_str(&ir.to_canonical_json()).unwrap();
+        let commands: Vec<(&String, &Value)> = model["commands"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .filter(|(name, _)| {
+                name.starts_with("connectors.refresh.") || name.starts_with("connectors.oauth2.")
+            })
+            .collect();
+        assert_eq!(
+            commands.len(),
+            11,
+            "the two domains declare eleven commands"
+        );
+        let expected: BTreeSet<String> = commands
+            .iter()
+            .flat_map(|(command, declaration)| {
+                declaration["outcomes"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(move |outcome| {
+                        format!("{command}/outcome/{}", outcome["name"].as_str().unwrap())
+                    })
+            })
+            .collect();
+
+        let out = tempfile::tempdir().unwrap();
+        let suite = emit_suite(&ir, mutate::BASELINE_DIR, out.path()).unwrap();
+        let text =
+            std::fs::read_to_string(out.path().join(&suite.dir).join(mutate::SUITE_FILE)).unwrap();
+        let authority = Authority::load(&root).unwrap();
+        let (report, _) = run_suite(&authority, &text).unwrap();
+        let statuses = report.statuses();
+        let unpassed: Vec<(&String, Option<&&str>)> = expected
+            .iter()
+            .map(|scenario| (scenario, statuses.get(scenario)))
+            .filter(|(_, status)| *status != Some(&"passed"))
+            .collect();
+        assert!(
+            unpassed.is_empty(),
+            "outcomes without a passing scenario (status None: not in the suite): {unpassed:#?}"
+        );
+        let counts = report.counts();
+        assert_eq!(
+            counts.passed, counts.total,
+            "every scenario of the suite passes"
+        );
+    }
+
+    /// `IssueAccessToken`: a refreshed issue names the attempt that published its generation, and
+    /// a current one names none. Either decision with the other shape is answered `unavailable`
+    /// and issues nothing.
+    #[test]
+    fn only_a_refreshed_access_token_issue_names_a_refresh_attempt() {
+        let registry = registry().unwrap();
+        let runtime = Runtime::new(&registry);
+        let attempt = "00000000-0000-4000-8000-08976e317bc2";
+        let decide = |decision: &str, refresh_attempt_id: Option<&str>| {
+            let mut input = json!({
+                "decision": decision,
+                "connection_ref": "connection",
+                "generation_id": "00000000-0000-4000-8000-5a183923d085",
+                "expires_at": "2020-01-01T00:00:00Z",
+                "scopes": ["read"],
+                "delivery": "metadata_only",
+            });
+            if let Some(attempt) = refresh_attempt_id {
+                input["refresh_attempt_id"] = json!(attempt);
+            }
+            runtime
+                .decide_create_derived(
+                    "connectors.oauth2.AccessTokenIssue",
+                    1,
+                    json!({"input": input, "bound": {"b00000000": "issue"}}),
+                )
+                .unwrap()
+        };
+        let refused = |evaluation: Evaluation| match evaluation {
+            Evaluation::Refused(refusal) => refusal.outcome,
+            other => panic!("issued: {other:?}"),
+        };
+        let issued = |evaluation: Evaluation| match evaluation {
+            Evaluation::Accepted(decision) => (
+                decision.record.outcome.clone(),
+                decision.instance.fields.get("refresh_attempt_id").cloned(),
+            ),
+            other => panic!("not issued: {other:?}"),
+        };
+
+        assert_eq!(
+            issued(decide("current", None)),
+            (Some("issued-current".to_owned()), None)
+        );
+        assert_eq!(
+            issued(decide("refreshed", Some(attempt))),
+            (Some("issued-refreshed".to_owned()), Some(json!(attempt)))
+        );
+        assert_eq!(refused(decide("current", Some(attempt))), "unavailable");
+        assert_eq!(refused(decide("refreshed", None)), "unavailable");
     }
 
     #[test]
