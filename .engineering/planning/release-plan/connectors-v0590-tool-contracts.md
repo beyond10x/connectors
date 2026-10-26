@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0590-tool-contracts
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.59.0: tool contracts for admitted operations (ADR 0103)'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-26T16:50:10Z", actor: "human:timo", revision: 2, decided_on: {"recorded":{"test_result":1}}}
+- {from: "active", to: "implemented", at: "2026-10-26T18:21:31Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":2}}}
 ---
 ## Outcome
 
