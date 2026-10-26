@@ -12,13 +12,15 @@ Planning validation uses the separate [AEP executable pin](../crates/connectors-
 The protocol document pin in `.engineering/project.yaml` selects governance documents;
 it does not identify an installed executable.
 `--msrv` additionally checks the pure workspace surface on installed Rust 1.88.0
-and the Eventlog-backed runtime roots on installed Rust 1.91.0. The Rust gate runs
+and the Eventlog-backed runtime roots on installed Rust 1.91.0; `connectors-tool-contracts` is left
+out there, because its `b10x-tool-contract` dependency needs Rust 1.98. The Rust gate runs
 formatting, descriptor drift, offline builds/tests/Clippy, library dependency
 boundaries, the [shared ESS provider boundary](../adapters/README.md),
 independent compilation of each internal adapter's model, the release-binaries check of the guides
 (`connectors-build release-binaries`, below), the website examples model synthesis
 (`connectors-build examples` without its WASM build), the drift check of the documentation
-site's generated pages (`connectors-docs generate --check`) and AEP validation. It uses a task-owned temporary directory under
+site's generated pages (`connectors-docs generate --check`), the drift check of each published
+tool contract (`connectors-tool-contracts generate --check`) and AEP validation. It uses a task-owned temporary directory under
 `.local/tmp`. The owner tests bind and connect Unix sockets inside it through a descriptor
 on the state directory (`/proc/self/fd/<fd>/owner.sock`), as the host does, so a long
 checkout path, such as a managed worktree under `~/.local/state/worktree/trees/…`, does not

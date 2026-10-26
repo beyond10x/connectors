@@ -27,3 +27,4 @@ domains:
   - connectors.cli
   - connectors.transport
   - connectors.oauth2
+  - connectors.tool_contracts

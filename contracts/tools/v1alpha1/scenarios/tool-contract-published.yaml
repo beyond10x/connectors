@@ -1,0 +1,53 @@
+type: ess-scenario/1
+domain: connectors.tool_contracts
+scenario: tool-contract-published
+summary: 'A publish whose every operation carries a profile records one Published contract and announces it.'
+arrange:
+- instance: contract
+  entity: connectors.tool_contracts.ToolContract
+timeline:
+- at: '2026-10-26T10:00:00Z'
+  command: connectors.tool_contracts.PublishToolContract
+  input:
+    decision: publish
+    instance: search-a
+    descriptor_revision: r1
+    toolset: connector-search-a
+    version: v1alpha1
+    digest: d1
+    operations:
+    - operation: websearch.search
+      name: search
+      omit: []
+      profile:
+        effects: [network, secret, external]
+        consequences: [money]
+        risk: high
+        idempotency: idempotent
+        determinism: nondeterministic
+        bounds:
+          timeout_ms: {default: 160000, max: 160000}
+          output_bytes: {max: 3145728}
+        placement: local
+        capability: web.search
+        output_untrusted: true
+  outcome: published
+  events:
+  - event: connectors.tool_contracts.ToolContractPublished
+  capture:
+    instance: contract
+    event: connectors.tool_contracts.ToolContractPublished
+    field: contract_ref
+assert:
+- view: connectors.tool_contracts.ToolContracts
+  contains:
+    contract_ref:
+      $instance: contract
+    instance: search-a
+    descriptor_revision: r1
+    toolset: connector-search-a
+    version: v1alpha1
+    digest: d1
+    state: Published
+- view: connectors.tool_contracts.ToolContracts
+  counts: {at_most: 1}

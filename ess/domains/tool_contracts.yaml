@@ -1,0 +1,150 @@
+domain: connectors.tool_contracts
+
+summary: A tool-contract/1 document an instance's descriptor revision publishes for its admitted operations, with the profile authored beside the adapter, and the refusals of its publisher.
+
+# Owner: contracts/tools/v1alpha1/semantics.md; epic:tool-contract-publication (Atlas ADR 0103).
+# The profile vocabulary mirrors tool-contract/1 § Profile (tools, tag 0.5.0); its spellings with a
+# hyphen (human-visible, send-external, sensitive-data, non-idempotent) are written with `_` here.
+# A published contract names no credential, configuration value, connection or grant: those stay in
+# the governed invocation (connectors.connection_admission, connectors.auth_bindings).
+types:
+  - name: connectors.tool_contracts.Effect
+    kind: enum
+    variants: [read, write, process, network, secret, external, human_visible]
+  - name: connectors.tool_contracts.Consequence
+    kind: enum
+    variants: [money, delete, send_external, irreversible, sensitive_data]
+  - name: connectors.tool_contracts.Risk
+    kind: enum
+    variants: [none, low, medium, high, critical]
+  - name: connectors.tool_contracts.Idempotency
+    kind: enum
+    variants: [idempotent, keyed, non_idempotent]
+  - name: connectors.tool_contracts.Determinism
+    kind: enum
+    variants: [deterministic, nondeterministic]
+  - name: connectors.tool_contracts.Placement
+    kind: enum
+    variants: [local, confined, container]
+  - name: connectors.tool_contracts.Bound
+    kind: struct
+    fields:
+      - {name: default, type: "Optional<Integer>"}
+      - {name: max, type: Integer}
+  - name: connectors.tool_contracts.Bounds
+    kind: struct
+    fields:
+      - {name: timeout_ms, type: connectors.tool_contracts.Bound}
+      - {name: output_bytes, type: "Optional<connectors.tool_contracts.Bound>"}
+  - name: connectors.tool_contracts.ToolProfile
+    kind: struct
+    fields:
+      - {name: effects, type: "List<connectors.tool_contracts.Effect>"}
+      - {name: consequences, type: "List<connectors.tool_contracts.Consequence>"}
+      - {name: risk, type: connectors.tool_contracts.Risk}
+      - {name: idempotency, type: connectors.tool_contracts.Idempotency}
+      - {name: determinism, type: connectors.tool_contracts.Determinism}
+      - {name: bounds, type: connectors.tool_contracts.Bounds}
+      - {name: placement, type: connectors.tool_contracts.Placement}
+      - {name: capability, type: String}
+      - {name: output_untrusted, type: Boolean}
+  - name: connectors.tool_contracts.OperationToolDeclaration
+    kind: struct
+    fields:
+      # The descriptor operation id, such as `websearch.search`.
+      - {name: operation, type: String}
+      # The `<op>` segment of the published name `connector-<instance>.<op>`.
+      - {name: name, type: String}
+      # Absent is refused: a provider profile name alone is not a profile.
+      - {name: profile, type: "Optional<connectors.tool_contracts.ToolProfile>"}
+      # Input fields the connection fills; they leave the published input.
+      - {name: omit, type: "List<String>"}
+  - name: connectors.tool_contracts.PublicationDecision
+    kind: enum
+    variants: [publish, profile_missing, schema_unrepresentable, risk_below_floor, profile_invalid, name_invalid]
+
+entities:
+  - name: connectors.tool_contracts.ToolContract
+    identity: {name: contract_ref, type: String}
+    fields:
+      - {name: instance, type: String}
+      - {name: descriptor_revision, type: String}
+      - {name: toolset, type: String}
+      - {name: version, type: String}
+      - {name: operations, type: "List<connectors.tool_contracts.OperationToolDeclaration>"}
+      # The SHA-256 of the canonical document bytes.
+      - {name: digest, type: String}
+    lifecycle:
+      initial: Published
+      states: [Published]
+      terminal: [Published]
+    # Immutable: a changed declaration or descriptor revision is a new contract.
+
+# ESS-LIMIT (0.69.2): the risk floor (the greatest floor over the declared effects and
+# consequences), the JSON Schema representability of each operation's input and output, the
+# instance name grammar and the presence of a profile for every descriptor operation are
+# reductions over lists and schema documents this model cannot express. `decision` is the
+# publisher's, computed by connectors_tool_contracts::publish (story:connector-projection) and held
+# to tool-contract/1 by b10x-tool-contract's validator; the outcomes below hold what each decision
+# may and may not record.
+errors:
+  - name: connectors.tool_contracts.ProfileMissing
+  - name: connectors.tool_contracts.SchemaUnrepresentable
+  - name: connectors.tool_contracts.RiskBelowFloor
+  - name: connectors.tool_contracts.ProfileInvalid
+  - name: connectors.tool_contracts.NameInvalid
+
+commands:
+  - name: connectors.tool_contracts.PublishToolContract
+    input:
+      - {name: decision, type: connectors.tool_contracts.PublicationDecision}
+      - {name: instance, type: String}
+      - {name: descriptor_revision, type: String}
+      - {name: toolset, type: String}
+      - {name: version, type: String}
+      - {name: operations, type: "List<connectors.tool_contracts.OperationToolDeclaration>"}
+      - {name: digest, type: String}
+    outcomes:
+      - name: published
+        when: decision == publish
+        creates: connectors.tool_contracts.ToolContract
+        instance: contract_ref
+        sets:
+          instance: input.instance
+          descriptor_revision: input.descriptor_revision
+          toolset: input.toolset
+          version: input.version
+          operations: input.operations
+          digest: input.digest
+        emits: [connectors.tool_contracts.ToolContractPublished]
+        payload: {connectors.tool_contracts.ToolContractPublished: {contract_ref: {generated: true}, toolset: input.toolset, version: input.version}}
+      - {name: profile-missing, when: decision == profile_missing, error: connectors.tool_contracts.ProfileMissing}
+      - {name: schema-unrepresentable, when: decision == schema_unrepresentable, error: connectors.tool_contracts.SchemaUnrepresentable}
+      - {name: risk-below-floor, when: decision == risk_below_floor, error: connectors.tool_contracts.RiskBelowFloor}
+      - {name: profile-invalid, when: decision == profile_invalid, error: connectors.tool_contracts.ProfileInvalid}
+      - {name: name-invalid, error: connectors.tool_contracts.NameInvalid}
+
+events:
+  - name: connectors.tool_contracts.ToolContractPublished
+    fields:
+      - {name: contract_ref, type: String}
+      - {name: toolset, type: String}
+      - {name: version, type: String}
+
+views:
+  - name: connectors.tool_contracts.ToolContracts
+    source: connectors.tool_contracts.ToolContract
+    consistency: read_your_writes
+    fields:
+      - {name: contract_ref, type: String}
+      - {name: instance, type: String}
+      - {name: descriptor_revision, type: String}
+      - {name: toolset, type: String}
+      - {name: version, type: String}
+      - {name: digest, type: String}
+      - {name: state, type: connectors.tool_contracts.ToolContract.State}
+
+actors:
+  - name: connectors.tool_contracts.LocalHost
+    may:
+      - connectors.tool_contracts.PublishToolContract
