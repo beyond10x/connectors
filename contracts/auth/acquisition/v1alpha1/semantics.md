@@ -210,12 +210,15 @@ The caller names a connection and a delivery; it cannot ask for a refresh.
    [ESS](../../../../ess/domains/oauth2.yaml)) in the transaction of the
    connection's refresh ledger: the issued generation, the refresh attempt that
    published it on a refreshed issue, the expiry, the granted scopes and the
-   delivery (`metadata_only`, `revealed` or `library`). The record carries no
+   delivery (`metadata_only`, `revealed`, `library` or `consumer_launch`). The record carries no
    token. When a refresh or a repair replaces the generation between its read
    and the record, the issue reads it again. An issue whose generation a repair
    rather than a refresh published is recorded as `current`. A refusal records nothing.
 4. The token leaves the owner only in the transport's secret frame, and only
-   for a delivery that carries it (`revealed`, `library`). `metadata_only`
+   for a delivery that carries it (`revealed`, `library`), or, for
+   `consumer_launch`, sealed on the launched consumer's descriptor 3
+   ([consumer launch](../../../cli/v1alpha1/consumer-launch.md) §9); only the
+   owner's own launch issues `consumer_launch`. `metadata_only`
    answers the metadata alone. No log, error, `Debug` or `Display` output names
    the token.
 
