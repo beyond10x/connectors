@@ -4,7 +4,7 @@
 
 ### Changed
 
-- ESS 0.74.0 (from 0.69.2). No user-visible effect: the specifications stay at their current
+- ESS 0.75.0 (from 0.69.2). No user-visible effect: the specifications stay at their current
   formats, and the regenerated types differ only in the generator version they name.
 
 ## 0.59.0 — 2026-10-26
