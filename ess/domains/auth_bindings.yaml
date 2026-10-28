@@ -400,7 +400,7 @@ commands:
     # ESS-LIMIT: a guard over the instance's other Connections
     # (`when_related: {entity, where}`) needs ess/22, and this specification
     # is ess/18; the pinned Entity Runtime lowering refuses it for this lowered
-    # command (ess-entity-runtime 0.74.0 RowSetUnsupported).
+    # command (ess-entity-runtime 0.75.0 RowSetUnsupported).
     outcomes:
       - name: instance-connected
         when:
