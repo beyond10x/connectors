@@ -65,12 +65,12 @@ release profile and the bridge deadline are unchanged.
 
 ## Pinned tools
 
-The repository pins released tool versions, not source builds: ESS 0.69.2 in
+The repository pins released tool versions, not source builds: ESS 0.72.0 in
 [`crates/connectors-spec/toolchain.json`](../crates/connectors-spec/toolchain.json)
 and AEP 0.71.3 in [`crates/connectors-build/aep-toolchain.json`](../crates/connectors-build/aep-toolchain.json).
 Use the `ess` and `aep` executables the Beyond10x plugins install (`b10x upgrade`
 keeps them current). The Cargo dependencies select Entity Runtime 0.30.3 and the
-Eventlog release it builds on (0.8.3); ESS 0.69.2, like 0.56.0 through 0.68.0, additionally brings
+Eventlog release it builds on (0.8.3); ESS 0.72.0, like 0.56.0 through 0.69.2, additionally brings
 Entity Runtime Core 0.28.0 through `ess-entity-runtime`. The CLI binding stays
 `ess-cli/1` with all three globals, so the committed `ess-cli-plan/1` plan keeps its
 bytes; ESS 0.57.0 and later generate a CLI runtime that reads an `ess-cli-plan/2` plan's optional
