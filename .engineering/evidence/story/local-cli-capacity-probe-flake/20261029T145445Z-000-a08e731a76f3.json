@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-29T14:54:45Z",
+  "actor": "human:timo",
+  "artifact": "story:local-cli-capacity-probe-flake",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "taskset -c 3 nice -n 19 local_cli --exact: 50/50 each capacity test; 4 workers nice -n 19: 200/200; cargo test -p connectors --test local_cli 27 passed; adversary pass: no finding",
+    "reference": "3436329e9"
+  }
+}

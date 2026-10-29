@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-29T14:54:50Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0591-capacity-probe",
+  "kind": "release-plan",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "story:local-cli-capacity-probe-flake implemented; local gate on fcaa67e68 stopped 3 times at pre-existing timing tests under host load 27-36 (story:mcp-long-read-exits-under-load); the PR's CI gate decides"
+  }
+}
