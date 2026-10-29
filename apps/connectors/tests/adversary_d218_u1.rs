@@ -514,7 +514,12 @@ fn removed_commands_appear_in_no_help_or_completion() {
 mod jailed {
     use super::{Value, json};
     use crate::mounted::*;
-    use std::{fs, os::unix::fs::PermissionsExt, process::Output, time::Duration};
+    use std::{
+        fs,
+        os::unix::fs::PermissionsExt,
+        process::Output,
+        time::{Duration, Instant},
+    };
 
     pub const ADAPTER_FIXTURE: &str = "jailed::adversary_d218_adapter_fixture";
 
@@ -567,26 +572,36 @@ mod jailed {
         serde_json::from_slice(stream).unwrap_or_else(|_| panic!("{output:?}"))
     }
 
-    /// story:connectors-do-short-invocation, D3 and the acceptance: "An
-    /// instance with no `ready` connection [...] is refused by
-    /// `connection_unresolved`, listing each connection and its state." The
-    /// instance's one connection reads `pending` once its validation evidence
-    /// lapsed; `invoke` without `--connection` refuses it and sends nothing to
-    /// the provider, neither the read nor a recollection of its evidence.
+    /// story:connectors-do-short-invocation, D3 amended and the acceptance: "an
+    /// instance with exactly one connection invoked without naming the
+    /// connection resolves it", an idle one included. The instance's one
+    /// connection reads `pending` once its validation evidence lapsed;
+    /// `invoke` without `--connection` selects it, and its evidence is
+    /// re-checked with the provider once before the one call.
     #[test]
-    fn a_connection_that_is_not_ready_is_not_selected() {
-        let (container, connection, _) = connected(1_000);
-        std::thread::sleep(Duration::from_millis(1_500));
-        let listed = success(&container.run(&[
-            "connections",
-            "list",
-            "--connector",
-            "fixture",
-            "--instance",
-            "main",
-        ]));
+    fn a_lapsed_connection_is_selected_and_rechecked_before_the_call() {
+        let (container, connection, _) = connected(3_000);
+        let until = Instant::now() + Duration::from_secs(30);
+        let listed = loop {
+            let listed = success(&container.run(&[
+                "connections",
+                "list",
+                "--connector",
+                "fixture",
+                "--instance",
+                "main",
+            ]));
+            if listed["connections"][0]["state"] == "pending" || Instant::now() > until {
+                break listed;
+            }
+            std::thread::sleep(Duration::from_millis(250));
+        };
         assert_eq!(
-            listed["connections"][0]["state"], "pending",
+            (
+                &listed["connections"][0]["connection"],
+                &listed["connections"][0]["state"]
+            ),
+            (&json!(connection), &json!("pending")),
             "precondition: the lapsed connection reads pending: {listed}"
         );
         let validations = container.seen("validations").len();
@@ -595,19 +610,13 @@ mod jailed {
         assert_eq!(
             (
                 output.status.code(),
-                answer["error"]["data"].clone(),
+                &answer["result"]["connector"],
+                &answer["result"]["instance"],
                 container.seen("invocations").len(),
                 container.seen("validations").len() - validations,
             ),
-            (
-                Some(1),
-                json!({"kind":"operational","code":"connection_unresolved","stage":"admission",
-                    "next_action":"repair_connection",
-                    "connections":[{"connection":connection,"state":"pending"}]}),
-                0,
-                0,
-            ),
-            "story:connectors-do-short-invocation: a connection that is not ready was used: {answer}"
+            (Some(0), &json!("fixture"), &json!("main"), 1, 1),
+            "story:connectors-do-short-invocation: D3 amended: lapsed evidence is re-checked before the call: {answer}"
         );
     }
 
@@ -738,40 +747,71 @@ fn describe_of_a_definition_needs_no_connection() {
         ),
     )
     .unwrap();
-    let mut command = command(
-        root.path(),
+    let definition = definition.to_str().unwrap();
+    // A credential file that is not there: describing reads none.
+    let absent = root.path().join("absent-client.json");
+    let absent = absent.to_str().unwrap();
+    for args in [
         &[
             "invoke",
             "forge",
             "project.get",
             "--definition",
-            definition.to_str().unwrap(),
+            definition,
             "--describe",
+        ][..],
+        // The target left out: the file names the connector.
+        &[
+            "invoke",
+            "--definition",
+            definition,
+            "--describe",
+            "--credential-file",
+            absent,
+            "project.get",
         ],
-    );
-    command
-        .env_remove("DBUS_SESSION_BUS_ADDRESS")
-        .env("CONNECTORS_INSTALLATION", &bin)
-        .stdin(Stdio::null());
-    // SAFETY: the child alone leaves the test's session: it has no
-    // controlling terminal to ask a question on.
-    unsafe {
-        command.pre_exec(|| {
-            if libc::setsid() < 0 {
-                return Err(std::io::Error::last_os_error());
-            }
-            Ok(())
-        });
+    ] {
+        let mut command = command(root.path(), args);
+        command
+            .env_remove("DBUS_SESSION_BUS_ADDRESS")
+            .env("CONNECTORS_INSTALLATION", &bin)
+            .stdin(Stdio::null());
+        // SAFETY: the child alone leaves the test's session: it has no
+        // controlling terminal to ask a question on.
+        unsafe {
+            command.pre_exec(|| {
+                if libc::setsid() < 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+        let output = command.output().unwrap();
+        let answer = envelope(&output);
+        assert_eq!(
+            (
+                output.status.code(),
+                &answer["result"]["connector"],
+                &answer["result"]["instance"],
+                &answer["result"]["operation"],
+                &answer["result"]["effect"]
+            ),
+            (
+                Some(0),
+                &json!("forge"),
+                &json!("definition"),
+                &json!("project.get"),
+                &json!("read")
+            ),
+            "story:connectors-do-short-invocation: --describe of a definition without a connection: {args:?}: {answer}"
+        );
     }
-    let output = command.output().unwrap();
-    let answer = envelope(&output);
-    assert_eq!(
-        (
-            output.status.code(),
-            &answer["result"]["operation"],
-            &answer["result"]["effect"]
-        ),
-        (Some(0), &json!("project.get"), &json!("read")),
-        "story:connectors-do-short-invocation: --describe of a definition without a connection: {answer}"
+    // Nothing was recorded and no connection was made for the description.
+    assert!(
+        !root
+            .path()
+            .join("state/definitions/instances.toml")
+            .exists(),
+        "story:connectors-do-short-invocation: a description recorded the definition's instance"
     );
 }

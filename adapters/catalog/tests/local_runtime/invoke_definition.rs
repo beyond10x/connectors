@@ -1,11 +1,12 @@
 //! story:invoke-definition-file, its acceptance: against a disposable HTTPS
-//! provider, a hand-written token-profile definition is invoked with
-//! `operations invoke --definition` while no instance is configured for it and
-//! no connection exists. The one connect question is answered "yes", the token
-//! is entered at the token prompt that follows, and the operation's result
-//! comes back. A second run with the same file, and a third after only an added
-//! operation, return results with neither the question nor the token prompt,
-//! and the operator's configuration file is byte-identical before and after.
+//! provider, a hand-written token-profile definition is invoked with `invoke
+//! --definition <file> <operation>` (story:connectors-do-short-invocation)
+//! while no instance is configured for it and no connection exists. The one
+//! connect question is answered "yes", the token is entered at the token
+//! prompt that follows, and the operation's result comes back. A second run
+//! with the same file, and a third after only an added operation, return
+//! results with neither the question nor the token prompt, and the operator's
+//! configuration file is byte-identical before and after.
 //!
 //! The definition's API is `https://gitlab.example.com/api/v4`. The journey runs
 //! in fresh user, network and mount namespaces in which that host resolves to a
@@ -532,13 +533,12 @@ fn refused_with(output: &Output) -> Value {
     envelope["error"]["data"].clone()
 }
 
+/// `invoke --definition <file> <operation>` (story:connectors-do-short-invocation).
 fn invoke<'a>(definition: &'a str, operation: &'a str) -> Vec<&'a str> {
     vec![
-        "operations",
         "invoke",
         "--definition",
         definition,
-        "--operation",
         operation,
         "--input-json",
         r#"{"id":"org/project"}"#,
@@ -589,13 +589,13 @@ fn a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_witho
     let first = success(output);
     assert_eq!(first["result"]["body"]["id"], 7, "{first}");
     assert_eq!(
-        (&first["connector"], &first["instance"], &first["adapter"]),
         (
-            &json!("forge"),
-            &json!("definition"),
-            &json!("forge.definition")
+            &first["connector"],
+            &first["instance"],
+            first.get("adapter")
         ),
-        "{first}"
+        (&json!("forge"), &json!("definition"), None),
+        "story:connectors-do-short-invocation: the answer names no alias: {first}"
     );
     assert_eq!(count(&shown, QUESTION), 1);
     assert_eq!(count(&shown, TOKEN_PROMPT), 1);
@@ -1083,7 +1083,11 @@ fn a_definition_moved_to_another_host_connects_fresh_under_a_new_instance_id() {
         digest.len() == 16 && digest.bytes().all(|b| b.is_ascii_hexdigit()),
         "{moved}"
     );
-    assert_eq!(moved["adapter"], format!("forge.{instance}"), "{moved}");
+    assert_eq!(
+        (&moved["connector"], moved.get("adapter")),
+        (&json!("forge"), None),
+        "story:connectors-do-short-invocation: the answer names no alias: {moved}"
+    );
     assert_eq!(count(&shown, REUSE_QUESTION), 0);
     assert_eq!(count(&shown, CANDIDATE), 0);
     assert_eq!(count(&shown, QUESTION), 1);

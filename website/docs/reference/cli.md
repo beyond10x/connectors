@@ -541,22 +541,22 @@ connectors instances stop [OPTIONS] --expected-revision <field:expected_revision
 Invoke one operation of a connector's instance; the instance, connection, schema and revision default to the only ones that fit
 
 ```text
-connectors invoke [OPTIONS] --schema <field:schema> --revision <field:revision> <--input-json <source:input:inline>|--input-file <source:input:file>|--input-stdin> <CONNECTOR[/INSTANCE]> <OPERATION>
+connectors invoke [OPTIONS] [CONNECTOR[/INSTANCE]] <OPERATION>
 ```
 
 | Argument | Required | Default | Values | Meaning |
 |---|---|---|---|---|
-| `<CONNECTOR[/INSTANCE]>` | yes | none | any | The connector, and after one `/` its instance; the instance may be left out when the connector has only one |
+| `<CONNECTOR[/INSTANCE]>` | no | none | any | The connector, and after one `/` its instance; the instance may be left out when the connector has only one; with --definition the target may be left out, the file naming the connector |
 | `<OPERATION>` | yes | none | any | The operation to invoke |
 | `--connection <field:connection>` | no | none | any | The connection to invoke through; the instance's only usable one when left out |
-| `--schema <field:schema>` | yes | none | any | A pin: the operation's schema identity, refused when the current description differs; taken from it when left out |
-| `--revision <field:revision>` | yes | none | any | A pin: the description's revision, refused when the current description differs; taken from it when left out |
+| `--schema <field:schema>` | no | none | any | A pin: the operation's schema identity, refused when the current description differs; taken from it when left out |
+| `--revision <field:revision>` | no | none | any | A pin: the description's revision, refused when the current description differs; taken from it when left out |
 | `--input-json <source:input:inline>` | no | none | any | The input document, as JSON text |
 | `--input-file <source:input:file>` | no | none | any | A file holding the input document |
 | `--input-stdin` | no | `false` | any | Read the input document from standard input, as happens when no input flag is given |
 | `--approval-file <field:approval_file>` | no | none | any | The approval proof a write is invoked with |
 | `--idempotency-key <field:idempotency_key>` | no | none | any | A write's idempotency key |
-| `--definition <field:definition>` | no | none | any | A connectors-definition/1 file to invoke without configuring it; the target names its connector |
+| `--definition <field:definition>` | no | none | any | A connectors-definition/1 file to invoke without configuring it; a target, when given, names its connector |
 | `--definitions-root <field:definitions_root>` | no | none | any | With --definition: the tree holding its vendored source and shared auth files [default: the parent of the file's directory] |
 | `--credential-file <field:credential_file>` | no | none | any | With --definition: the OAuth client file to connect with when the instance has no connection |
 | `--describe <field:describe>` | no | none | any | true: print the operation's description, effect, schema and revision, and invoke nothing |

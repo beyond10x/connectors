@@ -67,7 +67,9 @@ pub(super) struct Request {
     /// `--adapter`, `--connector` or `--instance` was given.
     pub(super) selected: bool,
     /// The connector and, if named, the instance an `invoke` target names
-    /// (story:connectors-do-short-invocation); `None` on `operations invoke`.
+    /// (story:connectors-do-short-invocation); `None` when no target is named,
+    /// on `invoke --definition <file> <operation>` and on `operations invoke`:
+    /// the file then names the connector and its instance.
     pub(super) target: Option<(String, Option<String>)>,
     pub(super) operation: String,
     pub(super) connection: Option<String>,
@@ -290,12 +292,29 @@ pub(super) fn run(request: &Request, definition: &Path) -> Result<Prepared, Hand
     prepared
 }
 
-/// [`run`], under the interrupt handler `signals`.
-pub(super) fn prepare_with(
+/// A definition lowered, cached and derived as the instance a run of it
+/// selects, before anything is recorded or any connection resolved.
+pub(super) struct Lowered {
+    paths: Paths,
+    pub(super) connector: String,
+    pub(super) instance: String,
+    alias: String,
+    digest: String,
+    native: PathBuf,
+    pub(super) adapter: connectors_host::local::config::Adapter,
+    /// The description the installed provider reported for it.
+    pub(super) reported: connectors_host::local::runtime::Bootstrap,
+}
+
+/// The first part of [`prepare_with`], under the interrupt handler `signals`:
+/// what `invoke --definition --describe` answers from
+/// (story:connectors-do-short-invocation). It records nothing, resolves, asks
+/// for or creates no connection, and reads no `--credential-file`.
+pub(super) fn lower(
     request: &Request,
     definition: &Path,
     signals: &protected::Signals,
-) -> Result<Prepared, HandlerReply> {
+) -> Result<Lowered, HandlerReply> {
     // A third selector: never beside `--adapter` or `--connector`/`--instance`.
     if request.selected {
         return Err(usage());
@@ -416,6 +435,43 @@ pub(super) fn prepare_with(
     {
         return Err(other_target());
     }
+    Ok(Lowered {
+        paths,
+        connector,
+        instance,
+        alias,
+        digest,
+        native,
+        adapter,
+        reported,
+    })
+}
+
+/// [`run`], under the interrupt handler `signals`.
+pub(super) fn prepare_with(
+    request: &Request,
+    definition: &Path,
+    signals: &protected::Signals,
+) -> Result<Prepared, HandlerReply> {
+    let Lowered {
+        paths,
+        connector,
+        instance,
+        alias,
+        digest,
+        native,
+        adapter,
+        reported,
+    } = lower(request, definition, signals)?;
+    // Nothing after an interruption runs (`interrupted`).
+    let interrupted = || {
+        if signals.interrupted() {
+            Err(owner_failure(owner::Code::Interrupted.into()))
+        } else {
+            Ok(())
+        }
+    };
+    interrupted()?;
     let recorded = definitions::record(
         &paths,
         &connector,

@@ -2,18 +2,18 @@
 //! the connection `connectors invoke <connector>[/<instance>] <operation>`
 //! selects when the command line names none.
 //!
-//! The approval record of the wave decides it: "The connection is the
-//! instance's single `ready` connection. When none or several are ready, the
-//! invoke is refused by `connection_unresolved`, listing each connection with
-//! its state; `--connection` chooses one." A connection whose validation
-//! evidence has lapsed is observed as `pending` (`connections list` reports
-//! it so), so an invoke that names no connection must refuse it, naming a
-//! repair, and must not reach the adapter.
+//! The approval record of the wave decides it, as amended (D3): the instance's
+//! single `ready` connection; with none ready, its single usable one, whose
+//! validation evidence lapsed under the current configuration (observed as
+//! `pending`, as an idle connection's is) and is re-checked with the provider
+//! before the call; otherwise `connection_unresolved`, listing each
+//! connection with its state. So an invoke that names no connection uses an
+//! instance's one lapsed connection only after its evidence was re-checked.
 //!
 //! The case runs the production CLI, owner and an adapter child in a jail
 //! against the read-only `mounted_secret` binding (`support/mounted.rs`);
-//! Linux only, as that binding is. The fixture profile's validation evidence
-//! lives 60 seconds, so the case waits for it to lapse.
+//! Linux only, as that binding is. The fixture's validation evidence is set
+//! to live 3 seconds, and the case waits for it to lapse.
 #![cfg(target_os = "linux")]
 #[path = "support/mounted.rs"]
 mod mounted;
@@ -53,20 +53,19 @@ mod jailed {
         fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
     }
 
-    /// story:connectors-do-short-invocation: an instance whose one connection
-    /// is observed `pending`, because its validation evidence lapsed, has no
-    /// `ready` connection. `invoke` without `--connection` is then
-    /// `connection_unresolved` naming a repair and listing the connection with
-    /// its state, and nothing is invoked; the decided rule admits only a
-    /// `ready` connection, and the instance's state `pending` is what the
-    /// listing and the refusal show the operator.
+    /// story:connectors-do-short-invocation, D3 amended: an instance whose one
+    /// connection is observed `pending`, because its validation evidence
+    /// lapsed, has no `ready` connection and one usable one. `invoke` without
+    /// `--connection` selects it, and the provider re-checks its evidence
+    /// before the one call reaches the adapter.
     #[test]
-    fn a_connection_observed_pending_is_never_selected_without_naming_it() {
+    fn a_connection_observed_pending_is_selected_after_its_evidence_is_rechecked() {
         let container = Container::new(ADAPTER_FIXTURE);
         container.deliver(PROFILE, SECRET);
         configure(&container);
         let init = success(&container.run(&["setup", "init"]));
         assert_eq!(init["disposition"], "state_initialized", "{init}");
+        container.set_knob("evidence_ms", 3_000);
         let connected = success(&container.connect(PROFILE));
         let connection = connected["connection"]["summary"]["connection"]
             .as_str()
@@ -88,9 +87,9 @@ mod jailed {
             "precondition: the fresh connection is ready: {}",
             state(&container)
         );
-        // The fixture profile's evidence lives 60 s; wait until the listing
-        // reports the one connection `pending`.
-        let until = Instant::now() + Duration::from_secs(120);
+        // The evidence lives 3 s; wait until the listing reports the one
+        // connection `pending`.
+        let until = Instant::now() + Duration::from_secs(60);
         loop {
             let listed = state(&container);
             if listed.contains("\"state\":\"pending\"") {
@@ -103,25 +102,21 @@ mod jailed {
             std::thread::sleep(Duration::from_secs(1));
         }
         let invoked = container.seen("invocations").len();
+        let validated = container.seen("validations").len();
         let output = container.run(&["invoke", "fixture", READ, "--input-json", "{}"]);
-        let stderr: Value = serde_json::from_slice(&output.stderr).unwrap_or(Value::Null);
+        let stdout: Value = serde_json::from_slice(&output.stdout).unwrap_or(Value::Null);
         assert_eq!(
-            (output.status.code(), stderr["error"]["data"].clone()),
             (
-                Some(1),
-                json!({"kind":"operational","code":"connection_unresolved","stage":"admission",
-                    "next_action":"repair_connection",
-                    "connections":[{"connection":connection,"state":"pending"}]})
+                output.status.code(),
+                &stdout["result"]["connector"],
+                &stdout["result"]["instance"],
+                container.seen("validations").len() - validated,
+                container.seen("invocations").len() - invoked,
             ),
-            "story:connectors-do-short-invocation: a connection observed pending was \
-             selected without --connection; stdout {} stderr {}",
+            (Some(0), &json!("fixture"), &json!("main"), 1, 1),
+            "story:connectors-do-short-invocation: D3 amended: lapsed evidence is re-checked before the call; connection {connection}, stdout {} stderr {}",
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
-        );
-        assert_eq!(
-            container.seen("invocations").len(),
-            invoked,
-            "story:connectors-do-short-invocation: the adapter was invoked"
         );
     }
 }
