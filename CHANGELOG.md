@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 0.60.0 — 2026-10-29
+## 0.60.0 — 2026-10-30
 
 Breaking changes. One command invokes an operation, named by connector and instance, and the
 commands that called a standalone service are gone.
@@ -61,9 +61,18 @@ commands that called a standalone service are gone.
   (`--connector catalog --instance <alias>`, or the `invoke` target `catalog/<alias>`) is
   `invalid_configuration` at `configuration` with next action `check_configuration`. Its
   replacement is a `[connectors.<connector>]` instance.
+- Zendesk read `ticket.audits` (`ListAuditsForTicket`) returns one ticket's audits by cursor
+  (`page[size]`, `page[after]`). Each audit carries its author, time, via channel and source, and
+  its events, field changes included. A walk ends on a page with `meta.has_more` false, with no
+  `meta.after_cursor`, or with no audits. Sending `include_boundary_indicators: true` is
+  recommended so that pages carry `has_more`. The catalog inventory now expands a deepObject
+  `page` that is either an offset number or cursor pairs into its cursor pairs.
 
 ### Changed
 
+- Zendesk `ticket.comments`: a walk now also ends on a page with no `meta.after_cursor` or with no
+  comments, not only on `meta.has_more` false, which the pinned API document never declares for
+  comments.
 - `connections revalidate` and `revoke` given the instance's configuration revision in place of a
   connection revision are `invalid_input` at `arguments`, exit status 2; any other stale revision
   stays `lifecycle_conflict`.
