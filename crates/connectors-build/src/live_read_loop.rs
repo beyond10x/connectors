@@ -10,7 +10,7 @@
 //!
 //! The reads are declared in a `connectors-live-read-loop/1` file the operator keeps outside
 //! the repository, since it names live connections. Each read is resolved once with
-//! `operations describe`, then invoked each round with `operations invoke`; those are the
+//! `operations describe`, then invoked each round with `invoke`; those are the
 //! only commands the loop issues. The report records no input, no result and no output
 //! bytes besides a refusal's `error` object, and it is refused inside the repository.
 use crate::Result;
@@ -214,7 +214,7 @@ pub struct Report {
     pub unanswered: u64,
     /// Calls the loop made to `connections revalidate`; the loop issues none.
     pub revalidations: u64,
-    /// The distinct commands the loop issued, such as `operations invoke`.
+    /// The distinct commands the loop issued, such as `invoke`.
     pub commands: Vec<String>,
     pub reads: Vec<ReadSummary>,
     pub records: Vec<CallRecord>,
@@ -240,7 +240,7 @@ fn millis(duration: Duration) -> u64 {
 /// has at least one round.
 pub fn drive(reads: &[Read], caller: &mut dyn Caller, settings: Settings) -> Report {
     let started = Instant::now();
-    let mut resolved: Vec<Option<(String, String)>> = vec![None; reads.len()];
+    let mut resolved: Vec<Option<(String, String, String)>> = vec![None; reads.len()];
     let mut summaries: Vec<ReadSummary> = reads
         .iter()
         .map(|read| ReadSummary {
@@ -275,15 +275,12 @@ pub fn drive(reads: &[Read], caller: &mut dyn Caller, settings: Settings) -> Rep
                         "--operation".into(),
                         read.operation.clone(),
                     ],
-                    (_, Some((schema, revision))) => vec![
-                        "operations".into(),
+                    (_, Some((target, schema, revision))) => vec![
                         "invoke".into(),
-                        "--adapter".into(),
-                        read.adapter.clone(),
+                        target.clone(),
+                        read.operation.clone(),
                         "--connection".into(),
                         read.connection.clone(),
-                        "--operation".into(),
-                        read.operation.clone(),
                         "--schema".into(),
                         schema.clone(),
                         "--revision".into(),
@@ -294,7 +291,11 @@ pub fn drive(reads: &[Read], caller: &mut dyn Caller, settings: Settings) -> Rep
                     // The describe in this round failed: the read is described again next round.
                     (_, None) => break,
                 };
-                let command = arguments[..2].join(" ");
+                // `invoke` names its target where a group names its command.
+                let command = match arguments[0].as_str() {
+                    "invoke" => arguments[0].clone(),
+                    _ => arguments[..2].join(" "),
+                };
                 if command == "connections revalidate" {
                     revalidations += 1;
                 }
@@ -309,14 +310,26 @@ pub fn drive(reads: &[Read], caller: &mut dyn Caller, settings: Settings) -> Rep
                     && let Outcome::Answered(result) = &outcome
                 {
                     let text = |field: &str| result.get(field).and_then(Value::as_str);
-                    match (text("schema"), text("revision")) {
-                        (Some(schema), Some(revision)) => {
-                            resolved[index] = Some((schema.to_string(), revision.to_string()));
+                    // `invoke` names the instance the describe answered for
+                    // (story:connectors-do-short-invocation).
+                    match (
+                        text("connector"),
+                        text("instance"),
+                        text("schema"),
+                        text("revision"),
+                    ) {
+                        (Some(connector), Some(instance), Some(schema), Some(revision)) => {
+                            resolved[index] = Some((
+                                format!("{connector}/{instance}"),
+                                schema.to_string(),
+                                revision.to_string(),
+                            ));
                         }
                         _ => {
-                            outcome = Outcome::Unanswered(
-                                json!({"kind":"describe_incomplete","missing":["schema","revision"]}),
-                            );
+                            outcome = Outcome::Unanswered(json!({
+                                "kind":"describe_incomplete",
+                                "missing":["connector","instance","schema","revision"]
+                            }));
                         }
                     }
                 }
@@ -572,12 +585,15 @@ mod tests {
     impl Caller for Fake {
         fn call(&mut self, arguments: &[String]) -> Raw {
             self.argv.push(arguments.to_vec());
-            let adapter = flag(arguments, "--adapter").to_string();
             match (arguments[0].as_str(), arguments[1].as_str()) {
-                ("operations", "describe") => envelope(
-                    json!({"ok":true,"result":{"adapter":adapter,"schema":format!("s-{adapter}"),"revision":"r1"}}),
-                ),
-                ("operations", "invoke") => {
+                ("operations", "describe") => {
+                    let adapter = flag(arguments, "--adapter");
+                    envelope(
+                        json!({"ok":true,"result":{"adapter":adapter,"connector":"fixture","instance":adapter,"schema":format!("s-{adapter}"),"revision":"r1"}}),
+                    )
+                }
+                ("invoke", target) => {
+                    let adapter = target.strip_prefix("fixture/").unwrap().to_string();
                     let count = self.invokes.entry(adapter.clone()).or_default();
                     *count += 1;
                     if let Some((_, _, error)) = self
@@ -619,22 +635,23 @@ mod tests {
         assert!(report.passed());
         assert_eq!(
             report.commands,
-            ["operations describe", "operations invoke"].map(String::from)
+            ["operations describe", "invoke"].map(String::from)
         );
         for argv in &fake.argv {
             assert!(!argv.iter().any(|a| a.contains("revalidate")), "{argv:?}");
         }
-        // Described once per read, then invoked every round with what describe answered.
+        // Described once per read, then invoked every round with what describe answered:
+        // its instance as the target (story:connectors-do-short-invocation).
         let describes = fake.argv.iter().filter(|a| a[1] == "describe").count();
         assert_eq!(describes, 2);
-        let invokes: Vec<_> = fake.argv.iter().filter(|a| a[1] == "invoke").collect();
+        let invokes: Vec<_> = fake.argv.iter().filter(|a| a[0] == "invoke").collect();
         assert_eq!(invokes.len() as u64, 2 * report.rounds);
         let jira = invokes
             .iter()
-            .find(|a| flag(a, "--adapter") == "jira-adapter")
+            .find(|a| a[1] == "fixture/jira-adapter")
             .unwrap();
         assert_eq!(flag(jira, "--connection"), "conn_jira");
-        assert_eq!(flag(jira, "--operation"), "jira.list");
+        assert_eq!(jira[2], "jira.list");
         assert_eq!(flag(jira, "--schema"), "s-jira-adapter");
         assert_eq!(flag(jira, "--revision"), "r1");
         assert_eq!(
@@ -687,7 +704,9 @@ mod tests {
                             json!({"ok":false,"error":{"code":"failure","data":{"code":"not_found"}}}),
                         );
                     }
-                    return envelope(json!({"ok":true,"result":{"schema":"s","revision":"r"}}));
+                    return envelope(
+                        json!({"ok":true,"result":{"connector":"k8s","instance":"main","schema":"s","revision":"r"}}),
+                    );
                 }
                 envelope(json!({"ok":true,"result":{"result":{"status":200}}}))
             }
@@ -805,17 +824,17 @@ mod tests {
     }
 
     /// A fake `connectors` executable in `directory`, a shell script and so Unix only:
-    /// logs its arguments to `argv.log`, answers `operations describe` with schema `s1`
-    /// at revision `r1`, runs the shell command `invoke` for `operations invoke` and
-    /// exits 3 on anything else.
+    /// logs its arguments to `argv.log`, answers `operations describe` with the instance
+    /// `fixture/main`, schema `s1` and revision `r1`, runs the shell command `invoke`
+    /// for `invoke` and exits 3 on anything else.
     #[cfg(unix)]
     fn fake_binary(directory: &Path, invoke: &str) -> PathBuf {
         use std::os::unix::fs::PermissionsExt;
         let path = directory.join("connectors");
         let script = format!(
             "#!/bin/sh\necho \"$@\" >> \"$(dirname \"$0\")/argv.log\"\ncase \"$*\" in\n  \
-             *\"operations describe\"*) echo '{{\"ok\":true,\"result\":{{\"schema\":\"s1\",\"revision\":\"r1\"}}}}' ;;\n  \
-             *\"operations invoke\"*) {invoke} ;;\n  *) exit 3 ;;\nesac\n"
+             *\"operations describe\"*) echo '{{\"ok\":true,\"result\":{{\"connector\":\"fixture\",\"instance\":\"main\",\"schema\":\"s1\",\"revision\":\"r1\"}}}}' ;;\n  \
+             *\"invoke \"*) {invoke} ;;\n  *) exit 3 ;;\nesac\n"
         );
         std::fs::write(&path, script).unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
@@ -862,7 +881,9 @@ mod tests {
         assert_eq!(raw.exit, Some(0));
         assert_eq!(
             classify(&raw),
-            Outcome::Answered(json!({"schema":"s1","revision":"r1"}))
+            Outcome::Answered(
+                json!({"connector":"fixture","instance":"main","schema":"s1","revision":"r1"})
+            )
         );
         let log = std::fs::read_to_string(temp.path().join("argv.log")).unwrap();
         assert_eq!(log, "--output json operations describe\n");
@@ -875,7 +896,7 @@ mod tests {
             timeout: Duration::from_millis(300),
         };
         let started = Instant::now();
-        let raw = process.call(&["operations".into(), "invoke".into()]);
+        let raw = process.call(&["invoke".into(), "fixture/main".into()]);
         assert!(started.elapsed() < Duration::from_secs(10));
         assert_eq!(
             classify(&raw),
@@ -887,7 +908,7 @@ mod tests {
             globals: Vec::new(),
             timeout: Duration::from_secs(1),
         };
-        let raw = missing.call(&["operations".into(), "invoke".into()]);
+        let raw = missing.call(&["invoke".into(), "fixture/main".into()]);
         assert!(matches!(classify(&raw), Outcome::Unanswered(v) if v["kind"] == "spawn"));
     }
 
@@ -916,11 +937,12 @@ mod tests {
         assert_eq!(value["rounds"], 1);
         let log = std::fs::read_to_string(outside.path().join("argv.log")).unwrap();
         let config = outside.path().join("config.toml");
+        let globals = format!("--config {} --output json ", config.display());
         assert!(
-            log.lines().all(|l| l.starts_with(&format!(
-                "--config {} --output json operations ",
-                config.display()
-            ))),
+            log.lines().all(|l| {
+                l.starts_with(&format!("{globals}operations describe "))
+                    || l.starts_with(&format!("{globals}invoke fixture/main "))
+            }),
             "{log}"
         );
 

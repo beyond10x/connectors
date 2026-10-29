@@ -38,14 +38,11 @@ fn a_provider_reason_reaches_the_cli_failure_json_and_a_credential_echo_does_not
     let read = |project: &str| {
         let input = json!({ "id": project }).to_string();
         refused_data(cli.run(&[
-            "operations",
             "invoke",
-            "--adapter",
-            "gitlab",
+            "gitlab/gitlab",
+            "project.get",
             "--connection",
             &reference,
-            "--operation",
-            "project.get",
             "--schema",
             &schema,
             "--revision",

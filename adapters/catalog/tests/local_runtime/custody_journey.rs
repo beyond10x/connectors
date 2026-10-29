@@ -145,7 +145,9 @@ impl Journey {
         output
     }
 
-    /// The target arguments of the create, under `key`.
+    /// The target arguments of the create, under `key`: the approval command
+    /// `group action`, or `invoke` of the instance `gitlab/gitlab`
+    /// (story:connectors-do-short-invocation) when `group` is `invoke`.
     fn target(&self, group: &str, action: &str) -> Vec<String> {
         let description = success(self.cli.run(&[
             "operations",
@@ -155,24 +157,33 @@ impl Journey {
             "--operation",
             "group_token.create",
         ]));
-        [
-            group,
-            action,
-            "--adapter",
-            "gitlab",
-            "--connection",
-            &self.connection,
-            "--operation",
-            "group_token.create",
-            "--schema",
-            description["schema"].as_str().unwrap(),
-            "--revision",
-            description["revision"].as_str().unwrap(),
-            "--input-json",
-            &json!({"id": "org", "body": {"name": "tenant", "scopes": ["api"]}}).to_string(),
-        ]
-        .map(str::to_owned)
-        .to_vec()
+        let selector: Vec<&str> = if group == "invoke" {
+            vec!["invoke", "gitlab/gitlab", "group_token.create"]
+        } else {
+            vec![
+                group,
+                action,
+                "--adapter",
+                "gitlab",
+                "--operation",
+                "group_token.create",
+            ]
+        };
+        let mut arguments: Vec<String> = selector.into_iter().map(str::to_owned).collect();
+        arguments.extend(
+            [
+                "--connection",
+                &self.connection,
+                "--schema",
+                description["schema"].as_str().unwrap(),
+                "--revision",
+                description["revision"].as_str().unwrap(),
+                "--input-json",
+                &json!({"id": "org", "body": {"name": "tenant", "scopes": ["api"]}}).to_string(),
+            ]
+            .map(str::to_owned),
+        );
+        arguments
     }
 
     /// The approved create invocation under `key`, its proof issued.
@@ -190,7 +201,7 @@ impl Journey {
             .map(str::to_owned),
         );
         success(self.run(&issue));
-        let mut invocation = self.target("operations", "invoke");
+        let mut invocation = self.target("invoke", "");
         invocation.extend(
             [
                 "--idempotency-key",
@@ -373,14 +384,11 @@ fn a_created_token_is_held_as_a_new_connection_and_only_its_hash_is_returned() {
     let read = success(
         journey.run(
             &[
-                "operations",
                 "invoke",
-                "--adapter",
-                "minted",
+                "gitlab/minted",
+                "project.get",
                 "--connection",
                 &connection,
-                "--operation",
-                "project.get",
                 "--schema",
                 description["schema"].as_str().unwrap(),
                 "--revision",

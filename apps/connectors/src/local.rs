@@ -33,15 +33,10 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     if let Some(help) = connectors::help::render(&args) {
         return help_output(help, is_root_help(&args));
     }
-    // `operations invoke --definition` is prepared, and rewritten to select the
-    // definition's instance, before anything else reads the command line.
-    let args = match definition::prepare(args) {
-        Ok(args) => args,
-        Err(refused) => return refused,
-    };
-    // `invoke` is prepared as well: its target, connection and pins are
-    // resolved and stated, `--describe` is answered and a write without
-    // approval is refused, before the generated runner reads the command line.
+    // `invoke` is prepared before the generated runner reads the command line:
+    // its target (or `--definition`), connection and pins are resolved and
+    // stated, `--describe` is answered and a write without approval is
+    // refused.
     let args = match invoke::prepare(args) {
         Ok(args) => args,
         Err(answered) => return answered,
@@ -199,10 +194,6 @@ impl LocalHandler {
                         approval_failure(error)
                     }
                 })
-        } else if call.callable == "operations-invoke" {
-            let session = self.0.borrow();
-            return operations::dispatch(call, session.deadline, session.mutation_deadline)
-                .unwrap_or_else(invoke_failure);
         } else if call.callable == "connections-launch" {
             connections::launch(call).map(|code| {
                 self.0.borrow_mut().launched = Some(code);
@@ -374,8 +365,8 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
 
 /// `owner_failure` of `approvals policy-set`, `prepare` and `issue`: an
 /// `invalid_input` names the argument it refused, as the CLI input model names
-/// it (contracts/cli/v1alpha1/semantics.md, "The refused argument"). No other
-/// command carries `field`, an approved write's `operations invoke` included.
+/// it (contracts/cli/v1alpha1/semantics.md, "The refused argument"). `invoke`
+/// names its own arguments (`invoke::dispatch`); no other command carries `field`.
 fn approval_failure(error: owner::Error) -> HandlerReply {
     let field = error
         .field
@@ -634,21 +625,36 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
             }
         };
         let request = cursor::Request::parse(&call.input).map_err(refused)?;
-        let adapters = config
+        // Each instance by its connector and instance only; a legacy catalog
+        // entry no connector is derived for is no instance and is named in
+        // `unmigrated` (story:connectors-do-short-invocation).
+        let listed = config
             .adapters
             .iter()
-            .map(|(alias, entry)| summary(alias, entry))
+            .filter_map(|(alias, entry)| {
+                let (connector, instance) = invoke::entry_name(&config, alias, entry)?;
+                Some((
+                    entry,
+                    json!({"connector":connector,"instance":instance,"instance_id":entry.instance_id,"startup":entry.startup,"restart":entry.restart}),
+                ))
+            })
             .collect::<Vec<_>>();
-        // The selection a cursor is bound to: every listed entry and the
+        // The selection a cursor is bound to: every listed instance and the
         // configuration revision it was listed under.
-        let source = config
-            .adapters
+        let source = listed
             .iter()
-            .zip(&adapters)
-            .map(|((_, entry), listed)| json!([entry.configuration_revision, listed]))
+            .map(|(entry, item)| json!([entry.configuration_revision, item]))
             .collect::<Value>();
-        let (range, next) = request.page(&source, adapters.len()).map_err(refused)?;
-        let mut result = json!({"adapters":adapters[range],"source":"configuration"});
+        let (range, next) = request.page(&source, listed.len()).map_err(refused)?;
+        let items = listed[range]
+            .iter()
+            .map(|(_, item)| item.clone())
+            .collect::<Vec<_>>();
+        let mut result = json!({"adapters":items,"source":"configuration"});
+        let unmigrated = invoke::unmigrated(&config);
+        if !unmigrated.is_empty() {
+            result["unmigrated"] = json!(unmigrated);
+        }
         if let Some(next) = next {
             result["next_cursor"] = json!(next);
         }

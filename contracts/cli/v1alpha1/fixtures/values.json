@@ -463,14 +463,26 @@
       "value": {
         "adapters": [
           {
-            "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
+            "connector": "fixture-forge", "instance": "forge",
             "instance_id": "forge-local",
-            "adapter_id": "fixture-forge",
             "startup": "on-demand",
             "restart": "never"
           }
         ],
+        "unmigrated": ["legacy"],
         "source": "configuration"
+      }
+    },
+    {
+      "id": "instance-list-item-names-no-adapter",
+      "type": "connectors.cli.InstanceSummary",
+      "valid": false,
+      "value": {
+        "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
+        "instance_id": "forge-local",
+        "adapter_id": "fixture-forge",
+        "startup": "on-demand",
+        "restart": "never"
       }
     },
     {
@@ -830,11 +842,11 @@
       }
     },
     {
-      "id": "valid-OperationInvokeInput-27",
-      "type": "connectors.cli.OperationInvokeInput",
+      "id": "valid-InvokeInput-27",
+      "type": "connectors.cli.InvokeInput",
       "valid": true,
       "value": {
-        "adapter": "forge",
+        "target": "fixture-forge/main",
         "connection": "forge-local/connection-1",
         "operation": "project.get",
         "schema": "forge-local/project.get/input/descriptor-r1",
@@ -843,14 +855,15 @@
       }
     },
     {
-      "id": "valid-OperationInvokeResult-28",
-      "type": "connectors.cli.OperationInvokeResult",
-      "valid": true,
+      "id": "invalid-invoke-input-selects-by-adapter",
+      "type": "connectors.cli.InvokeInput",
+      "valid": false,
       "value": {
-        "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
+        "adapter": "forge",
         "operation": "project.get",
+        "schema": "forge-local/project.get/input/descriptor-r1",
         "revision": "descriptor-r1",
-        "result": {"id": 7, "name": "fixture"}
+        "input": "{\"id\":7}"
       }
     },
     {
@@ -1279,10 +1292,10 @@
     },
     {
       "id": "C05-carrier-is-text-not-wire-object",
-      "type": "connectors.cli.OperationInvokeInput",
+      "type": "connectors.cli.InvokeInput",
       "valid": false,
       "value": {
-        "adapter": "forge",
+        "target": "fixture-forge/main",
         "connection": "forge-local/connection-1",
         "operation": "project.get",
         "schema": "forge-local/project.get/input/descriptor-r1",
@@ -1294,10 +1307,10 @@
     },
     {
       "id": "C05-revision-required",
-      "type": "connectors.cli.OperationInvokeInput",
+      "type": "connectors.cli.InvokeInput",
       "valid": false,
       "value": {
-        "adapter": "forge",
+        "target": "fixture-forge/main",
         "operation": "project.get",
         "schema": "schema-r1",
         "input": "{\"id\":7}"
@@ -1597,16 +1610,22 @@
       "value": {"kind":"usage","code":"invalid_configuration","stage":"configuration","next_action":"check_configuration","configuration_rule":"definition_instance_configured"}
     },
     {
-      "id": "invoke-selects-a-definition-file",
-      "type": "connectors.cli.OperationInvokeInput",
+      "id": "legacy-entry-unmigrated-is-named",
+      "type": "connectors.cli.Failure",
       "valid": true,
-      "value": {"definition":"/fixture/defs/connectors/forge.yaml","definitions_root":"/fixture/defs","credential_file":"/fixture/client.json","operation":"project.get","schema":"forge.definition/project.get/input/descriptor-r1","revision":"descriptor-r1","input":"{\"id\":\"org/project\"}"}
+      "value": {"kind":"usage","code":"invalid_configuration","stage":"configuration","next_action":"check_configuration","configuration_rule":"legacy_entry_unmigrated"}
+    },
+    {
+      "id": "invoke-selects-a-definition-file",
+      "type": "connectors.cli.InvokeInput",
+      "valid": true,
+      "value": {"target":"forge","definition":"/fixture/defs/connectors/forge.yaml","definitions_root":"/fixture/defs","credential_file":"/fixture/client.json","operation":"project.get","schema":"forge.definition/project.get/input/descriptor-r1","revision":"descriptor-r1","input":"{\"id\":\"org/project\"}"}
     },
     {
       "id": "invoke-definition-is-a-path-string",
-      "type": "connectors.cli.OperationInvokeInput",
+      "type": "connectors.cli.InvokeInput",
       "valid": false,
-      "value": {"definition":{"schema":"urn:beyond10x:connectors-definition:1"},"operation":"project.get","schema":"s1","revision":"r1","input":"{}"}
+      "value": {"target":"forge","definition":{"schema":"urn:beyond10x:connectors-definition:1"},"operation":"project.get","schema":"s1","revision":"r1","input":"{}"}
     },
     {
       "id": "custody-backend-has-no-plain-file-variant",

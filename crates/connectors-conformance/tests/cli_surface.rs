@@ -119,7 +119,6 @@ fn the_selected_inventory_has_thirty_four_commands_and_explicit_runtime_obligati
         "connections revoke",
         "operations list",
         "operations describe",
-        "operations invoke",
         "approvals key-init",
         "approvals key-status",
         "approvals key-rotate",
@@ -758,15 +757,14 @@ impl DynamicValidator for FixtureSchemas {
     }
 }
 
+/// `invoke` of `read` on `fixture-forge/forge`, every pin given
+/// (story:connectors-do-short-invocation).
 const INVOKE: &[&str] = &[
-    "operations",
     "invoke",
-    "--adapter",
-    "forge",
+    "fixture-forge/forge",
+    "read",
     "--connection",
     "c1",
-    "--operation",
-    "read",
     "--schema",
     "fixture-input",
     "--revision",
@@ -775,7 +773,7 @@ const INVOKE: &[&str] = &[
     "json",
 ];
 fn invocation_result(result: Value) -> Value {
-    json!({"adapter":"forge","connector":"fixture-forge","instance":"forge","operation":"read","revision":"r1","result":result})
+    json!({"connector":"fixture-forge","instance":"forge","operation":"read","revision":"r1","result":result})
 }
 
 #[test]
@@ -812,11 +810,10 @@ fn dynamic_business_sources_are_acquired_once_and_validate_both_directions() {
 }
 
 /// story:invoke-definition-file: `--definition`, `--definitions-root` and
-/// `--credential-file` are optional path fields of `operations invoke`, handed
-/// to the handler as given. The generated contract keeps `--schema` and
-/// `--revision` required: the host states them for a definition before this
-/// runner reads the command line (`contracts/cli/v1alpha1/semantics.md` §3,
-/// "Invoking a definition file").
+/// `--credential-file` are optional path fields of `invoke`, handed to the
+/// handler as given; the target and the operation stay required
+/// (story:connectors-do-short-invocation; `contracts/cli/v1alpha1/semantics.md`
+/// §3, "Invoking a definition file").
 #[test]
 fn invoke_carries_the_definition_selector_as_optional_path_fields() {
     let definition = [
@@ -848,14 +845,7 @@ fn invoke_carries_the_definition_selector_as_optional_path_fields() {
     let mut handler = Recorder::new(invocation_result(json!({"count":1})));
     let output = run(
         &[
-            &[
-                "operations",
-                "invoke",
-                "--operation",
-                "read",
-                "--output",
-                "json",
-            ][..],
+            &["invoke", "--output", "json"][..],
             &definition,
             &["--input-json", r#"{"selector":"fixture"}"#],
         ]
@@ -1146,7 +1136,8 @@ fn every_adapter_command_also_selects_by_connector_and_instance() {
             );
         }
     }
-    assert_eq!(selecting.len(), 26, "{selecting:?}");
+    // `operations invoke` is removed (story:connectors-do-short-invocation).
+    assert_eq!(selecting.len(), 25, "{selecting:?}");
     for (name, callable) in &plan.callables {
         assert!(names_selection(&callable.result.shape), "{name}");
     }
@@ -1346,8 +1337,9 @@ fn no_alias_or_path_replaces_another_command() {
             reached += 1;
         }
     }
-    // story:connectors-do-short-invocation: `invoke` is the thirty-fourth path.
-    assert_eq!(reached, 39);
+    // story:connectors-do-short-invocation: `invoke` is one of 33 paths and
+    // `operations invoke` is removed.
+    assert_eq!(reached, 38);
     // What the check refuses, the generated tree would hide: an alias onto
     // `connections list` replaces that command without a word.
     let mut colliding = plan.clone();

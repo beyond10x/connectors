@@ -1058,7 +1058,7 @@ fn instance_table(provider: &Provider, custody: &journey::Custody) -> String {
 /// Acceptance 1 and 5 through the production CLI: a token v2 refuses for
 /// scope connects bound to v1, `operations list` and `describe` with
 /// `--connection` name v1's operations, `page.get` returns the v1 page through
-/// `connectors operations invoke`, and a revalidation that sees v2 answering
+/// `connectors invoke`, and a revalidation that sees v2 answering
 /// rebinds the connection and says so.
 #[test]
 #[ignore = "requires built production CLI and qualified disposable Secret Service"]
@@ -1075,9 +1075,11 @@ fn a_v1_bound_connection_reads_the_v1_page_through_the_cli_and_rebinds_on_revali
     );
     connectors_host::local::config::Config::read(&cli.paths.config).unwrap();
     let selector = ["--connector", "confluence", "--instance", "either"];
+    // `invoke` takes its target positionally instead of the selector flags.
     let with = |args: &[&str], tail: &[&str]| -> Vec<String> {
+        let selector: &[&str] = if args[0] == "invoke" { &[] } else { &selector };
         args.iter()
-            .chain(&selector)
+            .chain(selector)
             .chain(tail)
             .map(|s| (*s).to_owned())
             .collect()
@@ -1143,13 +1145,12 @@ fn a_v1_bound_connection_reads_the_v1_page_through_the_cli_and_rebinds_on_revali
         )
     };
     let invoke = |operation: &str, (schema, revision): &(String, String), input: Value| {
+        // `invoke` names the instance positionally (story:connectors-do-short-invocation).
         run(with(
-            &["operations", "invoke"],
+            &["invoke", "confluence/either", operation],
             &[
                 "--connection",
                 &connection,
-                "--operation",
-                operation,
                 "--schema",
                 schema,
                 "--revision",
