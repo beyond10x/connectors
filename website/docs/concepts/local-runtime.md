@@ -9,8 +9,9 @@ source: contracts/cli/v1alpha1/semantics.md, contracts/auth/connection/v1alpha1/
 # The local runtime
 
 The grouped `connectors` commands (`setup`, `instances`, `connections`, `operations` and
-`approvals`) run against three local parts. The terms connector, instance and connection are
-those of the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary).
+`approvals`) and `invoke` run against three local parts. The terms connector, instance and
+connection are those of the
+[README vocabulary](https://github.com/beyond10x/connectors#vocabulary).
 
 | Part | What it holds | Where |
 |---|---|---|
@@ -96,7 +97,7 @@ A write runs through private protocol two, under the same rules for every provid
 2. `approvals prepare` resolves the exact subject of one write (connection, operation, schema,
    descriptor revision and whole input) and its SHA-256, without reading a credential.
 3. `approvals issue` signs a protected proof for that subject with a local approval-signing key.
-4. `operations invoke` presents the proof. The host records the attempt before its one dispatch,
+4. `invoke` presents the proof. The host records the attempt before its one dispatch,
    spends the approval once and records the outcome in the execution audit.
 
 Approval-signing keys are created, rotated, recovered, revoked and retired with

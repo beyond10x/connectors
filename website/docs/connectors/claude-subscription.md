@@ -280,13 +280,11 @@ configuration file and no state file holds them.
 
 ## A first read
 
-Take `--schema` and `--revision` from `operations describe --connector claude-subscription
---instance mine --operation account.profile`, then:
+`connectors invoke claude-subscription/mine account.profile --describe` prints the input schema.
+Then:
 
 ```sh
-connectors operations invoke --connector claude-subscription --instance mine \
-  --connection "$connection" --operation account.profile \
-  --schema "$schema" --revision "$revision" --input-json '{}'
+connectors invoke claude-subscription/mine account.profile --input-json '{}'
 ```
 
 The access token itself, for a program of yours:

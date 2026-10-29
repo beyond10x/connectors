@@ -120,7 +120,7 @@ variable `config` does not declare is refused as `undeclared_variable`. Config v
 `values` lists the allowed ones.
 
 Give every variable a `default`, and make the base URL `https://`.
-`operations invoke --definition` takes the instance's endpoint from the lowered declaration, and
+`invoke --definition` takes the instance's endpoint from the lowered declaration, and
 refuses a file whose endpoint is not stated in full or is not `https://` as `invalid_input` at
 `arguments`. The instance trusts the platform's roots.
 
@@ -279,14 +279,13 @@ The full list is the `Refusal` type in `crates/connectors-catalog/src/definition
 
 ## Invoke it
 
-`operations invoke --definition <file> --operation <key>` runs one operation of the file with no
-configured instance. The first run asks once whether to connect, then prompts with the profile's
-`label`:
+`invoke --definition <file> <key>` runs one operation of the file with no configured instance.
+The first run asks once whether to connect, then prompts with the profile's `label`:
 
 ```sh
-connectors operations invoke --definition defs/connectors/gitlab-reads.yaml --operation me.get
-connectors operations invoke --definition defs/connectors/gitlab-reads.yaml \
-  --operation project.get --input-json '{"id":"group/project"}'
+connectors invoke --definition defs/connectors/gitlab-reads.yaml me.get
+connectors invoke --definition defs/connectors/gitlab-reads.yaml project.get \
+  --input-json '{"id":"group/project"}'
 ```
 
 Run in a tree; output pasted in a later revision.
@@ -296,8 +295,7 @@ The definitions root defaults to the parent of the directory holding the file, s
 tree:
 
 ```sh
-connectors operations invoke --definition drafts/gitlab-reads.yaml --definitions-root defs \
-  --operation me.get
+connectors invoke --definition drafts/gitlab-reads.yaml --definitions-root defs me.get
 ```
 
 Run in a tree; output pasted in a later revision.

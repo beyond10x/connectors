@@ -2,6 +2,81 @@
 
 ## Unreleased
 
+## 0.60.0 — 2026-10-29
+
+Breaking changes. One command invokes an operation, named by connector and instance, and the
+commands that called a standalone service are gone.
+
+### Breaking
+
+- `operations invoke` is removed. Use `invoke <connector>[/<instance>] <operation>`.
+- `operations invoke --definition <file> --operation <op>` is removed. Use
+  `invoke --definition <file> <op>`, with no target: the file names the connector and instance,
+  and the on-the-fly lowering and the digest cache are the same.
+- `connectors invoke --endpoint <url> --token-file <file> --operation <op> --input <json>` is
+  removed. Give an instance its `endpoint` (`connections connect <connector>/<instance> --endpoint
+  <url>`) and run `invoke` on it. A standalone service is called over HTTP
+  (`GET /v1/describe`, `POST /v1/invoke`), as `docs/running-services.md` shows.
+- `connectors describe --endpoint …` is removed. Use `invoke <connector>/<instance> <operation>
+  --describe` for one operation, or `operations describe`.
+- `connectors serve --config …` is removed, with no command in its place. The federation host
+  stays a library, `connectors_host::federation`, which a Rust program embeds
+  ([Federate services](website/docs/guides/federate-adapter-services.md)).
+- Each of those command lines is now a parse refusal, exit status 2, and contacts nothing.
+- `instances list` items no longer carry `adapter` or `adapter_id`: each is `connector`,
+  `instance`, `instance_id`, `startup` and `restart`. An invoke result carries no `adapter`
+  member; it names `connector` and `instance`.
+
+### Added
+
+- `invoke <connector>[/<instance>] <operation>`. With the instance left out, the connector's only
+  instance is used; `default_instance` is not read. Without `--connection` the instance's one
+  ready connection is used, else its one usable one. `--schema` and `--revision` default to the
+  current description's; given, they are pins, and a differing description is
+  `stale_description`.
+- `invoke … --describe` prints the operation's description, effect (`read` or `write`), schema,
+  revision and input schema, and calls nothing. With `--definition` it answers from the file's
+  lowering and records, asks and connects nothing.
+- `invoke` reads its input from standard input when no input flag is given and standard input is
+  not a terminal; `--input-stdin` asks for it explicitly.
+- Refusal `instance_ambiguous` (usage, stage `arguments`, exit status 2): the connector has more
+  than one instance and none was named. `instances` lists each as `<connector>/<instance>`.
+- Refusal `connection_unresolved` (operational, stage `admission`, exit status 1): no usable
+  connection, or several. `connections` lists each held connection with its state, and the next
+  action is `create_connection`, `repair_connection` or `none`.
+- A write without `--approval-file` is refused `approval_required` before any provider call, and
+  `approval_steps` names the commands that issue the proof: `approvals prepare`,
+  `approvals clock-check`, `approvals issue`.
+- `connections connect` takes the target `<connector>/<instance>` and `--endpoint <url>`. The
+  endpoint is written into the configuration before a credential is asked for: the instance, and
+  its connector's table when absent, are created, every other byte of the file is kept, and a
+  different endpoint on an existing instance is refused `lifecycle_conflict` naming `endpoint`. A
+  connector without a default endpoint, on an instance without one, needs `--endpoint`.
+- `connections revalidate`, `revoke` and `reconnect` refused for a revision name it:
+  `revision_expected` and `revision_given` give the kind of revision each is, and `read_with`
+  the command that reads the right one.
+- `instances list` names a legacy catalog entry no connector is derived for in `unmigrated`,
+  sorted, instead of listing it as an instance.
+- Configuration rule `legacy_entry_unmigrated`: selecting such an entry as an instance
+  (`--connector catalog --instance <alias>`, or the `invoke` target `catalog/<alias>`) is
+  `invalid_configuration` at `configuration` with next action `check_configuration`. Its
+  replacement is a `[connectors.<connector>]` instance.
+
+### Changed
+
+- `connections revalidate` and `revoke` given the instance's configuration revision in place of a
+  connection revision are `invalid_input` at `arguments`, exit status 2; any other stale revision
+  stays `lifecycle_conflict`.
+- A legacy catalog entry is named, in `instances list` and every selection, by the connector
+  `setup migrate` derives for it.
+- `--adapter` on a command that takes none, such as `invoke`, is a parse refusal without a
+  deprecation notice.
+- `connectors-build live-read-loop` invokes each read as `invoke <connector>/<instance>`.
+- README, the guides, every connector page and the CLI contract show `invoke`. Getting started
+  calls the Kubernetes service over HTTP with `curl`; Federate services describes the library. The
+  landing page's terminal session is recorded again with 0.60.0. README states that
+  `connectors server --transport stdio` is a local MCP server on Linux.
+
 ## 0.59.2 — 2026-10-29
 
 No breaking changes.

@@ -98,14 +98,7 @@ not a Grafana account.
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector grafana --instance grafana \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector grafana --instance grafana \
-  --operation datasources.list | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector grafana --instance grafana \
-  --operation datasources.list | jq -r .result.revision)
-connectors operations invoke --connector grafana --instance grafana --connection "$connection" \
-  --operation datasources.list --schema "$schema" --revision "$revision" --input-json '{}'
+connectors invoke grafana/grafana datasources.list --input-json '{}'
 ```
 
 Each record carries `uid`, `name`, `type`, `access` and `is_default`, nothing else.
