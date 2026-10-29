@@ -32,9 +32,11 @@ cargo run --locked -p connectors-build -- catalog \
 ```
 
 It carries all 652 operations of the pinned document. 35 are reported
-unsupported: `deepObject` query parameters this pass does not expand, each sent
-as one value as given (34 `page` parameters that also take an offset page
-number, and one nested `filter`); no shipped read is among them.
+unsupported: 34 `page` parameters that take either an offset page number or
+the cursor pairs, recorded as the pairs `page[after]`, `page[before]` and
+`page[size]` without the offset number (the shipped read `ticket.audits` is one
+of them), and one nested `filter` this pass does not expand, sent as one value
+as given.
 `adapters/catalog/tests/bundle_drift.rs` refuses a committed bundle or index a
 fresh run would not reproduce byte for byte.
 
@@ -51,12 +53,14 @@ The pinned document declares most parameters once under
 `components.parameters` and references them; the bundle reads those references
 as the parameters they name. `ListTicketComments` declares its cursor as the
 `deepObject` `page`, which the bundle records as the query parameters
-`page[after]`, `page[before]` and `page[size]`.
+`page[after]`, `page[before]` and `page[size]`. `ListAuditsForTicket` declares
+`page` as a `oneOf` of an offset page number and those pairs; the bundle records
+the pairs only.
 
 ## The shipped selection set
 
 [`adapters/catalog/providers/zendesk/operations.json`](../adapters/catalog/providers/zendesk/operations.json)
-exposes seven reads and three writes ([Writes](#writes)).
+exposes eight reads and three writes ([Writes](#writes)).
 `adapters/catalog/tests/zendesk.rs` pins this exact id list and each
 id's `operationId` and path in the pinned document, so a renamed or dropped id,
 or a source operation that moved, fails the gate. The bundle refuses at load any
@@ -71,6 +75,7 @@ end of a walk are in it.
 | `tickets.incremental` | `IncrementalTicketExportCursor` | `GET /api/v2/incremental/tickets/cursor` | `start_time` on the first call, then `cursor`; `per_page` (amended) | `end_of_stream: true` | `start_time`, Unix seconds: tickets changed since |
 | `ticket.show` | `ShowTicket` | `GET /api/v2/tickets/{ticket_id}` | single item | n/a | none |
 | `ticket.comments` | `ListTicketComments` | `GET /api/v2/tickets/{ticket_id}/comments` | `page[size]`, `page[after]` | `meta.has_more: false` | none; deltas come from `tickets.incremental` |
+| `ticket.audits` | `ListAuditsForTicket` | `GET /api/v2/tickets/{ticket_id}/audits` | `page[size]`, `page[after]`, with `include_boundary_indicators: true` | `meta.has_more: false` | none; deltas come from `tickets.incremental` |
 | `users.incremental` | `IncrementalUserExportCursor` | `GET /api/v2/incremental/users/cursor` | `start_time` on the first call, then `cursor`; `per_page` | `end_of_stream: true` | `start_time`, Unix seconds: users changed since |
 | `user.show` | `ShowUser` | `GET /api/v2/users/{user_id}` | single item | n/a | none |
 | `organizations.incremental` | `IncrementalOrganizationExport` | `GET /api/v2/incremental/organizations` | `start_time`, then the previous page's `end_time` as `start_time`; `per_page` | `end_of_stream: true` | `start_time`, Unix seconds: organizations changed since |
@@ -108,6 +113,29 @@ end of a walk are in it.
   Offset paging (`per_page`, `sort_order`) is withheld by the selection, so an
   input carrying either is refused before any request. The engine sends the
   bracketed names percent-encoded: `page%5Bsize%5D=2&page%5Bafter%5D=…`.
+- **`ticket.audits`** takes `ticket_id` and walks one ticket's audits by
+  cursor as `ticket.comments` walks its comments: `page[size]` (at most 100 per
+  page), then the previous page's `meta.after_cursor` as `page[after]`, until a
+  page with `meta.has_more` `false`. The pinned response schema
+  (`TicketAuditsResponseNoneCursor`) declares no `meta`, and the pinned
+  `include_boundary_indicators` "includes `has_more` indicator in the cursor
+  pagination response meta" when true, so send
+  `"include_boundary_indicators": true` on every call of a walk. Whether
+  Zendesk leaves `has_more` out without it has not been checked against a live
+  account; `meta.after_cursor` and `links.next` are returned either way.
+  `sort_order` is withheld; the operation has no `per_page`, and the offset
+  page number is not declared. Each audit is returned as Zendesk sends it:
+  `author_id`, `created_at`, `via.channel`, `via.source.rel` and `events`, each
+  event with its `type` and `id`, a field change with `field_name`, `value` and
+  `previous_value`. It is not `ListTicketAudits` (`GET /api/v2/ticket_audits`),
+  which lists every ticket's audits.
+
+  ```sh
+  connectors invoke zendesk/support ticket.audits \
+    --input-json '{"ticket_id":101,"page[size]":100,"include_boundary_indicators":true}'
+  echo '{"ticket_id":101,"page[size]":100,"include_boundary_indicators":true,"page[after]":"<meta.after_cursor>"}' \
+    | connectors invoke zendesk/support ticket.audits
+  ```
 - **`ticket.show`**, **`user.show`** and **`organization.show`** take the
   numeric id from the path; tickets reference users (`requester_id`,
   `submitter_id`, `assignee_id`) and organizations (`organization_id`), and
