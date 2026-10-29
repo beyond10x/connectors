@@ -1417,7 +1417,8 @@ fn guide_cites_each_write_its_guard_and_the_move_steps() {
     for needle in [
         "approvals prepare",
         "approvals issue",
-        "operations invoke",
+        // `operations invoke` became `invoke` (story:connectors-do-short-invocation).
+        "invoke",
         DRAFT_MARKER.trim_end(),
         "https://github.com/beyond10x/connectors/releases",
     ] {

@@ -158,7 +158,7 @@ mod tests {
             "connectors setup init",
             "connectors adapters list",
             "connectors connections connect",
-            "connectors operations invoke",
+            "connectors operations describe",
             "connectors approvals clock-check",
             "connectors invoke",
         ] {
@@ -169,8 +169,13 @@ mod tests {
             "help is not a command"
         );
         // story:connectors-do-short-invocation: the explicit service commands
-        // are removed, and the page names no command that does not exist.
-        for removed in ["connectors describe", "connectors serve"] {
+        // and `operations invoke` are removed, and the page names no command
+        // that does not exist.
+        for removed in [
+            "connectors describe",
+            "connectors serve",
+            "connectors operations invoke",
+        ] {
             assert!(
                 !page.contains(&format!("## `{removed}`")),
                 "story:connectors-do-short-invocation: {removed} is removed"

@@ -45,7 +45,7 @@ fn repository(path: &str) -> PathBuf {
 
 /// A `connectors-catalog-local/2` configuration of the shipped `zendesk.oauth`
 /// client-credentials profile at [`API`], its token endpoint `token_url`; only
-/// the keys `operations invoke --definition` writes.
+/// the keys `invoke --definition` writes.
 fn native(instance: &str, token_url: &str) -> Value {
     let declaration: Value =
         serde_json::from_slice(&fs::read(repository("providers/zendesk/connector.json")).unwrap())

@@ -24,7 +24,7 @@ pub const GROUPS: [(&str, &str); 5] = [
     ),
     (
         "operations",
-        "The operations of an instance's connector: list, describe and invoke them",
+        "The operations of an instance's connector: list and describe them",
     ),
     (
         "setup",
@@ -36,34 +36,9 @@ pub const GROUPS: [(&str, &str); 5] = [
 pub const ADAPTER_HELP: &str =
     "Deprecated: the alias of a configured entry; select with --connector and --instance";
 
-/// The help of the `operations invoke` arguments a definition file adds or
-/// states (`contracts/cli/v1alpha1/semantics.md` §3, "Invoking a definition file").
-pub const DEFINITION_HELP: [(&str, &str); 5] = [
-    (
-        "field:definition",
-        "A connectors-definition/1 file to invoke without configuring it; instead of --connector and --instance",
-    ),
-    (
-        "field:definitions_root",
-        "With --definition: the tree holding its vendored source and shared auth files [default: the parent of the file's directory]",
-    ),
-    (
-        "field:credential_file",
-        "With --definition: the OAuth client file to connect with when the instance has no connection",
-    ),
-    (
-        "field:schema",
-        "The operation's schema identity; with --definition, the description's when left out",
-    ),
-    (
-        "field:revision",
-        "The description's revision; with --definition, the current one when left out",
-    ),
-];
-
 /// The help of the `invoke` arguments (story:connectors-do-short-invocation;
 /// `contracts/cli/v1alpha1/semantics.md` §3, "Invoking an operation").
-pub const INVOKE_HELP: [(&str, &str); 13] = [
+pub const INVOKE_HELP: [(&str, &str); 14] = [
     (
         "field:target",
         "The connector, and after one `/` its instance; the instance may be left out when the connector has only one; with --definition the target may be left out, the file naming the connector",
@@ -95,6 +70,10 @@ pub const INVOKE_HELP: [(&str, &str); 13] = [
     (
         "field:definition",
         "A connectors-definition/1 file to invoke without configuring it; a target, when given, names its connector",
+    ),
+    (
+        "field:definitions_root",
+        "With --definition: the tree holding its vendored source and shared auth files [default: the parent of the file's directory]",
     ),
     (
         "field:describe",
@@ -171,11 +150,6 @@ fn node(
     let mut command = command.mut_args(|arg: Arg| {
         if arg.get_id() == "field:adapter" {
             arg.value_name("ALIAS").help(ADAPTER_HELP)
-        } else if let Some((_, help)) = DEFINITION_HELP
-            .iter()
-            .find(|(id, _)| path == ["operations", "invoke"] && arg.get_id() == *id)
-        {
-            arg.help(*help)
         } else if path == ["invoke"] {
             invoke_arg(arg)
         } else {
@@ -209,15 +183,7 @@ fn invoke_arg(arg: Arg) -> Arg {
         "field:schema" | "field:revision" => arg.required(false),
         _ => arg,
     };
-    match INVOKE_HELP
-        .iter()
-        .chain(
-            DEFINITION_HELP
-                .iter()
-                .filter(|(id, _)| *id == "field:definitions_root"),
-        )
-        .find(|(field, _)| *field == id)
-    {
+    match INVOKE_HELP.iter().find(|(field, _)| *field == id) {
         Some((_, help)) => arg.help(*help),
         None => arg,
     }

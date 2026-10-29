@@ -123,20 +123,20 @@ impl ClaudeJourney {
         describe.extend(selector);
         describe.extend(["--operation", "account.profile"]);
         let description = success(self.cli.run(&describe));
-        let mut invoke = vec!["operations", "invoke"];
-        invoke.extend(selector);
-        invoke.extend([
+        let target = format!("{CONNECTOR}/{INSTANCE}");
+        let invoke = [
+            "invoke",
+            &target,
+            "account.profile",
             "--connection",
             reference,
-            "--operation",
-            "account.profile",
             "--schema",
             description["schema"].as_str().unwrap(),
             "--revision",
             description["revision"].as_str().unwrap(),
             "--input-json",
             "{}",
-        ]);
+        ];
         let output = self.cli.run(&invoke);
         assert!(!carries_claude_material(&output.stdout));
         assert!(!carries_claude_material(&output.stderr));

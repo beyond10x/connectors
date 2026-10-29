@@ -136,7 +136,7 @@ fn configured() -> (tempfile::TempDir, String) {
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
         + &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[adapters.forge.permissions]\nprofiles=['token']\noperations=['{GRANTED_READ}','{GRANTED_WRITE}']\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=['--connector','jira']\n[adapters.forge.permissions]\nprofiles=['token']\noperations=['{GRANTED_READ}','{GRANTED_WRITE}']\n",
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
@@ -171,14 +171,11 @@ fn invoke(root: &tempfile::TempDir, operation: &str, schema: &str, revision: &st
     command(
         root,
         &[
-            "operations",
             "invoke",
-            "--adapter",
-            "forge",
+            "jira/forge",
+            operation,
             "--connection",
             "conn-1",
-            "--operation",
-            operation,
             "--schema",
             schema,
             "--revision",

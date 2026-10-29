@@ -15,8 +15,8 @@
 //! definition's from its lowering), and reads and invokes nothing; a write
 //! without `--approval-file` is refused here, before any provider call. The
 //! command line is then rewritten with every value stated and the target as
-//! `<connector>/<instance>`, and the generated runner admits and invokes it as
-//! `operations invoke` would, the answer naming the connector and instance.
+//! `<connector>/<instance>`, and the generated runner admits and invokes it
+//! through the instance's selected entry, the answer naming the connector and instance.
 use super::*;
 use clap::parser::ValueSource;
 use connectors_cli_contract::ProcessOutput;
@@ -58,24 +58,57 @@ struct Named {
     alias: Option<String>,
 }
 
-/// Every configured instance by the names `invoke` knows it by: a
-/// `[connectors]` instance or recorded definition by its own; a legacy
-/// `[adapters.<alias>]` entry by its alias, under the connector `setup
-/// migrate` derives for it, or its implementation when that is not the
-/// catalog. A catalog entry no connector is derived for has no name here. A
-/// `[connectors]` instance wins over a legacy entry that derives its names, as
-/// `Config::select` selects it, so each name is listed once.
+/// The connector and instance the entry `alias` is known by: a `[connectors]`
+/// instance or recorded definition by its own; a legacy `[adapters.<alias>]`
+/// entry by its alias, under the connector `setup migrate` derives for it, or
+/// its implementation when that is not the catalog. `None` for a legacy
+/// catalog entry no connector is derived for, which is no instance.
+pub(super) fn entry_name(
+    config: &Config,
+    alias: &str,
+    adapter: &Adapter,
+) -> Option<(String, String)> {
+    if config.legacy_aliases().contains(&alias) {
+        let connector = match super::migrate::derived_connector(adapter) {
+            Some(connector) => connector,
+            None if adapter.adapter_id != super::declarations::CATALOG => {
+                adapter.adapter_id.clone()
+            }
+            None => return None,
+        };
+        Some((connector, alias.to_owned()))
+    } else {
+        let (connector, instance) = config.names(alias)?;
+        Some((connector.to_owned(), instance.to_owned()))
+    }
+}
+
+/// The aliases of the legacy catalog entries no connector is derived for,
+/// sorted: entries of the configuration that are no instance.
+pub(super) fn unmigrated(config: &Config) -> Vec<String> {
+    config
+        .adapters
+        .iter()
+        .filter(|(alias, adapter)| entry_name(config, alias, adapter).is_none())
+        .map(|(alias, _)| alias.clone())
+        .collect()
+}
+
+/// Every configured instance by the names `invoke` knows it by
+/// ([`entry_name`]). A catalog entry no connector is derived for has no name
+/// here. A `[connectors]` instance wins over a legacy entry that derives its
+/// names, as `Config::select` selects it, so each name is listed once.
 fn named(config: &Config) -> Vec<Named> {
     let legacy = config.legacy_aliases();
     let mut named: Vec<Named> = config
         .adapters
         .iter()
         .filter(|(alias, _)| !legacy.contains(&alias.as_str()))
-        .filter_map(|(alias, _)| {
-            let (connector, instance) = config.names(alias)?;
+        .filter_map(|(alias, adapter)| {
+            let (connector, instance) = entry_name(config, alias, adapter)?;
             Some(Named {
-                connector: connector.to_owned(),
-                instance: instance.to_owned(),
+                connector,
+                instance,
                 alias: Some(alias.clone()),
             })
         })
@@ -95,19 +128,16 @@ fn named(config: &Config) -> Vec<Named> {
         }
     }
     for alias in legacy {
-        let adapter = &config.adapters[alias];
-        let connector = match super::migrate::derived_connector(adapter) {
-            Some(connector) => connector,
-            None if adapter.adapter_id != "catalog" => adapter.adapter_id.clone(),
-            None => continue,
+        let Some((connector, instance)) = entry_name(config, alias, &config.adapters[alias]) else {
+            continue;
         };
         if !named
             .iter()
-            .any(|n| n.connector == connector && n.instance == alias)
+            .any(|n| n.connector == connector && n.instance == instance)
         {
             named.push(Named {
                 connector,
-                instance: alias.to_owned(),
+                instance,
                 alias: Some(alias.to_owned()),
             });
         }
@@ -122,6 +152,9 @@ pub(super) enum Unselected {
     Ambiguous(Vec<String>),
     NotFound,
     ProfileUnnamed,
+    /// The target names a legacy catalog entry no connector is derived for by
+    /// the name `catalog` gave it.
+    Unmigrated,
 }
 
 /// The connector, instance and alias the target selects under `config`.
@@ -135,6 +168,7 @@ fn select(
         .filter(|n| n.connector == connector && instance.is_none_or(|i| n.instance == i))
         .collect();
     match matching.as_slice() {
+        [] if names_unmigrated(config, connector, instance) => Err(Unselected::Unmigrated),
         [] => Err(Unselected::NotFound),
         [one] => match &one.alias {
             Some(alias) => Ok((one.connector.clone(), one.instance.clone(), alias.clone())),
@@ -157,8 +191,20 @@ fn select(
     }
 }
 
+/// Whether `connector` and `instance` name a legacy catalog entry no connector
+/// is derived for by the name `catalog` gave it: `catalog/<alias>`, or
+/// `catalog` alone while there is one.
+pub(super) fn names_unmigrated(config: &Config, connector: &str, instance: Option<&str>) -> bool {
+    let unmigrated = unmigrated(config);
+    connector == super::declarations::CATALOG
+        && instance.map_or(!unmigrated.is_empty(), |instance| {
+            unmigrated.iter().any(|alias| alias == instance)
+        })
+}
+
 fn unselected(refused: Unselected) -> HandlerReply {
     match refused {
+        Unselected::Unmigrated => configuration_refusal(Refusal::Rule(Rule::LegacyEntryUnmigrated)),
         Unselected::Ambiguous(instances) => {
             let mut reply = failure("instance_ambiguous", "arguments", "none", true);
             if let HandlerReply::UsageError { data, .. } = &mut reply {
@@ -191,7 +237,9 @@ pub(super) fn alias_at(input: &Value, paths: &Paths) -> owner::Result<String> {
         .map_err(|refused| match refused {
             Unselected::Ambiguous(_) => Code::InvalidInput.into(),
             Unselected::NotFound => Code::NotFound.into(),
-            Unselected::ProfileUnnamed => Code::InvalidConfiguration.into(),
+            Unselected::ProfileUnnamed | Unselected::Unmigrated => {
+                Code::InvalidConfiguration.into()
+            }
         })
 }
 
@@ -526,9 +574,7 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
     };
     let paths = Paths::resolve(request.config.as_deref(), request.state.as_deref())
         .map_err(|_| configuration_refusal(Refusal::Rule(Rule::ConfigPathUnresolved)))?;
-    let lowering = |definition: &PathBuf| definition::Request {
-        program: request.program.clone(),
-        definition: Some(definition.clone()),
+    let lowering = || definition::Request {
         root: request.definitions_root.clone(),
         credential_file: request.credential_file.clone(),
         selected: false,
@@ -536,19 +582,14 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
             .map(|(connector, instance)| (connector.to_owned(), instance.map(str::to_owned))),
         operation: request.operation.clone(),
         connection: request.connection.clone(),
-        schema: None,
-        revision: None,
         config: request.config.clone(),
         state: request.state.clone(),
-        json: request.json,
-        globals: Vec::new(),
-        kept: Vec::new(),
     };
     let (connector, instance, adapter, bootstrap, connection) = match &request.definition {
         // A definition is described from its lowering: nothing is recorded,
         // and no connection is resolved, asked for or created.
         Some(definition) if request.describe => {
-            let lowered = definition::lower(&lowering(definition), definition, signals)
+            let lowered = definition::lower(&lowering(), definition, signals)
                 .map_err(|reply| naming(reply, "definition"))?;
             let mut bootstrap = lowered.reported;
             bootstrap.configure(&lowered.adapter);
@@ -564,7 +605,7 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
             )
         }
         Some(definition) => {
-            let prepared = definition::prepare_with(&lowering(definition), definition, signals)
+            let prepared = definition::prepare_with(&lowering(), definition, signals)
                 .map_err(|reply| naming(reply, "definition"))?;
             let connection = Some(prepared.connection);
             let (adapter, bootstrap) = bound(&paths, &prepared.alias, connection.as_deref())?;
@@ -698,8 +739,8 @@ fn bound(
     Ok((adapter, bootstrap))
 }
 
-/// The `invoke` handler: the target's instance invoked as `operations invoke`
-/// invokes it (`operations::dispatch`), the answer naming the connector and
+/// The `invoke` handler: the target's instance invoked through its selected
+/// entry (`operations::dispatch_tagged`), the answer naming the connector and
 /// instance and never an alias, and every `invalid_input` naming its argument.
 pub(super) fn dispatch(
     call: &Invocation<'_>,

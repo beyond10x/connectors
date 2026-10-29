@@ -127,14 +127,11 @@ impl GrantJourney {
             "project.get",
         ]));
         let output = self.cli.run(&[
-            "operations",
             "invoke",
-            "--adapter",
-            "grant",
+            "gitlab/grant",
+            "project.get",
             "--connection",
             reference,
-            "--operation",
-            "project.get",
             "--schema",
             description["schema"].as_str().unwrap(),
             "--revision",
