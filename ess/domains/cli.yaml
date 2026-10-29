@@ -697,6 +697,12 @@ types:
   - name: connectors.cli.FailureCause
     kind: enum
     variants: [provider_unavailable, provider_timeout, provider_rate_limited, provider_internal, provider_capacity, adapter_exited, owner_stopping]
+  # Which revision an `--expected-revision` names (story:connectors-do-short-invocation):
+  # a connection's public revision, which `connections describe` reads, or an instance's
+  # configuration_revision.
+  - name: connectors.cli.RevisionKind
+    kind: enum
+    variants: [connection, configuration]
   - name: connectors.cli.ConfigurationFormat
     kind: enum
     variants: [connectors-local/1, connectors-local/2, connectors-local/3, connectors-local/4, connectors-local/5]
@@ -820,6 +826,17 @@ types:
       # enforced by the host and pinned by tests.
       - {name: cause, type: "Optional<connectors.cli.FailureCause>"}
       - {name: attempts, type: "Optional<Integer>"}
+      # ESS-LIMIT: revision_expected, revision_given and read_with appear only beside
+      # field = expected_revision on `connections revalidate` and `connections revoke`
+      # (story:connectors-do-short-invocation; contracts/cli/v1alpha1/semantics.md, "The
+      # refused argument"): revision_expected is the kind of revision the command
+      # expects, revision_given the kind the given value is when it is another one the
+      # instance holds, and read_with the command that reads the expected one. As for
+      # instance_id above, ESS declares no invariant on a CLI type, so the presence rule
+      # is enforced by the host and pinned by tests.
+      - {name: revision_expected, type: "Optional<connectors.cli.RevisionKind>"}
+      - {name: revision_given, type: "Optional<connectors.cli.RevisionKind>"}
+      - {name: read_with, type: "Optional<String>"}
   # setup check names its prerequisites: configuration, metadata, artifact:<alias>,
   # keyring and persistent_custody_qualification under a platform binding; under the
   # explicitly selected mounted_secret binding, mounted_custody (the configured
@@ -1230,6 +1247,11 @@ types:
   # --device true) runs the device grant of an oauth2_grant profile, through the device
   # dialect registered for its profile id when there is one; on any other profile, or
   # under the read-only binding, it is invalid_input.
+  # target (story:connectors-do-short-invocation) is `<connector>/<instance>`, the
+  # same selection as connector and instance, which it never stands beside. endpoint
+  # is written into that instance's table of the configuration file before any
+  # credential is asked for (contracts/cli/v1alpha1/semantics.md §3, "Giving an
+  # instance its endpoint"); no other command takes it.
   - name: connectors.cli.ConnectionConnectInput
     kind: struct
     fields:
@@ -1239,6 +1261,8 @@ types:
       - {name: profile, type: "String"}
       - {name: device, type: "Optional<Boolean>"}
       - {name: credential_document, type: "Optional<String>"}
+      - {name: target, type: "Optional<String>"}
+      - {name: endpoint, type: "Optional<String>"}
   - name: connectors.cli.ConnectionConnectResult
     kind: struct
     fields:

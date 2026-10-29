@@ -473,6 +473,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -483,6 +489,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -971,6 +997,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -981,6 +1013,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -1439,6 +1491,12 @@
                           "none"
                         ]
                       },
+                      "read_with": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
                       "request_id": {
                         "kind": "optional",
                         "of": {
@@ -1449,6 +1507,26 @@
                         "kind": "optional",
                         "of": {
                           "kind": "integer"
+                        }
+                      },
+                      "revision_expected": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "enum",
+                          "variants": [
+                            "connection",
+                            "configuration"
+                          ]
+                        }
+                      },
+                      "revision_given": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "enum",
+                          "variants": [
+                            "connection",
+                            "configuration"
+                          ]
                         }
                       },
                       "service_code": {
@@ -1881,6 +1959,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -1891,6 +1975,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -2358,6 +2462,12 @@
                           "none"
                         ]
                       },
+                      "read_with": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
                       "request_id": {
                         "kind": "optional",
                         "of": {
@@ -2368,6 +2478,26 @@
                         "kind": "optional",
                         "of": {
                           "kind": "integer"
+                        }
+                      },
+                      "revision_expected": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "enum",
+                          "variants": [
+                            "connection",
+                            "configuration"
+                          ]
+                        }
+                      },
+                      "revision_given": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "enum",
+                          "variants": [
+                            "connection",
+                            "configuration"
+                          ]
                         }
                       },
                       "service_code": {
@@ -2800,6 +2930,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -2810,6 +2946,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -3307,6 +3463,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -3317,6 +3479,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -3803,6 +3985,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -3813,6 +4001,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -4313,6 +4521,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -4323,6 +4537,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -4823,6 +5057,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -4833,6 +5073,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -5333,6 +5593,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -5343,6 +5609,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -5843,6 +6129,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -5853,6 +6145,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -6353,6 +6665,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -6363,6 +6681,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -6857,6 +7195,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -6867,6 +7211,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -7375,6 +7739,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -7385,6 +7755,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -7884,6 +8274,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -7894,6 +8290,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -8574,6 +8990,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -8584,6 +9006,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -8719,6 +9161,12 @@
                 "kind": "boolean"
               }
             },
+            "endpoint": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
             "instance": {
               "kind": "optional",
               "of": {
@@ -8727,6 +9175,12 @@
             },
             "profile": {
               "kind": "string"
+            },
+            "target": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -9145,6 +9599,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -9155,6 +9615,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -9701,6 +10181,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -9711,6 +10197,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -10176,6 +10682,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -10186,6 +10698,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -10710,6 +11242,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -10720,6 +11258,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -11287,6 +11845,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -11297,6 +11861,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -11860,6 +12444,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -11870,6 +12460,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -12350,6 +12960,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -12360,6 +12976,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -12980,6 +13616,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -12990,6 +13632,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -13464,6 +14126,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -13474,6 +14142,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -13916,6 +14604,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -13926,6 +14620,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -14428,6 +15142,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -14438,6 +15158,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -15060,6 +15800,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -15070,6 +15816,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -15587,6 +16353,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -15597,6 +16369,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -16086,6 +16878,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -16096,6 +16894,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -16550,6 +17368,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -16560,6 +17384,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -17000,6 +17844,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -17010,6 +17860,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -17577,6 +18447,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -17587,6 +18463,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -18022,6 +18918,12 @@
                   "none"
                 ]
               },
+              "read_with": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "request_id": {
                 "kind": "optional",
                 "of": {
@@ -18032,6 +18934,26 @@
                 "kind": "optional",
                 "of": {
                   "kind": "integer"
+                }
+              },
+              "revision_expected": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
+                }
+              },
+              "revision_given": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connection",
+                    "configuration"
+                  ]
                 }
               },
               "service_code": {
@@ -18658,7 +19580,7 @@
       ],
       "aliases": [],
       "callable": "connections-connect",
-      "about": "Begin admitted local protected credential acquisition",
+      "about": "Begin admitted local protected credential acquisition on <connector>/<instance>; --endpoint first writes that instance's endpoint into the configuration",
       "arguments": [
         {
           "field": "adapter",
@@ -18702,6 +19624,20 @@
             "file": "credential-file",
             "stdin": "credential-stdin",
             "hidden_tty": "credential-prompt"
+          }
+        },
+        {
+          "field": "target",
+          "source": {
+            "kind": "positional",
+            "index": 1
+          }
+        },
+        {
+          "field": "endpoint",
+          "source": {
+            "kind": "option",
+            "long": "endpoint"
           }
         }
       ]

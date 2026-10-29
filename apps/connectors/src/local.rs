@@ -18,6 +18,7 @@ mod cursor;
 mod declarations;
 mod definition;
 mod dialects;
+mod endpoint;
 mod list;
 mod migrate;
 mod operations;
@@ -67,6 +68,9 @@ fn help_output(mut stdout: String, root: bool) -> connectors_cli_contract::Proce
 fn run_selected(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     let session = session::Session::new(&args);
     if let Some(output) = configuration_preflight(&session.borrow()) {
+        return output;
+    }
+    if let Some(output) = endpoint::prepare(&session.borrow()) {
         return output;
     }
     let mut output = connectors_cli_contract::run(
@@ -131,6 +135,28 @@ impl Handler for LocalHandler {
     /// Every handler reads the selected alias in `adapter`, whichever selector
     /// named it; a result names its connector and instance beside it.
     fn call(&mut self, call: &Invocation<'_>) -> HandlerReply {
+        // A connect's target selects as `--connector` and `--instance` do; its
+        // endpoint was written before the runner started.
+        let connect;
+        let call = if call.callable == "connections-connect" {
+            let mut input = match endpoint::selection(&call.input) {
+                Ok(input) => input,
+                Err(refusal) => return refusal,
+            };
+            if let Some(fields) = input.as_object_mut() {
+                fields.remove("endpoint");
+                fields.remove("target");
+            }
+            connect = Invocation {
+                callable: call.callable,
+                target: call.target,
+                context: call.context.clone(),
+                input,
+            };
+            &connect
+        } else {
+            call
+        };
         let (mut input, config) = match select::resolve(call) {
             Ok(resolved) => resolved,
             Err(refusal) => return refusal,
