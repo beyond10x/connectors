@@ -126,7 +126,7 @@ version afterwards does not reach the consumer's copy.
 
 ### 4.3 Copy to another connection
 
-`operations invoke --definition`'s reuse answer ([CLI §3](../cli.md#invoking-a-definition-file),
+`invoke --definition`'s reuse answer ([CLI §3](../cli.md#invoking-a-definition-file),
 story:invoke-definition-reuse-credential) makes a new connection of the definition's
 instance from the current version of a connection another instance of the same
 connector holds. Only the owner holds the material. It reads the source's current

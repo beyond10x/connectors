@@ -70,8 +70,8 @@ args = ["--local-config", "/absolute/path/tavily.json"]
 
 ```sh
 target/release/connectors --output json connections connect --connector tavily --instance tavily --profile tavily.api-key --credential-prompt
-target/release/connectors --output json operations describe --connector tavily --instance tavily --operation websearch.search
-target/release/connectors --output json operations invoke --connector tavily --instance tavily --connection CONNECTION --operation websearch.search --schema SCHEMA --revision REVISION --input-json '{"query":"vector database release","max_results":5,"time_range":"week","content":"full"}'
+target/release/connectors --output json invoke tavily/tavily websearch.search --describe
+target/release/connectors --output json invoke tavily/tavily websearch.search --input-json '{"query":"vector database release","max_results":5,"time_range":"week","content":"full"}'
 ```
 
 For automation, `--credential-stdin` or `--credential-file /absolute/private/file.json` carries the

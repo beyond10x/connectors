@@ -52,11 +52,11 @@ endpoint = "https://your-domain.atlassian.net/wiki"
 ```
 
 ```sh
-connectors instances list
+connectors instances list | jq -c '.[] | arrays | .[]'
 ```
 
 ```json
-{"adapters":[{"adapter":"confluence.work","adapter_id":"catalog","connector":"confluence","instance":"work","instance_id":"confluence.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"connector":"confluence","instance":"work","instance_id":"confluence.work","restart":"never","startup":"on-demand"}
 ```
 
 For REST v1, enable `confluence-v1` the same way, with
@@ -77,14 +77,7 @@ Atlassian account.
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector confluence --instance work \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector confluence --instance work \
-  --operation page.get | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector confluence --instance work \
-  --operation page.get | jq -r .result.revision)
-connectors operations invoke --connector confluence --instance work --connection "$connection" \
-  --operation page.get --schema "$schema" --revision "$revision" \
+connectors invoke confluence/work page.get \
   --input-json '{"id":"65538","body-format":"storage"}'
 ```
 

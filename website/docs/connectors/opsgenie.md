@@ -46,11 +46,11 @@ enabled = true
 ```
 
 ```sh
-connectors instances list
+connectors instances list | jq -c '.[] | arrays | .[]'
 ```
 
 ```json
-{"adapters":[{"adapter":"opsgenie.work","adapter_id":"catalog","connector":"opsgenie","instance":"work","instance_id":"opsgenie.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"connector":"opsgenie","instance":"work","instance_id":"opsgenie.work","restart":"never","startup":"on-demand"}
 ```
 
 ## Connect
@@ -67,14 +67,7 @@ Every request carries `Authorization: GenieKey <key>`.
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector opsgenie --instance work \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector opsgenie --instance work \
-  --operation alerts.list | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector opsgenie --instance work \
-  --operation alerts.list | jq -r .result.revision)
-connectors operations invoke --connector opsgenie --instance work --connection "$connection" \
-  --operation alerts.list --schema "$schema" --revision "$revision" \
+connectors invoke opsgenie/work alerts.list \
   --input-json '{"query":"createdAt >= 1790000000000","sort":"createdAt","order":"asc","limit":100}'
 ```
 

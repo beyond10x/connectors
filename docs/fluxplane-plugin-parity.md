@@ -691,7 +691,7 @@ Connectors runs Loki as the native executable `connectors-loki` since 2026-10-08
 (`adapters/loki/README.md`). A saved connection uses the profile `loki.bearer`: a bearer token,
 proved by `GET /loki/api/v1/labels`, with the configured instance as its identity
 (`adapters/loki/contracts/logs/v1alpha1/semantics.md` §11.4). Each read below answers through
-`operations invoke` on that connection, tested against fixture answers in Loki v3.7.0 API shapes
+`invoke` on that connection, tested against fixture answers in Loki v3.7.0 API shapes
 (`adapters/loki/tests/local_runtime/cli_journey.rs`). The baseline's two limits of the contract
 (the usage record of 2026-09-09 (history, commit 6498a881c), U07), no metric expressions and no label discovery, are
 closed by §11. No `X-Scope-OrgID` tenant header is sent (§11.3), and a Loki that admits no
@@ -1051,7 +1051,7 @@ Source: fluxplane inventory §3. Connectors commands are cited from `apps/connec
 
 | fluxplane verb | calls | sessions | Connectors equivalent | verdict | gap |
 |---|---:|---:|---|---|---|
-| `operation invoke` | 6,533 | 95 | `operations invoke` (:432) | covered | A write needs `--approval-file` under an approval policy. |
+| `operation invoke` | 6,533 | 95 | `invoke` | covered | A write needs `--approval-file` under an approval policy. |
 | `operation list` | 646 | 83 | `operations list` (:410) | covered | — |
 | `operation describe` | 542 | 69 | `operations describe` (:423) | covered | — |
 | `operation search` | 121 | 34 | `operations list --family` (:410) | partial | Filters by family only. No text search over operation names or descriptions. |
@@ -1065,7 +1065,7 @@ Source: fluxplane inventory §3. Connectors commands are cited from `apps/connec
 | `auth disconnect` | 0 | 0 | `connections revoke` (:399) | covered | — |
 | `auth` (no subcommand) | 2 | 2 | `connections --help` | covered | — |
 | `datasource list` | 4 | 3 | `operations list --family` (:410) | partial | Lists operations by contract family, not datasource entities. |
-| `datasource records` / `search` / `search-all` / `get` / `batch-get` / `lookup` / `lookup-all` | 0 | 0 | `operations invoke` on a `datasource.records/v1alpha1` operation | partial | No cross-provider search (`search-all`) and no batch get. |
+| `datasource records` / `search` / `search-all` / `get` / `batch-get` / `lookup` / `lookup-all` | 0 | 0 | `invoke` on a `datasource.records/v1alpha1` operation | partial | No cross-provider search (`search-all`) and no batch get. |
 | `datasource` (no subcommand) | 1 | 1 | — | covered | Help only. |
 | `lookup` | 9 | 3 | — | missing | A reverse lookup over fluxplane-local indexes. Connectors keeps no index. |
 | `endpoint list` | 149 | 32 | `adapters list` (:284), `connections list` (:320) | covered | — |
@@ -1073,7 +1073,7 @@ Source: fluxplane inventory §3. Connectors commands are cited from `apps/connec
 | `endpoint save` | 6 | 3 | the per-adapter TOML startup config, then `connections connect` | partial | No CLI verb writes an instance. |
 | `endpoint import` | 6 | 2 | — | missing | No endpoint import. |
 | `endpoint remove` | 4 | 2 | `connections revoke` (:399) | partial | Revokes the credential; the instance stays in the config. |
-| `endpoint discover` | 4 | 2 | Kubernetes `endpoints.discover` through `operations invoke` | partial | Observes EndpointSlices but does not save endpoints. |
+| `endpoint discover` | 4 | 2 | Kubernetes `endpoints.discover` through `invoke` | partial | Observes EndpointSlices but does not save endpoints. |
 | `endpoint health` / `test` / `doctor` | 0 | 0 | `connections status` (:364), `connections revalidate` (:375), `setup check` (:279) | covered | — |
 | `endpoint` (no subcommand) | 5 | 5 | — | covered | Help only. |
 | `evidence list` / `observe` | 0 | 0 | — | missing | No evidence verb. |
