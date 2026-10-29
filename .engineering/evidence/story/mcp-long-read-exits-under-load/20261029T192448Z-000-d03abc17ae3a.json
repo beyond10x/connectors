@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-29T19:24:48Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-long-read-exits-under-load",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "pinned at 1d2e8f468 (taskset 5-8, nice 19, 4 yes workers): long-read test 48/50 (1 fixture connect admission timeout, 1 server stdout close with no stderr captured), then 100/100 on an instrumented build; stdin_close_refuses_a_call_not_yet_at_the_owner 50/50 on 2 CPUs; connection_lease three-lifetimes 10/10; local_mcp_server whole binary 9/10 (stdin_close_still_answers: reply past the lease live at hangup, story:mcp-reply-after-hangup-owner-latency-under-load)",
+    "reference": "apps/connectors/tests/adversary_local_mcp_server.rs"
+  }
+}

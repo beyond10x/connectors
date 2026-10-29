@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-29T18:08:29Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-long-read-exits-under-load",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "adversary_a_store_held_past_one_lease_leaves_the_session_ready: red on 1a5155e8f (server exit 1, mcp_unavailable), green from cb6527c56; adversary_local_mcp_server 16 passed at edb385bb3",
+    "reference": "apps/connectors/tests/adversary_local_mcp_server.rs"
+  }
+}

@@ -418,7 +418,7 @@ commands:
   # connector_id (`when_related: {via: input.connector_id}`) or the other
   # instances (`when_related: {entity, where}`) needs ess/22, and this
   # specification is ess/18; the pinned Entity Runtime lowering refuses both
-  # for this lowered command (ess-entity-runtime 0.75.0
+  # for this lowered command (ess-entity-runtime 0.77.0
   # RelatedGuardUnsupported, RowSetUnsupported).
   - name: connectors.declarations.RecordServiceConfiguration
     input:

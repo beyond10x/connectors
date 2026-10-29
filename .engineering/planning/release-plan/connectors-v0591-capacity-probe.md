@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0591-capacity-probe
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.59.1: the owner-capacity test fix and the ESS 0.75.0 pin'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-29T14:54:51Z", actor: "human:timo", revision: 2, decided_on: {"recorded":{"test_result":1}}}
+- {from: "active", to: "implemented", at: "2026-10-29T16:41:20Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":2}}}
 ---
 ## Outcome
 
