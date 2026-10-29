@@ -67,6 +67,9 @@ pub(super) enum Refused {
     /// They name a listed instance that has no entry: its connector declares
     /// several profiles and it names none (`Config::awaiting_profile`).
     ProfileUnnamed,
+    /// They name a legacy catalog entry no connector is derived for by the name
+    /// the catalog gave it (story:connectors-do-short-invocation).
+    Unmigrated,
 }
 
 impl From<Refused> for owner::Error {
@@ -74,7 +77,9 @@ impl From<Refused> for owner::Error {
         match refused {
             Refused::InvalidInput => owner::Code::InvalidInput.into(),
             Refused::NotFound => owner::Code::NotFound.into(),
-            Refused::ProfileUnnamed => owner::Code::InvalidConfiguration.into(),
+            Refused::ProfileUnnamed | Refused::Unmigrated => {
+                owner::Code::InvalidConfiguration.into()
+            }
         }
     }
 }
@@ -89,6 +94,7 @@ fn refusal(refused: Refused) -> HandlerReply {
             "check_configuration",
             false,
         ),
+        Refused::Unmigrated => configuration_refusal(Refusal::Rule(Rule::LegacyEntryUnmigrated)),
     }
 }
 
@@ -136,6 +142,11 @@ pub(super) fn alias(input: &Value, config: &Config) -> Result<String, Refused> {
     }
     let text = |field| input.get(field).and_then(Value::as_str);
     let selected = match (text("connector"), text("instance")) {
+        (Some(connector), Some(instance))
+            if super::invoke::names_unmigrated(config, connector, Some(instance)) =>
+        {
+            return Err(Refused::Unmigrated);
+        }
         (Some(connector), Some(instance)) => config
             .select(Selector::Instance {
                 connector,
@@ -318,18 +329,19 @@ pub(super) fn deprecations(args: &[OsString]) -> Vec<Deprecation> {
                 new: command.path.join(" "),
             })
     });
-    // A command that takes no `--adapter`, as `invoke` takes none
-    // (story:connectors-do-short-invocation), refuses it as any unknown option,
-    // naming no replacement.
-    let adapterless = plan().commands.iter().any(|command| {
+    // Only a command that takes `--adapter` deprecates it. One that takes
+    // none, as `invoke` takes none, and a removed command such as `operations
+    // invoke` (story:connectors-do-short-invocation), refuse it as any unknown
+    // option or command, naming no replacement.
+    let takes_adapter = plan().commands.iter().any(|command| {
         std::iter::once(&command.path)
             .chain(&command.aliases)
             .any(|path| words.starts_with(&path.iter().map(String::as_str).collect::<Vec<_>>()))
-            && !command.arguments.iter().any(|arg| arg.field == "adapter")
+            && command.arguments.iter().any(|arg| arg.field == "adapter")
     });
     renamed
         .into_iter()
-        .chain((adapter_selected(args) && !adapterless).then_some(Deprecation::Adapter))
+        .chain((adapter_selected(args) && takes_adapter).then_some(Deprecation::Adapter))
         .collect()
 }
 

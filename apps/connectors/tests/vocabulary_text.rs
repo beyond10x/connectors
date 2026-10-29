@@ -112,9 +112,9 @@ fn help_says_adapter_only_on_a_deprecated_line() {
         refused.push(format!("connectors-catalog-provider --help: {line}"));
     }
     assert!(refused.is_empty(), "{}", refused.join("\n"));
-    // Root, 6 groups, 34 command paths and 5 aliases; `invoke` is the 34th
-    // (story:connectors-do-short-invocation).
-    assert_eq!(paths.len(), 46, "{paths:?}");
+    // Root, 6 groups, 33 command paths and 5 aliases: `invoke` is one, and
+    // `operations invoke` is removed (story:connectors-do-short-invocation).
+    assert_eq!(paths.len(), 45, "{paths:?}");
 }
 
 /// The listing line `help` writes for `name`, the words after the name.

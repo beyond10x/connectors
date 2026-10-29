@@ -59,7 +59,6 @@ Every command accepts these, anywhere on the command line.
 | [`connectors invoke`](#connectors-invoke) | Invoke one operation of a connector's instance; the instance, connection, schema and revision default to the only ones that fit |
 | [`connectors list`](#connectors-list) | List every connector this build ships, with its auth profiles and the instances the configuration names; needs no configuration and starts no process |
 | [`connectors operations describe`](#connectors-operations-describe) | Inspect an operation and its exact schema identity |
-| [`connectors operations invoke`](#connectors-operations-invoke) | Invoke once under selected schema, revision and current admission |
 | [`connectors operations list`](#connectors-operations-list) | List operations from selected cached metadata |
 | [`connectors setup check`](#connectors-setup-check) | Check local configuration and prerequisites without authentication |
 | [`connectors setup checkpoints-enable`](#connectors-setup-checkpoints-enable) | Enable durable open checkpoints on the existing store; one-way, connectors 0.32.0 and earlier can no longer open it |
@@ -584,32 +583,6 @@ connectors operations describe [OPTIONS] --operation <field:operation>
 | `--instance <field:instance>` | no | none | any |  |
 | `--connection <field:connection>` | no | none | any |  |
 | `--operation <field:operation>` | yes | none | any |  |
-
-## `connectors operations invoke`
-
-Invoke once under selected schema, revision and current admission
-
-```text
-connectors operations invoke [OPTIONS] --operation <field:operation> --schema <field:schema> --revision <field:revision> <--input-json <source:input:inline>|--input-file <source:input:file>|--input-stdin>
-```
-
-| Argument | Required | Default | Values | Meaning |
-|---|---|---|---|---|
-| `--adapter <ALIAS>` | no | none | any | Deprecated: the alias of a configured entry; select with --connector and --instance |
-| `--connector <field:connector>` | no | none | any |  |
-| `--instance <field:instance>` | no | none | any |  |
-| `--connection <field:connection>` | no | none | any |  |
-| `--operation <field:operation>` | yes | none | any |  |
-| `--schema <field:schema>` | yes | none | any | The operation's schema identity; with --definition, the description's when left out |
-| `--revision <field:revision>` | yes | none | any | The description's revision; with --definition, the current one when left out |
-| `--input-json <source:input:inline>` | no | none | any |  |
-| `--input-file <source:input:file>` | no | none | any |  |
-| `--input-stdin` | no | `false` | any |  |
-| `--approval-file <field:approval_file>` | no | none | any |  |
-| `--idempotency-key <field:idempotency_key>` | no | none | any |  |
-| `--definition <field:definition>` | no | none | any | A connectors-definition/1 file to invoke without configuring it; instead of --connector and --instance |
-| `--definitions-root <field:definitions_root>` | no | none | any | With --definition: the tree holding its vendored source and shared auth files [default: the parent of the file's directory] |
-| `--credential-file <field:credential_file>` | no | none | any | With --definition: the OAuth client file to connect with when the instance has no connection |
 
 ## `connectors operations list`
 

@@ -1307,14 +1307,11 @@ impl OAuthCli {
             "project.get",
         ]));
         [
-            "operations",
             "invoke",
-            "--adapter",
-            "drive",
+            "gitlab/drive",
+            "project.get",
             "--connection",
             reference,
-            "--operation",
-            "project.get",
             "--schema",
             description["schema"].as_str().unwrap(),
             "--revision",

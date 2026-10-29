@@ -268,7 +268,7 @@ mod tests {
             &["c", "connections", "connect", "--device=true"],
             &["c", "connections", "connect", "--", "--device"],
             &["c", "connections", "status", "--device"],
-            &["c", "operations", "invoke", "--device"],
+            &["c", "operations", "describe", "--device"],
         ] {
             assert_eq!(switch_shorthand(args(unchanged)), args(unchanged));
         }
@@ -341,7 +341,7 @@ mod tests {
         for unchanged in [
             &["c", "invoke", "fixture", "item.read", "--describe", "false"][..],
             &["c", "invoke", "fixture", "--", "--describe"],
-            &["c", "operations", "invoke", "--describe"],
+            &["c", "operations", "describe", "--describe"],
             &["c", "connections", "token", "--describe"],
         ] {
             assert_eq!(switch_shorthand(args(unchanged)), args(unchanged));

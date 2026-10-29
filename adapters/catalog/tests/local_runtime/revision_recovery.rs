@@ -274,7 +274,7 @@ impl Scenario {
             .clone()
     }
 
-    /// `operations invoke` of `operation` through the saved connection, its
+    /// `invoke` of `operation` through the saved connection, its
     /// answer unchecked.
     fn invoke(&self, operation: &str, input: Value) -> Output {
         let description = success(self.cli.run(&[
@@ -286,14 +286,11 @@ impl Scenario {
             operation,
         ]));
         self.cli.run(&[
-            "operations",
             "invoke",
-            "--adapter",
-            "gitlab",
+            "gitlab/gitlab",
+            operation,
             "--connection",
             &self.reference,
-            "--operation",
-            operation,
             "--schema",
             description["schema"].as_str().unwrap(),
             "--revision",

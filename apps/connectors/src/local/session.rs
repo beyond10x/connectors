@@ -127,7 +127,7 @@ impl Session {
         self.signals()?;
         let is_write = (|| {
             let selection = self.selection.as_ref()?;
-            if !matches!(selection.callable.as_str(), "operations-invoke" | "invoke") {
+            if selection.callable != "invoke" {
                 return None;
             }
             let paths = Paths::resolve(
@@ -135,7 +135,7 @@ impl Session {
                 selection.context.state_dir.as_deref(),
             )
             .ok()?;
-            let alias = alias_at(&selection.callable, &selection.selectors, &paths).ok()?;
+            let alias = super::invoke::alias_at(&selection.selectors, &paths).ok()?;
             let bootstrap = owner::cached(&paths, &alias).ok()?;
             let operation = selection.selectors["operation"].as_str()?;
             Some(
@@ -152,7 +152,7 @@ impl Session {
             .is_some_and(|s| matches!(s.callable.as_str(), "approval-prepare" | "approval-issue"));
         // An approval command's refused business document names `input`
         // (contracts/cli/v1alpha1/semantics.md, "The refused argument"); an
-        // approved write's `operations invoke` names nothing.
+        // approved write's `invoke` names its own (`invoke::early_failure`).
         let named = |mut error: owner::Error| {
             if approval && error.code == Code::InvalidInput && error.field.is_none() {
                 error.field = Some(owner::Argument::Input);
@@ -461,7 +461,8 @@ impl DynamicValidator for NativeValidator {
                 call.context.config.as_deref(),
                 call.context.state_dir.as_deref(),
             )?;
-            let alias = alias_at(call.callable, &call.input, &paths)?;
+            // `invoke` is the one dynamic callable: its target selects the alias.
+            let alias = super::invoke::alias_at(&call.input, &paths)?;
             let bootstrap = owner::operation_snapshot(&paths, &alias, &call.input)?;
             let descriptor = bootstrap.descriptor()?;
             let operation = descriptor
@@ -501,16 +502,6 @@ impl DynamicValidator for NativeValidator {
             self.0.borrow_mut().early = Some((call.callable.into(), call.context.clone(), error));
             kind
         })
-    }
-}
-
-/// The alias an invoke's input selects: `invoke` by its target, any other
-/// callable by its selector fields.
-fn alias_at(callable: &str, input: &Value, paths: &Paths) -> owner::Result<String> {
-    if callable == "invoke" {
-        super::invoke::alias_at(input, paths)
-    } else {
-        super::select::alias_at(input, paths)
     }
 }
 

@@ -156,11 +156,15 @@ pub enum Rule {
     /// A configuration text is larger than [`CONFIG_LIMIT`], the most a read
     /// admits: the text `setup migrate` would write, which it then does not.
     ConfigTooLarge,
-    /// An `operations invoke --definition` whose connector already has an
-    /// instance named `definition` here, or whose instance id an entry here
-    /// already uses (story:invoke-definition-file): the configured one is never
-    /// replaced.
+    /// An `invoke --definition` whose connector already has an instance named
+    /// `definition` here, or whose instance id an entry here already uses
+    /// (story:invoke-definition-file): the configured one is never replaced.
     DefinitionInstanceConfigured,
+    /// A selection names a legacy `[adapters.<alias>]` entry of the catalog
+    /// provider by the name `catalog` gave it, and `setup migrate` derives no
+    /// connector for it, so it is no instance
+    /// (story:connectors-do-short-invocation).
+    LegacyEntryUnmigrated,
 }
 
 /// The most bytes a configuration read admits.
@@ -176,6 +180,7 @@ impl Rule {
             Self::ApprovalClockFormatRetired => "approval_clock_format_retired",
             Self::ConfigTooLarge => "config_too_large",
             Self::DefinitionInstanceConfigured => "definition_instance_configured",
+            Self::LegacyEntryUnmigrated => "legacy_entry_unmigrated",
         }
     }
 }

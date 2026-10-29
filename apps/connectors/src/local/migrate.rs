@@ -516,7 +516,7 @@ mod tests {
         );
         for unchanged in [
             &["c", "setup", "init", "--apply"][..],
-            &["c", "operations", "invoke", "--dry-run"],
+            &["c", "operations", "describe", "--dry-run"],
             &["c", "migrate", "setup", "--apply"],
         ] {
             assert_eq!(shorthand(args(unchanged)), args(unchanged));

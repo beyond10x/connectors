@@ -66,7 +66,7 @@ fn adapter_entry(alias: &str, operations: &[&str]) -> String {
         .collect::<Vec<_>>()
         .join(",");
     format!(
-        "\n[adapters.{alias}]\ninstance_id='{alias}-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.{alias}.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[adapters.{alias}.permissions]\nprofiles=['token']\noperations=[{granted}]\n",
+        "\n[adapters.{alias}]\ninstance_id='{alias}-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.{alias}.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=['--connector','jira']\n[adapters.{alias}.permissions]\nprofiles=['token']\noperations=[{granted}]\n",
         "a".repeat(64),
     )
 }
@@ -209,8 +209,12 @@ fn walk_adapters(root: &tempfile::TempDir, limit: usize) -> Vec<String> {
             args.extend(["--cursor", c.as_str()]);
         }
         let page = success(&command(root, &args));
-        let got = names(&page, "adapters", "adapter");
-        assert!(got.len() <= limit, "page longer than limit {limit}: {page}");
+        // An item names its instance, never its adapter.
+        let got = names(&page, "adapters", "instance");
+        assert!(
+            got.len() <= limit,
+            "story:connectors-do-short-invocation: page longer than limit {limit}: {page}"
+        );
         match page["next_cursor"].as_str() {
             Some(next) => {
                 assert_eq!(got.len(), limit, "short page with a cursor: {page}");
@@ -251,7 +255,11 @@ fn every_entry_appears_exactly_once_around_the_limit() {
     let aliases = (0..64).map(|i| format!("a{i:02}")).collect::<Vec<_>>();
     let root = initialized(&aliases);
     let page = success(&command(&root, &["instances", "list", "--limit", "500"]));
-    assert_eq!(names(&page, "adapters", "adapter"), aliases);
+    assert_eq!(
+        names(&page, "adapters", "instance"),
+        aliases,
+        "story:connectors-do-short-invocation: an item names its instance"
+    );
     assert!(page["next_cursor"].is_null(), "{page}");
     assert_eq!(walk_adapters(&root, 1), aliases);
 }

@@ -253,28 +253,25 @@ fn configured() -> tempfile::TempDir {
     root
 }
 
-/// `operations invoke` of a write reconstructs the approval subject through
-/// the same `approval_issuance::resolve` the approval commands use, so since
-/// this unit its `invalid_input` carries `field` too, which the contract
-/// scopes to the approval commands ("on an approval command, `field` names
-/// the argument"). A connection id the handler refuses is the case here.
+/// `invoke` of a write reconstructs the approval subject through
+/// the same `approval_issuance::resolve` the approval commands use, so its
+/// `invalid_input` could carry the approval commands' `field` values. Since
+/// story:connectors-do-short-invocation every `invalid_input` of `invoke` names
+/// the `invoke` argument it refused, never an approval command's. A
+/// connection id the handler refuses is the case here.
 #[test]
 fn a_write_invoke_refusal_carries_no_approval_field() {
     let root = configured();
     let schema = connectors_host::local::owner::schema(&bootstrap(), OPERATION).unwrap();
+    let target = format!("{CONNECTOR}/{INSTANCE}");
     let output = command(
         root.path(),
         &[
-            "operations",
             "invoke",
-            "--connector",
-            CONNECTOR,
-            "--instance",
-            INSTANCE,
+            &target,
+            OPERATION,
             "--connection",
             "not an id",
-            "--operation",
-            OPERATION,
             "--schema",
             &schema,
             "--revision",
@@ -285,5 +282,8 @@ fn a_write_invoke_refusal_carries_no_approval_field() {
     );
     let data = failure(&output);
     assert_eq!(data["code"], "invalid_input", "{data}");
-    assert_eq!(data.get("field"), None, "{data}");
+    assert_eq!(
+        data["field"], "connection",
+        "story:connectors-do-short-invocation: invoke names the argument it refused: {data}"
+    );
 }
