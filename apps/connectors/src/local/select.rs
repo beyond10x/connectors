@@ -318,9 +318,18 @@ pub(super) fn deprecations(args: &[OsString]) -> Vec<Deprecation> {
                 new: command.path.join(" "),
             })
     });
+    // A command that takes no `--adapter`, as `invoke` takes none
+    // (story:connectors-do-short-invocation), refuses it as any unknown option,
+    // naming no replacement.
+    let adapterless = plan().commands.iter().any(|command| {
+        std::iter::once(&command.path)
+            .chain(&command.aliases)
+            .any(|path| words.starts_with(&path.iter().map(String::as_str).collect::<Vec<_>>()))
+            && !command.arguments.iter().any(|arg| arg.field == "adapter")
+    });
     renamed
         .into_iter()
-        .chain(adapter_selected(args).then_some(Deprecation::Adapter))
+        .chain((adapter_selected(args) && !adapterless).then_some(Deprecation::Adapter))
         .collect()
 }
 

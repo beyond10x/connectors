@@ -17,7 +17,7 @@ The shared boundary an application, an adapter or a host builds on, and the `con
 
 | Package | Directory | In Rust | What it is |
 |---|---|---|---|
-| `connectors` | [`apps/connectors`](https://github.com/beyond10x/connectors/tree/main/apps/connectors) | `use connectors`, binary `connectors` | The connectors command: local setup, connector instances, connections, operations and approvals through a local owner, and the describe, invoke and serve service commands. |
+| `connectors` | [`apps/connectors`](https://github.com/beyond10x/connectors/tree/main/apps/connectors) | `use connectors`, binary `connectors` | The connectors command: invoke a connector's operations, and set up instances, connections and approvals through a local owner. |
 | `connectors-catalog` | [`crates/connectors-catalog`](https://github.com/beyond10x/connectors/tree/main/crates/connectors-catalog) | `use connectors_catalog` | Catalog ingest: a pinned OpenAPI source document compiled into a bundle with the provenance every later artifact cites; never reaches the network. |
 | `connectors-client` | [`crates/connectors-client`](https://github.com/beyond10x/connectors/tree/main/crates/connectors-client) | `use connectors_client` | Generic client that describes an adapter service and invokes its operations over the service wire. |
 | `connectors-contracts` | [`crates/connectors-contracts`](https://github.com/beyond10x/connectors/tree/main/crates/connectors-contracts) | `use connectors_contracts` | Higher-level, provider-neutral data and discovery contracts. |

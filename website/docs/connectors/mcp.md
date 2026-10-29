@@ -3,7 +3,7 @@ title: MCP
 sidebar_position: 21
 description: MCP has specified contracts and a selected command spelling, and no runtime yet; nothing on this page can be configured today.
 lede: MCP is planned, not shipped. Each step below says what is selected and what must land before it runs.
-source: docs/local-mcp-cli.md, apps/connectors/spec/compatibility.json, adapters/mcp/contracts/server/v1alpha1/semantics.md, adapters/mcp/contracts/client/v1alpha1/auth.md
+source: docs/local-mcp-cli.md, adapters/mcp/contracts/server/v1alpha1/semantics.md, adapters/mcp/contracts/client/v1alpha1/auth.md
 connectors: "mcp"
 ---
 

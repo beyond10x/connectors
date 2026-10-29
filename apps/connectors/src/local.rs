@@ -18,6 +18,7 @@ mod cursor;
 mod declarations;
 mod definition;
 mod dialects;
+mod invoke;
 mod list;
 mod migrate;
 mod operations;
@@ -38,6 +39,13 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
         Ok(args) => args,
         Err(refused) => return refused,
     };
+    // `invoke` is prepared as well: its target, connection and pins are
+    // resolved and stated, `--describe` is answered and a write without
+    // approval is refused, before the generated runner reads the command line.
+    let args = match invoke::prepare(args) {
+        Ok(args) => args,
+        Err(answered) => return answered,
+    };
     let deprecations = select::deprecations(&args);
     let json = select::json_output(&args);
     let mut output = run_selected(args);
@@ -47,15 +55,11 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     output
 }
 
-/// The help `connectors::help` rendered; root help is followed by the explicit
-/// service commands, which the generated tree does not carry.
+/// The help `connectors::help` rendered; root help is followed by the native
+/// integration command, which the generated tree does not carry.
 fn help_output(mut stdout: String, root: bool) -> connectors_cli_contract::ProcessOutput {
     if root {
         stdout.push_str("\nNative integration commands (use COMMAND --help for options):\n  server    Serve admitted read-only MCP tools over stdio\n");
-        stdout.push_str("\nExplicit service commands (use COMMAND --help for options):\n");
-        for (name, summary) in connectors::compat::SUMMARIES {
-            stdout.push_str(&format!("  {name:<8}  {summary}\n"));
-        }
     }
     connectors_cli_contract::ProcessOutput {
         exit_code: 0,
@@ -131,6 +135,12 @@ impl Handler for LocalHandler {
     /// Every handler reads the selected alias in `adapter`, whichever selector
     /// named it; a result names its connector and instance beside it.
     fn call(&mut self, call: &Invocation<'_>) -> HandlerReply {
+        // `invoke` selects by its target and names the connector and instance
+        // itself (story:connectors-do-short-invocation).
+        if call.callable == "invoke" {
+            let session = self.0.borrow();
+            return invoke::dispatch(call, session.deadline, session.mutation_deadline);
+        }
         let (mut input, config) = match select::resolve(call) {
             Ok(resolved) => resolved,
             Err(refusal) => return refusal,

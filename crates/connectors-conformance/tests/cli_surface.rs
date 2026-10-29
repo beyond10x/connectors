@@ -90,7 +90,7 @@ fn refusal(output: &ProcessOutput, exit: i32) -> Value {
 }
 
 #[test]
-fn the_selected_inventory_has_thirty_three_commands_and_explicit_runtime_obligations() {
+fn the_selected_inventory_has_thirty_four_commands_and_explicit_runtime_obligations() {
     let plan = connectors_cli_contract::plan();
     let actual: BTreeSet<_> = plan
         .commands
@@ -131,6 +131,8 @@ fn the_selected_inventory_has_thirty_three_commands_and_explicit_runtime_obligat
         "approvals policy-set",
         "approvals prepare",
         "approvals issue",
+        // story:connectors-do-short-invocation
+        "invoke",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -809,12 +811,12 @@ fn dynamic_business_sources_are_acquired_once_and_validate_both_directions() {
     }
 }
 
-/// story:invoke-definition-file: `--definition`, `--definitions-root` and
-/// `--credential-file` are optional path fields of `operations invoke`, handed
-/// to the handler as given. The generated contract keeps `--schema` and
-/// `--revision` required: the host states them for a definition before this
-/// runner reads the command line (`contracts/cli/v1alpha1/semantics.md` §3,
-/// "Invoking a definition file").
+/// story:invoke-definition-file, under story:connectors-do-short-invocation:
+/// `--definition`, `--definitions-root` and `--credential-file` are optional
+/// path fields of `invoke`, handed to the handler as given. The generated
+/// contract keeps the target, `--schema` and `--revision` required: the host
+/// states them for a definition before this runner reads the command line
+/// (`contracts/cli/v1alpha1/semantics.md` §3, "Invoking an operation").
 #[test]
 fn invoke_carries_the_definition_selector_as_optional_path_fields() {
     let definition = [
@@ -825,12 +827,30 @@ fn invoke_carries_the_definition_selector_as_optional_path_fields() {
         "--credential-file",
         "/fixture/client.json",
     ];
-    let mut handler = Recorder::new(invocation_result(json!({"count":1})));
+    let stated = [
+        "invoke",
+        "--connection",
+        "c1",
+        "--schema",
+        "fixture-input",
+        "--revision",
+        "r1",
+        "--output",
+        "json",
+    ];
+    let result = || {
+        Recorder::new(
+            json!({"connector":"forge","instance":"definition","operation":"read",
+            "revision":"r1","result":{"count":1}}),
+        )
+    };
+    let mut handler = result();
     let output = run(
         &[
-            INVOKE,
+            &stated[..],
             &definition,
             &["--input-json", r#"{"selector":"fixture"}"#],
+            &["--", "forge", "read"],
         ]
         .concat(),
         &mut InputSources::default(),
@@ -842,27 +862,30 @@ fn invoke_carries_the_definition_selector_as_optional_path_fields() {
     assert_eq!(input["definition"], "/fixture/defs/connectors/forge.yaml");
     assert_eq!(input["definitions_root"], "/fixture/defs");
     assert_eq!(input["credential_file"], "/fixture/client.json");
+    assert_eq!(
+        (&input["target"], &input["operation"]),
+        (&json!("forge"), &json!("read")),
+        "story:connectors-do-short-invocation: {input}"
+    );
 
-    let mut handler = Recorder::new(invocation_result(json!({"count":1})));
+    // The target left out, as the binary's preparation alone admits it.
+    let mut handler = result();
     let output = run(
         &[
-            &[
-                "operations",
-                "invoke",
-                "--operation",
-                "read",
-                "--output",
-                "json",
-            ][..],
+            &["invoke", "--output", "json"][..],
             &definition,
-            &["--input-json", r#"{"selector":"fixture"}"#],
+            &["--input-json", r#"{"selector":"fixture"}"#, "read"],
         ]
         .concat(),
         &mut InputSources::default(),
         &mut handler,
         Some(&mut FixtureSchemas::default()),
     );
-    assert_eq!(refusal(&output, 2)["error"]["code"], "cli_parse");
+    assert_eq!(
+        refusal(&output, 2)["error"]["code"],
+        "cli_parse",
+        "story:connectors-do-short-invocation"
+    );
     assert_eq!(handler.calls, 0);
 }
 
@@ -1344,7 +1367,8 @@ fn no_alias_or_path_replaces_another_command() {
             reached += 1;
         }
     }
-    assert_eq!(reached, 38);
+    // story:connectors-do-short-invocation: `invoke` is the thirty-fourth path.
+    assert_eq!(reached, 39);
     // What the check refuses, the generated tree would hide: an alias onto
     // `connections list` replaces that command without a word.
     let mut colliding = plan.clone();

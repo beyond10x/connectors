@@ -1,5 +1,6 @@
-//! Adversary cases for story:invoke-definition-file
-//! (`contracts/cli/v1alpha1/semantics.md` §3, "Invoking a definition file", and
+//! Adversary cases for story:invoke-definition-file, run as `invoke --definition
+//! <file> <operation>` (story:connectors-do-short-invocation;
+//! `contracts/cli/v1alpha1/semantics.md` §3, "Invoking a definition file", and
 //! the exit table: a user interruption is `interrupted`, exit 130).
 //!
 //! These cases start no real provider. The definition lowers for real (a
@@ -166,7 +167,7 @@ impl Fixture {
 
 /// SIGINT (the operator's Ctrl-C) arrives while the command prepares the
 /// definition: after the signal handlers `prepare` installs are in place
-/// (`definition.rs` `run`, `protected::Signals::install`), while the derived
+/// (`invoke.rs` `prepare`, `protected::Signals::install`), while the derived
 /// provider is being asked for its bootstrap. The command is interrupted:
 /// exit 130 with an `interrupted` failure, and it records no instance for the
 /// definition. A handler that only sets a flag nobody reads lets the command
@@ -187,11 +188,9 @@ fn adversary_an_interrupt_while_the_definition_is_prepared_ends_the_command() {
     let definition = fixture.definition();
     let mut child = fixture
         .command(&[
-            "operations",
             "invoke",
             "--definition",
             &definition,
-            "--operation",
             "project.get",
             "--input-json",
             r#"{"id":"org/project"}"#,
