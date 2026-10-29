@@ -2,11 +2,14 @@
 format: aep.planning-md/3
 id: story:local-cli-capacity-probe-flake
 kind: story
-status: draft
+status: active
 title: The build probe against a full owner reports not_running instead of capacity in 2 of 5 runs
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-29T13:54:21Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-29T13:54:21Z", actor: "human:timo", revision: 4}
 ---
 ## Defect
 
@@ -33,3 +36,22 @@ named.
 - The cause of `ok:not_running` within 2 s of filling the owner is named with a reproduction.
 - The test passes 200 of 200 runs on Linux under load (`nice -n 19`, at most 4 workers).
 - No `#[ignore]`, retry or longer deadline without the named cause.
+
+## Cause
+
+The test, not the CLI or the owner. The owner serves its startup channel as its first client, in one of its 32 slots (`crates/connectors-host/src/local/owner/transport.rs`, `serve_with_read_policy`: `handle(owner.clone(), startup)`). The test helper `start_owner_in` closed its end of that channel before the owner ran, and `owner_start::wait_listening` returns as soon as the socket file exists, before the owner takes that channel. `fill_owner` then connected 32 clients and a probe. When the owner's thread for the startup channel had not yet read the closed end, the owner counted it plus 31 of the test's clients, refused the 32nd and the probe, and `fill_owner` returned. Then the thread read end-of-file and freed the slot. The CLI's `build` probe and its greeting took that slot and were served, so `instances status` answered `ok:not_running`. On a quiet multi-core host the thread reads the closed channel before the clients arrive, so the race needs load or a single CPU.
+
+The owner behaves as designed: a starting CLI greets on that channel at once, and a slot whose peer has gone frees when the owner reads it.
+
+Reproduction on `wave/d210` from `616aef64f`, with each run executing the test binary on its own (`--exact`):
+
+- Pinned to one CPU (`taskset -c 3`, `nice -n 19`): this test failed 18 of 20 and 19 of 20 runs, and `a_same_build_owner_at_its_client_limit_answers_capacity_not_another_build`, which fills the owner the same way, failed 20 of 20 (exit 0, not 1). Unpinned, it passed 60 of 60.
+- Owner instrumentation (a throw-away build, not committed) showed 34 owner clients for the test's 33 connections. The first was the startup channel: its peer was the test process, and `recv(MSG_PEEK)` on it returned 0 right after the two `capacity` refusals. Its exchange ended `Unavailable`, and the CLI's probe was then admitted at "count before 31".
+
+## Fix
+
+`start_owner_holding_startup` returns the test's end of the startup channel open. `fill_owner` takes that end and holds it with the clients, so a refusal proves the test holds every slot until the owner's 10-second greeting deadline. Both capacity tests use it. The assertion is unchanged. The failure message now gives the elapsed time from the owner's start, when the startup channel's deadline begins.
+
+## Result
+
+After the fix, with the same commands: pinned to one CPU, 20 of 20 and then 50 of 50 runs passed for each of the two tests. Unpinned under 4 parallel workers at `nice -n 19`, 200 of 200 passed. `cargo test -p connectors --test local_cli` passed 27, with 1 ignored that was already ignored.
