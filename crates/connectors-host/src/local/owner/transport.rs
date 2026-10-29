@@ -181,13 +181,23 @@ impl Client {
 
     /// [`Client::connect_until`] to an owner that is already running, greeted by
     /// `authority`, the one an earlier client of this process confirmed
-    /// ([`Client::authority`]), instead of by a fresh read of the store. That
-    /// read takes the store's lifecycle lock, which the owner holds while it
-    /// records the work it serves; a caller that must answer within a short
-    /// lease (the MCP server's data lease, 1.9 s) cannot wait on it. The owner
-    /// still refuses an authority that is not its own, and starts nothing.
+    /// ([`Client::authority`]). The store's own authority is read only when its
+    /// lifecycle lock is free: the owner holds that lock while it records the
+    /// work it serves, and a caller that must answer within a short lease (the
+    /// MCP server's data lease, 1.9 s) cannot wait on it. A store that is gone
+    /// or names another authority refuses; a held lock defers that comparison
+    /// to the next call. The owner still refuses an authority that is not its
+    /// own, and a reconnect starts no owner.
     pub fn reconnect_until(paths: &Paths, authority: &str, deadline: Instant) -> Result<Self> {
         approval_issuance::check(deadline)?;
+        match Metadata::authority_unless_locked_until(&paths.state, deadline) {
+            Ok(Some(current)) if current.to_string() != authority => {
+                return Err(Code::ReadinessMismatch.into());
+            }
+            Ok(_) => {}
+            Err(_) if Instant::now() >= deadline => return Err(Code::Timeout.into()),
+            Err(error) => return Err(error.into()),
+        }
         let client = Self::connect_as(paths, false, VERSION, authority, deadline)?;
         approval_issuance::check(deadline)?;
         client.same_build()?;

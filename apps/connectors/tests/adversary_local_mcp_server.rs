@@ -846,6 +846,54 @@ fn adversary_a_store_held_past_one_lease_leaves_the_session_ready() {
     peer.finish();
 }
 
+/// Security review of story:mcp-long-read-exits-under-load. The owner is bound
+/// to the store authority it read at start (contracts/cli/v1alpha1/owner.md),
+/// and a lease is renewed only while the host still admits the session, under
+/// the same authority check as revocation; an authority that cannot be
+/// verified at renewal enters closing (contracts/sessions/v1alpha1/semantics.md
+/// § 4.1, adapters/mcp/contracts/server/v1alpha1/semantics.md § 2, § 3.3).
+/// Here the store is removed and `setup init` creates a new one, with a new
+/// authority, in the same state directory while the owner keeps running. The
+/// running owner is no longer the store's authority, so the next renewal must
+/// fail and the session must end within one lease plus the renewal interval.
+#[test]
+fn adversary_a_store_replaced_under_the_owner_ends_the_session() {
+    let served = Served::new();
+    let mut peer = Peer::start(&served, true);
+    assert!(peer.request(1, "ping", json!({})).get("result").is_some());
+    let state = served.container.path(STATE);
+    for name in [
+        "metadata.sqlite3",
+        "metadata.sqlite3-wal",
+        "metadata.sqlite3-shm",
+    ] {
+        match fs::remove_file(state.join(name)) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => panic!("removing {name}: {error}"),
+        }
+    }
+    let init = success(&served.container.run(&["setup", "init"]));
+    assert_eq!(init["disposition"], "state_initialized", "{init}");
+    let replaced = Instant::now();
+    let until = replaced + Duration::from_secs(5);
+    let status = loop {
+        if let Some(status) = peer.child.try_wait().unwrap() {
+            break Some(status);
+        }
+        if Instant::now() >= until {
+            break None;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    assert!(
+        status.is_some_and(|status| !status.success()),
+        "the store the owner is bound to was replaced (new authority) and the session still \
+         renewed its data lease: after {:?} the server is {status:?}",
+        replaced.elapsed()
+    );
+}
+
 /// 2025-11-25 lifecycle: between the `initialize` response and the
 /// `notifications/initialized` notification a client may still send `ping`
 /// ("The client SHOULD NOT send requests other than pings before the server
