@@ -41,9 +41,14 @@ use std::{
 static STANDIN_PROVIDER: extern "C" fn() = standin_provider;
 
 extern "C" fn standin_provider() {
-    let provider = std::env::args().any(|arg| {
-        arg == "--print-local-bootstrap" || arg == "--print-profiles" || arg == "--connector"
-    });
+    let args: Vec<String> = std::env::args().collect();
+    // story:connectors-do-short-invocation: the jailed adapter child is started
+    // as `--exact <fixture> -- --connector jira` (`support/mounted.rs`), so a
+    // filtered harness run is never the provider.
+    let provider = !args.iter().any(|arg| arg == "--exact")
+        && args.iter().any(|arg| {
+            arg == "--print-local-bootstrap" || arg == "--print-profiles" || arg == "--connector"
+        });
     if provider {
         standin::main(&[]);
         std::process::exit(0);

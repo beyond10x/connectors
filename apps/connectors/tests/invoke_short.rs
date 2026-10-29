@@ -773,6 +773,188 @@ fn a_legacy_catalog_entry_is_named_by_its_derived_connector() {
     }
 }
 
+/// A root holding instance `fixture/main`, the legacy catalog entry `jira-old`
+/// whose connector `setup migrate` derives as `jira`, and the legacy catalog
+/// entry `legacy` whose connector cannot be derived; every description cached.
+fn configured_with_legacy() -> tempfile::TempDir {
+    let legacy = |alias: &str, id: &str, args: &str| {
+        format!(
+            "[adapters.{alias}]\ninstance_id='{id}'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.{alias}.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs={args}\n[adapters.{alias}.permissions]\nprofiles=['token']\noperations=['{READ}','{WRITE}']\n",
+            "a".repeat(64)
+        )
+    };
+    let extra = legacy("jira-old", "jira-old", "['--connector','jira']")
+        + &legacy("legacy", "legacy-local", "[]");
+    let root = configured(&[&MAIN], &extra);
+    let paths = Paths {
+        config: root.path().join("config/config.toml"),
+        state: root.path().join("state"),
+    };
+    let config = Config::load(&paths.config).unwrap();
+    for (alias, id) in [("jira-old", "jira-old"), ("legacy", "legacy-local")] {
+        runtime::state::State::new(&paths.state)
+            .remember(&config.adapters[alias].selection(), &bootstrap(id))
+            .unwrap();
+    }
+    root
+}
+
+/// Whether any object in `value` names `catalog` as its connector.
+fn names_catalog(value: &Value) -> bool {
+    match value {
+        Value::Object(fields) => {
+            fields.get("connector") == Some(&json!("catalog")) || fields.values().any(names_catalog)
+        }
+        Value::Array(items) => items.iter().any(names_catalog),
+        Value::String(text) => text.starts_with("catalog/"),
+        _ => false,
+    }
+}
+
+/// story:connectors-do-short-invocation: `instances list` names each instance
+/// by its connector and instance only, a legacy catalog entry by the
+/// connector `setup migrate` derives for it; an entry no connector is derived
+/// for is no instance and is named in `unmigrated` by its alias.
+#[test]
+fn instances_list_names_the_connector_and_instance_only() {
+    let root = configured_with_legacy();
+    let output = run(root.path(), &["instances", "list"]);
+    let result = success(&output);
+    let envelope: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert!(
+        !names_adapter(&envelope) && !names_catalog(&envelope),
+        "story:connectors-do-short-invocation: {envelope}"
+    );
+    let items = result["adapters"].as_array().unwrap();
+    let mut named: Vec<(String, String)> = items
+        .iter()
+        .map(|item| {
+            let keys: BTreeSet<&str> = item
+                .as_object()
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect();
+            assert_eq!(
+                keys,
+                BTreeSet::from(["connector", "instance", "instance_id", "startup", "restart"]),
+                "story:connectors-do-short-invocation: {item}"
+            );
+            (
+                item["connector"].as_str().unwrap().to_owned(),
+                item["instance"].as_str().unwrap().to_owned(),
+            )
+        })
+        .collect();
+    named.sort();
+    assert_eq!(
+        named,
+        [
+            ("fixture".to_owned(), "main".to_owned()),
+            ("jira".to_owned(), "jira-old".to_owned())
+        ],
+        "story:connectors-do-short-invocation: {result}"
+    );
+    assert_eq!(
+        result["unmigrated"],
+        json!(["legacy"]),
+        "story:connectors-do-short-invocation: {result}"
+    );
+}
+
+/// story:connectors-do-short-invocation: an `invoke` answer and every refusal
+/// over a configuration holding legacy catalog entries name the connector and
+/// instance only: no `adapter` member and no `catalog` connector.
+#[test]
+fn invoke_answers_over_legacy_entries_name_no_adapter_and_no_catalog() {
+    let root = configured_with_legacy();
+    for args in [
+        &["invoke", "jira", READ, "--describe"][..],
+        &["invoke", "jira/jira-old", READ, "--input-json", "{}"],
+        &["invoke", CONNECTOR, READ, "--input-json", "{}"],
+        &[
+            "invoke",
+            "fixture/main",
+            WRITE,
+            "--connection",
+            "c1",
+            "--input-json",
+            "{}",
+        ],
+        &[
+            "invoke",
+            "fixture/main",
+            READ,
+            "--connection",
+            "c1",
+            "--revision",
+            "x",
+            "--input-json",
+            "{}",
+        ],
+        &["invoke", "catalog", READ, "--input-json", "{}"],
+        &["invoke", "catalog/legacy", READ, "--input-json", "{}"],
+        &["invoke", "nosuch", READ, "--input-json", "{}"],
+    ] {
+        let output = run(root.path(), args);
+        let stream = if output.status.success() {
+            &output.stdout
+        } else {
+            &output.stderr
+        };
+        let envelope: Value = serde_json::from_slice(stream)
+            .unwrap_or_else(|_| panic!("one JSON envelope: {args:?}: {output:?}"));
+        assert!(
+            !names_adapter(&envelope) && !names_catalog(&envelope),
+            "story:connectors-do-short-invocation: {args:?}: {envelope}"
+        );
+    }
+    let described = success(&run(root.path(), &["invoke", "jira", READ, "--describe"]));
+    assert_eq!(
+        (&described["connector"], &described["instance"]),
+        (&json!("jira"), &json!("jira-old")),
+        "story:connectors-do-short-invocation: {described}"
+    );
+}
+
+/// story:connectors-do-short-invocation: selecting a legacy catalog entry no
+/// connector is derived for, by the name `catalog` gave it, is refused
+/// `invalid_configuration` naming the rule `legacy_entry_unmigrated`, whether
+/// an `invoke` target or `--connector`/`--instance` selects it.
+#[test]
+fn selecting_an_unmigrated_legacy_entry_is_refused_by_its_rule() {
+    let root = configured_with_legacy();
+    let expected = json!({"kind":"usage","code":"invalid_configuration","stage":"configuration",
+        "next_action":"check_configuration","configuration_rule":"legacy_entry_unmigrated"});
+    for args in [
+        &["invoke", "catalog/legacy", READ, "--input-json", "{}"][..],
+        &["invoke", "catalog/legacy", READ, "--describe"],
+        &[
+            "operations",
+            "list",
+            "--connector",
+            "catalog",
+            "--instance",
+            "legacy",
+        ],
+        &[
+            "instances",
+            "describe",
+            "--connector",
+            "catalog",
+            "--instance",
+            "legacy",
+        ],
+    ] {
+        let (code, data) = refusal(&run(root.path(), args));
+        assert_eq!(
+            (code, data),
+            (Some(2), expected.clone()),
+            "story:connectors-do-short-invocation: {args:?}"
+        );
+    }
+}
+
 /// story:connectors-do-short-invocation: no `invoke` answer, success or
 /// refusal, carries an `adapter` member.
 #[test]

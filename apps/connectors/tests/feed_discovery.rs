@@ -34,7 +34,7 @@ mod consumer {
     pub const CONTAINERS: &str = "feed.containers";
     pub const ITEMS: &str = "feed.items";
 
-    /// What `operations invoke` selects one operation by.
+    /// What `invoke` selects one operation by.
     #[derive(Debug)]
     pub struct Selection {
         pub operation: String,
@@ -368,7 +368,7 @@ fn a_consumer_built_before_the_adapter_finds_and_describes_its_feed_binding() {
     assert_eq!(binding.containers.operation, "feed.containers");
     assert_eq!(binding.items.operation, "feed.items");
 
-    // Each selection is exactly what `operations invoke` admission compares: the operation is
+    // Each selection is exactly what `invoke` admission compares: the operation is
     // exposed and granted, and the schema identity and revision are current.
     let paths = paths(&root);
     for selection in [&binding.containers, &binding.items] {

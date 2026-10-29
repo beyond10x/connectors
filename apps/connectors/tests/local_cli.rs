@@ -288,7 +288,9 @@ fn clock_check_legacy_format_refusal() {
     ));
     // The retired table no longer fails the whole configuration.
     let listed = success(&command(&root, &["instances", "list"]));
-    assert_eq!(listed["adapters"][0]["adapter"], "forge", "{listed}");
+    // `forge` names no derivable connector, so it is listed as unmigrated
+    // (story:connectors-do-short-invocation).
+    assert_eq!(listed["unmigrated"][0], "forge", "{listed}");
     let refused = command(&root, &["approvals", "clock-check", "--adapter", "forge"]);
     assert_eq!(refused.status.code(), Some(2));
     let error = String::from_utf8(refused.stderr).unwrap();
@@ -491,7 +493,10 @@ fn inventory_and_unavailable_status_never_launch_configured_executable() {
         );
     fs::write(&config_path, config).unwrap();
     let list = success(&command(&root, &["instances", "list"]));
-    assert_eq!(list["adapters"][0]["adapter"], "forge");
+    // `forge` names no derivable connector, so it is listed as unmigrated
+    // (story:connectors-do-short-invocation).
+    assert_eq!(list["adapters"], serde_json::json!([]), "{list}");
+    assert_eq!(list["unmigrated"], serde_json::json!(["forge"]), "{list}");
     let status = success(&command(
         &root,
         &["instances", "status", "--adapter", "forge"],

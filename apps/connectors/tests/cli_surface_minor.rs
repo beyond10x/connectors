@@ -212,11 +212,18 @@ fn every_adapter_command_answers_an_unknown_alias_at_admission() {
         ],
         vec!["operations", "list"],
         vec!["operations", "describe", "--operation", "o"],
-        [&["operations", "invoke"][..], &selected].concat(),
     ];
     let mut wrong = Vec::new();
-    for args in &commands {
-        let output = command(&root, &[&args[..], &["--adapter", "nosuch"]].concat());
+    // story:connectors-do-short-invocation: `invoke` names its instance in its
+    // target rather than by `--adapter`, and answers an unknown one the same way.
+    let invoke = [&["invoke", "nosuch", "o"][..], &selected[8..]].concat();
+    for args in commands.iter().chain([&invoke]) {
+        let selector: &[&str] = if args[0] == "invoke" {
+            &[]
+        } else {
+            &["--adapter", "nosuch"]
+        };
+        let output = command(&root, &[&args[..], selector].concat());
         let envelope: Value = serde_json::from_slice(&output.stderr).unwrap_or_default();
         let data = &envelope["error"]["data"];
         if output.status.code() != Some(1)
@@ -229,7 +236,7 @@ fn every_adapter_command_answers_an_unknown_alias_at_admission() {
             wrong.push(format!("{}: {envelope}", args[..2].join(" ")));
         }
     }
-    assert_eq!(commands.len(), 24);
+    assert_eq!(commands.len(), 23);
     assert!(wrong.is_empty(), "{wrong:#?}");
 }
 
@@ -339,7 +346,7 @@ fn configured() -> (tempfile::TempDir, String) {
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
         + &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[adapters.forge.permissions]\nprofiles=['token']\noperations=['{OPERATION}']\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=['--connector','jira']\n[adapters.forge.permissions]\nprofiles=['token']\noperations=['{OPERATION}']\n",
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
@@ -383,14 +390,11 @@ fn c05_wrong_business_input_codes() {
         let output = command(
             &root,
             &[
-                "operations",
                 "invoke",
-                "--adapter",
-                "forge",
+                "jira/forge",
+                OPERATION,
                 "--connection",
                 "conn-1",
-                "--operation",
-                OPERATION,
                 "--schema",
                 &schema,
                 "--revision",
@@ -436,19 +440,13 @@ fn c05_wrong_business_input_codes() {
 fn c05_business_input_sources() {
     let (root, schema) = configured();
     let base = [
-        "operations",
         "invoke",
-        // An unmigrated entry is selected by its adapter id and alias
-        // (story:cli-connector-instance-selectors); `--adapter` would add a
-        // `deprecations` member to the exact envelope asserted below.
-        "--connector",
-        "catalog",
-        "--instance",
-        "forge",
+        // The legacy entry is named by the connector its arguments declare
+        // (story:connectors-do-short-invocation).
+        "jira/forge",
+        OPERATION,
         "--connection",
         "conn-1",
-        "--operation",
-        OPERATION,
         "--schema",
         &schema,
         "--revision",
@@ -486,6 +484,22 @@ fn code(output: &Output) -> String {
         error["code"].as_str().unwrap_or("?").to_owned()
     };
     format!("{}/{}", output.status.code().unwrap(), code)
+}
+
+/// `invoke <target>` of [`OPERATION`] on `conn-1`, its schema and revision pinned so
+/// the call reaches the input checks with no provider running.
+fn short_args<'a>(target: &'a str, schema: &'a str) -> Vec<&'a str> {
+    vec![
+        "invoke",
+        target,
+        OPERATION,
+        "--connection",
+        "conn-1",
+        "--schema",
+        schema,
+        "--revision",
+        REVISION,
+    ]
 }
 
 fn invoke_args<'a>(verb: &[&'a str], alias: &'a str, schema: &'a str) -> Vec<&'a str> {
@@ -552,7 +566,7 @@ fn c05_depth_past_the_decoder_limit_is_cli_dynamic_input() {
         fs::write(&file, document).unwrap();
         #[cfg(unix)]
         fs::set_permissions(&file, fs::Permissions::from_mode(0o600)).unwrap();
-        let mut args = invoke_args(&["operations", "invoke"], "forge", &schema);
+        let mut args = short_args("jira/forge", &schema);
         args.extend(["--input-file", file.to_str().unwrap()]);
         seen.push((arrays + 1, code(&command(&root, &args))));
     }
@@ -569,8 +583,11 @@ fn c05_depth_past_the_decoder_limit_is_cli_dynamic_input() {
     );
 }
 
-/// Precedence: the four document-taking commands read their document before
-/// admitting the alias; every other command answers `not_found` at admission.
+/// Precedence: the three approval document-taking commands read their document
+/// before admitting the alias; every other command answers `not_found` at
+/// admission. `invoke` resolves its target before the generated runner reads
+/// its input, so an unknown target is `not_found` whatever the document
+/// (story:connectors-do-short-invocation).
 #[test]
 fn document_commands_refuse_the_document_before_an_unknown_alias() {
     let root = initialized();
@@ -579,12 +596,14 @@ fn document_commands_refuse_the_document_before_an_unknown_alias() {
     let proof = root.path().join("proof");
     let proof = proof.to_str().unwrap();
     let with = |verb: &[&'static str], source: &[&'static str]| -> Vec<String> {
-        let mut args: Vec<String> = invoke_args(verb, "nosuch", "s")
-            .into_iter()
-            .map(String::from)
-            .collect();
+        let selected = if verb[0] == "invoke" {
+            short_args("jira/nosuch", "s")
+        } else {
+            invoke_args(verb, "nosuch", "s")
+        };
+        let mut args: Vec<String> = selected.into_iter().map(String::from).collect();
         args.extend(source.iter().map(|s| s.to_string()));
-        if verb[1] == "issue" {
+        if verb[verb.len() - 1] == "issue" {
             args.extend(["--approve-subject", "x", "--proof-output", proof].map(String::from));
         }
         args
@@ -595,20 +614,20 @@ fn document_commands_refuse_the_document_before_an_unknown_alias() {
     };
     let mut seen = Vec::new();
     for verb in [
-        &["operations", "invoke"][..],
+        &["invoke"][..],
         &["approvals", "prepare"][..],
         &["approvals", "issue"][..],
     ] {
         let mut args = with(verb, &[]);
         args.extend(["--input-file".to_owned(), absent.to_owned()]);
-        seen.push((verb[1], "absent", run(args)));
+        seen.push((verb[verb.len() - 1], "absent", run(args)));
         seen.push((
-            verb[1],
+            verb[verb.len() - 1],
             "malformed",
             run(with(verb, &["--input-json", "{\"name\":"])),
         ));
         seen.push((
-            verb[1],
+            verb[verb.len() - 1],
             "readable",
             run(with(verb, &["--input-json", "{}"])),
         ));
@@ -634,8 +653,8 @@ fn document_commands_refuse_the_document_before_an_unknown_alias() {
     assert_eq!(
         seen,
         [
-            ("invoke", "absent", owner.clone()),
-            ("invoke", "malformed", "2/cli_dynamic_input".to_owned()),
+            ("invoke", "absent", absent_alias.clone()),
+            ("invoke", "malformed", absent_alias.clone()),
             ("invoke", "readable", absent_alias.clone()),
             ("prepare", "absent", owner.clone()),
             ("prepare", "malformed", owner.clone()),

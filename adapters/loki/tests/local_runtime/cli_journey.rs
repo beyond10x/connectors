@@ -1,6 +1,6 @@
 //! Production CLI, real private owner/adapter processes and disposable custody.
 //! The Loki counterpart of the Kubernetes journey: a saved `loki.bearer`
-//! connection answers every advertised read through `operations invoke` against
+//! connection answers every advertised read through `invoke` against
 //! the recorded fixtures, and `connections revalidate` repeats the identity probe.
 use super::*;
 use connectors_host::local::{config::Paths, keyring, owner};
@@ -295,7 +295,7 @@ fn configure(cli: &Cli, provider: &Provider, custody: &Custody) {
     connectors_host::local::config::Config::load(&cli.paths.config).unwrap();
 }
 
-/// `operations describe`, then `operations invoke` with the described schema
+/// `operations describe`, then `invoke` with the described schema
 /// and revision, on the saved connection.
 fn invoke_saved(cli: &Cli, connection: &str, operation: &str, input: Value) -> Value {
     let describe = success(cli.run(&[
@@ -310,14 +310,11 @@ fn invoke_saved(cli: &Cli, connection: &str, operation: &str, input: Value) -> V
     let revision = describe["revision"].as_str().unwrap().to_owned();
     let input = input.to_string();
     success(cli.run(&[
-        "operations",
         "invoke",
-        "--adapter",
-        "logs",
+        "loki/logs",
+        operation,
         "--connection",
         connection,
-        "--operation",
-        operation,
         "--schema",
         &schema,
         "--revision",
