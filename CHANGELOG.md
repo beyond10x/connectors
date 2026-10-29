@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+
+- ESS 0.77.0 (from 0.75.0). No user-visible effect: the specifications stay at their current
+  formats, and the regenerated types differ only in the generator version they name.
+
 ## 0.59.1 — 2026-10-29
 
 No breaking changes. No change in the CLI's or the owner's behaviour.
