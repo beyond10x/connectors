@@ -293,8 +293,8 @@ mod tests {
 
     /// story:connectors-do-short-invocation: an endpoint the configuration
     /// would refuse (empty, whitespace, a control character, over 2048 bytes)
-    /// is `invalid_input` naming `endpoint`; one the provider refuses is the
-    /// configuration's refusal. Neither writes anything.
+    /// is `invalid_input` naming `endpoint`; so is one the provider refuses
+    /// while deriving the instance. None writes anything.
     pub fn an_endpoint_the_configuration_refuses_is_refused_without_writing() {
         let installation = Installation::new();
         let before = installation.configure("");
@@ -318,13 +318,21 @@ mod tests {
             );
             assert_eq!(installation.text(), before, "{endpoint:?}");
         }
-        let (_, data) = refusal(&run(
+        // story:connectors-do-short-invocation, decision 2 of the U2 review:
+        // an endpoint the provider refuses while deriving the instance is the
+        // argument's refusal, no longer the configuration's.
+        let (code, data) = refusal(&run(
             &installation,
             &with(GITLAB, &["--endpoint", "https://refuse.example.test"]),
         ));
+        assert_eq!(code, Some(2), "{data}");
         assert_eq!(
-            (&data["code"], &data["stage"]),
-            (&json!("invalid_configuration"), &json!("configuration")),
+            (&data["code"], &data["stage"], &data["field"]),
+            (
+                &json!("invalid_input"),
+                &json!("arguments"),
+                &json!("endpoint")
+            ),
             "{data}"
         );
         assert_eq!(installation.text(), before);
