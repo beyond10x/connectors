@@ -13,16 +13,18 @@ use connectors_oauth2::DeviceDialect;
 use connectors_sdk::Secret;
 use std::{collections::BTreeMap, ffi::OsString};
 
-/// A bare `--device` is `--device true`, and a bare `--reveal` is `--reveal
-/// true`: `ess-cli/1` has no valueless switch source. Only the arguments of
-/// `connections connect`, `reconnect` or its deprecated name `repair`
-/// (`--device`), and of `connections token` (`--reveal`), before a first `--`
-/// are rewritten, and a switch already followed by `true` or `false` is left
-/// as it is.
+/// A bare `--device` is `--device true`, a bare `--reveal` is `--reveal true`
+/// and a bare `--describe` is `--describe true`: `ess-cli/1` has no valueless
+/// switch source. Only the arguments of `connections connect`, `reconnect` or
+/// its deprecated name `repair` (`--device`), of `connections token`
+/// (`--reveal`) and of `invoke` (`--describe`,
+/// story:connectors-do-short-invocation), before a first `--` are rewritten,
+/// and a switch already followed by `true` or `false` is left as it is.
 pub(super) fn switch_shorthand(args: Vec<OsString>) -> Vec<OsString> {
     let switch = match command(&args).as_slice() {
         ["connections", "connect" | "reconnect" | "repair"] => "--device",
         ["connections", "token"] => "--reveal",
+        ["invoke", ..] => "--describe",
         _ => return args,
     };
     let mut rewritten = Vec::with_capacity(args.len() + 1);
@@ -302,6 +304,45 @@ mod tests {
             &["c", "connections", "token", "--device"],
             &["c", "connections", "connect", "--reveal"],
             &["c", "connections", "token", "--", "--reveal"],
+        ] {
+            assert_eq!(switch_shorthand(args(unchanged)), args(unchanged));
+        }
+    }
+
+    /// story:connectors-do-short-invocation: a bare `invoke --describe` reads
+    /// `--describe true`, wherever it stands before a first `--`.
+    #[test]
+    fn a_bare_describe_switch_reads_true_on_invoke_only() {
+        assert_eq!(
+            switch_shorthand(args(&["c", "invoke", "fixture", "item.read", "--describe"])),
+            args(&["c", "invoke", "fixture", "item.read", "--describe", "true"])
+        );
+        assert_eq!(
+            switch_shorthand(args(&[
+                "c",
+                "--output",
+                "json",
+                "invoke",
+                "--describe",
+                "fixture",
+                "item.read"
+            ])),
+            args(&[
+                "c",
+                "--output",
+                "json",
+                "invoke",
+                "--describe",
+                "true",
+                "fixture",
+                "item.read"
+            ])
+        );
+        for unchanged in [
+            &["c", "invoke", "fixture", "item.read", "--describe", "false"][..],
+            &["c", "invoke", "fixture", "--", "--describe"],
+            &["c", "operations", "invoke", "--describe"],
+            &["c", "connections", "token", "--describe"],
         ] {
             assert_eq!(switch_shorthand(args(unchanged)), args(unchanged));
         }

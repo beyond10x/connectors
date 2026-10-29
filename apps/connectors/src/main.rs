@@ -1,4 +1,3 @@
-mod legacy;
 mod local;
 mod mcp;
 
@@ -52,70 +51,11 @@ fn main() {
     if mcp::selected(&args) {
         std::process::exit(mcp::run(args));
     }
-    let args = legacy_help(args);
-    if legacy_route(&args) {
-        let runtime = tokio::runtime::Runtime::new().expect("create compatibility runtime");
-        runtime.block_on(legacy::main(args));
-        return;
-    }
-    let completions = is_bash_completions(&args);
-    let mut output = local::run(args);
-    if completions && output.exit_code == 0 {
-        output.stdout.push_str(&legacy::completion());
-    }
+    let output = local::run(args);
     use std::io::Write;
     let written = std::io::stdout()
         .lock()
         .write_all(output.stdout.as_bytes())
         .and_then(|_| std::io::stderr().lock().write_all(output.stderr.as_bytes()));
     std::process::exit(if written.is_ok() { output.exit_code } else { 1 });
-}
-
-/// Rewrites exactly `help COMMAND` to `COMMAND --help` when COMMAND is an
-/// explicit service command. Every other argument list, including one with a
-/// leading global, is returned unchanged.
-fn legacy_help(mut args: Vec<std::ffi::OsString>) -> Vec<std::ffi::OsString> {
-    if args.len() == 3
-        && args[1] == "help"
-        && matches!(args[2].to_str(), Some("describe" | "invoke" | "serve"))
-    {
-        args.remove(1);
-        args.push("--help".into());
-    }
-    args
-}
-
-/// Whether the words other than process globals are exactly `completions bash`.
-/// The generated parser accepts its globals anywhere, so they are skipped anywhere.
-fn is_bash_completions(args: &[std::ffi::OsString]) -> bool {
-    let mut words = Vec::new();
-    let mut rest = args.iter().skip(1);
-    while let Some(arg) = rest.next() {
-        match arg.to_str() {
-            Some("--output" | "--config" | "--state-dir") => {
-                rest.next();
-            }
-            Some(arg)
-                if ["--output=", "--config=", "--state-dir="]
-                    .iter()
-                    .any(|prefix| arg.starts_with(prefix)) => {}
-            word => words.push(word),
-        }
-    }
-    words == [Some("completions"), Some("bash")]
-}
-
-/// Whether the command word, after any leading `--output` selections, is an
-/// explicit service command. Only the output global applies to those commands.
-fn legacy_route(args: &[std::ffi::OsString]) -> bool {
-    let mut rest = args.iter().skip(1);
-    while let Some(arg) = rest.next() {
-        match arg.to_str() {
-            Some("--output") if rest.next().is_some() => {}
-            Some(arg) if arg.starts_with("--output=") => {}
-            Some("describe" | "invoke" | "serve") => return true,
-            _ => return false,
-        }
-    }
-    false
 }

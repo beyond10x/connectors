@@ -1,6 +1,6 @@
 [package]
 name = "connectors"
-description = "The connectors command: local setup, connector instances, connections, operations and approvals through a local owner, and the describe, invoke and serve service commands."
+description = "The connectors command: invoke a connector's operations, and set up instances, connections and approvals through a local owner."
 version.workspace = true
 edition.workspace = true
 rust-version = "1.91"
@@ -12,18 +12,15 @@ connectors-catalog = { path = "../../crates/connectors-catalog" }
 connectors-catalog-provider = { path = "../../adapters/catalog" }
 connectors-core.workspace = true
 connectors-sdk.workspace = true
-connectors-client.workspace = true
 connectors-host.workspace = true
 connectors-oauth2.workspace = true
 connectors-mcp = { path = "../../adapters/mcp/runtime" }
 connectors_cli_contract.workspace = true
 clap.workspace = true
-clap_complete = "4"
 hex.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 time.workspace = true
-tokio.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]

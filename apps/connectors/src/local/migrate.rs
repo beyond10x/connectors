@@ -230,6 +230,13 @@ fn connector_of(adapter: &Adapter) -> Result<String, Kept> {
         .ok_or(Kept::Reason("connector_undeclared"))
 }
 
+/// The connector `setup migrate` would map the legacy entry `adapter` to, if
+/// any: the name `invoke` knows that entry's connector by
+/// (story:connectors-do-short-invocation).
+pub(super) fn derived_connector(adapter: &Adapter) -> Option<String> {
+    connector_of(adapter).ok()
+}
+
 /// The value of `--<name> <value>` or `--<name>=<value>` in `args`.
 fn option<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
     let mut rest = args.iter();
