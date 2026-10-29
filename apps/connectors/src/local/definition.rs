@@ -188,7 +188,7 @@ fn parse(args: &[OsString]) -> Option<Request> {
 
 /// The one failure envelope a refused preparation writes, as the generated
 /// runner writes a handler's.
-fn render(reply: HandlerReply, json: bool) -> ProcessOutput {
+pub(super) fn render(reply: HandlerReply, json: bool) -> ProcessOutput {
     let (code, data, usage) = match reply {
         HandlerReply::UsageError { code, data } => (code, data, true),
         HandlerReply::Error { code, data } => (code, data, false),

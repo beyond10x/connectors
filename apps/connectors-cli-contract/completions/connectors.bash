@@ -1520,7 +1520,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__connections__subcmd__connect)
-            opts="-h --adapter --connector --instance --profile --device --credential-file --credential-stdin --credential-prompt --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --profile --device --credential-file --credential-stdin --credential-prompt --endpoint --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1547,6 +1547,10 @@ _connectors() {
                     return 0
                     ;;
                 --credential-file)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --endpoint)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

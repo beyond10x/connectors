@@ -453,7 +453,7 @@ commands:
   - path: [connections, connect]
     aliases: []
     callable: connections-connect
-    about: Begin admitted local protected credential acquisition
+    about: Begin admitted local protected credential acquisition on <connector>/<instance>; --endpoint first writes that instance's endpoint into the configuration
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
@@ -467,6 +467,10 @@ commands:
         source: {kind: option, long: device}
       - field: credential_document
         source: {kind: protected, file: credential-file, stdin: credential-stdin, hidden_tty: credential-prompt}
+      - field: target
+        source: {kind: positional, index: 1}
+      - field: endpoint
+        source: {kind: option, long: endpoint}
   - path: [connections, reconnect]
     aliases: [[connections, repair]]
     callable: connections-reconnect
