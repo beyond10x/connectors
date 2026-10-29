@@ -165,7 +165,10 @@ fn write_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     set_mode(path, 0o444)
 }
 
-/// An existing entry holds exactly this index's bytes and its files.
+/// An existing entry is a directory, not a link, holding exactly this index's
+/// bytes and its files and nothing else, read-only as [`write_entry`] left it. A
+/// difference is [`Refusal::DigestMismatch`] naming the path: a file of the
+/// release relative to the release, `index.json`, or the entry's own name.
 fn verify_entry(entry: &Path, index_bytes: &[u8], index: &Index) -> Result<(), Refusal> {
     if fs::read(entry.join("index.json")).ok().as_deref() != Some(index_bytes) {
         return Err(Refusal::DigestMismatch("index.json".to_owned()));
@@ -178,7 +181,80 @@ fn verify_entry(entry: &Path, index_bytes: &[u8], index: &Index) -> Result<(), R
             return Err(Refusal::DigestMismatch(file.path.clone()));
         }
     }
+    let named = |path: &Path| -> Refusal {
+        let path = if path.as_os_str().is_empty() {
+            entry.file_name().map(PathBuf::from).unwrap_or_default()
+        } else {
+            path.strip_prefix("files")
+                .ok()
+                .filter(|inner| !inner.as_os_str().is_empty())
+                .unwrap_or(path)
+                .to_owned()
+        };
+        Refusal::DigestMismatch(path.to_string_lossy().into_owned())
+    };
+    let mut expected: BTreeMap<PathBuf, bool> = BTreeMap::new();
+    expected.insert(PathBuf::from("index.json"), false);
+    expected.insert(PathBuf::from("files"), true);
+    for file in &index.files {
+        let path = Path::new("files").join(&file.path);
+        let mut parent = path.parent();
+        while let Some(directory) = parent.filter(|p| !p.as_os_str().is_empty()) {
+            expected.insert(directory.to_owned(), true);
+            parent = directory.parent();
+        }
+        expected.insert(path, false);
+    }
+    let mut held = BTreeMap::new();
+    held_tree(entry, Path::new(""), &mut held).map_err(|path| named(&path))?;
+    for (path, is_directory) in &held {
+        if expected.get(path) != Some(is_directory) {
+            return Err(named(path));
+        }
+    }
+    if let Some(path) = expected.keys().find(|path| !held.contains_key(*path)) {
+        return Err(named(path));
+    }
     Ok(())
+}
+
+/// Records every path beneath `root.join(relative)` in `held`, `true` for a
+/// directory. Returns the first path, relative to `root`, that is neither a
+/// regular file of mode 0444 nor a directory of mode 0555 (a link included).
+fn held_tree(
+    root: &Path,
+    relative: &Path,
+    held: &mut BTreeMap<PathBuf, bool>,
+) -> Result<(), PathBuf> {
+    let path = root.join(relative);
+    let metadata = fs::symlink_metadata(&path).map_err(|_| relative.to_owned())?;
+    let directory = metadata.is_dir();
+    if !(directory || metadata.is_file()) || !read_only(&metadata, directory) {
+        return Err(relative.to_owned());
+    }
+    if !relative.as_os_str().is_empty() {
+        held.insert(relative.to_owned(), directory);
+    }
+    if directory {
+        for child in fs::read_dir(&path).map_err(|_| relative.to_owned())? {
+            let child = child.map_err(|_| relative.to_owned())?;
+            held_tree(root, &relative.join(child.file_name()), held)?;
+        }
+    }
+    Ok(())
+}
+
+/// Whether `metadata` has the mode [`write_entry`] gives a file (0444) or a
+/// directory (0555).
+#[cfg(unix)]
+fn read_only(metadata: &fs::Metadata, directory: bool) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    metadata.permissions().mode() & 0o7777 == if directory { 0o555 } else { 0o444 }
+}
+
+#[cfg(not(unix))]
+fn read_only(metadata: &fs::Metadata, _directory: bool) -> bool {
+    metadata.permissions().readonly()
 }
 
 /// Writes `lock` at `path`, owner-only, through a temporary file renamed over it.
