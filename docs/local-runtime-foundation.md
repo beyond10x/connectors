@@ -189,9 +189,9 @@ original JSON text, pins exact material and commits the final read guard before
 dispatch. Expired evidence refuses; implicit identity probes and credential repair
 are not part of a business read.
 
-The original explicit `describe --endpoint --token-file`, `invoke --endpoint
---token-file --operation --input`, and `serve --config` retain their implementations.
-They use the existing service binding described in [running services](running-services.md).
+The original explicit `describe`, `invoke` with an endpoint and token file, and `serve` commands
+were removed in 0.60.0. A standalone service is called over its HTTP binding, as
+[running services](running-services.md) shows.
 
 ## Verification
 

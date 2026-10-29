@@ -279,7 +279,7 @@ derived from the shipped connector:
 
 ```console
 $ connectors instances list
-{"adapters":[{"adapter":"gmail.private","adapter_id":"catalog","connector":"gmail","instance":"private","instance_id":"gmail.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"adapters":[{"connector":"gmail","instance":"private","instance_id":"gmail.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
 ```
 
 Then connect it with the Google client file, as

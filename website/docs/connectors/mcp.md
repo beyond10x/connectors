@@ -1,7 +1,7 @@
 ---
 title: MCP
 sidebar_position: 21
-description: MCP has specified contracts and a selected command spelling, and no runtime yet; nothing on this page can be configured today.
+description: MCP as a connector has specified contracts and no runtime yet; the local MCP server offers admitted read-only tools on Linux.
 lede: MCP is planned, not shipped. Each step below says what is selected and what must land before it runs.
 source: docs/local-mcp-cli.md, adapters/mcp/contracts/server/v1alpha1/semantics.md, adapters/mcp/contracts/client/v1alpha1/auth.md
 connectors: "mcp"
@@ -11,8 +11,9 @@ connectors: "mcp"
 
 :::caution[Planned]
 
-MCP does not run. The CLI has no `server` command, no MCP instance configuration, no MCP auth
-profile and no MCP operation binding, and the compatibility metadata says `mcp: deferred`. This
+MCP as a connector does not run. The CLI has no MCP instance configuration, no MCP auth profile
+and no MCP operation binding, and the compatibility metadata says `mcp: deferred`. Its local MCP
+server, `server --transport stdio`, is described under [A first read](#a-first-read). This
 page keeps the onboarding steps in the same order as every other connector's so that each says
 what exists and what does not.
 
@@ -56,7 +57,11 @@ child, is spelled:
 connectors --config CONFIG --state-dir STATE_DIR server --transport stdio
 ```
 
-It is not implemented; do not substitute `serve`, which starts the federation service.
+On Linux it runs a bounded slice: admitted read-only operations of configured instances as tools,
+with no resources, prompts, mutations or outbound MCP
+([stdio guide](https://github.com/beyond10x/connectors/blob/main/docs/local-mcp-stdio.md)). On
+macOS and Windows it exits with `mcp_unavailable`. Reading from an MCP server as a connector is
+not implemented.
 
 ## A first guarded write
 

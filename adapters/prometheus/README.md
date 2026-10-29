@@ -76,13 +76,14 @@ args = ["--local-config", "/absolute/path/prometheus.json"]
 
 ```sh
 target/release/connectors --output json connections connect --connector prometheus --instance metrics --profile prometheus.bearer --credential-prompt
-target/release/connectors --output json operations describe --connector prometheus --instance metrics --operation series.query
-target/release/connectors --output json operations invoke --connector prometheus --instance metrics --connection CONNECTION --operation series.query --schema SCHEMA --revision REVISION --input-json '{"query":"up{job=\"api\"}"}'
-target/release/connectors --output json operations invoke --connector prometheus --instance metrics --connection CONNECTION --operation series.query_range --schema SCHEMA --revision REVISION --input-json '{"query":"sum by (status) (rate(http_requests_total[5m]))","start_unix_s":1788822000,"end_unix_s":1788825600,"step_s":60}'
-target/release/connectors --output json operations invoke --connector prometheus --instance metrics --connection CONNECTION --operation rules.list --schema SCHEMA --revision REVISION --input-json '{"kind":"alerting"}'
+target/release/connectors --output json invoke prometheus/metrics series.query --describe
+target/release/connectors --output json invoke prometheus/metrics series.query --input-json '{"query":"up{job=\"api\"}"}'
+target/release/connectors --output json invoke prometheus/metrics series.query_range --input-json '{"query":"sum by (status) (rate(http_requests_total[5m]))","start_unix_s":1788822000,"end_unix_s":1788825600,"step_s":60}'
+target/release/connectors --output json invoke prometheus/metrics rules.list --input-json '{"kind":"alerting"}'
 ```
 
-Each operation has its own schema and revision from `operations describe`. An omitted
+`--describe` prints an operation's input schema; the connection, schema and revision default to
+the instance's current ones. An omitted
 `time_unix_s` is now. A range spans at most seven days and at most 2,000 points per series
 (`(end − start) div step + 1`); a wider one is refused before any request. Sample values stay
 Prometheus's strings (`NaN`, `+Inf`); timestamps are its numbers. A provider warning makes the

@@ -50,7 +50,7 @@ endpoint = "https://gitlab.example.com"
 $ target/release/connectors --output json setup check | jq -c '[.result.prerequisites[]|{name,state}]'
 [{"name":"configuration","state":"ready"},{"name":"metadata","state":"ready"},{"name":"artifact:gitlab.forge","state":"ready"},{"name":"keyring","state":"ready"},{"name":"persistent_custody_qualification","state":"ready"}]
 $ target/release/connectors --output json instances list
-{"ok":true,"result":{"adapters":[{"adapter":"gitlab.forge","adapter_id":"catalog","connector":"gitlab","instance":"forge","instance_id":"gitlab.forge","restart":"never","startup":"on-demand"}],"source":"configuration"}}
+{"ok":true,"result":{"adapters":[{"connector":"gitlab","instance":"forge","instance_id":"gitlab.forge","restart":"never","startup":"on-demand"}],"source":"configuration"}}
 ```
 
 Connect with the hidden token prompt, then describe an operation:
@@ -346,17 +346,18 @@ against the local HTTPS GitLab fixture (the ignored test
 `cli_journey::serve_the_raw_file_fixture` in
 `adapters/catalog/tests/local_runtime.rs`), whose files and languages are
 synthetic. Its disposable tree is named with `--config` and `--state-dir`, which
-the commands omit, and `$schema` and `$revision` come from
-`operations describe --operation <id>`, with the deprecated `--adapter gitlab` selector the run used.
+the commands omit. The run, made before 0.60.0, described and invoked with the deprecated
+`--adapter gitlab` selector. Below is the 0.60.0 form on the instance `gitlab/forge`, which takes
+its connection, schema and revision, and the results without the `adapter` member a 0.60.0
+result no longer carries.
 
 ```sh
-connectors --output json operations invoke --adapter gitlab --connection "$connection" \
-  --operation file.raw --schema "$schema" --revision "$revision" \
+connectors --output json invoke gitlab/forge file.raw \
   --input-json '{"id":"org/project","file_path":"docs/guide.md","ref":"v1.0.0"}'
 ```
 
 ```json
-{"ok":true,"result":{"adapter":"gitlab","operation":"file.raw","result":{"body":"# Guide\nfirst release\n","provenance":{"instance":"fixture-gitlab","observed_at_unix_ms":1792194048246,"resource":"/api/v4/projects/{id}/repository/files/{file_path}/raw","source_revision":"f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"},"status":200},"revision":"7b95112a56d28803c09f5d58beedcc4ce448b4ae7086358faee060fa770f8ebe"}}
+{"ok":true,"result":{"operation":"file.raw","result":{"body":"# Guide\nfirst release\n","provenance":{"instance":"fixture-gitlab","observed_at_unix_ms":1792194048246,"resource":"/api/v4/projects/{id}/repository/files/{file_path}/raw","source_revision":"f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"},"status":200},"revision":"7b95112a56d28803c09f5d58beedcc4ce448b4ae7086358faee060fa770f8ebe"}}
 ```
 
 A file that is not UTF-8 (`latin1.txt` in the fixture) fails with exit status 1:
@@ -373,13 +374,12 @@ transport refuses the body while reading it, before the catalog provider answers
 ```
 
 ```sh
-connectors --output json operations invoke --adapter gitlab --connection "$connection" \
-  --operation project.languages --schema "$schema" --revision "$revision" \
+connectors --output json invoke gitlab/forge project.languages \
   --input-json '{"id":"org/project"}'
 ```
 
 ```json
-{"ok":true,"result":{"adapter":"gitlab","operation":"project.languages","result":{"body":{"Dockerfile":8.58,"Rust":71.42,"Shell":20.0},"provenance":{"instance":"fixture-gitlab","observed_at_unix_ms":1792194050329,"resource":"/api/v4/projects/{id}/languages","source_revision":"f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"},"status":200},"revision":"7b95112a56d28803c09f5d58beedcc4ce448b4ae7086358faee060fa770f8ebe"}}
+{"ok":true,"result":{"operation":"project.languages","result":{"body":{"Dockerfile":8.58,"Rust":71.42,"Shell":20.0},"provenance":{"instance":"fixture-gitlab","observed_at_unix_ms":1792194050329,"resource":"/api/v4/projects/{id}/languages","source_revision":"f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"},"status":200},"revision":"7b95112a56d28803c09f5d58beedcc4ce448b4ae7086358faee060fa770f8ebe"}}
 ```
 
 Neither read has run against a live GitLab.
@@ -509,7 +509,7 @@ The complete configuration used against the sandbox is
   evicts it, and `validate` always exchanges afresh. A token answer carrying a
   different `refresh_token` is refused as an invalid credential and nothing is
   kept. `invalid_grant` and `invalid_client` are an invalid credential; on an
-  `operations invoke` of a read on an existing connection the CLI reports it
+  `invoke` of a read on an existing connection the CLI reports it
   with `next_action: repair_connection`, and while connecting with
   `retry_explicitly`. A guarded write refused for its credential reports
   `retry_status` until `story:guarded-write-credential-refusal-says-repair`
@@ -1099,7 +1099,7 @@ its revision and prints the bootstrap it printed before. Through the CLI:
   revalidation that binds another one says so as `"rebound": {"from": "v1", "to": "v2"}`.
 - `operations list` and `operations describe` with `--connection` describe the binding that
   connection reads through; without it, the first binding.
-- `operations invoke` reads under the binding the connection's evidence selected. An id that
+- `invoke` reads under the binding the connection's evidence selected. An id that
   binding does not serve is `not_found` before any request, and the revision of another
   binding's description is `stale_description`: describe again with `--connection`.
 - The instance's `permissions.operations` names ids of every binding it allows.
@@ -1307,7 +1307,7 @@ target/release/connectors --output json operations describe --connector gitlab -
 Connect runs the declared identity and scope reads and refuses a token below
 `minimum_scopes`. Validation evidence lasts the `auth` object's `evidence_lifetime_ms`
 (60 seconds when omitted, at most 300 000 ms); after expiry the
-connection reports `pending`. The next `operations invoke` of a read recollects
+connection reports `pending`. The next `invoke` of a read recollects
 the evidence once from the credential already in custody, with no re-entry, as
 `connections revalidate --connector gitlab --instance forge --connection CONNECTION --expected-revision REVISION`
 would, and is then served: a connection connected or revalidated once keeps
@@ -1333,8 +1333,7 @@ binary read), and provenance whose `source_revision` is the pinned source's
 SHA-256.
 
 ```sh
-connectors operations invoke --connector gitlab --instance forge --connection "$connection" \
-  --operation merge_request.get --schema "$schema" --revision "$revision" \
+connectors invoke gitlab/forge merge_request.get \
   --input-json '{"id":"group/project","merge_request_iid":9}'
 ```
 
@@ -1396,7 +1395,7 @@ appeared, which opened merge request 11 at the moved head and was classified
   wait, then as long again as the first request took, then 500 ms, must all end
   before the invocation deadline. The second request must finish 500 ms before
   the deadline; if it does not, the first answer's refusal and delay stand.
-  Otherwise, and after a second `429`, `operations invoke` fails with
+  Otherwise, and after a second `429`, `invoke` fails with
   `service_code: rate_limited` and `retry_after_seconds` set to the named delay,
   so the caller can wait; without `retry_after_seconds` the provider named no
   delay the engine could read. Two `Retry-After` lines on one answer that

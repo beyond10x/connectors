@@ -51,11 +51,11 @@ profile = "zendesk.oauth"
 ```
 
 ```sh
-connectors instances list
+connectors instances list | jq -c '.[] | arrays | .[]'
 ```
 
 ```json
-{"adapters":[{"adapter":"zendesk.support","adapter_id":"catalog","connector":"zendesk","instance":"support","instance_id":"zendesk.support","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"connector":"zendesk","instance":"support","instance_id":"zendesk.support","restart":"never","startup":"on-demand"}
 ```
 
 ## Connect
@@ -75,14 +75,7 @@ document is `{"account": "<email>/token", "token": "<API token>"}`.
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector zendesk --instance support \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector zendesk --instance support \
-  --operation tickets.incremental | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector zendesk --instance support \
-  --operation tickets.incremental | jq -r .result.revision)
-connectors operations invoke --connector zendesk --instance support --connection "$connection" \
-  --operation tickets.incremental --schema "$schema" --revision "$revision" \
+connectors invoke zendesk/support tickets.incremental \
   --input-json '{"start_time":1790000000}'
 ```
 
@@ -111,10 +104,16 @@ Read the ticket with `ticket.show` and pin its `ticket.updated_at` as `updated_s
 {"ticket_id": 101, "body": {"ticket": {"comment": {"body": "Checked the billing history."}, "updated_stamp": "2025-09-16T10:00:00Z"}}}
 ```
 
-Take the schema and revision of `ticket.note` from `operations describe`, then prepare, issue and
-invoke:
+Take the connection, and the schema and revision of `ticket.note` from `invoke --describe`, then
+prepare, issue and invoke:
 
 ```sh
+connection=$(connectors --output json connections list --connector zendesk --instance support \
+  | jq -r '.result.connections[0].connection')
+schema=$(connectors --output json invoke zendesk/support ticket.note --describe \
+  | jq -r .result.schema)
+revision=$(connectors --output json invoke zendesk/support ticket.note --describe \
+  | jq -r .result.revision)
 subject_sha256=$(connectors --output json approvals prepare --connector zendesk --instance support \
   --connection "$connection" --operation ticket.note \
   --schema "$schema" --revision "$revision" --input-file note.json \
@@ -124,8 +123,7 @@ connectors approvals issue --connector zendesk --instance support \
   --connection "$connection" --operation ticket.note \
   --schema "$schema" --revision "$revision" --input-file note.json \
   --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-note-101.json"
-connectors operations invoke --connector zendesk --instance support --connection "$connection" \
-  --operation ticket.note --schema "$schema" --revision "$revision" \
+connectors invoke zendesk/support ticket.note \
   --input-file note.json --approval-file "$HOME/private/proof-note-101.json" \
   --idempotency-key note-101
 ```

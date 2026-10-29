@@ -150,7 +150,7 @@ connector. The instance id, and so the connection's subject, is
 
 ```console
 $ connectors instances list
-{"adapters":[{"adapter":"opsgenie.work","adapter_id":"catalog","connector":"opsgenie","instance":"work","instance_id":"opsgenie.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"adapters":[{"connector":"opsgenie","instance":"work","instance_id":"opsgenie.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
 ```
 
 The key needs read access to alerts, and to incidents for the incident reads.

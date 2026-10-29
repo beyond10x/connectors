@@ -88,8 +88,8 @@ args = ["--local-config", "/absolute/path/mysql.json"]
 ```sh
 target/release/connectors --output json connections connect --connector mysql --instance incidents --profile mysql.password --credential-prompt
 target/release/connectors --output json connections revalidate --connector mysql --instance incidents --connection CONNECTION --expected-revision CONNECTION_REVISION
-target/release/connectors --output json operations invoke --connector mysql --instance incidents --connection CONNECTION --operation schema.list --schema SCHEMA --revision REVISION --input-json '{"limit":200}'
-target/release/connectors --output json operations invoke --connector mysql --instance incidents --connection CONNECTION --operation query.read --schema SCHEMA --revision REVISION --input-json '{"query":"SELECT id, opened_at FROM incidents WHERE severity = ? ORDER BY opened_at DESC","parameters":["critical"],"limit":100}'
+target/release/connectors --output json invoke mysql/incidents schema.list --input-json '{"limit":200}'
+target/release/connectors --output json invoke mysql/incidents query.read --input-json '{"query":"SELECT id, opened_at FROM incidents WHERE severity = ? ORDER BY opened_at DESC","parameters":["critical"],"limit":100}'
 ```
 
 MySQL placeholders are `?`, not `$1`. Parameters are text or `null` and are
@@ -212,10 +212,10 @@ serve MySQL with the same columns, bounds and read-only session, each as one fix
 `information_schema` statement with the schema and table bound as `?` parameters:
 
 ```sh
-target/release/connectors --output json operations invoke --connector mysql --instance incidents --connection CONNECTION --operation database.list --schema SCHEMA --revision REVISION --input-json '{"limit":100}'
-target/release/connectors --output json operations invoke --connector mysql --instance incidents --connection CONNECTION --operation table.list --schema SCHEMA --revision REVISION --input-json '{"limit":200}'
-target/release/connectors --output json operations invoke --connector mysql --instance incidents --connection CONNECTION --operation table.describe --schema SCHEMA --revision REVISION --input-json '{"table":"incidents","limit":200}'
-target/release/connectors --output json operations invoke --connector mysql --instance incidents --connection CONNECTION --operation index.list --schema SCHEMA --revision REVISION --input-json '{"table":"incidents","limit":200}'
+target/release/connectors --output json invoke mysql/incidents database.list --input-json '{"limit":100}'
+target/release/connectors --output json invoke mysql/incidents table.list --input-json '{"limit":200}'
+target/release/connectors --output json invoke mysql/incidents table.describe --input-json '{"table":"incidents","limit":200}'
+target/release/connectors --output json invoke mysql/incidents index.list --input-json '{"table":"incidents","limit":200}'
 ```
 
 - `database.list` reads `information_schema.SCHEMATA`: the databases the user holds a

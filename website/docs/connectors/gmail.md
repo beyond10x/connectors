@@ -67,11 +67,11 @@ description = "personal mailbox"
 ```
 
 ```sh
-connectors instances list
+connectors instances list | jq -c '.[] | arrays | .[]'
 ```
 
 ```json
-{"adapters":[{"adapter":"gmail.private","adapter_id":"catalog","connector":"gmail","instance":"private","instance_id":"gmail.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"connector":"gmail","instance":"private","instance_id":"gmail.private","restart":"never","startup":"on-demand"}
 ```
 
 A second account is a second instance, such as `[connectors.gmail.instances.work]`, with a
@@ -93,18 +93,11 @@ Gmail scopes fails validation as insufficient scope.
 
 ## A first read
 
-A read needs the connection, and the schema and revision `operations describe` answers. Validation
-lasts 60 seconds after connect; later, `connections revalidate` renews it without a credential.
+A read takes the instance's one connection and its current schema and revision. Validation lasts
+60 seconds after connect; later, `connections revalidate` renews it without a credential.
 
 ```sh
-connection=$(connectors --output json connections list --connector gmail --instance private \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector gmail --instance private \
-  --operation users.getProfile | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector gmail --instance private \
-  --operation users.getProfile | jq -r .result.revision)
-connectors operations invoke --connector gmail --instance private --connection "$connection" \
-  --operation users.getProfile --schema "$schema" --revision "$revision" \
+connectors invoke gmail/private users.getProfile \
   --input-json '{"userId":"me"}'
 ```
 
@@ -130,10 +123,16 @@ Create a draft. `draft.json` holds the whole message, RFC 5322 text encoded base
 {"userId": "me", "body": {"message": {"raw": "<base64url RFC 5322 message>"}}}
 ```
 
-Take the schema and revision of `users.drafts.create` from `operations describe` as above,
+Take the connection, and the schema and revision of `users.drafts.create` from `invoke --describe`,
 prepare the approval, read the subject it names, issue the proof and invoke with it:
 
 ```sh
+connection=$(connectors --output json connections list --connector gmail --instance private \
+  | jq -r '.result.connections[0].connection')
+schema=$(connectors --output json invoke gmail/private users.drafts.create --describe \
+  | jq -r .result.schema)
+revision=$(connectors --output json invoke gmail/private users.drafts.create --describe \
+  | jq -r .result.revision)
 connectors --output json approvals prepare --connector gmail --instance private \
   --connection "$connection" --operation users.drafts.create \
   --schema "$schema" --revision "$revision" --input-file draft.json
@@ -142,8 +141,7 @@ connectors approvals issue --connector gmail --instance private \
   --connection "$connection" --operation users.drafts.create \
   --schema "$schema" --revision "$revision" --input-file draft.json \
   --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-draft-1.json"
-connectors operations invoke --connector gmail --instance private --connection "$connection" \
-  --operation users.drafts.create --schema "$schema" --revision "$revision" \
+connectors invoke gmail/private users.drafts.create \
   --input-file draft.json --approval-file "$HOME/private/proof-draft-1.json" \
   --idempotency-key draft-1
 ```
