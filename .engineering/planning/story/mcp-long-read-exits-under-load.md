@@ -2,11 +2,14 @@
 format: aep.planning-md/3
 id: story:mcp-long-read-exits-under-load
 kind: story
-status: draft
+status: active
 title: The local MCP server exits before answering a read longer than one lease when the host is loaded
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-29T17:06:28Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-29T17:06:28Z", actor: "human:timo", revision: 4}
 ---
 ## Defect
 
