@@ -23,7 +23,7 @@ out here. A command that needs a Zendesk account is shown without output.
 
 | Reads | Writes |
 |---|---|
-| `tickets.incremental`, `ticket.show`, `ticket.comments`, `users.incremental`, `user.show`, `organizations.incremental`, `organization.show` | `ticket.update`, `ticket.note` and `ticket.draft_reply`, each `effect: write` and run only under an issued approval. Each reads the ticket first and sends nothing unless its `updated_at` is the stamp you read, and then sends `safe_update`, so Zendesk refuses a ticket changed in between; both are refused as `service_failure` with `service_code: conflict`. `ticket.update` sets `group_id`, `tags` (replacing the whole set), `priority` or `type`; `ticket.note` adds a private note; `ticket.draft_reply` adds a private note whose first line marks it as a draft reply, and nothing reaches the requester |
+| `tickets.incremental`, `ticket.show`, `ticket.comments`, `ticket.audits`, `users.incremental`, `user.show`, `organizations.incremental`, `organization.show` | `ticket.update`, `ticket.note` and `ticket.draft_reply`, each `effect: write` and run only under an issued approval. Each reads the ticket first and sends nothing unless its `updated_at` is the stamp you read, and then sends `safe_update`, so Zendesk refuses a ticket changed in between; both are refused as `service_failure` with `service_code: conflict`. `ticket.update` sets `group_id`, `tags` (replacing the whole set), `priority` or `type`; `ticket.note` adds a private note; `ticket.draft_reply` adds a private note whose first line marks it as a draft reply, and nothing reaches the requester |
 
 The incremental exports take `start_time` in Unix seconds and return what changed since.
 
@@ -80,6 +80,18 @@ connectors invoke zendesk/support tickets.incremental \
 ```
 
 Send the answer's `after_cursor` as `cursor` until `end_of_stream` is `true`.
+
+A ticket's history is `ticket.audits`: each audit's author, time, `via` channel and source, and its
+events, field changes with their previous value included. Send `meta.after_cursor` as
+`page[after]` until `meta.has_more` is `false`; Zendesk's API document says `has_more` is included when the input
+sets `include_boundary_indicators`:
+
+```sh
+connectors invoke zendesk/support ticket.audits \
+  --input-json '{"ticket_id":101,"page[size]":100,"include_boundary_indicators":true}'
+echo '{"ticket_id":101,"page[size]":100,"include_boundary_indicators":true,"page[after]":"<meta.after_cursor>"}' \
+  | connectors invoke zendesk/support ticket.audits
+```
 
 ## A first guarded write
 

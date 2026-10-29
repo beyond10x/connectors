@@ -30,6 +30,10 @@ operations:
     op: ListTicketComments
     withhold: [per_page, sort_order]
     description: List one ticket's comments by cursor, one page per call; the walk sends meta.after_cursor as page[after] and ends on a page with meta.has_more false
+  ticket.audits:
+    op: ListAuditsForTicket
+    withhold: [sort_order]
+    description: List one ticket's audits by cursor, one page per call; the walk sends meta.after_cursor as page[after] and ends on a page with meta.has_more false
   users.incremental:
     op: IncrementalUserExportCursor
     description: Export the users changed since start_time, one page per call; the first call sends start_time, each later call sends the previous page's after_cursor as cursor, and the walk ends on a page with end_of_stream true
