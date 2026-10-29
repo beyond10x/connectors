@@ -56,6 +56,9 @@ fn check(until: Instant) -> Result<(), Value> {
 pub(super) struct Halt {
     pub cancelled: Arc<AtomicBool>,
     pub admission_closed: Arc<AtomicBool>,
+    /// The session's standard input, asked at admission whether its peer
+    /// has closed it.
+    pub input: std::os::fd::RawFd,
 }
 impl Halt {
     fn cancelled(&self) -> Result<(), Value> {
@@ -67,12 +70,27 @@ impl Halt {
     }
     fn admitted(&self) -> Result<(), Value> {
         self.cancelled()?;
-        if self.admission_closed.load(Ordering::SeqCst) {
+        // The serve loop closes admission when it reads the end of file, which
+        // a loaded host can delay past this worker's first owner call; the
+        // input's own hangup does not wait for that read (sessions § 4.1).
+        if self.admission_closed.load(Ordering::SeqCst) || hung_up(self.input) {
             Err(refusal("unavailable"))
         } else {
             Ok(())
         }
     }
+}
+/// Whether `input`'s peer has closed it, buffered input or not. A poll that
+/// fails answers no, which leaves the end of file to the serve loop.
+fn hung_up(input: std::os::fd::RawFd) -> bool {
+    let mut poll = libc::pollfd {
+        fd: input,
+        events: libc::POLLIN,
+        revents: 0,
+    };
+    // SAFETY: poll names one live entry and does not wait.
+    let ready = unsafe { libc::poll(&mut poll, 1, 0) };
+    ready > 0 && poll.revents & libc::POLLHUP != 0
 }
 fn client(paths: &Paths, host: Option<&str>, until: Instant) -> Result<owner::Client, Value> {
     let client = owner::Client::connect_until(paths, host.is_none(), until).map_err(owner_error)?;
@@ -438,6 +456,51 @@ fn inline_schema(value: &Value) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+
+    fn pipe() -> (OwnedFd, OwnedFd) {
+        let mut fds = [0; 2];
+        // SAFETY: fds is a live two-entry array the call fills.
+        assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0);
+        // SAFETY: pipe returned two fresh descriptors this test now owns.
+        unsafe { (OwnedFd::from_raw_fd(fds[0]), OwnedFd::from_raw_fd(fds[1])) }
+    }
+
+    fn halt(input: &OwnedFd) -> Halt {
+        Halt {
+            cancelled: Arc::new(AtomicBool::new(false)),
+            admission_closed: Arc::new(AtomicBool::new(false)),
+            input: input.as_raw_fd(),
+        }
+    }
+
+    /// sessions § 4.1, local MCP stdio: no request reaches the owner after
+    /// standard input closed. Admission asks the input itself, so a request is
+    /// refused once its peer has closed, even before the serve loop has read
+    /// the end of file and closed admission.
+    #[test]
+    fn admission_refuses_once_the_peer_closed_its_input() {
+        let (read, write) = pipe();
+        assert_eq!(halt(&read).admitted(), Ok(()), "input still open");
+        // SAFETY: write is a live pipe end; the frame is written whole.
+        let frame = b"{\"jsonrpc\":\"2.0\"}\n";
+        assert_eq!(
+            unsafe { libc::write(write.as_raw_fd(), frame.as_ptr().cast(), frame.len()) },
+            frame.len() as isize
+        );
+        assert_eq!(
+            halt(&read).admitted(),
+            Ok(()),
+            "unread input with the peer still open"
+        );
+        drop(write);
+        assert_eq!(
+            halt(&read).admitted(),
+            Err(refusal("unavailable")),
+            "unread input after the peer closed"
+        );
+    }
+
     #[test]
     fn nested_projection_does_not_advertise_relocated_schema_references() {
         assert!(inline_schema(

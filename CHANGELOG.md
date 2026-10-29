@@ -19,6 +19,10 @@ No breaking changes.
   session. A renewal now greets the owner by the authority the session was admitted under. It
   still compares the store's authority whenever the lock is free, so a replaced store still
   ends the session.
+- `connectors server --transport stdio` no longer sends a call to the owner after the client has
+  closed standard input. Admission now checks the input's hangup directly instead of waiting for
+  the serve loop to read the end of file, which a loaded host could delay. Such a call is
+  answered `unavailable`, as documented.
 
 ## 0.59.1 — 2026-10-29
 

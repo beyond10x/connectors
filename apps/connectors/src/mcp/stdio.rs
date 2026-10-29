@@ -320,6 +320,7 @@ pub(super) fn serve(
                         let halt = super::projection::Halt {
                             cancelled: cancelled.clone(),
                             admission_closed: admission_closed.clone(),
+                            input: 0,
                         };
                         let paths = paths.clone();
                         let host = host.clone();

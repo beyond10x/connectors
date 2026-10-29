@@ -914,14 +914,31 @@ fn stdin_close_still_answers_requests_already_read() {
 /// sessions § 4.1: closing stdin is the `remote_hangup` terminal, at which
 /// local admission stops. A call read just before the close, whose owner read
 /// has not started, is answered `unavailable` and never reaches the owner's
-/// provider; the server still exits successfully.
+/// provider; the server still exits successfully. The server is stopped while
+/// the call is written and stdin closed, so it finds both on resuming, however
+/// the host schedules its threads.
 #[test]
 fn stdin_close_refuses_a_call_not_yet_at_the_owner() {
     let served = Served::new();
     let mut peer = Peer::start(&served, true);
     let (tool, revision) = admitted(&served, &mut peer, 1);
+    let pid = i32::try_from(peer.child.id()).unwrap();
+    // SAFETY: these calls target only this test's own unreaped child; the
+    // stop is reported without reaping it.
+    assert_eq!(unsafe { libc::kill(pid, libc::SIGSTOP) }, 0);
+    let mut status = 0;
+    assert_eq!(
+        unsafe { libc::waitpid(pid, &mut status, libc::WUNTRACED) },
+        pid
+    );
+    assert!(
+        libc::WIFSTOPPED(status),
+        "the server did not stop: {status}"
+    );
     send_call(&mut peer, &tool, 333, &revision);
     drop(peer.child.stdin.take());
+    // SAFETY: as above.
+    assert_eq!(unsafe { libc::kill(pid, libc::SIGCONT) }, 0);
     let reply = match peer.frames.recv_timeout(Duration::from_secs(5)) {
         Ok(Ok(reply)) => reply,
         Ok(Err(line)) => panic!("{line}"),
