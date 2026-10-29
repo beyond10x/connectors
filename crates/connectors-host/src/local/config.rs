@@ -166,6 +166,17 @@ pub enum Rule {
 /// The most bytes a configuration read admits.
 pub const CONFIG_LIMIT: usize = 1024 * 1024;
 
+/// Whether an instance's `endpoint` is admitted: 1 to 2048 bytes, without a
+/// control or whitespace character. `connections connect --endpoint` writes
+/// only such a value (story:connectors-do-short-invocation).
+pub fn endpoint_admitted(endpoint: &str) -> bool {
+    !endpoint.is_empty()
+        && endpoint.len() <= 2048
+        && !endpoint
+            .chars()
+            .any(|c| c.is_control() || c.is_whitespace())
+}
+
 impl Rule {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -449,7 +460,7 @@ struct ConnectorTable {
 
 /// `[connectors.<connector>.instances.<instance>]` as written: the instance's
 /// own keys and the legacy entry's pins.
-#[derive(Deserialize, Serialize)]
+#[derive(Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct InstanceTable {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -593,13 +604,7 @@ impl InstanceTable {
                     .bytes()
                     .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
         };
-        let endpoint_admitted = self.endpoint.as_deref().is_none_or(|endpoint| {
-            !endpoint.is_empty()
-                && endpoint.len() <= 2048
-                && !endpoint
-                    .chars()
-                    .any(|c| c.is_control() || c.is_whitespace())
-        });
+        let endpoint_admitted = self.endpoint.as_deref().is_none_or(endpoint_admitted);
         if !plain(connector)
             || !plain(name)
             || !endpoint_admitted
@@ -1437,6 +1442,31 @@ pub fn installed_provider() -> Option<PathBuf> {
         "connectors-catalog-provider{}",
         std::env::consts::EXE_SUFFIX
     )))
+}
+
+/// The instance id and provider authority the installed catalog provider
+/// derives for the instance `name` of `connector` at `endpoint`, with
+/// `profile` when the instance states one: the provider started as a derived
+/// instance's is ([`InstanceTable::underived`]), and its `connectors-private/2`
+/// child's bootstrap. Nothing is remembered. `connections connect --endpoint`
+/// asks before it writes the endpoint, so an instance that holds a connection
+/// is never moved to another provider authority
+/// (story:connectors-do-short-invocation).
+pub fn derived_authority(
+    connector: &str,
+    name: &str,
+    endpoint: &str,
+    profile: Option<&str>,
+) -> Result<(String, String)> {
+    let table = InstanceTable {
+        endpoint: Some(endpoint.to_owned()),
+        profile: profile.map(str::to_owned),
+        ..InstanceTable::default()
+    };
+    let (instance, args) = table.underived(connector, name)?;
+    let installation = Installation::installed().ok_or(Failure::InvalidConfiguration)?;
+    let (adapter, bootstrap) = installation.pinned(&instance.alias, args)?;
+    Ok((adapter.instance_id, bootstrap.provider_authority))
 }
 
 impl Config {

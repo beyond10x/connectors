@@ -600,6 +600,7 @@ dependencies = [
  "tempfile",
  "time",
  "toml",
+ "toml_edit",
  "uuid",
  "zeroize",
 ]
@@ -3931,6 +3932,7 @@ dependencies = [
  "indexmap",
  "toml_datetime",
  "toml_parser",
+ "toml_writer",
  "winnow",
 ]
 

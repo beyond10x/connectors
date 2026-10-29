@@ -25,50 +25,74 @@ pub(super) fn execute(
         "connections-revalidate" => {
             let reference = text("connection")?;
             let revision = text("expected_revision")?;
-            // A running owner of this build admits the revalidation itself,
-            // from its held metadata handle, before it queues it. Without one
-            // the CLI admits it directly, which verifies the whole store (its
-            // cost grows with the store), and only then starts an owner. The
-            // 30-second bound is set here, after that direct admission; with a
-            // running owner it is set before the owner's own admission from
-            // its held handle, which counts against it but does not verify
-            // the whole store (contracts/cli/v1alpha1/owner.md).
-            let client = match owner::Client::connect(paths, false) {
-                Ok(client) if client.is_same_build() => client,
-                _ => {
-                    owner::admit_revalidation(paths, alias, reference, revision)
-                        .map_err(owner_failure)?;
-                    owner::Client::connect(paths, true).map_err(owner_failure)?
-                }
+            let stale = || {
+                matches!(
+                    registry.revalidation_binding(
+                        &adapter.instance_id,
+                        &adapter.adapter_id,
+                        reference,
+                        revision,
+                    ),
+                    Err(registry::Failure::Conflict)
+                )
             };
-            let deadline = connectors_sdk::now_ms() + 30_000;
-            client
-                .revalidate(alias, reference, revision, deadline)
-                .map_err(|error| {
-                    // The class of a transient failure the owner retried, and
-                    // how many validations it sent (semantics.md §6
-                    // "Revalidation retries").
-                    let (cause, attempts) = (error.cause, error.attempts);
-                    let mut reply = match error.code {
-                        // The owner's own definite answer to a dispatched
-                        // revalidation; a lost reply is already `outcome_unknown`.
-                        owner::Code::Unavailable | owner::Code::Timeout => {
-                            let code = serde_json::to_value(error.code).unwrap_or_default();
-                            let code = code.as_str().unwrap_or("unavailable").to_owned();
-                            failure(&code, "dispatch", "retry_explicitly", false)
-                        }
-                        _ => owner_failure(error),
-                    };
-                    if let (Some(cause), HandlerReply::Error { data, .. }) = (cause, &mut reply)
-                        && data["stage"] == "dispatch"
-                    {
-                        data["cause"] = json!(cause);
-                        if let Some(attempts) = attempts {
-                            data["attempts"] = json!(attempts);
-                        }
+            // The instance's configuration revision given for the
+            // connection's is a usage error, refused before any owner starts.
+            if revision == adapter.configuration_revision && stale() {
+                return Err(revision_kind_refusal());
+            }
+            let outcome = (|| -> Result<Value, HandlerReply> {
+                // A running owner of this build admits the revalidation itself,
+                // from its held metadata handle, before it queues it. Without one
+                // the CLI admits it directly, which verifies the whole store (its
+                // cost grows with the store), and only then starts an owner. The
+                // 30-second bound is set here, after that direct admission; with a
+                // running owner it is set before the owner's own admission from
+                // its held handle, which counts against it but does not verify
+                // the whole store (contracts/cli/v1alpha1/owner.md).
+                let client = match owner::Client::connect(paths, false) {
+                    Ok(client) if client.is_same_build() => client,
+                    _ => {
+                        owner::admit_revalidation(paths, alias, reference, revision)
+                            .map_err(owner_failure)?;
+                        owner::Client::connect(paths, true).map_err(owner_failure)?
                     }
-                    reply
-                })
+                };
+                let deadline = connectors_sdk::now_ms() + 30_000;
+                client
+                    .revalidate(alias, reference, revision, deadline)
+                    .map_err(|error| {
+                        // The class of a transient failure the owner retried, and
+                        // how many validations it sent (semantics.md §6
+                        // "Revalidation retries").
+                        let (cause, attempts) = (error.cause, error.attempts);
+                        let mut reply = match error.code {
+                            // The owner's own definite answer to a dispatched
+                            // revalidation; a lost reply is already `outcome_unknown`.
+                            owner::Code::Unavailable | owner::Code::Timeout => {
+                                let code = serde_json::to_value(error.code).unwrap_or_default();
+                                let code = code.as_str().unwrap_or("unavailable").to_owned();
+                                failure(&code, "dispatch", "retry_explicitly", false)
+                            }
+                            _ => owner_failure(error),
+                        };
+                        if let (Some(cause), HandlerReply::Error { data, .. }) = (cause, &mut reply)
+                            && data["stage"] == "dispatch"
+                        {
+                            data["cause"] = json!(cause);
+                            if let Some(attempts) = attempts {
+                                data["attempts"] = json!(attempts);
+                            }
+                        }
+                        reply
+                    })
+            })();
+            outcome.map_err(|mut reply| {
+                if stale() {
+                    stale_revision(&mut reply);
+                }
+                reply
+            })
         }
         "connections-list" => {
             let limit = call
@@ -143,23 +167,114 @@ pub(super) fn execute(
         }
         "connections-revoke" => {
             let reference = text("connection")?;
+            let expected = text("expected_revision")?;
             // A connection left under an instance id no entry configures any
-            // longer (the entry moved to a new one) stays revocable here.
+            // longer (the entry moved to a new one) stays revocable here. Only
+            // a revision that is not the connection's is a `Conflict`; a
+            // revoked connection answers its revision whatever was given.
             let revision = registry
                 .revoke_left_behind(
                     &adapter.instance_id,
                     &adapter.adapter_id,
                     configured,
                     reference,
-                    text("expected_revision")?,
+                    expected,
                     connectors_sdk::now_ms(),
                 )
-                .map_err(registry_failure)?;
+                .map_err(|error| match error {
+                    registry::Failure::Conflict if expected == adapter.configuration_revision => {
+                        revision_kind_refusal()
+                    }
+                    registry::Failure::Conflict => {
+                        let mut reply = registry_failure(error);
+                        stale_revision(&mut reply);
+                        reply
+                    }
+                    error => registry_failure(error),
+                })?;
             Ok(
                 json!({"adapter":alias,"connection":reference,"revision":revision,"local_state":"revoked","provider_outcome":"not_requested"}),
             )
         }
         _ => Err(failure("unsupported", "arguments", "none", true)),
+    }
+}
+
+/// `connections reconnect` admits its `--expected-revision` while it captures
+/// its protected source, before any handler runs. A revision that is not the
+/// connection's is answered here first, before anything is captured, as
+/// revalidate and revoke answer it (decision 5 of the U2 review): the
+/// instance's configuration revision is `invalid_input` naming both kinds, any
+/// other stale value `lifecycle_conflict` naming where to read the right one.
+/// Anything this cannot read is left to the command's own admission.
+pub(super) fn reconnect_revision(
+    session: &session::Session,
+) -> Option<connectors_cli_contract::ProcessOutput> {
+    let (callable, context) = session.selected()?;
+    if callable != "connections-reconnect" {
+        return None;
+    }
+    let selectors = session.selectors()?;
+    let expected = selectors.get("expected_revision")?.as_str()?;
+    let paths = Paths::resolve(context.config.as_deref(), context.state_dir.as_deref()).ok()?;
+    let alias = select::alias_at(selectors, &paths).ok()?;
+    let config = Config::load_at(&paths).ok()?;
+    let adapter = config.adapters.get(&alias)?;
+    let connection = match selectors.get("connection").and_then(Value::as_str) {
+        Some(connection) => connection.to_owned(),
+        None => held_one(&paths, &alias).ok()?,
+    };
+    let stale = matches!(
+        Registry::with_system_clock(&paths.state).revalidation_binding(
+            &adapter.instance_id,
+            &adapter.adapter_id,
+            &connection,
+            expected,
+        ),
+        Err(registry::Failure::Conflict)
+    );
+    if !stale {
+        return None;
+    }
+    let reply = if expected == adapter.configuration_revision {
+        revision_kind_refusal()
+    } else {
+        let mut reply = registry_failure(registry::Failure::Conflict);
+        stale_revision(&mut reply);
+        reply
+    };
+    Some(definition::render(
+        reply,
+        context.output == connectors_cli_contract::OutputMode::Json,
+    ))
+}
+
+/// `invalid_input` for the instance's configuration revision given as
+/// `--expected-revision` (story:connectors-do-short-invocation, decision
+/// D11): the argument takes the connection's revision, which
+/// `connections describe` reads.
+fn revision_kind_refusal() -> HandlerReply {
+    let mut reply = failure("invalid_input", "arguments", "none", true);
+    if let HandlerReply::UsageError { data, .. } | HandlerReply::Error { data, .. } = &mut reply {
+        data["field"] = json!("expected_revision");
+        data["revision_expected"] = json!("connection");
+        data["revision_given"] = json!("configuration");
+        data["read_with"] = json!(endpoint::READ_REVISION_WITH);
+    }
+    reply
+}
+
+/// A stale `--expected-revision` keeps its `lifecycle_conflict` and
+/// `retry_status`, and names the argument, the revision it takes and the
+/// command that reads it (decision D11).
+fn stale_revision(reply: &mut HandlerReply) {
+    if let HandlerReply::UsageError { data, .. } | HandlerReply::Error { data, .. } = reply
+        && data["code"] == "lifecycle_conflict"
+        && data["next_action"] == "retry_status"
+    {
+        data["field"] = json!("expected_revision");
+        data["revision_expected"] = json!("connection");
+        data["read_with"] = json!(endpoint::READ_REVISION_WITH);
     }
 }
 

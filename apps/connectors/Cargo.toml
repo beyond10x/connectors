@@ -21,6 +21,7 @@ hex.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 time.workspace = true
+toml_edit = { version = "=0.25.15", default-features = false, features = ["parse", "display"] }
 uuid.workspace = true
 
 [dev-dependencies]
@@ -38,3 +39,13 @@ connectors-host = { workspace = true, features = ["test-support"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
+
+# These test binaries are also the stand-in catalog provider the CLI starts
+# with provider arguments, which the standard test harness refuses.
+[[test]]
+name = "connect_endpoint"
+harness = false
+
+[[test]]
+name = "connect_endpoint_adversary"
+harness = false
