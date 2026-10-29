@@ -96,7 +96,7 @@ Error `failure`: `connectors.cli.Failure`.
 
 ### `connections connect`
 
-Begin admitted local protected credential acquisition
+Begin admitted local protected credential acquisition on <connector>/<instance>; --endpoint first writes that instance's endpoint into the configuration
 
 Callable: `connections-connect`. Input: `connectors.cli.ConnectionConnectInput`. Result: `connectors.cli.ConnectionConnectResult`.
 

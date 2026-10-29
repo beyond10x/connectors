@@ -80,10 +80,16 @@ impl Session {
                 "operation",
                 "device",
                 "target",
+                "endpoint",
             ] {
                 if let Ok(Some(value)) = leaf.try_get_one::<String>(&format!("field:{field}")) {
                     selectors[field] = json!(value);
                 }
+            }
+            // A connect's `<connector>/<instance>` selects as its options do;
+            // a target that cannot is refused by `endpoint::prepare`.
+            if command.callable == "connections-connect" {
+                selectors = super::endpoint::selection(&selectors).unwrap_or(selectors);
             }
             Some(Selection {
                 callable: command.callable.clone(),
@@ -109,6 +115,10 @@ impl Session {
         self.selection
             .as_ref()
             .map(|s| (s.callable.as_str(), &s.context))
+    }
+    /// The preparsed selectors, when the arguments parsed.
+    pub fn selectors(&self) -> Option<&Value> {
+        self.selection.as_ref().map(|s| &s.selectors)
     }
     pub fn signals(&mut self) -> owner::Result<()> {
         if self.signals.is_none() {

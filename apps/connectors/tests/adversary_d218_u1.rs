@@ -480,7 +480,17 @@ fn removed_commands_appear_in_no_help_or_completion() {
         ("completions bash", &completion),
     ] {
         assert!(output.status.success(), "{what}: {output:?}");
-        let text = String::from_utf8_lossy(&output.stdout).to_lowercase();
+        let mut text = String::from_utf8_lossy(&output.stdout).to_lowercase();
+        // story:connectors-do-short-invocation D10: `connections connect` alone
+        // takes `--endpoint`, so its completion case is left out of the search.
+        let connect = "connectors__subcmd__connections__subcmd__connect)";
+        if let Some(start) = text.find(connect) {
+            let rest = start + connect.len();
+            let end = text[rest..]
+                .find("connectors__subcmd__")
+                .map_or(text.len(), |offset| rest + offset);
+            text.replace_range(start..end, "");
+        }
         for removed in ["--endpoint", "--token-file", "--allow-plaintext"] {
             assert!(
                 !text.contains(removed),
@@ -580,8 +590,10 @@ mod jailed {
     /// re-checked with the provider once before the one call.
     #[test]
     fn a_lapsed_connection_is_selected_and_rechecked_before_the_call() {
-        let (container, connection, _) = connected(3_000);
-        let until = Instant::now() + Duration::from_secs(30);
+        // The window outlasts a connect on a loaded host (it read `pending` at 3 s
+        // under a parallel build), and the wait outlasts the window.
+        let (container, connection, _) = connected(10_000);
+        let until = Instant::now() + Duration::from_secs(60);
         let listed = loop {
             let listed = success(&container.run(&[
                 "connections",
