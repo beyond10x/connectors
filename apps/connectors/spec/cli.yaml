@@ -170,6 +170,11 @@ callables:
     input: connectors.cli.OperationInvokeInput
     result: connectors.cli.OperationInvokeResult
     errors: {failure: connectors.cli.Failure}
+  invoke:
+    target: {kind: dynamic, owner: connectors.cli, operation_field: operation, schema_field: schema, payload_field: input}
+    input: connectors.cli.InvokeInput
+    result: connectors.cli.InvokeResult
+    errors: {failure: connectors.cli.Failure}
 commands:
   - path: [approvals, policy-status]
     aliases: []
@@ -628,3 +633,32 @@ commands:
         source: {kind: option, long: definitions-root}
       - field: credential_file
         source: {kind: option, long: credential-file}
+  - path: [invoke]
+    aliases: []
+    callable: invoke
+    about: Invoke one operation of a connector's instance; the instance, connection, schema and revision default to the only ones that fit
+    arguments:
+      - field: target
+        source: {kind: positional, index: 1}
+      - field: operation
+        source: {kind: positional, index: 2}
+      - field: connection
+        source: {kind: option, long: connection}
+      - field: schema
+        source: {kind: option, long: schema}
+      - field: revision
+        source: {kind: option, long: revision}
+      - field: input
+        source: {kind: document, inline: input-json, file: input-file, stdin: input-stdin}
+      - field: approval_file
+        source: {kind: option, long: approval-file}
+      - field: idempotency_key
+        source: {kind: option, long: idempotency-key}
+      - field: definition
+        source: {kind: option, long: definition}
+      - field: definitions_root
+        source: {kind: option, long: definitions-root}
+      - field: credential_file
+        source: {kind: option, long: credential-file}
+      - field: describe
+        source: {kind: option, long: describe}

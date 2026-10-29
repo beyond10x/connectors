@@ -3,8 +3,8 @@
 **Inbound read-only tools run on Linux.** Use the [production stdio guide](local-mcp-stdio.md)
 for supported declarations, configuration, calls and limitations. This document
 retains the broader selected intent; resources, prompts, mutations and outbound
-MCP remain unfinished, so [compatibility metadata](../apps/connectors/spec/compatibility.json)
-remains `mcp: deferred`. The [authored inventory](../adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.json)
+MCP remain unfinished, and MCP stays deferred.
+The [authored inventory](../adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.json)
 is static documentation, not CLI output or a runtime discovery endpoint.
 
 Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).

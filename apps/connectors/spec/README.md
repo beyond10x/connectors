@@ -1,14 +1,10 @@
 # Local CLI presentation
 
 [cli.yaml](cli.yaml) is the authored ESS presentation binding for the selected
-`setup`, `adapters`, `connections` and `operations` commands. Types and behavior
-come from the [CLI contract](../../../contracts/cli/v1alpha1/semantics.md) and
+`setup`, `instances`, `connections`, `operations`, `approvals` and `invoke`
+commands. Types and behavior come from the
+[CLI contract](../../../contracts/cli/v1alpha1/semantics.md) and
 [shared ESS values](../../../ess/domains/cli.yaml).
-
-The [compatibility inventory](compatibility.json) keeps existing `describe`,
-`invoke` and `serve` routes explicit. They stay implemented by the current runtime.
-They are not aliases of grouped commands, and their successful raw JSON output
-does not acquire the new grouped-command envelope.
 
 Generate the separate contract-fixture package with:
 

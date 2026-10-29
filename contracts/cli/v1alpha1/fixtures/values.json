@@ -854,57 +854,46 @@
       }
     },
     {
-      "id": "valid-LegacyDescribeInput-29",
-      "type": "connectors.cli.LegacyDescribeInput",
+      "id": "valid-InvokeResult-29",
+      "type": "connectors.cli.InvokeResult",
       "valid": true,
       "value": {
-        "endpoint": "https://fixture.invalid",
-        "token_file": "/run/private/service-token.json",
-        "allow_plaintext": false
-      }
-    },
-    {
-      "id": "valid-LegacyDescribeResult-30",
-      "type": "connectors.cli.LegacyDescribeResult",
-      "valid": true,
-      "value": {
-        "descriptor": {
-          "version": "v1alpha1",
-          "instance": "forge-local",
-          "adapter": "fixture-forge",
-          "revision": "descriptor-r1",
-          "operations": [
-            {
-              "id": "project.get",
-              "description": "Read an admitted project",
-              "contract": "operations/v1alpha1",
-              "profile": "read",
-              "input_schema": {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"], "additionalProperties": false},
-              "output_schema": {"type": "object"}
-            }
-          ],
-          "configuration_schema": "{\"type\":\"object\"}"
-        }
-      }
-    },
-    {
-      "id": "valid-LegacyInvokeInput-31",
-      "type": "connectors.cli.LegacyInvokeInput",
-      "valid": true,
-      "value": {
-        "endpoint": "https://fixture.invalid",
-        "token_file": "/run/private/service-token.json",
+        "connector": "fixture-forge", "instance": "main",
         "operation": "project.get",
-        "input": "/home/fixture/business.json"
+        "revision": "descriptor-r1",
+        "result": {"id": 7, "name": "fixture"}
       }
     },
     {
-      "id": "valid-LegacyInvokeResult-32",
-      "type": "connectors.cli.LegacyInvokeResult",
+      "id": "invalid-invoke-result-names-adapter",
+      "type": "connectors.cli.InvokeResult",
+      "valid": false,
+      "value": {
+        "adapter": "forge", "connector": "fixture-forge", "instance": "main",
+        "operation": "project.get",
+        "revision": "descriptor-r1",
+        "result": {"id": 7}
+      }
+    },
+    {
+      "id": "valid-InvokeDescription-30",
+      "type": "connectors.cli.InvokeDescription",
       "valid": true,
       "value": {
-        "result": "{\"id\":7}"
+        "connector": "fixture-forge", "instance": "main",
+        "operation": "project.get",
+        "description": "Read an admitted project",
+        "effect": "read",
+        "schema": "0f3c5a7e9b1d2f4a",
+        "revision": "descriptor-r1",
+        "input_schema": {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"], "additionalProperties": false}
       }
+    },
+    {
+      "id": "valid-ConnectionCandidate-31",
+      "type": "connectors.cli.ConnectionCandidate",
+      "valid": true,
+      "value": {"connection": "0fd9de39-aed4-4673-8330-12f20cd0b962", "state": "reauthorization_required"}
     },
     {
       "id": "valid-ConnectionCreateRequest-33",

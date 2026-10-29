@@ -16,8 +16,7 @@ called by [local.rs](../../../../../apps/connectors/src/local.rs).
 `runtime-unavailable` means it must not be advertised as executable.
 `unresolved-binding` means current generic syntax lacks MCP-specific configuration,
 profile, identifiers and executable binding. These are documentation dispositions,
-not product lifecycle states. [Compatibility](../../../../../apps/connectors/spec/compatibility.json)
-continues to say `mcp: deferred`.
+not product lifecycle states. MCP stays deferred.
 
 All JSON `sources` are repository-relative file paths. `commands[].id` is a
 static documentation key, not an operation identifier. `commands[].path` is a CLI

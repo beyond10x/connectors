@@ -60,6 +60,51 @@ pub const DEFINITION_HELP: [(&str, &str); 5] = [
     ),
 ];
 
+/// The help of the `invoke` arguments (story:connectors-do-short-invocation;
+/// `contracts/cli/v1alpha1/semantics.md` §3, "Invoking an operation").
+pub const INVOKE_HELP: [(&str, &str); 13] = [
+    (
+        "field:target",
+        "The connector, and after one `/` its instance; the instance may be left out when the connector has only one",
+    ),
+    ("field:operation", "The operation to invoke"),
+    (
+        "field:connection",
+        "The connection to invoke through; the instance's only usable one when left out",
+    ),
+    (
+        "field:schema",
+        "A pin: the operation's schema identity, refused when the current description differs; taken from it when left out",
+    ),
+    (
+        "field:revision",
+        "A pin: the description's revision, refused when the current description differs; taken from it when left out",
+    ),
+    ("source:input:inline", "The input document, as JSON text"),
+    ("source:input:file", "A file holding the input document"),
+    (
+        "source:input:stdin",
+        "Read the input document from standard input, as happens when no input flag is given",
+    ),
+    (
+        "field:approval_file",
+        "The approval proof a write is invoked with",
+    ),
+    ("field:idempotency_key", "A write's idempotency key"),
+    (
+        "field:definition",
+        "A connectors-definition/1 file to invoke without configuring it; the target names its connector",
+    ),
+    (
+        "field:describe",
+        "true: print the operation's description, effect, schema and revision, and invoke nothing",
+    ),
+    (
+        "field:credential_file",
+        "With --definition: the OAuth client file to connect with when the instance has no connection",
+    ),
+];
+
 /// The generated command tree as the binary presents it.
 pub fn command() -> Command {
     decorate(
@@ -130,6 +175,8 @@ fn node(
             .find(|(id, _)| path == ["operations", "invoke"] && arg.get_id() == *id)
         {
             arg.help(*help)
+        } else if path == ["invoke"] {
+            invoke_arg(arg)
         } else {
             arg
         }
@@ -142,6 +189,29 @@ fn node(
         command = command.about(*about);
     }
     command.mut_subcommands(|sub| node(sub, path.clone(), renamed))
+}
+
+/// An `invoke` argument with its help; `--definitions-root` keeps the
+/// definition file's.
+fn invoke_arg(arg: Arg) -> Arg {
+    let id = arg.get_id().as_str().to_owned();
+    let arg = match id.as_str() {
+        "field:target" => arg.value_name("CONNECTOR[/INSTANCE]"),
+        "field:operation" => arg.value_name("OPERATION"),
+        _ => arg,
+    };
+    match INVOKE_HELP
+        .iter()
+        .chain(
+            DEFINITION_HELP
+                .iter()
+                .filter(|(id, _)| *id == "field:definitions_root"),
+        )
+        .find(|(field, _)| *field == id)
+    {
+        Some((_, help)) => arg.help(*help),
+        None => arg,
+    }
 }
 
 /// The help `args` asks for, as the binary prints it; `None` when they ask for none.
