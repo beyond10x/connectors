@@ -2,10 +2,23 @@
 
 ## Unreleased
 
+## 0.59.2 — 2026-10-29
+
+No breaking changes.
+
 ### Changed
 
 - ESS 0.77.0 (from 0.75.0). No user-visible effect: the specifications stay at their current
   formats, and the regenerated types differ only in the generator version they name.
+
+### Fixed
+
+- `connectors server --transport stdio` no longer exits with status 1 and `mcp_unavailable` while
+  it answers a long read on a loaded host. Renewing the session's data lease waited on the
+  store's lock, and an owner holding that lock past the lease's remaining 1.4 s ended the
+  session. A renewal now greets the owner by the authority the session was admitted under. It
+  still compares the store's authority whenever the lock is free, so a replaced store still
+  ends the session.
 
 ## 0.59.1 — 2026-10-29
 
