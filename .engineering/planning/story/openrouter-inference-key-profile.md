@@ -8,13 +8,17 @@ relations:
 - decomposes: epic:catalog-connectors-only-in-definitions
 - serves: vision:independent-contract-adapters
 scope:
+- confidence: inferred
+  path: apps/connectors/src/local/declarations.rs
+- confidence: inferred
+  path: apps/connectors/src/local/migrate.rs
 - confidence: cited
   path: apps/connectors/tests/setup_migrate.rs
 - confidence: inferred
-  path: crates/connectors-catalog/src/definition.rs
+  path: contracts/cli/v1alpha1/semantics.md
 - confidence: inferred
-  path: crates/connectors-catalog/tests/fixtures/definitions/connectors/openrouter.yaml
-revision: 4
+  path: crates/connectors-host/src/local/config.rs
+revision: 7
 ---
 ## Outcome
 
@@ -48,11 +52,42 @@ this the inference instance would stay pointing at a path story:catalog-provider
 
 ## Scope
 
-- **Files:** connectors-definitions `connectors/openrouter.yaml` — inferred (the other repository)
-- **Files:** `crates/connectors-catalog/src/definition.rs` (per-profile label in the lowered declaration) — inferred
-- **Files:** `apps/connectors/tests/setup_migrate.rs` — cited (the decision names the migration test)
-- **Files:** `crates/connectors-catalog/tests/fixtures/definitions/connectors/openrouter.yaml` — inferred, while the fixture copy exists
-- **Confidence:** medium; the definition format's profile shape is not read here
+Derived 2026-10-29 by `story-scoper` on origin/main 65c928d72 (connectors) and 3f9dd19
+(connectors-definitions). Every line is **cited** (read from the story or the tree) or **inferred**
+(a reading that could be wrong).
+
+- **Primary surface:** `apps/connectors` `setup migrate` (`apps/connectors/src/local/migrate.rs`) and
+  its test — cited (Acceptance names `apps/connectors/tests/setup_migrate.rs`; `connector_of`,
+  `migrate.rs:194-231`)
+- **Files:** `apps/connectors/tests/setup_migrate.rs` — cited (Acceptance)
+- **Files:** `apps/connectors/src/local/migrate.rs` — inferred: "each with its own profile" needs
+  migrate to pick a declaration profile per entry, presumably by `auth.label`; today the migrated
+  instance gets `profile: None` (`crates/connectors-host/src/local/config.rs:1043`)
+- **Files:** `apps/connectors/src/local/declarations.rs` — inferred: OpenRouter is not among the 14
+  compiled-in declarations (`declarations.rs:9-24`), so `connector_of` keeps both entries as
+  `connector_undeclared` until a declaration is added there
+- **Files (connectors-definitions):** `connectors/openrouter.yaml` — cited (Acceptance): a second
+  profile, such as `openrouter.inference-key`, labelled "OpenRouter inference key", with
+  `default: true` on `openrouter.api-key` (two profiles need exactly one default,
+  `crates/connectors-catalog/src/definition.rs:1844-1856`; ids start with `openrouter.`, `:890`)
+- **Files (connectors-definitions):** `CHANGELOG.md` — cited (connectors-definitions `AGENTS.md:69-80`)
+- **Also likely:** `crates/connectors-host/src/local/config.rs` (`with_instances`, `:1017`) — inferred
+- **Also likely:** `contracts/cli/v1alpha1/semantics.md` §3 — inferred, if migrate starts choosing a profile
+- **Not touched:** `crates/connectors-catalog/src/definition.rs` — cited: the lowerer already emits one
+  block per profile with its own `label` (`:1951`, `:2013`, loop at `:2196-2199`); zendesk's two
+  profiles lower to two labels (`adapters/catalog/providers/zendesk/connector.json:14,25`)
+- **Not touched:** `crates/connectors-catalog/tests/fixtures/definitions/connectors/openrouter.yaml` —
+  cited: SM-D207 keeps definitions only in connectors-definitions, and
+  `story:definitions-fixture-copy-removed` deletes the copy
+- **Confidence:** medium — the definition and lowerer side is read; where the migration test gets an
+  OpenRouter declaration, and how migrate picks a profile, are not decided by the story
+- **Would collide with:** any unit touching `apps/connectors/src/local/{migrate,declarations}.rs` or
+  `apps/connectors/tests/setup_migrate.rs` (the D218 units change `apps/connectors`); any unit editing
+  connectors-definitions `connectors/openrouter.yaml` or its `CHANGELOG.md`
+- **Not ready (2026-10-29):** the acceptance test needs an OpenRouter declaration, which
+  `story:instances-resolve-through-locked-index` adds, and that story depends on this one; the
+  "pinned tag" the acceptance names comes from `story:definitions-pin-covers-catalog`, which this story
+  does not depend on
 
 ## Ordering
 
