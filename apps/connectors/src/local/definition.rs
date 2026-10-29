@@ -1,6 +1,8 @@
 //! `operations invoke --definition <file>` (story:invoke-definition-file;
 //! architecture-decision-record:provider-definitions-and-runtimes D12 point 3;
-//! `contracts/cli/v1alpha1/semantics.md` §3, "Invoking a definition file").
+//! `contracts/cli/v1alpha1/semantics.md` §3, "Invoking a definition file"), and
+//! the same file under `invoke --definition` (story:connectors-do-short-invocation),
+//! whose preparation (`super::invoke`) runs [`prepare_with`] with its target.
 //!
 //! A command line that names `--definition` is prepared here, before the
 //! generated runner reads it. The definition is lowered with the reference
@@ -56,24 +58,38 @@ const OWNED: [&str; 10] = [
 ];
 
 /// What the command line asks for.
-struct Request {
+pub(super) struct Request {
     /// The program name the command line was given under.
-    program: OsString,
-    definition: Option<PathBuf>,
-    root: Option<PathBuf>,
-    credential_file: Option<PathBuf>,
+    pub(super) program: OsString,
+    pub(super) definition: Option<PathBuf>,
+    pub(super) root: Option<PathBuf>,
+    pub(super) credential_file: Option<PathBuf>,
     /// `--adapter`, `--connector` or `--instance` was given.
-    selected: bool,
-    operation: String,
-    connection: Option<String>,
-    schema: Option<String>,
-    revision: Option<String>,
-    config: Option<PathBuf>,
-    state: Option<PathBuf>,
-    json: bool,
+    pub(super) selected: bool,
+    /// The connector and, if named, the instance an `invoke` target names
+    /// (story:connectors-do-short-invocation); `None` on `operations invoke`.
+    pub(super) target: Option<(String, Option<String>)>,
+    pub(super) operation: String,
+    pub(super) connection: Option<String>,
+    pub(super) schema: Option<String>,
+    pub(super) revision: Option<String>,
+    pub(super) config: Option<PathBuf>,
+    pub(super) state: Option<PathBuf>,
+    pub(super) json: bool,
     /// The process globals as given, then the kept arguments.
-    globals: Vec<OsString>,
-    kept: Vec<OsString>,
+    pub(super) globals: Vec<OsString>,
+    pub(super) kept: Vec<OsString>,
+}
+
+/// The instance a prepared definition selects, the connection it holds and
+/// the schema and revision an invoke of `operation` pins.
+pub(super) struct Prepared {
+    pub(super) connector: String,
+    pub(super) instance: String,
+    pub(super) alias: String,
+    pub(super) connection: String,
+    pub(super) schema: String,
+    pub(super) revision: String,
 }
 
 /// The arguments the generated runner reads: `args` unchanged unless they are
@@ -85,13 +101,35 @@ pub(super) fn prepare(args: Vec<OsString>) -> Result<Vec<OsString>, ProcessOutpu
     };
     let usage = || failure("invalid_input", "arguments", "none", true);
     let prepared = match &request.definition {
-        Some(definition) => run(&request, definition),
+        Some(definition) => {
+            run(&request, definition).map(|prepared| rewritten(&request, &prepared))
+        }
         // `--definitions-root` and `--credential-file` belong to `--definition`.
         None if request.root.is_some() || request.credential_file.is_some() => Err(usage()),
         None => return Ok(args),
     };
     let json = request.json;
     prepared.map_err(|reply| render(reply, json))
+}
+
+/// The `operations invoke` command line that selects the prepared instance,
+/// its connection, schema and revision, with every kept argument.
+fn rewritten(request: &Request, prepared: &Prepared) -> Vec<OsString> {
+    let mut rewritten = vec![request.program.clone()];
+    rewritten.extend(request.globals.iter().cloned());
+    rewritten.extend(["operations", "invoke"].map(OsString::from));
+    for (long, value) in [
+        ("connector", prepared.connector.as_str()),
+        ("instance", prepared.instance.as_str()),
+        ("connection", prepared.connection.as_str()),
+        ("operation", request.operation.as_str()),
+        ("schema", prepared.schema.as_str()),
+        ("revision", prepared.revision.as_str()),
+    ] {
+        rewritten.push(OsString::from(format!("--{long}={value}")));
+    }
+    rewritten.extend(request.kept.iter().cloned());
+    rewritten
 }
 
 /// The generated command with `--schema` and `--revision` of `operations
@@ -174,6 +212,7 @@ fn parse(args: &[OsString]) -> Option<Request> {
         selected: ["adapter", "connector", "instance"]
             .iter()
             .any(|field| text(field).is_some()),
+        target: None,
         operation: text("operation")?,
         connection: text("connection"),
         schema: text("schema"),
@@ -188,7 +227,7 @@ fn parse(args: &[OsString]) -> Option<Request> {
 
 /// The one failure envelope a refused preparation writes, as the generated
 /// runner writes a handler's.
-fn render(reply: HandlerReply, json: bool) -> ProcessOutput {
+pub(super) fn render(reply: HandlerReply, json: bool) -> ProcessOutput {
     let (code, data, usage) = match reply {
         HandlerReply::UsageError { code, data } => (code, data, true),
         HandlerReply::Error { code, data } => (code, data, false),
@@ -224,7 +263,17 @@ fn usage() -> HandlerReply {
     failure("invalid_input", "arguments", "none", true)
 }
 
-/// Prepare `definition` and answer the rewritten command line.
+/// An `invoke` target naming another connector or instance than the one the
+/// definition prepares (story:connectors-do-short-invocation).
+fn other_target() -> HandlerReply {
+    let mut reply = usage();
+    if let HandlerReply::UsageError { data, .. } = &mut reply {
+        data["field"] = json!("target");
+    }
+    reply
+}
+
+/// Prepare `definition` and answer the instance it selects.
 ///
 /// The interrupt handler is installed before anything else runs: reading the
 /// configuration may start the installed provider to derive an unpinned
@@ -232,7 +281,7 @@ fn usage() -> HandlerReply {
 /// is ever started before an interruption is caught. An interruption at any
 /// point of the preparation ends the command as interrupted, whatever the step
 /// it arrived in answered, refusals included.
-fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerReply> {
+pub(super) fn run(request: &Request, definition: &Path) -> Result<Prepared, HandlerReply> {
     let signals = protected::Signals::install().map_err(owner_failure)?;
     let prepared = prepare_with(request, definition, &signals);
     if signals.interrupted() {
@@ -242,11 +291,11 @@ fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerRep
 }
 
 /// [`run`], under the interrupt handler `signals`.
-fn prepare_with(
+pub(super) fn prepare_with(
     request: &Request,
     definition: &Path,
     signals: &protected::Signals,
-) -> Result<Vec<OsString>, HandlerReply> {
+) -> Result<Prepared, HandlerReply> {
     // A third selector: never beside `--adapter` or `--connector`/`--instance`.
     if request.selected {
         return Err(usage());
@@ -263,6 +312,15 @@ fn prepare_with(
         .ok_or_else(usage)?
         .to_owned();
     let connector = parsed.id.clone().unwrap_or_else(|| stem.clone());
+    // `invoke` names the connector the definition declares; nothing is
+    // cached, derived or recorded for another.
+    if request
+        .target
+        .as_ref()
+        .is_some_and(|(named, _)| *named != connector)
+    {
+        return Err(other_target());
+    }
     let alias = definitions::alias(&connector);
     // The connector, the file stem and the catalog (the stem when the file
     // names none) name an alias, the selection file and the bundle's
@@ -348,6 +406,16 @@ fn prepare_with(
             reported,
         ),
     };
+    // An `invoke` target that names an instance names this one; nothing is
+    // recorded for another.
+    if request
+        .target
+        .as_ref()
+        .and_then(|(_, named)| named.as_ref())
+        .is_some_and(|named| *named != instance)
+    {
+        return Err(other_target());
+    }
     let recorded = definitions::record(
         &paths,
         &connector,
@@ -402,21 +470,14 @@ fn prepare_with(
         }
     };
     interrupted()?;
-    let mut rewritten = vec![request.program.clone()];
-    rewritten.extend(request.globals.iter().cloned());
-    rewritten.extend(["operations", "invoke"].map(OsString::from));
-    for (long, value) in [
-        ("connector", connector.as_str()),
-        ("instance", instance.as_str()),
-        ("connection", connection.as_str()),
-        ("operation", request.operation.as_str()),
-        ("schema", schema.as_str()),
-        ("revision", revision.as_str()),
-    ] {
-        rewritten.push(OsString::from(format!("--{long}={value}")));
-    }
-    rewritten.extend(request.kept.iter().cloned());
-    Ok(rewritten)
+    Ok(Prepared {
+        connector,
+        instance,
+        alias,
+        connection,
+        schema,
+        revision,
+    })
 }
 
 /// A plain name: ASCII letters, digits, `-` and `_`, as a derived instance's

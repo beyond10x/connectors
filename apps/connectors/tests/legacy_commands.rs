@@ -1,6 +1,8 @@
-//! The explicit service commands `describe`, `invoke` and `serve` parse like the
-//! grouped CLI contract: parse errors are the fixed `cli_parse` envelope, never an
-//! argv echo, and `--output` is accepted before the command word.
+//! story:connectors-do-short-invocation: the explicit service commands
+//! `describe`, `invoke --endpoint` and `serve` are removed. Each of their
+//! command lines is the grouped parser's fixed `cli_parse` envelope, never an
+//! argv echo, in either output mode and with `--output` before or after the
+//! command word; `invoke` is the generated command.
 
 use std::process::{Command, Output};
 
@@ -16,6 +18,7 @@ fn cli(args: &[&str]) -> Output {
         .env("HOME", home.path())
         .env_remove("XDG_CONFIG_HOME")
         .env_remove("XDG_STATE_HOME")
+        .stdin(std::process::Stdio::null())
         .output()
         .unwrap()
 }
@@ -48,20 +51,20 @@ fn malformed() -> Vec<Vec<String>> {
 }
 
 #[test]
-fn legacy_parse_errors_are_the_human_envelope_without_argv() {
+fn removed_command_lines_are_the_human_parse_envelope_without_argv() {
     for case in malformed() {
         let args: Vec<&str> = case.iter().map(String::as_str).collect();
         assert_eq!(
             parts(&cli(&args)),
             (Some(2), String::new(), HUMAN_PARSE.to_owned()),
-            "`connectors {}` must refuse with the fixed human parse envelope",
+            "story:connectors-do-short-invocation: `connectors {}` must refuse with the fixed human parse envelope",
             case.join(" "),
         );
     }
 }
 
 #[test]
-fn legacy_parse_errors_are_the_json_envelope_before_or_after_the_command_word() {
+fn removed_command_lines_are_the_json_envelope_before_or_after_the_command_word() {
     for case in malformed() {
         let (command, rest) = case.split_first().unwrap();
         let rest: Vec<&str> = rest.iter().map(String::as_str).collect();
@@ -74,7 +77,7 @@ fn legacy_parse_errors_are_the_json_envelope_before_or_after_the_command_word() 
             assert_eq!(
                 parts(&cli(&args)),
                 (Some(2), String::new(), JSON_PARSE.to_owned()),
-                "`connectors {}` must refuse with the fixed JSON parse envelope",
+                "story:connectors-do-short-invocation: `connectors {}` must refuse with the fixed JSON parse envelope",
                 args.join(" "),
             );
         }
@@ -82,21 +85,32 @@ fn legacy_parse_errors_are_the_json_envelope_before_or_after_the_command_word() 
 }
 
 #[test]
-fn legacy_parse_envelope_is_the_grouped_parse_envelope() {
+fn a_removed_word_is_answered_as_any_unknown_word() {
     for output in ["human", "json"] {
         let grouped = cli(&["--output", output, SENTINEL]);
-        let legacy = cli(&["--output", output, "describe", SENTINEL]);
-        assert_eq!(parts(&legacy), parts(&grouped), "output {output}");
+        for removed in ["describe", "serve"] {
+            let legacy = cli(&["--output", output, removed, SENTINEL]);
+            assert_eq!(
+                parts(&legacy),
+                parts(&grouped),
+                "story:connectors-do-short-invocation: `{removed}` is an unknown word, output {output}"
+            );
+        }
     }
 }
 
+/// story:connectors-do-short-invocation: what the removed routes ran is a
+/// parse refusal now, with `--output` before the command word too; their
+/// `--help` is one as well.
 #[test]
-fn output_before_the_legacy_command_word_is_accepted() {
+fn the_removed_routes_are_parse_refusals_with_output_before_the_word() {
     let temp = tempfile::tempdir().unwrap();
     let missing = temp.path().join("missing");
     let missing = missing.to_str().unwrap();
-    for output in [["--output", "json"], ["--output", "human"]] {
-        // Parsed and routed: the refusal is the command's own, not the parser's.
+    for (output, expected) in [
+        (["--output", "json"], JSON_PARSE),
+        (["--output", "human"], HUMAN_PARSE),
+    ] {
         let served = cli(&[&output[..], &["serve", "--config", missing]].concat());
         let described = cli(&[
             &output[..],
@@ -109,31 +123,52 @@ fn output_before_the_legacy_command_word_is_accepted() {
             ],
         ]
         .concat());
-        for routed in [served, described] {
-            let (code, stdout, stderr) = parts(&routed);
-            assert_eq!((code, stdout.as_str()), (Some(1), ""), "{stderr}");
-            assert!(!stderr.contains("cli_parse"), "{stderr}");
+        let invoked = cli(&[
+            &output[..],
+            &[
+                "invoke",
+                "--endpoint",
+                "http://127.0.0.1:9/",
+                "--token-file",
+                missing,
+                "--operation",
+                "read",
+                "--input",
+                missing,
+            ],
+        ]
+        .concat());
+        for refused in [served, described, invoked] {
+            assert_eq!(
+                parts(&refused),
+                (Some(2), String::new(), expected.to_owned()),
+                "story:connectors-do-short-invocation: {output:?}"
+            );
         }
-        for command in ["describe", "invoke", "serve"] {
-            let help = cli(&[output[0], output[1], command, "--help"]);
-            let (code, stdout, stderr) = parts(&help);
-            assert_eq!((code, stderr.as_str()), (Some(0), ""));
-            assert!(stdout.contains("Usage:"), "{stdout}");
+        for command in ["describe", "serve"] {
+            assert_eq!(
+                parts(&cli(&[output[0], output[1], command, "--help"])),
+                (Some(2), String::new(), expected.to_owned()),
+                "story:connectors-do-short-invocation: `{command} --help`"
+            );
         }
+        let help = cli(&[output[0], output[1], "invoke", "--help"]);
+        let (code, stdout, stderr) = parts(&help);
+        assert_eq!((code, stderr.as_str()), (Some(0), ""));
+        assert!(
+            stdout.contains("Usage:") && !stdout.contains("--endpoint"),
+            "story:connectors-do-short-invocation: {stdout}"
+        );
     }
-    let equals = cli(&["--output=json", "describe", "--help"]);
-    assert_eq!(equals.status.code(), Some(0));
+    assert_eq!(
+        parts(&cli(&["--output=json", "describe", "--help"])),
+        (Some(2), String::new(), JSON_PARSE.to_owned()),
+        "story:connectors-do-short-invocation"
+    );
 }
 
 #[test]
-fn root_help_keeps_generated_and_service_help_and_names_the_native_server() {
-    let semantics = include_str!("../../../contracts/cli/v1alpha1/semantics.md");
-    let block = semantics
-        .split("```text\n")
-        .nth(1)
-        .and_then(|rest| rest.split("```").next())
-        .filter(|block| block.starts_with("Explicit service commands"))
-        .expect("semantics.md states the explicit service commands block");
+fn root_help_is_the_generated_tree_and_names_the_native_server() {
     // help.txt is the generated tree's long help; root `--help` is the short form of that tree
     // as `connectors::help` presents it.
     assert_eq!(
@@ -146,11 +181,16 @@ fn root_help_keeps_generated_and_service_help_and_names_the_native_server() {
     let native = "Native integration commands (use COMMAND --help for options):\n  server    Serve admitted read-only MCP tools over stdio\n";
     assert_eq!(
         parts(&cli(&["--help"])),
-        (
-            Some(0),
-            format!("{short}\n{native}\n{block}"),
-            String::new()
-        )
+        (Some(0), format!("{short}\n{native}"), String::new()),
+        "story:connectors-do-short-invocation: root help is the generated tree and the native server"
     );
-    assert!(!short.contains("Explicit service commands"));
+    assert!(
+        !short.contains("Explicit service commands"),
+        "story:connectors-do-short-invocation"
+    );
+    let semantics = include_str!("../../../contracts/cli/v1alpha1/semantics.md");
+    assert!(
+        !semantics.contains("Explicit service commands (use COMMAND --help for options)"),
+        "story:connectors-do-short-invocation: semantics.md states no explicit service commands block"
+    );
 }

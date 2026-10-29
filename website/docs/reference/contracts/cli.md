@@ -114,6 +114,7 @@ management wire payload or a persistent record.
 | `operations list` | selected cached descriptor projection | `OperationListInput` → `OperationListResult` | only to [launch for a description](#launching-for-a-description) |
 | `operations describe` | selected cached descriptor projection | `OperationDescribeInput` → `OperationDescribeResult` | only to [launch for a description](#launching-for-a-description) |
 | `operations invoke` | admitted service request | `OperationInvokeInput` → `OperationInvokeResult` | yes / yes, after admission |
+| `invoke` | admitted service request on the instance and connection its target selects ([invoking an operation](#invoking-an-operation)) | `InvokeInput` → `InvokeResult`, or `InvokeDescription` with `--describe` | yes / yes, after admission; with `--describe` only to [launch for a description](#launching-for-a-description) |
 
 ### Consumer launch
 
@@ -273,7 +274,7 @@ stdout, never an application `Failure`:
 | unknown command or flag, missing or malformed argument, two sources for one field | `cli_parse` |
 | an argument value that does not decode to its field type or the command's input shape | `cli_input` |
 | a selected source the presentation cannot read, when the owner recorded no refusal of its own | `cli_source` |
-| an `operations invoke` business JSON document that does not decode as exactly one JSON value (malformed, a duplicate object key, trailing document, 128 or more nesting levels counting the outermost value: the decoder's recursion limit, reached before the owner's depth bound) | `cli_dynamic_input` |
+| an `operations invoke` or `invoke` business JSON document that does not decode as exactly one JSON value (malformed, a duplicate object key, trailing document, 128 or more nesting levels counting the outermost value: the decoder's recursion limit, reached before the owner's depth bound) | `cli_dynamic_input` |
 
 When the owner's reader refused the selected source, the owner's `Failure`
 takes the place of `cli_source` (an unreadable business document file is
@@ -288,49 +289,32 @@ claim rollback after a durable publication or possible provider dispatch. A
 publication whose acknowledgement is lost is `outcome_unknown`; a later status
 read may resolve it without replaying begin/exchange or the business request.
 
-Compatibility `describe --endpoint --token-file [--allow-plaintext]` retains the
-complete service descriptor, including configuration schema, instance, adapter,
-version, revision and operations. It is not an alias for one operation's describe.
-`LegacyDescribeInput` → `LegacyDescribeResult` models that complete result.
-Compatibility `invoke --endpoint --token-file [--allow-plaintext] --operation
---input FILE` retains existing argument meanings and raw successful provider JSON
-output (`LegacyInvokeInput` → `LegacyInvokeResult`). The carrier's internal field
-is unwrapped when printing; it is not a new public wrapper. These legacy explicit
-network routes are outside the no-launch/no-auth guarantee for local inspection.
-The current `serve --config` runtime stays a separate federation command; this
-contract does not claim its configuration starts the new local supervisor.
+The explicit service commands are removed
+(story:connectors-do-short-invocation): `describe --endpoint --token-file
+[--allow-plaintext]`, `invoke --endpoint --token-file [--allow-plaintext]
+--operation --input FILE` and `serve --config` are command lines like any other
+unknown command or option, exit 2, empty stdout and the fixed `cli_parse` code
+with empty data on stderr, never an argv echo, with `--output` before or after
+the command word, and they contact nothing. `describe --help`, `serve --help`,
+`help describe` and `help serve` are parse refusals as well. `invoke` is the
+generated command of [invoking an operation](#invoking-an-operation), and
+`completions bash` emits the generated completion function unchanged. The
+federation library stays a library; no command of this binary serves it, and no
+compatibility inventory or `Legacy*` type remains.
 
-These three compatibility commands accept the process global `--output` before
-or after the command word; it selects only the parse-refusal presentation, and
-successful results stay raw JSON. `--config` and `--state-dir` are not accepted
-before them (`serve --config` is that command's own argument). Their parse
-errors, including unknown, missing or malformed arguments, follow the output
-contract above: exit 2, empty stdout, and the fixed `cli_parse` code with empty
-data on stderr, never an argv echo. `COMMAND --help` prints that command's usage,
-and exactly `help COMMAND` prints the same usage with the same exit status;
-`help COMMAND` with a leading global or followed by anything else stays a parse
-refusal. `completions bash` emits the
-generated completion function unchanged, followed by a completion for these
-three commands built from their own parser and a routing function registered
-for `connectors`: a command line whose command word, after any leading
-`--output` selections, is one of them completes that command's own options;
-any other line is completed by the generated function, with the three command
-words added at the root and as the word after a leading `help`.
 Help is the generated grouped tree as `connectors::help` presents it
 (`apps/connectors/src/help.rs`) with what the `ess-cli/1` binding cannot
 declare: each group's summary, a deprecated command path marked `Deprecated` in
-its parent's listing and in its own usage line, and `--adapter` marked
-deprecated. It parses exactly as the generated tree does, and help prints no
-deprecation line on standard error, under an old path or with `--adapter` too.
-Root `--help` or `-h`, alone or after leading process globals, prints that
-help's short form, one blank line and then this block, which the generated help
-does not carry:
+its parent's listing and in its own usage line, `--adapter` marked deprecated,
+and the help of each `invoke` argument. It parses exactly as the generated tree
+does, and help prints no deprecation line on standard error, under an old path
+or with `--adapter` too. Root `--help` or `-h`, alone or after leading process
+globals, prints that help's short form, one blank line and then this block,
+which the generated help does not carry:
 
 ```text
-Explicit service commands (use COMMAND --help for options):
-  describe  Read a complete service descriptor
-  invoke    Invoke an explicit service operation
-  serve     Run the configured federation service
+Native integration commands (use COMMAND --help for options):
+  server    Serve admitted read-only MCP tools over stdio
 ```
 
 ### Access token issue
@@ -509,8 +493,9 @@ sources of every `operations invoke`, runs an operation of a
 &lt;dir>` is the tree holding the definition's vendored source and shared auth
 files; it defaults to the parent of the directory holding the file.
 `--schema` and `--revision` may be left out: each one left out is the one the
-instance's description states, as `operations describe` reports it. The bare
-`invoke` stays the explicit compatibility command.
+instance's description states, as `operations describe` reports it. `invoke
+--definition &lt;file>` reads the same file, its target naming the definition's
+connector ([invoking an operation](#invoking-an-operation)).
 
 The file is lowered with the reference lowerer into an owner-only cache under
 the state directory, `definitions/<digest>/`, keyed by the digest of every
@@ -648,6 +633,90 @@ description, admission, approval of writes, audit and the result envelope are
 those of every `operations invoke`, and a result names connector
 `<connector>`, instance `definition` and adapter `<connector>.definition`, or
 the moved instance and `<connector>.definition-<16 hex>`.
+
+### Invoking an operation
+
+`connectors invoke <connector>[/<instance>] <operation>`
+(story:connectors-do-short-invocation) invokes one operation of one configured
+instance, with only what has no default named. Before the generated runner
+reads the command line the instance, connection, schema and revision are
+resolved and stated, and the command is then admitted, approved, audited and
+dispatched as `operations invoke` on that instance and connection. It takes no
+`--adapter`, `--connector`, `--instance` or `--endpoint`: each is `cli_parse`.
+
+The target is a connector id, optionally followed by one `/` and an instance
+name, each an admitted selector (at most 128 bytes of `[A-Za-z0-9._-]`);
+anything else is `invalid_input` naming `target`, and the target is never
+echoed. A `[connectors]` instance and a recorded definition instance are named
+by their own names; a legacy `[adapters.<alias>]` entry by its alias, under the
+connector `setup migrate` derives for it, or under its implementation when that
+is not the catalog; a catalog entry no connector is derived for cannot be named
+here. With the instance left out the connector's only instance is selected;
+`default_instance` is never consulted. A connector or instance not configured
+is `not_found` at `admission` naming `check_configuration`.
+
+`instance_ambiguous`: the target names a connector with several instances and
+no instance. It is a usage refusal at `arguments`, exit 2, `next_action = none`,
+and its `Failure.instances` lists every instance of that connector as
+`<connector>/<instance>`, sorted, so the caller can name one. Nothing was read
+beyond the configuration.
+
+Without `--connection` the instance's one usable connection is selected:
+`ready`, or `pending` only because its validation evidence lapsed under the
+instance's current configuration, which the read that uses it recollects as
+every `operations invoke` read does. Revoked connections are not counted. A
+named `--connection` is used as named; one the instance does not hold is
+`not_found`.
+
+`connection_unresolved`: no connection, or more than one, is usable. It is
+operational at `admission`, exit 1, and names `create_connection` when the
+instance holds no connection, `repair_connection` when it holds connections and
+none is usable, and `none` when several are usable and `--connection` must
+choose. Its `Failure.connections` lists each connection the instance holds,
+revoked ones excepted, as `{connection, state}` with the state `connections
+list` reports; the list is empty when none is held.
+
+`--schema` and `--revision` left out are the instance's current admitted
+description's, read through the selected connection's binding as `operations
+describe` reports it. Given, each is a pin: a description that differs is
+`stale_description` at `observation` naming `refresh_description`, and the pin
+is never replaced by the current value.
+
+The business document comes from `--input-json`, `--input-file` or
+`--input-stdin` as for `operations invoke`. With none of them standard input is
+read, unless it is a terminal: then `invoke` refuses at once with
+`invalid_input` naming `input`, without reading it. A document that does not
+decode as one JSON value is `cli_dynamic_input`; one the operation's schema or
+bounds refuse is `invalid_input` naming `input`.
+
+`--describe` (or `--describe true`) prints the operation's
+`InvokeDescription`: `connector`, `instance`, `operation`, `description`,
+`effect` (`read`, `write` or `unknown`), `schema`, `revision` and
+`input_schema`. It reads no document, needs no connection and invokes nothing;
+it may [launch for a description](#launching-for-a-description) as `operations
+describe` does, and refuses a differing pin as above.
+
+`approval_required` on `invoke`: a write without `--approval-file` is refused at
+`admission`, exit 1, `next_action = none`, before any provider call, and its
+`Failure.approval_steps` names the commands that produce the proof, in order:
+`approvals prepare`, `approvals clock-check`, `approvals issue`. A read given
+`--approval-file` or `--idempotency-key` is `invalid_input` naming that
+argument. A write with its proof is the approved write of `operations invoke`.
+
+`--definition <file>` invokes a `connectors-definition/1` file as `operations
+invoke --definition` does ([invoking a definition file](#invoking-a-definition-file)),
+the target naming the definition's connector; a target naming another
+connector is `invalid_input` naming `target`. `--definitions-root` and
+`--credential-file` without `--definition` are `invalid_input` naming each, and
+a refusal of the file that names no argument names `definition`.
+
+The result is `InvokeResult`: `connector`, `instance`, `operation`, `revision`
+and the provider's `result`, with `request_id`, `mutation` and `source_audit` as
+`OperationInvokeResult` carries them. No answer of `invoke` (result, refusal or
+help) names a configured entry by its alias. Every `invalid_input` of `invoke`
+names the argument it refused in `Failure.field`: `target`, `operation`,
+`connection`, `schema`, `revision`, `input`, `approval_file`,
+`idempotency_key`, `definition`, `definitions_root` or `credential_file`.
 
 ### Renamed commands
 
@@ -1151,8 +1220,8 @@ quoted carrier string or a double-encoded document. Answers are not carriers:
 `OperationInvokeResult.result` is the provider result as a JSON value, validated
 against the selected operation's output schema, and `OperationDescription`
 answers `input_schema` and `output_schema` as JSON schema objects in
-`operations describe`, in the `instances describe` descriptor and in the
-compatibility `describe`. A caller decodes the answer once; none of these fields
+`operations describe`, in the `instances describe` descriptor and in
+`invoke --describe`. A caller decodes the answer once; none of these fields
 is a string holding JSON. The schema digest (`schema`), not the schema document,
 remains the identity an invocation selects. `ServiceDescriptor.configuration_schema`
 remains a JSON text carrier. Structured command metadata uses specific types, not
@@ -1192,6 +1261,9 @@ never replay a possible write after interruption, timeout or lost response.
 | no selected cached description | `description_unavailable` | 1 |
 | schema/descriptor changed | `stale_description` | 1 |
 | absent selected operation/connection | `not_found` | 1 |
+| `invoke` target naming a connector with several instances and no instance (`stage = arguments`, `next_action = none`, `instances` named; [invoking an operation](#invoking-an-operation)) | `instance_ambiguous` | 2 |
+| `invoke` without `--connection` on an instance with no usable connection or several (`stage = admission`, `connections` named; [invoking an operation](#invoking-an-operation)) | `connection_unresolved` | 1 |
+| `invoke` write without `--approval-file` (`stage = admission`, `next_action = none`, `approval_steps` named) | `approval_required` | 1 |
 | stale, expired or foreign list cursor (`stage = observation`, `next_action = retry_explicitly`) | `stale_cursor` | 1 |
 | connect whose acquisition failed before publication (`stage = dispatch`, `next_action = retry_explicitly`) | the acquisition owner's code | 1 |
 | known revoked connection | `revoked` | 1 |
@@ -1235,10 +1307,12 @@ directory is refused too), its directory exists, is the caller's own and
 admits no other user, every ancestor is writable only by its owner (the
 caller or root), and the directory holds no entry of that name; an existing
 file is never replaced. A path relative to the working directory is refused,
-not resolved. `field` never carries the caller's value and appears only on
-`invalid_input` of those three commands; no other command carries it, an
-approved write's `operations invoke` included; a refusal the presentation raises
-before the handler runs carries its `ess-cli/1` code and no `field`. As for
+not resolved. Every `invalid_input` of `invoke` names its argument too
+([invoking an operation](#invoking-an-operation)). `field` never carries the
+caller's value and appears only on `invalid_input` of those four commands; no
+other command carries it, an approved write's `operations invoke` included; a
+refusal the presentation raises before the handler runs carries its `ess-cli/1`
+code and no `field`. As for
 `instance_id`, the presence rule is a host obligation: ESS declares no
 invariant on a CLI type.
 

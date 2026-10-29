@@ -677,7 +677,7 @@ types:
     variants: [usage, operational, interrupted]
   - name: connectors.cli.FailureCode
     kind: enum
-    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer]
+    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer, instance_ambiguous, connection_unresolved]
   - name: connectors.cli.FailureStage
     kind: enum
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop]
@@ -811,6 +811,17 @@ types:
       - {name: clock_refusal, type: "Optional<connectors.clock.Refusal>"}
       - {name: clock_sources, type: "Optional<List<connectors.clock.SourceReport>>"}
       - {name: field, type: "Optional<String>"}
+      # ESS-LIMIT: instances appears only on `instance_ambiguous` (story:connectors-do-short-invocation):
+      # every configured instance of the connector an `invoke` target named without an
+      # instance, each `<connector>/<instance>`, sorted. connections appears only on
+      # `connection_unresolved`: every connection the selected instance holds, revoked ones
+      # excepted, with its state (empty when it holds none). approval_steps appears only on
+      # an `invoke` write's `approval_required`: the three approval commands in the order
+      # they run. As for instance_id above, ESS declares no invariant on a CLI type, so the
+      # presence rules and the order are enforced by the host and pinned by tests.
+      - {name: instances, type: "Optional<List<String>>"}
+      - {name: connections, type: "Optional<List<connectors.cli.ConnectionCandidate>>"}
+      - {name: approval_steps, type: "Optional<List<String>>"}
       # ESS-LIMIT: cause and attempts appear only on a `connections revalidate` failure at
       # stage dispatch that the owner classified as transient (contracts/cli/v1alpha1/semantics.md
       # §6, "Revalidation retries"): cause names the class of the last attempt, attempts the
@@ -1445,7 +1456,65 @@ types:
       - {name: request_id, type: "Optional<String>"}
       - {name: mutation, type: "Optional<connectors.cli.MutationObservation>"}
       - {name: source_audit, type: "Optional<connectors.service_wire.SourceAudit>"}
-  # Compatibility value only. Existing runtime arguments and codecs remain unchanged; token file metadata is sensitive.
+  # story:connectors-do-short-invocation: `connectors invoke <connector>[/<instance>] <operation>`.
+  # target names the connector and, after one `/`, the instance; operation is the second
+  # positional argument. ESS keeps a dynamic target's operation, schema and payload fields
+  # required, so schema and revision are filled before this input is decoded from the
+  # instance's current admitted description when the command line leaves them out; given,
+  # they are pins, refused as stale when they differ. input is the document from
+  # --input-json, --input-file or standard input; describe answers InvokeDescription and
+  # reads no input. definition, definitions_root and credential_file are path metadata as
+  # on OperationInvokeInput.
+  - name: connectors.cli.InvokeInput
+    kind: struct
+    fields:
+      - {name: target, type: "String"}
+      - {name: operation, type: "String"}
+      - {name: connection, type: "Optional<String>"}
+      - {name: schema, type: "String"}
+      - {name: revision, type: "String"}
+      - {name: input, type: "String"}
+      - {name: approval_file, type: "Optional<String>"}
+      - {name: idempotency_key, type: "Optional<String>"}
+      - {name: definition, type: "Optional<String>"}
+      - {name: definitions_root, type: "Optional<String>"}
+      - {name: credential_file, type: "Optional<String>"}
+      - {name: describe, type: "Optional<Boolean>"}
+  # An invoke's answer names the connector and instance; it never carries an adapter member.
+  - name: connectors.cli.InvokeResult
+    kind: struct
+    fields:
+      - {name: connector, type: String}
+      - {name: instance, type: String}
+      - {name: operation, type: "String"}
+      - {name: revision, type: "String"}
+      - {name: result, type: "Json"}
+      - {name: request_id, type: "Optional<String>"}
+      - {name: mutation, type: "Optional<connectors.cli.MutationObservation>"}
+      - {name: source_audit, type: "Optional<connectors.service_wire.SourceAudit>"}
+  # `invoke --describe`: the operation as the instance's current admitted description
+  # states it, with the schema and revision an invoke pins. effect is the description's
+  # classification. No provider is called and no input is read.
+  - name: connectors.cli.InvokeDescription
+    kind: struct
+    fields:
+      - {name: connector, type: String}
+      - {name: instance, type: String}
+      - {name: operation, type: "String"}
+      - {name: description, type: "String"}
+      - {name: effect, type: "connectors.cli.InvokeEffect"}
+      - {name: schema, type: "String"}
+      - {name: revision, type: "String"}
+      - {name: input_schema, type: "Json"}
+  - name: connectors.cli.InvokeEffect
+    kind: enum
+    variants: [read, write, unknown]
+  # One connection of `connection_unresolved`'s list: its id and observed state.
+  - name: connectors.cli.ConnectionCandidate
+    kind: struct
+    fields:
+      - {name: connection, type: String}
+      - {name: state, type: "connectors.connection_admission.ConnectionState"}
   # Presentation projection of service_wire only: pinned ess-cli cannot emit
   # Uuid. Runtime validates id as canonical non-nil UUID text before projection.
   # This is correlation metadata, not a new attempt identity or lookup authority.
@@ -1462,31 +1531,6 @@ types:
       - {name: original_request_id, type: "Optional<String>"}
       - {name: replayed, type: Boolean}
       - {name: cause, type: "Optional<connectors.service_wire.DiagnosticCause>"}
-  - name: connectors.cli.LegacyDescribeInput
-    kind: struct
-    fields:
-      - {name: endpoint, type: "String"}
-      - {name: token_file, type: "String"}
-      - {name: allow_plaintext, type: "Optional<Boolean>"}
-  # The legacy renderer unwraps the descriptor and decodes its configuration_schema carrier into the complete original wire object.
-  - name: connectors.cli.LegacyDescribeResult
-    kind: struct
-    fields:
-      - {name: descriptor, type: "connectors.cli.ServiceDescriptor"}
-  # input retains the legacy file-path argument, not the new dynamic carrier source binding.
-  - name: connectors.cli.LegacyInvokeInput
-    kind: struct
-    fields:
-      - {name: endpoint, type: "String"}
-      - {name: token_file, type: "String"}
-      - {name: allow_plaintext, type: "Optional<Boolean>"}
-      - {name: operation, type: "String"}
-      - {name: input, type: "String"}
-  # The legacy renderer prints the once-decoded JSON carrier directly, preserving raw successful provider output.
-  - name: connectors.cli.LegacyInvokeResult
-    kind: struct
-    fields:
-      - {name: result, type: "String"}
 
 # ESS-LIMIT executable obligations (ESS 0.40 has no file-system, process, terminal
 # or OS-permission construct, no TOML/JSON reader-closure or codec construct, no
@@ -1585,7 +1629,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:998, docs/local-connection-registry.md:222-223;
+    # contracts/cli/v1alpha1/semantics.md:1067, docs/local-connection-registry.md:222-223;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1745,7 +1789,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1002) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1071) and the host
     # removal path (er.rs:4538-4540) only expires Active cursors. The error name is
     # the decision; no source names one.
 
