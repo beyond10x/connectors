@@ -4,6 +4,7 @@
 //! configured entry before any handler, source or validator reads it, so every
 //! later step sees exactly what `--adapter <alias>` gave it; a result that names
 //! an alias names that entry's connector and instance beside it.
+use super::invoke::Unselected;
 use super::*;
 use connectors_cli_contract::{ProcessOutput, wire::Shape};
 use connectors_host::local::config::Selector;
@@ -135,28 +136,27 @@ fn given(input: &Value) -> Result<Option<&str>, Refused> {
 /// The alias the selector fields of `input` name under `config`: the given
 /// `--adapter`, the instance `--connector` and `--instance` name together, or,
 /// with neither, the configuration's `default_instance`, else its
-/// `default_adapter`.
+/// `default_adapter`. `--connector` and `--instance` select as `invoke`
+/// selects its target (`invoke::select`), so the names `instances list` gives
+/// an instance select it, and a legacy entry is never selected as `catalog`
+/// when a connector is derived for it (story:connectors-do-short-invocation).
 pub(super) fn alias(input: &Value, config: &Config) -> Result<String, Refused> {
     if let Some(alias) = given(input)? {
         return Ok(alias.to_owned());
     }
     let text = |field| input.get(field).and_then(Value::as_str);
     let selected = match (text("connector"), text("instance")) {
-        (Some(connector), Some(instance))
-            if super::invoke::names_unmigrated(config, connector, Some(instance)) =>
-        {
-            return Err(Refused::Unmigrated);
+        (Some(connector), Some(instance)) => {
+            return super::invoke::select(config, connector, Some(instance))
+                .map(|(_, _, alias)| alias)
+                .map_err(|refused| match refused {
+                    // An instance named matches at most one name.
+                    Unselected::Ambiguous(_) => Refused::InvalidInput,
+                    Unselected::NotFound => Refused::NotFound,
+                    Unselected::ProfileUnnamed => Refused::ProfileUnnamed,
+                    Unselected::Unmigrated => Refused::Unmigrated,
+                });
         }
-        (Some(connector), Some(instance)) => config
-            .select(Selector::Instance {
-                connector,
-                instance,
-            })
-            .ok_or(if config.awaiting_profile(connector, instance).is_some() {
-                Refused::ProfileUnnamed
-            } else {
-                Refused::NotFound
-            })?,
         (None, None) => config
             .select(Selector::Default)
             .ok_or(Refused::InvalidInput)?,
@@ -229,6 +229,13 @@ fn names(shape: &Shape) -> bool {
     }
 }
 
+/// The connector and instance named beside `alias` are those `invoke` knows
+/// its entry by (`invoke::entry_name`): a legacy catalog entry by the
+/// connector `setup migrate` derives for it, never `catalog`
+/// (story:connectors-do-short-invocation). Only an entry no connector is
+/// derived for, which the deprecated `--adapter` alone still selects and whose
+/// answer must name a connector, keeps its implementation's name
+/// (`Config::names`).
 fn fill(value: &mut Value, shape: &Shape, config: &Config) {
     match shape.required() {
         Shape::Struct { fields } => {
@@ -241,7 +248,13 @@ fn fill(value: &mut Value, shape: &Shape, config: &Config) {
                 && let Some((connector, instance)) = object
                     .get("adapter")
                     .and_then(Value::as_str)
-                    .and_then(|alias| config.names(alias))
+                    .and_then(|alias| {
+                        let (alias, entry) = config.adapters.get_key_value(alias)?;
+                        super::invoke::entry_name(config, alias, entry).or_else(|| {
+                            let (connector, instance) = config.names(alias)?;
+                            Some((connector.to_owned(), instance.to_owned()))
+                        })
+                    })
             {
                 let (connector, instance) = (json!(connector), json!(instance));
                 object.insert("connector".into(), connector);
