@@ -145,6 +145,18 @@ fn named(config: &Config) -> Vec<Named> {
     named
 }
 
+/// The connector and instance of every entry [`named`] lists, by alias: the
+/// instances `instances list` lists and `--connector`/`--instance` select,
+/// each name once. A legacy entry whose names a `[connectors]` instance holds
+/// is not among them, nor is a legacy catalog entry no connector is derived
+/// for (story:connectors-do-short-invocation).
+pub(super) fn instances(config: &Config) -> std::collections::BTreeMap<String, (String, String)> {
+    named(config)
+        .into_iter()
+        .filter_map(|n| Some((n.alias?, (n.connector, n.instance))))
+        .collect()
+}
+
 /// Why a target selects no entry.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Unselected {
@@ -157,8 +169,10 @@ pub(super) enum Unselected {
     Unmigrated,
 }
 
-/// The connector, instance and alias the target selects under `config`.
-fn select(
+/// The connector, instance and alias the target selects under `config`: the
+/// selection of `invoke` and of `--connector`/`--instance` on every other
+/// command (`select::alias`).
+pub(super) fn select(
     config: &Config,
     connector: &str,
     instance: Option<&str>,

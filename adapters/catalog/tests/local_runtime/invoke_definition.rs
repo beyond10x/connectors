@@ -852,7 +852,7 @@ fn unchanged(connection: &Value) -> Value {
 
 /// The acceptance: with a token connection under the configured instance
 /// `forge/main` at `gitlab.example.com` and a hand-written definition of
-/// `forge` at the same host, `operations invoke --definition` asks once; the
+/// `forge` at the same host, `invoke --definition` asks once; the
 /// answer "reuse" yields the operation's result without a token prompt, a new
 /// connection under the definition's instance with the same validated
 /// identity, and the configured instance's connection unchanged. Without a
