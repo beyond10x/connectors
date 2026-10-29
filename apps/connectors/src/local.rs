@@ -656,12 +656,16 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
         let request = cursor::Request::parse(&call.input).map_err(refused)?;
         // Each instance by its connector and instance only; a legacy catalog
         // entry no connector is derived for is no instance and is named in
-        // `unmigrated` (story:connectors-do-short-invocation).
+        // `unmigrated` (story:connectors-do-short-invocation). Each name is
+        // listed once, for the entry `invoke` and `--connector`/`--instance`
+        // select by it: a `[connectors]` instance over a legacy entry that
+        // derives the same names (`invoke::instances`).
+        let instances = invoke::instances(&config);
         let listed = config
             .adapters
             .iter()
             .filter_map(|(alias, entry)| {
-                let (connector, instance) = invoke::entry_name(&config, alias, entry)?;
+                let (connector, instance) = instances.get(alias)?;
                 Some((
                     entry,
                     json!({"connector":connector,"instance":instance,"instance_id":entry.instance_id,"startup":entry.startup,"restart":entry.restart}),
