@@ -52,6 +52,7 @@ Every grouped command accepts these, anywhere on the command line.
 | [`connectors connections revoke`](#connectors-connections-revoke) | Commit terminal local revocation under the current fence |
 | [`connectors connections status`](#connectors-connections-status) | Observe exactly one connection or acquisition |
 | [`connectors connections token`](#connectors-connections-token) | Issue a current access token of one OAuth2 connection, printed only with --reveal |
+| [`connectors definitions install`](#connectors-definitions-install) | Fetch the connectors-definitions release TAG from SOURCE (an https repository URL or a local directory), check every file against its index.json, and record it in definitions.lock and a read-only cache; grants nothing and starts no process |
 | [`connectors instances describe`](#connectors-instances-describe) | Inspect one configured instance and its cached descriptor; `adapters describe` is its deprecated name |
 | [`connectors instances list`](#connectors-instances-list) | List configured instances; `adapters list` is its deprecated name |
 | [`connectors instances status`](#connectors-instances-status) | Observe the lifecycle owner of the process that serves one instance; `adapters status` is its deprecated name |
@@ -479,6 +480,19 @@ connectors connections token [OPTIONS]
 | `--instance <field:instance>` | no | none | any |  |
 | `--connection <field:connection>` | no | none | any |  |
 | `--reveal <field:reveal>` | no | none | any |  |
+
+## `connectors definitions install`
+
+Fetch the connectors-definitions release TAG from SOURCE (an https repository URL or a local directory), check every file against its index.json, and record it in definitions.lock and a read-only cache; grants nothing and starts no process
+
+```text
+connectors definitions install [OPTIONS] --source <field:source> --tag <field:tag>
+```
+
+| Argument | Required | Default | Values | Meaning |
+|---|---|---|---|---|
+| `--source <field:source>` | yes | none | any |  |
+| `--tag <field:tag>` | yes | none | any |  |
 
 ## `connectors instances describe`
 

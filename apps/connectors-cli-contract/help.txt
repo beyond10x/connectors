@@ -6,6 +6,7 @@ Commands:
   adapters     
   approvals    
   connections  
+  definitions  
   instances    
   list         List every connector this build ships, with its auth profiles and the instances the configuration names; needs no configuration and starts no process
   operations   
