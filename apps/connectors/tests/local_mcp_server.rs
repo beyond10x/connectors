@@ -576,6 +576,14 @@ impl Drop for Peer {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+        // A failed test shows why the server ended: its stderr, which a
+        // passing test has already taken.
+        if let Some(errors) = self.errors.take().filter(|_| std::thread::panicking()) {
+            eprintln!(
+                "server stderr: {}",
+                String::from_utf8_lossy(&errors.join().unwrap_or_default())
+            );
+        }
     }
 }
 
