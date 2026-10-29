@@ -649,6 +649,24 @@ fn start_owner_in(
     root: &tempfile::TempDir,
     idle_ms: Option<u64>,
 ) -> OwnerProcess {
+    // Nobody greets on the startup channel; the owner keeps serving its socket.
+    start_owner_holding_startup(binary, config_root, root, idle_ms).0
+}
+
+/// As [`start_owner_in`], returning the test's end of the startup channel
+/// open. The owner serves that channel as its first client, in one of its 32
+/// client slots (transport.rs `serve_with_read_policy`, `handle(owner.clone(),
+/// startup)`), until the greeting arrives, the channel closes or the 10-second
+/// greeting deadline passes. A test that counts the owner's slots holds this
+/// end, so that slot is not freed at whatever moment the owner reads a closed
+/// channel (story:local-cli-capacity-probe-flake).
+#[cfg(unix)]
+fn start_owner_holding_startup(
+    binary: &std::path::Path,
+    config_root: &tempfile::TempDir,
+    root: &tempfile::TempDir,
+    idle_ms: Option<u64>,
+) -> (OwnerProcess, std::os::unix::net::UnixStream) {
     use std::os::{
         fd::AsRawFd,
         unix::{fs::OpenOptionsExt, net::UnixStream},
@@ -689,10 +707,8 @@ fn start_owner_in(
         .stderr(owner_start::stderr(root.path()))
         .spawn()
         .unwrap();
-    // Nobody greets on the startup channel; the owner keeps serving its socket.
-    drop(startup);
     owner_start::wait_listening(&mut owner, root.path());
-    OwnerProcess(owner)
+    (OwnerProcess(owner), startup)
 }
 
 /// A second build of the same CLI: identical behaviour, different executable digest.
@@ -989,10 +1005,24 @@ fn adversary_frame(control: &Value) -> Vec<u8> {
 /// probes, and the deadline only ends a test whose owner never fills; neither
 /// decides the result. Each held client keeps its slot until the owner's
 /// 10-second greeting deadline from when it was taken.
+///
+/// The owner's first slot is its startup channel's, so a refusal shows that
+/// the test holds every slot only while `startup`, the test's end from
+/// [`start_owner_holding_startup`], stays open: it is held with the clients.
+/// A startup channel closed at the start frees its slot whenever the owner's
+/// thread first reads it, which on a loaded or single CPU comes after the
+/// refusal, and the next client is then served
+/// (story:local-cli-capacity-probe-flake).
 #[cfg(unix)]
-fn fill_owner(directory: &sockets::Directory, socket: &str) -> Vec<std::os::unix::net::UnixStream> {
+fn fill_owner(
+    directory: &sockets::Directory,
+    socket: &str,
+    startup: std::os::unix::net::UnixStream,
+) -> Vec<std::os::unix::net::UnixStream> {
     use std::io::Read;
-    let mut held: Vec<_> = (0..32).map(|_| directory.connect(socket)).collect();
+    let mut held: Vec<_> = std::iter::once(startup)
+        .chain((0..32).map(|_| directory.connect(socket)))
+        .collect();
     let fail_safe = std::time::Instant::now() + std::time::Duration::from_secs(120);
     loop {
         assert!(
@@ -1222,10 +1252,10 @@ fn a_same_build_owner_at_its_client_limit_answers_capacity_not_another_build() {
         );
     fs::write(&config_path, config).unwrap();
     let started = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
-    let _owner = start_owner(started, &root);
+    let (_owner, startup) = start_owner_holding_startup(started, &root, &root, None);
     let directory = sockets::Directory::open(&root.path().join("state"));
     // 32 silent clients occupy every slot until the owner's greeting timeout.
-    let held = fill_owner(&directory, "owner.sock");
+    let held = fill_owner(&directory, "owner.sock", startup);
     let refused = command(&root, &["instances", "status", "--adapter", "forge"]);
     assert_eq!(refused.status.code(), Some(1));
     let error: Value = serde_json::from_slice(&refused.stderr).unwrap();
@@ -1397,20 +1427,21 @@ fn adversary2_the_build_probe_against_an_owner_at_capacity_reports_capacity() {
     let root = adversary_owner_root();
     let owner_root = adversary2_owner_root(&root);
     let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
-    let _owner = start_owner_in(binary, &root, &owner_root, None);
+    let started = std::time::Instant::now();
+    let (_owner, startup) = start_owner_holding_startup(binary, &root, &owner_root, None);
     let _relayed = adversary2_relay(&root, &owner_root, |index, _| index == 0);
     let directory = sockets::Directory::open(&owner_root.path().join("state"));
-    let held = fill_owner(&directory, "owner.sock");
-    let filled = std::time::Instant::now();
+    let held = fill_owner(&directory, "owner.sock", startup);
     let output = command(&root, &["instances", "status", "--adapter", "forge"]);
     // A slot frees only when a held client reaches the owner's 10-second
-    // greeting deadline; then the probe and the greeting are served and the
+    // greeting deadline, the startup channel's first, counted from the
+    // owner's start; then the probe and the greeting are served and the
     // status answers `ok:not_running`. The elapsed time says which it was.
     assert_eq!(
         adversary2_code(&output),
         Value::from("capacity"),
-        "{:?} after the owner was full: {}",
-        filled.elapsed(),
+        "{:?} after the owner started: {}",
+        started.elapsed(),
         String::from_utf8_lossy(&output.stderr)
     );
     drop(held);
