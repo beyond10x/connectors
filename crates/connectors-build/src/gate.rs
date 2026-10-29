@@ -518,7 +518,7 @@ fn authored_scenarios(root: &Path, ess: &Path, temp: &Path) -> Result<()> {
 
 /// Authored scenarios that fail when the pinned ESS interpreter executes them, measured with
 /// 0.59.0 on 2026-10-16 when the gate first executed authored traces, and the same 34 under
-/// 0.67.0 on 2026-10-21, 0.68.0 on 2026-10-23, 0.69.2 on 2026-10-26, 0.72.0, 0.74.0 and 0.75.0 on 2026-10-28.
+/// 0.67.0 on 2026-10-21, 0.68.0 on 2026-10-23, 0.69.2 on 2026-10-26, 0.72.0, 0.74.0 and 0.75.0 on 2026-10-28, 0.77.0 on 2026-10-29.
 /// Each needs its owner's triage; none is waived silently. Most claim an error field this ess/18
 /// model never fills (`state`, `reason`: an error's fields need payload sources, ess/19); the
 /// mutations traces also expect outcomes the model answers differently (`subject-missing`,

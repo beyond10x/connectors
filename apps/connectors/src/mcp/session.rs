@@ -113,6 +113,9 @@ pub(super) struct Session {
     connection: String,
     instance: String,
     host: String,
+    /// The store authority admission greeted the owner with; renewal greets
+    /// by it and never reads the store (story:mcp-long-read-exits-under-load).
+    authority: String,
     closing: Option<Closing>,
 }
 impl Session {
@@ -190,6 +193,7 @@ impl Session {
             connection: snapshot.connection.clone(),
             instance: snapshot.bootstrap.instance.clone(),
             host: snapshot.host.clone(),
+            authority: snapshot.authority.clone(),
             closing: None,
         })
     }
@@ -227,7 +231,11 @@ impl Session {
         if Instant::now() < self.renew_at {
             return Ok(());
         }
-        let owner = owner::Client::connect_until(paths, false, self.until()?)?;
+        // The owner's incarnation is the renewal's check; its greeting reuses the
+        // admitted authority, because the store read would wait on the lock the
+        // owner holds while it records work, past this lease's deadline.
+        let until = self.until()?;
+        let owner = owner::Client::reconnect_until(paths, &self.authority, until)?;
         if owner.host_incarnation != self.host {
             self.gate.revoke();
             return Err(Code::Unavailable.into());

@@ -185,3 +185,115 @@ fn owner_admission_requires_exact_build_before_returning_a_client() {
         peer.join().unwrap();
     }
 }
+
+/// A fixture owner that answers one greeting with `answer(authority greeted)`
+/// as its authority and this build, and reports the authority it was greeted by.
+fn answer_once(
+    listener: UnixListener,
+    answer: fn(&str) -> String,
+) -> std::thread::JoinHandle<String> {
+    std::thread::spawn(move || {
+        let mut stream = accept_before(&listener);
+        let until = Instant::now() + Duration::from_secs(2);
+        let hello = channel::read::<Request>(&mut stream, until, false, 0).unwrap();
+        let Request::Hello {
+            version,
+            challenge,
+            authority,
+            build,
+            ..
+        } = hello.control
+        else {
+            panic!("greeting required");
+        };
+        channel::write(
+            &mut stream,
+            &Reply::Hello {
+                version,
+                challenge,
+                authority: answer(&authority),
+                host_incarnation: uuid::Uuid::new_v4().to_string(),
+                build,
+            },
+            None,
+            &[],
+            until,
+        )
+        .unwrap();
+        authority
+    })
+}
+
+/// story:mcp-long-read-exits-under-load: a renewal greets a running owner by
+/// the authority it already knows and does not wait on the store, so a store lock
+/// held for longer than the renewal's deadline does not delay it.
+#[test]
+fn owner_reconnect_greets_by_the_known_authority_while_the_store_lock_is_held() {
+    let (_root, paths, directory) = setup();
+    let held = fs::private_file_at(&directory, std::ffi::OsStr::new("metadata.lock")).unwrap();
+    // SAFETY: this fixture owns held for the finite hold below.
+    assert_eq!(unsafe { libc::flock(held.as_raw_fd(), libc::LOCK_EX) }, 0);
+    let (_, listener) = listen_at(&directory);
+    let peer = answer_once(listener, str::to_owned);
+    let known = uuid::Uuid::new_v4().to_string();
+    let started = Instant::now();
+    let client = Client::reconnect_until(&paths, &known, started + Duration::from_millis(800))
+        .unwrap_or_else(|error| {
+            panic!(
+                "reconnect with the store lock held failed after {:?}: {:?}",
+                started.elapsed(),
+                error.code
+            )
+        });
+    assert!(started.elapsed() < Duration::from_millis(500));
+    assert_eq!(client.authority(), known);
+    assert_eq!(
+        peer.join().unwrap(),
+        known,
+        "the greeting named another authority"
+    );
+    drop(held);
+}
+
+/// The owner's greeting must confirm the authority the reconnect named: an
+/// owner answering with another one is not the owner that admitted the session.
+#[test]
+fn owner_reconnect_refuses_an_owner_confirming_another_authority() {
+    let (_root, paths, directory) = setup();
+    let (_, listener) = listen_at(&directory);
+    let peer = answer_once(listener, |_| uuid::Uuid::new_v4().to_string());
+    let known = Metadata::authority_at(&paths.state).unwrap().to_string();
+    let error = Client::reconnect_until(&paths, &known, Instant::now() + Duration::from_secs(2))
+        .map(|_| ())
+        .unwrap_err();
+    assert_eq!(error.code, Code::ReadinessMismatch);
+    peer.join().unwrap();
+}
+
+/// A reconnect starts no owner: with no socket, or a socket left by an owner
+/// that died, it refuses as unavailable at once and takes no lifetime lock.
+#[test]
+fn owner_reconnect_with_no_owner_running_starts_none() {
+    for stale in [false, true] {
+        let (_root, paths, directory) = setup();
+        if stale {
+            let (socket, listener) = listen_at(&directory);
+            drop(listener);
+            assert!(socket.exists(), "the dead owner's socket file is gone");
+        }
+        let started = Instant::now();
+        let error = Client::reconnect_until(
+            &paths,
+            &Metadata::authority_at(&paths.state).unwrap().to_string(),
+            started + Duration::from_secs(2),
+        )
+        .map(|_| ())
+        .unwrap_err();
+        assert_eq!(error.code, Code::Unavailable, "stale socket: {stale}");
+        assert!(started.elapsed() < Duration::from_millis(500));
+        assert!(
+            !paths.state.join("owner.lock").exists(),
+            "a reconnect took the owner lifetime lock (stale socket: {stale})"
+        );
+    }
+}
