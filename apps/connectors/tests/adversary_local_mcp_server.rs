@@ -1076,3 +1076,121 @@ fn adversary_a_lost_session_leaves_no_provider_read_open() {
          read was still open, waiting for the answer"
     );
 }
+
+/// The state store's lifecycle lock, taken by the test (waiting at most 5 s)
+/// and released when the returned file is dropped.
+fn hold_store(served: &Served) -> fs::File {
+    use std::os::fd::AsRawFd;
+    let lock = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(served.container.path(STATE).join("metadata.lock"))
+        .unwrap();
+    let until = Instant::now() + Duration::from_secs(5);
+    // SAFETY: lock owns a live descriptor; dropping it releases the lock.
+    while unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
+        assert!(
+            Instant::now() < until,
+            "the store lock stayed taken for 5 s"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    lock
+}
+
+/// story:mcp-long-read-exits-under-load, both halves at once: a read longer
+/// than one lease (§ 3.3, provider answers in 3 s) while the store is held
+/// from the moment the provider has the request until 1 s after it answers,
+/// so the owner's own record of the read waits on the lock too. Renewal must
+/// not wait on it: the reply arrives under a renewed lease and a later ping is
+/// answered.
+#[test]
+fn adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_ready() {
+    let served = Served::new();
+    let mut peer = Peer::start(&served, true);
+    let (tool, revision) = listed(&mut peer);
+    send_call(&mut peer, 2, &tool, SLOW, &revision);
+    let until = Instant::now() + Duration::from_secs(10);
+    while served.provider.requests() == 0 {
+        assert!(
+            Instant::now() < until,
+            "the read never reached the provider"
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let lock = hold_store(&served);
+    std::thread::sleep(Duration::from_secs(4));
+    let status = peer.child.try_wait().unwrap();
+    if status.is_some() {
+        let stderr = peer.errors.take().unwrap().join().unwrap();
+        panic!(
+            "the session ended during a read with the store held: {status:?}, stderr {}",
+            String::from_utf8_lossy(&stderr)
+        );
+    }
+    drop(lock);
+    let reply = peer.recv();
+    assert_eq!(reply["id"], 2, "{reply}");
+    assert_eq!(
+        reply["result"]["structuredContent"]["status"], "success",
+        "{reply}"
+    );
+    assert!(peer.request(3, "ping", json!({})).get("result").is_some());
+    peer.finish();
+}
+
+/// § 3.5 graceful close with the store held: end-of-file ends the session
+/// without any renewal, so the lock the owner (here the test) holds does not
+/// delay the exit, and the exit is successful.
+#[test]
+fn adversary_stdin_closed_while_the_store_is_held_exits_successfully() {
+    let served = Served::new();
+    let mut peer = Peer::start(&served, true);
+    assert!(peer.request(1, "ping", json!({})).get("result").is_some());
+    let lock = hold_store(&served);
+    let release = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(7));
+        drop(lock);
+    });
+    let started = Instant::now();
+    let (lines, _) = peer.exit(true);
+    assert!(
+        started.elapsed() < Duration::from_secs(3),
+        "exit took {:?} with the store held",
+        started.elapsed()
+    );
+    assert_eq!(lines.len(), 1, "only the ping reply: {lines:?}");
+    release.join().unwrap();
+}
+
+/// § 3.3 renewal "re-admits the same owner incarnation" and starts nothing:
+/// once `setup owner-stop` has stopped the owner the session admitted, the
+/// next renewal fails, the session ends unsuccessfully within its live lease
+/// (1.9 s) plus one renewal interval, and no owner runs afterwards.
+#[test]
+fn adversary_a_stopped_owner_ends_the_session_and_no_renewal_starts_another() {
+    let served = Served::new();
+    let mut peer = Peer::start(&served, true);
+    assert!(peer.request(1, "ping", json!({})).get("result").is_some());
+    let stopped = success(&served.container.run(&["setup", "owner-stop"]));
+    assert_eq!(stopped["disposition"], "stopped", "{stopped}");
+    let started = Instant::now();
+    let status = loop {
+        if let Some(status) = peer.child.try_wait().unwrap() {
+            break status;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(4),
+            "the session outlived its stopped owner by 4 s"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    assert!(!status.success(), "{status}");
+    let stderr = peer.errors.take().unwrap().join().unwrap();
+    assert_eq!(String::from_utf8_lossy(&stderr).trim(), "mcp_unavailable");
+    let again = success(&served.container.run(&["setup", "owner-stop"]));
+    assert_eq!(
+        again["disposition"], "no_owner",
+        "a renewal started an owner: {again}"
+    );
+}
