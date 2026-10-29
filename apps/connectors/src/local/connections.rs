@@ -200,6 +200,55 @@ pub(super) fn execute(
     }
 }
 
+/// `connections reconnect` admits its `--expected-revision` while it captures
+/// its protected source, before any handler runs. A revision that is not the
+/// connection's is answered here first, before anything is captured, as
+/// revalidate and revoke answer it (decision 5 of the U2 review): the
+/// instance's configuration revision is `invalid_input` naming both kinds, any
+/// other stale value `lifecycle_conflict` naming where to read the right one.
+/// Anything this cannot read is left to the command's own admission.
+pub(super) fn reconnect_revision(
+    session: &session::Session,
+) -> Option<connectors_cli_contract::ProcessOutput> {
+    let (callable, context) = session.selected()?;
+    if callable != "connections-reconnect" {
+        return None;
+    }
+    let selectors = session.selectors()?;
+    let expected = selectors.get("expected_revision")?.as_str()?;
+    let paths = Paths::resolve(context.config.as_deref(), context.state_dir.as_deref()).ok()?;
+    let alias = select::alias_at(selectors, &paths).ok()?;
+    let config = Config::load_at(&paths).ok()?;
+    let adapter = config.adapters.get(&alias)?;
+    let connection = match selectors.get("connection").and_then(Value::as_str) {
+        Some(connection) => connection.to_owned(),
+        None => held_one(&paths, &alias).ok()?,
+    };
+    let stale = matches!(
+        Registry::with_system_clock(&paths.state).revalidation_binding(
+            &adapter.instance_id,
+            &adapter.adapter_id,
+            &connection,
+            expected,
+        ),
+        Err(registry::Failure::Conflict)
+    );
+    if !stale {
+        return None;
+    }
+    let reply = if expected == adapter.configuration_revision {
+        revision_kind_refusal()
+    } else {
+        let mut reply = registry_failure(registry::Failure::Conflict);
+        stale_revision(&mut reply);
+        reply
+    };
+    Some(definition::render(
+        reply,
+        context.output == connectors_cli_contract::OutputMode::Json,
+    ))
+}
+
 /// `invalid_input` for the instance's configuration revision given as
 /// `--expected-revision` (story:connectors-do-short-invocation, decision
 /// D11): the argument takes the connection's revision, which

@@ -488,8 +488,9 @@ reading its `error`. Under `--output json`, output that is no envelope (help,
 `connections connect <connector>/<instance>`, which selects exactly as
 `--connector <connector> --instance <instance>` does. The positional beside
 `--connector`, `--instance` or `--adapter`, or one that is not exactly two
-non-empty names around one `/`, is `invalid_input` at `arguments` with
-`field = target` (exit 2).
+names around one `/`, each 1 to 128 bytes of `[A-Za-z0-9_-]`, is
+`invalid_input` at `arguments` with `field = target` (exit 2), before anything
+is written.
 
 `connections connect --endpoint <url>` gives the selected instance its
 endpoint, the one setting a catalog instance answers before it can be derived.
@@ -509,6 +510,17 @@ the endpoint is written into
   `field = endpoint` (exit 1): another host is another instance, which takes
   another name. The file is unchanged.
 
+Another host is another instance for a connection too. Before the file is
+written, the provider derives the instance at the new endpoint; when the
+instance already holds a connection, revoked ones included, admitted under a
+provider authority other than the one derived, adding or changing its
+endpoint would strand that connection, and the command is the same
+`lifecycle_conflict` naming `endpoint`, the file unchanged. An endpoint the
+provider refuses while deriving the instance (one that is not https, or
+carries userinfo, a query or a fragment) is `invalid_input` at `arguments`
+with `field = endpoint` (exit 2), nothing written; the refusal never echoes
+the endpoint.
+
 The endpoint must pass the configuration's own endpoint rule (non-empty, at
 most 2048 bytes, no whitespace or control character); otherwise the command is
 `invalid_input` with `field = endpoint` and nothing is written. So is
@@ -522,7 +534,8 @@ absent, before any credential is asked for.
 Only a `connectors-local/5` file is written. Any other format is
 `invalid_configuration` naming the file's `configuration_format`, which
 `setup migrate` rewrites. The write keeps every other byte of the file
-(comments, spacing, order, inline tables), checks the new text as every read
+(comments, spacing, order, inline tables, a leading UTF-8 byte order mark;
+in a file whose every line ends in CRLF, the added lines end in CRLF too), checks the new text as every read
 checks it before anything is written, and replaces the file atomically: a
 sibling temporary file with the file's own owner-only mode, synced, then
 renamed over it, while the file still holds the text the edit was made from
@@ -1278,19 +1291,18 @@ and `endpoint` for a refused `--endpoint`, on `invalid_input`, and `endpoint`
 on the `lifecycle_conflict` of an instance that holds another endpoint (§3,
 "Giving an instance its endpoint").
 
-`connections revalidate` and `connections revoke` name `expected_revision`
-when `--expected-revision` is not the connection's current revision. Given the
-selected instance's `configuration_revision` instead, the command is
-`invalid_input` at `arguments` (exit 2) and also carries
-`revision_expected = connection`, `revision_given = configuration` and
+`connections revalidate`, `connections revoke` and `connections reconnect`
+name `expected_revision` when `--expected-revision` is not the connection's
+current revision. Given the selected instance's `configuration_revision`
+instead, the command is `invalid_input` at `arguments` (exit 2) and also
+carries `revision_expected = connection`, `revision_given = configuration` and
 `read_with = "connections describe"`, the command that reads the connection's
-revision; nothing is admitted or dispatched. Any other stale value keeps its
-`lifecycle_conflict` with `next_action = retry_status` (exit 1) and carries
-`field`, `revision_expected` and `read_with`, never `revision_given`.
+revision; nothing is admitted, captured or dispatched. Any other stale value
+keeps its `lifecycle_conflict` with `next_action = retry_status` (exit 1) and
+carries `field`, `revision_expected` and `read_with`, never `revision_given`.
 `revision_expected` and `revision_given` are the closed enum `RevisionKind`
-(`connection`, `configuration`). `connections reconnect` admits its revision
-before any handler runs, in its protected-source capture, and carries none of
-these fields.
+(`connection`, `configuration`). `connections reconnect` answers both before
+it acquires its protected source, so no credential is asked for.
 
 `field` never carries the caller's value and appears only on the refusals
 named here; no other command carries it, an approved write's `operations

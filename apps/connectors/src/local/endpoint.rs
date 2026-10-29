@@ -63,9 +63,9 @@ pub(super) fn selection(input: &Value) -> Result<Value, HandlerReply> {
     let (connector, instance) = target
         .as_str()
         .and_then(|target| target.split_once('/'))
-        .filter(|(connector, instance)| {
-            !connector.is_empty() && !instance.is_empty() && !instance.contains('/')
-        })
+        // Each name as a derived instance takes it: at most 128 bytes of
+        // `[A-Za-z0-9_-]`, so TOML never reads either as a path.
+        .filter(|(connector, instance)| name(connector) && name(instance))
         .ok_or_else(|| argument("target"))?;
     let mut input = input.clone();
     if let Some(fields) = input.as_object_mut() {
@@ -74,6 +74,15 @@ pub(super) fn selection(input: &Value) -> Result<Value, HandlerReply> {
         fields.insert("instance".into(), json!(instance));
     }
     Ok(input)
+}
+
+/// Whether `name` is a connector or instance name a target may carry: 1 to
+/// 128 bytes of `[A-Za-z0-9_-]` (decision 4 of the U2 review).
+fn name(name: &str) -> bool {
+    (1..=128).contains(&name.len())
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
 /// What a `connections connect` decides before the generated runner acquires
@@ -216,8 +225,46 @@ fn child<'a>(
 }
 
 /// The configuration text with `endpoint` in the instance's table, or `None`
-/// when the table already holds exactly that endpoint.
+/// when the table already holds exactly that endpoint. A leading UTF-8 byte
+/// order mark is kept, and a file whose every line ends in CRLF keeps CRLF on
+/// the lines the edit adds (decision 3 of the U2 review).
 fn edited(
+    text: &str,
+    connector: &str,
+    instance: &str,
+    endpoint: &str,
+) -> Result<Option<String>, HandlerReply> {
+    const BOM: char = '\u{feff}';
+    let (bom, body) = match text.strip_prefix(BOM) {
+        Some(body) => (true, body),
+        None => (false, text),
+    };
+    let crlf = body.contains("\r\n") && !body.replace("\r\n", "").contains('\n');
+    Ok(
+        edited_body(body, connector, instance, endpoint)?.map(|written| {
+            let mut kept = String::with_capacity(written.len() + 64);
+            if bom {
+                kept.push(BOM);
+            }
+            if crlf {
+                let mut previous = '\0';
+                for c in written.chars() {
+                    if c == '\n' && previous != '\r' {
+                        kept.push('\r');
+                    }
+                    kept.push(c);
+                    previous = c;
+                }
+            } else {
+                kept.push_str(&written);
+            }
+            kept
+        }),
+    )
+}
+
+/// [`edited`] on a text without a byte order mark.
+fn edited_body(
     text: &str,
     connector: &str,
     instance: &str,
@@ -267,18 +314,7 @@ fn edited(
         }
         Some(Some(held)) if held == endpoint => Ok(None),
         // Another host is another instance.
-        Some(Some(_)) => {
-            let mut reply = failure(
-                "lifecycle_conflict",
-                "configuration",
-                "check_configuration",
-                false,
-            );
-            if let HandlerReply::Error { data, .. } = &mut reply {
-                data["field"] = json!("endpoint");
-            }
-            Err(reply)
-        }
+        Some(Some(_)) => Err(another_host()),
         Some(None) => Err(invalid_configuration()),
     }
 }
@@ -301,8 +337,21 @@ fn write(
     if written.len() > CONFIG_LIMIT {
         return Err(configuration_refusal(Refusal::Rule(Rule::ConfigTooLarge)));
     }
-    // A file every later read refuses is never written.
-    Config::parse(&written).map_err(configuration_refusal)?;
+    // A file every later read refuses is never written. When the file read
+    // before the edit and only the edit is refused, the provider refused the
+    // endpoint while deriving the instance: the argument's refusal.
+    let config = match Config::parse(&written) {
+        Ok(config) => config,
+        Err(refusal @ Refusal::Rule(_)) => return Err(configuration_refusal(refusal)),
+        Err(refusal) => {
+            return Err(if Config::parse(&text).is_ok() {
+                argument("endpoint")
+            } else {
+                configuration_refusal(refusal)
+            });
+        }
+    };
+    moves_no_connection(paths, &config, connector, instance, endpoint)?;
     publish(paths, &text, &written, mode)?;
     let holds = |config: &Config| {
         config
@@ -323,6 +372,58 @@ fn write(
             Err(invalid_configuration())
         }
     }
+}
+
+/// `lifecycle_conflict` naming `endpoint` (exit 1), as another endpoint
+/// already in the table is.
+fn another_host() -> HandlerReply {
+    let mut reply = failure(
+        "lifecycle_conflict",
+        "configuration",
+        "check_configuration",
+        false,
+    );
+    if let HandlerReply::Error { data, .. } = &mut reply {
+        data["field"] = json!("endpoint");
+    }
+    reply
+}
+
+/// Another host is another instance (decision 1 of the U2 review): an
+/// endpoint that derives, for an instance which already holds a connection
+/// (revoked ones included), a provider authority other than the one that
+/// connection was admitted under would strand it, and connect refuses that
+/// instance id afterwards. Refused before the file is written.
+fn moves_no_connection(
+    paths: &Paths,
+    config: &Config,
+    connector: &str,
+    instance: &str,
+    endpoint: &str,
+) -> Result<(), HandlerReply> {
+    let profile = config
+        .connectors
+        .as_ref()
+        .and_then(|connectors| connectors.get(connector))
+        .and_then(|table| table.instances.get(instance))
+        .and_then(|listed| listed.profile.as_deref());
+    // An instance awaiting its profile has no entry: nothing derives yet.
+    if !config
+        .adapters
+        .contains_key(&format!("{connector}.{instance}"))
+    {
+        return Ok(());
+    }
+    let (instance_id, authority) =
+        connectors_host::local::config::derived_authority(connector, instance, endpoint, profile)
+            .map_err(|_| argument("endpoint"))?;
+    let moved = connectors_host::local::registry::Registry::with_system_clock(&paths.state)
+        .authority_moves(&instance_id, &authority)
+        .map_err(connections::registry_failure)?;
+    if moved {
+        return Err(another_host());
+    }
+    Ok(())
 }
 
 /// Replace the configuration's `old` text with `new`, keeping `mode`, while

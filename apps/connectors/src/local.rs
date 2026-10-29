@@ -73,6 +73,9 @@ fn run_selected(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     if let Some(output) = endpoint::prepare(&session.borrow()) {
         return output;
     }
+    if let Some(output) = connections::reconnect_revision(&session.borrow()) {
+        return output;
+    }
     let mut output = connectors_cli_contract::run(
         args,
         &mut session::AdmittedSources(session.clone()),
