@@ -1,4 +1,5 @@
-//! `connectors invoke <connector>[/<instance>] <operation>`
+//! `connectors invoke <connector>[/<instance>] <operation>`, and with
+//! `--definition <file>` the target left out
 //! (story:connectors-do-short-invocation; `contracts/cli/v1alpha1/semantics.md`
 //! §3, "Invoking an operation").
 //!
@@ -6,11 +7,12 @@
 //! The target names a connector and, after one `/`, an instance; with the
 //! instance left out the connector's only configured instance is selected and
 //! `default_instance` is not consulted. Without `--connection` the instance's
-//! one usable connection is selected. `--schema` and `--revision`, left out,
-//! are the instance's current admitted description's; given, they are pins a
-//! differing description refuses. With no input flag the document is read from
-//! standard input, unless standard input is a terminal. `--describe` is
-//! answered here, from the description, and reads and invokes nothing; a write
+//! one `ready` connection is selected, else its one usable one ([`decide`]).
+//! `--schema` and `--revision`, left out, are the instance's current admitted
+//! description's; given, they are pins a differing description refuses. With
+//! no input flag the document is read from standard input, unless standard
+//! input is a terminal. `--describe` is answered here, from the description (a
+//! definition's from its lowering), and reads and invokes nothing; a write
 //! without `--approval-file` is refused here, before any provider call. The
 //! command line is then rewritten with every value stated and the target as
 //! `<connector>/<instance>`, and the generated runner admits and invokes it as
@@ -33,7 +35,7 @@ const APPROVAL_STEPS: [&str; 3] = [
     "approvals clock-check",
     "approvals issue",
 ];
-/// The most connections an instance's listing reads; an instance holds one.
+/// The connections one page of an instance's listing reads.
 const LISTED: u16 = 500;
 
 /// `<connector>` or `<connector>/<instance>`, each part an admitted id.
@@ -60,27 +62,20 @@ struct Named {
 /// `[connectors]` instance or recorded definition by its own; a legacy
 /// `[adapters.<alias>]` entry by its alias, under the connector `setup
 /// migrate` derives for it, or its implementation when that is not the
-/// catalog. A catalog entry no connector is derived for has no name here.
+/// catalog. A catalog entry no connector is derived for has no name here. A
+/// `[connectors]` instance wins over a legacy entry that derives its names, as
+/// `Config::select` selects it, so each name is listed once.
 fn named(config: &Config) -> Vec<Named> {
     let legacy = config.legacy_aliases();
     let mut named: Vec<Named> = config
         .adapters
         .iter()
-        .filter_map(|(alias, adapter)| {
-            let (connector, instance) = if legacy.contains(&alias.as_str()) {
-                let connector = match super::migrate::derived_connector(adapter) {
-                    Some(connector) => connector,
-                    None if adapter.adapter_id != "catalog" => adapter.adapter_id.clone(),
-                    None => return None,
-                };
-                (connector, alias.clone())
-            } else {
-                let (connector, instance) = config.names(alias)?;
-                (connector.to_owned(), instance.to_owned())
-            };
+        .filter(|(alias, _)| !legacy.contains(&alias.as_str()))
+        .filter_map(|(alias, _)| {
+            let (connector, instance) = config.names(alias)?;
             Some(Named {
-                connector,
-                instance,
+                connector: connector.to_owned(),
+                instance: instance.to_owned(),
                 alias: Some(alias.clone()),
             })
         })
@@ -97,6 +92,24 @@ fn named(config: &Config) -> Vec<Named> {
                     alias: None,
                 });
             }
+        }
+    }
+    for alias in legacy {
+        let adapter = &config.adapters[alias];
+        let connector = match super::migrate::derived_connector(adapter) {
+            Some(connector) => connector,
+            None if adapter.adapter_id != "catalog" => adapter.adapter_id.clone(),
+            None => continue,
+        };
+        if !named
+            .iter()
+            .any(|n| n.connector == connector && n.instance == alias)
+        {
+            named.push(Named {
+                connector,
+                instance: alias.to_owned(),
+                alias: Some(alias.to_owned()),
+            });
         }
     }
     named
@@ -191,19 +204,22 @@ pub(super) struct Held {
     pub(super) current: bool,
 }
 
-/// The connection an `invoke` without `--connection` uses: the one usable
-/// connection the instance holds. Usable is `ready`, or `pending` only because
-/// its validation evidence lapsed under the current configuration, which the
-/// read that uses it recollects (`owner::admit_invoke`); revoked connections
-/// are not held. None usable, or several, is `connection_unresolved` listing
-/// every connection held with its state: naming a connect when none is held,
-/// a repair when none held is usable, nothing when `--connection` must choose.
+/// The connection an `invoke` without `--connection` uses (D3 amended): the
+/// instance's one `ready` connection; with none ready, its one usable
+/// connection, `pending` only because its validation evidence lapsed under the
+/// current configuration, which the provider re-checks before the call
+/// (`owner::admit_invoke`). Revoked connections are not held. Otherwise (none
+/// usable, several ready, or several usable and none ready) it is
+/// `connection_unresolved` listing every connection held with its state:
+/// naming a connect when none is held, a repair when none held is usable,
+/// nothing when `--connection` must choose.
 pub(super) fn decide(held: &[Held]) -> Result<String, HandlerReply> {
+    let ready: Vec<&Held> = held.iter().filter(|h| h.state == State::Ready).collect();
     let usable: Vec<&Held> = held
         .iter()
         .filter(|h| h.state == State::Ready || (h.state == State::Pending && h.current))
         .collect();
-    if let [one] = usable.as_slice() {
+    if let ([one], _) | ([], [one]) = (ready.as_slice(), usable.as_slice()) {
         return Ok(one.connection.clone());
     }
     let next_action = if held.is_empty() {
@@ -224,31 +240,53 @@ pub(super) fn decide(held: &[Held]) -> Result<String, HandlerReply> {
     Err(reply)
 }
 
-/// The connections the instance of `adapter` holds, revoked ones excepted.
+/// The connections the instance of `adapter` holds, revoked ones excepted:
+/// every page of the listing is read, so no number of revoked connections
+/// hides a usable one.
 fn held(paths: &Paths, config: &Config, adapter: &Adapter) -> Result<Vec<Held>, HandlerReply> {
-    let page = Registry::with_system_clock(&paths.state)
-        .list(
-            &adapter.instance_id,
-            &adapter.adapter_id,
-            adapter.configured(),
-            registry::PageOptions {
-                limit: LISTED,
-                cursor: None,
-            },
-            connectors_sdk::now_ms(),
-            keyring::custody::available_for(&config.selection()),
-        )
-        .map_err(super::connections::registry_failure)?;
-    Ok(page
-        .connections
-        .into_iter()
-        .filter(|c| c.state != State::Revoked)
-        .map(|c| Held {
-            connection: c.reference,
-            state: c.state,
-            current: !c.stale,
-        })
-        .collect())
+    let registry = Registry::with_system_clock(&paths.state);
+    let custody = keyring::custody::available_for(&config.selection());
+    every_page(|cursor| {
+        registry
+            .list(
+                &adapter.instance_id,
+                &adapter.adapter_id,
+                adapter.configured(),
+                registry::PageOptions {
+                    limit: LISTED,
+                    cursor,
+                },
+                connectors_sdk::now_ms(),
+                custody,
+            )
+            .map_err(super::connections::registry_failure)
+    })
+}
+
+/// The connections every page `list` answers holds, revoked ones excepted,
+/// each page asked for with the cursor the one before it answered.
+fn every_page(
+    mut list: impl FnMut(Option<&str>) -> Result<registry::Page, HandlerReply>,
+) -> Result<Vec<Held>, HandlerReply> {
+    let mut held = Vec::new();
+    let mut cursor: Option<String> = None;
+    loop {
+        let page = list(cursor.as_deref())?;
+        held.extend(
+            page.connections
+                .into_iter()
+                .filter(|c| c.state != State::Revoked)
+                .map(|c| Held {
+                    connection: c.reference,
+                    state: c.state,
+                    current: !c.stale,
+                }),
+        );
+        match page.next_cursor {
+            Some(next) => cursor = Some(next),
+            None => return Ok(held),
+        }
+    }
 }
 
 /// What an `invoke` command line asks for.
@@ -258,7 +296,9 @@ struct Request {
     json: bool,
     config: Option<PathBuf>,
     state: Option<PathBuf>,
-    target: String,
+    /// `None` when one positional is given: it is the operation, and only a
+    /// `--definition` names the connector then.
+    target: Option<String>,
     operation: String,
     connection: Option<String>,
     schema: Option<String>,
@@ -274,11 +314,16 @@ struct Request {
     describe: bool,
 }
 
-/// The generated command with `--schema`, `--revision` and the input source
-/// of `invoke` optional: the preparation states them.
+/// The generated command with both positionals, `--schema`, `--revision` and
+/// the input source of `invoke` optional: the preparation states them. A lone
+/// positional is the operation ([`parse`]); clap's missing-positional mode is
+/// not used, as it moves a value given before an option, or after `--`, to the
+/// operation.
 fn relaxed() -> clap::Command {
     connectors_cli_contract::command().mut_subcommand("invoke", |invoke| {
         invoke
+            .mut_arg("field:target", |arg| arg.required(false))
+            .mut_arg("field:operation", |arg| arg.required(false))
             .mut_arg("field:schema", |arg| arg.required(false))
             .mut_arg("field:revision", |arg| arg.required(false))
             .mut_group("sources:input", |group| group.required(false))
@@ -331,6 +376,12 @@ fn parse(args: &[OsString]) -> Option<Request> {
             leaf.get_flag("source:input:stdin")
                 .then(|| "--input-stdin".into())
         });
+    // A lone positional is the operation: the target is left out.
+    let (target, operation) = match (text("target"), text("operation")) {
+        (target, Some(operation)) => (target, operation),
+        (Some(operation), None) => (None, operation),
+        (None, None) => return None,
+    };
     let describe = match text("describe").as_deref() {
         None | Some("false") => false,
         Some("true") => true,
@@ -346,8 +397,8 @@ fn parse(args: &[OsString]) -> Option<Request> {
             == Some("json"),
         config: matches.get_one::<PathBuf>("global_config").cloned(),
         state: matches.get_one::<PathBuf>("global_state").cloned(),
-        target: text("target")?,
-        operation: text("operation")?,
+        target,
+        operation,
         connection: text("connection"),
         schema: text("schema"),
         revision: text("revision"),
@@ -428,7 +479,12 @@ fn success(result: Value, json: bool) -> ProcessOutput {
 
 fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepared, HandlerReply> {
     // Arguments first, each refusal naming its argument; nothing is read yet.
-    let (connector, instance) = target(&request.target).ok_or_else(|| refused("target"))?;
+    let named = match &request.target {
+        Some(text) => Some(target(text).ok_or_else(|| refused("target"))?),
+        // A definition file names its connector and instance itself.
+        None if request.definition.is_some() => None,
+        None => return Err(refused("target")),
+    };
     if !connectors_core::valid_id(&request.operation) {
         return Err(refused("operation"));
     }
@@ -470,38 +526,60 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
     };
     let paths = Paths::resolve(request.config.as_deref(), request.state.as_deref())
         .map_err(|_| configuration_refusal(Refusal::Rule(Rule::ConfigPathUnresolved)))?;
-    let (connector, instance, alias, connection) = match &request.definition {
-        Some(definition) => {
-            let prepared = definition::prepare_with(
-                &definition::Request {
-                    program: request.program.clone(),
-                    definition: Some(definition.clone()),
-                    root: request.definitions_root.clone(),
-                    credential_file: request.credential_file.clone(),
-                    selected: false,
-                    target: Some((connector.to_owned(), instance.map(str::to_owned))),
-                    operation: request.operation.clone(),
-                    connection: request.connection.clone(),
-                    schema: None,
-                    revision: None,
-                    config: request.config.clone(),
-                    state: request.state.clone(),
-                    json: request.json,
-                    globals: Vec::new(),
-                    kept: Vec::new(),
-                },
-                definition,
-                signals,
+    let lowering = |definition: &PathBuf| definition::Request {
+        program: request.program.clone(),
+        definition: Some(definition.clone()),
+        root: request.definitions_root.clone(),
+        credential_file: request.credential_file.clone(),
+        selected: false,
+        target: named
+            .map(|(connector, instance)| (connector.to_owned(), instance.map(str::to_owned))),
+        operation: request.operation.clone(),
+        connection: request.connection.clone(),
+        schema: None,
+        revision: None,
+        config: request.config.clone(),
+        state: request.state.clone(),
+        json: request.json,
+        globals: Vec::new(),
+        kept: Vec::new(),
+    };
+    let (connector, instance, adapter, bootstrap, connection) = match &request.definition {
+        // A definition is described from its lowering: nothing is recorded,
+        // and no connection is resolved, asked for or created.
+        Some(definition) if request.describe => {
+            let lowered = definition::lower(&lowering(definition), definition, signals)
+                .map_err(|reply| naming(reply, "definition"))?;
+            let mut bootstrap = lowered.reported;
+            bootstrap.configure(&lowered.adapter);
+            let bootstrap = bootstrap
+                .bound(None)
+                .map_err(|failure| owner_failure(failure.into()))?;
+            (
+                lowered.connector,
+                lowered.instance,
+                lowered.adapter,
+                bootstrap,
+                None,
             )
-            .map_err(|reply| naming(reply, "definition"))?;
+        }
+        Some(definition) => {
+            let prepared = definition::prepare_with(&lowering(definition), definition, signals)
+                .map_err(|reply| naming(reply, "definition"))?;
+            let connection = Some(prepared.connection);
+            let (adapter, bootstrap) = bound(&paths, &prepared.alias, connection.as_deref())?;
             (
                 prepared.connector,
                 prepared.instance,
-                prepared.alias,
-                Some(prepared.connection),
+                adapter,
+                bootstrap,
+                connection,
             )
         }
         None => {
+            let Some((connector, instance)) = named else {
+                return Err(refused("target"));
+            };
             let config = Config::read_at(&paths).map_err(configuration_refusal)?;
             let (connector, instance, alias) =
                 select(&config, connector, instance).map_err(unselected)?;
@@ -516,17 +594,10 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
                 None if request.describe => decide(&held(&paths, &config, adapter)?).ok(),
                 None => Some(decide(&held(&paths, &config, adapter)?)?),
             };
-            (connector, instance, alias, connection)
+            let (adapter, bootstrap) = bound(&paths, &alias, connection.as_deref())?;
+            (connector, instance, adapter, bootstrap, connection)
         }
     };
-    let bootstrap =
-        owner::bound_described(&paths, &alias, connection.as_deref()).map_err(owner_failure)?;
-    let adapter = Config::load_at(&paths)
-        .map_err(|failure| owner_failure(failure.into()))?
-        .adapters
-        .get(&alias)
-        .cloned()
-        .ok_or_else(|| unselected(Unselected::NotFound))?;
     let requirement =
         owner::admit_operation(&adapter, &bootstrap, &request.operation).map_err(owner_failure)?;
     let descriptor = bootstrap
@@ -544,12 +615,19 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
         return Err(owner_failure(Code::StaleDescription.into()));
     }
     let effect = requirement.effect;
+    let shown = match effect {
+        Effect::Read => "read",
+        Effect::Write => "write",
+        // No admitted description leaves an effect unknown
+        // (`Bootstrap::validate_for`); one that did is refused, never shown.
+        Effect::Unknown => return Err(owner_failure(Code::Unsupported.into())),
+    };
     if request.describe {
         let operation = descriptor
             .operation(&request.operation)
             .map_err(|_| owner_failure(Code::NotFound.into()))?;
         return Ok(Prepared::Described(described(
-            &connector, &instance, operation, effect, schema, revision,
+            &connector, &instance, operation, shown, schema, revision,
         )));
     }
     match effect {
@@ -594,17 +672,30 @@ fn described(
     connector: &str,
     instance: &str,
     operation: &connectors_core::Operation,
-    effect: Effect,
+    effect: &str,
     schema: String,
     revision: String,
 ) -> Value {
     json!({"connector":connector,"instance":instance,"operation":operation.id,
-        "description":operation.description,"effect":match effect {
-            Effect::Read => "read",
-            Effect::Write => "write",
-            Effect::Unknown => "unknown",
-        },
+        "description":operation.description,"effect":effect,
         "schema":schema,"revision":revision,"input_schema":operation.input_schema})
+}
+
+/// The configured entry under `alias` and its description as `connection`
+/// reads it (`owner::bound_described`).
+fn bound(
+    paths: &Paths,
+    alias: &str,
+    connection: Option<&str>,
+) -> Result<(Adapter, connectors_host::local::runtime::Bootstrap), HandlerReply> {
+    let bootstrap = owner::bound_described(paths, alias, connection).map_err(owner_failure)?;
+    let adapter = Config::load_at(paths)
+        .map_err(|failure| owner_failure(failure.into()))?
+        .adapters
+        .get(alias)
+        .cloned()
+        .ok_or_else(|| unselected(Unselected::NotFound))?;
+    Ok((adapter, bootstrap))
 }
 
 /// The `invoke` handler: the target's instance invoked as `operations invoke`
@@ -733,19 +824,31 @@ mod tests {
         }
     }
 
-    /// story:connectors-do-short-invocation: the one usable connection is
-    /// selected, even beside held ones that are not usable; none usable or
-    /// several is `connection_unresolved` listing every one held.
+    /// story:connectors-do-short-invocation, D3 amended: the one `ready`
+    /// connection is selected, even beside usable ones that are not ready;
+    /// with none ready, the one usable connection (`pending` and current, its
+    /// lapsed evidence re-checked before the call). None usable, several
+    /// ready, or several usable and none ready is `connection_unresolved`
+    /// listing every one held.
     #[test]
-    fn the_one_usable_connection_is_selected_and_otherwise_listed() {
+    fn the_one_ready_else_the_one_usable_connection_is_selected_and_otherwise_listed() {
         assert_eq!(
             decide(&[held("a", State::Ready, true)]).ok(),
             Some("a".into())
         );
-        // Lapsed validation evidence reads `pending`; the read recollects it.
         assert_eq!(
             decide(&[held("a", State::Pending, true)]).ok(),
-            Some("a".into())
+            Some("a".into()),
+            "story:connectors-do-short-invocation: D3 amended: lapsed evidence is re-checked before the call"
+        );
+        assert_eq!(
+            decide(&[
+                held("a", State::Pending, true),
+                held("b", State::Ready, true),
+            ])
+            .ok(),
+            Some("b".into()),
+            "story:connectors-do-short-invocation: D3 amended: one ready beside one lapsed"
         );
         assert_eq!(
             decide(&[
@@ -755,6 +858,21 @@ mod tests {
             ])
             .ok(),
             Some("b".into())
+        );
+        let lapsed = data(
+            decide(&[
+                held("a", State::Pending, true),
+                held("b", State::Pending, true),
+            ])
+            .unwrap_err(),
+        );
+        assert_eq!(
+            lapsed,
+            json!({"kind":"operational","code":"connection_unresolved","stage":"admission",
+                "next_action":"none","connections":[
+                    {"connection":"a","state":"pending"},
+                    {"connection":"b","state":"pending"}]}),
+            "story:connectors-do-short-invocation: D3 amended: several usable and none ready"
         );
         let none = data(decide(&[]).unwrap_err());
         assert_eq!(
@@ -788,6 +906,53 @@ mod tests {
                     {"connection":"a","state":"ready"},
                     {"connection":"b","state":"ready"}]}),
             "story:connectors-do-short-invocation"
+        );
+    }
+
+    /// story:connectors-do-short-invocation: the connections held are read
+    /// from every page of the listing, so revoked connections filling the
+    /// first page never hide the usable one on a later page.
+    #[test]
+    fn every_page_of_the_listing_is_read() {
+        let observed = |reference: &str, state: State| registry::ObservedConnection {
+            reference: reference.into(),
+            instance: "fixture-instance".into(),
+            profile: "token".into(),
+            revision: "r1".into(),
+            state,
+            identity: None,
+            observed_at_ms: 1,
+            valid_until_ms: 2,
+            stale: false,
+            binding: None,
+            granted_scopes: None,
+            credential_expires_at_ms: None,
+        };
+        let mut asked = Vec::new();
+        let held = every_page(|cursor| {
+            asked.push(cursor.map(str::to_owned));
+            let (connections, next_cursor) = match cursor {
+                None => (
+                    vec![observed("a", State::Revoked), observed("b", State::Revoked)],
+                    Some("page-2".to_owned()),
+                ),
+                Some("page-2") => (vec![observed("c", State::Ready)], None),
+                Some(other) => panic!("an unknown cursor {other}"),
+            };
+            Ok(registry::Page {
+                connections,
+                next_cursor,
+                observed_at_ms: 1,
+                valid_until_ms: 2,
+                stale: false,
+            })
+        })
+        .unwrap_or_else(|_| panic!("story:connectors-do-short-invocation: every page is read"));
+        assert_eq!(asked, [None, Some("page-2".to_owned())]);
+        assert_eq!(
+            decide(&held).ok(),
+            Some("c".into()),
+            "story:connectors-do-short-invocation: {held:?}"
         );
     }
 

@@ -1494,7 +1494,8 @@ types:
       - {name: source_audit, type: "Optional<connectors.service_wire.SourceAudit>"}
   # `invoke --describe`: the operation as the instance's current admitted description
   # states it, with the schema and revision an invoke pins. effect is the description's
-  # classification. No provider is called and no input is read.
+  # classification, read or write: a description that leaves an effect unknown is never
+  # admitted. No provider is called and no input is read.
   - name: connectors.cli.InvokeDescription
     kind: struct
     fields:
@@ -1508,7 +1509,7 @@ types:
       - {name: input_schema, type: "Json"}
   - name: connectors.cli.InvokeEffect
     kind: enum
-    variants: [read, write, unknown]
+    variants: [read, write]
   # One connection of `connection_unresolved`'s list: its id and observed state.
   - name: connectors.cli.ConnectionCandidate
     kind: struct
@@ -1629,7 +1630,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:1067, docs/local-connection-registry.md:222-223;
+    # contracts/cli/v1alpha1/semantics.md:1084, docs/local-connection-registry.md:222-223;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1789,7 +1790,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1071) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1088) and the host
     # removal path (er.rs:4538-4540) only expires Active cursors. The error name is
     # the decision; no source names one.
 

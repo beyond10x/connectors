@@ -2,7 +2,8 @@
 //! `describe`, `invoke --endpoint` and `serve` are removed. Each of their
 //! command lines is the grouped parser's fixed `cli_parse` envelope, never an
 //! argv echo, in either output mode and with `--output` before or after the
-//! command word; `invoke` is the generated command.
+//! command word; `invoke` is the generated command, and one word after it is
+//! an operation without a target, refused as such and echoing nothing either.
 
 use std::process::{Command, Output};
 
@@ -36,7 +37,11 @@ fn malformed() -> Vec<Vec<String>> {
     let equals = format!("--endpoint={SENTINEL}");
     let mut cases = Vec::new();
     for command in ["describe", "invoke", "serve"] {
-        cases.push(vec![command.to_owned(), SENTINEL.to_owned()]);
+        // One word after `invoke` is an operation without its target:
+        // `a_lone_word_after_invoke_is_the_missing_target_refusal_without_argv`.
+        if command != "invoke" {
+            cases.push(vec![command.to_owned(), SENTINEL.to_owned()]);
+        }
         cases.push(vec![command.to_owned(), flag.clone()]);
         cases.push(vec![command.to_owned(), flag.clone(), SENTINEL.to_owned()]);
         cases.push(vec![
@@ -81,6 +86,26 @@ fn removed_command_lines_are_the_json_envelope_before_or_after_the_command_word(
                 args.join(" "),
             );
         }
+    }
+}
+
+#[test]
+fn a_lone_word_after_invoke_is_the_missing_target_refusal_without_argv() {
+    let data = "{\"code\":\"invalid_input\",\"field\":\"target\",\"kind\":\"usage\",\"next_action\":\"none\",\"stage\":\"arguments\"}";
+    let human = format!("failure: {data}\n");
+    let json = format!("{{\"error\":{{\"code\":\"failure\",\"data\":{data}}},\"ok\":false}}\n");
+    for (args, expected) in [
+        (&["invoke", SENTINEL][..], &human),
+        (&["--output", "json", "invoke", SENTINEL], &json),
+        (&["--output=json", "invoke", SENTINEL], &json),
+        (&["invoke", "--output", "json", SENTINEL], &json),
+    ] {
+        assert_eq!(
+            parts(&cli(args)),
+            (Some(2), String::new(), expected.clone()),
+            "story:connectors-do-short-invocation: `connectors {}` is the operation without a target, refused as `invalid_input` naming the target and echoing nothing",
+            args.join(" "),
+        );
     }
 }
 

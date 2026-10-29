@@ -1,6 +1,7 @@
-//! Adversary cases, round 2, for story:invoke-definition-file: the cache-hit
-//! check `published()` (`apps/connectors/src/local/definition.rs`) against the
-//! same state directory named by another spelling the CLI admits.
+//! Adversary cases, round 2, for story:invoke-definition-file, run as `invoke
+//! --definition <file> <operation>` (story:connectors-do-short-invocation): the
+//! cache-hit check `published()` (`apps/connectors/src/local/definition.rs`)
+//! against the same state directory named by another spelling the CLI admits.
 //!
 //! `--state-dir` is admitted with interior `.` components and repeated
 //! separators (`filesystem::validate_path` checks `Path::components`, which
@@ -143,11 +144,9 @@ impl Fixture {
         self.run(
             state,
             &[
-                "operations",
                 "invoke",
                 "--definition",
                 definition.to_str().unwrap(),
-                "--operation",
                 "project.get",
                 "--input-json",
                 r#"{"id":"org/project"}"#,

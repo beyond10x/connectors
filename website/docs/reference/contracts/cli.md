@@ -651,7 +651,9 @@ echoed. A `[connectors]` instance and a recorded definition instance are named
 by their own names; a legacy `[adapters.<alias>]` entry by its alias, under the
 connector `setup migrate` derives for it, or under its implementation when that
 is not the catalog; a catalog entry no connector is derived for cannot be named
-here. With the instance left out the connector's only instance is selected;
+here. A `[connectors]` instance wins over a legacy entry that derives the same
+names, as `--connector` and `--instance` select it, so each instance has one
+name. With the instance left out the connector's only instance is selected;
 `default_instance` is never consulted. A connector or instance not configured
 is `not_found` at `admission` naming `check_configuration`.
 
@@ -659,22 +661,25 @@ is `not_found` at `admission` naming `check_configuration`.
 no instance. It is a usage refusal at `arguments`, exit 2, `next_action = none`,
 and its `Failure.instances` lists every instance of that connector as
 `<connector>/<instance>`, sorted, so the caller can name one. Nothing was read
-beyond the configuration.
+beyond the configuration. A target that names its instance is never
+`instance_ambiguous`.
 
-Without `--connection` the instance's one usable connection is selected:
-`ready`, or `pending` only because its validation evidence lapsed under the
-instance's current configuration, which the read that uses it recollects as
-every `operations invoke` read does. Revoked connections are not counted. A
-named `--connection` is used as named; one the instance does not hold is
-`not_found`.
+Without `--connection` the instance's one `ready` connection is selected. When
+none is ready, its one usable connection is: `pending` only because its
+validation evidence lapsed under the instance's current configuration, as an
+idle connection's does; that evidence is re-checked with the provider before
+the call, as every `operations invoke` read re-checks it. One `ready`
+connection beside lapsed ones is the one selected. Revoked connections are not
+counted, whatever their number. A named `--connection` is used as named; one
+the instance does not hold is `not_found`.
 
-`connection_unresolved`: no connection, or more than one, is usable. It is
-operational at `admission`, exit 1, and names `create_connection` when the
-instance holds no connection, `repair_connection` when it holds connections and
-none is usable, and `none` when several are usable and `--connection` must
-choose. Its `Failure.connections` lists each connection the instance holds,
-revoked ones excepted, as `{connection, state}` with the state `connections
-list` reports; the list is empty when none is held.
+`connection_unresolved`: no connection is usable, several are `ready`, or
+several are usable and none is `ready`. It is operational at `admission`, exit
+1, and names `create_connection` when the instance holds no connection,
+`repair_connection` when it holds connections and none is usable, and `none`
+when `--connection` must choose. Its `Failure.connections` lists each
+connection the instance holds, revoked ones excepted, as `{connection, state}`
+with the state `connections list` reports; the list is empty when none is held.
 
 `--schema` and `--revision` left out are the instance's current admitted
 description's, read through the selected connection's binding as `operations
@@ -691,10 +696,12 @@ bounds refuse is `invalid_input` naming `input`.
 
 `--describe` (or `--describe true`) prints the operation's
 `InvokeDescription`: `connector`, `instance`, `operation`, `description`,
-`effect` (`read`, `write` or `unknown`), `schema`, `revision` and
-`input_schema`. It reads no document, needs no connection and invokes nothing;
-it may [launch for a description](#launching-for-a-description) as `operations
-describe` does, and refuses a differing pin as above.
+`effect` (`read` or `write`), `schema`, `revision` and `input_schema`. A
+description that leaves an operation's effect unknown is never admitted, so
+`effect` is never anything else; one that did would be `unsupported`. It reads
+no document, needs no connection and invokes nothing; it may [launch for a
+description](#launching-for-a-description) as `operations describe` does, and
+refuses a differing pin as above.
 
 `approval_required` on `invoke`: a write without `--approval-file` is refused at
 `admission`, exit 1, `next_action = none`, before any provider call, and its
@@ -703,12 +710,22 @@ describe` does, and refuses a differing pin as above.
 `--approval-file` or `--idempotency-key` is `invalid_input` naming that
 argument. A write with its proof is the approved write of `operations invoke`.
 
-`--definition <file>` invokes a `connectors-definition/1` file as `operations
-invoke --definition` does ([invoking a definition file](#invoking-a-definition-file)),
-the target naming the definition's connector; a target naming another
-connector is `invalid_input` naming `target`. `--definitions-root` and
+`connectors invoke --definition <file> <operation>` invokes a
+`connectors-definition/1` file read on the fly as `operations invoke
+--definition` does ([invoking a definition file](#invoking-a-definition-file)):
+the same digest cache under `<state>/definitions/<digest>/`, the same
+`definition` instance and the same connect question. With `--definition` the
+target may be left out, and one positional is the operation: the connector and
+its instance are the file's. A target given beside it names the definition's
+connector, and its instance if it names one; a target naming another connector
+or instance is `invalid_input` naming `target`. Without `--definition` one
+positional is `invalid_input` naming `target`. `--definitions-root` and
 `--credential-file` without `--definition` are `invalid_input` naming each, and
-a refusal of the file that names no argument names `definition`.
+a refusal of the file that names no argument names `definition`. With
+`--describe` the definition is lowered and answered from the description the
+installed provider reports for it: nothing is recorded, no connection is
+resolved, asked for or created, `--credential-file` is not read, and nothing is
+asked on the terminal.
 
 The result is `InvokeResult`: `connector`, `instance`, `operation`, `revision`
 and the provider's `result`, with `request_id`, `mutation` and `source_audit` as
@@ -1262,7 +1279,7 @@ never replay a possible write after interruption, timeout or lost response.
 | schema/descriptor changed | `stale_description` | 1 |
 | absent selected operation/connection | `not_found` | 1 |
 | `invoke` target naming a connector with several instances and no instance (`stage = arguments`, `next_action = none`, `instances` named; [invoking an operation](#invoking-an-operation)) | `instance_ambiguous` | 2 |
-| `invoke` without `--connection` on an instance with no usable connection or several (`stage = admission`, `connections` named; [invoking an operation](#invoking-an-operation)) | `connection_unresolved` | 1 |
+| `invoke` without `--connection` on an instance with no usable connection, several `ready`, or several usable and none `ready` (`stage = admission`, `connections` named; [invoking an operation](#invoking-an-operation)) | `connection_unresolved` | 1 |
 | `invoke` write without `--approval-file` (`stage = admission`, `next_action = none`, `approval_steps` named) | `approval_required` | 1 |
 | stale, expired or foreign list cursor (`stage = observation`, `next_action = retry_explicitly`) | `stale_cursor` | 1 |
 | connect whose acquisition failed before publication (`stage = dispatch`, `next_action = retry_explicitly`) | the acquisition owner's code | 1 |
