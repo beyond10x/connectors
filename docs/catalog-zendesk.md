@@ -145,7 +145,7 @@ reads, the profile's fields and the provider executable. The instance id is
 
 ```console
 $ connectors instances list
-{"adapters":[{"adapter":"zendesk.support","adapter_id":"catalog","connector":"zendesk","instance":"support","instance_id":"zendesk.support","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"adapters":[{"connector":"zendesk","instance":"support","instance_id":"zendesk.support","restart":"never","startup":"on-demand"}],"source":"configuration"}
 ```
 
 An installation configured before connectors were declared converts its
@@ -157,7 +157,7 @@ revision; the pinned form it writes is described in
 
 Three writes select the pinned `UpdateTicket`, each `effect: write`, so each
 runs only under an issued approval: through the local CLI, `approvals prepare`,
-`approvals issue` and `operations invoke` with the proof, and never on the read
+`approvals issue` and `invoke` with the proof, and never on the read
 transport. Each takes `ticket_id` and a `body` of the form
 `{"ticket": {...}}`, closed to the members below
 ([closed body keys](local-catalog-provider.md#configure-the-provider)); any other
@@ -240,16 +240,14 @@ does not cover a write. Move an existing install over in four steps:
 
 4. Connect with the [API token](#api-token-zendeskbasic) credential document
    (`connections connect --connector zendesk --instance support --profile
-   zendesk.basic --credential-file ~/private/zendesk.json`) and describe each
-   write for its `schema` and `revision`. For each write, put the input in a
-   file, `approvals prepare` it, pass the subject's digest to
+   zendesk.basic --credential-file ~/private/zendesk.json`) and take each write's
+   `schema` and `revision` from `connectors invoke zendesk/support <write> --describe`.
+   For each write, put the input in a file, `approvals prepare` it, pass the subject's digest to
    `approvals issue --approve-subject`, and invoke with the proof:
 
    ```sh
-   connectors operations invoke --connector zendesk --instance support \
-     --connection "$connection" --operation ticket.note \
-     --schema "$schema" --revision "$revision" --input-file note.json \
-     --approval-file "$proof_file" --idempotency-key "$business_key" --output json
+   connectors --output json invoke zendesk/support ticket.note --input-file note.json \
+     --approval-file "$proof_file" --idempotency-key "$business_key"
    ```
 
    ```json

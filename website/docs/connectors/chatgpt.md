@@ -178,20 +178,17 @@ id, the granted scopes and the access token's expiry, never a token.
 
 ## A first read
 
-Take `--schema` and `--revision` from `operations describe --connector chatgpt --instance personal
---operation models.list`, then:
+`connectors invoke chatgpt/personal models.list --describe` prints the input schema. Then:
 
 ```sh
-connectors operations invoke --connector chatgpt --instance personal --connection "$connection" \
-  --operation models.list --schema "$schema" --revision "$revision" \
+connectors invoke chatgpt/personal models.list \
   --input-json '{"client_version":"0.0.0"}'
 ```
 
 To use the subscription from your own tool, print the access token to its standard input:
 
 ```sh
-connectors connections token --connector chatgpt --instance personal \
-  --connection "$connection" --reveal
+connectors connections token --connector chatgpt --instance personal --reveal
 ```
 
 Standard output is the token and one newline. Without `--reveal` the command prints only the

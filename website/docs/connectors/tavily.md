@@ -89,14 +89,7 @@ For automation, an owner-only `{"api_key":"..."}` file goes to `--credential-fil
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector tavily --instance tavily \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector tavily --instance tavily \
-  --operation websearch.search | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector tavily --instance tavily \
-  --operation websearch.search | jq -r .result.revision)
-connectors operations invoke --connector tavily --instance tavily --connection "$connection" \
-  --operation websearch.search --schema "$schema" --revision "$revision" \
+connectors invoke tavily/tavily websearch.search \
   --input-json '{"query":"vector database release","max_results":5,"time_range":"week","content":"full"}'
 ```
 

@@ -11,7 +11,7 @@
     },
     {
       "area": "Service boundary",
-      "detail": "connectors serve puts one gateway in front of several standalone services, prefixes their operations and reports a downstream failure without retrying it.",
+      "detail": "The connectors_host::federation library puts one gateway in front of several standalone services, prefixes their operations and reports a downstream failure without retrying it.",
       "href": "/docs/guides/federate-adapter-services",
       "label": "One-hop federation",
       "status": "shipped"

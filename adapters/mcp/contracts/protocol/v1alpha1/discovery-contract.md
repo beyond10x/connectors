@@ -41,7 +41,7 @@ as its child, stdin receives frames, stdout sends only frames, and stderr carrie
 safe diagnostics. No credential source shares protocol stdin. This selects no
 outbound child owner or multi-caller Connection assignment.
 
-The existing compatibility `serve` path is not this command and is not an alias.
+The removed `serve` command (0.60.0) was not this command and had no alias.
 No parser, generated source, `ess-cli/1` declaration or compatibility flag is changed
 by this inventory. The launch's typed native ESS values, shared/native composition,
 pinned ESS 0.52.0 expressibility and streaming process binding remain prerequisites.
@@ -65,11 +65,11 @@ static-entry binding; they do not establish a managed MCP OAuth codec.
 | `connections revoke` | `adapter`, `connection`, `expected-revision` |
 | `operations list` | `adapter`, `limit`, `cursor` |
 | `operations describe` | `adapter`, `operation` |
-| `operations invoke` | `adapter`, `connection`, `operation`, `schema`, `revision`, `input-json`, `input-file`, `input-stdin`, `approval-file`, `idempotency-key` |
+| `invoke` | positional `<connector>[/<instance>]` and operation; `connection`, `schema`, `revision`, `input-json`, `input-file`, `input-stdin`, `approval-file`, `idempotency-key`, `describe` |
 
 Connect/repair select exactly one protected static source. Status selects exactly
-one connection or acquisition. Invoke selects one business input source, an exact
-operation/schema/revision and an explicit connection where required. The shared
+one connection or acquisition. Invoke selects one business input source, and the
+schema, revision and connection that fit unless pinned. The shared
 mutation profile governs approval-file and idempotency-key applicability; this
 inventory does not make MCP writes callable. Outbound local operation/profile
 identifiers remain null in the JSON, deliberately distinct from remote

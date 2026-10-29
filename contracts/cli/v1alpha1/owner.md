@@ -158,13 +158,13 @@ the owner's held metadata handle, and refuses with the codes a direct read gives
 (`not_found`, `description_unavailable`, `metadata_unavailable`). With
 `"launch": true` (and the named `connection`, when there is one) the owner, finding
 no description cached, checks the [launch condition](semantics.md#launching-for-a-description)
-again and starts the configured adapter, which caches it. `operations
-invoke` with such an owner running sends no admission of its own: the owner's
+again and starts the configured adapter, which caches it. `invoke`
+with such an owner running sends no admission of its own: the owner's
 admission of the `invoke` request decides it, before dispatch, from the same held
 handle. The authority a greeting names is read from the database's authority row
 without replaying the store. Without a reachable owner of the same build a
-command reads the store directly, which verifies it completely, and `operations
-invoke` admits directly before it starts an owner. A `cached` exchange that fails
+command reads the store directly, which verifies it completely, and `invoke`
+admits directly before it starts an owner. A `cached` exchange that fails
 after the greeting, an owner's refusal included, is answered by that direct
 read, so a refusal carries the direct read's own code. The owner itself never routes
 its reads through an owner.
@@ -227,7 +227,7 @@ written and no new acquisition is created. A lost publication acknowledgement is
 outcome_unknown; connection status observes the resulting baseline and no
 request is replayed.
 
-A read on `operations invoke` whose connection's evidence expired while its
+A read on `invoke` whose connection's evidence expired while its
 credential is intact, or would expire before the read could use it
 ([semantics.md](semantics.md)), runs this same recollection once, as the first step of its
 own job on the instance's serialized worker, within the read's deadline and at
@@ -237,7 +237,7 @@ upgrade: those stay with explicit `connections revalidate`.
 
 A running owner of the CLI's own build admits `connections revalidate` from its
 held metadata handle; only without one does the CLI admit it directly, which
-verifies the whole store, before it starts an owner, as for `operations invoke`.
+verifies the whole store, before it starts an owner, as for `invoke`.
 The command's 30-second deadline is set by the CLI as it sends the request to the
 owner: after its own direct admission when it admitted the revalidation itself,
 and before the owner's admission from its held handle otherwise, so that

@@ -1,18 +1,24 @@
 {
   "format": "b10x-terminal/1",
-  "title": "One gateway in front of a Kubernetes service",
-  "recordedWith": "connectors 0.52.0 built from source, the federation guide's configuration, no Kubernetes cluster",
+  "title": "Name an instance, invoke an operation",
+  "recordedWith": "connectors 0.60.0 built from source, a configuration with two GitLab instances, no connection and no provider contacted",
   "entries": [
     {
-      "comment": "A federation host lists its downstream operations under their source prefix.",
-      "command": "connectors describe --endpoint http://127.0.0.1:17100/ --allow-plaintext --token-file gateway.secret | jq '{instance, operations: [.operations[].id]}'",
-      "output": "{\n  \"instance\": \"engineering-gateway\",\n  \"operations\": [\n    \"kubernetes__resources.list\",\n    \"kubernetes__resources.get\",\n    \"kubernetes__namespaces.list\",\n    \"kubernetes__deployments.history\",\n    \"kubernetes__endpoints.discover\"\n  ]\n}",
+      "comment": "Each configured instance, named by its connector and instance.",
+      "command": "connectors instances list | jq -c '.[] | arrays | .[]'",
+      "output": "{\"connector\":\"gitlab\",\"instance\":\"oss\",\"instance_id\":\"gitlab.oss\",\"restart\":\"never\",\"startup\":\"on-demand\"}\n{\"connector\":\"gitlab\",\"instance\":\"work\",\"instance_id\":\"gitlab.work\",\"restart\":\"never\",\"startup\":\"on-demand\"}",
       "exitCode": 0
     },
     {
-      "comment": "No cluster answers behind the Kubernetes service: the refusal is named and nothing is retried.",
-      "command": "connectors invoke --endpoint http://127.0.0.1:17100/ --allow-plaintext --token-file gateway.secret --operation kubernetes__resources.list --input pods.json",
-      "output": "{\"code\":\"unavailable\",\"message\":\"dependency unavailable\"}",
+      "comment": "Two GitLab instances: a target without one is refused, naming both.",
+      "command": "printf '{\"id\":\"group/project\",\"merge_request_iid\":9}' | connectors invoke gitlab merge_request.get",
+      "output": "failure: {\"code\":\"instance_ambiguous\",\"instances\":[\"gitlab/oss\",\"gitlab/work\"],\"kind\":\"usage\",\"next_action\":\"none\",\"stage\":\"arguments\"}",
+      "exitCode": 2
+    },
+    {
+      "comment": "The instance holds no connection yet: refused before anything starts, with the next action.",
+      "command": "printf '{\"id\":\"group/project\",\"merge_request_iid\":9}' | connectors invoke gitlab/work merge_request.get",
+      "output": "failure: {\"code\":\"connection_unresolved\",\"connections\":[],\"kind\":\"operational\",\"next_action\":\"create_connection\",\"stage\":\"admission\"}",
       "exitCode": 1
     }
   ]

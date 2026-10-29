@@ -92,8 +92,8 @@ role grants that is Grafana's configuration; Connectors only observes the `200` 
 
 ```sh
 target/release/connectors --output json connections connect --connector grafana --instance grafana --profile grafana.service_account --credential-prompt
-target/release/connectors --output json operations describe --connector grafana --instance grafana --operation datasources.list
-target/release/connectors --output json operations invoke --connector grafana --instance grafana --connection CONNECTION --operation datasources.list --schema SCHEMA --revision REVISION --input-json '{}'
+target/release/connectors --output json invoke grafana/grafana datasources.list --describe
+target/release/connectors --output json invoke grafana/grafana datasources.list --input-json '{}'
 ```
 
 For automation, `--credential-stdin` or `--credential-file /absolute/private/file.json` carries
