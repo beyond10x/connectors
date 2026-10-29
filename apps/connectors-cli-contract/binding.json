@@ -287,7 +287,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -355,7 +359,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -785,7 +801,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -853,7 +873,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -1253,7 +1285,11 @@
                           "idempotency_conflict",
                           "owner_build_mismatch",
                           "confirmation_required",
-                          "metadata_schema_newer"
+                          "metadata_schema_newer",
+                          "digest_mismatch",
+                          "unknown_format_version",
+                          "unmet_feature",
+                          "release_invalid"
                         ]
                       },
                       "configuration_bytes": {
@@ -1321,7 +1357,19 @@
                           ]
                         }
                       },
+                      "feature": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
                       "field": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "file": {
                         "kind": "optional",
                         "of": {
                           "kind": "string"
@@ -1695,7 +1743,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -1763,7 +1815,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -2172,7 +2236,11 @@
                           "idempotency_conflict",
                           "owner_build_mismatch",
                           "confirmation_required",
-                          "metadata_schema_newer"
+                          "metadata_schema_newer",
+                          "digest_mismatch",
+                          "unknown_format_version",
+                          "unmet_feature",
+                          "release_invalid"
                         ]
                       },
                       "configuration_bytes": {
@@ -2240,7 +2308,19 @@
                           ]
                         }
                       },
+                      "feature": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
                       "field": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "file": {
                         "kind": "optional",
                         "of": {
                           "kind": "string"
@@ -2614,7 +2694,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -2682,7 +2766,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -3121,7 +3217,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -3189,7 +3289,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -3617,7 +3729,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -3685,7 +3801,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -4127,7 +4255,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -4195,7 +4327,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -4637,7 +4781,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -4705,7 +4853,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -5147,7 +5307,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -5215,7 +5379,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -5657,7 +5833,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -5725,7 +5905,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -6167,7 +6359,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -6235,7 +6431,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -6671,7 +6879,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -6739,7 +6951,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -7189,7 +7413,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -7257,7 +7485,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -7698,7 +7938,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -7766,7 +8010,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -8388,7 +8644,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -8456,7 +8716,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -8959,7 +9231,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -9027,7 +9303,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -9515,7 +9803,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -9583,7 +9875,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -9990,7 +10294,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -10058,7 +10366,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -10524,7 +10844,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -10592,7 +10916,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -11101,7 +11437,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -11169,7 +11509,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -11674,7 +12026,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -11742,7 +12098,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -12164,7 +12532,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -12232,7 +12604,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -12794,7 +13178,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -12862,7 +13250,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -13278,7 +13678,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -13346,7 +13750,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -13730,7 +14146,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -13798,7 +14218,511 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "mutation": {
+                "kind": "optional",
+                "of": {
+                  "kind": "struct",
+                  "fields": {
+                    "attempt": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "struct",
+                        "fields": {
+                          "id": {
+                            "kind": "string"
+                          },
+                          "instance": {
+                            "kind": "string"
+                          }
+                        }
+                      }
+                    },
+                    "cause": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "struct",
+                        "fields": {
+                          "code": {
+                            "kind": "enum",
+                            "variants": [
+                              "invalid_input",
+                              "unsupported",
+                              "unauthorized",
+                              "forbidden",
+                              "not_found",
+                              "stale_description",
+                              "stale_cursor",
+                              "rate_limited",
+                              "unavailable",
+                              "capacity",
+                              "timeout",
+                              "upstream_protocol",
+                              "internal"
+                            ]
+                          },
+                          "stage": {
+                            "kind": "enum",
+                            "variants": [
+                              "preflight",
+                              "attempt_store",
+                              "approval",
+                              "dispatch",
+                              "response",
+                              "observation",
+                              "audit"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "classification": {
+                      "kind": "enum",
+                      "variants": [
+                        "not_attempted",
+                        "refused",
+                        "applied",
+                        "unknown"
+                      ]
+                    },
+                    "original_request_id": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "string"
+                      }
+                    },
+                    "replayed": {
+                      "kind": "boolean"
+                    }
+                  }
+                }
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "revalidate_connection",
+                  "create_connection",
+                  "revoke_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "stop_owner",
+                  "upgrade",
+                  "choose_clock_source",
+                  "none"
+                ]
+              },
+              "request_id": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked",
+                    "conflict"
+                  ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "source_audit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "struct",
+                  "fields": {
+                    "audit_ref": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "string"
+                      }
+                    },
+                    "audit_status": {
+                      "kind": "enum",
+                      "variants": [
+                        "complete",
+                        "incomplete",
+                        "unavailable",
+                        "not_required"
+                      ]
+                    },
+                    "instance": {
+                      "kind": "string"
+                    }
+                  }
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "definitions-install": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "definitions-install"
+      },
+      "input": {
+        "type_ref": "connectors.cli.DefinitionsInstallInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "source": {
+              "kind": "string"
+            },
+            "tag": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.DefinitionsInstallResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "cache_entry": {
+              "kind": "enum",
+              "variants": [
+                "created",
+                "existing"
+              ]
+            },
+            "cache_path": {
+              "kind": "string"
+            },
+            "commit": {
+              "kind": "string"
+            },
+            "features": {
+              "kind": "list",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "files": {
+              "kind": "integer"
+            },
+            "index_sha256": {
+              "kind": "string"
+            },
+            "lock_path": {
+              "kind": "string"
+            },
+            "source": {
+              "kind": "string"
+            },
+            "tag": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "attempts": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "cause": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "provider_unavailable",
+                    "provider_timeout",
+                    "provider_rate_limited",
+                    "provider_internal",
+                    "provider_capacity",
+                    "adapter_exited",
+                    "owner_stopping"
+                  ]
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "below_quorum",
+                    "split",
+                    "too_imprecise"
+                  ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "custody_read_only",
+                  "metadata_unavailable",
+                  "revision_conflict",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure",
+                  "approval_required",
+                  "approval_refused",
+                  "approval_replayed",
+                  "idempotency_conflict",
+                  "owner_build_mismatch",
+                  "confirmation_required",
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
+                ]
+              },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2",
+                    "connectors-local/3",
+                    "connectors-local/4",
+                    "connectors-local/5"
+                  ]
+                }
+              },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "configuration_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "config_path_unresolved",
+                    "config_missing",
+                    "config_not_private",
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired",
+                    "config_too_large",
+                    "definition_instance_configured"
+                  ]
+                }
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -14242,7 +15166,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -14310,7 +15238,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -14874,7 +15814,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -14942,7 +15886,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -15401,7 +16357,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -15469,7 +16429,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -15900,7 +16872,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -15968,7 +16944,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -16364,7 +17352,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -16432,7 +17424,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -16814,7 +17818,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -16882,7 +17890,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -17391,7 +18411,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -17459,7 +18483,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -17836,7 +18872,11 @@
                   "idempotency_conflict",
                   "owner_build_mismatch",
                   "confirmation_required",
-                  "metadata_schema_newer"
+                  "metadata_schema_newer",
+                  "digest_mismatch",
+                  "unknown_format_version",
+                  "unmet_feature",
+                  "release_invalid"
                 ]
               },
               "configuration_bytes": {
@@ -17904,7 +18944,19 @@
                   ]
                 }
               },
+              "feature": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "field": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "file": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -19097,6 +20149,31 @@
     },
     {
       "path": [
+        "definitions",
+        "install"
+      ],
+      "aliases": [],
+      "callable": "definitions-install",
+      "about": "Fetch the connectors-definitions release TAG from SOURCE (an https repository URL or a local directory), check every file against its index.json, and record it in definitions.lock and a read-only cache; grants nothing and starts no process",
+      "arguments": [
+        {
+          "field": "source",
+          "source": {
+            "kind": "option",
+            "long": "source"
+          }
+        },
+        {
+          "field": "tag",
+          "source": {
+            "kind": "option",
+            "long": "tag"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
         "instances",
         "describe"
       ],
@@ -19569,6 +20646,7 @@
     "handler:connections-status: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-token: implement the owner-qualified callable and its declared result/error contract",
     "handler:connectors-list: implement the owner-qualified callable and its declared result/error contract",
+    "handler:definitions-install: implement the owner-qualified callable and its declared result/error contract",
     "handler:operations-describe: implement the owner-qualified callable and its declared result/error contract",
     "handler:operations-invoke: implement the owner-qualified callable and its declared result/error contract",
     "dynamic-validator:operations-invoke: resolve operation/schema identity and validate native input, result and errors; absent validator refuses",
