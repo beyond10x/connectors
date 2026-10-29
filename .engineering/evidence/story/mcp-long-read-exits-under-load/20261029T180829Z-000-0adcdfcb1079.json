@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-29T18:08:29Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-long-read-exits-under-load",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "pinned runs at edb385bb3: adversary_a_read_longer_than_one_lease_is_answered_and_the_session_stays_ready, taskset 5-8, nice 19, 4 yes workers: 50 of 50; taskset 5,6: 49 of 50 twice, both failures fixture connections connect admission timeout (story:cli-connect-admission-timeout-under-load), no MCP exit in 150 logs",
+    "reference": "adversary_local_mcp_server.rs"
+  }
+}
