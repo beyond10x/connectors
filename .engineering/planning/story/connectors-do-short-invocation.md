@@ -2,11 +2,15 @@
 format: aep.planning-md/3
 id: story:connectors-do-short-invocation
 kind: story
-status: draft
+status: active
 title: connectors invoke <connector>[/<instance>] <operation> is the one invocation, local or remote
 relations:
 - decomposes: epic:fluxplane-plugin-parity
-revision: 14
+- serves: vision:independent-contract-adapters
+revision: 18
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-29T21:15:05Z", actor: "human:timo", revision: 17}
+- {from: "proposed", to: "active", at: "2026-10-29T21:15:05Z", actor: "human:timo", revision: 18}
 ---
 ## Problem
 
@@ -66,29 +70,54 @@ Operator, 2026-10-22: "i dont want to keep anything old". The release that ships
 
 It is a breaking change, named in its CHANGELOG entry with the replacement for each removed form.
 
-## Open questions (operator to settle before this story is proposed)
+## Decisions
 
-- A write still needs its approval (`approvals prepare`, `clock-check`, `issue`). Should `invoke`
-  run that flow for a write after one confirmation, or refuse a write without `--approval-file`?
-- With two connections on one instance: refuse and list them, or pick the single `ready` one?
+Settled by `approval-record:wave-d218-short-invocation` (2026-10-29), replacing the open questions:
 
-## Acceptance (draft)
+- A write invoked without `--approval-file` is refused before any provider call by `approval_required`,
+  whose refusal names the approval steps (`approvals prepare`, `approvals clock-check`,
+  `approvals issue`). The approval flow itself is unchanged.
+- The connection is the instance's single `ready` connection. When none or several are ready, the
+  invoke is refused by `connection_unresolved`, listing each connection with its state;
+  `--connection` chooses one. Amended after review: with none `ready`, a single connection whose
+  validation evidence lapsed is used, since its evidence is re-checked before the call.
+
+- A connectors-definitions file stays invocable on the fly (a consumer requirement relayed by the
+  orchestrator, 2026-10-29): `connectors invoke --definition <file> <operation>`, with no target; the
+  connector and the `definition` instance come from the file, with the same digest cache. The removed
+  `operations invoke --definition <file> --operation <op>` is replaced by it.
+
+## Acceptance
+
+Each line is a test in `apps/connectors/tests/` that names this story.
 
 - `invoke slack chat.postMessage` with one `slack` instance and input on stdin invokes it.
-- `invoke slack chat.postMessage` with two `slack` instances is refused by a named code, and the
-  refusal lists both instances.
+- `invoke slack chat.postMessage` with two `slack` instances is refused by `instance_ambiguous`, and
+  the refusal lists both instances as `slack/<instance>`.
+- An instance holding exactly one connection, invoked without `--connection`, resolves that
+  connection. A refusal that remains on the arguments names the refused argument in `field`; no
+  `invalid_input` of `invoke` comes without one.
+- An instance with no usable connection, or with several `ready` ones, is refused by
+  `connection_unresolved`, listing each connection and its state. A connection whose validation
+  evidence lapsed (`pending`, current under the configuration) is usable when it is the only one;
+  one `ready` beside lapsed ones is selected.
+- A write invoked without `--approval-file` is refused by `approval_required` naming
+  `approvals prepare`, `approvals clock-check` and `approvals issue`, and makes no provider call.
 - `connections connect gitlab/ref-1 --endpoint <url>` stores `endpoint` in the instance; a later
   `invoke gitlab/ref-1 <operation>` with no `--endpoint` reaches that url.
 - `invoke`, `describe` and `operations` refuse an `--endpoint` flag.
-- `invoke slack/<instance> <operation> --describe` prints the description, the input schema and
-  read or write, and makes no provider call.
+- `invoke slack/<instance> <operation> --describe` prints the description, the input schema and read
+  or write, and makes no provider call.
 - `invoke` with a terminal stdin and no input flag is refused without waiting.
 - `invoke` against a stale revision, or one the instance no longer admits, is refused, not
   re-resolved silently.
 - `instances list`, `invoke` output and every refusal name the connector and instance only; none
   contains `catalog` as a connector name.
-- `connectors invoke --endpoint …` and `operations invoke` are refused as unknown, and the
-  CHANGELOG names their replacements.
+- `connectors invoke --endpoint …` and `operations invoke` are refused as unknown, and the CHANGELOG
+  names their replacements.
+- `connections revalidate --expected-revision` given the instance's `configuration_revision` instead
+  of the connection's revision is refused naming `field: expected_revision`, which revision was
+  expected (the connection's) and the command that reads it (`connections describe`).
 
 ## Command spelling
 
