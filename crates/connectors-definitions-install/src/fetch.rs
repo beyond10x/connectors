@@ -33,16 +33,7 @@ impl Source {
         }
         if text.contains("://") {
             let url = Url::parse(text).map_err(|_| Refusal::InvalidSource)?;
-            if url.scheme() != "https"
-                || url.host_str().is_none_or(str::is_empty)
-                || !url.username().is_empty()
-                || url.password().is_some()
-                || url.query().is_some()
-                || url.fragment().is_some()
-                || url.cannot_be_a_base()
-            {
-                return Err(Refusal::InvalidSource);
-            }
+            admitted(&url)?;
             return Ok(Self::Https(url));
         }
         let directory = std::fs::canonicalize(text).map_err(|_| Refusal::NotFound)?;
@@ -63,6 +54,22 @@ impl Source {
     }
 }
 
+/// Whether `url` is a source [`Source::parse`] admits: `https`, with a host and no
+/// credentials, query or fragment.
+fn admitted(url: &Url) -> Result<(), Refusal> {
+    if url.scheme() != "https"
+        || url.host_str().is_none_or(str::is_empty)
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || url.cannot_be_a_base()
+    {
+        return Err(Refusal::InvalidSource);
+    }
+    Ok(())
+}
+
 /// Reads release files from one source; an HTTPS source holds one client and one
 /// runtime for every file of an install.
 pub(crate) enum Fetcher {
@@ -79,35 +86,42 @@ impl Fetcher {
         match source {
             Source::Directory(directory) => Ok(Self::Directory(directory.clone())),
             Source::Https(url) => {
-                // reqwest carries no crypto provider of its own; ring is the one this
-                // workspace selects.
-                let _ = rustls::crypto::ring::default_provider().install_default();
-                let client = reqwest::Client::builder()
-                    .no_proxy()
-                    .redirect(reqwest::redirect::Policy::custom(|attempt| {
-                        if attempt.previous().len() >= REDIRECT_LIMIT
-                            || attempt.url().scheme() != "https"
-                        {
-                            attempt.error("redirect not followed")
-                        } else {
-                            attempt.follow()
-                        }
-                    }))
-                    .connect_timeout(Duration::from_secs(10))
-                    .timeout(Duration::from_secs(120))
-                    .build()
-                    .map_err(|_| Refusal::Unavailable)?;
-                let runtime = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .map_err(|_| Refusal::Unavailable)?;
-                Ok(Self::Https {
-                    base: url.clone(),
-                    client,
-                    runtime,
-                })
+                // A caller may build a source without `Source::parse`.
+                admitted(url)?;
+                Self::https(url)
             }
         }
+    }
+
+    /// An HTTPS fetcher for `url`, whatever its scheme: the caller checked it.
+    pub(crate) fn https(url: &Url) -> Result<Self, Refusal> {
+        // reqwest carries no crypto provider of its own; ring is the one this
+        // workspace selects.
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .redirect(reqwest::redirect::Policy::custom(|attempt| {
+                // `previous()` holds the initial URL and every redirect
+                // followed so far.
+                if attempt.previous().len() > REDIRECT_LIMIT || attempt.url().scheme() != "https" {
+                    attempt.error("redirect not followed")
+                } else {
+                    attempt.follow()
+                }
+            }))
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(120))
+            .build()
+            .map_err(|_| Refusal::Unavailable)?;
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|_| Refusal::Unavailable)?;
+        Ok(Self::Https {
+            base: url.clone(),
+            client,
+            runtime,
+        })
     }
 
     /// The bytes of `name` of the release `tag`, at most `limit` of them.

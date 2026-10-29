@@ -779,9 +779,11 @@ It checks, in this order, before it writes anything:
 2. The rest of the index is that format, with no other member: `tag` equals
    `--tag`, `commit` is 40 or 64 and every digest 64 lower-case hexadecimal digits,
    the asset's name is one path segment, every file path is relative with no empty,
-   `.` or `..` segment and no backslash, no file path is another's directory, the
-   files are sorted by path in byte order with no path twice, at most 16,384 files
-   and 512 MiB in all, and every feature is 1 to 64 bytes of `[a-z0-9_]`. Else
+   `.` or `..` segment, no segment over 255 bytes and no backslash, no file path is
+   another's directory, the files are sorted by path in byte order with no path
+   twice, no two paths differ only in case (a case-insensitive file system holds them
+   as one), at most 16,384 files and 512 MiB in all, and every feature is 1 to 64
+   bytes of `[a-z0-9_]`, sorted in byte order with none twice. Else
    `release_invalid`.
 3. Every name in `features` is a feature this build supports (`embedded_text`,
    `query_fixed`, `query_folds`, `rate_limit_headers`), else `unmet_feature`, with
@@ -793,7 +795,9 @@ It checks, in this order, before it writes anything:
    once, with the index's size and SHA-256: another size or digest is
    `digest_mismatch` with `file` naming the path. A file the index does not name, a
    file it names that the archive lacks, and an entry that is neither a regular file
-   nor a directory are `release_invalid`.
+   nor a directory are `release_invalid`, as is an asset that inflates past the
+   files the index names, each padded to a 512-byte block, plus 8 KiB of header
+   room per file and 1 MiB in all.
 
 These are the only things it takes from its own build: the format versions and the
 features it supports. A release whose tag, commit and connectors this binary was
@@ -804,8 +808,11 @@ Only then does it write. The cache entry is
 whose SHA-256 names the entry) and `files/<path>` for every file the index names.
 It is written under a temporary name in the same directory and renamed into place
 whole, its files mode 0444 and its directories 0555. An entry that already exists
-for that digest is not replaced: its files are verified against the index as the
-asset's were, and a difference is `digest_mismatch` naming the file. The lock is
+for that digest is not replaced: it must be a directory, not a link, holding
+exactly `index.json` and the files the index names, each with the index's size and
+SHA-256, its files mode 0444 and its directories 0555; any difference is
+`digest_mismatch` naming the file relative to the release, `index.json`, or the
+entry itself. The lock is
 `definitions.lock` in the configuration file's directory, owner-only, written to a
 temporary file and renamed over the previous one:
 

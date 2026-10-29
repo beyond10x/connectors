@@ -10,6 +10,42 @@ fn invalid(reason: &str) -> Refusal {
     Refusal::ReleaseInvalid(reason.to_owned())
 }
 
+/// Tar header room allowed per indexed file: its own header block, a pax or GNU
+/// long-name record, and the directories above it.
+const HEADER_ROOM_PER_FILE: u64 = 8 * 1024;
+/// Tar header room allowed once: the pax global header, the top directory and the
+/// end-of-archive record padding.
+const HEADER_ROOM: u64 = 1024 * 1024;
+
+/// The most bytes the asset may inflate to: the files the index names, each padded
+/// to a 512-byte block, and bounded header room. Nothing an archive declares (a
+/// long-name or pax record of any size) is read past it.
+fn inflated_bound(index: &Index) -> u64 {
+    let files = index.files.len() as u64;
+    let content: u64 = index
+        .files
+        .iter()
+        .map(|file| file.size.div_ceil(512) * 512)
+        .sum();
+    content + files * HEADER_ROOM_PER_FILE + HEADER_ROOM
+}
+
+/// A reader that fails once more than `left` bytes were read from `inner`.
+struct Capped<R> {
+    inner: R,
+    left: u64,
+}
+
+impl<R: Read> Read for Capped<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let read = self.inner.read(buf)?;
+        self.left = self.left.checked_sub(read as u64).ok_or_else(|| {
+            std::io::Error::other("the asset inflates past the files its index names")
+        })?;
+        Ok(read)
+    }
+}
+
 /// Checks `asset` against `index` and returns each file's bytes by path, in the
 /// index's order. The asset's own digest first, then every entry.
 pub(crate) fn verify(index: &Index, asset: &[u8]) -> Result<BTreeMap<String, Vec<u8>>, Refusal> {
@@ -23,7 +59,11 @@ pub(crate) fn verify(index: &Index, asset: &[u8]) -> Result<BTreeMap<String, Vec
         .collect();
     let mut files = BTreeMap::new();
     let mut top: Option<String> = None;
-    let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(asset));
+    let inflated = Capped {
+        inner: flate2::read::GzDecoder::new(asset),
+        left: inflated_bound(index),
+    };
+    let mut archive = tar::Archive::new(inflated);
     let entries = archive
         .entries()
         .map_err(|_| invalid("the asset is not a gzip tar archive"))?;

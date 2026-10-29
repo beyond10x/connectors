@@ -46,15 +46,25 @@ fn hex_of(text: &str, lengths: &[usize]) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
-/// Whether `path` is relative, with no empty, `.` or `..` segment, no backslash and
-/// no NUL, so it names one file beneath any root on every platform.
+/// The most bytes of one path segment: the name limit of every file system the
+/// binary ships for.
+pub(crate) const SEGMENT_LIMIT: usize = 255;
+
+/// Whether `path` is relative, with no empty, `.` or `..` segment, no segment over
+/// [`SEGMENT_LIMIT`] bytes, no backslash and no NUL, so it names one file beneath
+/// any root on every platform.
 pub(crate) fn relative_path(path: &str) -> bool {
     !path.is_empty()
         && path.len() <= 4096
         && !path.contains(['\\', '\0'])
         && path
             .split('/')
-            .all(|s| !s.is_empty() && s != "." && s != "..")
+            .all(|s| !s.is_empty() && s != "." && s != ".." && s.len() <= SEGMENT_LIMIT)
+}
+
+/// `path` as a case-insensitive file system (the macOS default) compares it.
+fn folded(path: &str) -> String {
+    path.to_lowercase()
 }
 
 fn invalid(reason: &str) -> Refusal {
@@ -111,11 +121,16 @@ impl Index {
                 .checked_add(file.size)
                 .filter(|total| *total <= UNPACKED_LIMIT)
                 .ok_or_else(|| invalid("the files exceed the unpacked bound"))?;
-            paths.insert(file.path.as_str());
+            // Two paths a case-insensitive file system holds as one file.
+            if !paths.insert(folded(&file.path)) {
+                return Err(invalid("two file paths differ only in case"));
+            }
         }
-        // A path that is also another path's directory cannot be both.
+        // A path that is also another path's directory cannot be both, on a
+        // case-insensitive file system either.
         for file in &index.files {
-            let mut prefix = file.path.as_str();
+            let path = folded(&file.path);
+            let mut prefix = path.as_str();
             while let Some((parent, _)) = prefix.rsplit_once('/') {
                 if paths.contains(parent) {
                     return Err(invalid("a file path is another file's directory"));
@@ -131,6 +146,13 @@ impl Index {
                     .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
         }) {
             return Err(invalid("a feature is not 1 to 64 bytes of [a-z0-9_]"));
+        }
+        if index
+            .features
+            .windows(2)
+            .any(|pair| pair[0].as_bytes() >= pair[1].as_bytes())
+        {
+            return Err(invalid("features are not sorted, once each"));
         }
         if let Some(unmet) = index
             .features
