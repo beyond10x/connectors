@@ -150,7 +150,21 @@ pub fn install(
     if !valid_tag(tag) {
         return Err(Refusal::InvalidTag);
     }
-    let mut fetcher = fetch::Fetcher::new(source)?;
+    let fetcher = fetch::Fetcher::new(source)?;
+    install_with(fetcher, source.recorded(), tag, cache_root, lock_path)
+}
+
+/// [`install`] through `fetcher`, recording `source` in the lock.
+pub(crate) fn install_with(
+    mut fetcher: fetch::Fetcher,
+    source: String,
+    tag: &str,
+    cache_root: &Path,
+    lock_path: &Path,
+) -> Result<Installed, Refusal> {
+    if !valid_tag(tag) {
+        return Err(Refusal::InvalidTag);
+    }
     let index_bytes = fetcher.read(tag, "index.json", INDEX_LIMIT)?;
     let index = Index::read(&index_bytes, tag)?;
     let asset = fetcher.read(tag, &index.asset.name, ASSET_LIMIT)?;
@@ -158,16 +172,29 @@ pub fn install(
     let index_sha256 = index::sha256(&index_bytes);
     let lock = Lock {
         format: LOCK_FORMAT.to_owned(),
-        source: source.recorded(),
+        source,
         tag: index.tag.clone(),
         commit: index.commit.clone(),
         index_sha256: index_sha256.clone(),
     };
+    let root_existed = std::fs::symlink_metadata(cache_root).is_ok();
     let (cache_path, created) =
-        store::cache(cache_root, &index_sha256, &index_bytes, &index, &files)?;
+        match store::cache(cache_root, &index_sha256, &index_bytes, &index, &files) {
+            Ok(stored) => stored,
+            Err(refusal) => {
+                if !root_existed {
+                    let _ = std::fs::remove_dir(cache_root);
+                }
+                return Err(refusal);
+            }
+        };
     if let Err(refusal) = store::write_lock(lock_path, &lock) {
         if created {
             store::remove(&cache_path);
+        }
+        if !root_existed {
+            // Only an empty directory is removed: one this call created.
+            let _ = std::fs::remove_dir(cache_root);
         }
         return Err(refusal);
     }
@@ -181,5 +208,7 @@ pub fn install(
     })
 }
 
+#[cfg(test)]
+mod adversary_tests;
 #[cfg(test)]
 mod tests;
