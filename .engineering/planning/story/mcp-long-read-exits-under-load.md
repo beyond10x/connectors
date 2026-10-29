@@ -6,7 +6,7 @@ status: implemented
 title: The local MCP server exits before answering a read longer than one lease when the host is loaded
 relations:
 - serves: vision:independent-contract-adapters
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-29T17:06:28Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-29T17:06:28Z", actor: "human:timo", revision: 4}
@@ -80,3 +80,11 @@ Fix (cb6527c56, 5ba31999e):
 - When the lock is free at the call, the renewal still compares the store's authority, so a
   replaced store ends the session (`adversary_a_store_replaced_under_the_owner_ends_the_session`).
 - When another holder has the lock, the comparison waits for the next renewal, 500 ms later.
+
+Second cause, found by the pinned whole-binary runs of `local_mcp_server`:
+`stdin_close_refuses_a_call_not_yet_at_the_owner` failed 2 of 10 times at edb385bb3. Admission
+read only the flag the serve loop sets when it reads the end of file. Under load the worker
+passed that check first, and the call reached the owner after the client had closed stdin. One
+run answered success. In the other, the reply missed the unrenewed lease and the exit was 1,
+which the docs specify for that case. Since 1d2e8f468, admission also polls the input for
+POLLHUP. The unit test `admission_refuses_once_the_peer_closed_its_input` was red before that.

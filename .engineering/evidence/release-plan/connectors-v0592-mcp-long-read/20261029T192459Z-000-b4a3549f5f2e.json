@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-29T19:24:59Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0592-mcp-long-read",
+  "kind": "release-plan",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "targeted at 1d2e8f468+: connectors mcp unit 10 passed, local_mcp_server 14 passed, adversary_local_mcp_server 16 passed 1 ignored (pre-existing), connectors-host owner::transport 23 passed, clippy -D warnings clean, connectors-docs generate 0 written with ESS 0.77.0",
+    "reference": "CHANGELOG.md"
+  }
+}
