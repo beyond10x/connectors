@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0592-mcp-long-read
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.59.2: the stdio MCP lease renewal and stdin-close admission fixes, ESS 0.77.0'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "active", at: "2026-10-29T19:24:59Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":1}}}
+- {from: "active", to: "implemented", at: "2026-10-29T22:28:03Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":3}}}
 ---
 ## Outcome
 
