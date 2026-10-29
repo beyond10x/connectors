@@ -34,6 +34,9 @@ type Listener = UnixListener;
 pub struct Client {
     stream: channel::Stream,
     pub host_incarnation: String,
+    /// The store authority this client greeted the owner with, which the
+    /// owner confirmed as its own.
+    authority: String,
     /// The owner's executable digest; `None` for an owner that predates the
     /// build handshake, which is by definition another build.
     owner_build: Option<String>,
@@ -176,6 +179,27 @@ impl Client {
         Ok(client)
     }
 
+    /// [`Client::connect_until`] to an owner that is already running, greeted by
+    /// `authority`, the one an earlier client of this process confirmed
+    /// ([`Client::authority`]), instead of by a fresh read of the store. That
+    /// read takes the store's lifecycle lock, which the owner holds while it
+    /// records the work it serves; a caller that must answer within a short
+    /// lease (the MCP server's data lease, 1.9 s) cannot wait on it. The owner
+    /// still refuses an authority that is not its own, and starts nothing.
+    pub fn reconnect_until(paths: &Paths, authority: &str, deadline: Instant) -> Result<Self> {
+        approval_issuance::check(deadline)?;
+        let client = Self::connect_as(paths, false, VERSION, authority, deadline)?;
+        approval_issuance::check(deadline)?;
+        client.same_build()?;
+        Ok(client)
+    }
+
+    /// The store authority the owner confirmed in this client's greeting.
+    #[must_use]
+    pub fn authority(&self) -> &str {
+        &self.authority
+    }
+
     pub fn connect(paths: &Paths, start: bool) -> Result<Self> {
         Self::connect_version(
             paths,
@@ -204,6 +228,15 @@ impl Client {
                 }
             })?
             .to_string();
+        Self::connect_as(paths, start, version, &authority, deadline)
+    }
+    fn connect_as(
+        paths: &Paths,
+        start: bool,
+        version: &str,
+        authority: &str,
+        deadline: Instant,
+    ) -> Result<Self> {
         let directory = fs::directory(&paths.state, false, true)?;
         // The pipe name's salt, published by the first caller and refused by
         // name when it is not owner-only.
@@ -216,7 +249,7 @@ impl Client {
             approval_issuance::check(deadline)?;
             match connect_identified(&socket, deadline) {
                 Ok((stream, identity)) => {
-                    match Self::greet_running(&socket, stream, paths, &authority, version, deadline)
+                    match Self::greet_running(&socket, stream, paths, authority, version, deadline)
                     {
                         // The owner closed the stream and its socket is no longer
                         // at the path: it retired (owner.md). Start over as if
@@ -242,7 +275,7 @@ impl Client {
                     match connect_socket(&socket, deadline) {
                         Ok(stream) => {
                             return Self::greet_running(
-                                &socket, stream, paths, &authority, version, deadline,
+                                &socket, stream, paths, authority, version, deadline,
                             );
                         }
                         // Only absence starts a replacement owner; a timeout
@@ -257,7 +290,7 @@ impl Client {
                     let result = Self::greet(
                         stream,
                         paths,
-                        &authority,
+                        authority,
                         version,
                         Some(own_build()?),
                         deadline,
@@ -432,6 +465,7 @@ impl Client {
                 Ok(Self {
                     stream,
                     host_incarnation,
+                    authority: authority.to_owned(),
                     owner_build,
                 })
             }
@@ -3094,6 +3128,7 @@ mod governed_client_tests {
         let result = Client {
             stream: client,
             host_incarnation: "host".into(),
+            authority: "authority".into(),
             owner_build: Some(own_build().unwrap().into()),
         }
         .bounded_projected_read("fixture", &request, "projection", budget)
@@ -3125,6 +3160,7 @@ mod governed_client_tests {
             let error = Client {
                 stream: client,
                 host_incarnation: "host".into(),
+                authority: "authority".into(),
                 owner_build: Some(
                     if mismatch {
                         "another-build"
@@ -3181,6 +3217,7 @@ mod governed_client_tests {
         let error = Client {
             stream: client,
             host_incarnation: "host".into(),
+            authority: "authority".into(),
             owner_build: Some(build),
         }
         .bounded_projected_read("fixture", &request, "projection", budget)
@@ -3223,6 +3260,7 @@ mod governed_client_tests {
                 Client {
                     stream: client,
                     host_incarnation: "host".into(),
+                    authority: "authority".into(),
                     owner_build: Some(own_build().unwrap().into()),
                 },
                 "fixture",
@@ -3236,6 +3274,7 @@ mod governed_client_tests {
                 Client {
                     stream: client,
                     host_incarnation: "host".into(),
+                    authority: "authority".into(),
                     owner_build: Some("another-build".into()),
                 },
                 "fixture",
@@ -3273,6 +3312,7 @@ mod governed_client_tests {
         let result = Client {
             stream: client,
             host_incarnation: "host".into(),
+            authority: "authority".into(),
             owner_build: Some(own_build().unwrap().into()),
         }
         .governed_read("fixture", &request, connectors_sdk::now_ms() + 5000)
@@ -3284,6 +3324,7 @@ mod governed_client_tests {
         let result = Client {
             stream: client,
             host_incarnation: "host".into(),
+            authority: "authority".into(),
             owner_build: Some("another-build".into()),
         }
         .governed_read("fixture", &request, connectors_sdk::now_ms() + 5000);
@@ -3305,6 +3346,7 @@ mod invoke_answer_tests {
             Client {
                 stream: client,
                 host_incarnation: "fixture-host".into(),
+                authority: "authority".into(),
                 owner_build: Some(own_build().unwrap().into()),
             },
             owner,
@@ -3375,6 +3417,7 @@ mod read_answer_depth_tests {
             Client {
                 stream: client,
                 host_incarnation: "fixture-host".into(),
+                authority: "authority".into(),
                 owner_build: None,
             }
         };
