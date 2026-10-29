@@ -17,6 +17,8 @@ pub(super) struct Snapshot {
     pub alias: String,
     pub connection: String,
     pub host: String,
+    /// The store authority the owner confirmed when this snapshot was taken.
+    pub authority: String,
     configuration: Configuration,
     adapter: connectors_host::local::config::Adapter,
 }
@@ -113,6 +115,7 @@ pub(super) fn snapshot(
     halt.map_or(Ok(()), Halt::admitted)?;
     let owner = client(paths, host, until)?;
     let host = owner.host_incarnation.clone();
+    let authority = owner.authority().to_owned();
     let left = until.saturating_duration_since(Instant::now()).as_millis() as u64;
     check(until)?;
     halt.map_or(Ok(()), Halt::cancelled)?;
@@ -155,6 +158,7 @@ pub(super) fn snapshot(
         alias,
         connection,
         host,
+        authority,
         configuration,
         adapter,
     })

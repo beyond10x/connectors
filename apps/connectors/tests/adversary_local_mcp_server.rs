@@ -788,13 +788,61 @@ fn adversary_a_read_longer_than_one_lease_is_answered_and_the_session_stays_read
             );
         }
         Ok(Err(line)) => panic!("{line}"),
-        Err(_) => panic!(
-            "no reply to a read the provider answers in 3 s (declared execution_ms 20000, \
-             provider_ms 15000): after {elapsed:?} the server is {status:?}, provider requests {}",
-            served.provider.requests()
-        ),
+        Err(_) => {
+            let _ = peer.child.kill();
+            let _ = peer.child.wait();
+            let stderr = peer.errors.take().unwrap().join().unwrap();
+            panic!(
+                "no reply to a read the provider answers in 3 s (declared execution_ms 20000, \
+                 provider_ms 15000): after {elapsed:?} the server is {status:?}, provider requests {}, \
+                 stderr {}",
+                served.provider.requests(),
+                String::from_utf8_lossy(&stderr)
+            )
+        }
     }
     assert!(peer.request(3, "ping", json!({})).get("result").is_some());
+    peer.finish();
+}
+
+/// story:mcp-long-read-exits-under-load. The owner holds the state store's
+/// lifecycle lock while it records the work it serves, and on a loaded host a
+/// record can take longer than a 1.9 s data lease. Renewal (§ 3.3) confirms
+/// the owner's incarnation; it must not wait on that lock, or a session that
+/// is `Ready` and doing nothing ends with exit status 1 at the lease deadline.
+/// The store is held 3 s here, longer than one lease and inside the 120 s
+/// request ceiling, and the session must still answer a ping afterwards.
+#[test]
+fn adversary_a_store_held_past_one_lease_leaves_the_session_ready() {
+    use std::os::fd::AsRawFd;
+    let served = Served::new();
+    let mut peer = Peer::start(&served, true);
+    assert!(peer.request(1, "ping", json!({})).get("result").is_some());
+    let lock = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(served.container.path(STATE).join("metadata.lock"))
+        .unwrap();
+    let until = Instant::now() + Duration::from_secs(5);
+    // SAFETY: lock owns a live descriptor; dropping it releases the lock.
+    while unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
+        assert!(
+            Instant::now() < until,
+            "the store lock stayed taken for 5 s"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    std::thread::sleep(Duration::from_secs(3));
+    drop(lock);
+    let status = peer.child.try_wait().unwrap();
+    if status.is_some() {
+        let stderr = peer.errors.take().unwrap().join().unwrap();
+        panic!(
+            "the session ended while the store was held 3 s: {status:?}, stderr {}",
+            String::from_utf8_lossy(&stderr)
+        );
+    }
+    assert!(peer.request(2, "ping", json!({})).get("result").is_some());
     peer.finish();
 }
 
