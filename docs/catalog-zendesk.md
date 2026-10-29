@@ -74,8 +74,8 @@ end of a walk are in it.
 |---|---|---|---|---|---|
 | `tickets.incremental` | `IncrementalTicketExportCursor` | `GET /api/v2/incremental/tickets/cursor` | `start_time` on the first call, then `cursor`; `per_page` (amended) | `end_of_stream: true` | `start_time`, Unix seconds: tickets changed since |
 | `ticket.show` | `ShowTicket` | `GET /api/v2/tickets/{ticket_id}` | single item | n/a | none |
-| `ticket.comments` | `ListTicketComments` | `GET /api/v2/tickets/{ticket_id}/comments` | `page[size]`, `page[after]` | `meta.has_more: false` | none; deltas come from `tickets.incremental` |
-| `ticket.audits` | `ListAuditsForTicket` | `GET /api/v2/tickets/{ticket_id}/audits` | `page[size]`, `page[after]`, with `include_boundary_indicators: true` | `meta.has_more: false` | none; deltas come from `tickets.incremental` |
+| `ticket.comments` | `ListTicketComments` | `GET /api/v2/tickets/{ticket_id}/comments` | `page[size]`, `page[after]` | `meta.has_more: false`, no `meta.after_cursor`, or no comments | none; deltas come from `tickets.incremental` |
+| `ticket.audits` | `ListAuditsForTicket` | `GET /api/v2/tickets/{ticket_id}/audits` | `page[size]`, `page[after]`; `include_boundary_indicators: true` recommended | `meta.has_more: false`, no `meta.after_cursor`, or no audits | none; deltas come from `tickets.incremental` |
 | `users.incremental` | `IncrementalUserExportCursor` | `GET /api/v2/incremental/users/cursor` | `start_time` on the first call, then `cursor`; `per_page` | `end_of_stream: true` | `start_time`, Unix seconds: users changed since |
 | `user.show` | `ShowUser` | `GET /api/v2/users/{user_id}` | single item | n/a | none |
 | `organizations.incremental` | `IncrementalOrganizationExport` | `GET /api/v2/incremental/organizations` | `start_time`, then the previous page's `end_time` as `start_time`; `per_page` | `end_of_stream: true` | `start_time`, Unix seconds: organizations changed since |
@@ -107,22 +107,26 @@ end of a walk are in it.
 - **`ticket.comments`** takes `ticket_id` and is read by cursor. The first call
   sends `page[size]` (the pinned description states at most 100 per page); each
   following call sends the previous page's `meta.after_cursor` as
-  `page[after]`. The walk ends on the page whose `meta.has_more` is `false`.
-  The pinned response schema declares only `comments`; `meta` and `links` come
-  from Zendesk's pagination guide, which the operation's description links.
+  `page[after]`. The walk ends on a page whose `meta.has_more` is `false`,
+  that has no `meta.after_cursor` (absent or `null`), or that has no comments,
+  whichever comes first. The pinned response schema declares only `comments`;
+  `meta` and `links` come from Zendesk's pagination guide, which the
+  operation's description links, and the operation has no parameter that asks
+  for `has_more`, so a walk does not rely on it alone.
   Offset paging (`per_page`, `sort_order`) is withheld by the selection, so an
   input carrying either is refused before any request. The engine sends the
   bracketed names percent-encoded: `page%5Bsize%5D=2&page%5Bafter%5D=…`.
 - **`ticket.audits`** takes `ticket_id` and walks one ticket's audits by
   cursor as `ticket.comments` walks its comments: `page[size]` (at most 100 per
-  page), then the previous page's `meta.after_cursor` as `page[after]`, until a
-  page with `meta.has_more` `false`. The pinned response schema
-  (`TicketAuditsResponseNoneCursor`) declares no `meta`, and the pinned
-  `include_boundary_indicators` "includes `has_more` indicator in the cursor
-  pagination response meta" when true, so send
-  `"include_boundary_indicators": true` on every call of a walk. Whether
-  Zendesk leaves `has_more` out without it has not been checked against a live
-  account; `meta.after_cursor` and `links.next` are returned either way.
+  page), then the previous page's `meta.after_cursor` as `page[after]`. The
+  walk ends on a page whose `meta.has_more` is `false`, that has no
+  `meta.after_cursor` (absent or `null`), or that has no audits, whichever
+  comes first. The pinned response schema (`TicketAuditsResponseNoneCursor`)
+  declares no `meta`, and the pinned `include_boundary_indicators` "includes
+  `has_more` indicator in the cursor pagination response meta" when true, so
+  sending `"include_boundary_indicators": true` on every call is recommended;
+  a walk without it still ends on the other two. Whether Zendesk leaves
+  `has_more` out without it has not been checked against a live account.
   `sort_order` is withheld; the operation has no `per_page`, and the offset
   page number is not declared. Each audit is returned as Zendesk sends it:
   `author_id`, `created_at`, `via.channel`, `via.source.rel` and `events`, each
