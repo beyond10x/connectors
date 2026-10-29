@@ -2,10 +2,21 @@
 
 ## Unreleased
 
+## 0.59.1 — 2026-10-29
+
+No breaking changes. No change in the CLI's or the owner's behaviour.
+
 ### Changed
 
 - ESS 0.75.0 (from 0.69.2). No user-visible effect: the specifications stay at their current
   formats, and the regenerated types differ only in the generator version they name.
+
+### Fixed
+
+- Two owner-capacity tests of the local CLI (`apps/connectors/tests/local_cli.rs`) no longer fail
+  on a loaded or single-CPU host. The owner serves its startup channel in one of its 32 client
+  slots. The tests closed that channel before the owner read it, so the slot could free after
+  they had seen the owner full. They now hold it with the clients that fill the owner.
 
 ## 0.59.0 — 2026-10-26
 
