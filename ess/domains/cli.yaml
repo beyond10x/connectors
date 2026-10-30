@@ -1680,7 +1680,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:1158, docs/local-connection-registry.md:222-223;
+    # contracts/cli/v1alpha1/semantics.md:1254, docs/local-connection-registry.md:222-223;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1840,7 +1840,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1162) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1258) and the host
     # removal path (er.rs:4538-4540) only expires Active cursors. The error name is
     # the decision; no source names one.
 
