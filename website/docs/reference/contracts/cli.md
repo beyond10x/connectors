@@ -809,7 +809,7 @@ help) names a configured entry by its alias. Every `invalid_input` of `invoke`
 names the argument it refused in `Failure.field`: `target`, `operation`,
 `connection`, `schema`, `revision`, `input`, `approval_file`,
 `idempotency_key`, `definition`, `definitions_root`, `credential_file`,
-`fields` or `each`.
+`fields`, `each`, `walk`, `max_pages` or `out`.
 
 ### Shaping a result
 
@@ -869,6 +869,70 @@ another output name; more than 256 paths or 64 steps in one path; either flag
 beside `--describe`, which reads no result. `--each` on a write is
 `invalid_input` naming `each`, ahead of `approval_required`; `--fields` on a
 write is admitted.
+
+### Walking pages
+
+`connectors invoke … --walk --out <file|-> [--max-pages <n>]` reads every page
+of a read whose description declares a walk, writes each record as one NDJSON
+line and prints a summary (story:invoke-walks-declared-pages). The walk is the
+one the operation's `input_schema` carries under `x-connectors-walk`, as
+`invoke --describe` prints it (`docs/local-catalog-provider.md`): the query
+parameter that carries the position, the pointer to the next position, the
+pointer to the records, `query` values every page sends, `first_only`
+parameters only the first page sends, an optional `continues` condition and
+the named `ends`.
+
+The loop runs in the CLI. Each page is one invoke of the same instance,
+connection, schema and revision with the page's input: the caller's document
+with the declared `query` values and, from the second page on, the position
+the page before named under the declared parameter, without the `first_only`
+parameters. Each page is admitted, audited and bounded as a plain invoke is:
+one audit record and one response bound per page. `--walk`, `--max-pages` and
+`--out` never reach the owner or the provider. The records of a page are the
+array at the declared `records` pointer of its result (for a catalog result,
+of its `body`); absent or `null` is none. `--fields` shapes each record as it
+shapes an element of `--each`. After each page the declared walk decides: while
+`continues` holds the walk goes on; otherwise the first end that holds ends it,
+by its name; otherwise it goes on to the next position.
+
+`--out <file>` writes the records to a new file, created owner-only (`0600`)
+and never over an existing path; `--out -` writes them to standard output.
+The summary, `InvokeWalked`, is printed last on standard output, in the
+envelope of the output mode:
+
+```console
+$ connectors --output json invoke zendesk/support ticket.audits --walk --out audits.ndjson --fields author_id,created_at,events[].field_name <<<'{"ticket_id":101,"page[size]":2}'
+{"ok":true,"result":{"complete":true,"end":"has_more_false","out":"audits.ndjson","pages":2,"records":3}}
+```
+
+`pages` and `records` count the pages read whose records were written and
+those records. `complete` is true exactly when a declared end held, and `end`
+names it. `missing` lists the `--fields` paths no record had, when there was a
+record. A walk stops before an end holds, and `complete` is false:
+
+| `stopped` | when | `resume` |
+|---|---|---|
+| `max_pages` | `--max-pages` pages were read (default 20, at most 10,000) and the last named a next position | the next page's input |
+| `refused` | a page's invoke was refused, `rate_limited` included; `error` is its failure envelope's `error` | the refused page's input |
+| `status` | a page's catalog result has a `status`, in `status`, that is not 2xx; its records are not written | that page's input |
+| `write` | a page's records could not be written; none of them is counted | that page's input |
+| `continues_without_position`, `no_position`, `invalid_position`, `repeated_position`, `records_not_a_list` | the declared walk cannot go on from the page | absent |
+
+Records already written stay written. `resume` is a document: given back as the
+input of `invoke --walk` it reads on from that page. A walk that stopped exits
+0 when its summary is printed. A refused first page is the failure envelope a
+plain invoke answers, on standard error with its exit status, and the walk
+leaves no `--out` file behind.
+
+Refused before any provider call and before the `--out` file is created, as
+`invalid_input` at `arguments`, exit 2: `--walk` without `--out` (naming
+`out`); `--max-pages` that is not a whole number from 1 to 10,000 (naming
+`max_pages`); `--max-pages` or `--out` without `--walk` (naming each);
+`--each` beside `--walk` (naming `each`: records are already one per line);
+`--walk` beside `--describe`, and `--walk` on a write, ahead of
+`approval_required` (naming `walk`). An `--out` path that exists or cannot be
+created is `invalid_input` naming `out`, before any call. An operation whose
+description declares no walk is `unsupported` at `admission` naming `walk`.
 
 ### Renamed commands
 
