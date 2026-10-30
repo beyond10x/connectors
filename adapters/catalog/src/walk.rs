@@ -8,11 +8,12 @@
 //! The evaluator ([`Walker::step`]) decides one page at a time: `continues` holding goes on
 //! whatever the ends say, else the first end that holds ends the walk by its name, else the walk
 //! goes on to the position at `next`. A page that names no position where one is needed, or one
-//! seen before in the walk, breaks it ([`Broken`]). Running the walk, one admitted read per page,
+//! sent before in the walk, breaks it ([`Broken`]). Running the walk, one admitted read per page,
 //! is the caller's.
-use crate::feed::{Condition, url_parameter};
+use crate::feed::{Condition, WATERMARK_BYTES, url_parameter};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest as _, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// The input schema annotation under which a declared operation carries its walk.
@@ -83,7 +84,8 @@ pub enum Broken {
     ContinuesWithoutPosition,
     /// No end held and the page names no next position.
     NoPosition,
-    /// The value at `next` is neither a string nor an integer.
+    /// The value at `next` is neither a string nor an integer, or is a string longer than
+    /// [`WATERMARK_BYTES`].
     InvalidPosition,
     /// The next position was already sent in this walk.
     RepeatedPosition(Value),
@@ -268,6 +270,9 @@ impl Walk {
                 Ok(url_parameter(link, name).map(Value::String))
             }
             (Some(_), Some(_)) => Err(Broken::InvalidPosition),
+            (Some(Value::String(text)), None) if text.len() > WATERMARK_BYTES => {
+                Err(Broken::InvalidPosition)
+            }
             (Some(value), None) if value.is_string() || value.is_i64() || value.is_u64() => {
                 Ok(Some(value.clone()))
             }
@@ -275,8 +280,8 @@ impl Walk {
         }
     }
 
-    /// One page decided against the positions this walk already sent.
-    pub fn step(&self, body: &Value, sent: &BTreeSet<String>) -> Result<Step, Broken> {
+    /// One page decided against the positions this walk already sent ([`Sent`]).
+    pub fn step(&self, body: &Value, sent: &Sent) -> Result<Step, Broken> {
         self.records(body)?;
         let continues = self
             .continues
@@ -292,7 +297,7 @@ impl Walk {
                 Broken::NoPosition
             });
         };
-        if sent.contains(&position.to_string()) {
+        if sent.contains(&position) {
             return Err(Broken::RepeatedPosition(position));
         }
         Ok(Step::Next(position))
@@ -317,25 +322,65 @@ impl Walk {
     }
 }
 
+/// The positions one walk sent, each kept as the SHA-256 of the query value it sends (the text
+/// of a string, the decimal digits of an integer), so `"5"` and `5` are one position and what a
+/// long walk holds does not grow with the length of its positions.
+#[derive(Clone, Debug, Default)]
+pub struct Sent(BTreeSet<[u8; 32]>);
+
+impl Sent {
+    /// The digest of the query value `position` sends; `None` for a value that is no position.
+    fn key(position: &Value) -> Option<[u8; 32]> {
+        let text = match position {
+            Value::String(text) => text.clone(),
+            Value::Number(number) if number.is_i64() || number.is_u64() => number.to_string(),
+            _ => return None,
+        };
+        Some(Sha256::digest(text.as_bytes()).into())
+    }
+
+    /// Whether `position` was sent in this walk.
+    pub fn contains(&self, position: &Value) -> bool {
+        Self::key(position).is_some_and(|key| self.0.contains(&key))
+    }
+
+    /// `position` recorded as sent; a value that is no position is not recorded.
+    pub fn insert(&mut self, position: &Value) {
+        if let Some(key) = Self::key(position) {
+            self.0.insert(key);
+        }
+    }
+}
+
 /// One walk in progress: the positions it sent, so a repeated one breaks it.
 pub struct Walker<'a> {
     walk: &'a Walk,
-    sent: BTreeSet<String>,
+    sent: Sent,
 }
 
 impl<'a> Walker<'a> {
     pub fn new(walk: &'a Walk) -> Self {
         Self {
             walk,
-            sent: BTreeSet::new(),
+            sent: Sent::default(),
         }
+    }
+
+    /// A walk that starts from `caller`, the first page's input: a position it already carries as
+    /// `parameter` (a `resume`) is sent by the first page, so it is recorded as sent.
+    pub fn starting_at(walk: &'a Walk, caller: &Value) -> Self {
+        let mut walker = Self::new(walk);
+        if let Some(position) = caller.get(&walk.parameter) {
+            walker.sent.insert(position);
+        }
+        walker
     }
 
     /// One page decided; a next position is recorded as sent.
     pub fn step(&mut self, body: &Value) -> Result<Step, Broken> {
         let step = self.walk.step(body, &self.sent)?;
         if let Step::Next(position) = &step {
-            self.sent.insert(position.to_string());
+            self.sent.insert(position);
         }
         Ok(step)
     }
@@ -360,6 +405,46 @@ mod tests {
         for bad in ["", "a", "meta/x", "/a~", "/a~2", "/~x"] {
             assert!(!pointer(bad), "{bad}");
         }
+    }
+
+    fn cursor_walk() -> Walk {
+        serde_json::from_value(serde_json::json!({"parameter": "cursor", "next": "/next",
+            "records": "/items", "ends": [{"name": "no_next", "absent": "/next"}]}))
+        .unwrap()
+    }
+
+    #[test]
+    fn a_position_is_one_by_the_query_value_it_sends() {
+        let walk = cursor_walk();
+        let mut walker = Walker::starting_at(&walk, &serde_json::json!({"cursor": 5}));
+        assert_eq!(
+            walker.step(&serde_json::json!({"items": [], "next": "5"})),
+            Err(Broken::RepeatedPosition(serde_json::json!("5")))
+        );
+        let mut walker = Walker::new(&walk);
+        assert_eq!(
+            walker.step(&serde_json::json!({"items": [], "next": "7"})),
+            Ok(Step::Next(serde_json::json!("7")))
+        );
+        assert_eq!(
+            walker.step(&serde_json::json!({"items": [], "next": 7})),
+            Err(Broken::RepeatedPosition(serde_json::json!(7)))
+        );
+    }
+
+    #[test]
+    fn a_plain_position_longer_than_the_watermark_cap_is_invalid() {
+        let walk = cursor_walk();
+        let at_cap = "c".repeat(WATERMARK_BYTES);
+        assert_eq!(
+            Walker::new(&walk).step(&serde_json::json!({"next": at_cap})),
+            Ok(Step::Next(serde_json::json!(at_cap)))
+        );
+        let over = "c".repeat(WATERMARK_BYTES + 1);
+        assert_eq!(
+            Walker::new(&walk).step(&serde_json::json!({"next": over})),
+            Err(Broken::InvalidPosition)
+        );
     }
 
     #[test]
