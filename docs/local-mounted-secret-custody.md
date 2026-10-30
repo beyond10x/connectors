@@ -122,6 +122,7 @@ provider and publishes it as a new version.
 | `connections revalidate` | Re-reads the item; changed bytes are validated and published as a new version, unchanged bytes refresh the evidence as before. |
 | `connections revoke` | Metadata only, as on every binding. The mounted item is untouched; delete or rotate the Secret as well. |
 | An OAuth-acquired (refresh-rotating) profile | `custody_read_only` at `custody`, before any provider exchange. |
+| A catalog `github_app` profile | Admitted. Its entry (App id, installation id, App private key) never rotates, and the installation token lives in the provider's memory only ([catalog provider guide](local-catalog-provider.md)). |
 | `approvals key-init`, `key-rotate`, `key-recover`, `key-retire` | `custody_read_only`: approval-signing seeds are not mounted. |
 | Signing an approval | `custody_read_only` before any custody is opened; the platform keyring is never reached in its place. |
 | A write, confirm or delete of a version | Not compiled: the binding implements only the read capability. |

@@ -289,6 +289,31 @@ fn mounted_refuses_refresh_and_approval_keys() {
     );
 }
 
+/// story:catalog-github-app-installation-token: a GitHub App entry (the App
+/// id, the installation id and the App's private key) rotates nothing in
+/// custody, since its installation token lives in the adapter's memory only.
+/// So the read-only mounted item is enough: connecting validates exactly the
+/// mounted bytes and writes neither the mount nor a copy into state, where a
+/// refresh-rotating profile is refused before any validation.
+#[test]
+fn mounted_secret_custody_admits_a_github_app_profile() {
+    let container = container("connectors-local/4", &Container::mounted());
+    let entry = br#"{"app_id":"424242","installation_id":4200017,"private_key":"fixture-app-key-material"}"#;
+    container.deliver(GITHUB_APP_PROFILE, entry);
+    let before = container.snapshot(SOURCE);
+    let connected = success(&container.connect(GITHUB_APP_PROFILE));
+    assert_eq!(
+        connected["connection"]["summary"]["state"], "ready",
+        "{connected}"
+    );
+    assert_eq!(container.seen("validations"), [digest(entry)]);
+    assert_eq!(container.snapshot(SOURCE), before, "the mount is unchanged");
+    assert!(
+        !container.state_holds(entry),
+        "no copy of the entry in state"
+    );
+}
+
 /// The configuration stage names the rule that refused, never a path:
 /// under an empty environment no path resolves; with an empty `HOME` no file
 /// is there; a group-readable file is not private; and another `owner_uid`.

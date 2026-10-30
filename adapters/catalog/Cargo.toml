@@ -8,7 +8,7 @@ license.workspace = true
 
 [features]
 default = ["service"]
-service = ["dep:connectors-host", "dep:connectors-oauth2", "dep:clap", "dep:tokio"]
+service = ["dep:connectors-host", "dep:connectors-oauth2", "dep:clap", "dep:tokio", "dep:ring"]
 
 [[bin]]
 name = "connectors-catalog-provider"
@@ -30,6 +30,7 @@ clap = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 sha2.workspace = true
 httpdate = "1.0.3"
+ring = { version = "0.17", optional = true }
 
 [dev-dependencies]
 entity-core.workspace = true
@@ -41,6 +42,7 @@ time.workspace = true
 rusqlite = { version = "=0.40.2", features = ["bundled"] }
 libc = "0.2"
 ring = "0.17"
+num-bigint = "0.4"
 tokio.workspace = true
 tempfile.workspace = true
 hex.workspace = true

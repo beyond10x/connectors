@@ -109,8 +109,10 @@ fn every_documented_identity_probe_is_a_value_of_the_catalog_identity_model() {
             "basic",
             "oauth2_refresh",
             "oauth2_client_credentials",
-            "oauth2_grant"
-        ])
+            "oauth2_grant",
+            "github_app"
+        ]),
+        "story:catalog-github-app-installation-token adds `github_app`"
     );
     // JSON Schema carries the model's invariants without enforcing them: the profile invariant is
     // checked by hand below, and here only that the model still states it.
@@ -126,6 +128,14 @@ fn every_documented_identity_probe_is_a_value_of_the_catalog_identity_model() {
             "the model no longer refuses a configured subject under `{scheme}`: {invariants}"
         );
     }
+    // story:catalog-github-app-installation-token: a `github_app` connection is the installation
+    // its entry names, so its identity is `configuration`, and the installation token travels as
+    // `Authorization: Bearer`.
+    assert!(
+        invariants.contains("not (scheme == github_app) or identity.source == configuration")
+            && invariants.contains("not (scheme == github_app) or bearer == true"),
+        "the model no longer confines `github_app` to a configured bearer profile: {invariants}"
+    );
     // A prefix is never beside `bearer: true`, and belongs to a token profile.
     assert!(
         invariants.contains("not (defined(prefix)) or not (bearer == true)")
@@ -161,8 +171,16 @@ fn every_documented_identity_probe_is_a_value_of_the_catalog_identity_model() {
         assert!(errors.is_empty(), "{guide}: {auth}: {errors:?}");
         let scheme = auth["scheme"].as_str().unwrap_or("token");
         assert!(
-            identity["source"] != "configuration" || ["token", "basic"].contains(&scheme),
-            "{guide}: a configured subject under `{scheme}`"
+            identity["source"] != "configuration"
+                || ["token", "basic", "github_app"].contains(&scheme),
+            "{guide}: a configured subject under `{scheme}` \
+             (story:catalog-github-app-installation-token admits `github_app`)"
+        );
+        // The installation is the connection, and its token a bearer token.
+        assert!(
+            scheme != "github_app"
+                || (identity["source"] == "configuration" && auth["bearer"] == true),
+            "{guide}: a `github_app` profile whose identity is not the configured installation"
         );
         assert!(
             identity["source"] != "id_token"
@@ -200,5 +218,12 @@ fn every_documented_identity_probe_is_a_value_of_the_catalog_identity_model() {
         .contains(&guide.as_str())
             && auth["identity"]["source"] == "configuration"),
         "the Runpod guide's configured identity was not read"
+    );
+    assert!(
+        documented
+            .iter()
+            .any(|(guide, auth)| guide == "local-catalog-provider.md"
+                && auth["scheme"] == "github_app"),
+        "the catalog guide's `github_app` profile was not read"
     );
 }
