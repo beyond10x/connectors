@@ -72,7 +72,10 @@ commands that called a standalone service are gone.
   `meta.after_cursor`. Without `meta.has_more`, a page with no `meta.after_cursor` or no audits
   ends the walk. A cursor seen before is an error. Sending `include_boundary_indicators: true` is
   recommended so that pages carry `has_more`. The catalog inventory now expands a deepObject
-  `page` that is either an offset number or cursor pairs into its cursor pairs.
+  `page` that is either an offset number or cursor pairs into its cursor pairs. The Zendesk
+  descriptor and the configuration revision of its guide change. An existing local entry keeps
+  working with the operations it names; add `ticket.audits` to its `operations` permission to use
+  it.
 
 ### Changed
 
