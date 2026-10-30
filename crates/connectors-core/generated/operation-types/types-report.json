@@ -1,12 +1,12 @@
 {
   "format": "ess-types-report/3",
-  "source_digest": "503006db7344c6fb103bd0dff091b4eadab55220141fd343b9c57f98f554790a",
+  "source_digest": "2fb402329c38a64ca55c451b162af9ebed1f61710312d6747861f60e16104bb5",
   "input": {
     "kind": "model",
     "system": "connectors",
     "specification_version": "v1",
     "contract_digest": "slice-sha256/2:fa0f2759122a9bbc9b98fab49e2f589d1d649e403f0cecb0abceb4d8fc44fe0f",
-    "projection_digest": "362822dba7251052b46b797676c33d1c20107c24c04790d49eed446572f0a7b4"
+    "projection_digest": "0f8762b25c44682e8ae0702ee392e95e457b419c369fa6c4c80da0628bfc324a"
   },
   "generator_version": "0.77.0",
   "target": "rust",

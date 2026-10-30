@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-29T21:26:19Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0592-mcp-long-read",
+  "kind": "release-plan",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "local full gate on 156cb04df: all checks passed, 3292/0 (re-run; first run failed only connectors-host printing_the_bootstrap_is_bounded_when_a_descendant_keeps_the_output, a 5 s bound under load); PR 219 checks 8/8 pass; merge db6050273, tree equal to the gated tree",
+    "reference": "https://github.com/beyond10x/connectors/pull/219"
+  }
+}

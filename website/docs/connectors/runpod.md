@@ -43,11 +43,11 @@ enabled = true
 ```
 
 ```sh
-connectors instances list
+connectors instances list | jq -c '.[] | arrays | .[]'
 ```
 
 ```json
-{"adapters":[{"adapter":"runpod.gpu","adapter_id":"catalog","connector":"runpod","instance":"gpu","instance_id":"runpod.gpu","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"connector":"runpod","instance":"gpu","instance_id":"runpod.gpu","restart":"never","startup":"on-demand"}
 ```
 
 ## Connect
@@ -64,14 +64,7 @@ Connecting proves the key with one `GET /v1/pods`.
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector runpod --instance gpu \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector runpod --instance gpu \
-  --operation pods.list | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector runpod --instance gpu \
-  --operation pods.list | jq -r .result.revision)
-connectors operations invoke --connector runpod --instance gpu --connection "$connection" \
-  --operation pods.list --schema "$schema" --revision "$revision" \
+connectors invoke runpod/gpu pods.list \
   --input-json '{"name":"worker-a","desiredStatus":"RUNNING"}'
 ```
 
@@ -96,10 +89,16 @@ Describe the pod in `create.json`, with a `name` unique to it:
           "env": {"MODE": "serve"}, "cloudType": "SECURE"}}
 ```
 
-Take the schema and revision of `pod.create` from `operations describe`, then prepare, issue and
-invoke:
+Take the connection, and the schema and revision of `pod.create` from `invoke --describe`, then
+prepare, issue and invoke:
 
 ```sh
+connection=$(connectors --output json connections list --connector runpod --instance gpu \
+  | jq -r '.result.connections[0].connection')
+schema=$(connectors --output json invoke runpod/gpu pod.create --describe \
+  | jq -r .result.schema)
+revision=$(connectors --output json invoke runpod/gpu pod.create --describe \
+  | jq -r .result.revision)
 connectors --output json approvals prepare --connector runpod --instance gpu \
   --connection "$connection" --operation pod.create \
   --schema "$schema" --revision "$revision" --input-file create.json
@@ -108,8 +107,7 @@ connectors approvals issue --connector runpod --instance gpu \
   --connection "$connection" --operation pod.create \
   --schema "$schema" --revision "$revision" --input-file create.json \
   --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-worker-a.json"
-connectors operations invoke --connector runpod --instance gpu --connection "$connection" \
-  --operation pod.create --schema "$schema" --revision "$revision" \
+connectors invoke runpod/gpu pod.create \
   --input-file create.json --approval-file "$HOME/private/proof-worker-a.json" \
   --idempotency-key worker-a
 ```

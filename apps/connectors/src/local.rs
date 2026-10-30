@@ -18,6 +18,8 @@ mod cursor;
 mod declarations;
 mod definition;
 mod dialects;
+mod endpoint;
+mod invoke;
 mod list;
 mod migrate;
 mod operations;
@@ -32,11 +34,13 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     if let Some(help) = connectors::help::render(&args) {
         return help_output(help, is_root_help(&args));
     }
-    // `operations invoke --definition` is prepared, and rewritten to select the
-    // definition's instance, before anything else reads the command line.
-    let args = match definition::prepare(args) {
+    // `invoke` is prepared before the generated runner reads the command line:
+    // its target (or `--definition`), connection and pins are resolved and
+    // stated, `--describe` is answered and a write without approval is
+    // refused.
+    let args = match invoke::prepare(args) {
         Ok(args) => args,
-        Err(refused) => return refused,
+        Err(answered) => return answered,
     };
     let deprecations = select::deprecations(&args);
     let json = select::json_output(&args);
@@ -47,15 +51,11 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     output
 }
 
-/// The help `connectors::help` rendered; root help is followed by the explicit
-/// service commands, which the generated tree does not carry.
+/// The help `connectors::help` rendered; root help is followed by the native
+/// integration command, which the generated tree does not carry.
 fn help_output(mut stdout: String, root: bool) -> connectors_cli_contract::ProcessOutput {
     if root {
         stdout.push_str("\nNative integration commands (use COMMAND --help for options):\n  server    Serve admitted read-only MCP tools over stdio\n");
-        stdout.push_str("\nExplicit service commands (use COMMAND --help for options):\n");
-        for (name, summary) in connectors::compat::SUMMARIES {
-            stdout.push_str(&format!("  {name:<8}  {summary}\n"));
-        }
     }
     connectors_cli_contract::ProcessOutput {
         exit_code: 0,
@@ -67,6 +67,12 @@ fn help_output(mut stdout: String, root: bool) -> connectors_cli_contract::Proce
 fn run_selected(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     let session = session::Session::new(&args);
     if let Some(output) = configuration_preflight(&session.borrow()) {
+        return output;
+    }
+    if let Some(output) = endpoint::prepare(&session.borrow()) {
+        return output;
+    }
+    if let Some(output) = connections::reconnect_revision(&session.borrow()) {
         return output;
     }
     let mut output = connectors_cli_contract::run(
@@ -131,6 +137,34 @@ impl Handler for LocalHandler {
     /// Every handler reads the selected alias in `adapter`, whichever selector
     /// named it; a result names its connector and instance beside it.
     fn call(&mut self, call: &Invocation<'_>) -> HandlerReply {
+        // `invoke` selects by its target and names the connector and instance
+        // itself (story:connectors-do-short-invocation).
+        if call.callable == "invoke" {
+            let session = self.0.borrow();
+            return invoke::dispatch(call, session.deadline, session.mutation_deadline);
+        }
+        // A connect's target selects as `--connector` and `--instance` do; its
+        // endpoint was written before the runner started.
+        let connect;
+        let call = if call.callable == "connections-connect" {
+            let mut input = match endpoint::selection(&call.input) {
+                Ok(input) => input,
+                Err(refusal) => return refusal,
+            };
+            if let Some(fields) = input.as_object_mut() {
+                fields.remove("endpoint");
+                fields.remove("target");
+            }
+            connect = Invocation {
+                callable: call.callable,
+                target: call.target,
+                context: call.context.clone(),
+                input,
+            };
+            &connect
+        } else {
+            call
+        };
         let (mut input, config) = match select::resolve(call) {
             Ok(resolved) => resolved,
             Err(refusal) => return refusal,
@@ -189,10 +223,6 @@ impl LocalHandler {
                         approval_failure(error)
                     }
                 })
-        } else if call.callable == "operations-invoke" {
-            let session = self.0.borrow();
-            return operations::dispatch(call, session.deadline, session.mutation_deadline)
-                .unwrap_or_else(invoke_failure);
         } else if call.callable == "connections-launch" {
             connections::launch(call).map(|code| {
                 self.0.borrow_mut().launched = Some(code);
@@ -364,8 +394,8 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
 
 /// `owner_failure` of `approvals policy-set`, `prepare` and `issue`: an
 /// `invalid_input` names the argument it refused, as the CLI input model names
-/// it (contracts/cli/v1alpha1/semantics.md, "The refused argument"). No other
-/// command carries `field`, an approved write's `operations invoke` included.
+/// it (contracts/cli/v1alpha1/semantics.md, "The refused argument"). `invoke`
+/// names its own arguments (`invoke::dispatch`); no other command carries `field`.
 fn approval_failure(error: owner::Error) -> HandlerReply {
     let field = error
         .field
@@ -624,21 +654,40 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
             }
         };
         let request = cursor::Request::parse(&call.input).map_err(refused)?;
-        let adapters = config
+        // Each instance by its connector and instance only; a legacy catalog
+        // entry no connector is derived for is no instance and is named in
+        // `unmigrated` (story:connectors-do-short-invocation). Each name is
+        // listed once, for the entry `invoke` and `--connector`/`--instance`
+        // select by it: a `[connectors]` instance over a legacy entry that
+        // derives the same names (`invoke::instances`).
+        let instances = invoke::instances(&config);
+        let listed = config
             .adapters
             .iter()
-            .map(|(alias, entry)| summary(alias, entry))
+            .filter_map(|(alias, entry)| {
+                let (connector, instance) = instances.get(alias)?;
+                Some((
+                    entry,
+                    json!({"connector":connector,"instance":instance,"instance_id":entry.instance_id,"startup":entry.startup,"restart":entry.restart}),
+                ))
+            })
             .collect::<Vec<_>>();
-        // The selection a cursor is bound to: every listed entry and the
+        // The selection a cursor is bound to: every listed instance and the
         // configuration revision it was listed under.
-        let source = config
-            .adapters
+        let source = listed
             .iter()
-            .zip(&adapters)
-            .map(|((_, entry), listed)| json!([entry.configuration_revision, listed]))
+            .map(|(entry, item)| json!([entry.configuration_revision, item]))
             .collect::<Value>();
-        let (range, next) = request.page(&source, adapters.len()).map_err(refused)?;
-        let mut result = json!({"adapters":adapters[range],"source":"configuration"});
+        let (range, next) = request.page(&source, listed.len()).map_err(refused)?;
+        let items = listed[range]
+            .iter()
+            .map(|(_, item)| item.clone())
+            .collect::<Vec<_>>();
+        let mut result = json!({"adapters":items,"source":"configuration"});
+        let unmigrated = invoke::unmigrated(&config);
+        if !unmigrated.is_empty() {
+            result["unmigrated"] = json!(unmigrated);
+        }
         if let Some(next) = next {
             result["next_cursor"] = json!(next);
         }

@@ -32,9 +32,11 @@ cargo run --locked -p connectors-build -- catalog \
 ```
 
 It carries all 652 operations of the pinned document. 35 are reported
-unsupported: `deepObject` query parameters this pass does not expand, each sent
-as one value as given (34 `page` parameters that also take an offset page
-number, and one nested `filter`); no shipped read is among them.
+unsupported: 34 `page` parameters that take either an offset page number or
+the cursor pairs, recorded as the pairs `page[after]`, `page[before]` and
+`page[size]` without the offset number (the shipped read `ticket.audits` is one
+of them), and one nested `filter` this pass does not expand, sent as one value
+as given.
 `adapters/catalog/tests/bundle_drift.rs` refuses a committed bundle or index a
 fresh run would not reproduce byte for byte.
 
@@ -51,12 +53,14 @@ The pinned document declares most parameters once under
 `components.parameters` and references them; the bundle reads those references
 as the parameters they name. `ListTicketComments` declares its cursor as the
 `deepObject` `page`, which the bundle records as the query parameters
-`page[after]`, `page[before]` and `page[size]`.
+`page[after]`, `page[before]` and `page[size]`. `ListAuditsForTicket` declares
+`page` as a `oneOf` of an offset page number and those pairs; the bundle records
+the pairs only.
 
 ## The shipped selection set
 
 [`adapters/catalog/providers/zendesk/operations.json`](../adapters/catalog/providers/zendesk/operations.json)
-exposes seven reads and three writes ([Writes](#writes)).
+exposes eight reads and three writes ([Writes](#writes)).
 `adapters/catalog/tests/zendesk.rs` pins this exact id list and each
 id's `operationId` and path in the pinned document, so a renamed or dropped id,
 or a source operation that moved, fails the gate. The bundle refuses at load any
@@ -70,7 +74,8 @@ end of a walk are in it.
 |---|---|---|---|---|---|
 | `tickets.incremental` | `IncrementalTicketExportCursor` | `GET /api/v2/incremental/tickets/cursor` | `start_time` on the first call, then `cursor`; `per_page` (amended) | `end_of_stream: true` | `start_time`, Unix seconds: tickets changed since |
 | `ticket.show` | `ShowTicket` | `GET /api/v2/tickets/{ticket_id}` | single item | n/a | none |
-| `ticket.comments` | `ListTicketComments` | `GET /api/v2/tickets/{ticket_id}/comments` | `page[size]`, `page[after]` | `meta.has_more: false` | none; deltas come from `tickets.incremental` |
+| `ticket.comments` | `ListTicketComments` | `GET /api/v2/tickets/{ticket_id}/comments` | `page[size]`, `page[after]` | `meta.has_more` decides when present; without it, no `meta.after_cursor` or no comments | none; deltas come from `tickets.incremental` |
+| `ticket.audits` | `ListAuditsForTicket` | `GET /api/v2/tickets/{ticket_id}/audits` | `page[size]`, `page[after]`; `include_boundary_indicators: true` recommended | `meta.has_more` decides when present; without it, no `meta.after_cursor` or no audits | none; deltas come from `tickets.incremental` |
 | `users.incremental` | `IncrementalUserExportCursor` | `GET /api/v2/incremental/users/cursor` | `start_time` on the first call, then `cursor`; `per_page` | `end_of_stream: true` | `start_time`, Unix seconds: users changed since |
 | `user.show` | `ShowUser` | `GET /api/v2/users/{user_id}` | single item | n/a | none |
 | `organizations.incremental` | `IncrementalOrganizationExport` | `GET /api/v2/incremental/organizations` | `start_time`, then the previous page's `end_time` as `start_time`; `per_page` | `end_of_stream: true` | `start_time`, Unix seconds: organizations changed since |
@@ -102,12 +107,44 @@ end of a walk are in it.
 - **`ticket.comments`** takes `ticket_id` and is read by cursor. The first call
   sends `page[size]` (the pinned description states at most 100 per page); each
   following call sends the previous page's `meta.after_cursor` as
-  `page[after]`. The walk ends on the page whose `meta.has_more` is `false`.
-  The pinned response schema declares only `comments`; `meta` and `links` come
-  from Zendesk's pagination guide, which the operation's description links.
+  `page[after]`. When a page carries `meta.has_more`, it decides: `false` ends
+  the walk, and `true` continues even past an empty page, and is an error when
+  the page has no `meta.after_cursor`. Without `meta.has_more`, the walk ends on
+  a page with no `meta.after_cursor` (absent or `null`) or with no comments. A
+  cursor seen before in the same walk is an error, so a walk cannot loop. The
+  pinned response schema declares only `comments`; `meta` and `links` come
+  from Zendesk's pagination guide, which the operation's description links,
+  and the operation has no parameter that asks for `has_more`.
   Offset paging (`per_page`, `sort_order`) is withheld by the selection, so an
   input carrying either is refused before any request. The engine sends the
   bracketed names percent-encoded: `page%5Bsize%5D=2&page%5Bafter%5D=…`.
+- **`ticket.audits`** takes `ticket_id` and walks one ticket's audits by
+  cursor as `ticket.comments` walks its comments: `page[size]` (at most 100 per
+  page), then the previous page's `meta.after_cursor` as `page[after]`, by the
+  same rule: `meta.has_more` decides when present (`false` ends, `true`
+  continues even past an empty page and is an error without
+  `meta.after_cursor`); without it, a page with no `meta.after_cursor` or no
+  audits ends the walk; a cursor seen before is an error. The pinned response
+  schema (`TicketAuditsResponseNoneCursor`) declares no `meta`, and the pinned
+  `include_boundary_indicators` "includes `has_more` indicator in the cursor
+  pagination response meta" when true, so sending
+  `"include_boundary_indicators": true` on every call is recommended: with
+  `has_more` present, an empty page in the middle of a walk does not end it.
+  Whether Zendesk leaves `has_more` out without it has not been checked
+  against a live account.
+  `sort_order` is withheld; the operation has no `per_page`, and the offset
+  page number is not declared. Each audit is returned as Zendesk sends it:
+  `author_id`, `created_at`, `via.channel`, `via.source.rel` and `events`, each
+  event with its `type` and `id`, a field change with `field_name`, `value` and
+  `previous_value`. It is not `ListTicketAudits` (`GET /api/v2/ticket_audits`),
+  which lists every ticket's audits.
+
+  ```sh
+  connectors invoke zendesk/support ticket.audits \
+    --input-json '{"ticket_id":101,"page[size]":100,"include_boundary_indicators":true}'
+  echo '{"ticket_id":101,"page[size]":100,"include_boundary_indicators":true,"page[after]":"<meta.after_cursor>"}' \
+    | connectors invoke zendesk/support ticket.audits
+  ```
 - **`ticket.show`**, **`user.show`** and **`organization.show`** take the
   numeric id from the path; tickets reference users (`requester_id`,
   `submitter_id`, `assignee_id`) and organizations (`organization_id`), and
@@ -145,7 +182,7 @@ reads, the profile's fields and the provider executable. The instance id is
 
 ```console
 $ connectors instances list
-{"adapters":[{"adapter":"zendesk.support","adapter_id":"catalog","connector":"zendesk","instance":"support","instance_id":"zendesk.support","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"adapters":[{"connector":"zendesk","instance":"support","instance_id":"zendesk.support","restart":"never","startup":"on-demand"}],"source":"configuration"}
 ```
 
 An installation configured before connectors were declared converts its
@@ -157,7 +194,7 @@ revision; the pinned form it writes is described in
 
 Three writes select the pinned `UpdateTicket`, each `effect: write`, so each
 runs only under an issued approval: through the local CLI, `approvals prepare`,
-`approvals issue` and `operations invoke` with the proof, and never on the read
+`approvals issue` and `invoke` with the proof, and never on the read
 transport. Each takes `ticket_id` and a `body` of the form
 `{"ticket": {...}}`, closed to the members below
 ([closed body keys](local-catalog-provider.md#configure-the-provider)); any other
@@ -240,16 +277,14 @@ does not cover a write. Move an existing install over in four steps:
 
 4. Connect with the [API token](#api-token-zendeskbasic) credential document
    (`connections connect --connector zendesk --instance support --profile
-   zendesk.basic --credential-file ~/private/zendesk.json`) and describe each
-   write for its `schema` and `revision`. For each write, put the input in a
-   file, `approvals prepare` it, pass the subject's digest to
+   zendesk.basic --credential-file ~/private/zendesk.json`) and take each write's
+   `schema` and `revision` from `connectors invoke zendesk/support <write> --describe`.
+   For each write, put the input in a file, `approvals prepare` it, pass the subject's digest to
    `approvals issue --approve-subject`, and invoke with the proof:
 
    ```sh
-   connectors operations invoke --connector zendesk --instance support \
-     --connection "$connection" --operation ticket.note \
-     --schema "$schema" --revision "$revision" --input-file note.json \
-     --approval-file "$proof_file" --idempotency-key "$business_key" --output json
+   connectors --output json invoke zendesk/support ticket.note --input-file note.json \
+     --approval-file "$proof_file" --idempotency-key "$business_key"
    ```
 
    ```json

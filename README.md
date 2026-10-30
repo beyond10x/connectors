@@ -92,20 +92,47 @@ installed beside `connectors`: the executable and its SHA-256, the configuration
 every operation. `default_instance` selects an instance for a command that names none.
 
 ```sh
-connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" instances list
+connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" instances list \
+  | jq -c '.[] | arrays | .[]'
 ```
 
 ```json
-{"adapters":[{"adapter":"gitlab.work","adapter_id":"catalog","connector":"gitlab","instance":"work","instance_id":"gitlab.work","restart":"never","startup":"on-demand"},{"adapter":"gmail.private","adapter_id":"catalog","connector":"gmail","instance":"private","instance_id":"gmail.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"connector":"gitlab","instance":"work","instance_id":"gitlab.work","restart":"never","startup":"on-demand"}
+{"connector":"gmail","instance":"private","instance_id":"gmail.private","restart":"never","startup":"on-demand"}
 ```
 
-Results keep the legacy `adapter` alias and the internal `adapter_id` beside `connector` and
-`instance` for the deprecation window.
+Each item names its instance by `connector` and `instance`. A legacy catalog entry for which no
+connector is derived is left out of the items and named in an `unmigrated` list instead; see
+[Move a legacy configuration](#move-a-legacy-configuration).
+
+`connections connect <connector>/<instance> --endpoint <url>` adds an instance with that endpoint,
+and the connector's table when it is missing, before it asks for the credential; every other
+byte of the file stays as it was. A different endpoint on an existing instance is refused and
+writes nothing.
 
 ### Select an instance
 
-A command that acts on one instance takes `--connector` and `--instance`; an instance name is
-unique within its connector only:
+`invoke` names its instance as `<connector>/<instance>`, then the operation, and reads the input
+from standard input when no input flag is given:
+
+```sh
+printf '{"id":"group/project","merge_request_iid":9}' \
+  | connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
+    invoke gitlab/work merge_request.get
+```
+
+The instance may be left out while its connector has one. With a second GitLab instance `oss`
+in the file, `invoke gitlab merge_request.get` is refused, exit status 2, naming both:
+
+```text
+failure: {"code":"instance_ambiguous","instances":["gitlab/oss","gitlab/work"],"kind":"usage","next_action":"none","stage":"arguments"}
+```
+
+`invoke` does not read `default_instance`. The connection, schema and revision default to the
+instance's own, and `invoke <connector>/<instance> <operation> --describe` prints the operation's
+input schema, effect, schema and revision without calling the provider. Other commands that act
+on one instance take `--connector` and `--instance`; an instance name is unique within its
+connector only:
 
 ```sh
 connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
@@ -113,7 +140,7 @@ connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
 ```
 
 ```json
-{"connections":[],"observed_at_ms":1792181808006,"source":"authority","stale":false,"valid_until_ms":1792182108006}
+{"connections":[],"observed_at_ms":1793314944444,"source":"authority","stale":false,"valid_until_ms":1793315244444}
 ```
 
 The deprecated `--adapter <alias>` still selects the same instance (`--adapter gitlab.work`) and
@@ -175,8 +202,13 @@ instead, whose value prints no token in `Debug` or `Display`.
 
 ### Move a legacy configuration
 
-A legacy `[adapters.<alias>]` entry keeps working: it is selected as connector `adapter_id`,
-instance `<alias>`, until it is moved. `setup migrate` moves each catalog entry whose provider
+A legacy `[adapters.<alias>]` entry keeps working until it is moved. A catalog entry is named by
+the connector `setup migrate` derives for it and its alias (`gitlab/forge` below); any other entry
+by its `adapter_id` and its alias. A catalog entry no connector is derived for, such as a
+legacy-format Slack or OpenRouter entry, is no instance: `instances list` names it in
+`unmigrated`, and selecting it is `invalid_configuration` with the rule
+`legacy_entry_unmigrated`. Its replacement is a `[connectors.<connector>]` instance.
+`setup migrate` moves each catalog entry whose provider
 ships a connector to `[connectors.<connector>.instances.<alias>]`, keeping its instance id,
 configuration revision, executable and custody item names byte for byte, so its connections and
 approval policy stay valid with no new consent. Other entries stay where they are, each with its
@@ -245,8 +277,11 @@ for a container with no keyring, which refuses OAuth refresh and approval signin
 ([§5.2](contracts/auth/custody/v1alpha1/semantics.md#52-the-read-only-mounted-secret-binding),
 [guide](docs/local-mounted-secret-custody.md)); on macOS the login keychain; on Windows the
 Credential Manager. Kubernetes and SQL also run as separate Rust services, which advertise no
-writes; writes run only through the local CLI under approval. MCP has specified contracts and no
-runtime; the two decision blockers on its contracts are cleared
+writes; writes run only through the local CLI under approval. On Linux,
+`connectors server --transport stdio` is a local MCP server that offers admitted read-only
+operations as tools through the same owner and custody ([guide](docs/local-mcp-stdio.md)); it
+offers no resources, prompts, writes or outbound MCP, and on macOS and Windows it exits with
+`mcp_unavailable`. The two decision blockers on the MCP contracts are cleared
 ([MCP](https://beyond10x.github.io/connectors/docs/connectors/mcp/)).
 
 ## Get started

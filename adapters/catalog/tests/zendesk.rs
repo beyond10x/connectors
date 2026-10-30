@@ -68,7 +68,7 @@ const ORGANIZATION_END: u64 = 1_758_003_600;
 
 /// The shipped ids, their pinned `operationId` and their pinned path. A
 /// renamed, dropped or added id fails here.
-const SHIPPED: [(&str, &str, &str); 7] = [
+const SHIPPED: [(&str, &str, &str); 8] = [
     (
         "organization.show",
         "ShowOrganization",
@@ -78,6 +78,13 @@ const SHIPPED: [(&str, &str, &str); 7] = [
         "organizations.incremental",
         "IncrementalOrganizationExport",
         "/api/v2/incremental/organizations",
+    ),
+    // story:catalog-zendesk-ticket-audits: one ticket's audits, not
+    // `ListTicketAudits` (`GET /api/v2/ticket_audits`, every ticket's).
+    (
+        "ticket.audits",
+        "ListAuditsForTicket",
+        "/api/v2/tickets/{ticket_id}/audits",
     ),
     (
         "ticket.comments",
@@ -114,6 +121,21 @@ const WRITES: [(&str, &str, &str); 3] = [
     ),
 ];
 
+/// story:catalog-zendesk-ticket-audits: the walk rules a caller follows, the
+/// same text connectors-definitions ships. The pinned cursor responses
+/// declare no `meta`: `has_more` decides when present, an empty page ends a
+/// walk only without it, and a repeated cursor is an error.
+const AUDITS_DESCRIPTION: &str = "List one ticket's audits by cursor, one page per call; the \
+     walk sends meta.after_cursor as page[after]. When meta.has_more is present it decides: \
+     false ends the walk, true continues even past an empty page and is an error without \
+     meta.after_cursor. Without meta.has_more the walk ends on a page with no \
+     meta.after_cursor or no audits. A cursor seen before is an error.";
+const COMMENTS_DESCRIPTION: &str = "List one ticket's comments by cursor, one page per call; \
+     the walk sends meta.after_cursor as page[after]. When meta.has_more is present it \
+     decides: false ends the walk, true continues even past an empty page and is an error \
+     without meta.after_cursor. Without meta.has_more the walk ends on a page with no \
+     meta.after_cursor or no comments. A cursor seen before is an error.";
+
 /// The first line of every draft reply, fixed by the selection.
 const DRAFT_MARKER: &str = "[Draft reply - not sent to the requester]\n";
 /// The fixture ticket's `updated_at`, which a write's `updated_stamp` must
@@ -136,6 +158,9 @@ fn committed() -> bundle::Bundle {
     bundle::load(&root().join("generated/bundles"), "zendesk").unwrap()
 }
 
+/// The shipped reads and writes. The name predates `ticket.audits`
+/// (story:catalog-zendesk-ticket-audits) and is kept because
+/// `crates/connectors-docs/src/status.rs` cites it; `SHIPPED` holds eight.
 #[test]
 fn shipped_zendesk_selections_are_the_seven_reads_and_three_writes() {
     let selections = shipped();
@@ -315,6 +340,86 @@ fn each_read_declares_the_pinned_parameters_and_the_comment_cursor_pairs() {
         .find(|s| s.id == "ticket.comments")
         .unwrap();
     assert_eq!(comments.withhold, ["per_page", "sort_order"]);
+    // story:catalog-zendesk-ticket-audits: the audits' `page` is a `deepObject`
+    // over an offset page number or the cursor pairs; only the pairs are
+    // declared, so offset paging is not reachable. The pinned operation has no
+    // `per_page`, so of the comments' withholding only `sort_order` applies.
+    assert_eq!(
+        names("ListAuditsForTicket"),
+        [
+            "ticket_id",
+            "page[after]",
+            "page[before]",
+            "page[size]",
+            "sort",
+            "include",
+            "include_boundary_indicators",
+            "include_item_cursors",
+            "filter_events",
+            "sort_order"
+        ]
+    );
+    let audits = shipped()
+        .into_iter()
+        .find(|s| s.id == "ticket.audits")
+        .unwrap();
+    assert_eq!(audits.withhold, ["sort_order"]);
+    // The walk ends on `meta.has_more: false`, which the pinned document
+    // includes when `include_boundary_indicators` is true. It stays a caller
+    // input: the connectors-definitions notation the shipped file round-trips
+    // through (`crates/connectors-catalog/tests/definition_import.rs`) has no
+    // fixed query.
+    assert!(audits.query_fixed.is_empty());
+}
+
+/// story:catalog-zendesk-ticket-audits: `ticket.audits` is listed as a read
+/// with the description the connectors-definitions operation carries, and it
+/// needs no approval: protocol two lists it as no write requirement.
+#[test]
+fn ticket_audits_is_listed_as_a_read_without_approval_and_its_description() {
+    let bundle = committed();
+    let engine = Engine::new(&bundle, BASE, &shipped()).unwrap();
+    let declared = engine
+        .declarations(&[Effect::Read])
+        .into_iter()
+        .find(|o| o.id == "ticket.audits")
+        .expect("`ticket.audits` is not listed as a read");
+    assert_eq!(declared.description, AUDITS_DESCRIPTION);
+    let comments = engine
+        .declarations(&[Effect::Read])
+        .into_iter()
+        .find(|o| o.id == "ticket.comments")
+        .unwrap();
+    assert_eq!(comments.description, COMMENTS_DESCRIPTION);
+    assert_eq!(engine.effect("ticket.audits"), Some(Effect::Read));
+    // The input that makes Zendesk include `meta.has_more` is declared.
+    assert_eq!(
+        declared.input_schema["properties"]["include_boundary_indicators"]["anyOf"][0]["type"],
+        "boolean",
+        "{}",
+        declared.input_schema
+    );
+    assert!(
+        engine
+            .declarations(&[Effect::Write])
+            .iter()
+            .all(|o| o.id != "ticket.audits")
+    );
+    // Protocol two lists every operation with its effect; an approval policy
+    // can name only a write, so a read's entry is what makes it need none.
+    let provider = Provider::writing();
+    let child = Child::spawn(&provider.selection()).unwrap();
+    let listed: Vec<_> = child
+        .bootstrap()
+        .requirements
+        .iter()
+        .filter(|r| r.operation == "ticket.audits")
+        .collect();
+    assert!(
+        listed.iter().all(|r| r.effect == runtime::Effect::Read),
+        "`ticket.audits` is listed as a write requirement"
+    );
+    assert!(provider.requests().is_empty());
 }
 
 #[test]
@@ -345,7 +450,16 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
             "ListTicketComments",
             "/api/v2/tickets/{ticket_id}/comments",
             "`page[size]`, `page[after]`",
-            "`meta.has_more: false`",
+            "`meta.has_more` decides when present; without it, no `meta.after_cursor` or no comments",
+            "`tickets.incremental`",
+        ),
+        // story:catalog-zendesk-ticket-audits
+        (
+            "ticket.audits",
+            "ListAuditsForTicket",
+            "/api/v2/tickets/{ticket_id}/audits",
+            "`page[size]`, `page[after]`",
+            "`meta.has_more` decides when present; without it, no `meta.after_cursor` or no audits",
             "`tickets.incremental`",
         ),
         (
@@ -475,6 +589,41 @@ fn comment(id: u64) -> Value {
     json!({"id": id, "type": "Comment", "author_id": 201, "public": true,
            "body": format!("fixture comment {id}"), "created_at": "2025-09-15T09:00:00Z"})
 }
+/// story:catalog-zendesk-ticket-audits: synthetic audits of ticket 101, shaped
+/// like the pinned `TicketAuditObject`. Audit 1 creates the ticket by web form
+/// with its first comment, audit 2 is a trigger's field changes with an
+/// internal note, audit 3 an API change of one field.
+fn audit(id: u64) -> Value {
+    match id {
+        1 => json!({"id": 9101, "ticket_id": 101, "author_id": 201,
+                    "created_at": "2025-09-15T08:00:00Z",
+                    "via": {"channel": "web", "source": {"from": {}, "to": {}, "rel": null}},
+                    "metadata": {"system": {"client": "fixture"}, "custom": {}},
+                    "events": [
+                        {"id": 9201, "type": "Comment", "author_id": 201, "public": true,
+                         "body": "fixture comment 1", "attachments": []},
+                        {"id": 9202, "type": "Create", "field_name": "status", "value": "new"},
+                        {"id": 9203, "type": "Create", "field_name": "priority", "value": "normal"}]}),
+        2 => json!({"id": 9102, "ticket_id": 101, "author_id": 200,
+                    "created_at": "2025-09-15T09:00:00Z",
+                    "via": {"channel": "rule",
+                            "source": {"from": {"id": 5001, "title": "fixture trigger"},
+                                       "to": {}, "rel": "trigger"}},
+                    "events": [
+                        {"id": 9204, "type": "Comment", "author_id": 200, "public": false,
+                         "body": "fixture comment 2", "attachments": []},
+                        {"id": 9205, "type": "Change", "field_name": "status",
+                         "value": "open", "previous_value": "new"},
+                        {"id": 9206, "type": "Change", "field_name": "tags",
+                         "value": ["fixture", "triaged"], "previous_value": ["fixture"]}]}),
+        _ => json!({"id": 9100 + id, "ticket_id": 101, "author_id": 200,
+                    "created_at": "2025-09-16T10:00:00Z",
+                    "via": {"channel": "api", "source": {"from": {}, "to": {}, "rel": null}},
+                    "events": [
+                        {"id": 9207, "type": "Change", "field_name": "priority",
+                         "value": "high", "previous_value": "normal"}]}),
+    }
+}
 
 /// The recorded bodies the fixture serves, keyed by route and paging position.
 /// Each list has three items over two pages; `None` for anything else, which
@@ -509,6 +658,79 @@ fn page(path: &str) -> Option<Value> {
             "meta": {"has_more": true, "after_cursor": "fixture-comment-cursor-2",
                      "before_cursor": "fixture-comment-cursor-1"},
             "links": {"next": "https://fixture.example.com/api/v2/tickets/101/comments?page%5Bafter%5D=fixture-comment-cursor-2&page%5Bsize%5D=2",
+                      "prev": null}}),
+        // story:catalog-zendesk-ticket-audits: the pinned document's
+        // `include_boundary_indicators` "includes `has_more` indicator in the
+        // cursor pagination response meta" when true, so the stand-in serves
+        // `meta.has_more` only when the request carries it.
+        // Without the indicator the last page carries no `has_more` and a
+        // null `after_cursor`; with it, `has_more: false` beside a cursor, so
+        // only `has_more` ends that walk.
+        "/api/v2/tickets/101/audits" => {
+            let last = has("page%5Bafter%5D=fixture-audit-cursor-2");
+            let indicated = has("include_boundary_indicators=true");
+            let mut meta = if last {
+                json!({"has_more": false, "after_cursor": "fixture-audit-cursor-3",
+                       "before_cursor": "fixture-audit-cursor-2"})
+            } else {
+                json!({"has_more": true, "after_cursor": "fixture-audit-cursor-2",
+                       "before_cursor": "fixture-audit-cursor-1"})
+            };
+            if !indicated {
+                meta.as_object_mut().unwrap().remove("has_more");
+                if last {
+                    meta["after_cursor"] = Value::Null;
+                }
+            }
+            if last {
+                json!({"audits": [audit(3)], "meta": meta,
+                       "links": {"next": null, "prev": null}})
+            } else {
+                json!({"audits": [audit(1), audit(2)], "meta": meta,
+                       "links": {"next": "https://fixture.example.com/api/v2/tickets/101/audits?page%5Bafter%5D=fixture-audit-cursor-2&page%5Bsize%5D=2&include_boundary_indicators=true",
+                                 "prev": null}})
+            }
+        }
+        // story:catalog-zendesk-ticket-audits: ticket 104's second page is
+        // empty while `has_more` is true; its third page holds a later audit.
+        "/api/v2/tickets/104/audits" if has("page%5Bafter%5D=fixture-audit-cursor-b") => json!({
+            "audits": [audit(2)],
+            "meta": {"has_more": false, "after_cursor": "fixture-audit-cursor-c",
+                     "before_cursor": "fixture-audit-cursor-b"},
+            "links": {"next": null, "prev": null}}),
+        "/api/v2/tickets/104/audits" if has("page%5Bafter%5D=fixture-audit-cursor-a") => json!({
+            "audits": [],
+            "meta": {"has_more": true, "after_cursor": "fixture-audit-cursor-b",
+                     "before_cursor": "fixture-audit-cursor-a"},
+            "links": {"next": null, "prev": null}}),
+        "/api/v2/tickets/104/audits" => json!({
+            "audits": [audit(1)],
+            "meta": {"has_more": true, "after_cursor": "fixture-audit-cursor-a",
+                     "before_cursor": null},
+            "links": {"next": null, "prev": null}}),
+        // Ticket 105 says `has_more: true` and names no cursor.
+        "/api/v2/tickets/105/audits" => json!({
+            "audits": [audit(1)],
+            "meta": {"has_more": true, "before_cursor": null},
+            "links": {"next": null, "prev": null}}),
+        // Ticket 106's second page names the cursor that fetched it again.
+        "/api/v2/tickets/106/audits" => json!({
+            "audits": [audit(1)],
+            "meta": {"has_more": true, "after_cursor": "fixture-audit-cursor-r",
+                     "before_cursor": null},
+            "links": {"next": null, "prev": null}}),
+        // story:catalog-zendesk-ticket-audits: ticket 103's second page is
+        // empty, with neither `has_more` nor a null cursor to end on.
+        "/api/v2/tickets/103/audits" if has("page%5Bafter%5D=fixture-audit-cursor-e") => json!({
+            "audits": [],
+            "meta": {"after_cursor": "fixture-audit-cursor-f",
+                     "before_cursor": "fixture-audit-cursor-e"},
+            "links": {"next": "https://fixture.example.com/api/v2/tickets/103/audits?page%5Bafter%5D=fixture-audit-cursor-f&page%5Bsize%5D=2",
+                      "prev": null}}),
+        "/api/v2/tickets/103/audits" => json!({
+            "audits": [audit(3)],
+            "meta": {"after_cursor": "fixture-audit-cursor-e", "before_cursor": null},
+            "links": {"next": "https://fixture.example.com/api/v2/tickets/103/audits?page%5Bafter%5D=fixture-audit-cursor-e&page%5Bsize%5D=2",
                       "prev": null}}),
         "/api/v2/incremental/users/cursor" if has("cursor=fixture-user-cursor-2") => json!({
             "users": [user(203)], "after_cursor": "fixture-user-cursor-3",
@@ -831,7 +1053,7 @@ fn connecting_records_the_current_user_as_the_identity() {
 
 /// Each read's first request: the input, and the exact request the fixture
 /// must observe, including the `start_time` filter on the exports.
-fn first_pages() -> [(&'static str, Value, String); 7] {
+fn first_pages() -> [(&'static str, Value, String); 8] {
     [
         (
             "tickets.incremental",
@@ -849,6 +1071,12 @@ fn first_pages() -> [(&'static str, Value, String); 7] {
             "ticket.comments",
             json!({"ticket_id": 101, "page[size]": 2}),
             "/api/v2/tickets/101/comments?page%5Bsize%5D=2".into(),
+        ),
+        // story:catalog-zendesk-ticket-audits
+        (
+            "ticket.audits",
+            json!({"ticket_id": 101, "page[size]": 2, "include_boundary_indicators": true}),
+            "/api/v2/tickets/101/audits?page%5Bsize%5D=2&include_boundary_indicators=true".into(),
         ),
         (
             "users.incremental",
@@ -921,6 +1149,14 @@ fn a_withheld_or_undeclared_parameter_is_refused_before_any_request() {
             "ticket.comments",
             json!({"ticket_id": 101, "sort_order": "desc"}),
         ),
+        // story:catalog-zendesk-ticket-audits: offset paging and offset sort
+        // on the audits; the operation declares no `per_page` at all.
+        ("ticket.audits", json!({"ticket_id": 101, "page": 2})),
+        ("ticket.audits", json!({"ticket_id": 101, "per_page": 2})),
+        (
+            "ticket.audits",
+            json!({"ticket_id": 101, "sort_order": "desc"}),
+        ),
         // The ticket export's `per_page` is bounded to Zendesk's 1 to 1,000.
         (
             "tickets.incremental",
@@ -971,16 +1207,75 @@ fn next(operation: &str, input: &Value, body: &Value) -> Option<Value> {
             }
             input["start_time"] = body["end_time"].clone();
         }
-        // `meta.has_more: false`; otherwise `meta.after_cursor` as `page[after]`.
-        "ticket.comments" => {
-            if body["meta"]["has_more"] == json!(false) {
-                return None;
-            }
-            input["page[after]"] = body["meta"]["after_cursor"].clone();
-        }
+        // story:catalog-zendesk-ticket-audits: `cursor_step`; a repeated
+        // cursor is checked by the walker that holds the cursors seen.
+        "ticket.comments" | "ticket.audits" => match cursor_step(operation, body) {
+            Ok(Some(cursor)) => input["page[after]"] = json!(cursor),
+            Ok(None) => return None,
+            Err(error) => panic!("`{operation}`: {error}"),
+        },
         other => panic!("`{other}` is not a list"),
     }
     Some(input)
+}
+
+/// story:catalog-zendesk-ticket-audits: one step of the cursor walk the
+/// `ticket.audits` and `ticket.comments` descriptions state, read from one
+/// page: the cursor to send as `page[after]`, `None` when the walk ends, or
+/// the error. When `meta.has_more` is present it decides: `false` ends,
+/// `true` continues even past an empty page and is an error without
+/// `meta.after_cursor`. Without it, a page with no `meta.after_cursor` or no
+/// items ends the walk.
+fn cursor_step(operation: &str, body: &Value) -> Result<Option<String>, String> {
+    let items = operation.strip_prefix("ticket.").unwrap();
+    let meta = &body["meta"];
+    let cursor = meta["after_cursor"].as_str().map(str::to_owned);
+    match meta.get("has_more") {
+        Some(Value::Bool(false)) => Ok(None),
+        Some(Value::Bool(true)) => cursor
+            .map(Some)
+            .ok_or_else(|| "meta.has_more is true without meta.after_cursor".to_owned()),
+        Some(other) => Err(format!("meta.has_more is not a boolean: {other}")),
+        None if body[items].as_array().is_none_or(Vec::is_empty) => Ok(None),
+        None => Ok(cursor),
+    }
+}
+
+/// story:catalog-zendesk-ticket-audits: a whole walk as the description
+/// states it, on the read transport: the pages read, the targets the
+/// stand-in saw, and the error that stopped it, if one did. A cursor seen
+/// before is an error, so the walk cannot loop; ten pages is a walker defect.
+struct Walk {
+    pages: Vec<Value>,
+    targets: Vec<String>,
+    error: Option<String>,
+}
+fn walk(operation: &str, input: Value) -> Walk {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let mut input = input;
+    let mut pages = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
+    let error = loop {
+        let result = invoke(&mut child, operation, &input);
+        assert_eq!(result["status"], 200);
+        pages.push(result["body"].clone());
+        match cursor_step(operation, pages.last().unwrap()) {
+            Ok(None) => break None,
+            Err(error) => break Some(error),
+            Ok(Some(cursor)) if !seen.insert(cursor.clone()) => {
+                break Some(format!("cursor `{cursor}` was seen before"));
+            }
+            Ok(Some(cursor)) => input["page[after]"] = json!(cursor),
+        }
+        assert!(pages.len() < 10, "the walker did not stop: {pages:?}");
+    };
+    let targets = provider.requests().into_iter().map(|(t, _)| t).collect();
+    Walk {
+        pages,
+        targets,
+        error,
+    }
 }
 
 #[test]
@@ -998,6 +1293,13 @@ fn each_list_walks_two_pages_and_stops_at_its_documented_end_condition() {
             "ticket.comments",
             "comments",
             "/api/v2/tickets/101/comments?page%5Bafter%5D=fixture-comment-cursor-2&page%5Bsize%5D=2"
+                .to_owned(),
+        ),
+        // story:catalog-zendesk-ticket-audits
+        (
+            "ticket.audits",
+            "audits",
+            "/api/v2/tickets/101/audits?page%5Bafter%5D=fixture-audit-cursor-2&page%5Bsize%5D=2&include_boundary_indicators=true"
                 .to_owned(),
         ),
         (
@@ -1037,6 +1339,254 @@ fn each_list_walks_two_pages_and_stops_at_its_documented_end_condition() {
             .collect();
         assert_eq!(requests, [expected, second], "`{operation}` requests");
     }
+}
+
+/// story:catalog-zendesk-ticket-audits: each audit `ticket.audits` returns
+/// keeps what a reader rebuilding the ticket's history needs: the author, the
+/// time, the channel and `via.source.rel`, every event with its type, and
+/// for a field change its field, value and previous value, and the id of the
+/// comment event the audit carried.
+#[test]
+fn ticket_audits_keeps_author_time_via_field_changes_and_the_comment_id() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    // Without the boundary indicator the stand-in, as the pinned parameter
+    // describes Zendesk, leaves `meta.has_more` out; the cursor and
+    // `links.next` are kept either way.
+    let bare = invoke(
+        &mut child,
+        "ticket.audits",
+        &json!({"ticket_id": 101, "page[size]": 2}),
+    );
+    assert_eq!(bare["body"]["meta"].get("has_more"), None);
+    assert_eq!(
+        bare["body"]["meta"]["after_cursor"],
+        "fixture-audit-cursor-2"
+    );
+    assert!(bare["body"]["links"]["next"].is_string());
+    let mut input = json!({"ticket_id": 101, "page[size]": 2, "include_boundary_indicators": true});
+    let mut audits = Vec::new();
+    let last = loop {
+        let result = invoke(&mut child, "ticket.audits", &input);
+        assert_eq!(result["status"], 200);
+        let body = result["body"].clone();
+        audits.extend(body["audits"].as_array().unwrap().clone());
+        match next("ticket.audits", &input, &body) {
+            Some(following) => input = following,
+            None => break body,
+        }
+        assert!(audits.len() < 10, "the walk did not stop");
+    };
+    assert_eq!(audits.len(), 3);
+    // The last page keeps the signal that ends the walk.
+    assert_eq!(last["meta"]["has_more"], false);
+    assert_eq!(last["links"]["next"], Value::Null);
+    for (index, kept) in audits.iter().enumerate() {
+        let served = audit(index as u64 + 1);
+        for pointer in [
+            "/author_id",
+            "/created_at",
+            "/via/channel",
+            "/via/source/rel",
+            "/events",
+        ] {
+            assert!(served.pointer(pointer).is_some(), "fixture lacks {pointer}");
+            assert_eq!(
+                kept.pointer(pointer),
+                served.pointer(pointer),
+                "audit {index} {pointer}"
+            );
+        }
+    }
+    assert_eq!(audits[1]["author_id"], 200);
+    assert_eq!(audits[1]["created_at"], "2025-09-15T09:00:00Z");
+    assert_eq!(audits[1]["via"]["channel"], "rule");
+    assert_eq!(audits[1]["via"]["source"]["rel"], "trigger");
+    let events = |audit: &Value| audit["events"].as_array().unwrap().clone();
+    let change = events(&audits[1])
+        .into_iter()
+        .find(|e| e["type"] == "Change" && e["field_name"] == "status")
+        .expect("the status change event");
+    assert_eq!(change["value"], "open");
+    assert_eq!(change["previous_value"], "new");
+    let tags = events(&audits[1])
+        .into_iter()
+        .find(|e| e["field_name"] == "tags")
+        .expect("the tags change event");
+    assert_eq!(tags["previous_value"], json!(["fixture"]));
+    let comments: Vec<Value> = audits
+        .iter()
+        .flat_map(events)
+        .filter(|e| e["type"] == "Comment")
+        .map(|e| e["id"].clone())
+        .collect();
+    assert_eq!(comments, [json!(9201), json!(9204)]);
+    let last = events(&audits[2]);
+    assert_eq!(last[0]["field_name"], "priority");
+    assert_eq!(last[0]["previous_value"], "normal");
+}
+
+/// story:catalog-zendesk-ticket-audits: the shipped `ticket.audits` and
+/// `ticket.comments` descriptions state `clause`, so a caller is told the
+/// rule the walker follows.
+fn states(clause: &str) {
+    for (id, items) in [("ticket.audits", "audits"), ("ticket.comments", "comments")] {
+        let description = shipped()
+            .into_iter()
+            .find(|s| s.id == id)
+            .and_then(|s| s.description)
+            .unwrap();
+        let clause = clause.replace("{items}", items);
+        assert!(
+            description.contains(&clause),
+            "`{id}` does not state `{clause}`: {description}"
+        );
+    }
+}
+
+/// story:catalog-zendesk-ticket-audits: with the boundary indicator the last
+/// page says `has_more: false` beside a cursor, and the walk ends there.
+#[test]
+fn ticket_audits_walk_ends_on_a_page_with_has_more_false() {
+    states("When meta.has_more is present it decides: false ends the walk");
+    let walked = walk(
+        "ticket.audits",
+        json!({"ticket_id": 101, "page[size]": 2, "include_boundary_indicators": true}),
+    );
+    assert_eq!(walked.error, None);
+    assert_eq!(walked.pages.len(), 2);
+    let last = &walked.pages[1];
+    assert_eq!(last["meta"]["has_more"], false);
+    assert!(last["meta"]["after_cursor"].is_string());
+    assert_eq!(
+        walked.targets,
+        [
+            "/api/v2/tickets/101/audits?page%5Bsize%5D=2&include_boundary_indicators=true",
+            "/api/v2/tickets/101/audits?page%5Bafter%5D=fixture-audit-cursor-2&page%5Bsize%5D=2&include_boundary_indicators=true",
+        ]
+    );
+}
+
+/// story:catalog-zendesk-ticket-audits: without the boundary indicator no
+/// page carries `has_more`; the last page's null `after_cursor` ends the walk.
+#[test]
+fn ticket_audits_walk_ends_on_a_page_without_has_more_and_a_null_cursor() {
+    states("Without meta.has_more the walk ends on a page with no meta.after_cursor");
+    let walked = walk("ticket.audits", json!({"ticket_id": 101, "page[size]": 2}));
+    assert_eq!(walked.error, None);
+    assert_eq!(walked.pages.len(), 2);
+    assert!(
+        walked
+            .pages
+            .iter()
+            .all(|p| p["meta"].get("has_more").is_none())
+    );
+    let last = &walked.pages[1];
+    assert_eq!(last["meta"]["after_cursor"], Value::Null);
+    assert_eq!(last["audits"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        walked.targets,
+        [
+            "/api/v2/tickets/101/audits?page%5Bsize%5D=2",
+            "/api/v2/tickets/101/audits?page%5Bafter%5D=fixture-audit-cursor-2&page%5Bsize%5D=2",
+        ]
+    );
+}
+
+/// story:catalog-zendesk-ticket-audits: without `has_more`, a page with no
+/// audits ends the walk even though it still names a cursor.
+#[test]
+fn ticket_audits_walk_without_has_more_ends_on_an_empty_page() {
+    states(
+        "Without meta.has_more the walk ends on a page with no meta.after_cursor or no {items}.",
+    );
+    let walked = walk("ticket.audits", json!({"ticket_id": 103, "page[size]": 2}));
+    assert_eq!(walked.error, None);
+    assert_eq!(walked.pages.len(), 2);
+    let last = &walked.pages[1];
+    assert_eq!(last["audits"], json!([]));
+    assert!(last["meta"].get("has_more").is_none());
+    assert!(last["meta"]["after_cursor"].is_string());
+    assert_eq!(
+        walked.targets,
+        [
+            "/api/v2/tickets/103/audits?page%5Bsize%5D=2",
+            "/api/v2/tickets/103/audits?page%5Bafter%5D=fixture-audit-cursor-e&page%5Bsize%5D=2",
+        ]
+    );
+}
+
+/// story:catalog-zendesk-ticket-audits: an empty page in the middle that says
+/// `has_more: true` and names a cursor is walked past, so the audits after
+/// it are not lost.
+#[test]
+fn ticket_audits_walk_continues_past_an_empty_page_with_has_more_true() {
+    states("true continues even past an empty page");
+    let walked = walk(
+        "ticket.audits",
+        json!({"ticket_id": 104, "page[size]": 2, "include_boundary_indicators": true}),
+    );
+    assert_eq!(walked.error, None);
+    assert_eq!(walked.pages.len(), 3);
+    assert_eq!(walked.pages[1]["audits"], json!([]));
+    assert_eq!(walked.pages[1]["meta"]["has_more"], true);
+    let ids: Vec<Value> = walked
+        .pages
+        .iter()
+        .flat_map(|p| p["audits"].as_array().unwrap().clone())
+        .map(|a| a["id"].clone())
+        .collect();
+    assert_eq!(ids, [json!(9101), json!(9102)]);
+    assert_eq!(
+        walked.targets,
+        [
+            "/api/v2/tickets/104/audits?page%5Bsize%5D=2&include_boundary_indicators=true",
+            "/api/v2/tickets/104/audits?page%5Bafter%5D=fixture-audit-cursor-a&page%5Bsize%5D=2&include_boundary_indicators=true",
+            "/api/v2/tickets/104/audits?page%5Bafter%5D=fixture-audit-cursor-b&page%5Bsize%5D=2&include_boundary_indicators=true",
+        ]
+    );
+}
+
+/// story:catalog-zendesk-ticket-audits: `has_more: true` with no cursor to
+/// send is an error, not an end: the walk cannot tell it read everything.
+#[test]
+fn ticket_audits_walk_with_has_more_true_and_no_cursor_is_an_error() {
+    states("true continues even past an empty page and is an error without meta.after_cursor.");
+    let walked = walk(
+        "ticket.audits",
+        json!({"ticket_id": 105, "page[size]": 2, "include_boundary_indicators": true}),
+    );
+    assert_eq!(walked.pages.len(), 1);
+    assert_eq!(walked.pages[0]["meta"]["has_more"], true);
+    assert!(walked.pages[0]["meta"].get("after_cursor").is_none());
+    let error = walked
+        .error
+        .expect("has_more true without a cursor ended the walk");
+    assert!(error.contains("without meta.after_cursor"), "{error}");
+    assert_eq!(walked.targets.len(), 1);
+}
+
+/// story:catalog-zendesk-ticket-audits: a page naming a cursor already sent is
+/// an error, so a walk cannot loop.
+#[test]
+fn ticket_audits_walk_with_a_repeated_cursor_is_an_error() {
+    states("A cursor seen before is an error.");
+    let walked = walk(
+        "ticket.audits",
+        json!({"ticket_id": 106, "page[size]": 2, "include_boundary_indicators": true}),
+    );
+    assert_eq!(walked.pages.len(), 2);
+    let error = walked
+        .error
+        .expect("a repeated cursor did not stop the walk");
+    assert!(error.contains("fixture-audit-cursor-r"), "{error}");
+    assert_eq!(
+        walked.targets,
+        [
+            "/api/v2/tickets/106/audits?page%5Bsize%5D=2&include_boundary_indicators=true",
+            "/api/v2/tickets/106/audits?page%5Bafter%5D=fixture-audit-cursor-r&page%5Bsize%5D=2&include_boundary_indicators=true",
+        ]
+    );
 }
 
 /// One call on the read transport, which carries no approval.
@@ -1417,7 +1967,8 @@ fn guide_cites_each_write_its_guard_and_the_move_steps() {
     for needle in [
         "approvals prepare",
         "approvals issue",
-        "operations invoke",
+        // `operations invoke` became `invoke` (story:connectors-do-short-invocation).
+        "invoke",
         DRAFT_MARKER.trim_end(),
         "https://github.com/beyond10x/connectors/releases",
     ] {

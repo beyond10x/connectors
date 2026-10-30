@@ -76,15 +76,13 @@ fn slow(container: &Container, args: &[&str]) -> Output {
 fn a_read_waits_for_a_slow_owner_start_within_its_deadline() {
     let (container, connection, _) = connected();
     let schema = container.schema();
+    let target = format!("{CONNECTOR}/{ALIAS}");
     let started = Instant::now();
     let read = success(&slow(
         &container,
         &[
-            "operations",
             "invoke",
-            "--adapter",
-            ALIAS,
-            "--operation",
+            &target,
             READ,
             "--connection",
             &connection,

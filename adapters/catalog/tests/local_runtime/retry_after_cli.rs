@@ -38,14 +38,11 @@ fn a_rate_limited_read_is_waited_for_once_or_states_its_delay_in_the_cli_json() 
     let read = |project: &str| {
         let input = json!({ "id": format!("org/{project}") }).to_string();
         cli.run(&[
-            "operations",
             "invoke",
-            "--adapter",
-            "gitlab",
+            "gitlab/gitlab",
+            "project.get",
             "--connection",
             &reference,
-            "--operation",
-            "project.get",
             "--schema",
             &schema,
             "--revision",

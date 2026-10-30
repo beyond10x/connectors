@@ -1,12 +1,22 @@
-//! The explicit service commands `describe`, `invoke` and `serve` are reachable
-//! through every route the root help advertises: `help COMMAND` prints the usage
-//! `COMMAND --help` prints, and the Bash completion completes them as root words
-//! with their own flags, not those of a generated command of the same name.
+//! story:connectors-do-short-invocation: the explicit service commands
+//! `describe` and `serve` are removed and `invoke` is the generated command.
+//! No route the root help advertises reaches a removed command: `help
+//! COMMAND` and `COMMAND --help` are parse refusals for it, and the Bash
+//! completion is the generated script, completing `invoke` with its own flags
+//! and offering no removed word.
 
 use std::collections::BTreeSet;
 use std::process::{Command, Output};
 
-const SERVICE_COMMANDS: [&str; 3] = ["describe", "invoke", "serve"];
+const REMOVED_COMMANDS: [&str; 2] = ["describe", "serve"];
+/// The explicit `invoke`'s own flags, none of which the generated one takes.
+const ENDPOINT_FLAGS: [&str; 5] = [
+    "--endpoint",
+    "--token-file",
+    "--allow-plaintext",
+    "--operation",
+    "--input",
+];
 
 fn cli(args: &[&str]) -> Output {
     let home = tempfile::tempdir().unwrap();
@@ -15,6 +25,7 @@ fn cli(args: &[&str]) -> Output {
         .env("HOME", home.path())
         .env_remove("XDG_CONFIG_HOME")
         .env_remove("XDG_STATE_HOME")
+        .stdin(std::process::Stdio::null())
         .output()
         .unwrap()
 }
@@ -28,21 +39,33 @@ fn parts(output: &Output) -> (Option<i32>, String, String) {
 }
 
 #[test]
-fn help_command_prints_the_service_command_usage() {
-    for command in SERVICE_COMMANDS {
-        let expected = parts(&cli(&[command, "--help"]));
-        assert_eq!(expected.0, Some(0), "`{command} --help` exits 0");
-        assert!(
-            expected.1.contains("Usage:") && expected.1.contains(command),
-            "`{command} --help` prints the command usage: {:?}",
-            expected.1
-        );
-        assert_eq!(
-            parts(&cli(&["help", command])),
-            expected,
-            "`connectors help {command}` prints what `connectors {command} --help` prints",
-        );
+fn help_reaches_invoke_and_no_removed_command() {
+    for command in REMOVED_COMMANDS {
+        for args in [&[command, "--help"][..], &["help", command]] {
+            assert_eq!(
+                parts(&cli(args)),
+                (Some(2), String::new(), "cli_parse\n".to_owned()),
+                "story:connectors-do-short-invocation: `connectors {}` is a parse refusal",
+                args.join(" "),
+            );
+        }
     }
+    let expected = parts(&cli(&["invoke", "--help"]));
+    assert_eq!(expected.0, Some(0), "`invoke --help` exits 0");
+    assert!(
+        expected.1.contains("Usage:")
+            && expected.1.contains("CONNECTOR[/INSTANCE]")
+            && ENDPOINT_FLAGS[..3]
+                .iter()
+                .all(|flag| !expected.1.contains(flag)),
+        "story:connectors-do-short-invocation: `invoke --help` is the generated command's: {:?}",
+        expected.1
+    );
+    assert_eq!(
+        parts(&cli(&["help", "invoke"])),
+        expected,
+        "story:connectors-do-short-invocation: `connectors help invoke` prints what `connectors invoke --help` prints",
+    );
 }
 
 #[test]
@@ -50,12 +73,13 @@ fn help_route_does_not_widen_the_parser() {
     for args in [
         &["help", "describe", "extra"][..],
         &["help", "serve", "--config"][..],
-        &["--config", "x", "help", "invoke"][..],
+        &["--config", "x", "help", "serve"][..],
+        &["help", "invoke", "extra"][..],
     ] {
         assert_eq!(
             parts(&cli(args)),
             (Some(2), String::new(), "cli_parse\n".to_owned()),
-            "`connectors {}` stays a parse refusal",
+            "story:connectors-do-short-invocation: `connectors {}` stays a parse refusal",
             args.join(" "),
         );
     }
@@ -135,104 +159,81 @@ printf '%s\n' "${COMPREPLY[@]}"
         .collect()
 }
 
-fn set(words: &[&str]) -> BTreeSet<String> {
-    words.iter().map(|word| (*word).to_owned()).collect()
-}
-
 #[test]
-fn completion_offers_service_commands_at_the_root() {
+fn completion_offers_invoke_and_no_removed_command() {
     let root = complete(&["connectors", ""]);
-    for word in SERVICE_COMMANDS
-        .iter()
-        .chain(&["instances", "adapters", "operations", "help"])
-    {
+    for word in ["invoke", "instances", "adapters", "operations", "help"] {
         assert!(
-            root.contains(*word),
+            root.contains(word),
             "root completion offers {word}: {root:?}"
         );
     }
     let after_output = complete(&["connectors", "--output", "json", ""]);
-    for word in SERVICE_COMMANDS {
-        assert!(
-            after_output.contains(word),
-            "completion after --output offers {word}: {after_output:?}"
-        );
-    }
     let help = complete(&["connectors", "help", ""]);
-    for word in SERVICE_COMMANDS
-        .iter()
-        .chain(&["instances", "adapters", "operations"])
-    {
+    for (offered, name) in [
+        (&root, "root"),
+        (&after_output, "after --output"),
+        (&help, "help"),
+    ] {
         assert!(
-            help.contains(*word),
-            "help completion offers {word}: {help:?}"
+            offered.contains("invoke"),
+            "story:connectors-do-short-invocation: {name} offers invoke: {offered:?}"
         );
+        for word in REMOVED_COMMANDS {
+            assert!(
+                !offered.contains(word),
+                "story:connectors-do-short-invocation: {name} does not offer {word}: {offered:?}"
+            );
+        }
     }
-    // `help COMMAND` after a global is a parse refusal, so it is not offered there.
-    let help_after_output = complete(&["connectors", "--output", "json", "help", ""]);
-    for word in SERVICE_COMMANDS {
+}
+
+#[test]
+fn completion_of_invoke_offers_its_own_flags_only() {
+    let invoke = connectors_cli_contract::command()
+        .find_subcommand("invoke")
+        .cloned()
+        .expect("the generated tree has invoke");
+    let own: BTreeSet<String> = invoke
+        .get_arguments()
+        .filter_map(|arg| arg.get_long().map(|long| format!("--{long}")))
+        .collect();
+    for words in [
+        &["connectors", "invoke", "--"][..],
+        &["connectors", "--output", "json", "invoke", "--"],
+    ] {
+        let offered = complete(words);
+        for flag in &own {
+            assert!(
+                offered.contains(flag),
+                "story:connectors-do-short-invocation: completion of {words:?} offers {flag}: {offered:?}"
+            );
+        }
+        for flag in ENDPOINT_FLAGS {
+            assert!(
+                !offered.contains(flag),
+                "story:connectors-do-short-invocation: completion of {words:?} offers no {flag}: {offered:?}"
+            );
+        }
+    }
+    for command in REMOVED_COMMANDS {
+        let offered = complete(&["connectors", command, "--"]);
         assert!(
-            !help_after_output.contains(word),
-            "help after --output does not offer {word}: {help_after_output:?}"
+            ["--endpoint", "--token-file", "--allow-plaintext"]
+                .iter()
+                .all(|flag| !offered.contains(*flag)),
+            "story:connectors-do-short-invocation: `{command}` completes no service flag: {offered:?}"
         );
     }
 }
 
 #[test]
-fn completion_offers_exactly_the_service_command_flags() {
-    let cases: [(&[&str], &[&str]); 4] = [
-        (
-            &["connectors", "describe", "--"],
-            &[
-                "--endpoint",
-                "--token-file",
-                "--allow-plaintext",
-                "--output",
-                "--help",
-            ],
-        ),
-        (
-            &["connectors", "invoke", "--"],
-            &[
-                "--endpoint",
-                "--token-file",
-                "--allow-plaintext",
-                "--operation",
-                "--input",
-                "--output",
-                "--help",
-            ],
-        ),
-        (
-            &["connectors", "serve", "--"],
-            &["--config", "--output", "--help"],
-        ),
-        (
-            &["connectors", "--output", "json", "describe", "--"],
-            &[
-                "--endpoint",
-                "--token-file",
-                "--allow-plaintext",
-                "--output",
-                "--help",
-            ],
-        ),
-    ];
-    for (words, flags) in cases {
-        assert_eq!(complete(words), set(flags), "completion of {words:?}");
-    }
-}
-
-#[test]
-fn generated_completion_is_unchanged() {
+fn the_completion_script_is_the_generated_one() {
     let script = script();
     let generated = include_str!("../../connectors-cli-contract/completions/connectors.bash");
-    let body = generated
-        .find("\nif [[ \"${BASH_VERSINFO[0]}\" -eq 4")
-        .map_or(generated, |end| &generated[..end]);
-    assert!(
-        script.starts_with(body),
-        "the emitted script keeps the generated completion function verbatim"
+    assert_eq!(
+        script, generated,
+        "story:connectors-do-short-invocation: the emitted script is the generated completion, with nothing appended"
     );
     // A generated `describe` keeps its own flags, and grouped words their completion.
     let operations = complete(&["connectors", "operations", "describe", "--"]);

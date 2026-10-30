@@ -1961,7 +1961,7 @@ fn a_cross_process_regression_is_refused() {
     assert_eq!(recorded_registry_floor(root.path()), NOW as i64);
 }
 
-/// The metadata transactions one `operations invoke` of a read operation
+/// The metadata transactions one `invoke` of a read operation
 /// performs, in the process that performs each: the CLI's cached-description
 /// reads, admission and owner handshake, then the owner's capture, dispatch
 /// and release. Each invoke's CLI is a fresh process; the owner is not.

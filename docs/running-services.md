@@ -17,24 +17,36 @@ changing a parent shell's environment cannot update an already running service.
 ```sh
 target/debug/connectors-kubernetes --config kubernetes.yaml
 target/debug/connectors-sql --config sql.yaml
-target/debug/connectors serve --config federation.yaml
 ```
 
-The shared CLI discovers the current contract before invoking it:
+A caller presents the service credential as a bearer token, reads the current descriptor with
+`GET /v1/describe` and names its revision in `POST /v1/invoke`:
 
 ```sh
-target/debug/connectors describe \
-  --endpoint http://127.0.0.1:7102/ --allow-plaintext --token-file service.secret
-target/debug/connectors invoke \
-  --endpoint http://127.0.0.1:7102/ --allow-plaintext --token-file service.secret \
-  --operation endpoints.discover --input examples/requests/kubernetes-endpoints.json
+token="authorization: Bearer $(cat service.secret)"
+revision=$(curl -s -H "$token" http://127.0.0.1:7102/v1/describe | jq -r .revision)
+jq -n --arg revision "$revision" --slurpfile input examples/requests/kubernetes-endpoints.json \
+  '{version: "v1alpha1", request_id: "discover-1", operation: "endpoints.discover",
+    revision: $revision, input: $input[0]}' \
+  | curl -s -H "$token" -H 'content-type: application/json' --data @- \
+    http://127.0.0.1:7102/v1/invoke
 ```
 
-Through the example federation host, the same operation is `kubernetes__endpoints.discover`.
+The `connectors` command does not call a standalone service: its `describe`, `invoke --endpoint`
+and `serve` commands were removed in 0.60.0. The local CLI reaches a provider through a configured
+instance; `connections connect <connector>/<instance> --endpoint <url>` saves the provider
+address there.
+
 GitLab has no standalone service: the [catalog provider](local-catalog-provider.md)
 serves it under the local CLI.
-Source prefixes distinguish instances; the gateway does not interpret provider data.
-The first profile supports one federation hop. It never retries a provider request.
+
+A federation host puts several services behind one endpoint. It is the library
+`connectors_host::federation`, which a Rust program embeds and serves with
+`connectors_host::server::serve`; `examples/federation.yaml` is its configuration, and
+[Federate services](../website/docs/guides/federate-adapter-services.md) shows the program's
+shape. Through it the operation above is `kubernetes__endpoints.discover`. Source prefixes
+distinguish instances; the host does not interpret provider data. It supports one federation hop
+and never retries a provider request.
 
 ## Supported surfaces
 

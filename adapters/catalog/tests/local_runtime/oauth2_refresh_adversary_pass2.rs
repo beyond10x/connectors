@@ -368,7 +368,7 @@ fn write_input() -> Vec<u8> {
 }
 
 /// `contracts/cli/v1alpha1/semantics.md` and `docs/local-catalog-provider.md`:
-/// a stored credential the provider refuses on `operations invoke` of a read
+/// a stored credential the provider refuses on `invoke` of a read
 /// reports `next_action = repair_connection`; a guarded write refused for its
 /// credential reports `retry_status` until
 /// `story:guarded-write-credential-refusal-says-repair` lands. This case pins
@@ -695,14 +695,11 @@ fn adversary2_oauth_cached_bootstrap_round_trips_across_owner_restart() {
         "project.get",
     ]));
     let invoke = [
-        "operations",
         "invoke",
-        "--adapter",
-        "drive",
+        "gitlab/drive",
+        "project.get",
         "--connection",
         &reference,
-        "--operation",
-        "project.get",
         "--schema",
         description["schema"].as_str().unwrap(),
         "--revision",

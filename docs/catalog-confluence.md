@@ -246,7 +246,7 @@ derived from the shipped connector:
 
 ```console
 $ connectors instances list
-{"adapters":[{"adapter":"confluence.work","adapter_id":"catalog","connector":"confluence","instance":"work","instance_id":"confluence.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"adapters":[{"connector":"confluence","instance":"work","instance_id":"confluence.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
 ```
 
 The access read makes validation also read one page through the v2 API. An
@@ -376,7 +376,7 @@ is a read. Both instances are then configured:
 
 ```console
 $ connectors instances list
-{"adapters":[{"adapter":"confluence-v1.work","adapter_id":"catalog","connector":"confluence-v1","instance":"work","instance_id":"confluence-v1.work","restart":"never","startup":"on-demand"},{"adapter":"confluence.work","adapter_id":"catalog","connector":"confluence","instance":"work","instance_id":"confluence.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"adapters":[{"connector":"confluence-v1","instance":"work","instance_id":"confluence-v1.work","restart":"never","startup":"on-demand"},{"connector":"confluence","instance":"work","instance_id":"confluence.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
 ```
 
 ### 2. Connect and read
@@ -392,15 +392,13 @@ connectors operations list --connector confluence-v1 --instance work
 ```
 
 The operations are `spaces.list`, `space.get`, `space.pages`, `pages.changed`, `page.get`,
-`page.comments` and `content.search`. A read needs no approval: take `--schema` and `--revision`
-from `operations describe`, then invoke, here with the connection id `connections connect`
-answered:
+`page.comments` and `content.search`. A read needs no approval; `invoke` takes the instance's
+connection, schema and revision, and `--describe` prints the operation's input schema without
+calling Atlassian:
 
 ```sh
-connectors operations describe --connector confluence-v1 --instance work --operation spaces.list
-connectors operations invoke --connector confluence-v1 --instance work \
-  --connection "$connection" --operation spaces.list \
-  --schema "$schema" --revision "$revision" --input-json '{"limit":25}'
+connectors invoke confluence-v1/work spaces.list --describe
+connectors invoke confluence-v1/work spaces.list --input-json '{"limit":25}'
 ```
 
 Validation evidence lasts 60 seconds; after that a read is refused until `connections revalidate`
@@ -431,7 +429,7 @@ longer be revoked through the CLI. With only the `confluence-v1` instance left:
 
 ```console
 $ connectors instances list
-{"adapters":[{"adapter":"confluence-v1.work","adapter_id":"catalog","connector":"confluence-v1","instance":"work","instance_id":"confluence-v1.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"adapters":[{"connector":"confluence-v1","instance":"work","instance_id":"confluence-v1.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
 $ connectors connections list --connector confluence --instance work
 failure: {"code":"not_found","kind":"operational","next_action":"check_configuration","stage":"admission"}
 ```
@@ -494,18 +492,15 @@ connectors connections connect --connector confluence --instance either \
   --profile atlassian.basic --credential-file ~/private/atlassian.json
 ```
 
-Describe the operations through that connection with `--connection`, and take `--schema` and
-`--revision` from it: without `--connection` the instance is described by its first binding,
-v2. An id the bound API does not serve, such as `spaces.list` on a v2-bound connection, is
-`not_found` before any request.
+Describe the operations through that connection with `--connection`: without it the instance is
+described by its first binding, v2. An id the bound API does not serve, such as `spaces.list` on
+a v2-bound connection, is `not_found` before any request.
 
 ```sh
 connectors operations list --connector confluence --instance either --connection "$connection"
-connectors operations describe --connector confluence --instance either \
-  --connection "$connection" --operation page.get
-connectors operations invoke --connector confluence --instance either \
-  --connection "$connection" --operation page.get \
-  --schema "$schema" --revision "$revision" --input-json '{"id":"1001"}'
+connectors invoke confluence/either page.get --connection "$connection" --describe
+connectors invoke confluence/either page.get --connection "$connection" \
+  --input-json '{"id":"1001"}'
 ```
 
 The input follows the bound API: `page.get` takes `body-format` under v2 and `expand` under v1,

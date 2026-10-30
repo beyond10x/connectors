@@ -165,10 +165,10 @@ callables:
     input: connectors.cli.OperationDescribeInput
     result: connectors.cli.OperationDescribeResult
     errors: {failure: connectors.cli.Failure}
-  operations-invoke:
+  invoke:
     target: {kind: dynamic, owner: connectors.cli, operation_field: operation, schema_field: schema, payload_field: input}
-    input: connectors.cli.OperationInvokeInput
-    result: connectors.cli.OperationInvokeResult
+    input: connectors.cli.InvokeInput
+    result: connectors.cli.InvokeResult
     errors: {failure: connectors.cli.Failure}
 commands:
   - path: [approvals, policy-status]
@@ -453,7 +453,7 @@ commands:
   - path: [connections, connect]
     aliases: []
     callable: connections-connect
-    about: Begin admitted local protected credential acquisition
+    about: Begin admitted local protected credential acquisition on <connector>/<instance>; --endpoint first writes that instance's endpoint into the configuration
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
@@ -467,6 +467,10 @@ commands:
         source: {kind: option, long: device}
       - field: credential_document
         source: {kind: protected, file: credential-file, stdin: credential-stdin, hidden_tty: credential-prompt}
+      - field: target
+        source: {kind: positional, index: 1}
+      - field: endpoint
+        source: {kind: option, long: endpoint}
   - path: [connections, reconnect]
     aliases: [[connections, repair]]
     callable: connections-reconnect
@@ -597,21 +601,17 @@ commands:
         source: {kind: option, long: connection}
       - field: operation
         source: {kind: option, long: operation}
-  - path: [operations, invoke]
+  - path: [invoke]
     aliases: []
-    callable: operations-invoke
-    about: Invoke once under selected schema, revision and current admission
+    callable: invoke
+    about: Invoke one operation of a connector's instance; the instance, connection, schema and revision default to the only ones that fit
     arguments:
-      - field: adapter
-        source: {kind: option, long: adapter}
-      - field: connector
-        source: {kind: option, long: connector}
-      - field: instance
-        source: {kind: option, long: instance}
+      - field: target
+        source: {kind: positional, index: 1}
+      - field: operation
+        source: {kind: positional, index: 2}
       - field: connection
         source: {kind: option, long: connection}
-      - field: operation
-        source: {kind: option, long: operation}
       - field: schema
         source: {kind: option, long: schema}
       - field: revision
@@ -628,3 +628,5 @@ commands:
         source: {kind: option, long: definitions-root}
       - field: credential_file
         source: {kind: option, long: credential-file}
+      - field: describe
+        source: {kind: option, long: describe}
