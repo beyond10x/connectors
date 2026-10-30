@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T15:04:45Z",
+  "actor": "human:timo",
+  "artifact": "story:served-state-on-a-shared-volume-root",
+  "kind": "story",
+  "revision": 12,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-host --lib local::filesystem local::service (4); --test served_state_volume_root (8) --test http_audit_anchor (6) --test local_foundation (11); cargo check x86_64-pc-windows-gnu",
+    "reference": "commit afbfe63e4"
+  }
+}

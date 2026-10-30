@@ -13,8 +13,8 @@ use connectors_core::{
 use connectors_host::{
     local::audit::{self, Reference},
     server::{
-        Admission, CONCURRENT_REVIEWS, ServiceConfig, ServiceConfigV3, ServiceState,
-        router_with_admission, router_with_state,
+        Admission, CONCURRENT_REVIEWS, ServiceAccountPattern, ServiceAccounts, ServiceConfig,
+        ServiceConfigV3, ServiceState, router_with_admission, router_with_state,
     },
 };
 use connectors_sdk::{Adapter, Credential, Secret};
@@ -824,6 +824,586 @@ async fn the_anchor_principal_is_the_service_account() {
         assert_eq!(anchored.request_id.as_deref(), Some(operation));
     }
     assert_eq!(host.calls.load(Ordering::SeqCst), 2);
+}
+
+/// An account host whose single `principal` is replaced by `accounts`, the
+/// `principals` or `service_accounts` member.
+async fn account_set_host(root: &Path, double: &Double, accounts: (&str, Value)) -> Host {
+    let credential = root.join("instance-token");
+    private_file(&credential, INSTANCE_TOKEN.as_bytes());
+    let mut document = account_config(&double.api, &double.ca, &credential, &root.join("state"));
+    document.as_object_mut().unwrap().remove("principal");
+    document[accounts.0] = accounts.1;
+    configured_host(root, &document).await
+}
+
+/// Each `username` the review names, as admitted (`Some(anchored principal)`)
+/// or refused `unauthorized` before any anchor (`None`), for a read and a write.
+async fn admits(host: &Host, double: &Double, username: &str, expected: Option<&str>) {
+    double.answer(201, &review(Some(username), &[AUDIENCE], true));
+    for operation in ["read", "write"] {
+        let calls = host.calls.load(Ordering::SeqCst);
+        let request_id = format!("{operation}-{}", double.reviews().len());
+        let (status, response) = invoke(
+            host,
+            Some(&bearer(CALLER_TOKEN)),
+            &request(operation, &request_id),
+        )
+        .await;
+        match expected {
+            Some(principal) => {
+                assert_eq!(status, 200, "{username} was refused");
+                let anchored = anchor(&host.path, &response.audit_ref.expect("an anchor"));
+                assert_eq!(anchored.principal_ref.as_deref(), Some(principal));
+                assert_eq!(host.calls.load(Ordering::SeqCst), calls + 1);
+            }
+            None => {
+                assert_refused(status, &response, 401, ErrorCode::Unauthorized);
+                assert_eq!(host.calls.load(Ordering::SeqCst), calls, "{username}");
+            }
+        }
+    }
+}
+
+/// v1alpha2-service-account-token-listed-accounts: `principals` admits each
+/// listed account and no other, and the anchor records the reviewed username.
+#[tokio::test]
+async fn a_listed_service_account_is_admitted_and_anchored_as_itself() {
+    let root = tempfile::tempdir().unwrap();
+    let double = double(root.path()).await;
+    let host = account_set_host(
+        root.path(),
+        &double,
+        ("principals", json!([PRINCIPAL, OTHER_PRINCIPAL])),
+    )
+    .await;
+
+    admits(&host, &double, PRINCIPAL, Some(PRINCIPAL)).await;
+    admits(&host, &double, OTHER_PRINCIPAL, Some(OTHER_PRINCIPAL)).await;
+    for refused in [
+        "system:serviceaccount:agents:third-agent".to_owned(),
+        format!("{PRINCIPAL}-2"),
+        "system:serviceaccount:other-namespace:example-agent".to_owned(),
+        "example-user".to_owned(),
+    ] {
+        admits(&host, &double, &refused, None).await;
+    }
+    assert_eq!(double.reviews().len(), 12);
+}
+
+/// v1alpha2-service-account-token-account-pattern: `service_accounts` admits
+/// an account of the literal namespace whose name matches the pattern, `*`
+/// standing for any run of characters; the anchor records the reviewed
+/// username.
+#[tokio::test]
+async fn a_namespace_and_name_pattern_admits_each_matching_account() {
+    let root = tempfile::tempdir().unwrap();
+    let double = double(root.path()).await;
+    let host = account_set_host(
+        root.path(),
+        &double,
+        (
+            "service_accounts",
+            json!({"namespace": "agents", "name": "*-agent"}),
+        ),
+    )
+    .await;
+
+    for admitted in [
+        PRINCIPAL,
+        OTHER_PRINCIPAL,
+        "system:serviceaccount:agents:a.b-agent",
+    ] {
+        admits(&host, &double, admitted, Some(admitted)).await;
+    }
+    for refused in [
+        // The pattern is anchored at both ends.
+        "system:serviceaccount:agents:example-agent-2",
+        "system:serviceaccount:agents:coder",
+        // `*` matches the name only, and the namespace is literal.
+        "system:serviceaccount:agents-2:example-agent",
+        "system:serviceaccount:other:example-agent",
+        "system:serviceaccount:Agents:example-agent",
+        "system:serviceaccounts:agents:example-agent",
+        "example-agent",
+    ] {
+        admits(&host, &double, refused, None).await;
+    }
+}
+
+/// v1alpha2-service-account-token-account-set-config: exactly one of
+/// `principal`, `principals` and `service_accounts` is configured. None, two,
+/// an empty or oversized list, an invalid entry and an empty or invalid
+/// pattern are refused by the schema and at start, naming the key.
+#[test]
+fn exactly_one_account_form_is_configured() {
+    let root = tempfile::tempdir().unwrap();
+    let ca = root.path().join("ca.crt");
+    let certificate = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+    std::fs::write(&ca, certificate.cert.pem()).unwrap();
+    let mut base = account_config(
+        "https://kubernetes.default.svc",
+        &ca,
+        &root.path().join("token"),
+        Path::new("/var/lib/connectors"),
+    );
+    base.as_object_mut().unwrap().remove("principal");
+    let v3_schema = schema("urn:connectors:config:v3:service");
+    let with = |members: &[(&str, Value)]| {
+        let mut document = base.clone();
+        for (member, value) in members {
+            document[*member] = value.clone();
+        }
+        document
+    };
+    let one = ("principal", json!(PRINCIPAL));
+    let listed = ("principals", json!([PRINCIPAL, OTHER_PRINCIPAL]));
+    let pattern = (
+        "service_accounts",
+        json!({"namespace": "agents", "name": "*-agent"}),
+    );
+
+    for admitted in [
+        with(std::slice::from_ref(&one)),
+        with(std::slice::from_ref(&listed)),
+        with(&[("principals", json!([PRINCIPAL]))]),
+        with(&[(
+            "principals",
+            json!(
+                (0..64)
+                    .map(|n| format!("system:serviceaccount:agents:agent-{n}"))
+                    .collect::<Vec<_>>()
+            ),
+        )]),
+        with(std::slice::from_ref(&pattern)),
+        with(&[(
+            "service_accounts",
+            json!({"namespace": "agents", "name": "*"}),
+        )]),
+        with(&[(
+            "service_accounts",
+            json!({"namespace": "agents", "name": "coding-agent"}),
+        )]),
+    ] {
+        connectors_sdk::validate(&v3_schema, &admitted)
+            .unwrap_or_else(|_| panic!("the v3 schema admits {admitted}"));
+        let read: ServiceConfigV3 = serde_json::from_value(admitted.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&read).unwrap(), admitted);
+        assert!(
+            matches!(read.admission(), Ok(Admission::ServiceAccountToken(_))),
+            "the reader admits {admitted}"
+        );
+    }
+
+    let keys = "exactly one of principal, principals or service_accounts";
+    let long_name = format!("system:serviceaccount:agents:{}", "a".repeat(120));
+    let refusals: Vec<(Value, &str)> = vec![
+        (with(&[]), keys),
+        (with(&[one.clone(), listed.clone()]), keys),
+        (with(&[one.clone(), pattern.clone()]), keys),
+        (with(&[listed.clone(), pattern.clone()]), keys),
+        (with(&[one, listed, pattern]), keys),
+        (with(&[("principals", json!([]))]), "admission principals"),
+        (
+            with(&[(
+                "principals",
+                json!(
+                    (0..65)
+                        .map(|n| format!("system:serviceaccount:agents:agent-{n}"))
+                        .collect::<Vec<_>>()
+                ),
+            )]),
+            "admission principals",
+        ),
+        (
+            with(&[("principals", json!([PRINCIPAL, "user:example-agent"]))]),
+            "admission principals",
+        ),
+        (
+            with(&[("principals", json!([PRINCIPAL, long_name]))]),
+            "admission principals",
+        ),
+        (
+            with(&[(
+                "principals",
+                json!(["system:serviceaccount:agents:*-agent"]),
+            )]),
+            "admission principals",
+        ),
+        (
+            with(&[(
+                "service_accounts",
+                json!({"namespace": "agents", "name": ""}),
+            )]),
+            "admission service_accounts",
+        ),
+        (
+            with(&[(
+                "service_accounts",
+                json!({"namespace": "agents", "name": "agent-?"}),
+            )]),
+            "admission service_accounts",
+        ),
+        (
+            with(&[(
+                "service_accounts",
+                json!({"namespace": "agents", "name": "Coding-*"}),
+            )]),
+            "admission service_accounts",
+        ),
+        (
+            with(&[(
+                "service_accounts",
+                json!({"namespace": "agents", "name": "a:*"}),
+            )]),
+            "admission service_accounts",
+        ),
+        (
+            with(&[(
+                "service_accounts",
+                json!({"namespace": "agents", "name": "a".repeat(129)}),
+            )]),
+            "admission service_accounts",
+        ),
+        (
+            with(&[("service_accounts", json!({"namespace": "*", "name": "*"}))]),
+            "admission service_accounts",
+        ),
+        (
+            with(&[(
+                "service_accounts",
+                json!({"namespace": "agent*", "name": "*"}),
+            )]),
+            "admission service_accounts",
+        ),
+        (
+            with(&[("service_accounts", json!({"namespace": "", "name": "*"}))]),
+            "admission service_accounts",
+        ),
+    ];
+    // A pattern no account name can match, read with each `*` as one letter:
+    // a dot or hyphen at a label's edge, an empty label, or a label over 63.
+    let mut refusals = refusals;
+    for unmatched in [
+        ".".to_owned(),
+        "-*".to_owned(),
+        "*-".to_owned(),
+        "a..b".to_owned(),
+        "*.".to_owned(),
+        ".*".to_owned(),
+        "a-.b".to_owned(),
+        "*.-a".to_owned(),
+        "*a".repeat(64),
+        format!("{}*", "a".repeat(63)),
+    ] {
+        refusals.push((
+            with(&[(
+                "service_accounts",
+                json!({"namespace": "agents", "name": unmatched}),
+            )]),
+            "admission service_accounts",
+        ));
+    }
+    for (refused, key) in &refusals {
+        assert!(
+            connectors_sdk::validate(&v3_schema, refused).is_err(),
+            "the v3 schema refuses {refused}"
+        );
+        let read: ServiceConfigV3 = serde_json::from_value(refused.clone()).unwrap();
+        let error = read
+            .admission()
+            .err()
+            .unwrap_or_else(|| panic!("the reader refuses {refused}"));
+        assert!(
+            error.message.contains(key),
+            "{refused}: {:?} does not name {key}",
+            error.message
+        );
+    }
+    // The account's 128 bytes are shared by the namespace and the name, so
+    // a name one byte past what the namespace leaves matches no account. The
+    // schema bounds each member alone; start checks their sum.
+    let namespace = "n".repeat(63);
+    let budget = 128 - "system:serviceaccount:".len() - namespace.len() - 1;
+    for (name, admitted) in [
+        (format!("{}*", "a".repeat(budget - 1)), true),
+        ("a".repeat(budget), true),
+        (format!("{}*", "a".repeat(budget)), false),
+        ("a".repeat(budget + 1), false),
+    ] {
+        let document = with(&[(
+            "service_accounts",
+            json!({"namespace": namespace, "name": name}),
+        )]);
+        let read: ServiceConfigV3 = serde_json::from_value(document.clone()).unwrap();
+        match read.admission() {
+            Ok(_) => assert!(admitted, "the reader admits {document}"),
+            Err(error) => {
+                assert!(!admitted, "the reader refuses {document}");
+                assert!(error.message.contains("admission service_accounts"));
+            }
+        }
+    }
+
+    // `service_accounts` is closed, and neither set member is a
+    // `static-bearer` member.
+    for refused in [
+        with(&[(
+            "service_accounts",
+            json!({"namespace": "agents", "name": "*", "groups": ["x"]}),
+        )]),
+        with(&[("service_accounts", json!({"name": "*"}))]),
+        with(&[("principals", json!(PRINCIPAL))]),
+    ] {
+        assert!(connectors_sdk::validate(&v3_schema, &refused).is_err());
+        assert!(serde_json::from_value::<ServiceConfigV3>(refused).is_err());
+    }
+    let token = root.path().join("token");
+    for member in [
+        ("principals", json!([PRINCIPAL])),
+        (
+            "service_accounts",
+            json!({"namespace": "agents", "name": "*"}),
+        ),
+    ] {
+        let mut document = json!({"instance":"leaf","listen":"127.0.0.1:0","service_credential":{"kind":"file","path":token}});
+        document[member.0] = member.1;
+        assert!(connectors_sdk::validate(&v3_schema, &document).is_err());
+        let read: ServiceConfigV3 = serde_json::from_value(document.clone()).unwrap();
+        assert!(read.admission().is_err(), "{document}");
+    }
+}
+
+/// A started admission describes the accounts it was configured with, and
+/// `principal()` answers what its documentation says for each form.
+#[test]
+fn a_started_admission_describes_its_configured_accounts() {
+    let root = tempfile::tempdir().unwrap();
+    let ca = root.path().join("ca.crt");
+    let certificate = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+    std::fs::write(&ca, certificate.cert.pem()).unwrap();
+    let mut base = account_config(
+        "https://kubernetes.default.svc",
+        &ca,
+        &root.path().join("token"),
+        Path::new("/var/lib/connectors"),
+    );
+    base.as_object_mut().unwrap().remove("principal");
+    let started = |member: &str, value: Value| {
+        let mut document = base.clone();
+        document[member] = value;
+        let read: ServiceConfigV3 = serde_json::from_value(document).unwrap();
+        match read.admission() {
+            Ok(Admission::ServiceAccountToken(admission)) => admission,
+            _ => panic!("{member} was not admitted"),
+        }
+    };
+    let pattern = ServiceAccountPattern {
+        namespace: "agents".into(),
+        name: "*-agent".into(),
+    };
+    for (member, value, accounts, principal) in [
+        (
+            "principal",
+            json!(PRINCIPAL),
+            ServiceAccounts::Listed(vec![PRINCIPAL.into()]),
+            PRINCIPAL,
+        ),
+        (
+            "principals",
+            json!([OTHER_PRINCIPAL, PRINCIPAL]),
+            ServiceAccounts::Listed(vec![OTHER_PRINCIPAL.into(), PRINCIPAL.into()]),
+            OTHER_PRINCIPAL,
+        ),
+        (
+            "service_accounts",
+            serde_json::to_value(&pattern).unwrap(),
+            ServiceAccounts::Pattern(pattern.clone()),
+            "system:serviceaccount:agents:*-agent",
+        ),
+    ] {
+        let admission = started(member, value);
+        assert_eq!(admission.accounts(), &accounts, "{member}");
+        assert_eq!(admission.principal(), principal, "{member}");
+    }
+}
+
+/// The class of the null-member finding: every v3 member whose presence the
+/// schema's `required`, `oneOf` or `not` reads (`service_credential`,
+/// `audience`, `principal`, `principals`, `service_accounts`,
+/// `token_review`), written as `null` under either profile, alone or beside
+/// its valid value's siblings, is refused by the schema and by the reader
+/// alike.
+#[test]
+fn a_null_presence_member_is_refused_by_the_schema_and_the_reader() {
+    let root = tempfile::tempdir().unwrap();
+    let ca = root.path().join("ca.crt");
+    let certificate = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+    std::fs::write(&ca, certificate.cert.pem()).unwrap();
+    let token = root.path().join("token");
+    let account = account_config(
+        "https://kubernetes.default.svc",
+        &ca,
+        &token,
+        Path::new("/var/lib/connectors"),
+    );
+    let bearer = json!({"instance":"leaf","listen":"127.0.0.1:0","service_credential":{"kind":"file","path":token}});
+    let v3_schema = schema("urn:connectors:config:v3:service");
+    let members = [
+        "service_credential",
+        "audience",
+        "principal",
+        "principals",
+        "service_accounts",
+        "token_review",
+    ];
+    let mut documents = Vec::new();
+    for base in [&account, &bearer] {
+        for member in members {
+            // Replacing the member's value, or adding it, as null.
+            let mut document = base.clone();
+            document[member] = Value::Null;
+            documents.push(document);
+        }
+    }
+    for document in &documents {
+        assert!(
+            connectors_sdk::validate(&v3_schema, document).is_err(),
+            "the v3 schema admits {document}"
+        );
+        let refused = match serde_json::from_value::<ServiceConfigV3>(document.clone()) {
+            Err(_) => true,
+            Ok(read) => read.admission().is_err(),
+        };
+        assert!(refused, "the reader admits {document}");
+    }
+}
+
+/// Adversary (D275 UA): the v3 schema and the reader agree on every account
+/// form, including a member present as `null`. A YAML document writes one as
+/// an empty value (`principals:`), which `read_config` reads as absent while
+/// the schema's `required` counts it as present.
+#[test]
+fn the_schema_and_the_reader_agree_on_a_null_account_member() {
+    let root = tempfile::tempdir().unwrap();
+    let ca = root.path().join("ca.crt");
+    let certificate = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+    std::fs::write(&ca, certificate.cert.pem()).unwrap();
+    let mut base = account_config(
+        "https://kubernetes.default.svc",
+        &ca,
+        &root.path().join("token"),
+        Path::new("/var/lib/connectors"),
+    );
+    base.as_object_mut().unwrap().remove("principal");
+    let v3_schema = schema("urn:connectors:config:v3:service");
+    let with = |members: &[(&str, Value)]| {
+        let mut document = base.clone();
+        for (member, value) in members {
+            document[*member] = value.clone();
+        }
+        document
+    };
+    let token = root.path().join("token");
+    let bearer = |member: &str| {
+        let mut document = json!({"instance":"leaf","listen":"127.0.0.1:0","service_credential":{"kind":"file","path":token}});
+        document[member] = Value::Null;
+        document
+    };
+    let pattern = json!({"namespace": "agents", "name": "*-agent"});
+    let documents = [
+        with(&[("principals", Value::Null)]),
+        with(&[("service_accounts", Value::Null)]),
+        with(&[
+            ("principal", Value::Null),
+            ("principals", json!([PRINCIPAL])),
+        ]),
+        with(&[
+            ("principal", Value::Null),
+            ("service_accounts", pattern.clone()),
+        ]),
+        with(&[("principals", Value::Null), ("principal", json!(PRINCIPAL))]),
+        with(&[
+            ("service_accounts", Value::Null),
+            ("principal", json!(PRINCIPAL)),
+        ]),
+        with(&[("principals", Value::Null), ("service_accounts", pattern)]),
+        bearer("principals"),
+        bearer("service_accounts"),
+    ];
+    let mut disagreements = Vec::new();
+    for document in &documents {
+        let schema_admits = connectors_sdk::validate(&v3_schema, document).is_ok();
+        let reader_admits = serde_json::from_value::<ServiceConfigV3>(document.clone())
+            .map(|read| read.admission().is_ok())
+            .unwrap_or(false);
+        if schema_admits != reader_admits {
+            disagreements.push(format!(
+                "schema {} / reader {}: {document}",
+                if schema_admits { "admits" } else { "refuses" },
+                if reader_admits { "admits" } else { "refuses" },
+            ));
+        }
+    }
+    assert!(
+        disagreements.is_empty(),
+        "the v3 schema and the reader disagree on {} documents:\n{}",
+        disagreements.len(),
+        disagreements.join("\n")
+    );
+}
+
+/// Adversary (D275 UA): the schema and the reader agree on a namespace, a
+/// name pattern and a listed account that end in a newline or hold a
+/// non-ASCII letter, which a `$`-anchored pattern or a char-counted
+/// `maxLength` could let through on one side only.
+#[test]
+fn the_schema_and_the_reader_agree_on_trailing_and_unicode_account_values() {
+    let root = tempfile::tempdir().unwrap();
+    let ca = root.path().join("ca.crt");
+    let certificate = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+    std::fs::write(&ca, certificate.cert.pem()).unwrap();
+    let mut base = account_config(
+        "https://kubernetes.default.svc",
+        &ca,
+        &root.path().join("token"),
+        Path::new("/var/lib/connectors"),
+    );
+    base.as_object_mut().unwrap().remove("principal");
+    let v3_schema = schema("urn:connectors:config:v3:service");
+    let with = |member: &str, value: Value| {
+        let mut document = base.clone();
+        document[member] = value;
+        document
+    };
+    let documents = [
+        with(
+            "service_accounts",
+            json!({"namespace": "agents\n", "name": "*"}),
+        ),
+        with(
+            "service_accounts",
+            json!({"namespace": "agents", "name": "*\n"}),
+        ),
+        with(
+            "service_accounts",
+            json!({"namespace": "agents", "name": "agent-\u{e4}*"}),
+        ),
+        with(
+            "service_accounts",
+            json!({"namespace": "\u{e4}gents", "name": "*"}),
+        ),
+        with("principals", json!([format!("{PRINCIPAL}\n")])),
+        with("principals", json!([format!("{PRINCIPAL}\u{e4}")])),
+    ];
+    for document in &documents {
+        assert!(
+            connectors_sdk::validate(&v3_schema, document).is_err(),
+            "the v3 schema admits {document}"
+        );
+        let read: ServiceConfigV3 = serde_json::from_value(document.clone()).unwrap();
+        assert!(read.admission().is_err(), "the reader admits {document}");
+    }
 }
 
 struct FixedSecret;

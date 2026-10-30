@@ -2,11 +2,16 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0620-served-forge-access
 kind: release-plan
-status: draft
+status: implemented
 title: 'Release 0.62.0: served forge access for credential-free agents'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-30T14:42:23Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "approved", at: "2026-10-30T14:42:24Z", actor: "human:timo", revision: 3}
+- {from: "approved", to: "active", at: "2026-10-30T14:42:25Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-30T14:42:26Z", actor: "human:timo", revision: 5}
 ---
 ## Outcome
 

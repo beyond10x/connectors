@@ -45,6 +45,51 @@ cursor loop. The local MCP server takes the same shaping and walk arguments.
 - `--fields` cannot name a key holding `,` or with leading or trailing whitespace.
 - Shaping applies to `invoke` and MCP `tools/call` only, not to the list commands.
 
+
+## 0.62.1 — 2026-10-30
+
+Findings from a cluster rehearsal of 0.62.0's served forge access: one instance serves several
+agent service accounts, the review token and `state` work on an ordinary pod's volumes, and a
+served catalog instance's reads stay inside the repositories it is configured for.
+
+No breaking changes.
+
+### Added
+
+- A served host under `service-account-token` admits several service accounts: `principals`
+  (1 to 64 accounts) or `service_accounts: {namespace, name}`, where `*` is the only wildcard in
+  the name. A single `principal` works as before. The audit anchor records the username the
+  review named (story:served-admission-admits-a-set-of-service-accounts). A configuration key
+  such as `principals` written with no value is refused, not read as absent. A
+  `service_accounts` pattern that no account name can match is refused at start.
+- A served catalog instance takes an optional `catalog.repositories` (`<owner>/<repo>`; owners
+  and names compare without case and a trailing `.git` in any case is dropped, as in
+  `git.repositories`, which now drops it the same way). An empty, `null` or invalid list
+  refuses start. With it set, operations taking `owner` and `repo` reach only listed
+  repositories; any other answers `not_found` before anything is recorded or sent. Other
+  operations are not described (story:catalog-reads-stay-inside-the-instance-repositories).
+  `connectors_sdk::Adapter` gains a defaulted `admit`, which the host asks before it records a
+  `/v1alpha2/invoke` call.
+
+### Changed
+
+- A `service-account-token` host now reads its TokenReview `credential_file` at exactly `0640` or
+  `0440` when its group is one the process holds (a pod with `fsGroup`). Special bits and
+  owner-execute are still refused, and every other credential file still needs `0600`
+  (story:review-token-file-admits-fsgroup-read).
+- A host whose `state` cannot be admitted now names the refused directory and why: an ancestor
+  that is owned by neither the host user nor root, or is writable by group or others, or `state`
+  itself, which must be owned by the host user with mode 0700, no group or other bits. A
+  directory the host cannot open still refuses with the closed text. The admission is
+  unchanged; docs/running-services.md shows how to run on a `0777` volume root
+  (story:served-state-on-a-shared-volume-root).
+
+### Fixed
+
+- The documented TokenReview example now names
+  `/var/run/secrets/kubernetes.io/serviceaccount/..data/token`, because the conventional `token`
+  name is a symbolic link the host refuses (story:review-token-path-in-docs-opens).
+
 ## 0.62.0 — 2026-10-30
 
 A served catalog instance takes a GitHub App credential, admits a Kubernetes service account,

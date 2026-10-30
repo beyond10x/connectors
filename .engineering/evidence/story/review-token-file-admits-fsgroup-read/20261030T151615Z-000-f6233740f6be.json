@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T15:16:15Z",
+  "actor": "human:timo",
+  "artifact": "story:review-token-file-admits-fsgroup-read",
+  "kind": "story",
+  "revision": 12,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-host --lib server::token_review credentials (9); --test http_service_account_token (18) --test http_service_account_token_review (13) --test service (14); cargo check x86_64-pc-windows-gnu",
+    "reference": "commit 323ef39c4"
+  }
+}

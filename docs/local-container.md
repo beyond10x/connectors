@@ -36,7 +36,9 @@ When the configuration stage refuses, `invalid_configuration` names its rule in
   cannot hold it: its files are root-owned, symbolically linked and group-readable.
 - Give the run user a state directory in the image's writable layer, for example
   `/srv/connectors/state`, owned by that user. An `emptyDir` or a persistent volume root
-  with `fsGroup` is group-writable and is refused.
+  with `fsGroup` is group-writable and is refused, and so is a `0777` volume root anywhere
+  above the state directory, because every directory above it is checked too. A volume
+  needs the layout a [served host's state](running-services.md#the-state-directory) does.
 - Keep `readOnlyRootFilesystem: false` for that layer.
 
 ```toml
