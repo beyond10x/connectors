@@ -125,6 +125,25 @@ way. The file has three members:
   - `definition`, a definition file, with `definitions_root`, the definitions checkout its
     source is under, `instance` and optionally `endpoint` and `profile`. The binary lowers
     the definition once at start, in a private temporary directory that it removes again.
+
+  `catalog.repositories`, optional, lists the repositories the instance's operations reach,
+  as `<owner>/<repo>`, for example `["example-org/service"]`. Entries are read as
+  [`git.repositories`](#git-relay) is: owners and names compare without case and a trailing
+  `.git`, in any case, is dropped. Start refuses an empty list, `null`, or an entry that is
+  not `<owner>/<repo>`.
+  With the list set:
+  - an operation whose input has both an `owner` and a `repo` member, a write included,
+    runs only for a listed repository. Any other repository is `not_found`, with the
+    message a repository the provider does not have gets, and the instance neither reads
+    its credential nor sends a request. A write is refused before the host records it, so
+    its key is not used;
+  - every other operation (a search, notifications, an organization listing, the user
+    read) is left out of the description, so the host answers `not_found`. A page
+    filtered to the listed repositories could be shorter than its page size, and a
+    caller walking the pages would stop early.
+
+  Without the list every described operation runs for any repository the credential
+  reaches.
 - `credential` names where the instance's credential document comes from. The only binding
   is `mounted_secret`. The document is the item `<directory>/<instance id>/<profile id>`,
   for example `gitlab.example-org/gitlab.pat`. Its content is the document the profile's
@@ -281,7 +300,9 @@ when the configuration has a fourth member, `git`:
 - `upstream` is the forge's git base over `https`. A repository is
   `<upstream>/<owner>/<repo>.git`. `ca_file`, when set, is the only root of its TLS.
 - `repositories` lists the relayed repositories as `<owner>/<repo>`. Any other repository is
-  `404`, and nothing is sent to the forge.
+  `404`, and nothing is sent to the forge. The relay reads this list only; operations read
+  [`catalog.repositories`](#catalog-instances), and neither list is read for the other. To
+  keep both to the same repositories, list them in both.
 - `ref_prefixes` lists the branch prefixes a push may update: `agent/` admits
   `refs/heads/agent/<name>`.
 - `push_limit_bytes` is the largest push the relay reads, 100 MiB by default and at most 1 GiB.

@@ -137,6 +137,12 @@ pub(super) async fn invoke(
     if let Err(error) = validate(&operation.input_schema, &request.input) {
         return refuse(code(error.code), &error.message);
     }
+    // Refusal before the anchor: one the adapter answers from the input
+    // alone (`Adapter::admit`), such as a repository its instance does not
+    // list.
+    if let Err(error) = service.adapter.admit(&request.operation, &request.input) {
+        return refuse(code(error.code), &error.message);
+    }
     // Refusal (keyed host only; the unchanged reader refused the key above):
     // a key promises a replay only a write's attempt can give.
     if operation.profile != MUTATION_PROFILE && request.idempotency_key.is_some() {
