@@ -145,6 +145,14 @@ end of a walk are in it.
   echo '{"ticket_id":101,"page[size]":100,"include_boundary_indicators":true,"page[after]":"<meta.after_cursor>"}' \
     | connectors invoke zendesk/support ticket.audits
   ```
+- **Declared walks.** `tickets.incremental`, `users.incremental`,
+  `organizations.incremental`, `ticket.comments` and `ticket.audits` declare
+  the rules above as their selection's `walk`
+  ([the catalog provider guide](local-catalog-provider.md)): `invoke --describe`
+  shows it under `x-connectors-walk` in `input_schema`, each end by name
+  (`end_of_stream`; `has_more_false`, `no_cursor`, `no_records`), and the
+  walk of `ticket.audits` sends `include_boundary_indicators: true` on every
+  page.
 - **`ticket.show`**, **`user.show`** and **`organization.show`** take the
   numeric id from the path; tickets reference users (`requester_id`,
   `submitter_id`, `assignee_id`) and organizations (`organization_id`), and
