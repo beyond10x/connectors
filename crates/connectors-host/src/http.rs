@@ -9,6 +9,10 @@ use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
+/// The `User-Agent` of every provider request: this build, by name and
+/// version. Some providers refuse a request without one (GitHub's REST API).
+const USER_AGENT: &str = concat!("connectors/", env!("CARGO_PKG_VERSION"));
+
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct HttpConfig {
@@ -97,6 +101,8 @@ fn refused_fixed_header_name(name: &str) -> bool {
                 | "x-http-method-override"
                 | "x-http-method"
                 | "x-method-override"
+                // identification: the client's own `User-Agent`
+                | "user-agent"
                 // framing and negotiation
                 | "accept"
                 | "accept-encoding"
@@ -211,9 +217,15 @@ impl ScopedHttp {
                 "authentication cannot replace HTTP routing or framing headers",
             ));
         }
+        if header == reqwest::header::USER_AGENT {
+            return Err(Error::invalid(
+                "authentication cannot replace the User-Agent",
+            ));
+        }
         // reqwest carries no crypto provider of its own; ring is the one this workspace selects.
         let _ = rustls::crypto::ring::default_provider().install_default();
         let mut builder = Client::builder()
+            .user_agent(USER_AGENT)
             .no_proxy()
             .redirect(reqwest::redirect::Policy::none())
             .retry(reqwest::retry::never())
@@ -383,7 +395,7 @@ impl ScopedHttp {
     /// port carries beside the credential, such as a provider's tenancy header whose value
     /// the admitted configuration derives (`contracts/auth/capability/v1alpha1/http-headers.md`).
     /// It cannot take the credential header's place, or a credential, cookie, routing,
-    /// forwarding, method-override, framing, content (`content-*`) or upgrade header's
+    /// forwarding, method-override, `user-agent`, framing, content (`content-*`) or upgrade header's
     /// (`refused_fixed_header_name`); its value is visible ASCII and spaces, at most
     /// [`FIXED_HEADER_VALUE_LIMIT`] bytes. A port has at most one. A business adapter
     /// holding only `AuthenticatedHttp` can neither add nor change it.
@@ -402,7 +414,7 @@ impl ScopedHttp {
             .map_err(|_| Error::invalid("invalid fixed header name"))?;
         if name == self.header || refused_fixed_header_name(name.as_str()) {
             return Err(Error::invalid(
-                "a fixed header cannot take a credential, routing, forwarding, method-override, framing, content or upgrade header",
+                "a fixed header cannot take a credential, routing, forwarding, method-override, user-agent, framing, content or upgrade header",
             ));
         }
         if value.is_empty()
@@ -1798,6 +1810,94 @@ mod tests {
         )
         .unwrap();
         assert!(custom.with_fixed_header("X-Api-Key", "v").is_err());
+    }
+
+    /// Every provider request names this build as `User-Agent: connectors/<version>`,
+    /// which some providers require of every request (GitHub refuses one without it):
+    /// a read, a read post, a probe, a write, a form post and an assertion post alike.
+    #[tokio::test]
+    async fn every_provider_request_carries_the_connectors_user_agent() {
+        let (base, server) = heads(6).await;
+        let http = plaintext(&base)
+            .with_read_posts(&[&["query"]], Duration::from_secs(30))
+            .unwrap()
+            .with_credential(Arc::new(FixtureCredential));
+        assert_eq!(http.get(&["items"], &[]).await.unwrap().status, 200);
+        assert_eq!(
+            http.post_json(&["query"], &[], &serde_json::json!({}))
+                .await
+                .unwrap()
+                .status,
+            200
+        );
+        let probe = http.probe_capability(&["whoami"]).unwrap();
+        assert_eq!(
+            probe.probe(&serde_json::json!({})).await.unwrap().status,
+            200
+        );
+        assert_eq!(
+            http.post_form(&["token"], &[("grant_type", b"client_credentials")])
+                .await
+                .unwrap()
+                .status,
+            200
+        );
+        assert_eq!(
+            http.post_assertion(
+                &["app", "installations", "7", "access_tokens"],
+                b"header.claims.signature",
+                "application/vnd.github+json",
+            )
+            .await
+            .unwrap()
+            .status,
+            200
+        );
+        assert_eq!(
+            http.into_write()
+                .send_json(WriteMethod::Post, &["items"], &[], &serde_json::json!({}))
+                .await
+                .unwrap()
+                .status,
+            200
+        );
+        let expected = format!("user-agent: connectors/{}\r\n", env!("CARGO_PKG_VERSION"));
+        let heads = server.await.unwrap();
+        assert_eq!(heads.len(), 6);
+        for head in heads {
+            let lower = head.to_ascii_lowercase();
+            assert_eq!(lower.matches("user-agent:").count(), 1, "{head}");
+            assert!(lower.contains(&expected), "{head}");
+        }
+    }
+
+    /// The `User-Agent` is the client's alone: neither the credential header a
+    /// configuration or definition names nor a fixed header may take its place, so
+    /// nothing replaces it, with an empty value or any other.
+    #[test]
+    fn neither_the_credential_nor_a_fixed_header_may_replace_the_user_agent() {
+        for name in ["user-agent", "User-Agent"] {
+            let credential = ScopedHttp::new_with_ca_bytes(
+                &HttpConfig {
+                    base_url: "https://probe.invalid/".into(),
+                    credential: None,
+                    credential_header: name.into(),
+                    bearer: false,
+                    allow_plaintext: false,
+                    ca_file: None,
+                },
+                None,
+                None,
+            );
+            match credential {
+                Ok(_) => panic!("{name:?} was accepted as the credential header"),
+                Err(error) => assert_eq!(error.code, ErrorCode::InvalidInput, "{name:?}"),
+            }
+            match scoped().with_fixed_header(name, "custom") {
+                Ok(_) => panic!("{name:?} was accepted as a fixed header"),
+                Err(error) => assert_eq!(error.code, ErrorCode::InvalidInput, "{name:?}"),
+            }
+        }
     }
 
     /// story:grafana-irm-history-reads: a read names a collection whose path ends in `/`

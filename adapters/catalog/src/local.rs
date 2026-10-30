@@ -764,6 +764,10 @@ fn grant_subject(id_token: &str, client_id: &str, subject_pointer: Option<&str>)
     );
     let document: Value =
         serde_json::from_slice(&payload).map_err(|_| Failure::InvalidCredential)?;
+    // Claims are an object; an array would be read as the claims by position.
+    if !document.is_object() {
+        return Err(Failure::InvalidCredential);
+    }
     let subject = match subject_pointer {
         None => None,
         Some(pointer) => match document.pointer(pointer) {
@@ -1027,12 +1031,17 @@ async fn app_exchange(http: &ScopedHttp, entry: &AppEntry) -> Result<Exchanged> 
     if body.len() > DOCUMENT_LIMIT {
         return Err(Failure::Protocol);
     }
-    let answer: InstallationToken = serde_json::from_slice(&body).map_err(|_| Failure::Protocol)?;
+    let answer: InstallationToken = answer_object(&body)?;
     let expires_at = feed::instant(&answer.expires_at).ok_or(Failure::Protocol)? / 1_000_000_000;
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|_| Failure::Protocol)?
         .as_secs();
+    // A token its issuer says has expired is no token, as an OAuth
+    // `expires_in` of 0 is none: it is never sent.
+    if expires_at <= i128::from(now) {
+        return Err(Failure::Protocol);
+    }
     let usable =
         (expires_at - i128::from(now) - APP_TOKEN_SKEW_S).clamp(0, i128::from(CACHE_LIFETIME_S));
     Ok(Exchanged {
@@ -1223,7 +1232,7 @@ impl OAuth {
         if body.len() > DOCUMENT_LIMIT {
             return Err(Failure::Protocol);
         }
-        let answer: TokenAnswer = serde_json::from_slice(&body).map_err(|_| Failure::Protocol)?;
+        let answer: TokenAnswer = answer_object(&body)?;
         // A client-credentials answer without `expires_in` (Zendesk clients created
         // before 2026-04-30) is cached for at most `CACHE_LIFETIME_S`; a refused
         // request evicts it sooner.
@@ -1315,8 +1324,7 @@ impl OAuth {
         if response.body.len() > DOCUMENT_LIMIT {
             return Err(Failure::Protocol);
         }
-        let info: TokenInfo =
-            serde_json::from_slice(&response.body).map_err(|_| Failure::Protocol)?;
+        let info: TokenInfo = answer_object(&response.body)?;
         if info.aud.as_bytes() != entry.client_id.as_bytes() {
             return Err(Failure::Protocol);
         }
@@ -1335,7 +1343,16 @@ fn id_claims(id_token: &str) -> Result<IdClaims> {
     let payload = URL_SAFE_NO_PAD
         .decode(payload.trim_end_matches('='))
         .map_err(|_| Failure::Protocol)?;
-    serde_json::from_slice(&payload).map_err(|_| Failure::Protocol)
+    answer_object(&payload)
+}
+/// A provider's JSON answer read as `T` only when it is an object. A derived
+/// struct is also read from an array, by position, and none of the answers
+/// read here is one: such an array's first string would become a token.
+fn answer_object<T: serde::de::DeserializeOwned>(body: &[u8]) -> Result<T> {
+    if body.iter().find(|byte| !byte.is_ascii_whitespace()) != Some(&b'{') {
+        return Err(Failure::Protocol);
+    }
+    serde_json::from_slice(body).map_err(|_| Failure::Protocol)
 }
 /// A space-separated OAuth scope string as a bounded set.
 fn scope_set(scope: &str) -> Result<BTreeSet<String>> {

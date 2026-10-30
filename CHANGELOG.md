@@ -10,10 +10,21 @@
   `{api_base}/app/installations/{installation_id}/access_tokens` for an installation token, sends
   that token as `Authorization: Bearer` and keeps it in memory only, reused until five minutes
   before its `expires_at`. The token is never returned, logged, stored or written into an error.
-  The connection is the installation (`identity.source` `configuration`, subject the installation
+  An answer whose `expires_at` is not in the future, or that is not a JSON object, is `protocol`
+  and its token is never sent. The connection is the installation (`identity.source` `configuration`, subject the installation
   id). A definition declares it as `scheme: github_app` with a label and no identity block.
   Nothing in the entry rotates, so `mounted_secret` custody admits the profile. See
   `docs/local-catalog-provider.md`. Run against a local fixture only, not against GitHub.
+
+### Fixed
+
+- Every provider request now carries `User-Agent: connectors/<version>`, set on the HTTP client;
+  GitHub's REST API refuses a request without one. Neither an instance's credential header nor a
+  fixed header may take that name (`invalid_input` when the instance loads), so no configuration
+  or definition replaces it (`contracts/auth/capability/v1alpha1/http-headers.md`).
+- The catalog provider refuses an OAuth token answer, a `tokeninfo` answer or `id_token` claims
+  that are a JSON array as `protocol` (stored grant claims as an invalid credential). Before, the
+  array was read field by field in order, so its first string could be sent as the access token.
 
 ## 0.59.3 — 2026-10-30
 
