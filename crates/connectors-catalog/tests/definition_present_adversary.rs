@@ -210,5 +210,24 @@ fn a_presence_in_a_preflight_and_any_of_round_trips_through_the_importer() {
     })
     .unwrap_or_else(|refusal| panic!("the imported definition lowers: {refusal}"));
     let back: Value = serde_json::from_slice(&std::fs::read(&lowered.operations).unwrap()).unwrap();
+    // story:catalog-operation-declares-its-walk: a shipped read's `walk` has no
+    // definition field yet (story:definition-lowerer-carries-walk). The import
+    // must report exactly the walks it left out, and the rest round-trips whole.
+    let mut walked = Vec::new();
+    for operation in shipped["operations"].as_array_mut().unwrap() {
+        let operation = operation.as_object_mut().unwrap();
+        if operation.remove("walk").is_some() {
+            walked.push((
+                operation["id"].as_str().unwrap().to_owned(),
+                "walk".to_owned(),
+            ));
+        }
+    }
+    let dropped: Vec<(String, String)> = imported
+        .dropped
+        .iter()
+        .map(|dropped| (dropped.operation.clone(), dropped.member.clone()))
+        .collect();
+    assert_eq!(dropped, walked);
     assert_eq!(back, shipped);
 }
