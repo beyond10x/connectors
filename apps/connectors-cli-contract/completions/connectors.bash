@@ -28,6 +28,9 @@ _connectors() {
             connectors,connections)
                 cmd="connectors__subcmd__connections"
                 ;;
+            connectors,definitions)
+                cmd="connectors__subcmd__definitions"
+                ;;
             connectors,help)
                 cmd="connectors__subcmd__help"
                 ;;
@@ -214,6 +217,18 @@ _connectors() {
             connectors__subcmd__connections__subcmd__help,token)
                 cmd="connectors__subcmd__connections__subcmd__help__subcmd__token"
                 ;;
+            connectors__subcmd__definitions,help)
+                cmd="connectors__subcmd__definitions__subcmd__help"
+                ;;
+            connectors__subcmd__definitions,install)
+                cmd="connectors__subcmd__definitions__subcmd__install"
+                ;;
+            connectors__subcmd__definitions__subcmd__help,help)
+                cmd="connectors__subcmd__definitions__subcmd__help__subcmd__help"
+                ;;
+            connectors__subcmd__definitions__subcmd__help,install)
+                cmd="connectors__subcmd__definitions__subcmd__help__subcmd__install"
+                ;;
             connectors__subcmd__help,adapters)
                 cmd="connectors__subcmd__help__subcmd__adapters"
                 ;;
@@ -225,6 +240,9 @@ _connectors() {
                 ;;
             connectors__subcmd__help,connections)
                 cmd="connectors__subcmd__help__subcmd__connections"
+                ;;
+            connectors__subcmd__help,definitions)
+                cmd="connectors__subcmd__help__subcmd__definitions"
                 ;;
             connectors__subcmd__help,help)
                 cmd="connectors__subcmd__help__subcmd__help"
@@ -318,6 +336,9 @@ _connectors() {
                 ;;
             connectors__subcmd__help__subcmd__connections,token)
                 cmd="connectors__subcmd__help__subcmd__connections__subcmd__token"
+                ;;
+            connectors__subcmd__help__subcmd__definitions,install)
+                cmd="connectors__subcmd__help__subcmd__definitions__subcmd__install"
                 ;;
             connectors__subcmd__help__subcmd__instances,describe)
                 cmd="connectors__subcmd__help__subcmd__instances__subcmd__describe"
@@ -443,7 +464,7 @@ _connectors() {
 
     case "${cmd}" in
         connectors)
-            opts="-h --config --state-dir --output --help adapters approvals connections instances invoke list operations setup completions help"
+            opts="-h --config --state-dir --output --help adapters approvals connections definitions instances invoke list operations setup completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2168,8 +2189,110 @@ _connectors() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
+        connectors__subcmd__definitions)
+            opts="-h --config --state-dir --output --help install help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__definitions__subcmd__help)
+            opts="install help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__definitions__subcmd__help__subcmd__help)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__definitions__subcmd__help__subcmd__install)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__definitions__subcmd__install)
+            opts="-h --source --tag --config --state-dir --output --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --source)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --tag)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
         connectors__subcmd__help)
-            opts="adapters approvals connections instances invoke list operations setup completions help"
+            opts="adapters approvals connections definitions instances invoke list operations setup completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2575,6 +2698,34 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__help__subcmd__connections__subcmd__token)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__definitions)
+            opts="install"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__definitions__subcmd__install)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )

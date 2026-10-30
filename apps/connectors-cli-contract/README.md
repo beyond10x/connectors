@@ -168,6 +168,14 @@ Callable: `connections-token`. Input: `connectors.cli.ConnectionTokenInput`. Res
 
 Error `failure`: `connectors.cli.Failure`.
 
+### `definitions install`
+
+Fetch the connectors-definitions release TAG from SOURCE (an https repository URL or a local directory), check every file against its index.json, and record it in definitions.lock and a read-only cache; grants nothing and starts no process
+
+Callable: `definitions-install`. Input: `connectors.cli.DefinitionsInstallInput`. Result: `connectors.cli.DefinitionsInstallResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
 ### `instances describe`
 
 Inspect one configured instance and its cached descriptor; `adapters describe` is its deprecated name
@@ -307,6 +315,7 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:connections-status: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-token: implement the owner-qualified callable and its declared result/error contract
 - handler:connectors-list: implement the owner-qualified callable and its declared result/error contract
+- handler:definitions-install: implement the owner-qualified callable and its declared result/error contract
 - handler:invoke: implement the owner-qualified callable and its declared result/error contract
 - dynamic-validator:invoke: resolve operation/schema identity and validate native input, result and errors; absent validator refuses
 - handler:operations-describe: implement the owner-qualified callable and its declared result/error contract
