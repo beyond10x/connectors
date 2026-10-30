@@ -247,6 +247,13 @@ key is never forgotten, so it is never admitted for another request. A write tha
 flight when the host stopped stays pending: its key answers `outcome_unknown` at once and is
 not sent again.
 
+The `state` directory holds at most 100,000 recorded attempts per instance, and the host never
+removes one: keyed attempts do not expire on the HTTP host. Once an instance has 100,000,
+every further write a grant covers answers `capacity`, records no attempt and sends nothing;
+a replay of a recorded key still answers its outcome. Writes resume only when the operator
+moves the host to a fresh `state` directory. The keys and hourly counts of the old one are not
+carried over, so a key used before is admitted there as a new write.
+
 `POST /v1/invoke`, as in the `curl` example above, carries no key, so on a host with standing
 grants it runs reads only. A Rust caller sends a keyed write with `Client::invoke_v1alpha2_keyed`;
 `Client::invoke_v1alpha2` sends no key, which such a host refuses for a write as
@@ -287,7 +294,7 @@ SQL keeps its execution deadline independent of caller-controlled database setti
 Timeouts and dropped invocations trigger a bounded cancellation/cleanup attempt;
 the request budget includes cleanup. Remote termination cannot be guaranteed after
 a network partition or process loss. See the [service contract](../contracts/service/v1alpha1/semantics.md)
-for the exact budgets. Live timeout, caller-drop and TLS checks run in the SQL adapter's ignored tests.
+for the exact budgets. Live timeout, caller-drop and TLS checks run in the ignored tests of `adapters/sql`.
 
 No service in this slice advertises OAuth acquisition, writes outside a standing grant,
 durable events, process execution, or media sessions. Those remain separate contracts in

@@ -77,7 +77,11 @@ No breaking changes.
   whose write a restart interrupted, answers `outcome_unknown` at once. An applied keyed write
   keeps its provider result, up to 64 KiB, for the replay; a replay of a larger result answers
   `capacity`, with the write still reported as applied. Keys and hourly counts survive a
-  restart in `standing-grants.sqlite3` (mode 0600); keys do not expire. With a grant file,
+  restart in `standing-grants.sqlite3` (mode 0600); keys do not expire. Limitation: the
+  `state` directory holds at most 100,000 recorded attempts per instance and the host removes
+  none, so once that many are recorded every further write answers `capacity` (a replay of a
+  recorded key still answers) until the operator moves the host to a fresh `state` directory,
+  which carries no earlier key over. With a grant file,
   `connectors-catalog-provider --config` lists and runs the instance's writes too; without one
   it serves reads only, as before. Rust callers send a key with the new
   `Client::invoke_v1alpha2_keyed`; `Client::invoke_v1alpha2` is unchanged. Contract:
