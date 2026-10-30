@@ -12,7 +12,12 @@ use std::{
     },
     path::Component,
 };
-use std::{ffi::OsStr, fs::File, io::Read, path::Path};
+use std::{
+    ffi::OsStr,
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 #[cfg(windows)]
 pub(crate) mod windows;
@@ -57,17 +62,80 @@ fn open_at(parent: &File, name: &OsStr, flags: i32, mode: u32) -> std::io::Resul
     Ok(unsafe { File::from_raw_fd(fd) })
 }
 
-#[cfg(unix)]
-fn admitted_directory(file: &File, private: bool) -> Result<()> {
-    let stat = file.metadata().map_err(|_| Failure::InvalidConfiguration)?;
-    if !stat.is_dir()
-        || (stat.uid() != uid() && stat.uid() != 0)
-        || stat.mode() & 0o022 != 0
-        || (private && (stat.uid() != uid() || stat.mode() & 0o077 != 0))
-    {
-        return Err(Failure::InvalidConfiguration);
+/// Why [`explained_directory`] refused a directory. Fixed words, never OS text.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Reason {
+    /// Owned by neither the host user nor root.
+    Owner,
+    /// Writable by group or others.
+    Writable,
+    /// The final directory of a private open is not the host user's with
+    /// mode `0700`.
+    NotPrivate,
+}
+
+/// A directory the admission refused: the configured path or one of its
+/// ancestors, and why.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Refused {
+    pub directory: PathBuf,
+    pub reason: Reason,
+}
+
+/// A failed [`explained_directory`]: a refused directory, or any other
+/// closed failure.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Refusal {
+    Refused(Refused),
+    Failure(Failure),
+}
+
+impl From<Failure> for Refusal {
+    fn from(failure: Failure) -> Self {
+        Self::Failure(failure)
     }
-    Ok(())
+}
+
+impl Refusal {
+    /// The closed failure this refusal is everywhere but at host start.
+    #[must_use]
+    pub fn failure(self) -> Failure {
+        match self {
+            Self::Refused(_) => Failure::InvalidConfiguration,
+            Self::Failure(failure) => failure,
+        }
+    }
+}
+
+/// The admission of a directory owned by `owner` with `mode`, for the host
+/// user `me`: owned by the host user or root and not group- or
+/// other-writable; `private`, also the host user's with no group or other bits.
+#[cfg(unix)]
+fn refusal(owner: u32, mode: u32, private: bool, me: u32) -> Option<Reason> {
+    if owner != me && owner != 0 {
+        Some(Reason::Owner)
+    } else if mode & 0o022 != 0 {
+        Some(Reason::Writable)
+    } else if private && (owner != me || mode & 0o077 != 0) {
+        Some(Reason::NotPrivate)
+    } else {
+        None
+    }
+}
+
+#[cfg(unix)]
+fn admitted_directory(file: &File, private: bool, path: &Path) -> std::result::Result<(), Refusal> {
+    let stat = file.metadata().map_err(|_| Failure::InvalidConfiguration)?;
+    if !stat.is_dir() {
+        return Err(Failure::InvalidConfiguration.into());
+    }
+    match refusal(stat.uid(), stat.mode(), private, uid()) {
+        None => Ok(()),
+        Some(reason) => Err(Refusal::Refused(Refused {
+            directory: path.to_owned(),
+            reason,
+        })),
+    }
 }
 
 /// An absolute local path on a drive (`C:\…`) with plain, literal names.
@@ -93,13 +161,25 @@ pub fn validate_path(path: &Path) -> Result<()> {
 /// Existing directories are never chmodded or repaired implicitly.
 #[cfg(unix)]
 pub fn directory(path: &Path, create: bool, private: bool) -> Result<File> {
+    explained_directory(path, create, private).map_err(Refusal::failure)
+}
+
+/// [`directory`], naming the directory it refused and why.
+#[cfg(unix)]
+pub fn explained_directory(
+    path: &Path,
+    create: bool,
+    private: bool,
+) -> std::result::Result<File, Refusal> {
     validate_path(path)?;
     let mut current = File::open("/").map_err(|_| Failure::InvalidConfiguration)?;
-    admitted_directory(&current, false)?;
+    let mut walked = PathBuf::from("/");
+    admitted_directory(&current, false, &walked)?;
     for component in path.components() {
         let Component::Normal(part) = component else {
             continue;
         };
+        walked.push(part);
         let next = match open_at(&current, part, libc::O_RDONLY | libc::O_DIRECTORY, 0) {
             Ok(next) => next,
             Err(error) if create && error.kind() == std::io::ErrorKind::NotFound => {
@@ -109,7 +189,7 @@ pub fn directory(path: &Path, create: bool, private: bool) -> Result<File> {
                 if result != 0
                     && std::io::Error::last_os_error().kind() != std::io::ErrorKind::AlreadyExists
                 {
-                    return Err(Failure::InvalidConfiguration);
+                    return Err(Failure::InvalidConfiguration.into());
                 }
                 let next = open_at(&current, part, libc::O_RDONLY | libc::O_DIRECTORY, 0)
                     .map_err(|_| Failure::InvalidConfiguration)?;
@@ -117,13 +197,23 @@ pub fn directory(path: &Path, create: bool, private: bool) -> Result<File> {
                 current.sync_all().map_err(|_| Failure::OutcomeUnknown)?;
                 next
             }
-            Err(_) => return Err(Failure::InvalidConfiguration),
+            Err(_) => return Err(Failure::InvalidConfiguration.into()),
         };
-        admitted_directory(&next, false)?;
+        admitted_directory(&next, false, &walked)?;
         current = next;
     }
-    admitted_directory(&current, private)?;
+    admitted_directory(&current, private, &walked)?;
     Ok(current)
+}
+
+/// [`directory`]; Windows names no refused directory.
+#[cfg(windows)]
+pub fn explained_directory(
+    path: &Path,
+    create: bool,
+    private: bool,
+) -> std::result::Result<File, Refusal> {
+    directory(path, create, private).map_err(Refusal::Failure)
 }
 
 #[cfg(unix)]
@@ -513,6 +603,54 @@ fn publish_with_mode(
         libc::unlinkat(parent.as_raw_fd(), temporary_c.as_ptr(), 0);
     }
     result
+}
+
+#[cfg(all(test, unix))]
+mod refusal_tests {
+    use super::*;
+
+    /// The reasons reproduce the admission exactly: a directory owned by
+    /// another user, a group- or other-writable one and a final directory
+    /// that is not the host user's `0700` are each refused, in that order.
+    #[test]
+    fn each_refused_directory_has_one_fixed_reason() {
+        let me = 1000;
+        assert_eq!(refusal(me, 0o755, false, me), None);
+        assert_eq!(refusal(0, 0o755, false, me), None);
+        assert_eq!(refusal(me, 0o700, true, me), None);
+        assert_eq!(refusal(2000, 0o755, false, me), Some(Reason::Owner));
+        assert_eq!(refusal(2000, 0o777, true, me), Some(Reason::Owner));
+        assert_eq!(refusal(me, 0o775, false, me), Some(Reason::Writable));
+        assert_eq!(refusal(0, 0o777, false, me), Some(Reason::Writable));
+        assert_eq!(refusal(me, 0o1777, false, me), Some(Reason::Writable));
+        assert_eq!(refusal(me, 0o777, true, me), Some(Reason::Writable));
+        assert_eq!(refusal(me, 0o750, true, me), Some(Reason::NotPrivate));
+        assert_eq!(refusal(0, 0o700, true, me), Some(Reason::NotPrivate));
+    }
+
+    /// The refused directory is the one the walk stood on: an ancestor
+    /// names that ancestor, and nothing below it is created.
+    #[test]
+    fn a_refused_ancestor_is_named_and_nothing_is_created() {
+        let root = tempfile::tempdir().unwrap();
+        let volume = root.path().join("volume");
+        std::fs::create_dir(&volume).unwrap();
+        std::fs::set_permissions(&volume, std::os::unix::fs::PermissionsExt::from_mode(0o777))
+            .unwrap();
+        let state = volume.join("state");
+        assert_eq!(
+            explained_directory(&state, true, true).err(),
+            Some(Refusal::Refused(Refused {
+                directory: volume,
+                reason: Reason::Writable,
+            }))
+        );
+        assert!(!state.exists());
+        assert_eq!(
+            directory(&state, true, true).err(),
+            Some(Failure::InvalidConfiguration)
+        );
+    }
 }
 
 #[cfg(all(test, target_os = "macos"))]
