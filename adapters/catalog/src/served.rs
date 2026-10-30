@@ -13,8 +13,9 @@
 //! 1. Admission, by the host (`connectors_host::server`): `unauthorized` or
 //!    `unavailable`, before the body is read.
 //! 2. An operation the description does not list (every catalog write when no
-//!    grant file is configured): the host answers `not_found` before any
-//!    anchor or adapter call.
+//!    grant file is configured, and with `catalog.repositories` every
+//!    operation whose input lacks `owner` or `repo`): the host answers
+//!    `not_found` before any anchor or adapter call.
 //! 3. A write: the host's standing-grant gate
 //!    (crates/connectors-host/src/server/v1alpha2.rs, module docs). Without
 //!    `idempotency_key` it is `invalid_input`; a key live for another request
@@ -25,7 +26,13 @@
 //!    before any adapter call.
 //! 4. [`Bridge::invoke`]: an operation outside the described reads and writes
 //!    is `unsupported` before the credential is read. This repeats 2.
-//! 5. The mounted credential: an item absent, or refused by any check, is
+//! 5. With `catalog.repositories`, a read or a write whose `owner` and `repo`
+//!    name no listed repository is `not_found`, with the message a missing
+//!    repository gets (story:catalog-reads-stay-inside-the-instance-repositories).
+//!    On `/v1alpha2/invoke` the host asks [`Bridge`]'s `admit` before it
+//!    anchors the call, so nothing is recorded and a key stays unused;
+//!    [`Bridge::invoke`] checks again before the credential is read.
+//! 6. The mounted credential: an item absent, or refused by any check, is
 //!    `unavailable`, and nothing is sent.
 //!
 //! A read is dispatched through `invoke_explained`, the read path. A write is
@@ -38,8 +45,9 @@
 //! read under the `mutation` profile, a write under any other profile, a
 //! write whose answer carries a credential it created (the served host has no
 //! custody target), more than one profile, a profile whose material is
-//! acquired by OAuth, alternative bindings, and a credential that cannot be
-//! read now.
+//! acquired by OAuth, alternative bindings, a credential that cannot be read
+//! now, and a `catalog.repositories` that is empty or has an entry that is
+//! not `<owner>/<repo>`.
 use crate::local::{Instance, Local};
 use connectors_core::{Descriptor, Error, ErrorCode, Result};
 use connectors_host::{
@@ -70,6 +78,71 @@ const MUTATION_PROFILE: &str = "mutation";
 /// execution deadline: an adapter that waits before sending again never
 /// waits past it.
 const READ_DEADLINE: Duration = Duration::from_secs(15);
+/// The input members that name one repository: an operation whose input has
+/// both is bounded by `catalog.repositories`.
+const OWNER: &str = "owner";
+const REPO: &str = "repo";
+/// The answer of a repository the provider does not have, and of one the
+/// repository list does not name.
+const PROVIDER_NOT_FOUND: &str = "the provider found nothing";
+
+/// One repository of a list (`catalog.repositories`, `git.repositories`).
+#[derive(Clone)]
+struct Repository {
+    owner: String,
+    name: String,
+}
+
+/// `1..=100` bytes of letters, digits, `.`, `_` and `-`, not `.` or `..`.
+fn valid_segment(segment: &str) -> bool {
+    !segment.is_empty()
+        && segment.len() <= 100
+        && segment != "."
+        && segment != ".."
+        && segment
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+}
+
+/// `name` without a trailing `.git` in any case.
+fn without_git(name: &str) -> &str {
+    let cut = name.len().saturating_sub(4);
+    match name.get(cut..) {
+        Some(suffix) if suffix.eq_ignore_ascii_case(".git") => &name[..cut],
+        _ => name,
+    }
+}
+
+/// A repository list's entries, each `<owner>/<repo>` with or without
+/// `.git`; at least one. The error is the refusal's text.
+fn repositories(entries: &[String]) -> std::result::Result<Vec<Repository>, &'static str> {
+    let mut repositories = Vec::new();
+    for entry in entries {
+        let Some((owner, name)) = entry.split_once('/') else {
+            return Err("a repository is <owner>/<repo>");
+        };
+        let name = without_git(name);
+        if !valid_segment(owner) || !valid_segment(name) {
+            return Err("a repository is <owner>/<repo>");
+        }
+        repositories.push(Repository {
+            owner: owner.to_owned(),
+            name: name.to_owned(),
+        });
+    }
+    if repositories.is_empty() {
+        return Err("repositories lists at least one repository");
+    }
+    Ok(repositories)
+}
+
+/// The listed repository `owner`/`repo` names, with or without `.git`;
+/// owners and names compare without case, as the forge's do.
+fn listed<'a>(list: &'a [Repository], owner: &str, repo: &str) -> Option<&'a Repository> {
+    let repo = without_git(repo);
+    list.iter()
+        .find(|r| r.owner.eq_ignore_ascii_case(owner) && r.name.eq_ignore_ascii_case(repo))
+}
 
 /// The served configuration: the host's, the instance's and its credential's.
 #[derive(Deserialize)]
@@ -105,6 +178,20 @@ pub struct Catalog {
     endpoint: Option<String>,
     #[serde(default)]
     profile: Option<String>,
+    /// The repositories, as `<owner>/<repo>`, that operations taking `owner`
+    /// and `repo` reach; with it set, no other operation is served. Present
+    /// as `null`, it is a list with no repository, which start refuses.
+    #[serde(default, deserialize_with = "present")]
+    repositories: Option<Vec<String>>,
+}
+
+/// A member that is present is `Some`, `null` included (as no entry); only
+/// an absent one is `None`, through `#[serde(default)]`.
+fn present<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<Vec<String>>, D::Error> {
+    Option::<Vec<String>>::deserialize(deserializer)
+        .map(|entries| Some(entries.unwrap_or_default()))
 }
 
 /// Where the credential document comes from. One binding exists.
@@ -126,12 +213,20 @@ enum Binding {
 /// serve it until the host stops.
 pub async fn run(path: &Path) -> Result<()> {
     let config: Configuration = connectors_host::read_config(path)?;
+    let bounds = config
+        .catalog
+        .repositories
+        .as_deref()
+        .map(repositories)
+        .transpose()
+        .map_err(|refusal| Error::invalid(format!("catalog: {refusal}")))?;
     let local = config.catalog.local()?;
     let bridge = if config.service.standing_grants.is_some() {
         Bridge::serving_writes(local, &config.credential).await?
     } else {
         Bridge::new(local, &config.credential).await?
-    };
+    }
+    .within(bounds);
     if config.service.instance != bridge.instance {
         return Err(Error::invalid(
             "service.instance must be the catalog instance's id",
@@ -222,6 +317,7 @@ impl Catalog {
                 instance: Some(name),
                 endpoint,
                 profile,
+                repositories: _,
             } => Local::derive(&Instance {
                 connector,
                 name,
@@ -237,6 +333,7 @@ impl Catalog {
                 instance: None,
                 endpoint: None,
                 profile: None,
+                repositories: _,
             } => Local::load(path)
                 .map_err(|failure| refused("the local configuration cannot be loaded", failure)),
             Self {
@@ -247,6 +344,7 @@ impl Catalog {
                 instance: Some(name),
                 endpoint,
                 profile,
+                repositories: _,
             } => lowered(
                 definition,
                 root,
@@ -364,6 +462,51 @@ pub struct Bridge<A> {
     writes: BTreeSet<String>,
     instance: String,
     credential: Mounted,
+    /// `catalog.repositories`: when set, the only repositories an operation
+    /// reaches.
+    repositories: Option<Vec<Repository>>,
+}
+
+/// Whether an operation's input has both `owner` and `repo` members.
+fn names_a_repository(operation: &connectors_core::Operation) -> bool {
+    let properties = &operation.input_schema["properties"];
+    [OWNER, REPO]
+        .iter()
+        .all(|member| properties.get(member).is_some())
+}
+
+impl<A> Bridge<A> {
+    /// The bridge bounded to `repositories` when they are set: only the
+    /// operations whose input names a repository stay described and
+    /// dispatched, because a page filtered to them would end a walk early.
+    fn within(mut self, repositories: Option<Vec<Repository>>) -> Self {
+        if repositories.is_some() {
+            self.descriptor.operations.retain(names_a_repository);
+            let kept: BTreeSet<String> = self
+                .descriptor
+                .operations
+                .iter()
+                .map(|operation| operation.id.clone())
+                .collect();
+            self.reads.retain(|id| kept.contains(id));
+            self.writes.retain(|id| kept.contains(id));
+        }
+        self.repositories = repositories;
+        self
+    }
+
+    /// Refusal: with a repository list, an input that names no listed
+    /// repository, answered as a missing repository is.
+    fn bounded(&self, input: &Value) -> Result<()> {
+        let Some(list) = &self.repositories else {
+            return Ok(());
+        };
+        let member = |name| input.get(name).and_then(Value::as_str);
+        match (member(OWNER), member(REPO)) {
+            (Some(owner), Some(repo)) if listed(list, owner, repo).is_some() => Ok(()),
+            _ => Err(Error::new(ErrorCode::NotFound, PROVIDER_NOT_FOUND)),
+        }
+    }
 }
 
 impl<A: runtime::Adapter> Bridge<A> {
@@ -459,6 +602,7 @@ impl<A: runtime::Adapter> Bridge<A> {
                 alias: bootstrap.instance,
                 profile: profile.id.clone(),
             },
+            repositories: None,
         };
         // A credential that cannot be read now refuses start.
         drop(bridge.credential.read().await?);
@@ -472,6 +616,11 @@ impl<A: runtime::Adapter> connectors_sdk::Adapter for Bridge<A> {
         self.descriptor.clone()
     }
 
+    /// The repository check, before the host anchors the call.
+    fn admit(&self, _operation: &str, input: &Value) -> Result<()> {
+        self.bounded(input)
+    }
+
     async fn invoke(&self, operation: &str, input: Value) -> Result<Value> {
         let write = self.writes.contains(operation);
         // Refusal: an operation this bridge did not describe.
@@ -481,6 +630,8 @@ impl<A: runtime::Adapter> connectors_sdk::Adapter for Bridge<A> {
                 "the served host dispatches only the operations it describes",
             ));
         }
+        // Refusal: with a repository list, an unlisted repository.
+        self.bounded(&input)?;
         // Refusal: no mounted credential now, so nothing is sent.
         let document = self.credential.read().await?;
         if write {
@@ -566,7 +717,7 @@ fn error(refusal: Refusal) -> Error {
         ReadinessMismatch | IncarnationMismatch | InvalidConfiguration => {
             (ErrorCode::Internal, "internal error", false)
         }
-        ProviderNotFound => (ErrorCode::NotFound, "the provider found nothing", true),
+        ProviderNotFound => (ErrorCode::NotFound, PROVIDER_NOT_FOUND, true),
         ProviderRateLimited => (ErrorCode::RateLimited, "the provider is rate limited", true),
         ProviderInternal => (ErrorCode::Internal, "the provider failed", true),
         ProviderForbidden => (ErrorCode::Forbidden, "the provider refused the read", true),
@@ -603,14 +754,30 @@ mod tests {
 
     impl Listed {
         fn new(operations: &[(&str, Effect, &str)]) -> Self {
+            let operations: Vec<_> = operations
+                .iter()
+                .map(|(id, effect, profile)| (*id, *effect, *profile, &[][..]))
+                .collect();
+            Self::taking(&operations)
+        }
+
+        /// Each operation's input has the members it names.
+        fn taking(operations: &[(&str, Effect, &str, &[&str])]) -> Self {
             let descriptor = serde_json::json!({
                 "version": connectors_core::WIRE_VERSION,
                 "instance": "fixture.one",
                 "adapter": "catalog",
                 "revision": "rev-1",
-                "operations": operations.iter().map(|(id, _, profile)| serde_json::json!({
+                "operations": operations.iter().map(|(id, _, profile, members)| serde_json::json!({
                     "id": id, "description": "d", "contract": "c", "profile": profile,
-                    "input_schema": {"type": "object"}, "output_schema": {},
+                    "input_schema": {
+                        "type": "object",
+                        "properties": members
+                            .iter()
+                            .map(|member| (member.to_string(), serde_json::json!({"type": "string"})))
+                            .collect::<serde_json::Map<_, _>>(),
+                    },
+                    "output_schema": {},
                 })).collect::<Vec<_>>(),
                 "configuration_schema": {"type": "object"},
             });
@@ -632,7 +799,7 @@ mod tests {
                 profiles: vec![serde_json::from_value(profile).unwrap()],
                 requirements: operations
                     .iter()
-                    .map(|(id, effect, _)| Requirement {
+                    .map(|(id, effect, _, _)| Requirement {
                         operation: (*id).into(),
                         custody: false,
                         profile: "fixture.pat".into(),
@@ -766,6 +933,7 @@ mod tests {
                 alias: "fixture.one".into(),
                 profile: "fixture.pat".into(),
             },
+            repositories: None,
             adapter,
         };
         use connectors_sdk::Adapter as _;
@@ -790,6 +958,7 @@ mod tests {
                 alias: "fixture.one".into(),
                 profile: "fixture.pat".into(),
             },
+            repositories: None,
             adapter,
         };
         use connectors_sdk::Adapter as _;
@@ -797,6 +966,199 @@ mod tests {
         assert_eq!(error.code, ErrorCode::Unsupported);
         let error = bridge.invoke("read", Value::Null).await.unwrap_err();
         assert_eq!(error.code, ErrorCode::Unavailable);
+        assert_eq!(bridge.adapter.calls.load(Ordering::SeqCst), 0);
+    }
+
+    /// story:catalog-reads-stay-inside-the-instance-repositories: a
+    /// repository list is a non-empty list of `<owner>/<repo>`, with or
+    /// without `.git`; anything else refuses start.
+    #[test]
+    fn a_repository_list_is_parsed_as_the_relay_parses_its_own() {
+        let parsed = |entries: &[&str]| {
+            let entries: Vec<String> = entries.iter().map(|entry| (*entry).to_owned()).collect();
+            repositories(&entries)
+        };
+        let list = parsed(&["Example-Org/Service.git", "example-org/tools.GIT"]).unwrap();
+        assert!(listed(&list, "example-org", "service").is_some());
+        assert!(listed(&list, "EXAMPLE-ORG", "Service.git").is_some());
+        assert!(listed(&list, "example-org", "service.Git").is_some());
+        assert!(listed(&list, "example-org", "tools.git").is_some());
+        assert!(listed(&list, "example-org", ".git").is_none());
+        assert!(listed(&list, "example-org", "tools").is_some());
+        assert!(listed(&list, "example-org", "other").is_none());
+        assert!(listed(&list, "other-org", "service").is_none());
+        assert!(listed(&list, "example-org", "service/../other").is_none());
+        assert_eq!(
+            parsed(&[]).err(),
+            Some("repositories lists at least one repository")
+        );
+        for invalid in [
+            "example-org",
+            "example-org/",
+            "/service",
+            "example-org/service/extra",
+            "../service",
+            "example org/service",
+            "example-org/.git",
+            "example-org/.GIT",
+        ] {
+            assert_eq!(
+                parsed(&[invalid]).err(),
+                Some("a repository is <owner>/<repo>"),
+                "{invalid}"
+            );
+        }
+    }
+
+    /// `catalog.repositories: null` is a list with no repository, which start
+    /// refuses, not an absent key, which serves every repository.
+    #[test]
+    fn a_null_repository_list_is_an_empty_one() {
+        let read = |catalog: Value| serde_json::from_value::<Catalog>(catalog).unwrap();
+        let named = serde_json::json!({"connector": "c", "instance": "i"});
+        assert!(read(named.clone()).repositories.is_none());
+        let mut null = named;
+        null["repositories"] = Value::Null;
+        let null = read(null).repositories.expect("null is not absent");
+        assert_eq!(
+            repositories(&null).err(),
+            Some("repositories lists at least one repository")
+        );
+    }
+
+    /// The fixture bridge of `adapter`, its credential never readable, its
+    /// reads and writes the described ones of each effect.
+    fn unreadable(adapter: Listed) -> Bridge<Listed> {
+        let descriptor: Descriptor = serde_json::from_str(&adapter.bootstrap.descriptor).unwrap();
+        let of = |effect: Effect| {
+            adapter
+                .bootstrap
+                .requirements
+                .iter()
+                .filter(|requirement| requirement.effect == effect)
+                .map(|requirement| requirement.operation.clone())
+                .collect()
+        };
+        Bridge {
+            reads: of(Effect::Read),
+            writes: of(Effect::Write),
+            descriptor,
+            instance: "fixture.one".into(),
+            credential: Mounted {
+                directory: PathBuf::from("/nonexistent/connectors-served-test"),
+                alias: "fixture.one".into(),
+                profile: "fixture.pat".into(),
+            },
+            repositories: None,
+            adapter,
+        }
+    }
+
+    /// With a repository list, only the operations whose input has `owner`
+    /// and `repo` are described and dispatched; a read or a write for an
+    /// unlisted repository is `not_found`, the missing repository's answer,
+    /// before the credential is read and before any adapter call. Without
+    /// one, nothing changes.
+    #[tokio::test]
+    async fn with_a_repository_list_only_a_listed_repository_reaches_the_credential() {
+        use connectors_sdk::Adapter as _;
+        let operations: &[(&str, Effect, &str, &[&str])] = &[
+            (
+                "repo.read",
+                Effect::Read,
+                "generic-http",
+                &["owner", "repo", "n"],
+            ),
+            ("search", Effect::Read, "generic-http", &["q"]),
+            ("owner.read", Effect::Read, "generic-http", &["owner"]),
+            (
+                "repo.write",
+                Effect::Write,
+                MUTATION_PROFILE,
+                &["owner", "repo"],
+            ),
+        ];
+        let unbounded = unreadable(Listed::taking(operations)).within(None);
+        let mut all: Vec<_> = unbounded
+            .descriptor()
+            .operations
+            .into_iter()
+            .map(|o| o.id)
+            .collect();
+        all.sort();
+        assert_eq!(all, ["owner.read", "repo.read", "repo.write", "search"]);
+        let refused = unbounded
+            .invoke("search", serde_json::json!({"q": "x"}))
+            .await
+            .unwrap_err();
+        assert_eq!(
+            refused.code,
+            ErrorCode::Unavailable,
+            "without a list a search is read"
+        );
+
+        let list = repositories(&["Example-Org/Service.git".to_owned()]).unwrap();
+        let bridge = unreadable(Listed::taking(operations)).within(Some(list));
+        let described: Vec<_> = bridge
+            .descriptor()
+            .operations
+            .into_iter()
+            .map(|o| o.id)
+            .collect();
+        assert_eq!(described, ["repo.read", "repo.write"]);
+        let missing = error(Refusal {
+            failure: Failure::ProviderNotFound,
+            reason: None,
+            retry_after_seconds: None,
+        });
+        for (operation, input) in [
+            (
+                "repo.read",
+                serde_json::json!({"owner": "other-org", "repo": "service"}),
+            ),
+            (
+                "repo.read",
+                serde_json::json!({"owner": "example-org", "repo": "other"}),
+            ),
+            ("repo.read", serde_json::json!({"owner": "example-org"})),
+            (
+                "repo.read",
+                serde_json::json!({"owner": "example-org", "repo": 7}),
+            ),
+            ("repo.read", Value::Null),
+            (
+                "repo.write",
+                serde_json::json!({"owner": "other-org", "repo": "service"}),
+            ),
+        ] {
+            let error = bridge.invoke(operation, input.clone()).await.unwrap_err();
+            assert_eq!(error.code, ErrorCode::NotFound, "{operation} {input}");
+            assert_eq!(error.message, missing.message, "{operation} {input}");
+        }
+        for operation in ["search", "owner.read"] {
+            let error = bridge
+                .invoke(
+                    operation,
+                    serde_json::json!({"q": "x", "owner": "example-org"}),
+                )
+                .await
+                .unwrap_err();
+            assert_eq!(error.code, ErrorCode::Unsupported, "{operation}");
+        }
+        // A listed repository passes the check and meets the credential.
+        for (operation, owner, repo) in [
+            ("repo.read", "example-org", "service"),
+            ("repo.read", "EXAMPLE-ORG", "Service.git"),
+            ("repo.write", "example-org", "service"),
+        ] {
+            let input = serde_json::json!({"owner": owner, "repo": repo});
+            let error = bridge.invoke(operation, input).await.unwrap_err();
+            assert_eq!(
+                error.code,
+                ErrorCode::Unavailable,
+                "{operation} {owner}/{repo}"
+            );
+        }
         assert_eq!(bridge.adapter.calls.load(Ordering::SeqCst), 0);
     }
 

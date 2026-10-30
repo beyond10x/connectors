@@ -28,6 +28,12 @@ pub trait Adapter: Send + Sync {
         }
         self.invoke(operation, input).await
     }
+    /// A refusal the adapter answers from a described operation's validated
+    /// input alone, which the host sends before it anchors the call: no
+    /// record, no attempt and no adapter call. None by default.
+    fn admit(&self, _operation: &str, _input: &Value) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// Deliberately has no Debug or Serialize implementation.
