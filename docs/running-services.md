@@ -192,11 +192,17 @@ with 1 to 16 target members.
 
 The host reads the file on every write, so an edit, a revocation or a removed grant applies
 from the next call on, without a restart. With no file at the path, no write is admitted.
-The host refuses the file, and answers `unavailable` without sending anything, when it is a
-symlink or not a regular file, is writable by group or others, is owned by a user other
-than the running user or root, is larger than 64 KiB, or is malformed. Whoever can change
-the file can widen what the instance writes, as whoever can change its mounted credential
-can: mount it read-only, with mode `0400` or `0600`.
+The file may be a plain file or a key of a Kubernetes Secret or ConfigMap volume: on Linux
+the host reads the volume's `grants.json -> ..data/grants.json` link through `..data`, as
+the [`mounted_secret` custody binding](local-mounted-secret-custody.md) reads its items, and
+follows no other symlink. The host refuses the file, and answers `unavailable` without
+sending anything, when any directory above it is owned by a user other than the running
+user or root or is writable by group or others (its own directory may be, on a read-only
+mount such as a volume's), when it is reached through any other symlink or is not a regular
+file, is writable by group or others, is owned by a user other than the running user or
+root, is larger than 64 KiB, or is malformed. Whoever can change the file can widen what
+the instance writes, as whoever can change its mounted credential can: mount it read-only,
+with mode `0400`, `0440` or `0644` on a volume and `0400` or `0600` otherwise.
 
 The caller sends every write with `idempotency_key`, a string of at most 256 bytes it chooses
 per intended effect. The host answers, before anything is recorded or sent:
@@ -214,13 +220,18 @@ per intended effect. The host answers, before anything is recorded or sent:
 A write that passes is recorded as one attempt and sent at most once. Sending the same key
 and input again never sends again: it answers the original attempt's outcome, marked
 `replayed: true`, and checks no grant, so a revoked grant does not hide what already
-happened. If the original is still running, the repeat waits up to 25 seconds and then
-answers `outcome_unknown`. To answer a replay, the host keeps an applied write's result, up
-to 64 KiB, in its `state` directory; a replay of a larger one answers `capacity` and still
-reports the write as applied. Concurrent requests with one key make one provider request. Keys
-and the hourly counts are kept in the host's `state` directory and survive a restart; a key
-is never forgotten, so it is never admitted for another request. A write that was in flight
-when the host stopped stays pending: its key answers `outcome_unknown` and is not sent again.
+happened. If the original is still running, the repeat waits up to 25 seconds, without
+taking one of the host's in-flight slots, and then answers `outcome_unknown`; at most 4
+repeats wait on one write, and a fifth answers `outcome_unknown` at once. To answer a
+replay, the host keeps an applied write's result, up to 64 KiB, in its `state` directory; a
+replay of a larger one answers `capacity` and still reports the write as applied. The host
+admits requests with one key one at a time, so concurrent requests with one key make one
+provider request and take one use of the grant: the others are replays, or
+`idempotency_conflict` when their input differs. Keys and the hourly counts are kept in the
+host's `state` directory (`standing-grants.sqlite3`, mode `0600`) and survive a restart; a
+key is never forgotten, so it is never admitted for another request. A write that was in
+flight when the host stopped stays pending: its key answers `outcome_unknown` at once and is
+not sent again.
 
 `connectors invoke` sends `POST /v1/invoke` with no key, so on a host with standing grants it
 runs reads only. A Rust caller sends a keyed write with `Client::invoke_v1alpha2_keyed`;

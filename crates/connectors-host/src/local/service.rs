@@ -21,11 +21,98 @@ use super::{
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use serde_json::{Value, json};
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
     sync::{Arc, Mutex, Weak},
     time::{Duration, Instant},
 };
 use uuid::Uuid;
+
+/// Replays that wait on one original this process is running
+/// (compatibility.md § 2.1, Replay). A further replay of it is answered
+/// `outcome_unknown` at once rather than wait.
+pub const REPLAY_WAITERS: usize = 4;
+
+/// The key lanes of this process: one async mutex per (principal, key) with
+/// a keyed write between its key lookup and its prepared attempt. An entry
+/// exists only while a request holds or waits for it.
+type Lanes = Arc<Mutex<HashMap<(String, String), Arc<tokio::sync::Mutex<()>>>>>;
+/// The keyed attempts this process prepared and has not yet settled or
+/// aborted, with the replays waiting on each.
+type Flights = Arc<Mutex<HashMap<Uuid, Flight>>>;
+
+struct Flight {
+    waiters: usize,
+    /// Dropped when the attempt leaves the map, which wakes every waiter.
+    landed: tokio::sync::watch::Sender<()>,
+}
+
+fn locked<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// One request's hold on a key lane ([`ServiceState::key_lane`]). Dropping
+/// it lets the next request with that key in.
+pub struct KeyLane {
+    held: Option<tokio::sync::OwnedMutexGuard<()>>,
+    lanes: Lanes,
+    name: (String, String),
+}
+
+impl Drop for KeyLane {
+    fn drop(&mut self) {
+        let mut lanes = locked(&self.lanes);
+        drop(self.held.take());
+        // Only the map still refers to an idle lane: no holder, no waiter.
+        if lanes
+            .get(&self.name)
+            .is_some_and(|lane| Arc::strong_count(lane) == 1)
+        {
+            lanes.remove(&self.name);
+        }
+    }
+}
+
+/// How a replay of a pending original may wait for it
+/// ([`ServiceState::wait_on`]).
+pub enum Waiting {
+    /// This process runs the original; the wait ends when it settles.
+    Joined(ReplayWait),
+    /// This process does not run the original: an earlier process (a crash
+    /// or a restart) or another process on the state directory left it
+    /// pending. Answered `outcome_unknown` at once.
+    NotRunHere,
+    /// [`REPLAY_WAITERS`] replays already wait on it. Answered
+    /// `outcome_unknown` at once.
+    Full,
+}
+
+/// One replay's place among an original's waiters.
+pub struct ReplayWait {
+    landed: tokio::sync::watch::Receiver<()>,
+    attempt: Uuid,
+    flights: Flights,
+}
+
+impl ReplayWait {
+    /// `true` once this process has settled or aborted the original, `false`
+    /// when `within` passed first.
+    pub async fn landed(&mut self, within: Duration) -> bool {
+        // Nothing is ever sent: `changed` ends only when the sender drops.
+        matches!(
+            tokio::time::timeout(within, self.landed.changed()).await,
+            Ok(Err(_))
+        )
+    }
+}
+
+impl Drop for ReplayWait {
+    fn drop(&mut self) {
+        if let Some(flight) = locked(&self.flights).get_mut(&self.attempt) {
+            flight.waiters = flight.waiters.saturating_sub(1);
+        }
+    }
+}
 
 /// The static-bearer service principal (compatibility.md § 2.1, Audit anchor):
 /// one receiver-configured principal, qualified by the anchor's instance, that
@@ -107,6 +194,8 @@ pub struct ServiceState {
     /// Present only when the service configuration sets `standing_grants`:
     /// then, and only then, writes are keyed and need a covering grant.
     standing: Option<Standing>,
+    lanes: Lanes,
+    flights: Flights,
 }
 
 /// A host's standing grants: the operator's grant file, read on every write,
@@ -208,6 +297,8 @@ impl ServiceState {
             pending_limit,
             pending: Mutex::new(Retained::default()),
             standing: None,
+            lanes: Lanes::default(),
+            flights: Flights::default(),
         })
     }
 
@@ -244,6 +335,65 @@ impl ServiceState {
 
     pub fn instance(&self) -> &str {
         &self.instance
+    }
+
+    /// Waits for, then holds, the lane of `key` in `principal`'s namespace.
+    /// A keyed write holds it from its key lookup until its attempt is
+    /// prepared (the key reserved) or the write is refused, so in this
+    /// process a second request with the key looks it up only after the
+    /// first has reserved it or given up: a duplicate is always a replay
+    /// (never `rate_limited` or `approval_required` for a write the first
+    /// request was admitted for), and a request with other input is refused
+    /// `idempotency_conflict` before its anchor. Lanes do not reach another
+    /// process on the same state directory; the ledger's reservation and the
+    /// recheck before a refusal remain the guard there.
+    pub async fn key_lane(&self, principal: &str, key: &str) -> KeyLane {
+        let name = (principal.to_owned(), key.to_owned());
+        let lane = locked(&self.lanes).entry(name.clone()).or_default().clone();
+        let held = lane.lock_owned().await;
+        KeyLane {
+            held: Some(held),
+            lanes: self.lanes.clone(),
+            name,
+        }
+    }
+
+    /// How a replay may wait for the pending original `attempt`: join the
+    /// original this process runs, unless [`REPLAY_WAITERS`] already wait on
+    /// it (`Full`); `NotRunHere` when this process is not running it.
+    pub fn wait_on(&self, attempt: Uuid) -> Waiting {
+        let mut flights = locked(&self.flights);
+        let Some(flight) = flights.get_mut(&attempt) else {
+            return Waiting::NotRunHere;
+        };
+        if flight.waiters >= REPLAY_WAITERS {
+            return Waiting::Full;
+        }
+        flight.waiters += 1;
+        Waiting::Joined(ReplayWait {
+            landed: flight.landed.subscribe(),
+            attempt,
+            flights: self.flights.clone(),
+        })
+    }
+
+    /// The replays now waiting on originals this process runs.
+    pub fn replays_waiting(&self) -> usize {
+        locked(&self.flights)
+            .values()
+            .map(|flight| flight.waiters)
+            .sum()
+    }
+
+    /// This process now runs the keyed attempt.
+    fn take_off(&self, attempt: Uuid) {
+        let (landed, _) = tokio::sync::watch::channel(());
+        locked(&self.flights).insert(attempt, Flight { waiters: 0, landed });
+    }
+
+    /// This process no longer runs the attempt: its waiters wake.
+    pub fn land(&self, attempt: Uuid) {
+        locked(&self.flights).remove(&attempt);
     }
 
     fn keyed_candidate(&self, write: &Write<'_>, key: &str) -> ledger::Candidate {
@@ -337,6 +487,9 @@ impl ServiceState {
             self.abort_attempt(attempt, "unavailable");
             return Ok(KeyedPreparation::GrantUnrecorded(attempt));
         }
+        // Replays of the key in this process wait on this attempt until it
+        // settles or is aborted ([`wait_on`](Self::wait_on)).
+        self.take_off(attempt.attempt_id);
         Ok(KeyedPreparation::Prepared(prepared))
     }
 
@@ -452,9 +605,12 @@ impl ServiceState {
 
     /// `AbortPrepared`: the attempt was not dispatched (`not_attempted`).
     pub fn abort_attempt(&self, attempt: ledger::AttemptRef, cause: &str) -> bool {
-        self.ledger
+        let aborted = self
+            .ledger
             .abort(attempt, settlement("not_attempted", Some(cause)))
-            .is_ok()
+            .is_ok();
+        self.land(attempt.attempt_id);
+        aborted
     }
 
     /// `RecordCompletion` when `applied`, else `RecordUncertainty` with its
@@ -497,7 +653,9 @@ impl ServiceState {
             }
             None => ledger::Outcome::Unknown(settlement("unknown", cause)),
         };
-        self.ledger.settle(attempt, &outcome).is_ok()
+        let settled = self.ledger.settle(attempt, &outcome).is_ok();
+        self.land(attempt.attempt_id);
+        settled
     }
 
     /// Internal owner read of one of this host's attempts by its public id.

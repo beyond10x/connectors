@@ -29,13 +29,26 @@
 //!
 //! A live key for this exact request is a replay: the original attempt's
 //! outcome, `replayed: true`, with no grant check, no count and no adapter
-//! call. Before `approval_required` or `rate_limited` the key is looked up
-//! again, so a concurrent winner is replayed instead (operations § 4 step 5).
+//! call. Within this process a keyed write holds its key's lane
+//! ([`ServiceState::key_lane`]) from the lookup until its attempt is
+//! prepared, so a second request with the key is looked up only after the
+//! key is reserved or the first gave up: a duplicate is a replay and other
+//! input is `idempotency_conflict`, both before the anchor. Before
+//! `approval_required` or `rate_limited` the key is looked up again, so a
+//! winner in another process is replayed instead (operations § 4 step 5).
+//!
+//! A replay of a pending original answers at once, with no wait, when this
+//! process does not run the original (a restart or crash left it pending:
+//! `outcome_unknown`, cause `unavailable` at `observation`) or when
+//! [`REPLAY_WAITERS`](crate::local::service::REPLAY_WAITERS) replays already wait on it (`outcome_unknown`, cause
+//! `capacity` at `observation`). Otherwise it gives its service slot back and
+//! waits at most [`REPLAY_WAIT`] for the original to settle (then
+//! `outcome_unknown`, cause `timeout` at `observation`).
 use super::{Service, admitted};
 use crate::local::{
     audit, mutations,
     mutations::AttemptRef,
-    service::{Admitted, GrantCheck, KeyLookup, KeyedPreparation, ServiceState, Write},
+    service::{Admitted, GrantCheck, KeyLookup, KeyedPreparation, ServiceState, Waiting, Write},
     standing,
 };
 use axum::{
@@ -65,10 +78,10 @@ use std::{
 /// Effect declaration rule); the legacy Descriptor carries no `effects`.
 pub(super) const MUTATION_PROFILE: &str = "mutation";
 const DEADLINE: Duration = Duration::from_secs(20);
-/// How long a replay waits for a pending original before it answers
-/// `outcome_unknown`: the original's own deadline and its settlement.
+/// How long a replay waits for a pending original this process runs before
+/// it answers `outcome_unknown`: the original's own deadline and its
+/// settlement.
 const REPLAY_WAIT: Duration = Duration::from_secs(25);
-const REPLAY_POLL: Duration = Duration::from_millis(50);
 
 pub(super) async fn invoke(
     State(service): State<Service>,
@@ -285,7 +298,7 @@ async fn execute(
     principal: String,
     request: KeyedInvokeRequest,
     operation: connectors_core::Operation,
-    _permit: tokio::sync::OwnedSemaphorePermit,
+    permit: tokio::sync::OwnedSemaphorePermit,
 ) -> InvokeResponse {
     let request_id = request.request_id.clone();
     let write = operation.profile == MUTATION_PROFILE;
@@ -293,6 +306,13 @@ async fn execute(
         audit::Access::Write
     } else {
         audit::Access::Read
+    };
+
+    // The key's lane, held until the attempt is prepared or the write is
+    // refused (module docs). A write without a key is refused below.
+    let mut lane = match (&request.idempotency_key, write && state.keyed()) {
+        (Some(key), true) => Some(state.key_lane(&principal, key).await),
+        _ => None,
     };
 
     // Keyed admission runs only on a host with standing grants; without them
@@ -310,6 +330,12 @@ async fn execute(
             .unwrap_or_else(|_| Err(Refused::new(ErrorCode::Internal, "internal error")))
         };
         match admitted {
+            // A replay reserves nothing: the next request with the key may
+            // look it up now, not after this request's anchor.
+            Ok(Keyed::Replay(original)) => {
+                drop(lane.take());
+                Some(Keyed::Replay(original))
+            }
             Ok(keyed) => Some(keyed),
             Err(refused) => {
                 return Refusal {
@@ -358,10 +384,12 @@ async fn execute(
     };
 
     let mut attempt = None;
+    let permit = Some(permit);
     if write {
         let grant = match keyed {
             Some(Keyed::Replay(original)) => {
-                return replay(&state, &reference, request_id, original).await;
+                drop(lane.take());
+                return replay(&state, &reference, request_id, original, permit).await;
             }
             Some(Keyed::New { key, taken }) => Some((key, taken)),
             None => None,
@@ -379,12 +407,15 @@ async fn execute(
             .await
             .unwrap_or(Staged::NotRecorded(ErrorCode::Internal))
         };
+        // The key is reserved, or this request reserved nothing: the next
+        // request with the key may look it up.
+        drop(lane.take());
         // Nothing was dispatched: the final observation records the refusal
         // (audit.md § 1 rule 6; execution_audit.yaml, Failed link).
         match staged {
             Staged::Open(opened) => attempt = Some(opened),
             Staged::Replay(original) => {
-                return replay(&state, &reference, request_id, original).await;
+                return replay(&state, &reference, request_id, original, permit).await;
             }
             Staged::NotRecorded(code) => {
                 let complete = finish(
@@ -436,6 +467,9 @@ async fn execute(
             }
         }
     }
+    // However this task ends, replays of the key stop waiting on its attempt
+    // (settlement lands it first; this covers a panic in between).
+    let _landing = attempt.map(|opened| Landing(state.clone(), opened.attempt_id));
 
     let started = Instant::now();
     let answer = dispatch(&service, &request, &operation).await;
@@ -614,33 +648,72 @@ fn observation(
     }
 }
 
+/// Lands an attempt this task opened when the task ends
+/// ([`ServiceState::land`]).
+struct Landing(Arc<ServiceState>, uuid::Uuid);
+
+impl Drop for Landing {
+    fn drop(&mut self) {
+        self.0.land(self.1);
+    }
+}
+
+fn pending(observation: &mutations::Observation) -> bool {
+    matches!(
+        observation.state,
+        mutations::State::Prepared | mutations::State::Dispatching
+    )
+}
+
+/// The attempt's current observation; `None` when the store cannot answer.
+async fn observe(state: &Arc<ServiceState>, attempt: AttemptRef) -> Option<mutations::Observation> {
+    let state = state.clone();
+    tokio::task::spawn_blocking(move || state.observe_attempt(attempt))
+        .await
+        .ok()
+        .and_then(Result::ok)
+}
+
 /// A keyed replay (operations § 5.1): the original attempt's outcome,
 /// `replayed: true`, naming the original attempt and its request. Nothing is
-/// dispatched, no grant is read and nothing is counted. A pending original is
-/// awaited up to [`REPLAY_WAIT`] and then answered `outcome_unknown`. This
-/// request's own anchor records what it answered.
+/// dispatched, no grant is read and nothing is counted. This request's own
+/// anchor records what it answered. A pending original (Prepared or
+/// Dispatching) is never dispatched again from here, and is answered
+/// `outcome_unknown` with the `cause` naming why the replay did not wait for
+/// it, or waited and gave up:
+///
+/// | The original | Cause |
+/// |---|---|
+/// | is not run by this process (a restart or crash left it pending), answered at once | `unavailable` at `observation` |
+/// | has [`REPLAY_WAITERS`](crate::local::service::REPLAY_WAITERS) replays waiting on it, answered at once | `capacity` at `observation` |
+/// | did not settle within [`REPLAY_WAIT`]; the wait holds no service slot | `timeout` at `observation` |
 async fn replay(
     state: &Arc<ServiceState>,
     reference: &audit::Reference,
     request_id: String,
     original: mutations::Observation,
+    permit: Option<tokio::sync::OwnedSemaphorePermit>,
 ) -> InvokeResponse {
     let attempt = original.reference;
     let mut current = original;
-    let waited = Instant::now();
-    while matches!(
-        current.state,
-        mutations::State::Prepared | mutations::State::Dispatching
-    ) && waited.elapsed() < REPLAY_WAIT
-    {
-        tokio::time::sleep(REPLAY_POLL).await;
-        let observed = {
-            let state = state.clone();
-            tokio::task::spawn_blocking(move || state.observe_attempt(attempt)).await
-        };
-        match observed {
-            Ok(Ok(observation)) => current = observation,
-            _ => break,
+    let mut unsettled = BaseErrorCode::Timeout;
+    if pending(&current) {
+        match state.wait_on(attempt.attempt_id) {
+            Waiting::Joined(mut wait) => {
+                // The service slot goes back for the wait: a replay waiting
+                // on an original pins no slot another caller's request needs.
+                drop(permit);
+                wait.landed(REPLAY_WAIT).await;
+            }
+            // Refusal to wait: an earlier process left the original pending,
+            // and no process will settle it.
+            Waiting::NotRunHere => unsettled = BaseErrorCode::Unavailable,
+            // Refusal to wait: REPLAY_WAITERS replays already wait on it.
+            Waiting::Full => unsettled = BaseErrorCode::Capacity,
+        }
+        // Settled since it was looked up, or still pending.
+        if let Some(observed) = observe(state, attempt).await {
+            current = observed;
         }
     }
     let replayed = |classification, cause| MutationObservation {
@@ -689,7 +762,7 @@ async fn replay(
             )),
             replayed(EffectKnowledge::Unknown, None),
         ),
-        // Still pending after the wait: never dispatched again from here.
+        // Still pending: never dispatched again from here (table above).
         mutations::State::Prepared | mutations::State::Dispatching => (
             audit::Outcome::Unknown,
             Err(Error::new(
@@ -699,7 +772,7 @@ async fn replay(
             replayed(
                 EffectKnowledge::Unknown,
                 Some(DiagnosticCause {
-                    code: BaseErrorCode::Timeout,
+                    code: unsettled,
                     stage: CauseStage::Observation,
                 }),
             ),

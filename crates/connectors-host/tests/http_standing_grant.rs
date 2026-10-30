@@ -14,8 +14,12 @@
 use async_trait::async_trait;
 use connectors_core::{
     Descriptor, Operation, Result, WIRE_VERSION,
-    v1alpha2::{AuditStatus, EffectKnowledge, ErrorCode, InvokeResponse, ResponseStatus},
+    v1alpha2::{
+        AuditStatus, BaseErrorCode, CauseStage, EffectKnowledge, ErrorCode, InvokeResponse,
+        ResponseStatus,
+    },
 };
+use connectors_host::local::service::REPLAY_WAITERS;
 use connectors_host::server::{ServiceState, router_with_state};
 use connectors_sdk::{Adapter, Credential, Secret};
 use serde_json::{Value, json};
@@ -26,7 +30,7 @@ use std::{
         Arc,
         atomic::{AtomicUsize, Ordering},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::sync::RwLock;
 
@@ -282,6 +286,15 @@ fn write(operation: &str, request_id: &str, key: Option<&str>, input: Value) -> 
 }
 fn widgets(title: &str) -> Value {
     json!({"owner": "acme", "repo": "widgets", "title": title})
+}
+
+/// Waits until `done`, at most 20 seconds.
+async fn until(what: &str, done: impl Fn() -> bool) {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !done() {
+        assert!(Instant::now() < deadline, "{what}");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
 }
 
 /// A refusal before the anchor: the named code, the request echoed, no
@@ -765,21 +778,255 @@ async fn concurrent_requests_with_one_key_make_one_provider_request() {
     tokio::time::sleep(Duration::from_millis(500)).await;
     drop(held);
     let mut originals = 0;
+    let mut applied = 0;
     let mut attempts = std::collections::BTreeSet::new();
     for call in calls {
         let (status, response) = call.await.unwrap();
-        assert_eq!(status, 200, "{response:?}");
-        let mutation = response.mutation.unwrap();
-        assert_eq!(mutation.classification, EffectKnowledge::Applied);
-        if !mutation.replayed {
-            originals += 1;
-        }
+        let mutation = response.mutation.clone().unwrap();
         attempts.insert(mutation.attempt.unwrap().id.as_str().to_owned());
+        if status == 200 {
+            assert_eq!(mutation.classification, EffectKnowledge::Applied);
+            applied += 1;
+            if !mutation.replayed {
+                originals += 1;
+            }
+            continue;
+        }
+        // story:served-keyed-writes-under-a-standing-approval (C3 fix round,
+        // decision 4): past REPLAY_WAITERS waiting replays, a further replay
+        // of the pending original is answered at once, `outcome_unknown`.
+        assert_eq!(
+            (status, response.error.as_ref().map(|e| e.code)),
+            (502, Some(ErrorCode::OutcomeUnknown)),
+            "{response:?}"
+        );
+        assert!(mutation.replayed);
+        assert_eq!(mutation.classification, EffectKnowledge::Unknown);
+        assert_eq!(
+            mutation.cause.map(|cause| cause.code),
+            Some(BaseErrorCode::Capacity)
+        );
     }
     assert_eq!(originals, 1);
+    assert!(applied > REPLAY_WAITERS, "{applied} answers were applied");
     assert_eq!(attempts.len(), 1);
     assert_eq!(host.requests(), 1, "one key reached the provider twice");
     assert_eq!(host.state.attempt_count().unwrap(), 1);
+}
+
+/// compatibility § 2.1: a key live for another request is refused
+/// `idempotency_conflict` before the anchor, `audit_ref: null`. Eight
+/// concurrent requests with one key and eight inputs, the first admitted held
+/// at the provider: one is dispatched and the other seven are refused before
+/// their anchor, in each of three rounds. No request of a round reaches the
+/// key's lookup before the one ahead of it has reserved the key or given up.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn concurrent_requests_with_one_key_and_other_input_are_refused_conflict_before_the_anchor() {
+    let host = Arc::new(
+        host(Some(grant_file(
+            json!([grant("g-widgets", 100, LATER)]),
+            json!([]),
+        )))
+        .await,
+    );
+    for round in 0..3 {
+        let held = host.gate.clone().write_owned().await;
+        let before = host.requests();
+        let mut calls = Vec::new();
+        for index in 0..8 {
+            let host = host.clone();
+            calls.push(tokio::spawn(async move {
+                invoke(
+                    &host,
+                    &write(
+                        "issue.create",
+                        &format!("w-{round}-{index}"),
+                        Some(&format!("key-{round}")),
+                        widgets(&format!("title {index}")),
+                    ),
+                )
+                .await
+            }));
+        }
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        drop(held);
+        let mut dispatched = 0;
+        for call in calls {
+            let (status, response) = call.await.unwrap();
+            if status == 200 {
+                assert!(!response.mutation.unwrap().replayed);
+                dispatched += 1;
+                continue;
+            }
+            assert_eq!(
+                (status, response.error.as_ref().map(|e| e.code)),
+                (409, Some(ErrorCode::IdempotencyConflict)),
+                "round {round}: {response:?}"
+            );
+            assert_eq!(response.audit_status, AuditStatus::Unavailable);
+            assert!(
+                response.audit_ref.is_none() && response.mutation.is_none(),
+                "round {round}: a conflict was refused after its anchor: {response:?}"
+            );
+        }
+        assert_eq!(dispatched, 1, "round {round}");
+        assert_eq!(host.requests(), before + 1, "round {round}");
+    }
+    assert_eq!(host.state.attempt_count().unwrap(), 3);
+}
+
+/// A duplicate of an admitted write is a replay even when the operator revoked
+/// the grant, and spent its only use, between the two requests: under
+/// `max_per_hour: 1` the original is held at the provider, the grant is
+/// listed as revoked, and the duplicate waits for the original and answers
+/// its outcome, never `approval_required` or `rate_limited`.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_duplicate_after_the_grant_is_revoked_and_spent_is_a_replay() {
+    let host = Arc::new(
+        host(Some(grant_file(
+            json!([grant("g-widgets", 1, LATER)]),
+            json!([]),
+        )))
+        .await,
+    );
+    let held = host.gate.clone().write_owned().await;
+    let original = {
+        let host = host.clone();
+        tokio::spawn(async move {
+            invoke(
+                &host,
+                &write("issue.create", "w-1", Some("key-1"), widgets("first")),
+            )
+            .await
+        })
+    };
+    until("the original did not reach the provider", || {
+        host.requests() == 1
+    })
+    .await;
+    host.write_grants(&grant_file(
+        json!([grant("g-widgets", 1, LATER)]),
+        json!(["g-widgets"]),
+    ));
+    let duplicate = {
+        let host = host.clone();
+        tokio::spawn(async move {
+            invoke(
+                &host,
+                &write("issue.create", "w-1-again", Some("key-1"), widgets("first")),
+            )
+            .await
+        })
+    };
+    until("the duplicate did not join the original", || {
+        host.state.replays_waiting() == 1
+    })
+    .await;
+    drop(held);
+    let (status, first) = original.await.unwrap();
+    assert_eq!(status, 200, "{first:?}");
+    let (status, again) = duplicate.await.unwrap();
+    assert_eq!(status, 200, "{again:?}");
+    let mutation = again.mutation.unwrap();
+    assert!(mutation.replayed);
+    assert_eq!(mutation.classification, EffectKnowledge::Applied);
+    assert_eq!(
+        mutation.attempt,
+        first.mutation.unwrap().attempt,
+        "the duplicate answered another attempt"
+    );
+    assert_eq!(host.requests(), 1);
+    assert_eq!(host.state.attempt_count().unwrap(), 1);
+}
+
+/// Replays of an original this host runs wait for it without a service slot,
+/// at most REPLAY_WAITERS per key: with eight originals held at the provider
+/// and four replays waiting on each (40 requests in flight, past the host's
+/// 32 slots), another caller's read is served, a fifth replay of one key is
+/// answered `outcome_unknown` at once (cause `capacity` at `observation`),
+/// and once the originals settle every waiting replay answers their outcome.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn replays_waiting_on_an_original_hold_no_slot_and_at_most_four_wait_per_key() {
+    let host = Arc::new(
+        host(Some(grant_file(
+            json!([grant("g-widgets", 100, LATER)]),
+            json!([]),
+        )))
+        .await,
+    );
+    let held = host.gate.clone().write_owned().await;
+    let send = |request_id: String, key: String| {
+        let host = host.clone();
+        tokio::spawn(async move {
+            invoke(
+                &host,
+                &write("issue.create", &request_id, Some(&key), widgets(&key)),
+            )
+            .await
+        })
+    };
+    let originals: Vec<_> = (0..8)
+        .map(|key| send(format!("w-{key}"), format!("key-{key}")))
+        .collect();
+    until("the originals did not reach the provider", || {
+        host.requests() == 8
+    })
+    .await;
+    let mut waiting = Vec::new();
+    for key in 0..8 {
+        for replay in 0..REPLAY_WAITERS {
+            waiting.push(send(format!("w-{key}-{replay}"), format!("key-{key}")));
+        }
+        let joined = (key + 1) * REPLAY_WAITERS;
+        until("the replays did not join their original", || {
+            host.state.replays_waiting() == joined
+        })
+        .await;
+    }
+
+    let started = Instant::now();
+    let (status, fifth) = invoke(
+        &host,
+        &write("issue.create", "w-0-fifth", Some("key-0"), widgets("key-0")),
+    )
+    .await;
+    assert!(started.elapsed() < Duration::from_secs(5));
+    assert_eq!(
+        (status, fifth.error.as_ref().map(|e| e.code)),
+        (502, Some(ErrorCode::OutcomeUnknown)),
+        "{fifth:?}"
+    );
+    let mutation = fifth.mutation.unwrap();
+    assert!(mutation.replayed);
+    assert_eq!(mutation.classification, EffectKnowledge::Unknown);
+    assert_eq!(
+        mutation.cause.map(|cause| (cause.code, cause.stage)),
+        Some((BaseErrorCode::Capacity, CauseStage::Observation))
+    );
+
+    let (status, read) = invoke(
+        &host,
+        &write("issue.read", "r-other-caller", None, json!({"q": 1})),
+    )
+    .await;
+    assert_eq!(
+        (status, read.status),
+        (200, ResponseStatus::Success),
+        "{read:?}"
+    );
+
+    drop(held);
+    for call in originals.into_iter().chain(waiting) {
+        let (status, response) = call.await.unwrap();
+        assert_eq!(status, 200, "{response:?}");
+        assert_eq!(
+            response.mutation.unwrap().classification,
+            EffectKnowledge::Applied
+        );
+    }
+    assert_eq!(host.state.replays_waiting(), 0);
+    assert_eq!(host.requests(), 9, "a replay reached the provider");
+    assert_eq!(host.state.attempt_count().unwrap(), 8);
 }
 
 /// Both stores survive a restart: the keyed reservation (the ledger in

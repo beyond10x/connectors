@@ -489,7 +489,9 @@ views:
 # shared with it. Unknown settlement needs no clock.
 # The above is a host without `standing_grants`. A host whose configuration
 # sets it (compatibility.md § 2.1, "Keyed writes under a standing grant";
-# connectors.standing_approvals) keys every such write. Before its audit
+# connectors.standing_approvals) keys every such write. One host process
+# admits requests with one caller and key one at a time, from the lookup until
+# the key is reserved or the request is refused. Before its audit
 # anchor the host looks the key up in the caller's namespace (a live key for
 # this exact request is a replay; for another request
 # `idempotency_conflict`), then counts one use of a covering grant
@@ -502,10 +504,11 @@ views:
 # `replayed: true`, with no grant check, no count and no dispatch: Completed
 # with the retained result (or `capacity`, `applied`, when the result was not
 # retained), Aborted or Failed `not_attempted`, Indeterminate
-# `outcome_unknown`. A Prepared or Dispatching original is awaited for at most
-# 25 seconds, then answered `outcome_unknown`; the host does not recover a
-# pending attempt after a restart, so the replay of an original a crash
-# interrupted is `outcome_unknown`, never a second dispatch. Keys and attempts
+# `outcome_unknown`. A Prepared or Dispatching original the same process runs
+# is awaited for at most 25 seconds by at most 4 replays, then answered
+# `outcome_unknown`; the host does not recover a pending attempt after a
+# restart, so the replay of an original a crash interrupted is
+# `outcome_unknown` at once, never a second dispatch. Keys and attempts
 # survive a restart. A Completed attempt there retains its result up to
 # 65,536 bytes (`result_retained: false` above it) beside its settlement
 # text. That host never runs ExpireKeyReservation: a key stays live for as
