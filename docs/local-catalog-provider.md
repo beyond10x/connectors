@@ -860,9 +860,9 @@ The complete configuration used against the sandbox is
   read's pages are walked and when the walk ends, so a caller follows the
   provider's own rule instead of re-deriving it from the description. The
   second page on sends the position as `parameter`; the position is the value
-  at the RFC 6901 pointer `next` in the previous page's answer (a string or an
-  integer), or, with `url_parameter`, that one query parameter of the link at
-  `next`, form-decoded. `records` points at the page's records, an array
+  at the RFC 6901 pointer `next` in the previous page's answer (a string of at
+  most 16 KiB or an integer), or, with `url_parameter`, that one query
+  parameter of the link at `next` (a link of at most 16 KiB), form-decoded. `records` points at the page's records, an array
   (absent or null is no records). Every page sends `query`, each value a
   string, an integer or a boolean, such as Zendesk's
   `include_boundary_indicators: true`; only the first page sends the
@@ -873,7 +873,9 @@ The complete configuration used against the sandbox is
   `name` (lower snake case, at most 64 bytes, such as `has_more_false`) says
   which; otherwise the walk goes on to the position, and a page that names
   none is an error. A position sent before in the same walk is an error, so a
-  walk cannot loop. Each end takes exactly one test: `when` (`{"pointer",
+  walk cannot loop; positions are compared by the query value they send (so
+  `"5"` and `5` are one position), a position the first page's input already
+  carries counts as sent, and the walk keeps a SHA-256 of each, not its text. Each end takes exactly one test: `when` (`{"pointer",
   "equals"}`, the value there equals `equals`), `absent` (a pointer whose
   value is absent, null or the empty string), `present` (one whose value is
   neither) or `empty` (one whose value is absent, null or an empty array).

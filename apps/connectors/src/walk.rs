@@ -145,6 +145,17 @@ fn page_body(result: &Value) -> Result<&Value, u64> {
     }
 }
 
+/// The paths both lists name; `later` alone when there is no `before`.
+fn both(before: Option<Vec<String>>, later: Vec<String>) -> Vec<String> {
+    match before {
+        None => later,
+        Some(before) => before
+            .into_iter()
+            .filter(|path| later.contains(path))
+            .collect(),
+    }
+}
+
 /// Walk `walk` from the caller's input `caller`, reading at most `max_pages` pages.
 ///
 /// `read` performs one page's read with the input it is given. `sink` takes one page's
@@ -158,10 +169,11 @@ pub fn run(
     mut read: impl FnMut(&Value) -> Page,
     mut sink: impl FnMut(Vec<Value>) -> Result<(), &'static str>,
 ) -> Walked {
-    let mut walker = Walker::new(walk);
+    // A position the caller's input already carries (a `resume`) is sent by the first page.
+    let mut walker = Walker::starting_at(walk, caller);
     let mut walked = Walked::default();
     let mut position: Option<Value> = None;
-    // The fields every record so far missed; `None` before the first record.
+    // The fields every record the sink took missed; `None` before the first such record.
     let mut everywhere: Option<Vec<String>> = None;
     loop {
         let input = walk.page_input(caller, position.as_ref());
@@ -193,18 +205,14 @@ pub fn run(
                 break;
             }
         };
+        // The fields every record of this page missed; counted only once the sink takes it.
+        let mut page_missing: Option<Vec<String>> = None;
         let shaped: Vec<Value> = records
             .iter()
             .map(|record| match fields {
                 Some(fields) => {
                     let shaped = fields.apply(record);
-                    everywhere = Some(match everywhere.take() {
-                        None => shaped.missing,
-                        Some(before) => before
-                            .into_iter()
-                            .filter(|path| shaped.missing.contains(path))
-                            .collect(),
-                    });
+                    page_missing = Some(both(page_missing.take(), shaped.missing));
                     Value::Object(shaped.value)
                 }
                 None => record.clone(),
@@ -219,6 +227,9 @@ pub fn run(
         }
         walked.pages += 1;
         walked.records += count;
+        if let Some(page_missing) = page_missing {
+            everywhere = Some(both(everywhere.take(), page_missing));
+        }
         match step {
             Ok(Step::End(name)) => {
                 walked.end = Some(name);
