@@ -17,8 +17,15 @@
 //! command line is then rewritten with every value stated and the target as
 //! `<connector>/<instance>`, and the generated runner admits and invokes it
 //! through the instance's selected entry, the answer naming the connector and instance.
+//!
+//! `--fields` and `--each` (story:invoke-shapes-its-result) are parsed here and
+//! left off the rewritten command line: a malformed path, either beside
+//! `--describe` and `--each` on a write are refused before any provider call,
+//! and the full answer is shaped ([`Shaping`]) after the generated runner,
+//! the owner, the audit and the mutation ledger have it.
 use super::*;
 use clap::parser::ValueSource;
+use connectors::shape;
 use connectors_cli_contract::ProcessOutput;
 use connectors_host::local::{
     config::Adapter,
@@ -374,6 +381,32 @@ struct Request {
     definitions_root: Option<PathBuf>,
     credential_file: Option<PathBuf>,
     describe: bool,
+    fields: Option<String>,
+    each: Option<String>,
+}
+
+/// What `--fields` and `--each` ask of a successful answer
+/// (`contracts/cli/v1alpha1/semantics.md`, "Shaping a result").
+pub(super) struct Shaping {
+    fields: Option<shape::Fields>,
+    each: Option<shape::Path>,
+    json: bool,
+}
+
+impl Shaping {
+    /// Standard output for `answer`, the full `InvokeResult` the runner
+    /// printed: each record of `--each` on its own line, then the shaped
+    /// envelope. `None` when it stays printed whole (`shape::answer`).
+    pub(super) fn render(&self, answer: &Value) -> Option<String> {
+        let shaped = shape::answer(answer, self.fields.as_ref(), self.each.as_ref())?;
+        let mut stdout: String = shaped
+            .records
+            .iter()
+            .map(|record| format!("{record}\n"))
+            .collect();
+        stdout.push_str(&success(shaped.result, self.json).stdout);
+        Some(stdout)
+    }
 }
 
 /// The generated command with both positionals, `--schema`, `--revision` and
@@ -471,6 +504,8 @@ fn parse(args: &[OsString]) -> Option<Request> {
         definitions_root: text("definitions_root").map(PathBuf::from),
         credential_file: text("credential_file").map(PathBuf::from),
         describe,
+        fields: text("fields"),
+        each: text("each"),
     })
 }
 
@@ -495,11 +530,14 @@ fn naming(mut reply: HandlerReply, field: &str) -> HandlerReply {
 }
 
 /// The arguments the generated runner reads: `args` unchanged unless they are
-/// an `invoke`, which is prepared and answered as the rewritten command line;
+/// an `invoke`, which is prepared and answered as the rewritten command line,
+/// with the shaping its answer takes when `--fields` or `--each` is given;
 /// `--describe` is answered here, and a refusal is the one failure envelope.
-pub(super) fn prepare(args: Vec<OsString>) -> Result<Vec<OsString>, ProcessOutput> {
+pub(super) fn prepare(
+    args: Vec<OsString>,
+) -> Result<(Vec<OsString>, Option<Shaping>), ProcessOutput> {
     let Some(request) = parse(&args) else {
-        return Ok(args);
+        return Ok((args, None));
     };
     let json = request.json;
     let prepared = match protected::Signals::install() {
@@ -514,14 +552,14 @@ pub(super) fn prepare(args: Vec<OsString>) -> Result<Vec<OsString>, ProcessOutpu
         Err(error) => Err(owner_failure(error)),
     };
     match prepared {
-        Ok(Prepared::Run(args)) => Ok(args),
+        Ok(Prepared::Run(args, shaping)) => Ok((args, shaping)),
         Ok(Prepared::Described(result)) => Err(success(result, json)),
         Err(reply) => Err(definition::render(reply, json)),
     }
 }
 
 enum Prepared {
-    Run(Vec<OsString>),
+    Run(Vec<OsString>, Option<Shaping>),
     Described(Value),
 }
 
@@ -578,6 +616,18 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
     {
         return Err(refused("idempotency_key"));
     }
+    // The paths are parsed once, before anything is read; `--describe` reads
+    // no result to shape.
+    let fields = match request.fields.as_deref() {
+        Some(_) if request.describe => return Err(refused("fields")),
+        Some(text) => Some(shape::Fields::parse(text).map_err(|_| refused("fields"))?),
+        None => None,
+    };
+    let each = match request.each.as_deref() {
+        Some(_) if request.describe => return Err(refused("each")),
+        Some(text) => Some(shape::Path::parse(text).map_err(|_| refused("each"))?),
+        None => None,
+    };
     // With no input flag the document is standard input, which is never read
     // when it is a terminal: nothing would end it.
     let input = match &request.input {
@@ -686,6 +736,8 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
         )));
     }
     match effect {
+        // A write prints its one answer: `--each` would split it.
+        Effect::Write if each.is_some() => return Err(refused("each")),
         Effect::Read if request.idempotency_key.is_some() => {
             return Err(refused("idempotency_key"));
         }
@@ -719,7 +771,12 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
     rewritten.push("--".into());
     rewritten.push(format!("{connector}/{instance}").into());
     rewritten.push(request.operation.clone().into());
-    Ok(Prepared::Run(rewritten))
+    let shaping = (fields.is_some() || each.is_some()).then_some(Shaping {
+        fields,
+        each,
+        json: request.json,
+    });
+    Ok(Prepared::Run(rewritten, shaping))
 }
 
 /// `invoke --describe`'s answer (`connectors.cli.InvokeDescription`).
