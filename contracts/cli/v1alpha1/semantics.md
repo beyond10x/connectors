@@ -904,14 +904,20 @@ record. A walk stops before an end holds, and `complete` is false:
 | `max_pages` | `--max-pages` pages were read (default 20, at most 10,000) and the last named a next position | the next page's input |
 | `refused` | a page's invoke was refused, `rate_limited` included; `error` is its failure envelope's `error` | the refused page's input |
 | `status` | a page's catalog result has a `status`, in `status`, that is not 2xx; its records are not written | that page's input |
-| `write` | a page's records could not be written; none of them is counted | that page's input |
-| `continues_without_position`, `no_position`, `invalid_position`, `repeated_position`, `records_not_a_list` | the declared walk cannot go on from the page | absent |
+| `write` | a page's records could not be written whole; none of them is counted, and the `--out` file is cut back to where the page began | that page's input |
+| `continues_without_position`, `no_position`, `invalid_position`, `repeated_position`, `records_not_a_list` | the declared walk cannot go on from the page: no next position, one that is neither a string of at most 16 KiB nor an integer, or one already sent | absent |
 
-Records already written stay written. `resume` is a document: given back as the
-input of `invoke --walk` it reads on from that page. A walk that stopped exits
-0 when its summary is printed. A refused first page is the failure envelope a
-plain invoke answers, on standard error with its exit status, and the walk
-leaves no `--out` file behind.
+Records already written stay written. Standard output cannot be taken back, so
+a reader of `--out -` may see part of a page that stopped the walk as `write`.
+`resume` is a document: given back as the input of `invoke --walk` it reads on
+from that page, and the position it carries counts as sent, so a provider that
+names it again stops the walk as `repeated_position`. Positions are compared by
+the query value they send: `"5"` and `5` are one position. `missing` counts
+only records that were written. A walk that stopped exits 0 when its summary is
+printed. A refused first page is the failure envelope a plain invoke answers,
+on standard error with its exit status, and the walk leaves no `--out` file
+behind; so is a caller document a plain invoke refuses, such as one naming a
+key twice, before any page is read.
 
 Refused before any provider call and before the `--out` file is created, as
 `invalid_input` at `arguments`, exit 2: `--walk` without `--out` (naming
