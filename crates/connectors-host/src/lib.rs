@@ -19,9 +19,14 @@ pub fn read_config<T: DeserializeOwned>(path: &Path) -> Result<T> {
         .map_err(|_| Error::invalid("configuration does not match the adapter schema"))
 }
 
+/// The one log subscriber of every binary in this repository. A log line that
+/// cannot be written is dropped: with internal-error logging on, the fmt layer
+/// reports a failed write with `eprintln!`, which panics when standard error is
+/// a closed pipe and so ends the request that logged, after its dispatch.
 pub fn logging() {
     let _ = tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
+        .log_internal_errors(false)
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )

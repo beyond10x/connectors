@@ -13,13 +13,32 @@
 //!    the host answers `not_found` before any anchor or adapter call.
 //! 3. [`Bridge::invoke`]: an operation outside the reads is `unsupported`
 //!    before the credential is read. This repeats 2 for a description that
-//!    would list one, and is the one place a write would be let through.
+//!    would list one.
 //! 4. The mounted credential: an item absent, or refused by any check, is
 //!    `unavailable`, and nothing is sent.
 //!
 //! Start refuses a description that lists anything but reads, more than one
 //! profile, a profile whose material is acquired by OAuth, alternative
 //! bindings, and a credential that cannot be read now.
+//!
+//! Serving a write is not one switch. Four places hold it closed, and a write
+//! needs all four changed together:
+//!
+//! - the description source: [`Bridge::new`] reads `bootstrap()`, the private
+//!   bootstrap's first description, which lists no write. Writes and their
+//!   requirements are only in `bootstrap_v2()`.
+//! - [`dispatched`], with the `profile != mutation` check beside it in
+//!   [`Bridge::new`]: start refuses any listed operation that is not a read.
+//! - [`Bridge::invoke`] dispatches through `invoke_explained`, the read path.
+//!   A write goes through `runtime::Adapter::prepare_write` and the prepared
+//!   write it returns, never through `invoke_explained`.
+//! - The host: `/v1alpha2/invoke` (crates/connectors-host/src/server/
+//!   v1alpha2.rs) anchors, records an attempt for and dispatches any listed
+//!   operation whose profile is `mutation`. Its legacy description carries no
+//!   idempotency kind and no approval mode, so the host has no check of its
+//!   own that refuses a keyed or approval-gated operation. Contract
+//!   compatibility.md § 2.1 says such an operation is not invocable on this
+//!   binding. Today that holds only because this binary describes no write.
 use crate::local::{Instance, Local};
 use connectors_core::{Descriptor, Error, ErrorCode, Result};
 use connectors_host::{
@@ -227,8 +246,9 @@ impl Mounted {
 }
 
 /// Whether the served host dispatches an operation of `effect`. Reads only:
-/// a catalog write needs an approval this host does not hold. This is the
-/// seam a keyed write under a standing approval opens.
+/// a catalog write needs an approval this host does not hold. This is one
+/// of the four places that keep writes closed (module doc). Changing it
+/// alone serves no write, because `bootstrap()` lists none.
 fn dispatched(effect: runtime::Effect) -> bool {
     matches!(effect, runtime::Effect::Read)
 }

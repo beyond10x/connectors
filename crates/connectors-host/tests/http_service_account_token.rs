@@ -13,8 +13,8 @@ use connectors_core::{
 use connectors_host::{
     local::audit::{self, Reference},
     server::{
-        Admission, ServiceConfig, ServiceConfigV3, ServiceState, router_with_admission,
-        router_with_state,
+        Admission, CONCURRENT_REVIEWS, ServiceConfig, ServiceConfigV3, ServiceState,
+        router_with_admission, router_with_state,
     },
 };
 use connectors_sdk::{Adapter, Credential, Secret};
@@ -111,6 +111,12 @@ impl Drop for Double {
 }
 
 async fn double(directory: &Path) -> Double {
+    double_gated(directory, None).await
+}
+
+/// With a `gate`, each review is recorded on arrival and answered only once
+/// it takes one permit of the gate, so a test can hold reviews in flight.
+async fn double_gated(directory: &Path, gate: Option<Arc<tokio::sync::Semaphore>>) -> Double {
     let certificate = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
     let server = rustls::ServerConfig::builder_with_provider(Arc::new(
         rustls::crypto::ring::default_provider(),
@@ -146,6 +152,7 @@ async fn double(directory: &Path) -> Double {
                     stream,
                     reviews.clone(),
                     reply.clone(),
+                    gate.clone(),
                 ));
             }
         }
@@ -164,6 +171,7 @@ async fn answer(
     stream: tokio::net::TcpStream,
     reviews: Arc<Mutex<Vec<Recorded>>>,
     reply: Arc<Mutex<(u16, Vec<u8>)>>,
+    gate: Option<Arc<tokio::sync::Semaphore>>,
 ) {
     let Ok(mut stream) = acceptor.accept(stream).await else {
         return;
@@ -202,6 +210,9 @@ async fn answer(
         authorization,
         body: serde_json::from_slice(&body).unwrap(),
     });
+    if let Some(gate) = gate {
+        gate.acquire().await.unwrap().forget();
+    }
     let (status, bytes) = reply.lock().unwrap().clone();
     let head = format!(
         "HTTP/1.1 {status} Fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -686,6 +697,76 @@ async fn a_failing_or_unreachable_review_is_unavailable_with_no_adapter_call() {
     }
     assert_eq!(unreachable.calls.load(Ordering::SeqCst), 0);
     assert_eq!(host.calls.load(Ordering::SeqCst), 1);
+}
+
+/// v1alpha2-service-account-token-review-bound: with `CONCURRENT_REVIEWS`
+/// reviews in flight, the next request on either admitting route is
+/// `unavailable` at once, with no review sent and zero adapter calls; the held
+/// reviews then admit, and a later request is reviewed again.
+#[tokio::test]
+async fn a_request_past_the_review_bound_is_unavailable_with_no_review() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let root = tempfile::tempdir().unwrap();
+    let gate = Arc::new(tokio::sync::Semaphore::new(0));
+    let double = double_gated(root.path(), Some(gate.clone())).await;
+    let host = account_host(root.path(), &double).await;
+
+    let held: Vec<_> = (0..CONCURRENT_REVIEWS)
+        .map(|index| {
+            let url = format!("{}/v1alpha2/invoke", host.base);
+            let body = serde_json::to_vec(&request("read", &format!("held-{index}"))).unwrap();
+            tokio::spawn(async move {
+                let response = reqwest::Client::new()
+                    .post(url)
+                    .header("authorization", bearer(CALLER_TOKEN))
+                    .body(body)
+                    .send()
+                    .await
+                    .unwrap();
+                response.status().as_u16()
+            })
+        })
+        .collect();
+    // Within the 5-second review deadline, so the held reviews do not expire.
+    let started = std::time::Instant::now();
+    while double.reviews().len() < CONCURRENT_REVIEWS {
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(3),
+            "{} of {CONCURRENT_REVIEWS} reviews reached the double",
+            double.reviews().len()
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+
+    let (status, response) =
+        invoke(&host, Some(&bearer(CALLER_TOKEN)), &request("read", "past")).await;
+    assert_refused(status, &response, 503, ErrorCode::Unavailable);
+    let (status, _) = send(
+        &host,
+        reqwest::Method::GET,
+        "/v1/describe",
+        Some(&bearer(CALLER_TOKEN)),
+        None,
+    )
+    .await;
+    assert_eq!(status, 503);
+    assert_eq!(double.reviews().len(), CONCURRENT_REVIEWS);
+    assert_eq!(host.calls.load(Ordering::SeqCst), 0);
+
+    gate.add_permits(CONCURRENT_REVIEWS);
+    for task in held {
+        assert_eq!(task.await.unwrap(), 200);
+    }
+    assert_eq!(host.calls.load(Ordering::SeqCst), CONCURRENT_REVIEWS);
+    gate.add_permits(1);
+    let (status, _) = invoke(
+        &host,
+        Some(&bearer(CALLER_TOKEN)),
+        &request("read", "after"),
+    )
+    .await;
+    assert_eq!(status, 200);
+    assert_eq!(double.reviews().len(), CONCURRENT_REVIEWS + 1);
 }
 
 /// v1alpha2-service-account-token-other-principal: no bearer, no review.
