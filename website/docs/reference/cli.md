@@ -575,6 +575,8 @@ connectors invoke [OPTIONS] [CONNECTOR[/INSTANCE]] <OPERATION>
 | `--definitions-root <field:definitions_root>` | no | none | any | With --definition: the tree holding its vendored source and shared auth files [default: the parent of the file's directory] |
 | `--credential-file <field:credential_file>` | no | none | any | With --definition: the OAuth client file to connect with when the instance has no connection |
 | `--describe <field:describe>` | no | none | any | true: print the operation's description, effect, schema and revision, and invoke nothing |
+| `--fields <field:fields>` | no | none | any | Print only these members of the provider result: comma-separated paths such as `ticket.id`, `events[].field_name`, `alias:path` or the pointer `/page[after]`; unmatched paths are listed in `missing` |
+| `--each <field:each>` | no | none | any | Print one JSON line per element of the array at this path, each shaped by --fields, then the envelope; refused on a write |
 
 ## `connectors list`
 

@@ -808,7 +808,67 @@ the invoke produced them. No answer of `invoke` (result, refusal or
 help) names a configured entry by its alias. Every `invalid_input` of `invoke`
 names the argument it refused in `Failure.field`: `target`, `operation`,
 `connection`, `schema`, `revision`, `input`, `approval_file`,
-`idempotency_key`, `definition`, `definitions_root` or `credential_file`.
+`idempotency_key`, `definition`, `definitions_root`, `credential_file`,
+`fields` or `each`.
+
+### Shaping a result
+
+`connectors invoke … --fields <paths>` prints only the named members of the
+provider result, and `--each <path>` one line per element of an array in it
+(story:invoke-shapes-its-result). Both are presentation: the paths are parsed
+before anything is read, are not part of the approval subject, never reach the
+owner or the provider, and are applied in the CLI process to the full
+`InvokeResult` after the generated runner has checked it and the owner, the
+audit record and the mutation ledger have it. The answer is then
+`InvokeShaped`.
+
+A path list is comma-separated paths, each item trimmed. A path is
+`name(.name)*`, where `[]` after a name, or at the start, maps over an array
+(`events[].field_name`); a name holds no `.`, `[`, `]`, `,`, `:`, `/`,
+whitespace or control character. A key holding one of them is written as an
+RFC 6901 pointer, a path beginning with `/` whose tokens are member names (`~1`
+is `/`, `~0` is `~`): `/page[after]`. `alias:path` prints the value the path
+reaches under `alias`, a name. There are no filters and no indexes. Paths read
+the provider's `result`; for a catalog result, `{status, body, provenance}`
+with an integer `status`, a path whose first name the result does not have
+reads `body`, so `ticket.id` and `body.ticket.id` name the same member.
+
+`--fields` prints each path without an alias nested as written, from its first
+name, paths that share a prefix in one member; `[]` keeps the elements the rest
+of the path reaches, and an empty array stays empty. A path that reaches
+nothing (a missing member, a member of a scalar, `[]` over a non-array or over
+elements none of which has the rest) is listed, as written, in
+`result.missing`, so an absent field is never silent; a `null` member is
+present. `missing` is left out when every path matched.
+
+```console
+$ connectors --output json invoke zendesk/support ticket.show --fields ticket.id,state:ticket.status <<<'{"ticket_id":101}'
+{"ok":true,"result":{"state":"open","ticket":{"id":101}}}
+$ connectors --output json invoke zendesk/support ticket.show --fields status <<<'{"ticket_id":101}'
+{"ok":true,"result":{"status":200}}
+```
+
+`--each <path>` takes one path of member names (no `[]`, alias or comma) naming
+an array and prints one JSON line per element, each shaped by `--fields` when it
+is given and whole otherwise, then the envelope as the last line, whose result
+holds `records`, the number of lines printed. A field is in `missing` when no
+element has it; the each path is, with `records = 0`, when it names no array.
+Under `--output human` the last line is the result alone.
+
+The answer is printed whole, as without either flag, when its result is a
+catalog result whose `status` is not 2xx. A refusal is never shaped: the failure
+envelope stays on standard error unchanged. `request_id`, `mutation` and
+`source_audit` are printed whenever the answer has them, whatever `--fields`
+names, so a write's `outcome_unknown` cannot be projected away.
+
+Refused before any provider call, as `invalid_input` at `arguments`, exit 2,
+naming `fields` or `each`: a malformed path; an empty item; an alias that is not
+a name; a path without an alias that begins with `[]`; an output name that is
+`missing`, `request_id`, `mutation` or `source_audit`; an alias that repeats
+another output name; more than 256 paths or 64 steps in one path; either flag
+beside `--describe`, which reads no result. `--each` on a write is
+`invalid_input` naming `each`, ahead of `approval_required`; `--fields` on a
+write is admitted.
 
 ### Renamed commands
 

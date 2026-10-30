@@ -1515,6 +1515,10 @@ types:
   # auth files and defaults to the parent of the directory holding it; credential_file is
   # the OAuth client file the existing consent reads when the instance is connected first.
   # All three are path metadata, given only with definition.
+  # fields and each (story:invoke-shapes-its-result) are presentation only: a comma-separated
+  # path list and one path the CLI applies to the full answer after the owner, the audit
+  # record and the mutation ledger have it. They are not part of the approval subject, never
+  # reach the owner or the provider, and the answer is then InvokeShaped.
   - name: connectors.cli.InvokeInput
     kind: struct
     fields:
@@ -1530,6 +1534,8 @@ types:
       - {name: definitions_root, type: "Optional<String>"}
       - {name: credential_file, type: "Optional<String>"}
       - {name: describe, type: "Optional<Boolean>"}
+      - {name: fields, type: "Optional<String>"}
+      - {name: each, type: "Optional<String>"}
   # An invoke's answer names the connector and instance; it never carries an adapter member.
   - name: connectors.cli.InvokeResult
     kind: struct
@@ -1539,6 +1545,25 @@ types:
       - {name: operation, type: "String"}
       - {name: revision, type: "String"}
       - {name: result, type: "Json"}
+      - {name: request_id, type: "Optional<String>"}
+      - {name: mutation, type: "Optional<connectors.cli.MutationObservation>"}
+      - {name: source_audit, type: "Optional<connectors.service_wire.SourceAudit>"}
+  # story:invoke-shapes-its-result: the answer of `invoke --fields` or `--each`, printed in
+  # place of InvokeResult unless the invoke was refused or its result is a catalog result
+  # whose status is not 2xx (then InvokeResult is printed whole).
+  # ESS-LIMIT: beside the members declared here the result holds the members --fields names,
+  # each under its first path name or its alias, which no field may make one of these. ess-cli/1
+  # binds one result type to a command, so the generated runner checks the full InvokeResult
+  # and the CLI shapes it afterwards; the open members are enforced by the host and pinned by
+  # apps/connectors/tests/invoke_shapes.rs. records is the number of elements --each printed,
+  # one NDJSON line each before this envelope; missing lists the paths that matched nothing,
+  # as written, when any did; request_id, mutation and source_audit are the InvokeResult's,
+  # copied when it has them.
+  - name: connectors.cli.InvokeShaped
+    kind: struct
+    fields:
+      - {name: records, type: "Optional<Integer>"}
+      - {name: missing, type: "Optional<List<String>>"}
       - {name: request_id, type: "Optional<String>"}
       - {name: mutation, type: "Optional<connectors.cli.MutationObservation>"}
       - {name: source_audit, type: "Optional<connectors.service_wire.SourceAudit>"}
