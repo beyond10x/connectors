@@ -6,7 +6,7 @@ status: draft
 title: Owner and store path tests hold under machine load
 relations:
 - informed_by: story:connectors-do-short-invocation
-revision: 2
+revision: 6
 ---
 ## Problem
 
@@ -23,6 +23,16 @@ On the gate rerun, `apps/connectors/tests/local_mcp_server.rs`
 `stdin_close_still_answers_requests_already_read` failed at load average 38. The server was still
 running, its stderr said `mcp_unavailable`, and no reply came within 5 s. Run alone twice, it
 passed once and failed once. The wave did not change the MCP server code.
+
+D218's `apps/connectors/tests/adversary_d218_u2.rs`
+`concurrent_endpoints_on_one_instance_agree_with_the_file` flaked in CI on pull request 223 (the
+0.61.0 release, 2026-10-30). It passed 20 of 20 runs locally and on the CI re-run.
+
+
+The connectors-host library test
+`local::config::derived_instance_tests::printing_the_bootstrap_is_bounded_when_a_descendant_keeps_the_output`
+(`crates/connectors-host/src/local/config.rs:2938`, `started.elapsed() < 5 s`) failed in the 0.62.0
+local gate on 2026-10-30 at load average 30, then passed alone in 0.57 s.
 
 ## Outcome
 

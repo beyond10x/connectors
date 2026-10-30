@@ -688,6 +688,29 @@ const PROFILES: &[Profile] = &[
         )],
     },
     Profile {
+        name: "catalog github_app",
+        fields: &[
+            ("app_id", 128),
+            ("installation_id", 20),
+            ("private_key", 16 * 1024),
+        ],
+        document_limit: 64 * 1024,
+        declares: &[
+            (
+                CATALOG,
+                "field(\"app_id\", \"GitHub App ID\", APP_ID_LIMIT as u32)",
+            ),
+            (CATALOG, "const APP_ID_LIMIT: usize = 128;"),
+            (CATALOG, "INSTALLATION_ID_LIMIT as u32,"),
+            (CATALOG, "const INSTALLATION_ID_LIMIT: usize = 20;"),
+            (
+                CATALOG,
+                "field(\"private_key\", &config.auth.label, APP_KEY_LIMIT as u32)",
+            ),
+            (CATALOG, "const APP_KEY_LIMIT: usize = 16 * 1024;"),
+        ],
+    },
+    Profile {
         name: "kubernetes token",
         fields: &[("token", 8192)],
         document_limit: 64 * 1024,

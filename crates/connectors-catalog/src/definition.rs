@@ -29,6 +29,22 @@ pub const SCHEMA: &str = "urn:beyond10x:connectors-definition:1";
 pub const EVIDENCE_LIFETIME_MS: u64 = 300_000;
 /// The selection format the catalog provider's `operations_file` reads.
 pub const OPERATIONS_FORMAT: &str = "connectors-catalog-operations/1";
+/// The optional definition members this lowerer reads that a connectors-definitions
+/// release names in its index's `features`, sorted: the members connectors-definitions
+/// 0.3.0 and later declare. `connectors definitions install` admits exactly these
+/// (D247); a test that links both crates holds the two lists equal.
+pub const READ_FEATURES: &[&str] = &[
+    "embedded_text",
+    "query_fixed",
+    "query_folds",
+    "rate_limit_headers",
+];
+/// The most query values an operation's `query_fixed` fixes: the catalog
+/// provider's `QUERY_FIXED`, which a test linking both crates holds equal.
+pub const QUERY_FIXED_MAX: usize = 8;
+/// The most bytes an `embedded_text` reads: the catalog provider's
+/// `BINARY_LIMIT`, which a test linking both crates holds equal.
+pub const EMBEDDED_TEXT_MAX_BYTES: u64 = 2 * 1024 * 1024;
 
 /// `connectors_definitions.definition.SchemaId`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -125,6 +141,9 @@ pub const CONNECTOR_FORMAT: &str = "connectors-catalog-connector/1";
 /// `Authorization: Basic`, `bearer` `Authorization: Bearer`, `header` the token
 /// in `header`, behind `prefix` when one is given; the two OAuth schemes
 /// exchange the stored entry at `token_url` for a bearer access token.
+/// `github_app` signs a JWT with the stored GitHub App key and exchanges it
+/// under the base URL for an installation token sent as `Authorization:
+/// Bearer`; its connection is the installation the entry names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AuthScheme {
@@ -135,7 +154,15 @@ pub enum AuthScheme {
     OAuth2Refresh,
     #[serde(rename = "oauth2_client_credentials")]
     OAuth2ClientCredentials,
+    #[serde(rename = "github_app")]
+    GitHubApp,
 }
+
+/// The read a `github_app` profile proves its installation token with when the
+/// definition names none: the repositories the installation may reach.
+const GITHUB_APP_IDENTITY_PATH: &str = "installation/repositories";
+/// The identity kind of a `github_app` connection when the definition names none.
+const GITHUB_APP_IDENTITY_KIND: &str = "github.installation";
 
 impl AuthScheme {
     fn is_oauth(self) -> bool {
@@ -473,12 +500,57 @@ pub struct Custody {
     pub returns: BTreeMap<String, String>,
 }
 
+/// `connectors_definitions.definition.FoldFormat`, the engine's
+/// `connectors_catalog.selection.FoldFormat`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FoldFormat {
+    Timestamp,
+}
+
+/// `connectors_definitions.definition.QueryFold`, the engine's
+/// `connectors_catalog.selection.QueryFold`, carried as written: a caller
+/// input appended to the fixed query value of `into` as one space, `prefix`
+/// and the input in `format`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QueryFold {
+    pub into: String,
+    pub prefix: String,
+    pub format: FoldFormat,
+}
+
+/// `connectors_definitions.definition.EmbeddedText`, the engine's
+/// `connectors_catalog.selection.EmbeddedText`, carried as written: the file a
+/// read's JSON answer carries as base64, answered as its text.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EmbeddedText {
+    pub content: String,
+    pub encoding: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<String>,
+    pub max_bytes: u64,
+}
+
+/// `connectors_definitions.definition.RateLimitHeaders`, the engine's
+/// `connectors_catalog.selection.RateLimitHeaders`, carried as written: the
+/// headers by which a `403` or `429` says the rate limit is spent.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RateLimitHeaders {
+    pub remaining: String,
+    pub reset: String,
+}
+
 /// `connectors_definitions.definition.Defaults`: the fields an operation
 /// carries to the engine as written, given once for every operation that
 /// does not set the field itself. `envelope` applies only to the reads that
-/// answer JSON (no `response` other than `json`, no `download`), the only
-/// operations the engine admits one on; `refusal_texts` and `custody` apply only
-/// to writes, the only operations the engine admits them on; every other field
+/// answer JSON (no `response` other than `json`, no `download`, no
+/// `embedded_text`), the only operations the engine admits one on;
+/// `refusal_texts` and `custody` apply only to writes, the only operations the
+/// engine admits them on; `rate_limit_headers` applies to every operation but
+/// a `download`, which the engine reads no rate limit on; every other field
 /// applies to every operation.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -501,6 +573,8 @@ pub struct Defaults {
     pub envelope: Option<Envelope>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rate_limit_reasons: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate_limit_headers: Option<RateLimitHeaders>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refusal_texts: Option<Vec<TextRefusal>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -705,8 +779,10 @@ pub struct Datasource {
 }
 
 /// `connectors_definitions.definition.Operation`. `op` is absent only for a
-/// `download`. The fields from `required` to `custody` reach the
-/// engine as written, and each takes its value from `defaults` when not set.
+/// `download`. The fields from `required` to `custody`, and
+/// `rate_limit_headers`, reach the engine as written, and each takes its value
+/// from `defaults` when not set. `query_fixed`, `query_folds` and
+/// `embedded_text` reach it as written and have no default.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Operation {
@@ -769,6 +845,20 @@ pub struct Operation {
     pub conflict_status: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub guard: Option<Guard>,
+    /// Query parameters of a read sent with these values on every request,
+    /// which a caller cannot send: the engine's `query_fixed`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query_fixed: Option<IndexMap<String, String>>,
+    /// Caller inputs, by name, folded into a fixed query value: the engine's
+    /// `query_folds`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query_folds: Option<IndexMap<String, QueryFold>>,
+    /// A read answering JSON whose answer carries a file as base64, answered
+    /// as its text: the engine's `embedded_text`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embedded_text: Option<EmbeddedText>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate_limit_headers: Option<RateLimitHeaders>,
     /// Written only where it differs from the source operation's summary,
     /// which is the description otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1397,6 +1487,14 @@ pub struct SelectionEntry {
     pub guard: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custody: Option<Custody>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub query_fixed: BTreeMap<String, String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub query_folds: BTreeMap<String, QueryFold>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embedded_text: Option<EmbeddedText>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate_limit_headers: Option<RateLimitHeaders>,
 }
 
 /// The `connectors-catalog-operations/1` file a definition lowers to.
@@ -1949,10 +2047,44 @@ fn profile_block(id: &str, profile: &Auth, base_url: &str) -> Result<Fields, Ref
     };
     let scheme = profile.scheme.ok_or_else(|| missing("scheme"))?;
     let label = profile.label.as_ref().ok_or_else(|| missing("label"))?;
-    let identity = profile
-        .identity
-        .as_ref()
-        .ok_or_else(|| missing("identity"))?;
+    let identity = match (&profile.identity, scheme) {
+        // The connection is the installation the token exchange proves, named
+        // by the entry's installation id: the definition may replace the read
+        // or the kind, never the source or the subject.
+        (identity, AuthScheme::GitHubApp) => {
+            let given = identity.clone().unwrap_or(AuthIdentity {
+                source: None,
+                path: None,
+                kind: None,
+                subject: None,
+            });
+            if given
+                .source
+                .is_some_and(|source| source != IdentitySource::Configuration)
+            {
+                return Err(misplaced("identity.source"));
+            }
+            if given.subject.is_some() {
+                return Err(misplaced("identity.subject"));
+            }
+            AuthIdentity {
+                source: Some(IdentitySource::Configuration),
+                path: Some(
+                    given
+                        .path
+                        .unwrap_or_else(|| GITHUB_APP_IDENTITY_PATH.to_owned()),
+                ),
+                kind: Some(
+                    given
+                        .kind
+                        .unwrap_or_else(|| GITHUB_APP_IDENTITY_KIND.to_owned()),
+                ),
+                subject: None,
+            }
+        }
+        (Some(identity), _) => identity.clone(),
+        (None, _) => return Err(missing("identity")),
+    };
     let source = identity.source.unwrap_or(IdentitySource::Api);
     let mut probe = Fields::new();
     match source {
@@ -1984,12 +2116,15 @@ fn profile_block(id: &str, profile: &Auth, base_url: &str) -> Result<Fields, Ref
         AuthScheme::Basic => Some("basic"),
         AuthScheme::OAuth2Refresh => Some("oauth2_refresh"),
         AuthScheme::OAuth2ClientCredentials => Some("oauth2_client_credentials"),
+        AuthScheme::GitHubApp => Some("github_app"),
         AuthScheme::Bearer | AuthScheme::Header => None,
     };
     if let Some(word) = word {
         block.push(field("scheme", text(word)));
     }
     let header = match (&profile.header, scheme) {
+        // The installation token has one placement, `Authorization: Bearer`.
+        (Some(_), AuthScheme::GitHubApp) => return Err(misplaced("header")),
         (Some(header), _) => header.clone(),
         (None, AuthScheme::Header) => return Err(missing("header")),
         (None, _) => "Authorization".to_owned(),
@@ -2654,6 +2789,7 @@ struct Carried {
     download: Option<Download>,
     envelope: Option<Envelope>,
     rate_limit_reasons: Vec<String>,
+    rate_limit_headers: Option<RateLimitHeaders>,
     refusal_texts: Vec<TextRefusal>,
     custody: Option<Custody>,
 }
@@ -2673,7 +2809,9 @@ fn carried(definition: &ProviderDefinition, operation: &Operation) -> Carried {
     let writes = effect == Effect::Write;
     let answers_json = effect == Effect::Read
         && matches!(response, None | Some(ResponseKind::Json))
-        && download.is_none();
+        && download.is_none()
+        && operation.embedded_text.is_none();
+    let downloads = download.is_some();
     Carried {
         required: list(&operation.required, &defaults.required),
         withhold: list(&operation.withhold, &defaults.withhold),
@@ -2687,6 +2825,11 @@ fn carried(definition: &ProviderDefinition, operation: &Operation) -> Carried {
             .clone()
             .or_else(|| answers_json.then(|| defaults.envelope.clone()).flatten()),
         rate_limit_reasons: list(&operation.rate_limit_reasons, &defaults.rate_limit_reasons),
+        rate_limit_headers: operation.rate_limit_headers.clone().or_else(|| {
+            (!downloads)
+                .then(|| defaults.rate_limit_headers.clone())
+                .flatten()
+        }),
         refusal_texts: operation
             .refusal_texts
             .clone()
@@ -2854,6 +2997,14 @@ pub fn select(
     inventory: &crate::inventory::Inventory,
     document: &Value,
 ) -> Result<OperationsFile, Refusal> {
+    // Held to the engine's rule as written, whether or not an operation takes it.
+    if let Some(headers) = definition
+        .defaults
+        .as_ref()
+        .and_then(|defaults| defaults.rate_limit_headers.as_ref())
+    {
+        check_rate_limit_headers("defaults", headers)?;
+    }
     let mut operations = Vec::new();
     for (key, operation) in &definition.operations {
         let carried = carried(definition, operation);
@@ -2940,6 +3091,59 @@ pub fn select(
                 "operation `{key}` declares {member}; only a write declares a body"
             )));
         }
+        // The engine fixes query values only on a read, and reads an embedded
+        // text only from a read answering JSON that reads its answer no other way.
+        if effect != Effect::Read
+            && let Some(member) = [
+                ("query_fixed", operation.query_fixed.is_some()),
+                ("query_folds", operation.query_folds.is_some()),
+            ]
+            .iter()
+            .find_map(|(member, declared)| declared.then_some(member))
+        {
+            return Err(Refusal::Malformed(format!(
+                "operation `{key}` declares {member}; only a read fixes query values"
+            )));
+        }
+        if operation.embedded_text.is_some()
+            && let Some(member) = [
+                ("a write", effect != Effect::Read),
+                ("response", carried.response.is_some()),
+                ("envelope", carried.envelope.is_some()),
+                ("binary", carried.binary.is_some()),
+                ("download", carried.download.is_some()),
+            ]
+            .iter()
+            .find_map(|(member, declared)| declared.then_some(member))
+        {
+            return Err(Refusal::Malformed(format!(
+                "operation `{key}` declares embedded_text beside {member}; only a read answering JSON that it reads no other way carries one"
+            )));
+        }
+        // The engine reads no fixed query value, fold or rate limit on a download.
+        if carried.download.is_some() {
+            let members: Vec<&str> = [
+                ("query_fixed", operation.query_fixed.is_some()),
+                ("query_folds", operation.query_folds.is_some()),
+                ("rate_limit_headers", operation.rate_limit_headers.is_some()),
+            ]
+            .into_iter()
+            .filter_map(|(member, declared)| declared.then_some(member))
+            .collect();
+            if !members.is_empty() {
+                return Err(Refusal::Malformed(format!(
+                    "operation `{key}` is a download, which reads no {}",
+                    members.join(", ")
+                )));
+            }
+        }
+        if let Some(headers) = &operation.rate_limit_headers {
+            check_rate_limit_headers(&format!("operation `{key}`"), headers)?;
+        }
+        if let Some(embedded) = &operation.embedded_text {
+            check_embedded_text(key, embedded, found)?;
+        }
+        check_fixed_query(key, operation, found, &bounds, &carried)?;
         let guard = operation
             .guard
             .as_ref()
@@ -2977,6 +3181,20 @@ pub fn select(
             conflict_status: operation.conflict_status,
             guard,
             custody: carried.custody,
+            query_fixed: operation
+                .query_fixed
+                .iter()
+                .flatten()
+                .map(|(name, value)| (name.clone(), value.clone()))
+                .collect(),
+            query_folds: operation
+                .query_folds
+                .iter()
+                .flatten()
+                .map(|(name, fold)| (name.clone(), fold.clone()))
+                .collect(),
+            embedded_text: operation.embedded_text.clone(),
+            rate_limit_headers: carried.rate_limit_headers,
         });
     }
     check_references(definition, inventory)?;
@@ -2986,6 +3204,140 @@ pub fn select(
         operations,
         feed: feed(definition, inventory)?,
     })
+}
+
+/// Whether a header name is an HTTP token (RFC 9110 §5.6.2), as the catalog
+/// provider holds a `rate_limit_headers` name at load.
+fn header_token(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b))
+}
+
+/// The catalog provider's load rule for `rate_limit_headers`: two distinct
+/// header names, compared in any ASCII case.
+fn check_rate_limit_headers(owner: &str, headers: &RateLimitHeaders) -> Result<(), Refusal> {
+    if !header_token(&headers.remaining)
+        || !header_token(&headers.reset)
+        || headers.remaining.eq_ignore_ascii_case(&headers.reset)
+    {
+        return Err(Refusal::Malformed(format!(
+            "{owner} declares rate_limit_headers that are not two distinct header names"
+        )));
+    }
+    Ok(())
+}
+
+/// The catalog provider's load rule for an `embedded_text`: pointers with a
+/// leading `/` and a `max_bytes` from 1 to [`EMBEDDED_TEXT_MAX_BYTES`]; and,
+/// beyond what the provider checks at load, a source operation whose answer it
+/// reads as JSON. One answering only `text/` it reads as a string, from which
+/// no embedded file is ever read.
+fn check_embedded_text(
+    key: &str,
+    embedded: &EmbeddedText,
+    found: Option<&crate::inventory::Operation>,
+) -> Result<(), Refusal> {
+    let refused = |reason: &str| {
+        Err(Refusal::Malformed(format!(
+            "operation `{key}` declares embedded_text {reason}"
+        )))
+    };
+    if [
+        Some(&embedded.content),
+        Some(&embedded.encoding),
+        embedded.size.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    .any(|pointer| !pointer.starts_with('/'))
+    {
+        return refused("with a pointer that does not start with `/`");
+    }
+    if !(1..=EMBEDDED_TEXT_MAX_BYTES).contains(&embedded.max_bytes) {
+        return refused(&format!(
+            "with a max_bytes outside 1 to {EMBEDDED_TEXT_MAX_BYTES}"
+        ));
+    }
+    let answers: Vec<&String> = found
+        .iter()
+        .flat_map(|found| found.responses.iter())
+        .filter(|response| response.status.starts_with('2'))
+        .flat_map(|response| response.media_types.iter())
+        .collect();
+    if !answers.is_empty() && answers.iter().all(|media| media.starts_with("text/")) {
+        return refused("on an operation that answers only text");
+    }
+    Ok(())
+}
+
+/// The catalog provider's load rules for `query_fixed` and `query_folds`, held
+/// against the source operation and the bounds, required, withheld and
+/// credential parameters the selection entry carries: up to
+/// [`QUERY_FIXED_MAX`] non-empty values of query parameters it neither bounds,
+/// requires, withholds nor passes as the credential; each fold under an id that
+/// is no parameter of the operation, into a value it fixes and no other fold
+/// joins, with a non-empty prefix free of whitespace.
+fn check_fixed_query(
+    key: &str,
+    operation: &Operation,
+    found: Option<&crate::inventory::Operation>,
+    bounds: &BTreeMap<String, Bound>,
+    carried: &Carried,
+) -> Result<(), Refusal> {
+    let fixed = operation.query_fixed.as_ref();
+    let parameters = found.map_or(&[][..], |found| found.parameters.as_slice());
+    if fixed.is_some_and(|fixed| fixed.len() > QUERY_FIXED_MAX) {
+        return Err(Refusal::Malformed(format!(
+            "operation `{key}` declares query_fixed with more than {QUERY_FIXED_MAX} values"
+        )));
+    }
+    for (name, value) in fixed.into_iter().flatten() {
+        let reason = if value.is_empty() {
+            Some("to the empty value")
+        } else if !parameters.iter().any(|parameter| {
+            &parameter.name == name && parameter.location == crate::inventory::Location::Query
+        }) {
+            Some("which is not a query parameter of its operation")
+        } else if bounds.contains_key(name) {
+            Some("which it also bounds, as written or by its paging style's limit")
+        } else if carried.required.contains(name)
+            || carried.withhold.contains(name)
+            || carried.credential.contains(name)
+        {
+            Some("which it also marks required, withholds or passes as the credential")
+        } else {
+            None
+        };
+        if let Some(reason) = reason {
+            return Err(Refusal::Malformed(format!(
+                "operation `{key}` declares query_fixed `{name}` {reason}"
+            )));
+        }
+    }
+    let mut joined = BTreeSet::new();
+    for (name, fold) in operation.query_folds.iter().flatten() {
+        let reason = if !connectors_core::valid_id(name)
+            || parameters.iter().any(|parameter| &parameter.name == name)
+        {
+            Some("under a name that is not an id or is a parameter of its operation")
+        } else if !fixed.is_some_and(|fixed| fixed.contains_key(&fold.into)) {
+            Some("into a value it does not fix")
+        } else if !joined.insert(&fold.into) {
+            Some("into a value another fold joins")
+        } else if fold.prefix.is_empty() || fold.prefix.chars().any(char::is_whitespace) {
+            Some("with an empty prefix or one holding whitespace")
+        } else {
+            None
+        };
+        if let Some(reason) = reason {
+            return Err(Refusal::Malformed(format!(
+                "operation `{key}` declares query_folds `{name}` {reason}"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// `scheme://host` of a URL or URL template: everything before the third `/`.

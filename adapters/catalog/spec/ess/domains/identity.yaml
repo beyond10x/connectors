@@ -18,7 +18,8 @@ types:
   #   such as ChatGPT's account id (`Profile` below).
   # - `configuration`: the read at `path` must answer 200 and proves the credential; its body is
   #   not read, and the subject is the configured instance id. For a provider whose API names no
-  #   account or user, so the subject is the configured connection, not a provider account.
+  #   account or user, so the subject is the configured connection, not a provider account. Under
+  #   `github_app` the subject is the entry's installation id instead.
   - name: connectors_catalog.identity.Source
     kind: enum
     variants: [api, id_token, configuration]
@@ -41,10 +42,12 @@ types:
       - any: [{not: {source: id_token}}, {not: defined(path)}]
       - any: [{not: {source: configuration}}, {not: defined(subject_pointer)}]
 
-  # How the profile's credential is sent; an absent `scheme` is `token`.
+  # How the profile's credential is sent; an absent `scheme` is `token`. `github_app` signs an
+  # RS256 JWT with the entry's GitHub App key and exchanges it under the API base for an
+  # installation token, sent as `Authorization: Bearer` and kept in the provider's memory only.
   - name: connectors_catalog.identity.Scheme
     kind: enum
-    variants: [token, basic, oauth2_refresh, oauth2_client_credentials, oauth2_grant]
+    variants: [token, basic, oauth2_refresh, oauth2_client_credentials, oauth2_grant, github_app]
 
   # The part of an authentication profile (`auth`) that decides what its identity may be, and
   # the word its token is sent behind.
@@ -52,6 +55,9 @@ types:
   # for a static credential (`token` or `basic`): an OAuth profile's credential belongs to a
   # user or client its provider can name, and a configured subject would let repair accept
   # another holder's credential as the same identity.
+  # A `github_app` profile is the exception, and needs a `configuration` identity: its connection
+  # is the installation its entry names, which the token exchange proves, and its subject is that
+  # installation id, not the instance id. Its installation token is always a bearer token.
   # `bearer: true` sends a token as `Bearer <token>`. `prefix` sends it as `<prefix> <token>`
   # instead, for a provider whose header names another scheme word, such as Opsgenie's
   # `Authorization: GenieKey <key>`. It belongs to a `token` profile only (absent `scheme` is
@@ -71,6 +77,8 @@ types:
       - any: [{not: {identity.source: configuration}}, {not: {scheme: oauth2_refresh}}]
       - any: [{not: {identity.source: configuration}}, {not: {scheme: oauth2_client_credentials}}]
       - any: [{not: {identity.source: configuration}}, {not: {scheme: oauth2_grant}}]
+      - any: [{not: {scheme: github_app}}, {identity.source: configuration}]
+      - any: [{not: {scheme: github_app}}, {bearer: true}]
       - any: [{not: defined(prefix)}, {not: {bearer: true}}]
       - any: [{not: defined(prefix)}, {not: defined(scheme)}, {scheme: token}]
       - any: [{not: defined(prefix)}, {all: [prefix.utf8_bytes >= 1, prefix.utf8_bytes <= 32]}]

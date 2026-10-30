@@ -20,5 +20,6 @@ tokio.workspace = true
 url.workspace = true
 
 [dev-dependencies]
+connectors-catalog = { path = "../connectors-catalog" }
 tempfile.workspace = true
 toml = "1.1"
