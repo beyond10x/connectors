@@ -608,7 +608,12 @@ enum Caller {
 /// Where a walk writes its records.
 enum Out {
     Stdout,
-    File { file: std::fs::File, path: PathBuf },
+    File {
+        file: std::fs::File,
+        /// Read only where `discard` can prove the file is the one created.
+        #[cfg_attr(not(unix), expect(dead_code))]
+        path: PathBuf,
+    },
 }
 
 impl Out {
