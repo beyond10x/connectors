@@ -124,6 +124,16 @@ to start another owner. Socket ownership, peer credentials, challenge and
 exact-build checks remain required before this connection port returns an
 admitted client.
 
+An owner verifies the whole store before it answers its startup greeting, so its
+start takes longer as the store grows. A read on `operations invoke` that starts
+the owner waits for its greeting within the read's own deadline. A command without a
+deadline of its own reaches a running owner within 10 seconds and waits for the
+greeting of an owner it started up to 60 seconds from that start, and for an
+owner another process is starting up to 60 seconds from when it found it
+starting. A caller that stops waiting with `timeout` leaves the owner it started
+to finish its start, and the next command reaches it; a caller that fails
+otherwise ends it.
+
 A `reuse` request (`connectors.cli.LocalOwnerReuseRequest`,
 `{"kind":"reuse","adapter":…,"source":…,"connection":…,"expected_revision":…,"profile":…}`,
 story:invoke-definition-reuse-credential) carries no document and no material: it
