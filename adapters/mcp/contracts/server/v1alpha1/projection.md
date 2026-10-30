@@ -163,7 +163,12 @@ introduced by this document.
   serialization. This object wrapper preserves legacy structuredContent's object
   restriction even when the operation result itself is a scalar, array or null.
   The tool output schema describes the complete wrapper, not just its business
-  result. If both representations appear they must decode to identical values.
+  result. Its `result` is any JSON (`{}`), because a call that shapes its
+  result ([below](#shaping-a-tool-result)) returns a value the operation's
+  output schema does not describe (decision D240 c = A); the operation's own
+  output schema is in the tool's `_meta["io.beyond10x.connectors/operation"]`
+  under `output_schema`. If both representations appear they must decode to
+  identical values.
 - **Resources:** only read-only operations whose declared input accepts exactly
   the configured empty object, with no omitted required arguments, qualify.
   Return one text resource content item, with the requested canonical URI,
@@ -209,6 +214,62 @@ notifications do not become final results.
 | prompt-coercion-refused | prompts | omitted |
 | prompt-data-refused | prompts | omitted |
 | prompt-write-refused | prompts | omitted |
+
+### Shaping a tool result
+
+`tools/call` takes, beside the required `input`, the arguments with which the
+CLI's `invoke` shapes and walks a result
+([CLI semantics](../../../../../contracts/cli/v1alpha1/semantics.md), "Shaping a
+result" and "Walking pages"; story:mcp-tool-call-shapes-its-result). Each tool's
+input schema declares them, and no other member:
+
+- `fields`, a string: the comma-separated path list of `--fields`. A single call
+  returns the members of the operation result the paths name, with `missing`
+  listing the paths that reached nothing, when any did.
+- `each`, a string: the member path of `--each`. A single call returns
+  `{"records": <n>, "items": [...]}`, `items` being the elements of the array
+  it names, each shaped by `fields` when given; `missing` as for `--each`.
+- `walk`, a boolean, and `max_pages`, an integer from 1 to 10,000 (default 20),
+  declared only on a tool whose operation's input schema declares a walk under
+  `x-connectors-walk`. With `walk: true` the server reads the walk's pages, as
+  `invoke --walk` does, and returns the walk's summary (`InvokeWalked` without
+  `out`: `pages`, `records`, `complete`, and `end`, `stopped`, `error`,
+  `status`, `resume` and `missing` when they apply) with the records, each
+  shaped by `fields`, as `items`. The records are never written to a file: the
+  server has no local write effect.
+
+The shaped value replaces the Response's `result`; every other Response member
+(`version`, `request_id`, `status`, `audit_ref`, `audit_status`,
+`source_audit`, `mutation`) is the service's, and both representations carry
+the same shaped Response. An error Response, a catalog result whose `status` is
+not 2xx and a call with none of these arguments are returned whole, as above.
+Shaping is the caller's selection and runs after the owner, its audit and its
+bounds have the complete answer; it is never a way to fit a result to MCP.
+
+Each page of a walk is one admitted, audited and bounded read through the same
+path a single call takes, with the page's input; `walk` and `max_pages` never
+reach the owner or the provider. The summary's Response members are those of
+the last page that answered. The records are kept while their JSON fits the
+operation's declared result bound less its request bound and 8 KiB, so the
+reply fits the configured response bound as a single result does; a page that
+would pass it is not taken, and the walk stops with `stopped: "bound"`,
+`complete: false` and that page's input as `resume`. A refused first page is
+answered as a single call refused, on its own channel. A page refused after
+the first stops the walk with `stopped: "refused"` and the refusal's service
+`error`; the reply is a success carrying the records already taken. A page
+after the first is a new owner read: once local admission has ended
+([local binding](semantics.md), standard input closed) it is refused
+`unavailable` without reaching the owner. All pages share the request's own
+time budget, so a walk that outlasts it stops refused with `timeout`.
+
+Before any owner read, and after lookup and the projection revision, invalid
+params (`-32602`) with the message `Invalid arguments.<name>` refuse a
+`fields` or `each` that is not a string or that the grammar refuses; a `walk`
+that is not a boolean, or present on a tool whose operation declares no walk;
+`each` beside `walk: true`; and a `max_pages` without `walk: true` or outside 1
+to 10,000. A missing `input` or a member not named here is refused as before,
+`Expected arguments.input`. No shaping argument grants an operation, a page or
+a write: the server still admits only the reads its projection lists.
 
 ## Error mapping
 
