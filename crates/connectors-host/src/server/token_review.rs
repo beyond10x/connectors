@@ -21,7 +21,7 @@
 //! Nothing is cached across requests. The presented token is sent only in the
 //! review body and never logged.
 use crate::{
-    credentials::CredentialRef,
+    credentials::ReviewTokenFile,
     http::{HttpConfig, ScopedHttp},
 };
 use connectors_core::{Error, ErrorCode, Result};
@@ -65,9 +65,12 @@ pub struct TokenReviewConfig {
     /// The CA bundle that alone roots the API's TLS, read at start.
     #[schemars(with = "String", length(min = 1, max = 4096))]
     pub ca_file: PathBuf,
-    /// The instance's own token, read again for each review: private,
-    /// owner-bound, at most 8 KiB, and not a symbolic link as the last path
-    /// component (for a projected token, `<mount>/..data/token`).
+    /// The instance's own token, read again for each review: a regular file of
+    /// at most 8 KiB, not a symbolic link as the last path component (for a
+    /// projected token, `<mount>/..data/token`), and either private (`0600`)
+    /// and owned by the effective user, or exactly `0640` or `0440`, owned by
+    /// the effective user or root, its group the effective or a supplementary
+    /// group of the process.
     #[schemars(with = "String", length(min = 1, max = 4096))]
     pub credential_file: PathBuf,
 }
@@ -178,7 +181,7 @@ pub struct ServiceAccountAdmission {
     accounts: Accounts,
     /// What [`Self::principal`] answers.
     principal: String,
-    credential: CredentialRef,
+    credential: ReviewTokenFile,
     review: Arc<dyn AuthProbe>,
     deadline: Duration,
     /// [`CONCURRENT_REVIEWS`] slots; one is held for each review in flight.
@@ -208,9 +211,7 @@ impl ServiceAccountAdmission {
                 )
             }
         };
-        let credential = CredentialRef::File {
-            path: config.credential_file.clone(),
-        };
+        let credential = ReviewTokenFile(config.credential_file.clone());
         let http = ScopedHttp::new(
             &HttpConfig {
                 base_url: config.api.clone(),
