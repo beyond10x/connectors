@@ -116,6 +116,15 @@ commands that called a standalone service are gone.
   calls the Kubernetes service over HTTP with `curl`; Federate services describes the library. The
   landing page's terminal session is recorded again with 0.60.0. README states that
   `connectors server --transport stdio` is a local MCP server on Linux.
+- Tests: the adversary test `root_help_after_a_global_output_carries_the_service_block` is
+  inverted to `root_help_after_a_global_output_carries_no_service_block`
+  (`apps/connectors/tests/adversary_legacy_edges.rs:42`), because the service commands are
+  removed (`contracts/cli/v1alpha1/semantics.md:282`). Root help lists `invoke`.
+- Tests: `describe_of_a_definition_needs_no_connection`
+  (`apps/connectors/tests/adversary_d218_u1.rs:687`) needs a built catalog provider. Like the
+  definition connect-question tests, it runs under `connectors-build ignored`, which supplies the
+  provider (`crates/connectors-build/src/ignored.rs:403`). No CI job runs it yet
+  (story:provider-ignored-tests-run-in-ci). It passed by hand against this release.
 
 ## 0.59.3 — 2026-10-30
 
