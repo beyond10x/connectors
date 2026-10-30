@@ -179,7 +179,7 @@ impl ServiceAccountAdmission {
         decide(&review.status, &self.audience, &self.principal)
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     fn with_deadline(mut self, deadline: Duration) -> Self {
         self.deadline = deadline;
         self
