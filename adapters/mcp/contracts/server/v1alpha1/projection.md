@@ -229,8 +229,9 @@ input schema declares them, and no other member:
 - `each`, a string: the member path of `--each`. A single call returns
   `{"records": <n>, "items": [...]}`, `items` being the elements of the array
   it names, each shaped by `fields` when given; `missing` as for `--each`.
-- `walk`, a boolean, and `max_pages`, an integer from 1 to 10,000 (default 20),
-  declared only on a tool whose operation's input schema declares a walk under
+- `walk`, a boolean, and `max_pages`, an integer from 1 to 10,000 (default 20;
+  a JSON number without a fraction, such as `2.0`, is that integer), declared
+  only on a tool whose operation's input schema declares a walk under
   `x-connectors-walk`. With `walk: true` the server reads the walk's pages, as
   `invoke --walk` does, and returns the walk's summary (`InvokeWalked` without
   `out`: `pages`, `records`, `complete`, and `end`, `stopped`, `error`,
@@ -260,7 +261,9 @@ the first stops the walk with `stopped: "refused"` and the refusal's service
 after the first is a new owner read: once local admission has ended
 ([local binding](semantics.md), standard input closed) it is refused
 `unavailable` without reaching the owner. All pages share the request's own
-time budget, so a walk that outlasts it stops refused with `timeout`.
+time budget less a 5 s reserve for shaping, encoding and writing the reply, so
+a walk that outlasts it stops refused with `timeout` and its reply still
+arrives before the request's deadline.
 
 Before any owner read, and after lookup and the projection revision, invalid
 params (`-32602`) with the message `Invalid arguments.<name>` refuse a
