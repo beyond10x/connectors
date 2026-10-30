@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:connectors-do-short-invocation
 kind: story
-status: active
+status: implemented
 title: connectors invoke <connector>[/<instance>] <operation> is the one invocation, local or remote
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 18
+revision: 19
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-29T21:15:05Z", actor: "human:timo", revision: 17}
 - {from: "proposed", to: "active", at: "2026-10-29T21:15:05Z", actor: "human:timo", revision: 18}
+- {from: "active", to: "implemented", at: "2026-10-30T03:03:07Z", actor: "human:timo", revision: 19, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Problem
 
