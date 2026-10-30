@@ -110,14 +110,22 @@ pub(super) fn invoke(call: &Invocation<'_>, deadline: u64) -> owner::Result<Valu
     // A running owner of this build admits the invoke itself, from its held
     // metadata handle, before it dispatches. Without one the CLI admits it
     // directly, which verifies the whole store, and only then starts an owner.
+    // That owner verifies the whole store again before it answers; its start
+    // counts against the read's own deadline, never against a shorter fixed
+    // bound (owner.md; story:owner-start-outlasts-a-fixed-bound).
     let client = match owner::Client::connect(&paths, false) {
         Ok(client) if client.is_same_build() => client,
         _ => {
             owner::admit_invoke(&paths, alias, &call.input, document)?;
-            if connectors_sdk::now_ms() >= deadline {
-                return Err(Code::Timeout.into());
-            }
-            owner::Client::connect(&paths, true)?
+            let remaining = deadline
+                .checked_sub(connectors_sdk::now_ms())
+                .filter(|ms| *ms > 0)
+                .ok_or(Code::Timeout)?;
+            owner::Client::connect_until(
+                &paths,
+                true,
+                std::time::Instant::now() + std::time::Duration::from_millis(remaining),
+            )?
         }
     };
     if connectors_sdk::now_ms() >= deadline {
