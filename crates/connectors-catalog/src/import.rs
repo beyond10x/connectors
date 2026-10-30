@@ -214,6 +214,11 @@ struct ShippedOperation {
     body_prefixes: BTreeMap<String, String>,
     #[serde(default)]
     conflict_status: Option<u16>,
+    /// A read's declared walk (story:catalog-operation-declares-its-walk), which the
+    /// definition notation has no field for yet (story:definition-lowerer-carries-walk):
+    /// the importer reads past it and the lowered selection does not carry it.
+    #[serde(default, rename = "walk")]
+    _walk: Option<serde::de::IgnoredAny>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -2157,8 +2162,15 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
         .map_err(|refusal| Failure::Lowering(refusal.to_string()))?;
     let lowered =
         serde_json::to_value(&lowered).map_err(|error| Failure::Write(error.to_string()))?;
-    let expected: Value = serde_json::from_slice(&selection_bytes)
+    let mut expected: Value = serde_json::from_slice(&selection_bytes)
         .map_err(|error| Failure::Malformed(error.to_string()))?;
+    // A read's `walk` has no definition field yet (story:definition-lowerer-carries-walk):
+    // until it has, the definition lowers the selection without it.
+    for operation in expected["operations"].as_array_mut().into_iter().flatten() {
+        if let Some(operation) = operation.as_object_mut() {
+            operation.remove("walk");
+        }
+    }
     if lowered != expected {
         return Err(first_difference(&lowered, &expected));
     }
