@@ -39,6 +39,12 @@ pub const READ_FEATURES: &[&str] = &[
     "query_folds",
     "rate_limit_headers",
 ];
+/// The most query values an operation's `query_fixed` fixes: the catalog
+/// provider's `QUERY_FIXED`, which a test linking both crates holds equal.
+pub const QUERY_FIXED_MAX: usize = 8;
+/// The most bytes an `embedded_text` reads: the catalog provider's
+/// `BINARY_LIMIT`, which a test linking both crates holds equal.
+pub const EMBEDDED_TEXT_MAX_BYTES: u64 = 2 * 1024 * 1024;
 
 /// `connectors_definitions.definition.SchemaId`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -532,7 +538,8 @@ pub struct RateLimitHeaders {
 /// answer JSON (no `response` other than `json`, no `download`, no
 /// `embedded_text`), the only operations the engine admits one on;
 /// `refusal_texts` and `custody` apply only to writes, the only operations the
-/// engine admits them on; every other field, `rate_limit_headers` included,
+/// engine admits them on; `rate_limit_headers` applies to every operation but
+/// a `download`, which the engine reads no rate limit on; every other field
 /// applies to every operation.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -2756,6 +2763,7 @@ fn carried(definition: &ProviderDefinition, operation: &Operation) -> Carried {
         && matches!(response, None | Some(ResponseKind::Json))
         && download.is_none()
         && operation.embedded_text.is_none();
+    let downloads = download.is_some();
     Carried {
         required: list(&operation.required, &defaults.required),
         withhold: list(&operation.withhold, &defaults.withhold),
@@ -2769,10 +2777,11 @@ fn carried(definition: &ProviderDefinition, operation: &Operation) -> Carried {
             .clone()
             .or_else(|| answers_json.then(|| defaults.envelope.clone()).flatten()),
         rate_limit_reasons: list(&operation.rate_limit_reasons, &defaults.rate_limit_reasons),
-        rate_limit_headers: operation
-            .rate_limit_headers
-            .clone()
-            .or_else(|| defaults.rate_limit_headers.clone()),
+        rate_limit_headers: operation.rate_limit_headers.clone().or_else(|| {
+            (!downloads)
+                .then(|| defaults.rate_limit_headers.clone())
+                .flatten()
+        }),
         refusal_texts: operation
             .refusal_texts
             .clone()
@@ -2940,6 +2949,14 @@ pub fn select(
     inventory: &crate::inventory::Inventory,
     document: &Value,
 ) -> Result<OperationsFile, Refusal> {
+    // Held to the engine's rule as written, whether or not an operation takes it.
+    if let Some(headers) = definition
+        .defaults
+        .as_ref()
+        .and_then(|defaults| defaults.rate_limit_headers.as_ref())
+    {
+        check_rate_limit_headers("defaults", headers)?;
+    }
     let mut operations = Vec::new();
     for (key, operation) in &definition.operations {
         let carried = carried(definition, operation);
@@ -3055,6 +3072,30 @@ pub fn select(
                 "operation `{key}` declares embedded_text beside {member}; only a read answering JSON that it reads no other way carries one"
             )));
         }
+        // The engine reads no fixed query value, fold or rate limit on a download.
+        if carried.download.is_some() {
+            let members: Vec<&str> = [
+                ("query_fixed", operation.query_fixed.is_some()),
+                ("query_folds", operation.query_folds.is_some()),
+                ("rate_limit_headers", operation.rate_limit_headers.is_some()),
+            ]
+            .into_iter()
+            .filter_map(|(member, declared)| declared.then_some(member))
+            .collect();
+            if !members.is_empty() {
+                return Err(Refusal::Malformed(format!(
+                    "operation `{key}` is a download, which reads no {}",
+                    members.join(", ")
+                )));
+            }
+        }
+        if let Some(headers) = &operation.rate_limit_headers {
+            check_rate_limit_headers(&format!("operation `{key}`"), headers)?;
+        }
+        if let Some(embedded) = &operation.embedded_text {
+            check_embedded_text(key, embedded, found)?;
+        }
+        check_fixed_query(key, operation, found, &bounds, &carried)?;
         let guard = operation
             .guard
             .as_ref()
@@ -3115,6 +3156,140 @@ pub fn select(
         operations,
         feed: feed(definition, inventory)?,
     })
+}
+
+/// Whether a header name is an HTTP token (RFC 9110 §5.6.2), as the catalog
+/// provider holds a `rate_limit_headers` name at load.
+fn header_token(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b))
+}
+
+/// The catalog provider's load rule for `rate_limit_headers`: two distinct
+/// header names, compared in any ASCII case.
+fn check_rate_limit_headers(owner: &str, headers: &RateLimitHeaders) -> Result<(), Refusal> {
+    if !header_token(&headers.remaining)
+        || !header_token(&headers.reset)
+        || headers.remaining.eq_ignore_ascii_case(&headers.reset)
+    {
+        return Err(Refusal::Malformed(format!(
+            "{owner} declares rate_limit_headers that are not two distinct header names"
+        )));
+    }
+    Ok(())
+}
+
+/// The catalog provider's load rule for an `embedded_text`: pointers with a
+/// leading `/` and a `max_bytes` from 1 to [`EMBEDDED_TEXT_MAX_BYTES`]; and,
+/// beyond what the provider checks at load, a source operation whose answer it
+/// reads as JSON. One answering only `text/` it reads as a string, from which
+/// no embedded file is ever read.
+fn check_embedded_text(
+    key: &str,
+    embedded: &EmbeddedText,
+    found: Option<&crate::inventory::Operation>,
+) -> Result<(), Refusal> {
+    let refused = |reason: &str| {
+        Err(Refusal::Malformed(format!(
+            "operation `{key}` declares embedded_text {reason}"
+        )))
+    };
+    if [
+        Some(&embedded.content),
+        Some(&embedded.encoding),
+        embedded.size.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    .any(|pointer| !pointer.starts_with('/'))
+    {
+        return refused("with a pointer that does not start with `/`");
+    }
+    if !(1..=EMBEDDED_TEXT_MAX_BYTES).contains(&embedded.max_bytes) {
+        return refused(&format!(
+            "with a max_bytes outside 1 to {EMBEDDED_TEXT_MAX_BYTES}"
+        ));
+    }
+    let answers: Vec<&String> = found
+        .iter()
+        .flat_map(|found| found.responses.iter())
+        .filter(|response| response.status.starts_with('2'))
+        .flat_map(|response| response.media_types.iter())
+        .collect();
+    if !answers.is_empty() && answers.iter().all(|media| media.starts_with("text/")) {
+        return refused("on an operation that answers only text");
+    }
+    Ok(())
+}
+
+/// The catalog provider's load rules for `query_fixed` and `query_folds`, held
+/// against the source operation and the bounds, required, withheld and
+/// credential parameters the selection entry carries: up to
+/// [`QUERY_FIXED_MAX`] non-empty values of query parameters it neither bounds,
+/// requires, withholds nor passes as the credential; each fold under an id that
+/// is no parameter of the operation, into a value it fixes and no other fold
+/// joins, with a non-empty prefix free of whitespace.
+fn check_fixed_query(
+    key: &str,
+    operation: &Operation,
+    found: Option<&crate::inventory::Operation>,
+    bounds: &BTreeMap<String, Bound>,
+    carried: &Carried,
+) -> Result<(), Refusal> {
+    let fixed = operation.query_fixed.as_ref();
+    let parameters = found.map_or(&[][..], |found| found.parameters.as_slice());
+    if fixed.is_some_and(|fixed| fixed.len() > QUERY_FIXED_MAX) {
+        return Err(Refusal::Malformed(format!(
+            "operation `{key}` declares query_fixed with more than {QUERY_FIXED_MAX} values"
+        )));
+    }
+    for (name, value) in fixed.into_iter().flatten() {
+        let reason = if value.is_empty() {
+            Some("to the empty value")
+        } else if !parameters.iter().any(|parameter| {
+            &parameter.name == name && parameter.location == crate::inventory::Location::Query
+        }) {
+            Some("which is not a query parameter of its operation")
+        } else if bounds.contains_key(name) {
+            Some("which it also bounds, as written or by its paging style's limit")
+        } else if carried.required.contains(name)
+            || carried.withhold.contains(name)
+            || carried.credential.contains(name)
+        {
+            Some("which it also marks required, withholds or passes as the credential")
+        } else {
+            None
+        };
+        if let Some(reason) = reason {
+            return Err(Refusal::Malformed(format!(
+                "operation `{key}` declares query_fixed `{name}` {reason}"
+            )));
+        }
+    }
+    let mut joined = BTreeSet::new();
+    for (name, fold) in operation.query_folds.iter().flatten() {
+        let reason = if !connectors_core::valid_id(name)
+            || parameters.iter().any(|parameter| &parameter.name == name)
+        {
+            Some("under a name that is not an id or is a parameter of its operation")
+        } else if !fixed.is_some_and(|fixed| fixed.contains_key(&fold.into)) {
+            Some("into a value it does not fix")
+        } else if !joined.insert(&fold.into) {
+            Some("into a value another fold joins")
+        } else if fold.prefix.is_empty() || fold.prefix.chars().any(char::is_whitespace) {
+            Some("with an empty prefix or one holding whitespace")
+        } else {
+            None
+        };
+        if let Some(reason) = reason {
+            return Err(Refusal::Malformed(format!(
+                "operation `{key}` declares query_folds `{name}` {reason}"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// `scheme://host` of a URL or URL template: everything before the third `/`.

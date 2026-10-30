@@ -29,7 +29,15 @@
   none, and a default `envelope` does not apply to an `embedded_text` read. `query_fixed` or
   `query_folds` on a write, and `embedded_text` other than on a read answering JSON that sets no
   `response`, `envelope`, `binary` or `download`, are refused when lowering, as the catalog
-  provider would refuse them.
+  provider would refuse them. So are the members the catalog provider would refuse at load or
+  never read, each by name: `rate_limit_headers` that are not two distinct header names, or set on
+  a `download`; `query_fixed` or `query_folds` on a `download`; a `query_fixed` value that is
+  empty, on more than eight parameters, or on a parameter that is not a query parameter of the
+  operation or that it bounds, requires, withholds or passes as the credential; a `query_folds`
+  fold not named by an id, named after a parameter, into a value it does not fix or another fold
+  joins, or with an empty prefix or one holding whitespace; and `embedded_text` with a pointer not
+  starting with `/`, a `max_bytes` outside 1 to 2 MiB, or on an operation that answers only text.
+  A default `rate_limit_headers` does not apply to a `download`.
 
 ## 0.59.3 — 2026-10-30
 
