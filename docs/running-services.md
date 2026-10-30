@@ -49,7 +49,27 @@ gives the exact rules.
 ```
 
 The host admits a request only when the review authenticates the token for `audience` as
-`principal`. Any other answer is `unauthorized`. A review that fails, takes longer than
+an admitted service account. Name the accounts in exactly one of three ways:
+
+- `principal`: one account, `system:serviceaccount:<namespace>:<name>`, at most 128 bytes.
+- `principals`: a list of 1 to 64 such accounts. Each is admitted, and no other.
+- `service_accounts`: a namespace and a name pattern, such as
+  `{"namespace": "agents", "name": "*-agent"}`. The namespace is a literal DNS label, with
+  no wildcard. The name is 1 to
+  128 bytes of `a-z`, `0-9`, `-`, `.` and `*`, and `*` is its only wildcard: it matches any
+  run of characters, or none. The pattern must match the whole name, so `*-agent` admits
+  `coding-agent` but not `coding-agent-2`. With each `*` read as one letter, the pattern
+  must be a valid account name, and the whole account
+  `system:serviceaccount:<namespace>:<name>` must fit in 128 bytes. A pattern such as `-*`,
+  `*-` or `a..b`, which no account name can match, is refused.
+
+None of the three, more than one of them, an empty list or one longer than 64, an invalid
+entry and an empty or invalid pattern are refused at start, with a message that names the
+key. A key written with no value (`principals:` in YAML, `null` in JSON) is refused, not
+read as absent.
+
+A review that names any other account, another audience or no authenticated user is
+`unauthorized`. A review that fails, takes longer than
 5 seconds or cannot be reached is `unavailable`. In either case no operation runs. The host
 sends one review per request and keeps none. At most 8 reviews run at once: a request that
 arrives while 8 are under way is `unavailable` at once and sends no review, so a caller can
@@ -58,8 +78,8 @@ retry it. The host never logs the token. Its own token,
 used from the next review on. The host's service account needs the `system:auth-delegator`
 cluster role, or another role that may create `tokenreviews`. Under this profile
 `GET /v1/describe` is admitted the same way, and `POST /v1/invoke` answers `unsupported`.
-Callers invoke through `POST /v1alpha2/invoke`, which records the service account as the
-principal of every call.
+Callers invoke through `POST /v1alpha2/invoke`, which records the service account the
+review named, its username verbatim, as the principal of every call.
 
 Under `static-bearer`, a caller presents the service credential as a bearer token, reads the
 current descriptor with `GET /v1/describe` and names its revision in `POST /v1/invoke`:
