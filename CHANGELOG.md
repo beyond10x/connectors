@@ -6,25 +6,8 @@ No breaking changes.
 
 ### Added
 
-- `connectors definitions install --source <source> --tag <tag>` installs a connectors-definitions
-  release (story:definitions-install). It reads `index.json` and the release asset from an `https`
-  repository (`<source>/releases/download/<tag>/`) or a local directory (`<source>/<tag>/`),
-  checks every file against the index, and only then writes a read-only cache entry,
-  `<state>/installed-definitions/<index sha256>/`, and `definitions.lock` beside the configuration
-  file, naming source, tag, commit and index SHA-256. A digest mismatch, an index format version
-  this build does not read and a feature it does not support are refused by name
-  (`digest_mismatch`, `unknown_format_version`, `unmet_feature`), as is an index or asset outside
-  the format (`release_invalid`); a refusal leaves the lock and the cache as they were. A release
-  this binary was never built with installs without a rebuild: install takes only the supported
-  format versions and features from the build. Installing grants nothing, starts no process, and
-  no instance resolves through the lock yet. The four features install admits
-  (`embedded_text`, `query_fixed`, `query_folds`, `rate_limit_headers`) are exactly those the
-  definition lowerer reads, held equal by a test. The core is the new library
-  `connectors-definitions-install`, which depends on no connectors crate. Contract:
-  `contracts/cli/v1alpha1/semantics.md`, "Installing a definitions release"; model:
-  `ess/domains/definitions_install.yaml`.
 - A published definition that uses `rate_limit_headers` (on `defaults` or an operation),
-  `query_fixed`, `query_folds` or `embedded_text` now lowers, so `operations invoke --definition`
+  `query_fixed`, `query_folds` or `embedded_text` now lowers, so `invoke --definition`
   and `connectors-build definition` accept connectors-definitions 0.5.2's `connectors/github.yaml`
   (story:definition-lowerer-reads-published-features). Each member reaches the catalog provider's
   selection as written; `rate_limit_headers` on `defaults` applies to every operation that sets
@@ -76,13 +59,53 @@ No breaking changes.
   request to the forge with its own profile's token (a `token` profile's, or a `github_app`
   installation token) in HTTP basic authentication; the caller holds no forge credential. A push
   is read whole up to `push_limit_bytes` and is refused, with nothing sent to the forge's
-  receive-pack, when a command is not a branch under `ref_prefixes` (deletes and tags included),
-  when its pack does not index into a quarantine repository beside the instance's mirror, when a
+  receive-pack, when a command is not a branch under `ref_prefixes` (deletes, tags and push options
+  included),
+  when its pack does not index into a quarantine repository beside the instance's mirror or carries
+  an object no pushed branch reaches and the mirror lacks, when a
   new commit's author or committer is not `commit_identity`, or when `pre_push_check`, a configured
-  command run in the quarantine with no credential, exits non-zero. A passing push is sent once;
+  command run in the quarantine with no credential in its environment, exits non-zero (it runs as
+  the instance's user, so it must not run pushed code). A passing push is sent once;
   each command is logged `applied`, `refused` or `unknown`, and a push whose answer is lost is
   reported `unknown` and never resent. See
   [Run connector services](docs/running-services.md#git-relay).
+- Opt-in keyed writes under a standing grant on a served host
+  (story:served-keyed-writes-under-a-standing-approval). A host whose service configuration
+  has no `standing_grants` is unchanged: a write on `POST /v1alpha2/invoke` is dispatched
+  unkeyed and `idempotency_key` is still `unsupported`. Setting `standing_grants` (it requires
+  `state`) names a `connectors.standing-grants/1` file the operator mounts; each grant names the
+  instance, one operation, the input members a write must hold (a JSON pointer and its exact
+  value), an expiry and `max_per_hour`. On such a host every write on `POST /v1alpha2/invoke`
+  needs `idempotency_key` and a covering grant, and `POST /v1/invoke`, which records no attempt,
+  refuses writes as `unsupported`. The host reads the file on every write, so an edit or a
+  revocation applies from the next call on. The file may be a key of a Kubernetes Secret or
+  ConfigMap volume (on Linux its `..data` link is read as the `mounted_secret` custody binding
+  reads an item); the host refuses it as `unavailable` when it is reached through any other
+  symlink or a directory another user can write, is writable by group or others, owned by
+  another user than the host's or root, over 64 KiB or malformed. A write without
+  `idempotency_key` is `invalid_input`, a key used for another request `idempotency_conflict`,
+  a write no grant covers `approval_required`, a grant over its hour `rate_limited` with
+  `retry_after_seconds`; none of them records an attempt or reaches the provider. The same key
+  and input again replays the original outcome with `replayed: true` and never sends again;
+  the host admits requests with one key one at a time, so concurrent requests with one key
+  make one provider request and take one grant use. A replay of a write still running waits
+  up to 25 s without holding an in-flight slot, at most 4 per write; a further one, or one
+  whose write a restart interrupted, answers `outcome_unknown` at once. An applied keyed write
+  keeps its provider result, up to 64 KiB, for the replay; a replay of a larger result answers
+  `capacity`, with the write still reported as applied. Keys and hourly counts survive a
+  restart in `standing-grants.sqlite3` (mode 0600); keys do not expire. Limitation: the
+  `state` directory holds at most 100,000 recorded attempts per instance and the host removes
+  none, so once that many are recorded every further write answers `capacity` (a replay of a
+  recorded key still answers) until the operator moves the host to a fresh `state` directory,
+  which carries no earlier key over. With a grant file,
+  `connectors-catalog-provider --config` lists and runs the instance's writes too; without one
+  it serves reads only, as before. Rust callers send a key with the new
+  `Client::invoke_v1alpha2_keyed`; `Client::invoke_v1alpha2` is unchanged. Contract:
+  `contracts/service/compatibility.md` § 2.1, "Keyed writes under a standing grant"; model:
+  `ess/domains/standing_approvals.yaml`; operator guide:
+  [Standing write grants](docs/running-services.md#standing-write-grants). Scenarios added:
+  `v1alpha2-invoke-keyed-write-under-standing-grant`, `v1alpha2-invoke-keyed-replay`,
+  `v1alpha2-invoke-write-outside-grant-refused`.
 
 ### Fixed
 
@@ -98,6 +121,132 @@ No breaking changes.
   request: a read the provider had answered came back `internal` (HTTP 500) with no final audit
   observation, and an admission refusal closed the connection with no answer. Every binary that
   uses the shared log setup now drops a log line it cannot write.
+
+## 0.61.0 — 2026-10-30
+
+One command installs a connectors-definitions release, verified file by file, into a read-only
+cache and a lock.
+
+### Added
+
+- `connectors definitions install --source <source> --tag <tag>` installs a connectors-definitions
+  release (story:definitions-install). It reads `index.json` and the release asset from an `https`
+  repository (`<source>/releases/download/<tag>/`) or a local directory (`<source>/<tag>/`),
+  checks every file against the index, and only then writes a read-only cache entry,
+  `<state>/installed-definitions/<index sha256>/`, and `definitions.lock` beside the configuration
+  file, naming source, tag, commit and index SHA-256. A digest mismatch, an index format version
+  this build does not read and a feature it does not support are refused by name
+  (`digest_mismatch`, `unknown_format_version`, `unmet_feature`), as is an index or asset outside
+  the format (`release_invalid`); a refusal leaves the lock and the cache as they were. A release
+  this binary was never built with installs without a rebuild: install takes only the supported
+  format versions and features from the build. Installing grants nothing, starts no process, and
+  no instance resolves through the lock yet. The four features install admits
+  (`embedded_text`, `query_fixed`, `query_folds`, `rate_limit_headers`) are not yet read by the
+  definition lowerer, which refuses a published definition that uses them. The core is the new library
+  `connectors-definitions-install`, which depends on no connectors crate. Contract:
+  `contracts/cli/v1alpha1/semantics.md`, "Installing a definitions release"; model:
+  `ess/domains/definitions_install.yaml`.
+
+## 0.60.0 — 2026-10-30
+
+Breaking changes. One command invokes an operation, named by connector and instance, and the
+commands that called a standalone service are gone.
+
+### Breaking
+
+- `operations invoke` is removed. Use `invoke <connector>[/<instance>] <operation>`.
+- `operations invoke --definition <file> --operation <op>` is removed. Use
+  `invoke --definition <file> <op>`, with no target: the file names the connector and instance,
+  and the on-the-fly lowering and the digest cache are the same.
+- `connectors invoke --endpoint <url> --token-file <file> --operation <op> --input <json>` is
+  removed. Give an instance its `endpoint` (`connections connect <connector>/<instance> --endpoint
+  <url>`) and run `invoke` on it. A standalone service is called over HTTP
+  (`GET /v1/describe`, `POST /v1/invoke`), as `docs/running-services.md` shows.
+- `connectors describe --endpoint …` is removed. Use `invoke <connector>/<instance> <operation>
+  --describe` for one operation, or `operations describe`.
+- `connectors serve --config …` is removed, with no command in its place. The federation host
+  stays a library, `connectors_host::federation`, which a Rust program embeds
+  ([Federate services](website/docs/guides/federate-adapter-services.md)).
+- Each of those command lines is now a parse refusal, exit status 2, and contacts nothing.
+- `instances list` items no longer carry `adapter` or `adapter_id`: each is `connector`,
+  `instance`, `instance_id`, `startup` and `restart`. An invoke result carries no `adapter`
+  member; it names `connector` and `instance`.
+- A legacy catalog entry is named, in `instances list` and every selection, by the connector
+  `setup migrate` derives for it. `--connector catalog --instance <alias>` and the target
+  `catalog/<alias>` no longer select such an entry; they are `not_found`. Name it as
+  `<connector>/<alias>`, or keep the deprecated `--adapter <alias>`.
+
+### Added
+
+- `invoke <connector>[/<instance>] <operation>`. With the instance left out, the connector's only
+  instance is used; `default_instance` is not read. Without `--connection` the instance's one
+  ready connection is used, else its one usable one. `--schema` and `--revision` default to the
+  current description's; given, they are pins, and a differing description is
+  `stale_description`.
+- `invoke … --describe` prints the operation's description, effect (`read` or `write`), schema,
+  revision and input schema, and calls nothing. With `--definition` it answers from the file's
+  lowering and records, asks and connects nothing.
+- `invoke` reads its input from standard input when no input flag is given and standard input is
+  not a terminal; `--input-stdin` asks for it explicitly.
+- Refusal `instance_ambiguous` (usage, stage `arguments`, exit status 2): the connector has more
+  than one instance and none was named. `instances` lists each as `<connector>/<instance>`.
+- Refusal `connection_unresolved` (operational, stage `admission`, exit status 1): no usable
+  connection, or several. `connections` lists each held connection with its state, and the next
+  action is `create_connection`, `repair_connection` or `none`.
+- A write without `--approval-file` is refused `approval_required` before any provider call, and
+  `approval_steps` names the commands that issue the proof: `approvals prepare`,
+  `approvals clock-check`, `approvals issue`.
+- `connections connect` takes the target `<connector>/<instance>` and `--endpoint <url>`. The
+  endpoint is written into the configuration before a credential is asked for: the instance, and
+  its connector's table when absent, are created, every other byte of the file is kept, and a
+  different endpoint on an existing instance is refused `lifecycle_conflict` naming `endpoint`. A
+  connector without a default endpoint, on an instance without one, needs `--endpoint`.
+- `connections revalidate`, `revoke` and `reconnect` refused for a revision name it:
+  `revision_expected` and `revision_given` give the kind of revision each is, and `read_with`
+  the command that reads the right one.
+- `instances list` names a legacy catalog entry no connector is derived for in `unmigrated`,
+  sorted, instead of listing it as an instance.
+- Configuration rule `legacy_entry_unmigrated`: selecting such an entry as an instance
+  (`--connector catalog --instance <alias>`, or the `invoke` target `catalog/<alias>`) is
+  `invalid_configuration` at `configuration` with next action `check_configuration`. Its
+  replacement is a `[connectors.<connector>]` instance.
+- Zendesk read `ticket.audits` (`ListAuditsForTicket`) returns one ticket's audits by cursor
+  (`page[size]`, `page[after]`). Each audit carries its author, time, via channel and source, and
+  its events, field changes included. When `meta.has_more` is present it decides the walk: false
+  ends it, and true continues even past an empty page and is an error without
+  `meta.after_cursor`. Without `meta.has_more`, a page with no `meta.after_cursor` or no audits
+  ends the walk. A cursor seen before is an error. Sending `include_boundary_indicators: true` is
+  recommended so that pages carry `has_more`. The catalog inventory now expands a deepObject
+  `page` that is either an offset number or cursor pairs into its cursor pairs. The Zendesk
+  descriptor and the configuration revision of its guide change. An existing local entry keeps
+  working with the operations it names; add `ticket.audits` to its `operations` permission to use
+  it.
+
+### Changed
+
+- Zendesk `ticket.comments`: the walk follows the rule of `ticket.audits`. `meta.has_more`
+  decides when present; without it, a page with no `meta.after_cursor` or no comments ends the
+  walk; a cursor seen before is an error. Before, it ended only on `meta.has_more` false, which the
+  pinned API document never declares for comments.
+- `connections revalidate` and `revoke` given the instance's configuration revision in place of a
+  connection revision are `invalid_input` at `arguments`, exit status 2; any other stale revision
+  stays `lifecycle_conflict`.
+- `--adapter` on a command that takes none, such as `invoke`, is a parse refusal without a
+  deprecation notice.
+- `connectors-build live-read-loop` invokes each read as `invoke <connector>/<instance>`.
+- README, the guides, every connector page and the CLI contract show `invoke`. Getting started
+  calls the Kubernetes service over HTTP with `curl`; Federate services describes the library. The
+  landing page's terminal session is recorded again with 0.60.0. README states that
+  `connectors server --transport stdio` is a local MCP server on Linux.
+- Tests: the adversary test `root_help_after_a_global_output_carries_the_service_block` is
+  inverted to `root_help_after_a_global_output_carries_no_service_block`
+  (`apps/connectors/tests/adversary_legacy_edges.rs:42`), because the service commands are
+  removed (`contracts/cli/v1alpha1/semantics.md:282`). Root help lists `invoke`.
+- Tests: `describe_of_a_definition_needs_no_connection`
+  (`apps/connectors/tests/adversary_d218_u1.rs:687`) needs a built catalog provider. Like the
+  definition connect-question tests, it runs under `connectors-build ignored`, which supplies the
+  provider (`crates/connectors-build/src/ignored.rs:403`). No CI job runs it yet
+  (story:provider-ignored-tests-run-in-ci). It passed by hand against this release.
 
 ## 0.59.3 — 2026-10-30
 

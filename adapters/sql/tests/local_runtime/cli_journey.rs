@@ -333,14 +333,11 @@ fn a_real_postgres_session_persists_across_cli_and_owner_restart() {
     let descriptor = describe["revision"].as_str().unwrap().to_owned();
     let read = |input: &str| {
         [
-            "operations",
             "invoke",
-            "--adapter",
-            "warehouse",
+            "sql/warehouse",
+            "query.read",
             "--connection",
             &reference,
-            "--operation",
-            "query.read",
             "--schema",
             &schema,
             "--revision",
@@ -416,14 +413,11 @@ fn a_real_postgres_session_persists_across_cli_and_owner_restart() {
         "schema.list",
     ]));
     let listed = success(cli.run(&[
-        "operations",
         "invoke",
-        "--adapter",
-        "warehouse",
+        "sql/warehouse",
+        "schema.list",
         "--connection",
         &reference,
-        "--operation",
-        "schema.list",
         "--schema",
         describe["schema"].as_str().unwrap(),
         "--revision",
@@ -582,14 +576,11 @@ impl LivePg {
     fn args(&self, query: &str, parameters: Value, limit: u32) -> Vec<String> {
         let input = json!({"query":query,"parameters":parameters,"limit":limit}).to_string();
         [
-            "operations",
             "invoke",
-            "--adapter",
-            "warehouse",
+            "sql/warehouse",
+            "query.read",
             "--connection",
             &self.reference,
-            "--operation",
-            "query.read",
             "--schema",
             self.descriptor["schema"].as_str().unwrap(),
             "--revision",

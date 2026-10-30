@@ -47,6 +47,9 @@ const RAW: &str =
 /// How every command selects the instance (story:cli-connector-instance-selectors).
 const SELECTION: &[&str] = &["--connector", "gmail", "--instance", "private"];
 
+/// The same instance as the target of `invoke` (story:connectors-do-short-invocation).
+const TARGET: &str = "gmail/private";
+
 /// How many objects in `value` name the alias `gmail.private`; each must name
 /// `connector` `gmail` and `instance` `private` beside it.
 fn names_the_instance(value: &Value) -> usize {
@@ -211,10 +214,18 @@ fn a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_
     );
     // Every result that names the derived alias names its connector and
     // instance beside it.
-    let adapters = journey.cli(&["adapters", "list"]);
-    for result in [&connect, &listed, &adapters] {
+    for result in [&connect, &listed] {
         assert!(names_the_instance(result) > 0, "{result}");
     }
+    // An instance list item names the connector and instance and no alias
+    // (story:connectors-do-short-invocation).
+    let adapters = journey.cli(&["adapters", "list"]);
+    assert_eq!(
+        adapters["adapters"],
+        json!([{"connector":"gmail","instance":"private","instance_id":"gmail.private",
+            "restart":"never","startup":"on-demand"}]),
+        "{adapters}"
+    );
     for request in fixture.requests() {
         assert!(HOSTS.contains(&request.host.as_str()), "{}", request.host);
     }
@@ -814,12 +825,19 @@ impl Journey {
         output
     }
 
-    /// `operations invoke` of `operation` with `input` on `connection`, under
-    /// the description the CLI reports for it.
+    /// `invoke` of `operation` with `input` on `connection`, under the
+    /// description the CLI reports for it.
     fn invoke(&self, connection: &str, operation: &str, input: Value, extra: &[&str]) -> Output {
         let target = self.target(connection, operation, &input);
-        let target: Vec<&str> = target.iter().map(String::as_str).collect();
-        self.cli_output(&[&["operations", "invoke"][..], &target, extra].concat())
+        // The selection and `--operation <name>` give way to the positional target and operation.
+        let pinned: Vec<&str> = target[SELECTION.len()..]
+            .iter()
+            .map(String::as_str)
+            .enumerate()
+            .filter(|(index, _)| !matches!(index, 2 | 3))
+            .map(|(_, arg)| arg)
+            .collect();
+        self.cli_output(&[&["invoke", TARGET, operation][..], &pinned, extra].concat())
     }
 
     fn target(&self, connection: &str, operation: &str, input: &Value) -> Vec<String> {

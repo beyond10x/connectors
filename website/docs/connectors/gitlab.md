@@ -52,11 +52,11 @@ endpoint = "https://gitlab.example.com"
 ```
 
 ```sh
-connectors instances list
+connectors instances list | jq -c '.[] | arrays | .[]'
 ```
 
 ```json
-{"adapters":[{"adapter":"gitlab.work","adapter_id":"catalog","connector":"gitlab","instance":"work","instance_id":"gitlab.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"connector":"gitlab","instance":"work","instance_id":"gitlab.work","restart":"never","startup":"on-demand"}
 ```
 
 A second host or account is a second instance. A GitLab behind a private CA needs a `ca_file`,
@@ -77,14 +77,7 @@ For automation, `--credential-file` with an owner-only `{"token":"..."}` documen
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector gitlab --instance work \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector gitlab --instance work \
-  --operation merge_request.get | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector gitlab --instance work \
-  --operation merge_request.get | jq -r .result.revision)
-connectors operations invoke --connector gitlab --instance work --connection "$connection" \
-  --operation merge_request.get --schema "$schema" --revision "$revision" \
+connectors invoke gitlab/work merge_request.get \
   --input-json '{"id":"group/project","merge_request_iid":9}'
 ```
 
@@ -110,10 +103,16 @@ Pin the merge to the head commit and the successful pipeline the read above show
 {"id":"group/project","merge_request_iid":17,"pipeline_id":123,"body":{"sha":"0123456789abcdef0123456789abcdef01234567"}}
 ```
 
-Take the schema and revision of `merge_request.merge` from `operations describe`, then prepare,
-issue and invoke:
+Take the connection, and the schema and revision of `merge_request.merge`
+from `invoke --describe`, then prepare, issue and invoke:
 
 ```sh
+connection=$(connectors --output json connections list --connector gitlab --instance work \
+  | jq -r '.result.connections[0].connection')
+schema=$(connectors --output json invoke gitlab/work merge_request.merge --describe \
+  | jq -r .result.schema)
+revision=$(connectors --output json invoke gitlab/work merge_request.merge --describe \
+  | jq -r .result.revision)
 connectors --output json approvals prepare --connector gitlab --instance work \
   --connection "$connection" --operation merge_request.merge \
   --schema "$schema" --revision "$revision" --input-file merge.json
@@ -122,8 +121,7 @@ connectors approvals issue --connector gitlab --instance work \
   --connection "$connection" --operation merge_request.merge \
   --schema "$schema" --revision "$revision" --input-file merge.json \
   --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-merge-17.json"
-connectors operations invoke --connector gitlab --instance work --connection "$connection" \
-  --operation merge_request.merge --schema "$schema" --revision "$revision" \
+connectors invoke gitlab/work merge_request.merge \
   --input-file merge.json --approval-file "$HOME/private/proof-merge-17.json" \
   --idempotency-key merge-17
 ```

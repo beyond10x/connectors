@@ -295,7 +295,7 @@ types:
     fields:
       - {name: bootstrap, type: connectors.cli.PrivateAdapterBootstrap}
   # Request::Reuse (story:invoke-definition-reuse-credential): the reuse answer of
-  # `operations invoke --definition` (contracts/cli/v1alpha1/semantics.md, "Invoking a
+  # `invoke --definition` (contracts/cli/v1alpha1/semantics.md, "Invoking a
   # definition file"; owner.md). adapter is the definition's instance to connect, source
   # another instance of the same connector, connection the source connection and
   # expected_revision the revision it was offered under, profile the target's profile. It
@@ -323,7 +323,7 @@ types:
       - {name: profile, type: connectors.cli.PrivateStaticProfile}
   # What admitted a revalidation (contracts/cli/v1alpha1/semantics.md, owner.md):
   # an explicit `connections revalidate`, or the one recollection a read on
-  # `operations invoke` runs, first in its own worker job and within its own deadline,
+  # `invoke` runs, first in its own worker job and within its own deadline,
   # when only its connection's evidence lapsed, or would lapse before the read could use
   # it (under half its own lifetime, collected_at to valid_until, and under the read's
   # own deadline left), while the credential
@@ -677,7 +677,7 @@ types:
     variants: [usage, operational, interrupted]
   - name: connectors.cli.FailureCode
     kind: enum
-    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer, digest_mismatch, unknown_format_version, unmet_feature, release_invalid]
+    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer, instance_ambiguous, connection_unresolved, digest_mismatch, unknown_format_version, unmet_feature, release_invalid]
   - name: connectors.cli.FailureStage
     kind: enum
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop]
@@ -697,6 +697,12 @@ types:
   - name: connectors.cli.FailureCause
     kind: enum
     variants: [provider_unavailable, provider_timeout, provider_rate_limited, provider_internal, provider_capacity, adapter_exited, owner_stopping]
+  # Which revision an `--expected-revision` names (story:connectors-do-short-invocation):
+  # a connection's public revision, which `connections describe` reads, or an instance's
+  # configuration_revision.
+  - name: connectors.cli.RevisionKind
+    kind: enum
+    variants: [connection, configuration]
   - name: connectors.cli.ConfigurationFormat
     kind: enum
     variants: [connectors-local/1, connectors-local/2, connectors-local/3, connectors-local/4, connectors-local/5]
@@ -710,14 +716,18 @@ types:
   # as roughtime-quorum/1 (docs/local-clock.md). config_too_large: a configuration
   # text is larger than the most a read admits; `setup migrate` refuses a rewritten
   # file past that bound and writes nothing. definition_instance_configured: an
-  # `operations invoke --definition` whose connector already has an instance named
+  # `invoke --definition` whose connector already has an instance named
   # `definition`, or the moved `definition-<16 hex>` the file resolves to, in the
   # configuration, or whose instance id an entry there already uses; the configured
-  # one is never replaced. It names the rule only, never a path
-  # or OS text.
+  # one is never replaced. legacy_entry_unmigrated (story:connectors-do-short-invocation):
+  # a selection names a legacy `[adapters.<alias>]` entry of the built-in provider by
+  # the name that provider gave it (an `invoke` target `<provider>/<alias>`, or
+  # `--connector <provider> --instance <alias>`) and `setup migrate` derives no connector for it, so it
+  # is no instance; `setup migrate` reports why it stays. It names the rule only, never
+  # a path or OS text.
   - name: connectors.cli.ConfigurationRule
     kind: enum
-    variants: [config_path_unresolved, config_missing, config_not_private, owner_uid_mismatch, approval_clock_format_retired, config_too_large, definition_instance_configured]
+    variants: [config_path_unresolved, config_missing, config_not_private, owner_uid_mismatch, approval_clock_format_retired, config_too_large, definition_instance_configured, legacy_entry_unmigrated]
   - name: connectors.cli.InitDisposition
     kind: enum
     variants: [created, state_initialized]
@@ -811,6 +821,17 @@ types:
       - {name: clock_refusal, type: "Optional<connectors.clock.Refusal>"}
       - {name: clock_sources, type: "Optional<List<connectors.clock.SourceReport>>"}
       - {name: field, type: "Optional<String>"}
+      # ESS-LIMIT: instances appears only on `instance_ambiguous` (story:connectors-do-short-invocation):
+      # every configured instance of the connector an `invoke` target named without an
+      # instance, each `<connector>/<instance>`, sorted. connections appears only on
+      # `connection_unresolved`: every connection the selected instance holds, revoked ones
+      # excepted, with its state (empty when it holds none). approval_steps appears only on
+      # an `invoke` write's `approval_required`: the three approval commands in the order
+      # they run. As for instance_id above, ESS declares no invariant on a CLI type, so the
+      # presence rules and the order are enforced by the host and pinned by tests.
+      - {name: instances, type: "Optional<List<String>>"}
+      - {name: connections, type: "Optional<List<connectors.cli.ConnectionCandidate>>"}
+      - {name: approval_steps, type: "Optional<List<String>>"}
       # ESS-LIMIT: cause and attempts appear only on a `connections revalidate` failure at
       # stage dispatch that the owner classified as transient (contracts/cli/v1alpha1/semantics.md
       # §6, "Revalidation retries"): cause names the class of the last attempt, attempts the
@@ -830,6 +851,17 @@ types:
       # enforced by the host and pinned by tests.
       - {name: feature, type: "Optional<String>"}
       - {name: file, type: "Optional<String>"}
+      # ESS-LIMIT: revision_expected, revision_given and read_with appear only beside
+      # field = expected_revision on `connections revalidate` and `connections revoke`
+      # (story:connectors-do-short-invocation; contracts/cli/v1alpha1/semantics.md, "The
+      # refused argument"): revision_expected is the kind of revision the command
+      # expects, revision_given the kind the given value is when it is another one the
+      # instance holds, and read_with the command that reads the expected one. As for
+      # instance_id above, ESS declares no invariant on a CLI type, so the presence rule
+      # is enforced by the host and pinned by tests.
+      - {name: revision_expected, type: "Optional<connectors.cli.RevisionKind>"}
+      - {name: revision_given, type: "Optional<connectors.cli.RevisionKind>"}
+      - {name: read_with, type: "Optional<String>"}
   # setup check names its prerequisites: configuration, metadata, artifact:<alias>,
   # keyring and persistent_custody_qualification under a platform binding; under the
   # explicitly selected mounted_secret binding, mounted_custody (the configured
@@ -849,6 +881,16 @@ types:
       - {name: instance, type: String}
       - {name: instance_id, type: "String"}
       - {name: adapter_id, type: "String"}
+      - {name: startup, type: "connectors.cli.StartupMode"}
+      - {name: restart, type: "connectors.cli.RestartPolicy"}
+  # One item of `instances list` (story:connectors-do-short-invocation): the instance by
+  # its connector and instance, never by an alias or implementation.
+  - name: connectors.cli.InstanceSummary
+    kind: struct
+    fields:
+      - {name: connector, type: String}
+      - {name: instance, type: String}
+      - {name: instance_id, type: "String"}
       - {name: startup, type: "connectors.cli.StartupMode"}
       - {name: restart, type: "connectors.cli.RestartPolicy"}
   - name: connectors.cli.ConfiguredExecutable
@@ -1173,10 +1215,16 @@ types:
     fields:
       - {name: limit, type: "Optional<Integer>"}
       - {name: cursor, type: "Optional<String>"}
+  # story:connectors-do-short-invocation: `instances list` names each instance by its
+  # connector and instance only, a legacy `[adapters.<alias>]` entry of the built-in
+  # provider by the connector `setup migrate` derives for it. A legacy built-in entry
+  # no connector is derived for is no instance: it is left out of adapters and its
+  # alias is listed, sorted, in unmigrated, present only when there is one.
   - name: connectors.cli.AdapterListResult
     kind: struct
     fields:
-      - {name: adapters, type: "List<connectors.cli.AdapterSummary>"}
+      - {name: adapters, type: "List<connectors.cli.InstanceSummary>"}
+      - {name: unmigrated, type: "Optional<List<String>>"}
       - {name: next_cursor, type: "Optional<String>"}
       - {name: source, type: "connectors.cli.MetadataSource"}
   - name: connectors.cli.AdapterDescribeInput
@@ -1269,6 +1317,11 @@ types:
   # --device true) runs the device grant of an oauth2_grant profile, through the device
   # dialect registered for its profile id when there is one; on any other profile, or
   # under the read-only binding, it is invalid_input.
+  # target (story:connectors-do-short-invocation) is `<connector>/<instance>`, the
+  # same selection as connector and instance, which it never stands beside. endpoint
+  # is written into that instance's table of the configuration file before any
+  # credential is asked for (contracts/cli/v1alpha1/semantics.md §3, "Giving an
+  # instance its endpoint"); no other command takes it.
   - name: connectors.cli.ConnectionConnectInput
     kind: struct
     fields:
@@ -1278,6 +1331,8 @@ types:
       - {name: profile, type: "String"}
       - {name: device, type: "Optional<Boolean>"}
       - {name: credential_document, type: "Optional<String>"}
+      - {name: target, type: "Optional<String>"}
+      - {name: endpoint, type: "Optional<String>"}
   - name: connectors.cli.ConnectionConnectResult
     kind: struct
     fields:
@@ -1443,39 +1498,42 @@ types:
       - {name: operation, type: "connectors.cli.OperationDescription"}
       - {name: source, type: "connectors.cli.MetadataSource"}
       - {name: stale, type: "Boolean"}
-  # Dynamic schema identity and descriptor revision are distinct. input is bounded UTF-8 JSON TEXT; a provider schema validates its once-decoded JSON VALUE. Never treat the String schema as provider validation.
-  - name: connectors.cli.OperationInvokeInput
+  # story:connectors-do-short-invocation: `connectors invoke <connector>[/<instance>] <operation>`,
+  # the one command that invokes an operation (`operations invoke` is removed).
+  # target names the connector and, after one `/`, the instance; operation is the second
+  # positional argument. ESS keeps a dynamic target's operation, schema and payload fields
+  # required, so schema and revision are filled before this input is decoded from the
+  # instance's current admitted description when the command line leaves them out; given,
+  # they are pins, refused as stale when they differ. Dynamic schema identity and descriptor
+  # revision are distinct. input is the document from --input-json, --input-file or standard
+  # input, bounded UTF-8 JSON TEXT; a provider schema validates its once-decoded JSON VALUE,
+  # never the String schema. describe answers InvokeDescription and reads no input.
+  # approval_file is path metadata only: the trusted handler reads proof bytes into a
+  # protected buffer after current admission and exact-key observation, never parser JSON.
+  # definition (story:invoke-definition-file) is a connectors-definition/1 file the host
+  # lowers into an owner-only cache; definitions_root holds its vendored source and shared
+  # auth files and defaults to the parent of the directory holding it; credential_file is
+  # the OAuth client file the existing consent reads when the instance is connected first.
+  # All three are path metadata, given only with definition.
+  - name: connectors.cli.InvokeInput
     kind: struct
     fields:
-      - {name: adapter, type: "Optional<String>"}
-      - {name: connector, type: "Optional<String>"}
-      - {name: instance, type: "Optional<String>"}
-      - {name: connection, type: "Optional<String>"}
+      - {name: target, type: "String"}
       - {name: operation, type: "String"}
+      - {name: connection, type: "Optional<String>"}
       - {name: schema, type: "String"}
       - {name: revision, type: "String"}
       - {name: input, type: "String"}
-      # Path metadata only. The trusted handler reads proof bytes into a protected
-      # buffer after current admission and exact-key observation; never parser JSON.
       - {name: approval_file, type: "Optional<String>"}
       - {name: idempotency_key, type: "Optional<String>"}
-      # story:invoke-definition-file: a third selector, exclusive with adapter and with
-      # connector and instance. definition is a connectors-definition/1 file the host lowers
-      # into an owner-only cache; definitions_root holds its vendored source and shared auth
-      # files and defaults to the parent of the directory holding it; credential_file is the
-      # OAuth client file the existing consent reads when the instance is connected first.
-      # All three are path metadata, given only with definition. With definition the
-      # command line may leave out schema and revision: the host states them from the
-      # lowered definition's description before this input is decoded, and ESS keeps
-      # dynamic selector fields required.
       - {name: definition, type: "Optional<String>"}
       - {name: definitions_root, type: "Optional<String>"}
       - {name: credential_file, type: "Optional<String>"}
-  # result is the selected provider output as a JSON value; it must pass that operation's output schema.
-  - name: connectors.cli.OperationInvokeResult
+      - {name: describe, type: "Optional<Boolean>"}
+  # An invoke's answer names the connector and instance; it never carries an adapter member.
+  - name: connectors.cli.InvokeResult
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
       - {name: connector, type: String}
       - {name: instance, type: String}
       - {name: operation, type: "String"}
@@ -1484,7 +1542,30 @@ types:
       - {name: request_id, type: "Optional<String>"}
       - {name: mutation, type: "Optional<connectors.cli.MutationObservation>"}
       - {name: source_audit, type: "Optional<connectors.service_wire.SourceAudit>"}
-  # Compatibility value only. Existing runtime arguments and codecs remain unchanged; token file metadata is sensitive.
+  # `invoke --describe`: the operation as the instance's current admitted description
+  # states it, with the schema and revision an invoke pins. effect is the description's
+  # classification, read or write: a description that leaves an effect unknown is never
+  # admitted. No provider is called and no input is read.
+  - name: connectors.cli.InvokeDescription
+    kind: struct
+    fields:
+      - {name: connector, type: String}
+      - {name: instance, type: String}
+      - {name: operation, type: "String"}
+      - {name: description, type: "String"}
+      - {name: effect, type: "connectors.cli.InvokeEffect"}
+      - {name: schema, type: "String"}
+      - {name: revision, type: "String"}
+      - {name: input_schema, type: "Json"}
+  - name: connectors.cli.InvokeEffect
+    kind: enum
+    variants: [read, write]
+  # One connection of `connection_unresolved`'s list: its id and observed state.
+  - name: connectors.cli.ConnectionCandidate
+    kind: struct
+    fields:
+      - {name: connection, type: String}
+      - {name: state, type: "connectors.connection_admission.ConnectionState"}
   # Presentation projection of service_wire only: pinned ess-cli cannot emit
   # Uuid. Runtime validates id as canonical non-nil UUID text before projection.
   # This is correlation metadata, not a new attempt identity or lookup authority.
@@ -1501,31 +1582,6 @@ types:
       - {name: original_request_id, type: "Optional<String>"}
       - {name: replayed, type: Boolean}
       - {name: cause, type: "Optional<connectors.service_wire.DiagnosticCause>"}
-  - name: connectors.cli.LegacyDescribeInput
-    kind: struct
-    fields:
-      - {name: endpoint, type: "String"}
-      - {name: token_file, type: "String"}
-      - {name: allow_plaintext, type: "Optional<Boolean>"}
-  # The legacy renderer unwraps the descriptor and decodes its configuration_schema carrier into the complete original wire object.
-  - name: connectors.cli.LegacyDescribeResult
-    kind: struct
-    fields:
-      - {name: descriptor, type: "connectors.cli.ServiceDescriptor"}
-  # input retains the legacy file-path argument, not the new dynamic carrier source binding.
-  - name: connectors.cli.LegacyInvokeInput
-    kind: struct
-    fields:
-      - {name: endpoint, type: "String"}
-      - {name: token_file, type: "String"}
-      - {name: allow_plaintext, type: "Optional<Boolean>"}
-      - {name: operation, type: "String"}
-      - {name: input, type: "String"}
-  # The legacy renderer prints the once-decoded JSON carrier directly, preserving raw successful provider output.
-  - name: connectors.cli.LegacyInvokeResult
-    kind: struct
-    fields:
-      - {name: result, type: "String"}
 
 # ESS-LIMIT executable obligations (ESS 0.40 has no file-system, process, terminal
 # or OS-permission construct, no TOML/JSON reader-closure or codec construct, no
@@ -1624,7 +1680,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:998, docs/local-connection-registry.md:222-223;
+    # contracts/cli/v1alpha1/semantics.md:1254, docs/local-connection-registry.md:222-223;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1784,7 +1840,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1002) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1258) and the host
     # removal path (er.rs:4538-4540) only expires Active cursors. The error name is
     # the decision; no source names one.
 

@@ -870,3 +870,30 @@ fn follow(tx: &Transaction<'_>, row: &ConnectionRow) -> Result<()> {
     .map_err(db)?;
     super::revalidation::follow_instance(tx, &binding.instance_id, &binding.configuration_revision)
 }
+
+impl Registry {
+    /// Whether a connection of `instance`, revoked ones included, was admitted
+    /// under a provider authority other than `authority`: a configuration that
+    /// derives `authority` for the instance would strand it, as
+    /// `authentication_changed` refuses every later connection of the instance
+    /// id (story:connectors-do-short-invocation). Read-only; the scan is bounded
+    /// by the per-instance capacity.
+    pub fn authority_moves(&self, instance: &str, authority: &str) -> Result<bool> {
+        let mut metadata = Metadata::inspect(&self.path).map_err(super::host_failure)?;
+        let tx = metadata.connection.transaction().map_err(db)?;
+        let stored = tx
+            .prepare("SELECT binding FROM registry_connections WHERE instance_id=?1")
+            .map_err(db)?
+            .query_map([instance], |r| r.get::<_, String>(0))
+            .map_err(db)?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(db)?;
+        for text in stored {
+            let (admitted, _) = decode_stored(&text)?;
+            if admitted.provider_authority != authority {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+}

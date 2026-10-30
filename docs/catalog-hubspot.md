@@ -110,7 +110,7 @@ from the shipped connector:
 
 ```console
 $ connectors instances list
-{"adapters":[{"adapter":"hubspot.work","adapter_id":"catalog","connector":"hubspot","instance":"work","instance_id":"hubspot.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"adapters":[{"connector":"hubspot","instance":"work","instance_id":"hubspot.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
 ```
 
 Connect with the credential document `{"token": "<private app access token>"}`

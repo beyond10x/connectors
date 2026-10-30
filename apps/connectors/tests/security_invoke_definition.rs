@@ -1,6 +1,7 @@
-//! story:invoke-definition-file, security review: the owner-only cache under
-//! `<state>/definitions/` holds one directory per lowering, keyed by digest,
-//! and `instances.toml`; "an entry holds the lowering of its key"
+//! story:invoke-definition-file, security review, run as `invoke --definition
+//! <file> <operation>` (story:connectors-do-short-invocation): the owner-only
+//! cache under `<state>/definitions/` holds one directory per lowering, keyed
+//! by digest, and `instances.toml`; "an entry holds the lowering of its key"
 //! (`contracts/cli/v1alpha1/semantics.md` §3, "Invoking a definition file").
 //! A definition is data: no field of it places files outside its own cache
 //! entry. These cases start no provider (`CONNECTORS_INSTALLATION` names an
@@ -99,7 +100,7 @@ impl Fixture {
         command
     }
 
-    /// `operations invoke --definition` of `connectors/<stem>.yaml`.
+    /// `invoke --definition` of `connectors/<stem>.yaml`.
     fn invoke(&self, stem: &str, text: &str) -> Output {
         let file = self.write(stem, text);
         self.run(&invoke_args(&file))
@@ -193,11 +194,9 @@ fn security_a_catalog_name_never_places_lowered_files_outside_its_cache_entry() 
 
 fn invoke_args(file: &str) -> Vec<&str> {
     vec![
-        "operations",
         "invoke",
         "--definition",
         file,
-        "--operation",
         "project.get",
         "--input-json",
         r#"{"id":"org/project"}"#,
