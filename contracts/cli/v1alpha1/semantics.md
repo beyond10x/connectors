@@ -99,7 +99,7 @@ management wire payload or a persistent record.
 | `connections revoke` | connection metadata authority | `ConnectionRevokeInput` → `ConnectionRevokeResult` | no / no |
 | `operations list` | selected cached descriptor projection | `OperationListInput` → `OperationListResult` | only to [launch for a description](#launching-for-a-description) |
 | `operations describe` | selected cached descriptor projection | `OperationDescribeInput` → `OperationDescribeResult` | only to [launch for a description](#launching-for-a-description) |
-| `operations invoke` | admitted service request | `OperationInvokeInput` → `OperationInvokeResult` | yes / yes, after admission |
+| `invoke` | admitted service request on the instance and connection its target selects ([invoking an operation](#invoking-an-operation)) | `InvokeInput` → `InvokeResult`, or `InvokeDescription` with `--describe` | yes / yes, after admission; with `--describe` only to [launch for a description](#launching-for-a-description) |
 
 ### Consumer launch
 
@@ -153,8 +153,8 @@ installation or authentication, and never a launch except as follows.
 
 #### Launching for a description
 
-`operations describe`, `operations list` and `operations invoke` (a read or a
-write) start the instance's configured adapter when, and only when, all of these hold: no description is
+`operations describe`, `operations list` and `invoke` (a read, a write, or with
+`--describe`) start the instance's configured adapter when, and only when, all of these hold: no description is
 cached for the instance's configured selection; the started executable is the
 configured one, admitted by its pinned SHA-256 as every launch is; and the
 instance holds a published connection (the named one, for a command that names
@@ -193,7 +193,13 @@ labels preserve observation provenance; they grant no invocation or publication
 authority. The same cached-is-stale rule covers adapter descriptions, operation
 lists/descriptions and cached connection descriptions.
 `instances list` reports configured inventory with `source: configuration` only;
-it carries no cached lifecycle or readiness claim. Adapter status and acquisition
+it carries no cached lifecycle or readiness claim. Each item is an
+`InstanceSummary`: `connector`, `instance`, `instance_id`, `startup` and
+`restart`, never an alias or implementation (story:connectors-do-short-invocation).
+A legacy `[adapters.<alias>]` entry of the catalog provider is listed under the
+connector `setup migrate` derives for it; one no connector is derived for is
+left out, and its alias is listed, sorted, in `unmigrated`, a member present
+only when there is one. Adapter status and acquisition
 status read their existing owner's observations or report owner unavailability;
 they have no cached-result fallback. Connection status can carry a cached
 `ConnectionDescription` only with its explicit cached/stale labels.
@@ -259,7 +265,7 @@ stdout, never an application `Failure`:
 | unknown command or flag, missing or malformed argument, two sources for one field | `cli_parse` |
 | an argument value that does not decode to its field type or the command's input shape | `cli_input` |
 | a selected source the presentation cannot read, when the owner recorded no refusal of its own | `cli_source` |
-| an `operations invoke` business JSON document that does not decode as exactly one JSON value (malformed, a duplicate object key, trailing document, 128 or more nesting levels counting the outermost value: the decoder's recursion limit, reached before the owner's depth bound) | `cli_dynamic_input` |
+| an `invoke` business JSON document that does not decode as exactly one JSON value (malformed, a duplicate object key, trailing document, 128 or more nesting levels counting the outermost value: the decoder's recursion limit, reached before the owner's depth bound) | `cli_dynamic_input` |
 
 When the owner's reader refused the selected source, the owner's `Failure`
 takes the place of `cli_source` (an unreadable business document file is
@@ -274,49 +280,32 @@ claim rollback after a durable publication or possible provider dispatch. A
 publication whose acknowledgement is lost is `outcome_unknown`; a later status
 read may resolve it without replaying begin/exchange or the business request.
 
-Compatibility `describe --endpoint --token-file [--allow-plaintext]` retains the
-complete service descriptor, including configuration schema, instance, adapter,
-version, revision and operations. It is not an alias for one operation's describe.
-`LegacyDescribeInput` → `LegacyDescribeResult` models that complete result.
-Compatibility `invoke --endpoint --token-file [--allow-plaintext] --operation
---input FILE` retains existing argument meanings and raw successful provider JSON
-output (`LegacyInvokeInput` → `LegacyInvokeResult`). The carrier's internal field
-is unwrapped when printing; it is not a new public wrapper. These legacy explicit
-network routes are outside the no-launch/no-auth guarantee for local inspection.
-The current `serve --config` runtime stays a separate federation command; this
-contract does not claim its configuration starts the new local supervisor.
+The explicit service commands are removed
+(story:connectors-do-short-invocation): `describe --endpoint --token-file
+[--allow-plaintext]`, `invoke --endpoint --token-file [--allow-plaintext]
+--operation --input FILE` and `serve --config` are command lines like any other
+unknown command or option, exit 2, empty stdout and the fixed `cli_parse` code
+with empty data on stderr, never an argv echo, with `--output` before or after
+the command word, and they contact nothing. `describe --help`, `serve --help`,
+`help describe` and `help serve` are parse refusals as well. `invoke` is the
+generated command of [invoking an operation](#invoking-an-operation), and
+`completions bash` emits the generated completion function unchanged. The
+federation library stays a library; no command of this binary serves it, and no
+compatibility inventory or `Legacy*` type remains.
 
-These three compatibility commands accept the process global `--output` before
-or after the command word; it selects only the parse-refusal presentation, and
-successful results stay raw JSON. `--config` and `--state-dir` are not accepted
-before them (`serve --config` is that command's own argument). Their parse
-errors, including unknown, missing or malformed arguments, follow the output
-contract above: exit 2, empty stdout, and the fixed `cli_parse` code with empty
-data on stderr, never an argv echo. `COMMAND --help` prints that command's usage,
-and exactly `help COMMAND` prints the same usage with the same exit status;
-`help COMMAND` with a leading global or followed by anything else stays a parse
-refusal. `completions bash` emits the
-generated completion function unchanged, followed by a completion for these
-three commands built from their own parser and a routing function registered
-for `connectors`: a command line whose command word, after any leading
-`--output` selections, is one of them completes that command's own options;
-any other line is completed by the generated function, with the three command
-words added at the root and as the word after a leading `help`.
 Help is the generated grouped tree as `connectors::help` presents it
 (`apps/connectors/src/help.rs`) with what the `ess-cli/1` binding cannot
 declare: each group's summary, a deprecated command path marked `Deprecated` in
-its parent's listing and in its own usage line, and `--adapter` marked
-deprecated. It parses exactly as the generated tree does, and help prints no
-deprecation line on standard error, under an old path or with `--adapter` too.
-Root `--help` or `-h`, alone or after leading process globals, prints that
-help's short form, one blank line and then this block, which the generated help
-does not carry:
+its parent's listing and in its own usage line, `--adapter` marked deprecated,
+and the help of each `invoke` argument. It parses exactly as the generated tree
+does, and help prints no deprecation line on standard error, under an old path
+or with `--adapter` too. Root `--help` or `-h`, alone or after leading process
+globals, prints that help's short form, one blank line and then this block,
+which the generated help does not carry:
 
 ```text
-Explicit service commands (use COMMAND --help for options):
-  describe  Read a complete service descriptor
-  invoke    Invoke an explicit service operation
-  serve     Run the configured federation service
+Native integration commands (use COMMAND --help for options):
+  server    Serve admitted read-only MCP tools over stdio
 ```
 
 ### Access token issue
@@ -429,7 +418,7 @@ inadmissible path), `config_missing` (no file at the resolved path),
 `owner_uid_mismatch` or, from `setup migrate` only, `config_too_large` (the
 rewritten file would be larger than the 1 MiB a read admits; the refusal
 carries its size in `configuration_bytes` and the bound in
-`configuration_limit`). `operations invoke --definition` alone also names
+`configuration_limit`). `invoke --definition` alone also names
 `definition_instance_configured` ([invoking a definition file](#invoking-a-definition-file)).
 
 ### Selecting an instance
@@ -447,7 +436,12 @@ neither, the configuration's `default_instance` selects, else its
 
 An instance's names are those of the `[connectors.<connector>.instances.<instance>]`
 table that names its alias. An `[adapters.<alias>]` entry that no instance names
-is selected as connector `adapter_id`, instance `<alias>`, until it is migrated. A
+is selected as connector `adapter_id`, instance `<alias>`, until it is migrated.
+A catalog entry no connector is derived for is no instance: naming it so
+(`--connector catalog --instance <alias>`, or the `invoke` target
+`catalog/<alias>`) is `invalid_configuration` at `configuration` with
+`configuration_rule` `legacy_entry_unmigrated` and `next_action`
+`check_configuration`. A
 configuration in which two entries would answer to one connector and instance
 pair refuses the whole file, as does `default_instance` that is not
 `"<connector>/<instance>"` naming a configured instance, `default_instance`
@@ -456,7 +450,8 @@ outside `connectors-local/5`, or `default_instance` beside `default_adapter`.
 Both selectors reach the same entry and the same records: a result is the same
 whichever selected it. Every result type that carries `adapter` carries
 `connector` and `instance` beside it, all three required. `adapter` is the
-instance's legacy alias for the deprecation window. One shape is exempt: the
+instance's legacy alias for the deprecation window. `instances list` items and
+every answer of `invoke` carry no `adapter`. One shape is exempt: the
 service descriptor that `adapters describe` returns (the object carrying
 `configuration_schema`) keeps its own `adapter`, the implementation it describes
 (such as `catalog`), and its own `instance`, the instance id. Neither is a
@@ -483,20 +478,84 @@ A caller that reads all of standard error as one JSON failure envelope keeps
 reading its `error`. Under `--output json`, output that is no envelope (help,
 `completions`, a launched consumer's streams) is unchanged.
 
+### Giving an instance its endpoint
+
+`connections connect` also takes its instance as one positional argument,
+`connections connect <connector>/<instance>`, which selects exactly as
+`--connector <connector> --instance <instance>` does. The positional beside
+`--connector`, `--instance` or `--adapter`, or one that is not exactly two
+names around one `/`, each 1 to 128 bytes of `[A-Za-z0-9_-]`, is
+`invalid_input` at `arguments` with `field = target` (exit 2), before anything
+is written.
+
+`connections connect --endpoint <url>` gives the selected instance its
+endpoint, the one setting a catalog instance answers before it can be derived.
+No other command takes `--endpoint`; there it is an `ess-cli/1` parse refusal.
+Before any protected source is acquired and before the provider is started,
+the endpoint is written into
+`[connectors.<connector>.instances.<instance>]` of the configuration file:
+
+- an instance that is not listed is added with only `endpoint`, and a
+  `[connectors.<connector>]` table that is absent is added with
+  `enabled = true`; a disabled connector table is left as written and the
+  command is `invalid_configuration`;
+- a listed instance without `endpoint` gains the key;
+- a listed instance with the same endpoint is not written at all;
+- a listed instance with another endpoint is `lifecycle_conflict` at
+  `configuration` with `next_action = check_configuration` and
+  `field = endpoint` (exit 1): another host is another instance, which takes
+  another name. The file is unchanged.
+
+Another host is another instance for a connection too. Before the file is
+written, the provider derives the instance at the new endpoint; when the
+instance already holds a connection, revoked ones included, admitted under a
+provider authority other than the one derived, adding or changing its
+endpoint would strand that connection, and the command is the same
+`lifecycle_conflict` naming `endpoint`, the file unchanged. An endpoint the
+provider refuses while deriving the instance (one that is not https, or
+carries userinfo, a query or a fragment) is `invalid_input` at `arguments`
+with `field = endpoint` (exit 2), nothing written; the refusal never echoes
+the endpoint.
+
+The endpoint must pass the configuration's own endpoint rule (non-empty, at
+most 2048 bytes, no whitespace or control character); otherwise the command is
+`invalid_input` with `field = endpoint` and nothing is written. So is
+`--endpoint` with no `<connector>/<instance>` named (`--adapter` or the default
+instance), and on an instance that carries the pins of a legacy entry, whose
+endpoint is its pinned selection's. A connector that declares no default
+endpoint, selected on an instance that is not listed or is listed with neither
+`endpoint` nor pins, is `invalid_input` with `field = endpoint` when `--endpoint` is
+absent, before any credential is asked for.
+
+Only a `connectors-local/5` file is written. Any other format is
+`invalid_configuration` naming the file's `configuration_format`, which
+`setup migrate` rewrites. The write keeps every other byte of the file
+(comments, spacing, order, inline tables, a leading UTF-8 byte order mark;
+in a file whose every line ends in CRLF, the added lines end in CRLF too), checks the new text as every read
+checks it before anything is written, and replaces the file atomically: a
+sibling temporary file with the file's own owner-only mode, synced, then
+renamed over it, while the file still holds the text the edit was made from
+(else `revision_conflict`). The file is then read back; a read-back that does
+not hold the endpoint restores the original text and is
+`invalid_configuration`. A file that is not the caller's own, admits another
+user, or is a symbolic link is refused as every read refuses it, unwritten.
+The endpoint is never a credential: a token or secret is never written into the
+configuration.
+
 ### Invoking a definition file
 
-`operations invoke --definition <file> --operation <key>`, with the input
-sources of every `operations invoke`, runs an operation of a
-`connectors-definition/1` file that no configuration names
+`invoke --definition <file> <operation>`, with the input sources of every
+`invoke`, runs an operation of a `connectors-definition/1` file that no
+configuration names
 (architecture-decision-record:provider-definitions-and-runtimes D12 point 3).
-`--definition` is a third selector: given beside `--adapter`, `--connector` or
-`--instance` the command is `invalid_input` at `arguments`, as are
-`--definitions-root` and `--credential-file` without it. `--definitions-root
-<dir>` is the tree holding the definition's vendored source and shared auth
-files; it defaults to the parent of the directory holding the file.
-`--schema` and `--revision` may be left out: each one left out is the one the
-instance's description states, as `operations describe` reports it. The bare
-`invoke` stays the explicit compatibility command.
+The target may be left out; given, it names the definition's connector
+([invoking an operation](#invoking-an-operation)). `--definitions-root` and
+`--credential-file` without `--definition` are `invalid_input` naming each.
+`--definitions-root <dir>` is the tree holding the definition's vendored
+source and shared auth files; it defaults to the parent of the directory
+holding the file. `--schema` and `--revision` may be left out: each one left
+out is the one the instance's description states, as `invoke --describe`
+reports it.
 
 The file is lowered with the reference lowerer into an owner-only cache under
 the state directory, `definitions/<digest>/`, keyed by the digest of every
@@ -631,9 +690,110 @@ other as it was.
 
 From the selection on, the command is the configured instance's: the
 description, admission, approval of writes, audit and the result envelope are
-those of every `operations invoke`, and a result names connector
-`<connector>`, instance `definition` and adapter `<connector>.definition`, or
-the moved instance and `<connector>.definition-<16 hex>`.
+those of every `invoke` of a configured instance, and a result names connector
+`<connector>` and instance `definition`, or the moved instance
+`definition-<16 hex>`.
+
+### Invoking an operation
+
+`connectors invoke <connector>[/<instance>] <operation>`
+(story:connectors-do-short-invocation) invokes one operation of one configured
+instance, with only what has no default named. Before the generated runner
+reads the command line the instance, connection, schema and revision are
+resolved and stated, and the command is then admitted, approved, audited and
+dispatched on that instance and connection. It takes no
+`--adapter`, `--connector`, `--instance` or `--endpoint`: each is `cli_parse`.
+
+The target is a connector id, optionally followed by one `/` and an instance
+name, each an admitted selector (at most 128 bytes of `[A-Za-z0-9._-]`);
+anything else is `invalid_input` naming `target`, and the target is never
+echoed. A `[connectors]` instance and a recorded definition instance are named
+by their own names; a legacy `[adapters.<alias>]` entry by its alias, under the
+connector `setup migrate` derives for it, or under its implementation when that
+is not the catalog; a catalog entry no connector is derived for cannot be named
+here. A `[connectors]` instance wins over a legacy entry that derives the same
+names, as `--connector` and `--instance` select it, so each instance has one
+name. With the instance left out the connector's only instance is selected;
+`default_instance` is never consulted. A connector or instance not configured
+is `not_found` at `admission` naming `check_configuration`.
+
+`instance_ambiguous`: the target names a connector with several instances and
+no instance. It is a usage refusal at `arguments`, exit 2, `next_action = none`,
+and its `Failure.instances` lists every instance of that connector as
+`<connector>/<instance>`, sorted, so the caller can name one. Nothing was read
+beyond the configuration. A target that names its instance is never
+`instance_ambiguous`.
+
+Without `--connection` the instance's one `ready` connection is selected. When
+none is ready, its one usable connection is: `pending` only because its
+validation evidence lapsed under the instance's current configuration, as an
+idle connection's does; that evidence is re-checked with the provider before
+the call, as every read re-checks lapsed evidence (§6). One `ready`
+connection beside lapsed ones is the one selected. Revoked connections are not
+counted, whatever their number. A named `--connection` is used as named; one
+the instance does not hold is `not_found`.
+
+`connection_unresolved`: no connection is usable, several are `ready`, or
+several are usable and none is `ready`. It is operational at `admission`, exit
+1, and names `create_connection` when the instance holds no connection,
+`repair_connection` when it holds connections and none is usable, and `none`
+when `--connection` must choose. Its `Failure.connections` lists each
+connection the instance holds, revoked ones excepted, as `{connection, state}`
+with the state `connections list` reports; the list is empty when none is held.
+
+`--schema` and `--revision` left out are the instance's current admitted
+description's, read through the selected connection's binding as `operations
+describe` reports it. Given, each is a pin: a description that differs is
+`stale_description` at `observation` naming `refresh_description`, and the pin
+is never replaced by the current value.
+
+The business document comes from `--input-json`, `--input-file` or
+`--input-stdin`. With none of them standard input is
+read, unless it is a terminal: then `invoke` refuses at once with
+`invalid_input` naming `input`, without reading it. A document that does not
+decode as one JSON value is `cli_dynamic_input`; one the operation's schema or
+bounds refuse is `invalid_input` naming `input`.
+
+`--describe` (or `--describe true`) prints the operation's
+`InvokeDescription`: `connector`, `instance`, `operation`, `description`,
+`effect` (`read` or `write`), `schema`, `revision` and `input_schema`. A
+description that leaves an operation's effect unknown is never admitted, so
+`effect` is never anything else; one that did would be `unsupported`. It reads
+no document, needs no connection and invokes nothing; it may [launch for a
+description](#launching-for-a-description) as `operations describe` does, and
+refuses a differing pin as above.
+
+`approval_required` on `invoke`: a write without `--approval-file` is refused at
+`admission`, exit 1, `next_action = none`, before any provider call, and its
+`Failure.approval_steps` names the commands that produce the proof, in order:
+`approvals prepare`, `approvals clock-check`, `approvals issue`. A read given
+`--approval-file` or `--idempotency-key` is `invalid_input` naming that
+argument. A write with its proof is admitted and dispatched under the [local mutation binding](../../service/local-mutations.md).
+
+`connectors invoke --definition <file> <operation>` invokes a
+`connectors-definition/1` file read on the fly
+([invoking a definition file](#invoking-a-definition-file)):
+the same digest cache under `<state>/definitions/<digest>/`, the same
+`definition` instance and the same connect question. With `--definition` the
+target may be left out, and one positional is the operation: the connector and
+its instance are the file's. A target given beside it names the definition's
+connector, and its instance if it names one; a target naming another connector
+or instance is `invalid_input` naming `target`. Without `--definition` one
+positional is `invalid_input` naming `target`. `--definitions-root` and
+`--credential-file` without `--definition` are `invalid_input` naming each, and
+a refusal of the file that names no argument names `definition`. With
+`--describe` the definition is lowered and answered from the description the
+installed provider reports for it: nothing is recorded, no connection is
+resolved, asked for or created, `--credential-file` is not read, and nothing is
+asked on the terminal.
+
+The result is `InvokeResult`: `connector`, `instance`, `operation`, `revision`
+and the provider's `result`, with `request_id`, `mutation` and `source_audit` when
+the invoke produced them. No answer of `invoke` (result, refusal or
+help) names a configured entry by its alias. Every `invalid_input` of `invoke`
+names the argument it refused in `Failure.field`: `target`, `operation`,
+`connection`, `schema`, `revision`, `input`, `approval_file`,
+`idempotency_key`, `definition`, `definitions_root` or `credential_file`.
 
 ### Renamed commands
 
@@ -741,7 +901,7 @@ that a consumer, `default_adapter` or custody target may name) is not checked:
 such a name is accepted. `list` never refuses a file every other command
 accepts. Legacy `[adapters.<alias>]` entries are not
 connector instances and are not listed; `instances list` lists every
-configured entry. Under `--output human` the rows are a table with the columns
+configured entry but a legacy catalog entry no connector is derived for. Under `--output human` the rows are a table with the columns
 `CONNECTOR`, `PROFILES` and `INSTANCES`, `-` where a row has none; under
 `--output json` they are the result envelope.
 
@@ -1220,7 +1380,7 @@ authoritative read; no observation of missing sockets permits resurrection.
 
 ## 6. Dynamic operation input and safe failure mapping
 
-`OperationInvokeInput.input` is a String carrying one bounded UTF-8 JSON document.
+`InvokeInput.input` is a String carrying one bounded UTF-8 JSON document.
 It is the exception needed for runtime-selected provider schemas, not a
 universal input/result property bag. A file/stdin presentation binding reads text
 once; the provider JSON decoder then rejects malformed/duplicate/trailing input and
@@ -1228,11 +1388,11 @@ validates the decoded JSON value against the exact selected operation schema.
 Carrier validation and provider-schema validation establish separate facts. When
 serializing the service request, `input` is that decoded JSON value, never the
 quoted carrier string or a double-encoded document. Answers are not carriers:
-`OperationInvokeResult.result` is the provider result as a JSON value, validated
+`InvokeResult.result` is the provider result as a JSON value, validated
 against the selected operation's output schema, and `OperationDescription`
 answers `input_schema` and `output_schema` as JSON schema objects in
-`operations describe`, in the `instances describe` descriptor and in the
-compatibility `describe`. A caller decodes the answer once; none of these fields
+`operations describe`, in the `instances describe` descriptor and in
+`invoke --describe`. A caller decodes the answer once; none of these fields
 is a string holding JSON. The schema digest (`schema`), not the schema document,
 remains the identity an invocation selects. `ServiceDescriptor.configuration_schema`
 remains a JSON text carrier. Structured command metadata uses specific types, not
@@ -1272,6 +1432,9 @@ never replay a possible write after interruption, timeout or lost response.
 | no selected cached description | `description_unavailable` | 1 |
 | schema/descriptor changed | `stale_description` | 1 |
 | absent selected operation/connection | `not_found` | 1 |
+| `invoke` target naming a connector with several instances and no instance (`stage = arguments`, `next_action = none`, `instances` named; [invoking an operation](#invoking-an-operation)) | `instance_ambiguous` | 2 |
+| `invoke` without `--connection` on an instance with no usable connection, several `ready`, or several usable and none `ready` (`stage = admission`, `connections` named; [invoking an operation](#invoking-an-operation)) | `connection_unresolved` | 1 |
+| `invoke` write without `--approval-file` (`stage = admission`, `next_action = none`, `approval_steps` named) | `approval_required` | 1 |
 | stale, expired or foreign list cursor (`stage = observation`, `next_action = retry_explicitly`) | `stale_cursor` | 1 |
 | connect whose acquisition failed before publication (`stage = dispatch`, `next_action = retry_explicitly`) | the acquisition owner's code | 1 |
 | known revoked connection | `revoked` | 1 |
@@ -1319,11 +1482,33 @@ directory is refused too), its directory exists, is the caller's own and
 admits no other user, every ancestor is writable only by its owner (the
 caller or root), and the directory holds no entry of that name; an existing
 file is never replaced. A path relative to the working directory is refused,
-not resolved. `field` never carries the caller's value and appears only on
-`invalid_input` of those three commands; no other command carries it, an
-approved write's `operations invoke` included; a refusal the presentation raises
-before the handler runs carries its `ess-cli/1` code and no `field`. As for
-`instance_id`, the presence rule is a host obligation: ESS declares no
+not resolved. Every `invalid_input` of `invoke` names its argument too
+([invoking an operation](#invoking-an-operation)).
+
+`connections connect` names `target` for a refused `<connector>/<instance>`
+and `endpoint` for a refused `--endpoint`, on `invalid_input`, and `endpoint`
+on the `lifecycle_conflict` of an instance that holds another endpoint (§3,
+"Giving an instance its endpoint").
+
+`connections revalidate`, `connections revoke` and `connections reconnect`
+name `expected_revision` when `--expected-revision` is not the connection's
+current revision. Given the selected instance's `configuration_revision`
+instead, the command is `invalid_input` at `arguments` (exit 2) and also
+carries `revision_expected = connection`, `revision_given = configuration` and
+`read_with = "connections describe"`, the command that reads the connection's
+revision; nothing is admitted, captured or dispatched. Any other stale value
+keeps its `lifecycle_conflict` with `next_action = retry_status` (exit 1) and
+carries `field`, `revision_expected` and `read_with`, never `revision_given`.
+`revision_expected` and `revision_given` are the closed enum `RevisionKind`
+(`connection`, `configuration`). `connections reconnect` answers both before
+it acquires its protected source, so no credential is asked for.
+
+`field` never carries the caller's value and appears only on the refusals
+named here and on `invalid_input` of `invoke`; no other command carries it, and
+no other refusal of `invoke`, an approved write's included; a refusal the presentation
+raises before the handler runs carries its `ess-cli/1` code and no `field`.
+As for `instance_id`, the presence rules of `field`, `revision_expected`,
+`revision_given` and `read_with` are host obligations: ESS declares no
 invariant on a CLI type.
 
 Other admitted provider/service failures preserve their existing shared error code
@@ -1333,7 +1518,7 @@ and next-action enum, plus optional opaque correlation refs under current result
 access; it never contains raw provider evidence or custody references.
 
 `Failure.service_reason` is the one provider text a failure may carry, and only
-in this admitted form. It appears on `operations invoke` of a read, at
+in this admitted form. It appears on `invoke` of a read, at
 `stage = dispatch`, when the provider refused the dispatched request: beside
 `service_code`, or on the provider's own `forbidden`. It also appears on a
 validation (`connections connect`, `reconnect`, `repair`, `revalidate`) refused
@@ -1389,7 +1574,7 @@ any other connection probe's answer and every other route carry none.
 
 `Failure.retry_after_seconds` is the delay a provider named before a
 rate-limited read may be sent again, so the caller can wait. It appears on
-`operations invoke` of a read, at `stage = dispatch`, only beside
+`invoke` of a read, at `stage = dispatch`, only beside
 `service_code = rate_limited`, and only when the provider's `429` carried a
 `Retry-After` the adapter could read: delta-seconds, or an HTTP-date counted
 from when the answer arrived and rounded up to a whole second (a date already
@@ -1416,7 +1601,7 @@ unknown adapter alias included), or by an adapter from its own configured
 scope (a namespace, resource kind or operation the adapter entry does not
 allow) — reports `stage = admission` (`forbidden` with
 `next_action = request_permission`, `not_found` with `check_configuration`).
-`operations invoke`, `approvals prepare`, `approvals issue` and
+`invoke`, `approvals prepare`, `approvals issue` and
 `approvals policy-set` read their business document before the adapter alias is
 admitted, so an unreadable or undecodable document is refused first (the
 document refusals above) and an unknown alias is `not_found` only once the
@@ -1428,7 +1613,7 @@ reports `stage = dispatch`: an upstream forbidden answer (HTTP 403) keeps
 not-found answer (HTTP 404; the catalog provider also 410) is
 `code = service_failure`, `service_code = not_found` with
 `next_action = none`. Neither sends the operator to connectors configuration.
-A stored credential the provider refuses on `operations invoke` of a read on an
+A stored credential the provider refuses on `invoke` of a read on an
 existing connection — an HTTP 401, or an OAuth token endpoint's `invalid_grant` or
 `invalid_client` for a refresh profile — is `code = service_failure`,
 `service_code = unauthorized` at `stage = dispatch` with
@@ -1446,7 +1631,7 @@ the Kubernetes token review) is classified separately and not by this rule: a
 `service_code = upstream_protocol` at `dispatch` and
 `next_action = retry_explicitly`.
 
-A read on `operations invoke` whose connection's validation evidence expired
+A read on `invoke` whose connection's validation evidence expired
 while its credential is intact (the connection reports `pending`) recollects
 that evidence once before it is admitted, as `connections revalidate` does: the
 owner, on the instance's serialized worker, captures the retained custody
@@ -1511,7 +1696,7 @@ executable-only change validates the connection once, as a read does.
 
 A connection saved under another configuration revision of its instance also
 reports `pending` (`stale = true`), and no status change is pending for it: a
-read on `operations invoke`, an approval naming it and a consumer launch refuse
+read on `invoke`, an approval naming it and a consumer launch refuse
 it as `code = lifecycle_conflict` at `stage = admission`, never with
 `next_action = retry_status`. The next action is `revalidate_connection` only
 when a revalidation can follow the configuration upgrade: its provider
@@ -1576,7 +1761,7 @@ report `timeout` / `capacity` at `stage = dispatch` with
 `next_action = retry_explicitly`. A connection that never opened sent nothing
 and is not one of them. The host's own deadline and limits, and an adapter's
 own connect or work deadline and result bounds, keep `stage = admission`
-(`retry_explicitly`). An `operations invoke` read whose deadline passes after
+(`retry_explicitly`). An `invoke` read whose deadline passes after
 the owner dispatched it (its read use recorded dispatched) is the provider's
 `timeout` at `stage = dispatch`; one whose deadline passes before is the host's
 at `stage = admission`, and the owner dispatches nothing for it afterwards. The
@@ -1786,13 +1971,13 @@ selects another binding than the evidence it replaces, the result says so in
 otherwise; a read recollecting evidence may rebind as well, and that read refuses
 as `stale_description` unsent, so the next read runs under the new binding.
 
-`operations invoke` admits and dispatches a read under the binding of the
+`invoke` admits and dispatches a read under the binding of the
 evidence it captured: an id that binding does not serve refuses as `not_found`
 before any request, though another binding of the instance serves it.
 `operations list` and `operations describe` answer the first binding by default,
 as for every instance; with `--connection CONNECTION`, a connection of the
 selected instance, they answer the binding that connection's evidence selected,
-and its revision is the one `operations invoke` checks. A connection the
+and its revision is the one `invoke` checks. A connection the
 selected instance does not hold refuses as `not_found`, as `connections describe`
 refuses it, and one never validated answers the first binding.
 

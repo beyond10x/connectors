@@ -195,6 +195,14 @@ types:
       # anchor's `principal_ref` under that profile.
       - {name: principal, type: "Optional<connectors.declarations.ServiceAccountPrincipal>"}
       - {name: token_review, type: "Optional<connectors.declarations.TokenReviewEndpoint>"}
+      # A file path: the instance's standing write grants
+      # (connectors.standing_approvals.GrantFile), read on every write on
+      # POST /v1alpha2/invoke. Absent: the host is unchanged and dispatches a
+      # write there unkeyed. Present: every write there is keyed and needs a
+      # covering grant (a path naming no file holds none, so the write is
+      # `approval_required`), and POST /v1/invoke refuses writes. Requires
+      # `state`.
+      - {name: standing_grants, type: "Optional<String>"}
 
 # Immutable declarations, not the lifecycle of a running process or connection.
 # Interaction and failure semantics are in contracts/service/v1alpha1/semantics.md.

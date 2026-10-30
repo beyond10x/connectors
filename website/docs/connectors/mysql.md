@@ -101,14 +101,7 @@ The handshake is the credential check; the identity is `reader@incidents`.
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector mysql --instance incidents \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector mysql --instance incidents \
-  --operation query.read | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector mysql --instance incidents \
-  --operation query.read | jq -r .result.revision)
-connectors operations invoke --connector mysql --instance incidents --connection "$connection" \
-  --operation query.read --schema "$schema" --revision "$revision" \
+connectors invoke mysql/incidents query.read \
   --input-json '{"query":"SELECT id, opened_at FROM incidents WHERE severity = ? ORDER BY opened_at DESC","parameters":["critical"],"limit":100}'
 ```
 

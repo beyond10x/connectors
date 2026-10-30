@@ -1,51 +1,52 @@
 //! One catalog instance on the served HTTP host (docs/running-services.md,
 //! "Catalog instances"): `connectors-catalog-provider --config <file>`.
 //!
-//! The instance's description is the private bootstrap's first one, which
-//! lists reads only. Its credential document is a file the platform mounts,
-//! read at every request under the `mounted_secret` checks
-//! (docs/local-mounted-secret-custody.md). A request meets these refusals, in
-//! this order, and none of them reaches the provider:
+//! Without `service.standing_grants` the instance's description is the
+//! private bootstrap's first one, which lists reads only. With it the
+//! description is `bootstrap_v2()`, which lists the instance's writes too
+//! (story:served-keyed-writes-under-a-standing-approval). Its credential
+//! document is a file the platform mounts, read at every request under the
+//! `mounted_secret` checks (docs/local-mounted-secret-custody.md). A request
+//! meets these refusals, in this order, and none of them reaches the
+//! provider:
 //!
 //! 1. Admission, by the host (`connectors_host::server`): `unauthorized` or
 //!    `unavailable`, before the body is read.
-//! 2. An operation the description does not list, a catalog write included:
-//!    the host answers `not_found` before any anchor or adapter call.
-//! 3. [`Bridge::invoke`]: an operation outside the reads is `unsupported`
-//!    before the credential is read. This repeats 2 for a description that
-//!    would list one.
-//! 4. The mounted credential: an item absent, or refused by any check, is
+//! 2. An operation the description does not list (every catalog write when no
+//!    grant file is configured): the host answers `not_found` before any
+//!    anchor or adapter call.
+//! 3. A write: the host's standing-grant gate
+//!    (crates/connectors-host/src/server/v1alpha2.rs, module docs). Without
+//!    `idempotency_key` it is `invalid_input`; a key live for another request
+//!    is `idempotency_conflict`; a write no grant in the file covers is
+//!    `approval_required`; a grant's hour used up is `rate_limited`; a grant
+//!    file that cannot be read safely is `unavailable`. Each before the anchor.
+//!    On `POST /v1/invoke`, which reads no grant, a write is `unsupported`
+//!    before any adapter call.
+//! 4. [`Bridge::invoke`]: an operation outside the described reads and writes
+//!    is `unsupported` before the credential is read. This repeats 2.
+//! 5. The mounted credential: an item absent, or refused by any check, is
 //!    `unavailable`, and nothing is sent.
 //!
-//! Start refuses a description that lists anything but reads, more than one
-//! profile, a profile whose material is acquired by OAuth, alternative
-//! bindings, and a credential that cannot be read now.
+//! A read is dispatched through `invoke_explained`, the read path. A write is
+//! dispatched through `runtime::Adapter::prepare_write` and executed once;
+//! only an applied write with a deliverable result is a success. Any other
+//! answer after dispatch is an error, which the host records as `unknown`
+//! and never dispatches again.
 //!
-//! Serving a write is not one switch. Four places hold it closed, and a write
-//! needs all four changed together:
-//!
-//! - the description source: [`Bridge::new`] reads `bootstrap()`, the private
-//!   bootstrap's first description, which lists no write. Writes and their
-//!   requirements are only in `bootstrap_v2()`.
-//! - [`dispatched`], with the `profile != mutation` check beside it in
-//!   [`Bridge::new`]: start refuses any listed operation that is not a read.
-//! - [`Bridge::invoke`] dispatches through `invoke_explained`, the read path.
-//!   A write goes through `runtime::Adapter::prepare_write` and the prepared
-//!   write it returns, never through `invoke_explained`.
-//! - The host: `/v1alpha2/invoke` (crates/connectors-host/src/server/
-//!   v1alpha2.rs) anchors, records an attempt for and dispatches any listed
-//!   operation whose profile is `mutation`. Its legacy description carries no
-//!   idempotency kind and no approval mode, so the host has no check of its
-//!   own that refuses a keyed or approval-gated operation. Contract
-//!   compatibility.md § 2.1 says such an operation is not invocable on this
-//!   binding. Today that holds only because this binary describes no write.
+//! Start refuses a description that lists an operation of unknown effect, a
+//! read under the `mutation` profile, a write under any other profile, a
+//! write whose answer carries a credential it created (the served host has no
+//! custody target), more than one profile, a profile whose material is
+//! acquired by OAuth, alternative bindings, and a credential that cannot be
+//! read now.
 use crate::local::{Instance, Local};
 use connectors_core::{Descriptor, Error, ErrorCode, Result};
 use connectors_host::{
     local::runtime::{self, Failure, Refusal},
     server::ServiceConfigV3,
 };
-use connectors_sdk::Secret;
+use connectors_sdk::{Secret, WriteOutcome};
 use serde::Deserialize;
 use serde_json::Value;
 use std::{
@@ -119,7 +120,12 @@ enum Binding {
 /// serve it until the host stops.
 pub async fn run(path: &Path) -> Result<()> {
     let config: Configuration = connectors_host::read_config(path)?;
-    let bridge = Bridge::new(config.catalog.local()?, &config.credential).await?;
+    let local = config.catalog.local()?;
+    let bridge = if config.service.standing_grants.is_some() {
+        Bridge::serving_writes(local, &config.credential).await?
+    } else {
+        Bridge::new(local, &config.credential).await?
+    };
     if config.service.instance != bridge.instance {
         return Err(Error::invalid(
             "service.instance must be the catalog instance's id",
@@ -296,27 +302,68 @@ impl Mounted {
     }
 }
 
-/// Whether the served host dispatches an operation of `effect`. Reads only:
-/// a catalog write needs an approval this host does not hold. This is one
-/// of the four places that keep writes closed (module doc). Changing it
-/// alone serves no write, because `bootstrap()` lists none.
-fn dispatched(effect: runtime::Effect) -> bool {
-    matches!(effect, runtime::Effect::Read)
+/// How the served host dispatches one described operation.
+enum Dispatch {
+    Read,
+    Write,
 }
 
-/// A private-runtime adapter on the HTTP host: the description its first
-/// bootstrap gives, its reads, and the mounted credential each read uses.
+/// How the served host dispatches an operation of `effect` under `profile`,
+/// or `None` when start must refuse it. A read is never under the `mutation`
+/// profile; a write is only under it, so the host's standing-grant gate
+/// applies to it, and only when `writes` is set (a grant file is configured)
+/// and its answer carries no created credential.
+fn dispatched(
+    effect: runtime::Effect,
+    profile: &str,
+    custody: bool,
+    writes: bool,
+) -> Option<Dispatch> {
+    match effect {
+        runtime::Effect::Read if profile != MUTATION_PROFILE && !custody => Some(Dispatch::Read),
+        runtime::Effect::Write if writes && profile == MUTATION_PROFILE && !custody => {
+            Some(Dispatch::Write)
+        }
+        _ => None,
+    }
+}
+
+/// A private-runtime adapter on the HTTP host: the description its bootstrap
+/// gives, its reads and writes, and the mounted credential each call uses.
 pub struct Bridge<A> {
     adapter: A,
     descriptor: Descriptor,
     reads: BTreeSet<String>,
+    writes: BTreeSet<String>,
     instance: String,
     credential: Mounted,
 }
 
 impl<A: runtime::Adapter> Bridge<A> {
+    /// The instance's reads: the first bootstrap's description, which lists
+    /// no write.
     pub async fn new(adapter: A, credential: &CredentialConfig) -> Result<Self> {
         let bootstrap = adapter.bootstrap();
+        Self::described(adapter, bootstrap, credential, false).await
+    }
+
+    /// The instance's reads and writes: the second bootstrap's description.
+    /// Only for a host whose configuration names a standing grant file, so
+    /// each write passes the host's grant gate before it reaches
+    /// [`Bridge::invoke`].
+    pub async fn serving_writes(adapter: A, credential: &CredentialConfig) -> Result<Self> {
+        let bootstrap = adapter.bootstrap_v2().map_err(|_| {
+            Error::invalid("the instance does not describe its writes to the served host")
+        })?;
+        Self::described(adapter, bootstrap, credential, true).await
+    }
+
+    async fn described(
+        adapter: A,
+        bootstrap: runtime::Bootstrap,
+        credential: &CredentialConfig,
+        writes_served: bool,
+    ) -> Result<Self> {
         if bootstrap.bindings.is_some() {
             return Err(Error::invalid(
                 "a served catalog instance has one binding; alternative bindings are not served",
@@ -342,22 +389,30 @@ impl<A: runtime::Adapter> Bridge<A> {
             ));
         }
         let mut reads = BTreeSet::new();
+        let mut writes = BTreeSet::new();
         for operation in &descriptor.operations {
             let requirement = bootstrap
                 .requirements
                 .iter()
-                .find(|requirement| requirement.operation == operation.id);
-            let read = requirement.is_some_and(|requirement| {
-                dispatched(requirement.effect)
-                    && !requirement.custody
-                    && requirement.profile == profile.id
-            }) && operation.profile != MUTATION_PROFILE;
-            if !read {
-                return Err(Error::invalid(
-                    "the instance's description lists an operation the served host does not dispatch",
-                ));
-            }
-            reads.insert(operation.id.clone());
+                .find(|requirement| requirement.operation == operation.id)
+                .filter(|requirement| requirement.profile == profile.id);
+            let dispatch = requirement.and_then(|requirement| {
+                dispatched(
+                    requirement.effect,
+                    &operation.profile,
+                    requirement.custody,
+                    writes_served,
+                )
+            });
+            match dispatch {
+                Some(Dispatch::Read) => reads.insert(operation.id.clone()),
+                Some(Dispatch::Write) => writes.insert(operation.id.clone()),
+                None => {
+                    return Err(Error::invalid(
+                        "the instance's description lists an operation the served host does not dispatch",
+                    ));
+                }
+            };
         }
         let Binding::MountedSecret = credential.binding;
         if !cfg!(target_os = "linux") {
@@ -370,6 +425,7 @@ impl<A: runtime::Adapter> Bridge<A> {
             adapter,
             descriptor,
             reads,
+            writes,
             instance: bootstrap.instance.clone(),
             credential: Mounted {
                 directory: credential.directory.clone(),
@@ -390,13 +446,19 @@ impl<A: runtime::Adapter> connectors_sdk::Adapter for Bridge<A> {
     }
 
     async fn invoke(&self, operation: &str, input: Value) -> Result<Value> {
-        if !self.reads.contains(operation) {
+        let write = self.writes.contains(operation);
+        // Refusal: an operation this bridge did not describe.
+        if !write && !self.reads.contains(operation) {
             return Err(Error::new(
                 ErrorCode::Unsupported,
-                "the served host dispatches catalog reads only",
+                "the served host dispatches only the operations it describes",
             ));
         }
+        // Refusal: no mounted credential now, so nothing is sent.
         let document = self.credential.read().await?;
+        if write {
+            return self.write(operation, document, input).await;
+        }
         self.adapter
             .invoke_explained(
                 operation,
@@ -407,6 +469,28 @@ impl<A: runtime::Adapter> connectors_sdk::Adapter for Bridge<A> {
             )
             .await
             .map_err(error)
+    }
+}
+
+impl<A: runtime::Adapter> Bridge<A> {
+    /// One write the host admitted under a standing grant, its attempt open:
+    /// prepared on the private write path and executed once. Only an applied
+    /// write with a deliverable result is `Ok`. A refused preparation, a
+    /// refused or unknown write, and an applied write whose result cannot be
+    /// delivered are each an error; after dispatch the host records any error
+    /// as `unknown` and never dispatches the attempt again.
+    async fn write(&self, operation: &str, document: Secret, input: Value) -> Result<Value> {
+        let prepared = self
+            .adapter
+            .prepare_write(operation, &self.instance, document, input)
+            .await
+            .map_err(|failure| error(Refusal::from(failure)))?;
+        match prepared.execute().await {
+            WriteOutcome::Applied(Ok(result)) => Ok(result),
+            WriteOutcome::Applied(Err(error))
+            | WriteOutcome::Refused(error)
+            | WriteOutcome::Unknown(error) => Err(error),
+        }
     }
 }
 
@@ -556,6 +640,16 @@ mod tests {
             self.calls.fetch_add(1, Ordering::SeqCst);
             Ok(Value::Null)
         }
+        async fn prepare_write(
+            &self,
+            _operation: &str,
+            _partition: &str,
+            _document: Secret,
+            _input: Value,
+        ) -> runtime::Result<Box<dyn runtime::PreparedWrite>> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Err(Failure::Unsupported)
+        }
     }
 
     fn mounted() -> CredentialConfig {
@@ -590,6 +684,69 @@ mod tests {
         }
     }
 
+    /// story:served-keyed-writes-under-a-standing-approval: which described
+    /// operation the served host dispatches, and how. A write only with a
+    /// grant file, only under the `mutation` profile (so the host's grant gate
+    /// applies) and never one whose answer carries a created credential.
+    #[test]
+    fn a_write_is_dispatched_only_under_a_grant_file_and_the_mutation_profile() {
+        use runtime::Effect::{Read, Unknown, Write};
+        for (case, (effect, profile, custody, writes, expected)) in [
+            (Read, "generic-http", false, false, Some("read")),
+            (Read, "generic-http", false, true, Some("read")),
+            (Read, MUTATION_PROFILE, false, true, None),
+            (Read, "generic-http", true, true, None),
+            (Write, MUTATION_PROFILE, false, false, None),
+            (Write, MUTATION_PROFILE, false, true, Some("write")),
+            (Write, "generic-http", false, true, None),
+            (Write, MUTATION_PROFILE, true, true, None),
+            (Unknown, "generic-http", false, true, None),
+            (Unknown, MUTATION_PROFILE, false, true, None),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let dispatch = dispatched(effect, profile, custody, writes).map(|d| match d {
+                Dispatch::Read => "read",
+                Dispatch::Write => "write",
+            });
+            assert_eq!(dispatch, expected, "case {case}");
+        }
+    }
+
+    /// An instance with no second bootstrap refuses to serve writes.
+    #[tokio::test]
+    async fn an_instance_without_a_write_description_refuses_to_serve_writes() {
+        let listed = Listed::new(&[("read", Effect::Read, "generic-http")]);
+        let Err(error) = Bridge::serving_writes(listed, &mounted()).await else {
+            panic!("an instance without bootstrap_v2 must refuse to serve writes");
+        };
+        assert_eq!(error.code, ErrorCode::InvalidInput);
+    }
+
+    /// A described write whose credential cannot be read is `unavailable`
+    /// with no preparation and no provider request.
+    #[tokio::test]
+    async fn a_write_without_a_credential_is_unavailable_with_no_preparation() {
+        let adapter = Listed::new(&[("write", Effect::Write, MUTATION_PROFILE)]);
+        let bridge = Bridge {
+            descriptor: serde_json::from_str(&adapter.bootstrap.descriptor).unwrap(),
+            reads: BTreeSet::new(),
+            writes: BTreeSet::from(["write".to_owned()]),
+            instance: "fixture.one".into(),
+            credential: Mounted {
+                directory: PathBuf::from("/nonexistent/connectors-served-test"),
+                alias: "fixture.one".into(),
+                profile: "fixture.pat".into(),
+            },
+            adapter,
+        };
+        use connectors_sdk::Adapter as _;
+        let error = bridge.invoke("write", Value::Null).await.unwrap_err();
+        assert_eq!(error.code, ErrorCode::Unavailable);
+        assert_eq!(bridge.adapter.calls.load(Ordering::SeqCst), 0);
+    }
+
     /// An operation outside the reads is `unsupported` before the credential
     /// is read and before any adapter call; a read whose credential cannot
     /// be read is `unavailable` with no adapter call.
@@ -599,6 +756,7 @@ mod tests {
         let bridge = Bridge {
             descriptor: serde_json::from_str(&adapter.bootstrap.descriptor).unwrap(),
             reads: BTreeSet::from(["read".to_owned()]),
+            writes: BTreeSet::new(),
             instance: "fixture.one".into(),
             credential: Mounted {
                 directory: PathBuf::from("/nonexistent/connectors-served-test"),

@@ -9,8 +9,8 @@ source: apps/connectors/src/local/definition.rs, crates/connectors-host/src/loca
 # Invoke a definition file
 
 A `connectors-definition/1` file names a vendored API document, the auth profiles that
-authenticate against it and the operations it exposes. `connectors operations invoke
---definition <file> --operation <key>` runs one of those operations with no configured instance:
+authenticate against it and the operations it exposes. `connectors invoke
+--definition <file> <operation>` runs one of those operations with no configured instance:
 it lowers the file, connects the first time after one question, and invokes through the same
 owner, admission, approval and audit as a configured instance. Run the commands from the
 repository root after `cargo build --locked -p connectors -p connectors-build -p
@@ -54,8 +54,8 @@ target/debug/connectors --config "$PWD/target/try/cli/config.toml" \
 created
 ```
 
-On a terminal, `operations invoke --definition target/try/defs/connectors/gitlab.yaml
---operation project.get --input-json '{"id":"group/project"}'` with those two globals lowers the
+On a terminal, `invoke --definition target/try/defs/connectors/gitlab.yaml
+project.get --input-json '{"id":"group/project"}'` with those two globals lowers the
 file, finds that its instance holds no connection, and asks once, naming the endpoint the
 credential is validated at,
 `No connection for gitlab/definition. Connect now to https://gitlab.example.com/api/v4/? [y/N]`.
@@ -94,8 +94,8 @@ runs the same command that way. The refusal names the step that clears it:
 
 ```sh
 setsid -w target/debug/connectors --output json --config "$PWD/target/try/cli/config.toml" \
-  --state-dir "$PWD/target/try/cli/state" operations invoke \
-  --definition target/try/defs/connectors/gitlab.yaml --operation project.get \
+  --state-dir "$PWD/target/try/cli/state" invoke \
+  --definition target/try/defs/connectors/gitlab.yaml project.get \
   --input-json '{"id":"group/project"}'
 ```
 

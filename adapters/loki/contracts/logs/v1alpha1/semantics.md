@@ -316,7 +316,7 @@ final page"):
 - **Redaction** is not applied; `redacted` is always false.
 
 The executable composition that serves this binding through `connections connect` and
-`operations invoke` is §11.4.
+`invoke` is §11.4.
 
 ### 11.4 The bearer connection (2026-10-08)
 

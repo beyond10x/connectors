@@ -96,7 +96,7 @@ Error `failure`: `connectors.cli.Failure`.
 
 ### `connections connect`
 
-Begin admitted local protected credential acquisition
+Begin admitted local protected credential acquisition on <connector>/<instance>; --endpoint first writes that instance's endpoint into the configuration
 
 Callable: `connections-connect`. Input: `connectors.cli.ConnectionConnectInput`. Result: `connectors.cli.ConnectionConnectResult`.
 
@@ -216,6 +216,14 @@ Alias: `adapters stop`.
 
 Error `failure`: `connectors.cli.Failure`.
 
+### `invoke`
+
+Invoke one operation of a connector's instance; the instance, connection, schema and revision default to the only ones that fit
+
+Callable: `invoke`. Input: `connectors.cli.InvokeInput`. Result: `connectors.cli.InvokeResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
 ### `list`
 
 List every connector this build ships, with its auth profiles and the instances the configuration names; needs no configuration and starts no process
@@ -229,14 +237,6 @@ Error `failure`: `connectors.cli.Failure`.
 Inspect an operation and its exact schema identity
 
 Callable: `operations-describe`. Input: `connectors.cli.OperationDescribeInput`. Result: `connectors.cli.OperationDescribeResult`.
-
-Error `failure`: `connectors.cli.Failure`.
-
-### `operations invoke`
-
-Invoke once under selected schema, revision and current admission
-
-Callable: `operations-invoke`. Input: `connectors.cli.OperationInvokeInput`. Result: `connectors.cli.OperationInvokeResult`.
 
 Error `failure`: `connectors.cli.Failure`.
 
@@ -316,9 +316,9 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:connections-token: implement the owner-qualified callable and its declared result/error contract
 - handler:connectors-list: implement the owner-qualified callable and its declared result/error contract
 - handler:definitions-install: implement the owner-qualified callable and its declared result/error contract
+- handler:invoke: implement the owner-qualified callable and its declared result/error contract
+- dynamic-validator:invoke: resolve operation/schema identity and validate native input, result and errors; absent validator refuses
 - handler:operations-describe: implement the owner-qualified callable and its declared result/error contract
-- handler:operations-invoke: implement the owner-qualified callable and its declared result/error contract
-- dynamic-validator:operations-invoke: resolve operation/schema identity and validate native input, result and errors; absent validator refuses
 - handler:operations-list: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-check: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-checkpoints-enable: implement the owner-qualified callable and its declared result/error contract

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T03:03:06Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-zendesk-ticket-audits",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-catalog-provider --test zendesk 27/27 (six walk tests: has_more false ends; null cursor ends; empty page without has_more ends; has_more true continues past an empty page; has_more true without cursor is an error; repeated cursor is an error), definition_import 41/41, bundle_drift 1/1, inventory 20/20, connector_declarations 9/9, connectors-docs generate --check current",
+    "reference": "df4d2e1d1"
+  }
+}

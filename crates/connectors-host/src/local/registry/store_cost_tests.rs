@@ -8,7 +8,7 @@ use super::*;
 use std::os::unix::fs::PermissionsExt;
 use std::{collections::BTreeMap, time::Duration};
 
-/// The transactions of one `operations invoke` of a read operation with an
+/// The transactions of one `invoke` of a read operation with an
 /// owner running, in the process that performs each: the CLI reads the
 /// store's authority for its greeting in a fresh process, and its
 /// cached-description reads and the admission are answered by the owner from

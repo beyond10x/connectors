@@ -99,6 +99,16 @@ pub struct ServiceConfigV3 {
     /// The TokenReview endpoint of a `service-account-token` host.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub token_review: Option<TokenReviewConfig>,
+    /// The instance's standing write grants
+    /// (`connectors.standing_approvals.GrantFile`). Absent: the host is
+    /// unchanged, and a write on `POST /v1alpha2/invoke` is dispatched unkeyed
+    /// as before. Present: every write there is keyed and needs a grant the
+    /// file holds when the write arrives (a file absent at that moment holds
+    /// none, so the write is `approval_required`), and `POST /v1/invoke`
+    /// refuses writes. Requires `state`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>", length(min = 1, max = 4096))]
+    pub standing_grants: Option<std::path::PathBuf>,
 }
 
 /// `connectors.declarations.ServiceAdmissionProfile`.
@@ -128,6 +138,7 @@ impl From<ServiceConfig> for ServiceConfigV3 {
             audience: None,
             principal: None,
             token_review: None,
+            standing_grants: None,
         }
     }
 }
@@ -348,6 +359,18 @@ async fn execute(service: &Service, request: &Invocation) -> Result<serde_json::
         ));
     }
     let operation = descriptor.operation(&request.operation)?;
+    // Refusal: on a host with standing grants a write runs only keyed, under
+    // a grant, on `/v1alpha2/invoke`; this route records no attempt and reads
+    // no grant, so it never dispatches one (compatibility.md § 2.1, Keyed
+    // writes under a standing grant). A host without them is unchanged.
+    if operation.profile == v1alpha2::MUTATION_PROFILE
+        && service.state.as_ref().is_some_and(|state| state.keyed())
+    {
+        return Err(Error::new(
+            ErrorCode::Unsupported,
+            "on this host a write runs only on /v1alpha2/invoke",
+        ));
+    }
     validate(&operation.input_schema, &request.input)?;
     let _permit = service
         .slots
@@ -422,6 +445,11 @@ pub async fn serve_with_routes(
 ) -> Result<()> {
     let config = config.into();
     let admission = config.admission()?;
+    // Refusal: keys and grant uses are kept in `state`; a grant file without
+    // it would admit writes that nothing could replay or count.
+    if config.standing_grants.is_some() && config.state.is_none() {
+        return Err(Error::invalid("standing_grants requires state"));
+    }
     match &admission {
         Admission::StaticBearer(credential) => drop(credential.resolve().await?),
         Admission::ServiceAccountToken(account) => account.ready().await?,
@@ -439,6 +467,9 @@ pub async fn serve_with_routes(
             .await
             .map_err(|_| Error::internal())?
             .map_err(|_| Error::invalid("service state cannot be opened for this instance"))?;
+            let state = state
+                .with_standing_grants(config.standing_grants.clone())
+                .map_err(|_| Error::invalid("standing grant uses cannot be opened"))?;
             Some(Arc::new(state))
         }
     };

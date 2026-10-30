@@ -61,13 +61,14 @@ fn slow(container: &Container, delay: Duration, args: &[&str]) -> Output {
     )
 }
 
+/// The `invoke` target of the fixture entry: `CONNECTOR/ALIAS`.
+const TARGET: &str = "jira/forge";
+
 fn read_args<'a>(connection: &'a str, schema: &'a str) -> Vec<&'a str> {
+    assert_eq!(TARGET, format!("{CONNECTOR}/{ALIAS}"));
     vec![
-        "operations",
         "invoke",
-        "--adapter",
-        ALIAS,
-        "--operation",
+        TARGET,
         READ,
         "--connection",
         connection,
