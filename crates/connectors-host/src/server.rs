@@ -20,7 +20,10 @@ use subtle::ConstantTimeEq;
 use tokio::sync::Semaphore;
 
 pub use crate::local::service::ServiceState;
-pub use token_review::{CONCURRENT_REVIEWS, ServiceAccountAdmission, TokenReviewConfig};
+pub use token_review::{
+    Accounts as ServiceAccounts, CONCURRENT_REVIEWS, ServiceAccountAdmission,
+    ServiceAccountPattern, TokenReviewConfig,
+};
 
 /// `urn:connectors:config:v2:service` (`connectors.declarations.ServiceHostConfiguration`):
 /// the v1 members plus the optional `state` directory, which `POST
@@ -63,12 +66,23 @@ pub(crate) struct ServiceConfigV1 {
     {
         "properties": {"admission": {"const": "static-bearer"}},
         "required": ["service_credential"],
-        "not": {"anyOf": [{"required": ["audience"]}, {"required": ["principal"]}, {"required": ["token_review"]}]}
+        "not": {"anyOf": [
+            {"required": ["audience"]},
+            {"required": ["principal"]},
+            {"required": ["principals"]},
+            {"required": ["service_accounts"]},
+            {"required": ["token_review"]}
+        ]}
     },
     {
         "properties": {"admission": {"const": "service-account-token"}},
-        "required": ["admission", "audience", "principal", "token_review"],
-        "not": {"required": ["service_credential"]}
+        "required": ["admission", "audience", "token_review"],
+        "not": {"required": ["service_credential"]},
+        "oneOf": [
+            {"required": ["principal"]},
+            {"required": ["principals"]},
+            {"required": ["service_accounts"]}
+        ]
     }
 ]))]
 pub struct ServiceConfigV3 {
@@ -76,8 +90,15 @@ pub struct ServiceConfigV3 {
     pub instance: String,
     #[schemars(with = "String", length(min = 1, max = 512))]
     pub listen: SocketAddr,
-    /// The bearer callers present under `static-bearer`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// The bearer callers present under `static-bearer`. Like every member
+    /// whose presence selects or refuses a profile, it is absent or a value,
+    /// never `null` ([`present`]).
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(with = "CredentialRef")]
     pub service_credential: Option<CredentialRef>,
     /// The directory of the host's local metadata authority: its audit anchors
     /// and attempt records. Without it the host serves only `/v1/*`.
@@ -88,16 +109,55 @@ pub struct ServiceConfigV3 {
     #[serde(default, skip_serializing_if = "AdmissionProfile::is_static_bearer")]
     pub admission: AdmissionProfile,
     /// The one audience a `service-account-token` review asks for.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schemars(length(min = 1, max = 256))]
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(with = "String", length(min = 1, max = 256))]
     pub audience: Option<String>,
     /// The one service account a `service-account-token` host admits,
     /// `system:serviceaccount:<namespace>:<name>`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schemars(length(min = 1, max = 128), regex(pattern = token_review::PRINCIPAL_PATTERN))]
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(
+        with = "String",
+        length(min = 1, max = 128),
+        regex(pattern = token_review::PRINCIPAL_PATTERN)
+    )]
     pub principal: Option<String>,
+    /// The service accounts a `service-account-token` host admits, 1 to 64
+    /// of the `principal` form; instead of `principal`.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(
+        with = "Vec<String>",
+        length(min = 1, max = 64),
+        inner(length(min = 1, max = 128), regex(pattern = token_review::PRINCIPAL_PATTERN))
+    )]
+    pub principals: Option<Vec<String>>,
+    /// The namespace and name pattern of the service accounts a
+    /// `service-account-token` host admits; instead of `principal`.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(with = "ServiceAccountPattern")]
+    pub service_accounts: Option<ServiceAccountPattern>,
     /// The TokenReview endpoint of a `service-account-token` host.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(with = "TokenReviewConfig")]
     pub token_review: Option<TokenReviewConfig>,
     /// The instance's standing write grants
     /// (`connectors.standing_approvals.GrantFile`). Absent: the host is
@@ -109,6 +169,19 @@ pub struct ServiceConfigV3 {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<String>", length(min = 1, max = 4096))]
     pub standing_grants: Option<std::path::PathBuf>,
+}
+
+/// A member of [`ServiceConfigV3`] that is absent (`None`, by
+/// `#[serde(default)]`) or a value, never `null`. The schema gives these
+/// members a non-null type and reads their presence in `required`, `oneOf`
+/// and `not`, so a `null` the reader took for absent would make the two
+/// disagree (a YAML `principals:` with no value is such a `null`).
+fn present<'de, D, T>(deserializer: D) -> std::result::Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
 }
 
 /// `connectors.declarations.ServiceAdmissionProfile`.
@@ -137,6 +210,8 @@ impl From<ServiceConfig> for ServiceConfigV3 {
             admission: AdmissionProfile::StaticBearer,
             audience: None,
             principal: None,
+            principals: None,
+            service_accounts: None,
             token_review: None,
             standing_grants: None,
         }
@@ -147,13 +222,16 @@ impl ServiceConfigV3 {
     /// The configured admission, refusing a document that mixes the profiles'
     /// members. `service-account-token` reads its CA here, once.
     pub fn admission(&self) -> Result<Admission> {
-        let review_members =
-            self.audience.is_some() || self.principal.is_some() || self.token_review.is_some();
+        let review_members = self.audience.is_some()
+            || self.principal.is_some()
+            || self.principals.is_some()
+            || self.service_accounts.is_some()
+            || self.token_review.is_some();
         match self.admission {
             AdmissionProfile::StaticBearer => {
                 if review_members {
                     return Err(Error::invalid(
-                        "static-bearer admission takes no audience, principal or token_review",
+                        "static-bearer admission takes no audience, principal, principals, service_accounts or token_review",
                     ));
                 }
                 let Some(credential) = self.service_credential.clone() else {
@@ -169,15 +247,23 @@ impl ServiceConfigV3 {
                         "service-account-token admission takes no service_credential",
                     ));
                 }
-                let (Some(audience), Some(principal), Some(review)) =
-                    (&self.audience, &self.principal, &self.token_review)
-                else {
+                let (Some(audience), Some(review)) = (&self.audience, &self.token_review) else {
                     return Err(Error::invalid(
-                        "service-account-token admission requires audience, principal and token_review",
+                        "service-account-token admission requires audience and token_review",
                     ));
                 };
+                let accounts = match (&self.principal, &self.principals, &self.service_accounts) {
+                    (Some(principal), None, None) => token_review::Accounts::one(principal)?,
+                    (None, Some(principals), None) => token_review::Accounts::listed(principals)?,
+                    (None, None, Some(pattern)) => token_review::Accounts::pattern(pattern)?,
+                    _ => {
+                        return Err(Error::invalid(
+                            "service-account-token admission requires exactly one of principal, principals or service_accounts",
+                        ));
+                    }
+                };
                 Ok(Admission::ServiceAccountToken(Arc::new(
-                    ServiceAccountAdmission::new(audience, principal, review)?,
+                    ServiceAccountAdmission::new(audience, accounts, review)?,
                 )))
             }
         }
@@ -191,8 +277,8 @@ pub enum Admission {
     /// One bearer compared in constant time; the principal is
     /// [`STATIC_BEARER_PRINCIPAL`](crate::local::service::STATIC_BEARER_PRINCIPAL).
     StaticBearer(Arc<dyn Credential>),
-    /// One TokenReview per request; the principal is the configured service
-    /// account.
+    /// One TokenReview per request; the principal is the service account the
+    /// review named, one the configuration admits.
     ServiceAccountToken(Arc<ServiceAccountAdmission>),
 }
 
@@ -278,8 +364,8 @@ impl Admission {
                 // Refusal: every answer but the exact positive review
                 // (`unauthorized`); every failed review, and a request that finds
                 // all CONCURRENT_REVIEWS slots taken, with no review (`unavailable`).
-                account.admit(presented).await?;
-                Ok(account.principal().to_owned())
+                // The principal is the reviewed username, verbatim.
+                account.admit(presented).await
             }
         }
     }
@@ -429,6 +515,38 @@ fn legacy(mut error: Error) -> Error {
     error
 }
 
+/// The start refusal for a `state` that cannot be opened. A refused directory
+/// is named (the configured path or one of its ancestors, never OS text) with
+/// its fixed reason; any other failure keeps the closed text.
+fn state_refusal(
+    configured: &std::path::Path,
+    refusal: crate::local::filesystem::Refusal,
+) -> Error {
+    use crate::local::filesystem::{Reason, Refusal};
+    const REFUSED: &str = "service state cannot be opened for this instance";
+    let Refusal::Refused(refused) = refusal else {
+        return Error::invalid(REFUSED);
+    };
+    let directory = &refused.directory;
+    // `state` itself is told its whole target, whichever check failed first:
+    // fixing one bit at a time would only move the refusal to the next check.
+    if directory == configured {
+        return Error::invalid(format!(
+            "{REFUSED}: {directory:?}, the state directory, must be owned by the host user \
+             with mode 0700, no group or other bits"
+        ));
+    }
+    let reason = match refused.reason {
+        Reason::Owner => "is owned by neither the host user nor root",
+        Reason::Writable => "is writable by group or others",
+        // An ancestor is admitted without the private check; kept for totality.
+        Reason::NotPrivate => "is not private",
+    };
+    Error::invalid(format!(
+        "{REFUSED}: {directory:?}, an ancestor of state, {reason}"
+    ))
+}
+
 /// Serves a v2 ([`ServiceConfig`], always `static-bearer`) or v3
 /// ([`ServiceConfigV3`]) service configuration.
 pub async fn serve(config: impl Into<ServiceConfigV3>, adapter: Arc<dyn Adapter>) -> Result<()> {
@@ -461,12 +579,18 @@ pub async fn serve_with_routes(
         Some(path) => {
             let descriptor = adapter.descriptor();
             let instance = config.instance.clone();
+            let configured = path.clone();
             let state = tokio::task::spawn_blocking(move || {
-                ServiceState::open(&path, &instance, &descriptor.adapter, &descriptor.revision)
+                ServiceState::open_explained(
+                    &path,
+                    &instance,
+                    &descriptor.adapter,
+                    &descriptor.revision,
+                )
             })
             .await
             .map_err(|_| Error::internal())?
-            .map_err(|_| Error::invalid("service state cannot be opened for this instance"))?;
+            .map_err(|refusal| state_refusal(&configured, refusal))?;
             let state = state
                 .with_standing_grants(config.standing_grants.clone())
                 .map_err(|_| Error::invalid("standing grant uses cannot be opened"))?;
