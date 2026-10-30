@@ -35,6 +35,23 @@ and remain explicit runtime obligations.
 | C06 mounted custody rotation | A connection published from the item; the platform replaces the item's bytes. Invoke, revalidate, invoke. | The first invoke is `custody_unavailable` with `revalidate_connection`, exit 1, and the new bytes are never sent. Revalidate validates and publishes the new bytes without re-entry; the next invoke uses them. Runtime check: [`mounted_custody.rs`](../../../apps/connectors/tests/mounted_custody.rs) (`mounted_rotation_requires_revalidate`). |
 | C06 mounted custody container | An empty environment (no `HOME`, no `PATH`) with only `--config` and `--state-dir`, a user that is not root, the configuration owner-only and the item in a Secret volume's projected layout on a read-only mount. `setup init`, `setup check`, connect, list, invoke. | Every command succeeds; the read uses the item's bytes. Runtime check: [`container_env_i.rs`](../../../apps/connectors/tests/container_env_i.rs) (`env_i_mounted_custody_round_trip`). |
 
+## Installing a definitions release
+
+Each case serves a connectors-definitions release from a local directory
+(`<directory>/<tag>/index.json` beside its asset) after `setup init`, and needs no
+network ([installing a definitions release](semantics.md#installing-a-definitions-release)).
+"Unchanged" means the bytes of `definitions.lock` and the paths, modes and bytes
+of everything under `<state>/installed-definitions/` equal those recorded before
+the command. Runtime check: [`definitions_install.rs`](../../../apps/connectors/tests/definitions_install.rs).
+
+| Case | Arrange and actions | Required observations |
+|---|---|---|
+| D01 install | A release whose index names format 1, the four supported features and its files. `definitions install --source <directory> --tag <tag>`. | Exit 0. `definitions.lock` beside the configuration names source, tag, commit and index SHA-256, owner-only. `<state>/installed-definitions/<index sha256>/` holds `index.json` with that SHA-256 and `files/<path>` with each indexed file's bytes; every file there is read-only. The result names the same values and `cache_entry = created`. No process starts. |
+| D02 digest mismatch | A first release installed; a second whose asset holds one file with other bytes than its index entry (the asset's own digest matches). | `digest_mismatch`, exit 1, `file` naming that path; lock and cache unchanged. |
+| D03 unknown format version | A first release installed; a second whose index `schema` is a format version this build does not read. | `unknown_format_version`, exit 1; lock and cache unchanged. |
+| D04 unmet feature | A first release installed; a second whose `features` names a feature this build does not support. | `unmet_feature`, exit 1, `feature` naming it; lock and cache unchanged. |
+| D05 not built with it | A release whose tag and connectors appear nowhere in this build, format 1 and supported features. | Exit 0, as D01: the lock names that tag and the cache holds its connector files. No rebuild. |
+
 ## Startup and process ownership traces
 
 Each row starts from the same explicit two-entry configuration unless stated

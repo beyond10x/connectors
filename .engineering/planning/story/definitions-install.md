@@ -2,13 +2,48 @@
 format: aep.planning-md/3
 id: story:definitions-install
 kind: story
-status: draft
+status: implemented
 title: connectors definitions install fetches a connectors-definitions tag, verifies it against index.json, and records a lock and a cache
 relations:
 - decomposes: epic:catalog-connectors-only-in-definitions
 - serves: vision:independent-contract-adapters
 - depends_on: story:definitions-release-index
-revision: 4
+scope:
+- confidence: inferred
+  path: CHANGELOG.md
+- confidence: inferred
+  path: Cargo.lock
+- confidence: inferred
+  path: Cargo.toml
+- confidence: cited
+  path: apps/connectors-cli-contract
+- confidence: inferred
+  path: apps/connectors/Cargo.toml
+- confidence: cited
+  path: apps/connectors/spec/cli.yaml
+- confidence: inferred
+  path: apps/connectors/src/local
+- confidence: inferred
+  path: apps/connectors/src/local.rs
+- confidence: inferred
+  path: apps/connectors/tests
+- confidence: cited
+  path: contracts/cli/v1alpha1/scenarios.md
+- confidence: cited
+  path: contracts/cli/v1alpha1/semantics.md
+- confidence: inferred
+  path: crates/connectors-host/src/local/config.rs
+- confidence: cited
+  path: ess/domains/cli.yaml
+- confidence: inferred
+  path: ess/system.yaml
+- confidence: cited
+  path: website/docs/reference/cli.md
+revision: 13
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-29T20:20:57Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":2}}}
+- {from: "proposed", to: "active", at: "2026-10-29T20:20:57Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"review_outcome":2}}}
+- {from: "active", to: "implemented", at: "2026-10-30T05:39:52Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"test_result":1,"review_outcome":3}}}
 ---
 ## Outcome
 
@@ -71,13 +106,26 @@ format version and an unmet feature are each a refusal by name. Epic step 1.
 
 ## Scope
 
-- `apps/connectors/spec/cli.yaml` (cited)
-- `ess/domains/cli.yaml` (cited)
-- `contracts/cli/v1alpha1/semantics.md`, `contracts/cli/v1alpha1/scenarios.md` (cited)
-- `apps/connectors/src/local/` (inferred: a command module beside `definition.rs`)
-- `crates/connectors-host/src/local/` (inferred: lock and cache paths beside `definitions.rs`)
-- `apps/connectors/tests/` (inferred)
-- `website/docs/reference/` (inferred: the generated CLI reference)
+Derived 2026-10-29 by `story-scoper` on origin/main 65c928d72. Every line is **cited** (read from the story or the tree) or **inferred** (a reading that could be wrong).
+
+- **Primary surface:** a new `connectors definitions install` command in `apps/connectors`, built on a fetch-and-verify library crate — cited (story Context: "lives in a library crate, not only in `apps/connectors`")
+- **Files:** `apps/connectors/spec/cli.yaml` — cited (story Context)
+- **Files:** `ess/domains/cli.yaml` — cited (story Context; owned by `contracts/cli/v1alpha1/semantics.md`, `ess/domains/cli.yaml:4`)
+- **Files:** `contracts/cli/v1alpha1/semantics.md`, `contracts/cli/v1alpha1/scenarios.md` — cited (story Scope)
+- **Files:** `apps/connectors-cli-contract/` (generated from `cli.yaml` by `connectors-build`, `crates/connectors-build/src/cli.rs:13-20`) — cited
+- **Files:** `website/docs/reference/cli.md` (generated page, `crates/connectors-docs/src/cli.rs:10`) — cited
+- **Also likely:** `apps/connectors/src/local.rs` — inferred: the new callable is routed in `LocalHandler::dispatch` (`:158`) and probably admitted without a configuration in `configuration_preflight` (`:485`)
+- **Also likely:** a new module in `apps/connectors/src/local/` and `apps/connectors/Cargo.toml` — inferred
+- **Also likely:** a new crate under `crates/` holding the fetch-and-verify core, with its `[workspace.dependencies]` entry in `Cargo.toml` and `Cargo.lock` — inferred. `members` already globs `crates/*` (`Cargo.toml:4`). No `tar` workspace dependency exists today.
+- **Also likely:** `crates/connectors-host/src/local/config.rs` — inferred: design section 6 puts the cache under `<data dir>`, and `Paths` has only `config` and `state` (`:1109-1112`)
+- **Also likely:** a new ESS domain file next to `ess/domains/cli.yaml` for lock, index and cache entry, plus its entry in `ess/system.yaml` (`:5-30`) — inferred (the story says the placement is inferred)
+- **Also likely:** `apps/connectors/tests/` (a new install test with a release served from a local directory) — inferred
+- **Also likely:** `CHANGELOG.md` (`## Unreleased`) — inferred
+- **Documents:** the two CLI contract documents above. The acceptance requires no guide. — cited
+- **Confidence:** medium — the CLI binding and contract files are cited, but the crate split, the host paths and the ESS placement are left to implementation
+- **Would collide with:** any unit that changes the `connectors` command tree (`apps/connectors/spec/cli.yaml`, which regenerates `apps/connectors-cli-contract/` and `website/docs/reference/cli.md`), the callable routing in `apps/connectors/src/local.rs`, `ess/domains/cli.yaml`, the `contracts/cli/v1alpha1/` semantics and scenarios, or the workspace `Cargo.toml`/`Cargo.lock`. In flight on 2026-10-29: the D218 invoke units change `apps/connectors/spec/cli.yaml` and its generated contract and page; the D215 branch changes `Cargo.toml`, `Cargo.lock` and `CHANGELOG.md`.
+- **Safety fact:** the install cache is a different namespace from `<state>/definitions/`, the only definitions cache `Config::read_at` merges into a configuration (`crates/connectors-host/src/local/definitions.rs:4-10,36`). Until `story:instances-resolve-through-locked-index` lands, an install cannot change what any configured instance resolves to. Proven to level 2 (file:line); unproven at run time.
+- **Not established:** the new crate's path; the new ESS domain file's name; the cache location (`<data dir>` against `Paths`); whether release asset downloads redirect (the host HTTP client follows no redirect, `crates/connectors-host/src/http.rs:178-179`).
 
 ## Not in this story
 
@@ -99,3 +147,26 @@ Each against a release served from a local directory in tests:
   refusal by name, and the lock and the cache are as they were before the command.
 - Unmet feature: a release requiring a feature this build does not support ends in a refusal by
   name, and the lock and the cache are as they were before the command.
+- Not built with it (SM-D209): installing a release whose tag and connectors this binary was not
+  built with succeeds without a rebuild, provided its format version and features are supported.
+  Install reads nothing embedded at build time except the format versions and features this build
+  supports.
+
+## Decisions
+
+- SM-D209 (operator, 2026-10-29): "make sure that the stuff from connectors-definitions can be
+  read on-the-fly". A running binary reads an installed connectors-definitions release; adding or
+  changing a catalog connector needs a definitions release and an install, not a connectors
+  rebuild.
+- SM-D210 (coordinating session, 2026-10-29): SM-D209 does not retire option C of
+  `decision-blocker:catalog-first-run-source`. The pinned release embedded at build time stays the
+  first-run default before any install; an installed tag resolves at run time on top of it, and
+  `story:instances-resolve-through-locked-index` carries that resolution. This story's install
+  therefore writes the lock and cache a running binary reads, and the new acceptance case holds it.
+- D247 (orchestrator, 2026-10-30): "B, as you proposed. Keep the four in FEATURES, state the
+  limitation in the CHANGELOG and the doc comment, and go on with your release. C0 will carry the
+  test that FEATURES equals what the lowerer accepts." The proposal (this wave's coordinating
+  session): install admits `embedded_text`, `query_fixed`, `query_folds` and `rate_limit_headers`
+  by name, while the definition lowerer (`crates/connectors-catalog/src/definition.rs:485`, `:712`)
+  still refuses all four; no instance reads the lock yet, so nothing breaks today. Lowerer support
+  for the four goes to the next connectors wave (D243 C0).

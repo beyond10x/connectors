@@ -577,7 +577,7 @@ dependencies = [
 
 [[package]]
 name = "connectors"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -587,16 +587,19 @@ dependencies = [
  "connectors-cli-contract",
  "connectors-core",
  "connectors-custody",
+ "connectors-definitions-install",
  "connectors-host",
  "connectors-mcp",
  "connectors-oauth2",
  "connectors-sdk",
+ "flate2",
  "hex",
  "libc",
  "ring",
  "rusqlite",
  "serde_json",
  "sha2 0.11.0",
+ "tar",
  "tempfile",
  "time",
  "toml",
@@ -607,7 +610,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-build"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "clap",
@@ -638,7 +641,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-catalog"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "connectors-core",
  "flate2",
@@ -656,7 +659,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-catalog-provider"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -701,7 +704,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-client"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "connectors-core",
  "futures-util",
@@ -714,7 +717,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-conformance"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -736,7 +739,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-contracts"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -744,7 +747,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-core"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "connectors-operation-types",
  "hex",
@@ -756,7 +759,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-custody"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "clap",
  "core-foundation",
@@ -775,8 +778,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "connectors-definitions-install"
+version = "0.61.0"
+dependencies = [
+ "flate2",
+ "hex",
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tar",
+ "tempfile",
+ "tokio",
+ "toml",
+ "url",
+]
+
+[[package]]
 name = "connectors-docs"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "clap",
  "connectors",
@@ -791,7 +812,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-grafana"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "clap",
@@ -813,7 +834,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-host"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -859,7 +880,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-kubernetes"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -889,7 +910,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-loki"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "clap",
@@ -911,7 +932,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-mcp"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "clap",
  "connectors-core",
@@ -953,7 +974,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-oauth2"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "base64 0.23.1",
  "getrandom 0.3.4",
@@ -978,7 +999,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-prometheus"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "clap",
@@ -1000,7 +1021,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-sdk"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -1017,7 +1038,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-spec"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "connectors-core",
  "connectors-host",
@@ -1031,7 +1052,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-sql"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -1063,7 +1084,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-tavily"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "clap",
@@ -1079,7 +1100,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-tool-contracts"
-version = "0.60.0"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "b10x-tool-contract",
@@ -1632,6 +1653,16 @@ name = "fastrand"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
+
+[[package]]
+name = "filetime"
+version = "0.2.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c287a33c7f0a620c38e641e7f60827713987b3c0f26e8ddc9462cc69cf75759"
+dependencies = [
+ "cfg-if",
+ "libc",
+]
 
 [[package]]
 name = "find-msvc-tools"
@@ -3685,6 +3716,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.6",
+]
+
+[[package]]
+name = "tar"
+version = "0.4.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
+dependencies = [
+ "filetime",
+ "libc",
 ]
 
 [[package]]

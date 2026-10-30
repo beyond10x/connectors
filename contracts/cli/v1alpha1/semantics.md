@@ -83,6 +83,7 @@ management wire payload or a persistent record.
 | `approvals prepare` | local subject coordinator | `ApprovalPrepareInput` → `ApprovalPrepareResult` | no / no |
 | `approvals issue` | local issuer coordinator | `ApprovalIssueInput` → `ApprovalIssueResult` | no / no |
 | `list` | the shipped connector declarations and, when one exists, the configuration's `[connectors]` table ([listing connectors](#listing-connectors)) | inputless Context → `ConnectorListResult` | no / no |
+| `definitions install` | the configuration's `definitions.lock` and the state directory's read-only definitions cache ([installing a definitions release](#installing-a-definitions-release)) | `DefinitionsInstallInput` → `DefinitionsInstallResult` | no / no |
 | `instances list` | configured inventory | `AdapterListInput` → `AdapterListResult` | no / no |
 | `instances describe` | configured inventory and selected cached metadata | `AdapterDescribeInput` → `AdapterDescribeResult` | no / no |
 | `instances status` | existing lifecycle owner observation | `AdapterStatusInput` → `AdapterStatusResult` | no / no |
@@ -904,6 +905,101 @@ configured entry but a legacy catalog entry no connector is derived for. Under `
 `CONNECTOR`, `PROFILES` and `INSTANCES`, `-` where a row has none; under
 `--output json` they are the result envelope.
 
+### Installing a definitions release
+
+`definitions install --source <source> --tag <tag>` fetches one
+connectors-definitions release, checks every file of it against the release's
+`index.json`, keeps the files in a read-only cache and records the release in a
+lock file. The model is `connectors.definitions_install`
+([ESS](../../../ess/domains/definitions_install.yaml)); the index format is the one
+the connectors-definitions repository publishes beside each tag from 0.3.0 on.
+Both arguments are required; there is no default source, and nothing updates
+implicitly.
+
+- `--source` is an `https` repository URL, from which the command reads
+  `<source>/releases/download/<tag>/index.json` and the asset it names, or a local
+  directory holding `<tag>/index.json` and that asset beside it. Any other scheme,
+  and a URL with credentials, a query or a fragment, is `invalid_input`. An HTTPS
+  request follows at most five redirects, each to `https`, uses no proxy, and reads
+  at most 4 MiB of `index.json` and 64 MiB of asset.
+- `--tag` is 1 to 128 bytes of `[A-Za-z0-9._-]`, not `.` or `..`; anything else is
+  `invalid_input`.
+
+The command reads the configuration as every command does, so `setup init` comes
+first. It starts no local host or adapter, reads no credential, and grants
+nothing: no connection, no operation admission, no OAuth exchange and no write
+authority. No command of this binding reads the lock yet, and the cache is not
+`<state>/definitions/`, the invoked definitions' cache, so an install changes what
+no instance resolves to.
+
+It checks, in this order, before it writes anything:
+
+1. `index.json`'s `schema` is a format version this build reads
+   (`urn:beyond10x:connectors-definitions-index:1`), else `unknown_format_version`.
+2. The rest of the index is that format, with no other member: `tag` equals
+   `--tag`, `commit` is 40 or 64 and every digest 64 lower-case hexadecimal digits,
+   the asset's name is one path segment, every file path is relative with no empty,
+   `.` or `..` segment, no segment over 255 bytes and no backslash, no file path is
+   another's directory, the files are sorted by path in byte order with no path
+   twice, no two paths differ only in case (a case-insensitive file system holds them
+   as one), at most 16,384 files and 512 MiB in all, and every feature is 1 to 64
+   bytes of `[a-z0-9_]`, sorted in byte order with none twice. Else
+   `release_invalid`.
+3. Every name in `features` is a feature this build supports (`embedded_text`,
+   `query_fixed`, `query_folds`, `rate_limit_headers`), else `unmet_feature`, with
+   `feature` naming the first unsupported one. The definition lowerer does not read these four
+   members yet, so an installed release is stored and locked, and no instance
+   resolves through it until it does.
+4. The asset's SHA-256 equals the index's `asset.sha256`, else `digest_mismatch`
+   with `file` naming the asset.
+5. The asset is a gzip tar archive whose entries all lie under one top directory.
+   Each regular file under it, that directory removed, is a path the index names,
+   once, with the index's size and SHA-256: another size or digest is
+   `digest_mismatch` with `file` naming the path. A file the index does not name, a
+   file it names that the archive lacks, and an entry that is neither a regular file
+   nor a directory are `release_invalid`, as is an asset that inflates past the
+   files the index names, each padded to a 512-byte block, plus 8 KiB of header
+   room per file and 1 MiB in all.
+
+These are the only things it takes from its own build: the format versions and the
+features it supports. A release whose tag, commit and connectors this binary was
+never built with installs without a rebuild.
+
+Only then does it write. The cache entry is
+`<state>/installed-definitions/<index sha256>/`, holding `index.json` (the bytes
+whose SHA-256 names the entry) and `files/<path>` for every file the index names.
+It is written under a temporary name in the same directory and renamed into place
+whole, its files mode 0444 and its directories 0555. An entry that already exists
+for that digest is not replaced: it must be a directory, not a link, holding
+exactly `index.json` and the files the index names, each with the index's size and
+SHA-256, its files mode 0444 and its directories 0555; any difference is
+`digest_mismatch` naming the file relative to the release, `index.json`, or the
+entry itself. The lock is
+`definitions.lock` in the configuration file's directory, owner-only, written to a
+temporary file and renamed over the previous one:
+
+```json
+{"format":"connectors-definitions-lock/1","source":"<source>","tag":"<tag>","commit":"<commit>","index_sha256":"<sha256>"}
+```
+
+`source` is the URL without a trailing `/`, or the directory's canonical path. A refused command
+leaves the lock and every cache entry as they were. The result names `source`,
+`tag`, `commit`, `index_sha256`, `features`, the number of `files`, `lock_path`,
+`cache_path` and `cache_entry` (`created`, or `existing` for an entry that was
+already there). Several entries may coexist; the lock names one. No command removes
+an entry.
+
+| Condition | `Failure.code` | `stage` | `next_action` | Exit |
+|---|---|---|---|---|
+| a `--source` or `--tag` this section refuses | `invalid_input` | `arguments` | `none` | 2 |
+| a release file the source does not have: no directory, file or HTTP 404 | `not_found` | `dispatch` | `none` | 1 |
+| a source that does not answer, another HTTP status, a redirect it does not follow, or a file over its bound | `unavailable` | `dispatch` | `retry_explicitly` | 1 |
+| an index format version this build does not read | `unknown_format_version` | `admission` | `upgrade` | 1 |
+| a release requiring a feature this build does not support | `unmet_feature` | `admission` | `upgrade` | 1 |
+| an index or asset that is not what the index format states | `release_invalid` | `admission` | `none` | 1 |
+| an asset or file whose SHA-256 or size differs from the index | `digest_mismatch` | `admission` | `none` | 1 |
+| the cache or the lock could not be written; nothing was renamed into place | `unavailable` | `publication` | `retry_explicitly` | 1 |
+
 ### Migrating adapter entries
 
 `setup migrate --mode dry-run` and `setup migrate --mode apply` move legacy
@@ -1348,6 +1444,10 @@ never replay a possible write after interruption, timeout or lost response.
 | `setup owner-stop`: state directory, owner socket or lock file of another user (`stage = stop`, `next_action = check_configuration`) | `forbidden` | 1 |
 | `setup owner-stop`: the lifetime lock is held and no owner answers within the bound; nothing is signalled (`stage = stop`, `next_action = retry_explicitly`) | `unavailable` | 1 |
 | `setup owner-stop`: the owner accepted the request and still holds the lifetime lock at the bound (`stage = stop`, `next_action = retry_explicitly`) | `timeout` | 1 |
+| `definitions install`: an index format version this build does not read; nothing written (`stage = admission`, `next_action = upgrade`, [installing a definitions release](#installing-a-definitions-release)) | `unknown_format_version` | 1 |
+| `definitions install`: a release requiring a feature this build does not support, named in `feature`; nothing written (`stage = admission`, `next_action = upgrade`) | `unmet_feature` | 1 |
+| `definitions install`: a release asset or file whose SHA-256 or size differs from `index.json`, named in `file`; nothing written (`stage = admission`, `next_action = none`) | `digest_mismatch` | 1 |
+| `definitions install`: an index or asset that is not what the index format states; nothing written (`stage = admission`, `next_action = none`) | `release_invalid` | 1 |
 | user interruption | `interrupted` | 130 |
 
 A configuration whose adapter entry contradicts its format — a
