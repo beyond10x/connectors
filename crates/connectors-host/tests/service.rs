@@ -243,6 +243,55 @@ async fn credential_stores_are_substitutable_and_file_permissions_are_enforced()
     assert!(CredentialRef::File { path: link }.resolve().await.is_err());
 }
 
+/// D275: the group read admitted for the TokenReview token is the review
+/// token's alone. A static-bearer `service_credential`, and every other
+/// credential file, keeps the private rule: at `0640` under a group the
+/// process holds it is refused, by itself and at host start.
+#[tokio::test]
+async fn a_group_readable_credential_file_is_still_refused_outside_the_review_token() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("credential");
+    std::fs::write(&path, b"service-token").unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    let credential = CredentialRef::File { path: path.clone() };
+    let directory = BoundCredential {
+        store: Arc::new(DirectorySecrets(temp.path().into())),
+        reference: "credential".into(),
+    };
+    assert!(credential.resolve().await.is_ok());
+    assert!(directory.resolve().await.is_ok());
+    for mode in [0o640, 0o440, 0o660, 0o644, 0o604] {
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).unwrap();
+        let Err(error) = credential.resolve().await else {
+            panic!("a {mode:o} credential file was read");
+        };
+        assert_eq!(error.code, ErrorCode::Forbidden, "{mode:o}");
+        assert_eq!(
+            error.message, "credential file must be private, owner-bound and bounded",
+            "{mode:o}"
+        );
+        assert!(directory.resolve().await.is_err(), "{mode:o}");
+    }
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
+    let started = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        connectors_host::server::serve(
+            ServiceConfig {
+                instance: "leaf".into(),
+                listen: "127.0.0.1:0".parse().unwrap(),
+                service_credential: credential,
+                state: None,
+            },
+            Arc::new(Echo(Arc::new(AtomicUsize::new(0)))),
+        ),
+    )
+    .await;
+    assert!(
+        matches!(started, Ok(Err(_))),
+        "a 0640 static-bearer credential was admitted at start"
+    );
+}
+
 struct ChangingLeaf {
     calls: Arc<AtomicUsize>,
     revision: Arc<AtomicUsize>,

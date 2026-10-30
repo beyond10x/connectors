@@ -8,7 +8,8 @@ Connector, instance and connection are the terms of the [vocabulary](../README.m
 
 Copy the matching file from `examples/`, choose a unique instance/listener, configure
 the permitted resources, and bind private credential files or environment references.
-Credential files must be regular files owned by the running user with mode `0600`.
+Credential files must be regular files owned by the running user with mode `0600`; the
+TokenReview `credential_file` alone may also be `0640` or `0440` (Admission, below).
 Credentials never belong in operation input. Config changes require a restart.
 Credential file replacement is resolved on subsequent requests, including gateway
 downstream credentials. Environment references reflect the process environment;
@@ -43,10 +44,20 @@ gives the exact rules.
   "token_review": {
     "api": "https://kubernetes.default.svc",
     "ca_file": "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
-    "credential_file": "/var/run/secrets/kubernetes.io/serviceaccount/token"
+    "credential_file": "/var/run/secrets/kubernetes.io/serviceaccount/..data/token"
   }
 }
 ```
+
+`credential_file` names `..data/token` because the conventional `serviceaccount/token` is a
+symbolic link to it, and the host refuses a symbolic link as the last path component. The
+token must be a regular file of at most 8 KiB, either `0600` and owned by the running user,
+or exactly `0640` or `0440`, as the kubelet presents it to a pod with `fsGroup`: owned by
+the running user or root, with a group the process holds as its effective or a
+supplementary group. Any other mode with a bit for group or others is refused, among them a
+group-writable file, one with any bit for others, a setuid, setgid or sticky bit and owner
+execute beside group read, and so is a `0640` file whose group the process does not hold;
+every other credential file keeps the `0600` rule.
 
 The host admits a request only when the review authenticates the token for `audience` as
 an admitted service account. Name the accounts in exactly one of three ways:

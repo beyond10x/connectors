@@ -99,6 +99,14 @@ impl Double {
     fn seen(&self) -> usize {
         self.seen.lock().unwrap().len()
     }
+    /// The Authorization value of the last review received.
+    fn last_authorization(&self) -> Option<String> {
+        self.seen
+            .lock()
+            .unwrap()
+            .last()
+            .and_then(|(a, _)| a.clone())
+    }
 }
 
 fn certificate() -> rcgen::CertifiedKey<rcgen::KeyPair> {
@@ -250,7 +258,19 @@ async fn host_with(root: &Path, api: &str, ca: &Path) -> Host {
 async fn host_admitting(root: &Path, api: &str, ca: &Path, accounts: (&str, Value)) -> Host {
     let credential = root.join("instance-token");
     private_file(&credential, INSTANCE_TOKEN.as_bytes());
-    let mut document = account_document(api, ca, &credential);
+    host_reading(root, api, ca, accounts, &credential).await
+}
+
+/// [`host_admitting`] with the instance's token read from `credential`, which
+/// the caller has written.
+async fn host_reading(
+    root: &Path,
+    api: &str,
+    ca: &Path,
+    accounts: (&str, Value),
+    credential: &Path,
+) -> Host {
+    let mut document = account_document(api, ca, credential);
     document.as_object_mut().unwrap().remove("principal");
     document[accounts.0] = accounts.1;
     let config = read(root, &document).unwrap();
@@ -922,4 +942,363 @@ fn the_v3_reader_refuses_unknown_admission_values_and_extra_keys() {
     let mut plaintext = base.clone();
     plaintext["token_review"]["api"] = json!("http://kubernetes.default.svc");
     assert!(read(root.path(), &plaintext).unwrap().admission().is_err());
+}
+
+/// The message start refuses an unreadable instance token with.
+const START_REFUSAL: &str = "the token_review credential_file cannot be read";
+const ROTATED_TOKEN: &str = "instance-token-9c02e4-rotated-probe";
+
+/// Start's verdict on the instance token at `credential`: `Ok` when the host
+/// is still serving after half a second, else start's error.
+async fn start_reading(
+    root: &Path,
+    double: &Double,
+    credential: &Path,
+) -> std::result::Result<(), connectors_core::Error> {
+    let config = read(root, &account_document(&double.api, &double.ca, credential)).unwrap();
+    let adapter = Arc::new(Fixture {
+        calls: Arc::new(AtomicUsize::new(0)),
+    });
+    match tokio::time::timeout(
+        std::time::Duration::from_millis(500),
+        connectors_host::server::serve(config, adapter),
+    )
+    .await
+    {
+        Err(_) => Ok(()),
+        Ok(Ok(())) => panic!("serve returned without an error"),
+        Ok(Err(error)) => Err(error),
+    }
+}
+
+fn set_mode(path: &Path, mode: u32) {
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).unwrap();
+}
+
+/// D275 (story:review-token-file-admits-fsgroup-read): under `fsGroup` the
+/// kubelet presents the projected token as `0640` with the pod's group. The
+/// review token is read at `0600`, and at `0640` or `0440` when its group is
+/// one the host holds (here the group the test created it under), at start
+/// and at each review. A group-writable file or one with other bits is
+/// refused at start with the current message, and at a review with no
+/// review sent.
+#[tokio::test]
+async fn the_review_token_is_read_at_0640_under_a_group_the_host_holds() {
+    let root = tempfile::tempdir().unwrap();
+    let double = double(root.path()).await;
+    let token = root.path().join("projected-token");
+    private_file(&token, INSTANCE_TOKEN.as_bytes());
+    for mode in [0o600, 0o640, 0o440] {
+        set_mode(&token, mode);
+        let started = start_reading(root.path(), &double, &token).await;
+        assert!(started.is_ok(), "{mode:o} refused at start: {started:?}");
+    }
+    let refused = [0o660, 0o644, 0o604, 0o620, 0o650];
+    for mode in refused {
+        set_mode(&token, mode);
+        let error = start_reading(root.path(), &double, &token)
+            .await
+            .unwrap_err();
+        assert_eq!(error.message, START_REFUSAL, "{mode:o}");
+    }
+
+    set_mode(&token, 0o640);
+    let host = host_reading(
+        root.path(),
+        &double.api,
+        &double.ca,
+        ("principal", json!(PRINCIPAL)),
+        &token,
+    )
+    .await;
+    let caller = format!("Bearer {CALLER_TOKEN}");
+    let (status, text) = send(
+        &host,
+        reqwest::Method::POST,
+        "/v1alpha2/invoke",
+        Some(caller.as_bytes()),
+        Some(&invocation("read", "group-read")),
+    )
+    .await;
+    assert_eq!(status, 200, "{text}");
+    assert_eq!(
+        double.last_authorization(),
+        Some(format!("Bearer {INSTANCE_TOKEN}"))
+    );
+    for (index, mode) in refused.into_iter().enumerate() {
+        set_mode(&token, mode);
+        let (status, text) = send(
+            &host,
+            reqwest::Method::POST,
+            "/v1alpha2/invoke",
+            Some(caller.as_bytes()),
+            Some(&invocation("read", &format!("refused-{index}"))),
+        )
+        .await;
+        assert_eq!(status, 503, "{mode:o}: {text}");
+    }
+    assert_eq!(double.seen(), 1);
+    assert_eq!(host.calls.load(Ordering::SeqCst), 1);
+}
+
+/// D275 (story:review-token-path-in-docs-opens): the layout of a projected
+/// service account volume, its token `0640` as under `fsGroup`.
+/// `<mount>/token` is a symbolic link to `..data/token` and is refused at
+/// start with the current message; `<mount>/..data/token` is read through the
+/// `..data` link; after `..data` is swapped to a new directory, the next
+/// review sends the new token.
+#[tokio::test]
+async fn the_projected_token_is_read_through_data_and_follows_its_swap() {
+    let root = tempfile::tempdir().unwrap();
+    let double = double(root.path()).await;
+    let mount = root.path().join("serviceaccount");
+    let first = mount.join("..2026_10_30_a");
+    std::fs::create_dir_all(&first).unwrap();
+    private_file(&first.join("token"), INSTANCE_TOKEN.as_bytes());
+    set_mode(&first.join("token"), 0o640);
+    std::os::unix::fs::symlink("..2026_10_30_a", mount.join("..data")).unwrap();
+    std::os::unix::fs::symlink("..data/token", mount.join("token")).unwrap();
+
+    let error = start_reading(root.path(), &double, &mount.join("token"))
+        .await
+        .unwrap_err();
+    assert_eq!(error.message, START_REFUSAL);
+    let data_token = mount.join("..data").join("token");
+    let started = start_reading(root.path(), &double, &data_token).await;
+    assert!(started.is_ok(), "{started:?}");
+
+    let host = host_reading(
+        root.path(),
+        &double.api,
+        &double.ca,
+        ("principal", json!(PRINCIPAL)),
+        &data_token,
+    )
+    .await;
+    let caller = format!("Bearer {CALLER_TOKEN}");
+    let (status, text) = send(
+        &host,
+        reqwest::Method::POST,
+        "/v1alpha2/invoke",
+        Some(caller.as_bytes()),
+        Some(&invocation("read", "before-swap")),
+    )
+    .await;
+    assert_eq!(status, 200, "{text}");
+    assert_eq!(
+        double.last_authorization(),
+        Some(format!("Bearer {INSTANCE_TOKEN}"))
+    );
+
+    // The kubelet's swap: a new timestamp directory, a link to it renamed
+    // over `..data`, the old directory removed.
+    let second = mount.join("..2026_10_30_b");
+    std::fs::create_dir(&second).unwrap();
+    private_file(&second.join("token"), ROTATED_TOKEN.as_bytes());
+    set_mode(&second.join("token"), 0o640);
+    std::os::unix::fs::symlink("..2026_10_30_b", mount.join("..data_tmp")).unwrap();
+    std::fs::rename(mount.join("..data_tmp"), mount.join("..data")).unwrap();
+    std::fs::remove_dir_all(&first).unwrap();
+    let (status, text) = send(
+        &host,
+        reqwest::Method::POST,
+        "/v1alpha2/invoke",
+        Some(caller.as_bytes()),
+        Some(&invocation("read", "after-swap")),
+    )
+    .await;
+    assert_eq!(status, 200, "{text}");
+    assert_eq!(
+        double.last_authorization(),
+        Some(format!("Bearer {ROTATED_TOKEN}"))
+    );
+    assert_eq!(double.seen(), 2);
+    assert_eq!(host.calls.load(Ordering::SeqCst), 2);
+}
+
+/// Sets `mode` and asserts the kernel kept every bit, so a case fails for the
+/// rule under test and not for a fixture the kernel silently changed.
+fn set_exact_mode(path: &Path, mode: u32) {
+    set_mode(path, mode);
+    let kept = std::fs::metadata(path).unwrap().permissions().mode() & 0o7777;
+    assert_eq!(kept, mode, "the kernel did not keep mode {mode:o}");
+}
+
+/// Adversary, D275 brief: "`0640` is admitted only when ... no group write,
+/// no other bits". The decided group-read rule names `0640` (and the docs'
+/// "group-readable with no other bit for group or others (`0640`)"); a
+/// setuid, setgid or sticky bit on the group-readable review token is not
+/// `0640` and is refused at start with the current message.
+#[tokio::test]
+async fn adversary_d275_special_bits_on_a_group_readable_review_token_are_refused() {
+    let root = tempfile::tempdir().unwrap();
+    let double = double(root.path()).await;
+    let token = root.path().join("projected-token");
+    private_file(&token, INSTANCE_TOKEN.as_bytes());
+    let mut admitted = Vec::new();
+    for mode in [0o4640, 0o2640, 0o1640, 0o6440] {
+        set_exact_mode(&token, mode);
+        if start_reading(root.path(), &double, &token).await.is_ok() {
+            admitted.push(format!("{mode:o}"));
+        }
+    }
+    assert!(
+        admitted.is_empty(),
+        "special-bit modes admitted for the review token: {admitted:?}"
+    );
+}
+
+/// Adversary, D275 brief: the group-read exception is `0640`; an owner
+/// execute bit beside group read (`0740`, `0540`) is not `0640` and is
+/// refused at start.
+#[tokio::test]
+async fn adversary_d275_owner_execute_beside_group_read_is_refused() {
+    let root = tempfile::tempdir().unwrap();
+    let double = double(root.path()).await;
+    let token = root.path().join("projected-token");
+    private_file(&token, INSTANCE_TOKEN.as_bytes());
+    let mut admitted = Vec::new();
+    for mode in [0o740, 0o540, 0o140] {
+        set_exact_mode(&token, mode);
+        if start_reading(root.path(), &double, &token).await.is_ok() {
+            admitted.push(format!("{mode:o}"));
+        }
+    }
+    assert!(
+        admitted.is_empty(),
+        "owner-execute modes admitted for the review token: {admitted:?}"
+    );
+}
+
+/// A group this process holds only as a supplementary group, read from
+/// `/proc/self/status` (not from `getgroups`, the call under test).
+fn supplementary_only_group() -> Option<u32> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    let egid = status
+        .lines()
+        .find_map(|line| line.strip_prefix("Gid:"))?
+        .split_whitespace()
+        .nth(1)?
+        .parse::<u32>()
+        .ok()?;
+    status
+        .lines()
+        .find_map(|line| line.strip_prefix("Groups:"))?
+        .split_whitespace()
+        .filter_map(|gid| gid.parse::<u32>().ok())
+        .find(|gid| *gid != egid)
+}
+
+/// Adversary, D275: under `fsGroup` the pod's group reaches the process as a
+/// supplementary group, not its effective group. Every other case in this
+/// file writes the token under the effective group, so a `Process::current`
+/// that dropped the supplementary groups would pass them all. Here the token
+/// is `0640` under a group held only as a supplementary group: start
+/// succeeds and a review sends it.
+#[tokio::test]
+async fn adversary_d275_a_review_token_under_a_supplementary_only_group_is_read() {
+    let Some(group) = supplementary_only_group() else {
+        eprintln!("no supplementary group besides the effective one; case not exercised");
+        return;
+    };
+    let root = tempfile::tempdir().unwrap();
+    let double = double(root.path()).await;
+    let token = root.path().join("projected-token");
+    private_file(&token, INSTANCE_TOKEN.as_bytes());
+    std::os::unix::fs::chown(&token, None, Some(group)).unwrap();
+    set_exact_mode(&token, 0o640);
+    let started = start_reading(root.path(), &double, &token).await;
+    assert!(
+        started.is_ok(),
+        "group {group} refused at start: {started:?}"
+    );
+    let host = host_reading(
+        root.path(),
+        &double.api,
+        &double.ca,
+        ("principal", json!(PRINCIPAL)),
+        &token,
+    )
+    .await;
+    let caller = format!("Bearer {CALLER_TOKEN}");
+    let (status, text) = send(
+        &host,
+        reqwest::Method::POST,
+        "/v1alpha2/invoke",
+        Some(caller.as_bytes()),
+        Some(&invocation("read", "supplementary")),
+    )
+    .await;
+    assert_eq!(status, 200, "{text}");
+    assert_eq!(
+        double.last_authorization(),
+        Some(format!("Bearer {INSTANCE_TOKEN}"))
+    );
+}
+
+/// Adversary, D275: with `0640` admitted, the regular-file and size guards
+/// are all that stand between the review token and a FIFO, a directory or
+/// an oversized file whose mode passes. Each is refused at start with the
+/// current message, without blocking, and at a review with no review sent and
+/// a body that names neither the path nor an OS error.
+#[tokio::test]
+async fn adversary_d275_a_group_readable_non_file_or_oversized_review_token_is_refused() {
+    let root = tempfile::tempdir().unwrap();
+    let double = double(root.path()).await;
+    let token = root.path().join("projected-token");
+
+    std::fs::create_dir(&token).unwrap();
+    set_exact_mode(&token, 0o750);
+    let error = start_reading(root.path(), &double, &token)
+        .await
+        .unwrap_err();
+    assert_eq!(error.message, START_REFUSAL, "directory");
+    std::fs::remove_dir(&token).unwrap();
+
+    let fifo = std::ffi::CString::new(token.as_os_str().as_encoded_bytes()).unwrap();
+    // SAFETY: `fifo` is a NUL-terminated path.
+    assert_eq!(unsafe { libc::mkfifo(fifo.as_ptr(), 0o640) }, 0);
+    set_exact_mode(&token, 0o640);
+    let error = start_reading(root.path(), &double, &token)
+        .await
+        .unwrap_err();
+    assert_eq!(error.message, START_REFUSAL, "fifo");
+    std::fs::remove_file(&token).unwrap();
+
+    private_file(&token, &vec![b'a'; 8193]);
+    set_exact_mode(&token, 0o640);
+    let error = start_reading(root.path(), &double, &token)
+        .await
+        .unwrap_err();
+    assert_eq!(error.message, START_REFUSAL, "8193 bytes");
+
+    std::fs::write(&token, INSTANCE_TOKEN.as_bytes()).unwrap();
+    set_exact_mode(&token, 0o640);
+    let host = host_reading(
+        root.path(),
+        &double.api,
+        &double.ca,
+        ("principal", json!(PRINCIPAL)),
+        &token,
+    )
+    .await;
+    std::fs::remove_file(&token).unwrap();
+    // SAFETY: `fifo` is a NUL-terminated path.
+    assert_eq!(unsafe { libc::mkfifo(fifo.as_ptr(), 0o640) }, 0);
+    set_exact_mode(&token, 0o640);
+    let caller = format!("Bearer {CALLER_TOKEN}");
+    let (status, text) = send(
+        &host,
+        reqwest::Method::POST,
+        "/v1alpha2/invoke",
+        Some(caller.as_bytes()),
+        Some(&invocation("read", "fifo-at-review")),
+    )
+    .await;
+    assert_eq!(status, 503, "{text}");
+    let path = token.to_string_lossy();
+    assert!(!text.contains(path.as_ref()), "{text}");
+    assert!(!text.contains("os error"), "{text}");
+    assert_eq!(double.seen(), 0);
+    assert_eq!(host.calls.load(Ordering::SeqCst), 0);
 }
