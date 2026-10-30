@@ -25,6 +25,7 @@ domains:
   - connectors.artifact_provenance
   - connectors.auth_bindings
   - connectors.cli
+  - connectors.definitions_install
   - connectors.transport
   - connectors.oauth2
   - connectors.tool_contracts

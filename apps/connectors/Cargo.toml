@@ -11,6 +11,7 @@ base64.workspace = true
 connectors-catalog = { path = "../../crates/connectors-catalog" }
 connectors-catalog-provider = { path = "../../adapters/catalog" }
 connectors-core.workspace = true
+connectors-definitions-install.workspace = true
 connectors-sdk.workspace = true
 connectors-client.workspace = true
 connectors-host.workspace = true
@@ -29,6 +30,8 @@ uuid.workspace = true
 [dev-dependencies]
 connectors-custody = { workspace = true, features = ["test-support"] }
 async-trait.workspace = true
+flate2.workspace = true
+tar = { version = "0.4.46", default-features = false }
 hex.workspace = true
 libc = "0.2"
 rusqlite = { version = "=0.40.2", features = ["bundled"] }

@@ -29,6 +29,16 @@ pub const SCHEMA: &str = "urn:beyond10x:connectors-definition:1";
 pub const EVIDENCE_LIFETIME_MS: u64 = 300_000;
 /// The selection format the catalog provider's `operations_file` reads.
 pub const OPERATIONS_FORMAT: &str = "connectors-catalog-operations/1";
+/// The optional definition members this lowerer reads that a connectors-definitions
+/// release names in its index's `features`, sorted: the members connectors-definitions
+/// 0.3.0 and later declare. `connectors definitions install` admits exactly these
+/// (D247); a test that links both crates holds the two lists equal.
+pub const READ_FEATURES: &[&str] = &[
+    "embedded_text",
+    "query_fixed",
+    "query_folds",
+    "rate_limit_headers",
+];
 
 /// `connectors_definitions.definition.SchemaId`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -473,12 +483,56 @@ pub struct Custody {
     pub returns: BTreeMap<String, String>,
 }
 
+/// `connectors_definitions.definition.FoldFormat`, the engine's
+/// `connectors_catalog.selection.FoldFormat`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FoldFormat {
+    Timestamp,
+}
+
+/// `connectors_definitions.definition.QueryFold`, the engine's
+/// `connectors_catalog.selection.QueryFold`, carried as written: a caller
+/// input appended to the fixed query value of `into` as one space, `prefix`
+/// and the input in `format`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QueryFold {
+    pub into: String,
+    pub prefix: String,
+    pub format: FoldFormat,
+}
+
+/// `connectors_definitions.definition.EmbeddedText`, the engine's
+/// `connectors_catalog.selection.EmbeddedText`, carried as written: the file a
+/// read's JSON answer carries as base64, answered as its text.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EmbeddedText {
+    pub content: String,
+    pub encoding: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<String>,
+    pub max_bytes: u64,
+}
+
+/// `connectors_definitions.definition.RateLimitHeaders`, the engine's
+/// `connectors_catalog.selection.RateLimitHeaders`, carried as written: the
+/// headers by which a `403` or `429` says the rate limit is spent.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RateLimitHeaders {
+    pub remaining: String,
+    pub reset: String,
+}
+
 /// `connectors_definitions.definition.Defaults`: the fields an operation
 /// carries to the engine as written, given once for every operation that
 /// does not set the field itself. `envelope` applies only to the reads that
-/// answer JSON (no `response` other than `json`, no `download`), the only
-/// operations the engine admits one on; `refusal_texts` and `custody` apply only
-/// to writes, the only operations the engine admits them on; every other field
+/// answer JSON (no `response` other than `json`, no `download`, no
+/// `embedded_text`), the only operations the engine admits one on;
+/// `refusal_texts` and `custody` apply only to writes, the only operations the
+/// engine admits them on; every other field, `rate_limit_headers` included,
 /// applies to every operation.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -501,6 +555,8 @@ pub struct Defaults {
     pub envelope: Option<Envelope>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rate_limit_reasons: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate_limit_headers: Option<RateLimitHeaders>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refusal_texts: Option<Vec<TextRefusal>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -705,8 +761,10 @@ pub struct Datasource {
 }
 
 /// `connectors_definitions.definition.Operation`. `op` is absent only for a
-/// `download`. The fields from `required` to `custody` reach the
-/// engine as written, and each takes its value from `defaults` when not set.
+/// `download`. The fields from `required` to `custody`, and
+/// `rate_limit_headers`, reach the engine as written, and each takes its value
+/// from `defaults` when not set. `query_fixed`, `query_folds` and
+/// `embedded_text` reach it as written and have no default.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Operation {
@@ -769,6 +827,20 @@ pub struct Operation {
     pub conflict_status: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub guard: Option<Guard>,
+    /// Query parameters of a read sent with these values on every request,
+    /// which a caller cannot send: the engine's `query_fixed`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query_fixed: Option<IndexMap<String, String>>,
+    /// Caller inputs, by name, folded into a fixed query value: the engine's
+    /// `query_folds`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query_folds: Option<IndexMap<String, QueryFold>>,
+    /// A read answering JSON whose answer carries a file as base64, answered
+    /// as its text: the engine's `embedded_text`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embedded_text: Option<EmbeddedText>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate_limit_headers: Option<RateLimitHeaders>,
     /// Written only where it differs from the source operation's summary,
     /// which is the description otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1397,6 +1469,14 @@ pub struct SelectionEntry {
     pub guard: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custody: Option<Custody>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub query_fixed: BTreeMap<String, String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub query_folds: BTreeMap<String, QueryFold>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embedded_text: Option<EmbeddedText>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate_limit_headers: Option<RateLimitHeaders>,
 }
 
 /// The `connectors-catalog-operations/1` file a definition lowers to.
@@ -2654,6 +2734,7 @@ struct Carried {
     download: Option<Download>,
     envelope: Option<Envelope>,
     rate_limit_reasons: Vec<String>,
+    rate_limit_headers: Option<RateLimitHeaders>,
     refusal_texts: Vec<TextRefusal>,
     custody: Option<Custody>,
 }
@@ -2673,7 +2754,8 @@ fn carried(definition: &ProviderDefinition, operation: &Operation) -> Carried {
     let writes = effect == Effect::Write;
     let answers_json = effect == Effect::Read
         && matches!(response, None | Some(ResponseKind::Json))
-        && download.is_none();
+        && download.is_none()
+        && operation.embedded_text.is_none();
     Carried {
         required: list(&operation.required, &defaults.required),
         withhold: list(&operation.withhold, &defaults.withhold),
@@ -2687,6 +2769,10 @@ fn carried(definition: &ProviderDefinition, operation: &Operation) -> Carried {
             .clone()
             .or_else(|| answers_json.then(|| defaults.envelope.clone()).flatten()),
         rate_limit_reasons: list(&operation.rate_limit_reasons, &defaults.rate_limit_reasons),
+        rate_limit_headers: operation
+            .rate_limit_headers
+            .clone()
+            .or_else(|| defaults.rate_limit_headers.clone()),
         refusal_texts: operation
             .refusal_texts
             .clone()
@@ -2940,6 +3026,35 @@ pub fn select(
                 "operation `{key}` declares {member}; only a write declares a body"
             )));
         }
+        // The engine fixes query values only on a read, and reads an embedded
+        // text only from a read answering JSON that reads its answer no other way.
+        if effect != Effect::Read
+            && let Some(member) = [
+                ("query_fixed", operation.query_fixed.is_some()),
+                ("query_folds", operation.query_folds.is_some()),
+            ]
+            .iter()
+            .find_map(|(member, declared)| declared.then_some(member))
+        {
+            return Err(Refusal::Malformed(format!(
+                "operation `{key}` declares {member}; only a read fixes query values"
+            )));
+        }
+        if operation.embedded_text.is_some()
+            && let Some(member) = [
+                ("a write", effect != Effect::Read),
+                ("response", carried.response.is_some()),
+                ("envelope", carried.envelope.is_some()),
+                ("binary", carried.binary.is_some()),
+                ("download", carried.download.is_some()),
+            ]
+            .iter()
+            .find_map(|(member, declared)| declared.then_some(member))
+        {
+            return Err(Refusal::Malformed(format!(
+                "operation `{key}` declares embedded_text beside {member}; only a read answering JSON that it reads no other way carries one"
+            )));
+        }
         let guard = operation
             .guard
             .as_ref()
@@ -2977,6 +3092,20 @@ pub fn select(
             conflict_status: operation.conflict_status,
             guard,
             custody: carried.custody,
+            query_fixed: operation
+                .query_fixed
+                .iter()
+                .flatten()
+                .map(|(name, value)| (name.clone(), value.clone()))
+                .collect(),
+            query_folds: operation
+                .query_folds
+                .iter()
+                .flatten()
+                .map(|(name, fold)| (name.clone(), fold.clone()))
+                .collect(),
+            embedded_text: operation.embedded_text.clone(),
+            rate_limit_headers: carried.rate_limit_headers,
         });
     }
     check_references(definition, inventory)?;

@@ -548,7 +548,15 @@ fn resolved(call: &Invocation<'_>) -> Result<Paths, HandlerReply> {
     .map_err(|_| configuration_refusal(Refusal::Rule(Rule::ConfigPathUnresolved)))
 }
 
+/// `definitions install` (story:definitions-install): the configuration was
+/// read by the preflight; the release is fetched, verified and recorded in the
+/// lock beside it and the cache under the state directory.
+mod definitions_install;
+
 fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
+    if call.callable == "definitions-install" {
+        return definitions_install::execute(call);
+    }
     if call.callable == "connectors-list" {
         return list::execute(call);
     }
