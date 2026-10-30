@@ -28,6 +28,8 @@ cursor loop. The local MCP server takes the same shaping and walk arguments.
   It reaches callers in the operation's input schema as `x-connectors-walk`, so `invoke --describe`
   shows it. Declared for Zendesk (ticket comments, ticket audits, the incremental exports), Gmail,
   Google Calendar, Google Drive, Confluence, Jira `issues.search`, HubSpot `objects.list` and Slack.
+  The configuration revision of these providers' instances changes, because their selection files
+  change; their bundles do not.
 - `invoke --walk --out <file|-> [--max-pages n]` follows a declared walk (story:invoke-walks-declared-pages).
   Each page is one admitted read. Records are written as NDJSON to a new owner-only file, or to
   stdout with `--out -`, and a summary (`pages`, `records`, `complete`, `end`, `stopped`, `resume`)
