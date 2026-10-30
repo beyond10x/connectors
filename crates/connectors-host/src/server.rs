@@ -234,30 +234,42 @@ pub fn router_with_admission(
 /// service principal, or the refusal the route answers before any anchor and
 /// any adapter call.
 async fn admitted(service: &Service, headers: &HeaderMap) -> Result<String> {
-    // Refusal: no bearer at all, before any credential read or review.
-    let presented = headers
-        .get("authorization")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-        .ok_or_else(|| Error::new(ErrorCode::Unauthorized, "service authentication required"))?;
-    match &service.admission {
-        Admission::StaticBearer(credential) => {
-            let expected = credential.resolve().await?;
-            // Refusal: any bearer other than the configured bytes.
-            if !bool::from(expected.0.as_slice().ct_eq(presented.as_bytes())) {
-                return Err(Error::new(
-                    ErrorCode::Unauthorized,
-                    "service authentication failed",
-                ));
+    service.admission.admit(headers).await
+}
+
+impl Admission {
+    /// Admits the caller of one request by its `Authorization: Bearer`, under
+    /// this host's profile, and returns the admitted service principal. Routes
+    /// a composition adds ([`serve_with_routes`]) answer this refusal before
+    /// they read the body.
+    pub async fn admit(&self, headers: &HeaderMap) -> Result<String> {
+        // Refusal: no bearer at all, before any credential read or review.
+        let presented = headers
+            .get("authorization")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .ok_or_else(|| {
+                Error::new(ErrorCode::Unauthorized, "service authentication required")
+            })?;
+        match self {
+            Admission::StaticBearer(credential) => {
+                let expected = credential.resolve().await?;
+                // Refusal: any bearer other than the configured bytes.
+                if !bool::from(expected.0.as_slice().ct_eq(presented.as_bytes())) {
+                    return Err(Error::new(
+                        ErrorCode::Unauthorized,
+                        "service authentication failed",
+                    ));
+                }
+                Ok(crate::local::service::STATIC_BEARER_PRINCIPAL.to_owned())
             }
-            Ok(crate::local::service::STATIC_BEARER_PRINCIPAL.to_owned())
-        }
-        Admission::ServiceAccountToken(account) => {
-            // Refusal: every answer but the exact positive review
-            // (`unauthorized`); every failed review, and a request that finds
-            // all CONCURRENT_REVIEWS slots taken, with no review (`unavailable`).
-            account.admit(presented).await?;
-            Ok(account.principal().to_owned())
+            Admission::ServiceAccountToken(account) => {
+                // Refusal: every answer but the exact positive review
+                // (`unauthorized`); every failed review, and a request that finds
+                // all CONCURRENT_REVIEWS slots taken, with no review (`unavailable`).
+                account.admit(presented).await?;
+                Ok(account.principal().to_owned())
+            }
         }
     }
 }
@@ -397,6 +409,17 @@ fn legacy(mut error: Error) -> Error {
 /// Serves a v2 ([`ServiceConfig`], always `static-bearer`) or v3
 /// ([`ServiceConfigV3`]) service configuration.
 pub async fn serve(config: impl Into<ServiceConfigV3>, adapter: Arc<dyn Adapter>) -> Result<()> {
+    serve_with_routes(config, adapter, |_| Router::new()).await
+}
+
+/// [`serve`], with the routes `routes` builds from the host's admission
+/// merged beside the host's own. The added routes carry their own body
+/// limits and must call [`Admission::admit`] before anything else.
+pub async fn serve_with_routes(
+    config: impl Into<ServiceConfigV3>,
+    adapter: Arc<dyn Adapter>,
+    routes: impl FnOnce(Admission) -> Router,
+) -> Result<()> {
     let config = config.into();
     let admission = config.admission()?;
     match &admission {
@@ -423,43 +446,47 @@ pub async fn serve(config: impl Into<ServiceConfigV3>, adapter: Arc<dyn Adapter>
         .await
         .map_err(|_| Error::invalid("service listener cannot be bound"))?;
     tracing::info!(instance=%config.instance, listen=%listener.local_addr().map_err(|_|Error::internal())?, admission=?config.admission, "adapter service listening");
-    axum::serve(listener, router_with_admission(adapter, admission, state))
-        .with_graceful_shutdown(async {
-            // Windows has no SIGTERM: Ctrl+C or Ctrl+Break, and closing or
-            // shutting down the console, end the service.
-            #[cfg(windows)]
-            {
-                use tokio::signal::windows;
-                match (
-                    windows::ctrl_break(),
-                    windows::ctrl_close(),
-                    windows::ctrl_shutdown(),
-                ) {
-                    (Ok(mut brk), Ok(mut close), Ok(mut shutdown)) => {
-                        tokio::select! {
-                            _=tokio::signal::ctrl_c()=>{},
-                            _=brk.recv()=>{},
-                            _=close.recv()=>{},
-                            _=shutdown.recv()=>{},
-                        }
-                    }
-                    _ => {
-                        let _ = tokio::signal::ctrl_c().await;
+    let added = routes(admission.clone());
+    axum::serve(
+        listener,
+        router_with_admission(adapter, admission, state).merge(added),
+    )
+    .with_graceful_shutdown(async {
+        // Windows has no SIGTERM: Ctrl+C or Ctrl+Break, and closing or
+        // shutting down the console, end the service.
+        #[cfg(windows)]
+        {
+            use tokio::signal::windows;
+            match (
+                windows::ctrl_break(),
+                windows::ctrl_close(),
+                windows::ctrl_shutdown(),
+            ) {
+                (Ok(mut brk), Ok(mut close), Ok(mut shutdown)) => {
+                    tokio::select! {
+                        _=tokio::signal::ctrl_c()=>{},
+                        _=brk.recv()=>{},
+                        _=close.recv()=>{},
+                        _=shutdown.recv()=>{},
                     }
                 }
-            }
-            #[cfg(unix)]
-            match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
-                Ok(mut terminate) => {
-                    tokio::select! { _=tokio::signal::ctrl_c()=>{}, _=terminate.recv()=>{} }
-                }
-                Err(_) => {
+                _ => {
                     let _ = tokio::signal::ctrl_c().await;
                 }
             }
-        })
-        .await
-        .map_err(|_| Error::internal())
+        }
+        #[cfg(unix)]
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut terminate) => {
+                tokio::select! { _=tokio::signal::ctrl_c()=>{}, _=terminate.recv()=>{} }
+            }
+            Err(_) => {
+                let _ = tokio::signal::ctrl_c().await;
+            }
+        }
+    })
+    .await
+    .map_err(|_| Error::internal())
 }
 
 #[cfg(test)]

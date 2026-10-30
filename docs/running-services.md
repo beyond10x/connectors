@@ -136,13 +136,74 @@ and invoking one answers `not_found` before anything is recorded or sent. Start 
   mounts it);
 - an instance with alternative bindings.
 
+### Git relay
+
+A catalog instance can also relay git smart-HTTP, so that a caller with no forge credential
+clones, fetches and pushes through it with a stock `git` client. The instance adds the token of
+its own profile to each request it sends to the forge; the caller never sees it. The relay is on
+when the configuration has a fourth member, `git`:
+
+```json
+"git": {
+  "upstream": "https://github.com",
+  "repositories": ["example-org/service"],
+  "ref_prefixes": ["agent/"],
+  "push_limit_bytes": 104857600,
+  "commit_identity": {"name": "Example Automation", "email": "automation@example.com"},
+  "pre_push_check": {"command": ["/usr/local/bin/secret-scan", "--policy", "/etc/scan/policy"], "timeout_seconds": 300},
+  "work_directory": "/var/lib/connectors/git"
+}
+```
+
+- `upstream` is the forge's git base over `https`. A repository is
+  `<upstream>/<owner>/<repo>.git`. `ca_file`, when set, is the only root of its TLS.
+- `repositories` lists the relayed repositories as `<owner>/<repo>`. Any other repository is
+  `404`, and nothing is sent to the forge.
+- `ref_prefixes` lists the branch prefixes a push may update: `agent/` admits
+  `refs/heads/agent/<name>`.
+- `push_limit_bytes` is the largest push the relay reads, 100 MiB by default and at most 1 GiB.
+- `commit_identity`, optional: the author and the committer every new commit must carry.
+- `pre_push_check`, optional: a command every push must pass, with its timeout (300 s by default).
+- `work_directory` is a private directory the instance owns. It holds one mirror per repository and
+  one quarantine repository per push, which is removed when the push is answered.
+
+The caller reaches `<host>/git/<owner>/<repo>.git` and is admitted under the host's admission
+profile, as for the operations: `Authorization: Bearer` carries its service account token or the
+static bearer (with a stock `git`, `-c http.extraHeader="Authorization: Bearer <token>"`). A
+refused caller gets `401` or `503`, before any forge request. The forge receives the instance's
+token in HTTP basic authentication (`x-access-token:<token>`): the stored token of a `token`
+profile without a prefix, or the installation token of a `github_app` profile. Start refuses any
+other profile, and refuses when `git` is not on `PATH`.
+
+Clone and fetch (upload-pack) and both advertisements are relayed as they are. A push
+(receive-pack) is read whole, up to `push_limit_bytes`; a larger one is `413`. The relay then
+checks, in this order, and answers a refusal for every command of the push, which `git` shows as
+`! [remote rejected]`:
+
+1. The ref policy: every command updates a branch under a prefix. A delete, a tag, any other ref,
+   a shallow push and a signed push are refused. Nothing is sent to the forge.
+2. Quarantine: the relay fetches the repository into its mirror, indexes the pack into a new
+   repository whose objects borrow the mirror's, and requires every new object to be present.
+3. `commit_identity`: every new commit's author and committer.
+4. `pre_push_check`: the command runs in the quarantine repository, with the pushed refs applied,
+   `GIT_DIR` set and `CONNECTORS_GIT_REPOSITORY` naming `<owner>/<repo>`. Its standard input has
+   one `<old> <new> <ref>` line per command. Its environment holds no credential. Any exit status
+   but 0 refuses the push; the reason the caller sees does not include the command's output, which
+   is logged.
+
+Only then is the original request sent to the forge's receive-pack, once. The old object id of
+each command is the forge's own compare-and-swap. The forge's report goes back to the caller
+unchanged, and each command is logged as `applied`, `refused` or `unknown`. When the forge's answer
+is lost, the outcome is `unknown`: the caller is told so, and the push is not sent again. A fetch
+shows whether it was applied. At most 4 pushes are worked on at once; another one is `503`.
+
 ## Supported surfaces
 
 | Service | Operations | External binding |
 |---|---|---|
 | Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover`, optionally `helm_releases.history`/`.status`/`.values`/`.manifest` | Kubernetes API; namespace/kind restrictions; bearer token and CA; Helm release reads need their own `helm_release_reads` selection |
 | SQL | `schema.list`, `query.read`, `database.list`, `table.list`, `table.describe`, `index.list` | PostgreSQL or MySQL; explicit role or user and database; read-only transactions or sessions and deadlines |
-| Catalog | The instance's reads | The provider's HTTPS API; one profile; credential document from a mounted file |
+| Catalog | The instance's reads; optionally the git relay | The provider's HTTPS API; one profile; credential document from a mounted file; the forge's git smart-HTTP |
 
 SQL uses the `postgresql-native-text` profile: column names and native type names
 accompany rows of strings or JSON null. Exact numeric, array, timestamp, and JSON

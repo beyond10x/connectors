@@ -2229,6 +2229,27 @@ impl Local {
     pub fn description(&self) -> &Bootstrap {
         &self.bootstrap
     }
+    /// Whether [`Self::upstream_token`] serves this profile: a `token`
+    /// profile without a prefix, or a `github_app` profile.
+    pub fn has_upstream_token(&self) -> bool {
+        match self.auth.scheme {
+            Scheme::Token => self.auth.prefix.is_none(),
+            Scheme::GitHubApp => true,
+            _ => false,
+        }
+    }
+    /// The bare token the git relay sends to the forge for this profile's
+    /// document (`served::git`): the stored token of a `token` profile, or
+    /// the installation token a `github_app` entry is exchanged for, from the
+    /// same in-memory cache the operations use. Any other profile is
+    /// `unsupported`.
+    pub async fn upstream_token(&self, document: Secret) -> Result<Secret> {
+        if !self.has_upstream_token() {
+            return Err(Failure::Unsupported);
+        }
+        let (token, _) = self.credential(document).await?;
+        Ok(token)
+    }
     /// The API port carrying `credential` as this profile's header.
     fn with(&self, credential: Secret) -> ScopedHttp {
         self.http.with_credential(Arc::new(Fixed(credential)))
