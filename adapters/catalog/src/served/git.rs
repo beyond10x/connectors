@@ -43,14 +43,18 @@ use connectors_core::{Error, ErrorCode, Result};
 use connectors_host::server::Admission;
 use serde::Deserialize;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     io::Read as _,
     path::{Path as FsPath, PathBuf},
     process::Stdio,
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tokio::{io::AsyncWriteExt as _, process::Command, sync::Semaphore};
+use tokio::{
+    io::{AsyncReadExt as _, AsyncWriteExt as _},
+    process::Command,
+    sync::Semaphore,
+};
 use zeroize::Zeroizing;
 
 /// The default and the largest bound of a buffered push.
@@ -156,7 +160,7 @@ pub struct Relay {
     git: PathBuf,
     path: std::ffi::OsString,
     token: Arc<Upstream>,
-    pushes: Semaphore,
+    pushes: Arc<Semaphore>,
     /// One lock per repository: its mirror is fetched and read by one push
     /// at a time.
     mirrors: Mutex<BTreeMap<String, Arc<tokio::sync::Mutex<()>>>>,
@@ -283,7 +287,10 @@ impl Relay {
         if !config.work_directory.is_absolute() {
             return Err(invalid("work_directory is an absolute path"));
         }
-        for directory in ["mirrors", "quarantine"] {
+        private_directory(&config.work_directory)?;
+        // `ca-path` stays empty: with `ca_file` set, it replaces any CA
+        // directory git's TLS library would otherwise trust as well.
+        for directory in ["mirrors", "quarantine", "ca-path"] {
             private_directory(&config.work_directory.join(directory))?;
         }
         let _ = rustls::crypto::ring::default_provider().install_default();
@@ -316,7 +323,7 @@ impl Relay {
             git,
             path,
             token,
-            pushes: Semaphore::new(CONCURRENT_PUSHES),
+            pushes: Arc::new(Semaphore::new(CONCURRENT_PUSHES)),
             mirrors: Mutex::default(),
         })
     }
@@ -369,6 +376,19 @@ fn private_directory(path: &FsPath) -> Result<()> {
         .map_err(|_| invalid("work_directory cannot be prepared"))?;
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))
         .map_err(|_| invalid("work_directory cannot be prepared"))
+}
+
+/// A process group, killed whole when dropped.
+struct ProcessGroup(i32);
+
+impl Drop for ProcessGroup {
+    fn drop(&mut self) {
+        // SAFETY: kill(2) takes plain integers and touches no memory; the
+        // negative id names the group the check was started in.
+        unsafe {
+            libc::kill(-self.0, libc::SIGKILL);
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -610,7 +630,7 @@ async fn receive_pack(
         );
     }
     let relay = &routes.relay;
-    let Ok(_slot) = relay.pushes.try_acquire() else {
+    let Ok(slot) = relay.pushes.clone().try_acquire_owned() else {
         return text(
             StatusCode::SERVICE_UNAVAILABLE,
             "the relay is busy; push again",
@@ -646,7 +666,15 @@ async fn receive_pack(
             );
         }
     };
-    relay.push(&principal, &repository, request).await
+    // The push runs to its end in its own task: a caller that hangs up
+    // cannot cancel it between the forge applying it and the outcome log.
+    let relay = routes.relay.clone();
+    tokio::spawn(async move {
+        let _slot = slot;
+        relay.push(&principal, &repository, request).await
+    })
+    .await
+    .unwrap_or_else(|_| text(StatusCode::INTERNAL_SERVER_ERROR, "internal error"))
 }
 
 /// The gzip body inflated, or `None` when it is invalid or larger than `bound`.
@@ -676,6 +704,8 @@ struct PushRequest {
     updates: Vec<Update>,
     capabilities: Vec<String>,
     pack: usize,
+    /// The push carries push options, which the relay does not forward.
+    options: bool,
 }
 
 impl PushRequest {
@@ -768,12 +798,13 @@ fn parse(bytes: &[u8]) -> std::result::Result<PushRequest, &'static str> {
         updates,
         capabilities,
         pack: at,
+        options: false,
     };
     if request.has("push-options") && !request.updates.is_empty() {
         loop {
             match packet(bytes, &mut at).ok_or("the push options are not pkt-lines")? {
                 Packet::Flush => break,
-                Packet::Data(_) => {}
+                Packet::Data(_) => request.options = true,
             }
         }
         request.pack = at;
@@ -1051,11 +1082,15 @@ impl Relay {
             ("credential.helper", ""),
             ("protocol.allow", "never"),
             ("protocol.https.allow", "always"),
+            // A redirect would carry the token's header to another host.
+            ("http.followRedirects", "false"),
         ];
-        let ca;
+        let (ca, ca_path);
         if let Some(file) = &self.ca_file {
             ca = file.to_string_lossy().into_owned();
+            ca_path = self.work.join("ca-path").to_string_lossy().into_owned();
             settings.push(("http.sslCAInfo", ca.as_str()));
+            settings.push(("http.sslCAPath", ca_path.as_str()));
         }
         fetch.env("GIT_CONFIG_COUNT", settings.len().to_string());
         for (index, (key, value)) in settings.iter().enumerate() {
@@ -1118,21 +1153,71 @@ impl Relay {
         }
         let mut index = self.git_command(quarantine);
         index.args(["index-pack", "--stdin", "--fix-thin", "--strict"]);
-        self.run(index, Some(pack)).await.ok_or(Refused {
+        let indexed = self.run(index, Some(pack)).await.ok_or(Refused {
             reason: "the pack cannot be indexed".into(),
             unpack: "index-pack failed",
         })?;
         // Every object the new tips reach is now present.
         let mut connected = self.git_command(quarantine);
         connected
-            .args(["rev-list", "--objects", "--quiet"])
+            .args(["rev-list", "--objects"])
             .args(request.updates.iter().map(|u| u.new.as_str()))
             .args(["--not", "--all"]);
-        self.run(connected, None).await.ok_or(Refused {
+        let reached = self.run(connected, None).await.ok_or(Refused {
             reason: "the push is missing objects".into(),
             unpack: "missing objects",
         })?;
+        // The forge stores the whole pack, so the checks below must see every
+        // object in it: each is reached from a pushed tip, or the mirror
+        // already holds it (as the bases --fix-thin appends do).
+        let reached: BTreeSet<&[u8]> = reached
+            .split(|b| *b == b'\n')
+            .filter_map(|line| line.split(|b| *b == b' ').next())
+            .filter(|id| !id.is_empty())
+            .collect();
+        let packed = self.packed(quarantine, &indexed).await.ok_or_else(failed)?;
+        let others: Vec<u8> = packed
+            .iter()
+            .filter(|id| !reached.contains(id.as_bytes()))
+            .flat_map(|id| [id.as_bytes(), b"\n"].concat())
+            .collect();
+        if !others.is_empty() {
+            let mut present = self.git_command(mirror);
+            present.args(["cat-file", "--batch-check=%(objectname)"]);
+            let answer = self.run(present, Some(&others)).await.ok_or_else(failed)?;
+            if answer
+                .split(|b| *b == b'\n')
+                .any(|line| line.ends_with(b" missing"))
+            {
+                return Err(Refused {
+                    reason: "the pack carries objects no pushed branch reaches".into(),
+                    unpack: "unreachable objects",
+                });
+            }
+        }
         Ok(directory)
+    }
+
+    /// The ids of the objects in the pack `index-pack` just wrote, read from
+    /// its index; `indexed` is what `index-pack --stdin` printed.
+    async fn packed(&self, quarantine: &FsPath, indexed: &[u8]) -> Option<Vec<String>> {
+        let printed = std::str::from_utf8(indexed).ok()?.trim_end();
+        let (_, hash) = printed.split_once('\t')?;
+        if !object_id(hash) {
+            return None;
+        }
+        let index = std::fs::read(quarantine.join(format!("objects/pack/pack-{hash}.idx"))).ok()?;
+        let mut show = self.git_command(quarantine);
+        show.arg("show-index");
+        let listed = self.run(show, Some(&index)).await?;
+        std::str::from_utf8(&listed)
+            .ok()?
+            .lines()
+            .map(|line| {
+                let id = line.split(' ').nth(1)?;
+                object_id(id).then(|| id.to_owned())
+            })
+            .collect()
     }
 
     /// Every new commit's author and committer are the configured identity.
@@ -1143,27 +1228,40 @@ impl Relay {
         identity: &CommitIdentity,
     ) -> std::result::Result<(), Refused> {
         let mut log = self.git_command(quarantine);
-        log.args(["log", "--format=%H%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1e"])
+        // NUL separates the fields and ends each record: a commit object's
+        // header cannot carry NUL, while other control bytes are accepted
+        // there and are refused below.
+        log.args(["log", "-z", "--format=%H%x00%an%x00%ae%x00%cn%x00%ce"])
             .args(request.updates.iter().map(|u| u.new.as_str()))
             .args(["--not", "--all"]);
-        let listed = self
-            .run(log, None)
-            .await
-            .ok_or_else(|| Refused::new("the relay cannot read the new commits"))?;
-        let listed = String::from_utf8_lossy(&listed);
-        for record in listed.split('\x1e') {
-            let record = record.trim_start_matches('\n');
-            if record.is_empty() {
-                continue;
-            }
-            let fields: Vec<&str> = record.split('\x1f').collect();
-            let [commit, author, author_email, committer, committer_email] = fields[..] else {
-                return Err(Refused::new("the relay cannot read the new commits"));
+        let unreadable = || Refused::new("the relay cannot read the new commits");
+        let listed = self.run(log, None).await.ok_or_else(unreadable)?;
+        let listed = std::str::from_utf8(&listed)
+            .map_err(|_| Refused::new("a new commit's author or committer is not UTF-8"))?;
+        let listed = listed.strip_suffix('\0').unwrap_or(listed);
+        let fields: Vec<&str> = if listed.is_empty() {
+            Vec::new()
+        } else {
+            listed.split('\0').collect()
+        };
+        if !fields.len().is_multiple_of(5) {
+            return Err(unreadable());
+        }
+        for record in fields.chunks(5) {
+            let [commit, author, author_email, committer, committer_email] = record else {
+                return Err(unreadable());
             };
-            if author != identity.name
-                || author_email != identity.email
-                || committer != identity.name
-                || committer_email != identity.email
+            let commit = commit.trim_start_matches('\n');
+            if !object_id(commit) || record[1..].iter().any(|f| f.chars().any(char::is_control)) {
+                return Err(Refused::new(format!(
+                    "commit {} is not authored and committed by the configured identity",
+                    if object_id(commit) { commit } else { "?" }
+                )));
+            }
+            if *author != identity.name
+                || *author_email != identity.email
+                || *committer != identity.name
+                || *committer_email != identity.email
             {
                 return Err(Refused::new(format!(
                     "commit {commit} is not authored and committed by the configured identity"
@@ -1220,29 +1318,50 @@ impl Relay {
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
+            // Its own process group, killed whole once the check is over, so
+            // nothing it started outlives the push.
+            .process_group(0)
             .kill_on_drop(true);
         let mut child = command.spawn().map_err(|_| failed())?;
+        let group = child.id().map(|id| ProcessGroup(id as i32));
         let input = command_lines(&request.updates);
         let stdin = child.stdin.take();
+        let stderr = child.stderr.take();
         let feed = async {
             if let Some(mut stdin) = stdin {
                 let _ = stdin.write_all(&input).await;
             }
         };
+        // Drained to the end, the first CHECK_LOG_LIMIT bytes kept.
+        let collect = tokio::spawn(async move {
+            let mut kept = Vec::new();
+            if let Some(mut stderr) = stderr {
+                let mut buffer = [0u8; 8192];
+                while let Ok(read @ 1..) = stderr.read(&mut buffer).await {
+                    let room = CHECK_LOG_LIMIT.saturating_sub(kept.len());
+                    kept.extend_from_slice(&buffer[..read.min(room)]);
+                }
+            }
+            kept
+        });
         let deadline = Duration::from_secs(check.timeout_seconds);
-        let Ok((_, output)) = tokio::time::timeout(deadline, async {
-            tokio::join!(feed, child.wait_with_output())
-        })
-        .await
-        else {
+        let finished =
+            tokio::time::timeout(deadline, async { tokio::join!(feed, child.wait()).1 }).await;
+        drop(group);
+        let Ok(status) = finished else {
             return Err(Refused::new("the pre-push check did not finish in time"));
         };
-        let output = output.map_err(|_| failed())?;
-        if !output.status.success() {
+        let status = status.map_err(|_| failed())?;
+        if !status.success() {
+            let stderr = tokio::time::timeout(Duration::from_secs(1), collect)
+                .await
+                .ok()
+                .and_then(|joined| joined.ok())
+                .unwrap_or_default();
             tracing::info!(
                 repository = %repository.path(),
-                status = ?output.status.code(),
-                stderr = %String::from_utf8_lossy(&output.stderr[..output.stderr.len().min(CHECK_LOG_LIMIT)]),
+                status = ?status.code(),
+                stderr = %String::from_utf8_lossy(&stderr),
                 "git push refused by the pre-push check"
             );
             return Err(Refused::new("the pre-push check refused the push"));
@@ -1286,6 +1405,9 @@ impl Relay {
         request: &PushRequest,
         body: &[u8],
     ) -> std::result::Result<(), Refused> {
+        if request.options {
+            return Err(Refused::new("push options are not relayed"));
+        }
         self.ref_policy(&request.updates)?;
         let lock = {
             let mut mirrors = self
@@ -1480,6 +1602,7 @@ mod tests {
         bytes.extend_from_slice(b"0000PACK");
         let parsed = parse(&bytes).unwrap();
         assert_eq!(&bytes[parsed.pack..], b"PACK");
+        assert!(parsed.options);
     }
 
     #[test]
