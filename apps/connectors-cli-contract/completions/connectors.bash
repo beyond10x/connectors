@@ -3248,7 +3248,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__invoke)
-            opts="-h --connection --schema --revision --input-json --input-file --input-stdin --approval-file --idempotency-key --definition --definitions-root --credential-file --describe --config --state-dir --output --help"
+            opts="-h --connection --schema --revision --input-json --input-file --input-stdin --approval-file --idempotency-key --definition --definitions-root --credential-file --describe --fields --each --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -3295,6 +3295,14 @@ _connectors() {
                     return 0
                     ;;
                 --describe)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --fields)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --each)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

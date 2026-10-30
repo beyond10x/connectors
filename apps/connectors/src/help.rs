@@ -42,7 +42,7 @@ pub const ADAPTER_HELP: &str =
 
 /// The help of the `invoke` arguments (story:connectors-do-short-invocation;
 /// `contracts/cli/v1alpha1/semantics.md` §3, "Invoking an operation").
-pub const INVOKE_HELP: [(&str, &str); 14] = [
+pub const INVOKE_HELP: [(&str, &str); 16] = [
     (
         "field:target",
         "The connector, and after one `/` its instance; the instance may be left out when the connector has only one; with --definition the target may be left out, the file naming the connector",
@@ -86,6 +86,14 @@ pub const INVOKE_HELP: [(&str, &str); 14] = [
     (
         "field:credential_file",
         "With --definition: the OAuth client file to connect with when the instance has no connection",
+    ),
+    (
+        "field:fields",
+        "Print only these members of the provider result: comma-separated paths such as `ticket.id`, `events[].field_name`, `alias:path` or the pointer `/page[after]`; unmatched paths are listed in `missing`",
+    ),
+    (
+        "field:each",
+        "Print one JSON line per element of the array at this path, each shaped by --fields, then the envelope; refused on a write",
     ),
 ];
 

@@ -644,3 +644,7 @@ commands:
         source: {kind: option, long: credential-file}
       - field: describe
         source: {kind: option, long: describe}
+      - field: fields
+        source: {kind: option, long: fields}
+      - field: each
+        source: {kind: option, long: each}
