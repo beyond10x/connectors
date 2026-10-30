@@ -83,10 +83,12 @@ Send the answer's `after_cursor` as `cursor` until `end_of_stream` is `true`.
 
 A ticket's history is `ticket.audits`: each audit's author, time, `via` channel and source, and its
 events, field changes with their previous value included. Send `meta.after_cursor` as
-`page[after]`, and stop on a page whose `meta.has_more` is `false`, that has no
-`meta.after_cursor`, or that has no audits. Zendesk's API document says `has_more` is included
-when the input sets `include_boundary_indicators`, so setting it is recommended. `ticket.comments`
-walks and ends the same way:
+`page[after]`. When a page carries `meta.has_more`, it decides: `false` ends the walk, `true`
+continues even past an empty page and is an error without `meta.after_cursor`. Without
+`meta.has_more`, stop on a page with no `meta.after_cursor` or no audits. A cursor seen before is
+an error. Zendesk's API document says `has_more` is included when the input sets
+`include_boundary_indicators`, so setting it is recommended. `ticket.comments` walks and ends the
+same way:
 
 ```sh
 connectors invoke zendesk/support ticket.audits \
