@@ -3,7 +3,9 @@
   "provider": "hubspot",
   "operations": [
     {"id": "objects.list", "operation_id": "get-/crm/objects/2026-09/{objectType}_/crm/objects/2026-03/{objectType}", "effect": "read",
-     "description": "List one object type's records (contacts, companies, deals, tickets or any other type the account has), one page per call; the walk sends paging.next.after as after and ends on a page without paging.next"},
+     "description": "List one object type's records (contacts, companies, deals, tickets or any other type the account has), one page per call; the walk sends paging.next.after as after and ends on a page without paging.next",
+     "walk": {"parameter": "after", "next": "/paging/next/after", "records": "/results",
+              "ends": [{"name": "no_next_page", "absent": "/paging/next"}]}},
     {"id": "object.get", "operation_id": "get-/crm/objects/2026-09/{objectType}/{objectId}_/crm/objects/2026-03/{objectType}/{objectId}", "effect": "read",
      "description": "Read one record by objectType and objectId; properties and associations are comma-separated lists"}
   ]

@@ -14,6 +14,7 @@
 pub mod chatgpt;
 mod closed;
 pub mod feed;
+pub mod walk;
 
 use connectors_catalog::{
     bundle::Bundle,
@@ -738,6 +739,15 @@ pub struct Selection {
         deserialize_with = "present_rate_limit_headers"
     )]
     pub rate_limit_headers: Option<RateLimitHeaders>,
+    /// How a read's pages are walked and when the walk ends ([`walk::Walk`]),
+    /// carried in the declared input schema under [`walk::KEYWORD`]. Only on a
+    /// read answering JSON. Omitted when absent; an explicit `null` is refused.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_walk"
+    )]
+    pub walk: Option<walk::Walk>,
 }
 
 /// The JSON type of a closed body key (`connectors_catalog.selection.BodyType`),
@@ -948,6 +958,13 @@ where
     RateLimitHeaders::deserialize(deserializer).map(Some)
 }
 
+fn present_walk<'de, D>(deserializer: D) -> std::result::Result<Option<walk::Walk>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    walk::Walk::deserialize(deserializer).map(Some)
+}
+
 fn present_mismatch<'de, D>(deserializer: D) -> std::result::Result<Option<MismatchCode>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -1149,6 +1166,7 @@ impl Engine {
             check_refusal_texts(selection)?;
             check_custody(selection)?;
             check_conflict_status(selection)?;
+            check_walk(selection)?;
             if let Some(download) = &selection.download {
                 check_download(selection, download)?;
                 downloads.push(Downloaded {
@@ -1357,6 +1375,7 @@ impl Engine {
             operation
                 .parameters
                 .retain(|p| !selection.query_fixed.contains_key(&p.name));
+            check_walk_parameters(selection, &operation)?;
             let template =
                 Template::from_operation(&operation).map_err(|refusal| refuse(refusal.reason()))?;
             if let Some(guard) = &selection.guard {
@@ -1533,6 +1552,16 @@ impl Engine {
                     "selection `{}` declares an envelope on a text read",
                     selection.id
                 )));
+            }
+            if let Some(walk) = &selection.walk {
+                if text {
+                    return Err(refuse(format!(
+                        "selection `{}` declares a walk on a read that does not answer JSON",
+                        selection.id
+                    )));
+                }
+                declaration.input_schema[walk::KEYWORD] =
+                    serde_json::to_value(walk).map_err(|_| Error::internal())?;
             }
             exposed.push(Exposed {
                 selection: selection.clone(),
@@ -3224,6 +3253,54 @@ fn check_fixed_query(
         };
         if let Some(reason) = reason {
             return refused(format!("folds `{name}` {reason}"));
+        }
+    }
+    Ok(())
+}
+
+/// A walk is a read's, of an answer in JSON, and well formed ([`walk::Walk::check`]).
+/// A text read is refused where the read is known to be text, after the
+/// envelope's own refusal of a text read, so that refusal keeps its words.
+fn check_walk(selection: &Selection) -> Result<()> {
+    let Some(walk) = &selection.walk else {
+        return Ok(());
+    };
+    let refused = |reason: String| Err(refuse(format!("selection `{}` {reason}", selection.id)));
+    if selection.effect != Effect::Read {
+        return refused("declares a walk on a write".into());
+    }
+    if selection.download.is_some()
+        || selection.binary.is_some()
+        || selection.embedded_text.is_some()
+        || selection.response == Some(ResponseKind::Binary)
+    {
+        return refused("declares a walk on a read that does not answer JSON".into());
+    }
+    walk.check().or_else(refused)
+}
+
+/// The walk's `parameter`, `query` and `first_only` name query parameters of
+/// the operation as the selection exposes it: neither withheld, fixed nor the
+/// credential.
+fn check_walk_parameters(selection: &Selection, operation: &Operation) -> Result<()> {
+    let Some(walk) = &selection.walk else {
+        return Ok(());
+    };
+    let declared = |name: &str| {
+        operation
+            .parameters
+            .iter()
+            .any(|p| p.name == name && p.location == Location::Query)
+    };
+    let named = std::iter::once(("parameter", &walk.parameter))
+        .chain(walk.query.keys().map(|key| ("query", key)))
+        .chain(walk.first_only.iter().map(|key| ("first_only", key)));
+    for (member, name) in named {
+        if !declared(name) {
+            return Err(refuse(format!(
+                "selection `{}` walk `{member}` `{name}` is not a query parameter of its operation",
+                selection.id
+            )));
         }
     }
     Ok(())
