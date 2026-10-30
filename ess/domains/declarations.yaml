@@ -118,7 +118,8 @@ types:
   # § 2.1, Admission). `static-bearer` compares one configured bearer;
   # `service-account-token` asks the cluster API with a TokenReview whether the
   # presented projected token is authenticated for the configured audience as
-  # the one configured principal.
+  # an admitted service account: the one `principal`, one of the listed
+  # `principals`, or an account matching `service_accounts`.
   - name: connectors.declarations.ServiceAdmissionProfile
     kind: enum
     variants: [static-bearer, service-account-token]
@@ -138,6 +139,25 @@ types:
     invariants:
       - value.count >= 1
       - value.count <= 128
+  # The service accounts of one namespace a `service-account-token` host
+  # admits: `namespace` is a literal DNS label, and `name` a pattern of 1 to
+  # 128 bytes of `a-z`, `0-9`, `-`, `.` and `*`, whose only wildcard `*`
+  # matches any run of characters, none included. A reviewed username is
+  # admitted when it is a ServiceAccountPrincipal of that namespace whose name
+  # the whole pattern matches. Read with each `*` as one letter, `name` is a
+  # DNS-subdomain name and the account it gives with `namespace` fits in 128
+  # bytes, so a pattern no account name can match is refused at start.
+  # ESS-LIMIT: the DNS-label form of `namespace`, the alphabet and shape of
+  # `name` and their joint 128-byte bound are checked when the host builds its
+  # admission at start (`valid_name_pattern`, `pattern_matches_an_account` and
+  # `dns_label` in crates/connectors-host/src/server/token_review.rs, and the
+  # configuration schema but for the joint bound); ESS 0.77 has no pattern
+  # invariant.
+  - name: connectors.declarations.ServiceAccountPattern
+    kind: struct
+    fields:
+      - {name: namespace, type: String}
+      - {name: name, type: String}
   # The TokenReview endpoint of a `service-account-token` host: the cluster
   # API's HTTPS base URL, the CA file that alone roots its TLS, and the file
   # holding the instance's own token, read again at each review.
@@ -151,7 +171,8 @@ types:
   # The HTTP service host's configuration (crates/connectors-host/src/server.rs
   # ServiceConfig), read as `urn:connectors:config:v3:service`. Revision v3 is
   # v2 plus the optional admission members `admission`, `audience`,
-  # `principal` and `token_review`; revision v2 is v1 plus the optional
+  # `principal`, `principals`, `service_accounts` and `token_review`; revision
+  # v2 is v1 plus the optional
   # `state`. `urn:connectors:config:v1:service` and
   # `urn:connectors:config:v2:service` stay readable unchanged and closed
   # (contracts/service/compatibility.md § 2.1, Service configuration).
@@ -165,14 +186,31 @@ types:
   - name: connectors.declarations.ServiceHostConfiguration
     kind: struct
     invariants:
-      # `service-account-token` names its audience, principal and endpoint;
+      # `service-account-token` names its audience, its endpoint and exactly
+      # one of `principal`, `principals` and `service_accounts`;
       # `static-bearer`, explicit or absent, names none of them.
       - any:
           - not: {admission: service-account-token}
-          - all: [defined(audience), defined(principal), defined(token_review)]
+          - all: [defined(audience), defined(token_review)]
+      - any:
+          - not: {admission: service-account-token}
+          - all:
+              - defined(principal)
+              - none: [defined(principals), defined(service_accounts)]
+          - all:
+              - defined(principals)
+              - none: [defined(principal), defined(service_accounts)]
+          - all:
+              - defined(service_accounts)
+              - none: [defined(principal), defined(principals)]
       - any:
           - {admission: service-account-token}
-          - none: [defined(audience), defined(principal), defined(token_review)]
+          - none:
+              - defined(audience)
+              - defined(principal)
+              - defined(principals)
+              - defined(service_accounts)
+              - defined(token_review)
     fields:
       # The service instance id; the ServiceConfiguration the host records at
       # start carries it as `instance_id`. Vocabulary: the instance (design
@@ -191,9 +229,18 @@ types:
       # The one audience a `service-account-token` review asks for, 1-256
       # bytes.
       - {name: audience, type: "Optional<String>"}
-      # The one service account a `service-account-token` host admits; the
-      # anchor's `principal_ref` under that profile.
+      # The one service account a `service-account-token` host admits.
       - {name: principal, type: "Optional<connectors.declarations.ServiceAccountPrincipal>"}
+      # The service accounts a `service-account-token` host admits, each byte
+      # for byte: 1 to 64 entries.
+      # ESS-LIMIT: the entry count is checked when the host builds its
+      # admission at start and in the configuration schema (`maxItems`); a
+      # `.count` invariant on an optional list has no synthesized scenario.
+      - {name: principals, type: "Optional<List<connectors.declarations.ServiceAccountPrincipal>>"}
+      # The namespace and name pattern of the service accounts a
+      # `service-account-token` host admits. Under each of the three forms the
+      # anchor's `principal_ref` is the reviewed username, verbatim.
+      - {name: service_accounts, type: "Optional<connectors.declarations.ServiceAccountPattern>"}
       - {name: token_review, type: "Optional<connectors.declarations.TokenReviewEndpoint>"}
       # A file path: the instance's standing write grants
       # (connectors.standing_approvals.GrantFile), read on every write on
