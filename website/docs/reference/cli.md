@@ -577,6 +577,9 @@ connectors invoke [OPTIONS] [CONNECTOR[/INSTANCE]] <OPERATION>
 | `--describe <field:describe>` | no | none | any | true: print the operation's description, effect, schema and revision, and invoke nothing |
 | `--fields <field:fields>` | no | none | any | Print only these members of the provider result: comma-separated paths such as `ticket.id`, `events[].field_name`, `alias:path` or the pointer `/page[after]`; unmatched paths are listed in `missing` |
 | `--each <field:each>` | no | none | any | Print one JSON line per element of the array at this path, each shaped by --fields, then the envelope; refused on a write |
+| `--walk <field:walk>` | no | none | any | true: read every page of the walk the read declares, one invoke per page, writing each record as one JSON line to --out, then print a summary |
+| `--max-pages <field:max_pages>` | no | none | any | With --walk: the most pages read, 1 to 10000 [default: 20]; a walk stopped there names its next input in `resume` |
+| `--out <field:out>` | no | none | any | With --walk: a new file the records are written to, owner-only, or `-` for standard output |
 
 ## `connectors list`
 
