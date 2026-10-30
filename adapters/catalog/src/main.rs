@@ -1,13 +1,19 @@
-//! One process per provider bundle, reached only through the host's private
-//! protocol. There is no standalone service realization here.
+//! One process per provider bundle, reached through the host's private
+//! protocol, or one catalog instance on the served HTTP host (`--config`,
+//! reads only; see `served`).
 use clap::{ArgGroup, Parser};
 use std::path::PathBuf;
 mod local;
+mod served;
 
 #[derive(Parser)]
 #[command(version)]
-#[command(group(ArgGroup::new("configuration").required(true).args(["local_config", "connector"])))]
+#[command(group(ArgGroup::new("configuration").required(true).args(["config", "local_config", "connector"])))]
 struct Args {
+    /// Serve one catalog instance on the HTTP host: the service, the
+    /// instance and its mounted credential (docs/running-services.md).
+    #[arg(long, conflicts_with_all = ["print_local_bootstrap", "print_profiles", "connectors_private_fd"])]
+    config: Option<PathBuf>,
     /// Owner-only nonsecret configuration for the private host binding.
     #[arg(long)]
     local_config: Option<PathBuf>,
@@ -35,6 +41,15 @@ struct Args {
 }
 fn main() {
     let args = Args::parse();
+    if let Some(path) = &args.config {
+        connectors_host::logging();
+        let runtime = tokio::runtime::Runtime::new().expect("create service runtime");
+        if let Err(error) = runtime.block_on(served::run(path)) {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     let result = (|| -> connectors_host::local::runtime::Result<()> {
         if args.print_profiles {
             let connector = args

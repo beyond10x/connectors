@@ -1,5 +1,148 @@
 # Changelog
 
+## 0.62.0 — 2026-10-30
+
+A served catalog instance takes a GitHub App credential, admits a Kubernetes service account,
+runs writes under a standing grant when asked to, and relays git smart-HTTP, so an agent pod
+clones and pushes with no forge credential of its own. The lowerer reads the four features
+connectors-definitions 0.5.2 publishes.
+
+No breaking changes.
+
+### Added
+
+- A published definition that uses `rate_limit_headers` (on `defaults` or an operation),
+  `query_fixed`, `query_folds` or `embedded_text` now lowers, so `invoke --definition`
+  and `connectors-build definition` accept connectors-definitions 0.5.2's `connectors/github.yaml`
+  (story:definition-lowerer-reads-published-features). Each member reaches the catalog provider's
+  selection as written; `rate_limit_headers` on `defaults` applies to every operation that sets
+  none, and a default `envelope` does not apply to an `embedded_text` read. `query_fixed` or
+  `query_folds` on a write, and `embedded_text` other than on a read answering JSON that sets no
+  `response`, `envelope`, `binary` or `download`, are refused when lowering, as the catalog
+  provider would refuse them. So are the members the catalog provider would refuse at load or
+  never read, each by name: `rate_limit_headers` that are not two distinct header names, or set on
+  a `download`; `query_fixed` or `query_folds` on a `download`; a `query_fixed` value that is
+  empty, on more than eight parameters, or on a parameter that is not a query parameter of the
+  operation or that it bounds, requires, withholds or passes as the credential; a `query_folds`
+  fold not named by an id, named after a parameter, into a value it does not fix or another fold
+  joins, or with an empty prefix or one holding whitespace; and `embedded_text` with a pointer not
+  starting with `/`, a `max_bytes` outside 1 to 2 MiB, or on an operation that answers only text.
+  A default `rate_limit_headers` does not apply to a `download`.
+- Catalog auth scheme `github_app`: an instance authenticates as a GitHub App installation. The
+  stored entry holds the App id, the installation id and the App's RSA private key (PEM, PKCS #1
+  or PKCS #8). The provider signs a nine-minute RS256 JWT, exchanges it at
+  `{api_base}/app/installations/{installation_id}/access_tokens` for an installation token, sends
+  that token as `Authorization: Bearer` and keeps it in memory only, reused until five minutes
+  before its `expires_at`. The token is never returned, logged, stored or written into an error.
+  An answer whose `expires_at` is not in the future, or that is not a JSON object, is `protocol`
+  and its token is never sent. The connection is the installation (`identity.source` `configuration`, subject the installation
+  id). A definition declares it as `scheme: github_app` with a label and no identity block.
+  Nothing in the entry rotates, so `mounted_secret` custody admits the profile. See
+  `docs/local-catalog-provider.md`. Run against a local fixture only, not against GitHub.
+- A served host can admit its caller by a Kubernetes service account token instead of a static
+  bearer. With `admission: service-account-token` in a `urn:connectors:config:v3:service`
+  configuration, the host sends each request's bearer to the configured TokenReview endpoint
+  and admits it only when the review authenticates it for the configured `audience` as the
+  configured `principal` (`system:serviceaccount:<namespace>:<name>`). Any other answer is
+  `unauthorized`; a review that fails, times out or cannot be reached is `unavailable`. In both
+  cases no operation runs. At most 8 reviews run at once; a request that arrives while 8 are
+  under way is `unavailable` at once, with no review sent. Reviews are not cached, and the
+  token is never logged. The audit
+  anchor names the service account. Under this profile `POST /v1/invoke` answers
+  `unsupported`. `static-bearer` stays the default, and v1 and v2 configurations read
+  unchanged.
+- `connectors-catalog-provider --config <file>` serves one catalog instance on the HTTP host:
+  a shipped connector's instance, a local catalog configuration, or a definition file under a
+  definitions checkout. The instance's credential document is a file the platform mounts. The
+  host reads it at every request under the `mounted_secret` checks, so a rotated Secret is used
+  from the next read on. A missing or refused item answers `unavailable` and sends nothing. The
+  served host lists and runs the instance's reads only; a catalog write is not offered. See
+  [Run connector services](docs/running-services.md#catalog-instances).
+- On Unix, a served catalog instance can relay git smart-HTTP
+  (story:git-smart-http-relay-with-quarantine).
+  With a `git` member in its configuration it serves `/git/<owner>/<repo>.git` for clone, fetch
+  and push to the repositories it lists, under the host's admission profile, and sends each
+  request to the forge with its own profile's token (a `token` profile's, or a `github_app`
+  installation token) in HTTP basic authentication; the caller holds no forge credential. A push
+  is read whole up to `push_limit_bytes` and is refused, with nothing sent to the forge's
+  receive-pack, when a command is not a branch under `ref_prefixes` (deletes, tags and push options
+  included),
+  when its pack does not index into a quarantine repository beside the instance's mirror or carries
+  an object no pushed branch reaches and the mirror lacks, when a
+  new commit's author or committer is not `commit_identity`, or when `pre_push_check`, a configured
+  command run in the quarantine with no credential in its environment, exits non-zero (it runs as
+  the instance's user, so it must not run pushed code). A passing push is sent once;
+  each command is logged `applied`, `refused` or `unknown`, and a push whose answer is lost is
+  reported `unknown` and never resent. See
+  [Run connector services](docs/running-services.md#git-relay).
+- Opt-in keyed writes under a standing grant on a served host
+  (story:served-keyed-writes-under-a-standing-approval). A host whose service configuration
+  has no `standing_grants` is unchanged: a write on `POST /v1alpha2/invoke` is dispatched
+  unkeyed and `idempotency_key` is still `unsupported`. Setting `standing_grants` (it requires
+  `state`) names a `connectors.standing-grants/1` file the operator mounts; each grant names the
+  instance, one operation, the input members a write must hold (a JSON pointer and its exact
+  value), an expiry and `max_per_hour`. On such a host every write on `POST /v1alpha2/invoke`
+  needs `idempotency_key` and a covering grant, and `POST /v1/invoke`, which records no attempt,
+  refuses writes as `unsupported`. The host reads the file on every write, so an edit or a
+  revocation applies from the next call on. The file may be a key of a Kubernetes Secret or
+  ConfigMap volume (on Linux its `..data` link is read as the `mounted_secret` custody binding
+  reads an item); the host refuses it as `unavailable` when it is reached through any other
+  symlink or a directory another user can write, is writable by group or others, owned by
+  another user than the host's or root, over 64 KiB or malformed. A write without
+  `idempotency_key` is `invalid_input`, a key used for another request `idempotency_conflict`,
+  a write no grant covers `approval_required`, a grant over its hour `rate_limited` with
+  `retry_after_seconds`; none of them records an attempt or reaches the provider. The same key
+  and input again replays the original outcome with `replayed: true` and never sends again;
+  the host admits requests with one key one at a time, so concurrent requests with one key
+  make one provider request and take one grant use. A replay of a write still running waits
+  up to 25 s without holding an in-flight slot, at most 4 per write; a further one, or one
+  whose write a restart interrupted, answers `outcome_unknown` at once. An applied keyed write
+  keeps its provider result, up to 64 KiB, for the replay; a replay of a larger result answers
+  `capacity`, with the write still reported as applied. Keys and hourly counts survive a
+  restart in `standing-grants.sqlite3` (mode 0600); keys do not expire. Limitation: the
+  `state` directory holds at most 100,000 recorded attempts per instance and the host removes
+  none, so once that many are recorded every further write answers `capacity` (a replay of a
+  recorded key still answers) until the operator moves the host to a fresh `state` directory,
+  which carries no earlier key over. With a grant file,
+  `connectors-catalog-provider --config` lists and runs the instance's writes too; without one
+  it serves reads only, as before. Rust callers send a key with the new
+  `Client::invoke_v1alpha2_keyed`; `Client::invoke_v1alpha2` is unchanged. Contract:
+  `contracts/service/compatibility.md` § 2.1, "Keyed writes under a standing grant"; model:
+  `ess/domains/standing_approvals.yaml`; operator guide:
+  [Standing write grants](docs/running-services.md#standing-write-grants). Scenarios added:
+  `v1alpha2-invoke-keyed-write-under-standing-grant`, `v1alpha2-invoke-keyed-replay`,
+  `v1alpha2-invoke-write-outside-grant-refused`.
+
+### Fixed
+
+- Every provider request now carries `User-Agent: connectors/<version>`, set on the HTTP client;
+  GitHub's REST API refuses a request without one. Neither an instance's credential header nor a
+  fixed header may take that name (`invalid_input` when the instance loads), so no configuration
+  or definition replaces it (`contracts/auth/capability/v1alpha1/http-headers.md`).
+- The catalog provider refuses an OAuth token answer, a `tokeninfo` answer or `id_token` claims
+  that are a JSON array as `protocol` (stored grant claims as an invalid credential). Before, the
+  array was read field by field in order, so its first string could be sent as the access token.
+- A served host whose standard error is a closed pipe, for example after its supervisor exited,
+  now answers requests normally. Before, the first log line it could not write ended the
+  request: a read the provider had answered came back `internal` (HTTP 500) with no final audit
+  observation, and an admission refusal closed the connection with no answer. Every binary that
+  uses the shared log setup now drops a log line it cannot write.
+
+### Limitations
+
+- Keyed writes under a standing grant stay opt-in (D269). A host without `standing_grants`
+  dispatches unkeyed writes as before; the default changes only after the consumers send
+  `Client::invoke_v1alpha2_keyed`, so no consumer breaks.
+- Keyed attempts on the HTTP host never expire, and a keyed write cut off by a restart is not
+  recovered: its replay answers `outcome_unknown`.
+- `connectors-oauth2` and the local host's OAuth handling still read a token answer that is a
+  JSON array field by field; only the catalog provider refuses it.
+- The lowerer and the catalog engine check a definition's members separately; one shared check
+  is still to come.
+- The git relay's `pre_push_check` runs as the instance's user, so it can read what the instance
+  reads; configure a check that inspects the pushed objects and never runs them
+  (story:git-relay-pre-push-check-sandbox).
+
 ## 0.61.0 — 2026-10-30
 
 One command installs a connectors-definitions release, verified file by file, into a read-only

@@ -8,7 +8,7 @@ license.workspace = true
 
 [features]
 default = ["service"]
-service = ["dep:connectors-host", "dep:connectors-oauth2", "dep:clap", "dep:tokio"]
+service = ["dep:connectors-host", "dep:connectors-oauth2", "dep:connectors-custody", "dep:clap", "dep:tokio", "dep:ring", "dep:tempfile", "dep:axum", "dep:reqwest", "dep:rustls", "dep:flate2", "dep:url", "dep:tracing", "dep:libc"]
 
 [[bin]]
 name = "connectors-catalog-provider"
@@ -21,6 +21,8 @@ connectors-sdk.workspace = true
 connectors-catalog = { path = "../../crates/connectors-catalog" }
 connectors-host = { workspace = true, optional = true }
 connectors-oauth2 = { workspace = true, optional = true }
+connectors-custody = { workspace = true, optional = true }
+tempfile = { workspace = true, optional = true }
 async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -30,6 +32,14 @@ clap = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 sha2.workspace = true
 httpdate = "1.0.3"
+ring = { version = "0.17", optional = true }
+axum = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+rustls = { workspace = true, optional = true }
+flate2 = { workspace = true, optional = true }
+url = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }
+libc = { version = "0.2", optional = true }
 
 [dev-dependencies]
 entity-core.workspace = true
@@ -41,9 +51,12 @@ time.workspace = true
 rusqlite = { version = "=0.40.2", features = ["bundled"] }
 libc = "0.2"
 ring = "0.17"
+num-bigint = "0.4"
 tokio.workspace = true
 tempfile.workspace = true
 hex.workspace = true
 connectors-host.workspace = true
+connectors-custody = { workspace = true, features = ["test-support"] }
+reqwest.workspace = true
 rcgen = "0.14"
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }

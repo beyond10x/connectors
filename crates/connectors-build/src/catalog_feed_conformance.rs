@@ -1191,16 +1191,70 @@ fn direct_conversations_are_neither_listed_nor_readable() {
     }
 }
 
+/// The Rust [`no_rust_names_a_declared_provider`] reads: this suite adapter and every `.rs` file
+/// under `adapters/catalog/src`, at any depth, in path order.
+fn name_check_sources() -> Vec<PathBuf> {
+    fn walk(directory: &Path, sources: &mut Vec<PathBuf>) {
+        let mut paths: Vec<PathBuf> = std::fs::read_dir(directory)
+            .unwrap_or_else(|error| panic!("{directory:?}: {error}"))
+            .map(|entry| entry.expect("entry").path())
+            .collect();
+        paths.sort();
+        for path in paths {
+            if path.is_dir() {
+                walk(&path, sources);
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                sources.push(path);
+            }
+        }
+    }
+    let root = feed_conformance::root();
+    let mut sources = vec![root.join("crates/connectors-build/src/catalog_feed_conformance.rs")];
+    walk(&root.join("adapters/catalog/src"), &mut sources);
+    sources
+}
+
+/// The name check reaches a source file in a subdirectory of the catalog engine, and reads only
+/// Rust files.
+#[test]
+fn the_name_check_reads_nested_sources() {
+    let sources = name_check_sources();
+    let nested = feed_conformance::root().join("adapters/catalog/src/served/git.rs");
+    assert!(sources.contains(&nested), "{sources:?}");
+    assert!(
+        sources
+            .iter()
+            .all(|source| source.is_file() && source.extension().is_some_and(|ext| ext == "rs")),
+        "{sources:?}"
+    );
+}
+
+/// Adversary: the story's acceptance says the check "still reads `catalog_feed_conformance.rs`
+/// itself", and nothing asserted it: dropping the suite adapter from the list kept every case
+/// green. Pin it, with the top-level and nested engine files beside it.
+#[test]
+fn adversary_the_name_check_still_reads_the_suite_adapter_and_both_levels() {
+    let root = feed_conformance::root();
+    let sources = name_check_sources();
+    for expected in [
+        "crates/connectors-build/src/catalog_feed_conformance.rs",
+        "adapters/catalog/src/lib.rs",
+        "adapters/catalog/src/served.rs",
+        "adapters/catalog/src/served/git.rs",
+    ] {
+        assert!(
+            sources.contains(&root.join(expected)),
+            "{expected} missing from {sources:?}"
+        );
+    }
+}
+
 /// No Rust in the catalog engine, or in this suite adapter, names a declared provider, a fixture
 /// or a shipped one: not its provider id, its profile or an operation it reads, in any letter
 /// case. What one provider needs is data in its declaration.
 #[test]
 fn no_rust_names_a_declared_provider() {
-    let root = feed_conformance::root();
-    let mut sources = vec![root.join("crates/connectors-build/src/catalog_feed_conformance.rs")];
-    for entry in std::fs::read_dir(root.join("adapters/catalog/src")).unwrap() {
-        sources.push(entry.unwrap().path());
-    }
+    let sources = name_check_sources();
     let fixtures = declared().into_iter().map(|declaration| declaration.raw);
     for raw in fixtures.chain(shipped().into_iter().map(|(_, raw)| raw)) {
         let feed = &raw["feed"];

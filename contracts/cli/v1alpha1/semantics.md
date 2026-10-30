@@ -947,9 +947,8 @@ It checks, in this order, before it writes anything:
    `release_invalid`.
 3. Every name in `features` is a feature this build supports (`embedded_text`,
    `query_fixed`, `query_folds`, `rate_limit_headers`), else `unmet_feature`, with
-   `feature` naming the first unsupported one. The definition lowerer does not read these four
-   members yet, so an installed release is stored and locked, and no instance
-   resolves through it until it does.
+   `feature` naming the first unsupported one. These are exactly the members the
+   definition lowerer reads beyond the base format.
 4. The asset's SHA-256 equals the index's `asset.sha256`, else `digest_mismatch`
    with `file` naming the asset.
 5. The asset is a gzip tar archive whose entries all lie under one top directory.

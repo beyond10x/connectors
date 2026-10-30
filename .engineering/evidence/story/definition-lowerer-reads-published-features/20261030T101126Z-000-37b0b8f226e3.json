@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T10:11:26Z",
+  "actor": "human:timo",
+  "artifact": "story:definition-lowerer-reads-published-features",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "wave D243-C1 gate on 14e6ce0c7 (touched targets in 11 crates, clippy, drift checks, ESS validate, Gates check) and the local 0.62.0 gate on 503d55ea9",
+    "reference": "wave/d243-c1@14e6ce0c7"
+  }
+}

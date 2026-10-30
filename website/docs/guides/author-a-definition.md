@@ -165,6 +165,22 @@ in the change that adds the file. No client id, secret or token is ever in the f
 `oauth2_refresh` profile, connecting reads the OAuth client from the file `--credential-file`
 names.
 
+A GitHub App profile is `scheme: github_app` with a `label` and nothing else:
+
+```yaml
+auth:
+  github.app: {scheme: github_app, label: GitHub App private key}
+```
+
+Its stored entry holds the App id, the installation id and the App's private key. The instance
+signs a short-lived JWT with the key, exchanges it under `base_url` for an installation token and
+sends that token as `Authorization: Bearer`; the token stays in the instance's memory. It needs no
+`identity`: the connection is the installation, proven by the exchange and by a read of
+`installation/repositories`. An `identity` may replace that read's `path` or the `kind`
+(`github.installation`). An identity `source` other than `configuration`, a `subject`, a
+`header`, a `prefix`, an `account_label`, a `token_url` or `scopes.requested` is refused as
+`auth_misplaced`.
+
 ### Operations
 
 Each key under `operations` is the local name a caller invokes; `op` is the document's
@@ -309,9 +325,9 @@ covers the connect question, credential reuse, the cache and a file moved to ano
 - **Composed writes.** One operation is one request, with its guard reads around it. A write
   that takes two requests, such as an upload address followed by a completion, is two
   operations, each invoked and approved on its own.
-- **Login exchange.** The schemes are `basic`, `bearer`, `header`, `oauth2_refresh` and
-  `oauth2_client_credentials`. An API that trades a password or key for a session token at a
-  login endpoint cannot be described.
+- **Login exchange.** The schemes are `basic`, `bearer`, `header`, `oauth2_refresh`,
+  `oauth2_client_credentials` and `github_app`. An API that trades a password or key for a
+  session token at a login endpoint cannot be described, GitHub's App installation token aside.
 - **Fixed values beyond scalars.** `=value` is a string, an integer or a boolean. A fixed array,
   object or null cannot be written.
 - **A fixed document with a caller's member.** A nested document cannot be fixed with one member

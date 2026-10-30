@@ -114,17 +114,65 @@ types:
     # reader/codec and transport rules; ESS 0.40 has no reader-closure, upstream-pin
     # or transport construct.
 
+  # How the HTTP service host admits its caller (contracts/service/compatibility.md
+  # § 2.1, Admission). `static-bearer` compares one configured bearer;
+  # `service-account-token` asks the cluster API with a TokenReview whether the
+  # presented projected token is authenticated for the configured audience as
+  # the one configured principal.
+  - name: connectors.declarations.ServiceAdmissionProfile
+    kind: enum
+    variants: [static-bearer, service-account-token]
+  # `system:serviceaccount:<namespace>:<name>`, the username a TokenReview
+  # answers for a service account: a DNS-label namespace and a DNS-subdomain
+  # name. At most 128 bytes, the `principal_ref` bound of
+  # contracts/service/audit.md § 4, because the anchor records it verbatim.
+  # ESS-LIMIT: the fixed `system:serviceaccount:` prefix and the two-segment
+  # shape are checked when the host builds its admission at start
+  # (`valid_principal` in crates/connectors-host/src/server/token_review.rs,
+  # and `PRINCIPAL_PATTERN` in the configuration schema); ESS 0.77 has no
+  # prefix or pattern invariant.
+  - name: connectors.declarations.ServiceAccountPrincipal
+    kind: newtype
+    of: String
+    alphabet: "abcdefghijklmnopqrstuvwxyz0123456789-.:"
+    invariants:
+      - value.count >= 1
+      - value.count <= 128
+  # The TokenReview endpoint of a `service-account-token` host: the cluster
+  # API's HTTPS base URL, the CA file that alone roots its TLS, and the file
+  # holding the instance's own token, read again at each review.
+  - name: connectors.declarations.TokenReviewEndpoint
+    kind: struct
+    fields:
+      - {name: api, type: String}
+      - {name: ca_file, type: String}
+      - {name: credential_file, type: String}
+
   # The HTTP service host's configuration (crates/connectors-host/src/server.rs
-  # ServiceConfig), read as `urn:connectors:config:v2:service`. Revision v2 is
-  # v1 plus the optional `state`; `urn:connectors:config:v1:service` stays
-  # readable unchanged and has no `state` (contracts/service/compatibility.md
-  # § 2.1, Service configuration). `listen` and `service_credential` keep their
-  # v1 meaning; they are transport and credential-reference facts with no ESS
-  # noun and are not modelled here. This is a configuration value, not the
+  # ServiceConfig), read as `urn:connectors:config:v3:service`. Revision v3 is
+  # v2 plus the optional admission members `admission`, `audience`,
+  # `principal` and `token_review`; revision v2 is v1 plus the optional
+  # `state`. `urn:connectors:config:v1:service` and
+  # `urn:connectors:config:v2:service` stay readable unchanged and closed
+  # (contracts/service/compatibility.md § 2.1, Service configuration).
+  # `listen` and `service_credential` keep their v1 meaning; they are transport
+  # and credential-reference facts with no ESS noun and are not modelled here.
+  # `service_credential` is present exactly when the admission is
+  # `static-bearer`, which the reader checks (ESS-LIMIT: an unmodelled field
+  # cannot appear in an invariant). This is a configuration value, not the
   # recorded ServiceConfiguration entity: the state directory is where that
   # record lives, so it is not a field of it.
   - name: connectors.declarations.ServiceHostConfiguration
     kind: struct
+    invariants:
+      # `service-account-token` names its audience, principal and endpoint;
+      # `static-bearer`, explicit or absent, names none of them.
+      - any:
+          - not: {admission: service-account-token}
+          - all: [defined(audience), defined(principal), defined(token_review)]
+      - any:
+          - {admission: service-account-token}
+          - none: [defined(audience), defined(principal), defined(token_review)]
     fields:
       # The service instance id; the ServiceConfiguration the host records at
       # start carries it as `instance_id`. Vocabulary: the instance (design
@@ -138,6 +186,23 @@ types:
       # only /v1/* and answers /v1alpha2/invoke with 503 `unavailable` before
       # decoding.
       - {name: state, type: "Optional<String>"}
+      # Absent means `static-bearer`.
+      - {name: admission, type: "Optional<connectors.declarations.ServiceAdmissionProfile>"}
+      # The one audience a `service-account-token` review asks for, 1-256
+      # bytes.
+      - {name: audience, type: "Optional<String>"}
+      # The one service account a `service-account-token` host admits; the
+      # anchor's `principal_ref` under that profile.
+      - {name: principal, type: "Optional<connectors.declarations.ServiceAccountPrincipal>"}
+      - {name: token_review, type: "Optional<connectors.declarations.TokenReviewEndpoint>"}
+      # A file path: the instance's standing write grants
+      # (connectors.standing_approvals.GrantFile), read on every write on
+      # POST /v1alpha2/invoke. Absent: the host is unchanged and dispatches a
+      # write there unkeyed. Present: every write there is keyed and needs a
+      # covering grant (a path naming no file holds none, so the write is
+      # `approval_required`), and POST /v1/invoke refuses writes. Requires
+      # `state`.
+      - {name: standing_grants, type: "Optional<String>"}
 
 # Immutable declarations, not the lifecycle of a running process or connection.
 # Interaction and failure semantics are in contracts/service/v1alpha1/semantics.md.

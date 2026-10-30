@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T12:49:05Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-name-check-reads-nested-sources",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-build --bin connectors-build catalog_feed_conformance: 20 passed; clippy -D warnings clean",
+    "reference": "248115dd5"
+  }
+}

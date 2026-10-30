@@ -8,16 +8,111 @@
 //! An acknowledged anchor is one prerequisite for dispatch, never caller,
 //! credential or dispatch authority by itself (contracts/service/audit.md § 1).
 //! The attempt ledger follows `ess/domains/mutations.yaml`, "The HTTP host's
-//! attempt ledger".
-use super::{Failure, Result, audit, filesystem as fs, metadata::Metadata, mutations as ledger};
+//! attempt ledger". Without `standing_grants` a write is recorded unkeyed
+//! ([`ServiceState::prepare_attempt`]), as before standing grants existed.
+//! With them ([`ServiceState::with_standing_grants`]) every write is keyed and
+//! admitted under a standing grant (`ess/domains/standing_approvals.yaml`):
+//! the keyed reservation is the ledger's own (`mutation_keys`, in the metadata
+//! authority) and the hourly count is [`standing::Uses`] beside it. Both are
+//! durable, so a restart keeps every key and every counted use.
+use super::{
+    Failure, Result, audit, filesystem as fs, metadata::Metadata, mutations as ledger, standing,
+};
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use serde_json::{Value, json};
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
     sync::{Arc, Mutex, Weak},
     time::{Duration, Instant},
 };
 use uuid::Uuid;
+
+/// Replays that wait on one original this process is running
+/// (compatibility.md § 2.1, Replay). A further replay of it is answered
+/// `outcome_unknown` at once rather than wait.
+pub const REPLAY_WAITERS: usize = 4;
+
+/// The key lanes of this process: one async mutex per (principal, key) with
+/// a keyed write between its key lookup and its prepared attempt. An entry
+/// exists only while a request holds or waits for it.
+type Lanes = Arc<Mutex<HashMap<(String, String), Arc<tokio::sync::Mutex<()>>>>>;
+/// The keyed attempts this process prepared and has not yet settled or
+/// aborted, with the replays waiting on each.
+type Flights = Arc<Mutex<HashMap<Uuid, Flight>>>;
+
+struct Flight {
+    waiters: usize,
+    /// Dropped when the attempt leaves the map, which wakes every waiter.
+    landed: tokio::sync::watch::Sender<()>,
+}
+
+fn locked<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// One request's hold on a key lane ([`ServiceState::key_lane`]). Dropping
+/// it lets the next request with that key in.
+pub struct KeyLane {
+    held: Option<tokio::sync::OwnedMutexGuard<()>>,
+    lanes: Lanes,
+    name: (String, String),
+}
+
+impl Drop for KeyLane {
+    fn drop(&mut self) {
+        let mut lanes = locked(&self.lanes);
+        drop(self.held.take());
+        // Only the map still refers to an idle lane: no holder, no waiter.
+        if lanes
+            .get(&self.name)
+            .is_some_and(|lane| Arc::strong_count(lane) == 1)
+        {
+            lanes.remove(&self.name);
+        }
+    }
+}
+
+/// How a replay of a pending original may wait for it
+/// ([`ServiceState::wait_on`]).
+pub enum Waiting {
+    /// This process runs the original; the wait ends when it settles.
+    Joined(ReplayWait),
+    /// This process does not run the original: an earlier process (a crash
+    /// or a restart) or another process on the state directory left it
+    /// pending. Answered `outcome_unknown` at once.
+    NotRunHere,
+    /// [`REPLAY_WAITERS`] replays already wait on it. Answered
+    /// `outcome_unknown` at once.
+    Full,
+}
+
+/// One replay's place among an original's waiters.
+pub struct ReplayWait {
+    landed: tokio::sync::watch::Receiver<()>,
+    attempt: Uuid,
+    flights: Flights,
+}
+
+impl ReplayWait {
+    /// `true` once this process has settled or aborted the original, `false`
+    /// when `within` passed first.
+    pub async fn landed(&mut self, within: Duration) -> bool {
+        // Nothing is ever sent: `changed` ends only when the sender drops.
+        matches!(
+            tokio::time::timeout(within, self.landed.changed()).await,
+            Ok(Err(_))
+        )
+    }
+}
+
+impl Drop for ReplayWait {
+    fn drop(&mut self) {
+        if let Some(flight) = locked(&self.flights).get_mut(&self.attempt) {
+            flight.waiters = flight.waiters.saturating_sub(1);
+        }
+    }
+}
 
 /// The static-bearer service principal (compatibility.md § 2.1, Audit anchor):
 /// one receiver-configured principal, qualified by the anchor's instance, that
@@ -36,13 +131,21 @@ const RECOVERY_INTERVAL: Duration = Duration::from_secs(1);
 /// Retained attempts per instance (mutations.yaml); capacity refuses before
 /// the attempt and never evicts.
 const ATTEMPTS_PER_INSTANCE: u32 = 100_000;
-/// The terminal text of an HTTP-host attempt: a bounded safe observation.
+/// The terminal text of an HTTP-host attempt without its result: a bounded
+/// safe observation.
 const SETTLEMENT_BYTES: usize = 1024;
+/// The largest write result an attempt's settlement retains for keyed replay;
+/// a larger one is settled with `result_retained: false`.
+pub const RETAINED_RESULT_BYTES: usize = 64 * 1024;
 const CANONICALIZATION: &str = "adapter-v1-canonical-json";
 
 /// The facts the host verified for one admitted invocation.
 pub struct Admitted<'a> {
     pub request_id: &'a str,
+    /// The admitted service principal: [`STATIC_BEARER_PRINCIPAL`], or the
+    /// configured service account under `service-account-token`
+    /// (compatibility.md § 2.1, Audit anchor).
+    pub principal: &'a str,
     pub operation: &'a str,
     pub descriptor_revision: &'a str,
     pub access: audit::Access,
@@ -51,6 +154,8 @@ pub struct Admitted<'a> {
 /// The facts of one admitted `external_write` the host records an attempt for.
 pub struct Write<'a> {
     pub request_id: &'a str,
+    /// The admitted service principal, the attempt's caller.
+    pub principal: &'a str,
     pub operation: &'a str,
     pub contract: &'a str,
     pub profile: &'a str,
@@ -60,8 +165,9 @@ pub struct Write<'a> {
 
 /// The HTTP host's settlement time (mutations.yaml, Clock): a zero-width
 /// system wall-clock sample, which the ledger floors with the mutation
-/// `LocalClockFloor`. Record time only: an HTTP-host attempt has no key, so no
-/// expiry, replay or approval window ever reads it.
+/// `LocalClockFloor`. Record time only: this host runs no key expiry, so no
+/// replay window reads it. Standing grants are read against the host's own
+/// clock ([`now_ms`]), as its operator's configuration (standing_approvals.yaml).
 struct RecordClock;
 impl ledger::Clock for RecordClock {
     fn now(&self) -> ledger::Result<ledger::ClockInterval> {
@@ -85,6 +191,51 @@ pub struct ServiceState {
     /// Exact final observations whose append was not acknowledged, retained
     /// unchanged for idempotent recovery (audit.md § 3).
     pending: Mutex<Retained>,
+    /// Present only when the service configuration sets `standing_grants`:
+    /// then, and only then, writes are keyed and need a covering grant.
+    standing: Option<Standing>,
+    lanes: Lanes,
+    flights: Flights,
+}
+
+/// A host's standing grants: the operator's grant file, read on every write,
+/// and the hourly count of writes admitted under each grant.
+struct Standing {
+    grants: PathBuf,
+    uses: standing::Uses,
+}
+
+/// How a keyed write's key stands before any grant is read.
+pub enum KeyLookup {
+    /// No live reservation: a new attempt may be admitted.
+    Miss,
+    /// The key names an attempt for this exact request: replay it.
+    Replay(ledger::Observation),
+}
+
+/// How the grant check of one keyed write ended, before the anchor.
+pub enum GrantCheck {
+    /// A slot under this grant is taken and counts from now on.
+    Admitted(standing::Use),
+    /// The grant file could not be read safely (`unavailable`).
+    Unreadable(standing::Unreadable),
+    /// No grant covers the write (`approval_required`).
+    Uncovered(standing::Uncovered),
+    /// Every covering grant is at its cap (`rate_limited`).
+    AtCap { retry_after_seconds: u64 },
+    /// The use store failed (`unavailable`).
+    UsesUnavailable,
+}
+
+/// How the keyed preparation of an admitted write ended.
+pub enum KeyedPreparation {
+    /// The attempt is prepared and its grant recorded with it.
+    Prepared(ledger::Prepared),
+    /// A concurrent request with the same key and input won: replay it.
+    Existing(ledger::Observation),
+    /// The attempt was prepared but its grant could not be recorded: it was
+    /// aborted (`not_attempted`).
+    GrantUnrecorded(ledger::AttemptRef),
 }
 
 /// The retained final observations: those waiting for a recovery pass and
@@ -145,11 +296,221 @@ impl ServiceState {
             .map_err(|_| Failure::InvalidConfiguration)?,
             pending_limit,
             pending: Mutex::new(Retained::default()),
+            standing: None,
+            lanes: Lanes::default(),
+            flights: Flights::default(),
         })
+    }
+
+    /// The service configuration's `standing_grants`. `None` leaves the host
+    /// as it was: writes unkeyed, nothing more opened. `Some(path)` makes every
+    /// write keyed and admitted only under a grant the file at `path` holds
+    /// when the write arrives; it opens the hourly use count
+    /// (`standing-grants.sqlite3`) in the state directory, and lets an
+    /// attempt's settlement retain its result for replay.
+    pub fn with_standing_grants(mut self, grants: Option<PathBuf>) -> Result<Self> {
+        let Some(grants) = grants else {
+            return Ok(self);
+        };
+        self.ledger = ledger::Store::new(
+            &self.path,
+            RecordClock,
+            ledger::Limits {
+                attempts_per_instance: ATTEMPTS_PER_INSTANCE,
+                result_bytes: RETAINED_RESULT_BYTES + SETTLEMENT_BYTES,
+            },
+        )
+        .map_err(|_| Failure::InvalidConfiguration)?;
+        self.standing = Some(Standing {
+            grants,
+            uses: standing::Uses::open(&self.path).map_err(|_| Failure::MetadataUnavailable)?,
+        });
+        Ok(self)
+    }
+
+    /// `true` when the host runs keyed writes under standing grants.
+    pub fn keyed(&self) -> bool {
+        self.standing.is_some()
     }
 
     pub fn instance(&self) -> &str {
         &self.instance
+    }
+
+    /// Waits for, then holds, the lane of `key` in `principal`'s namespace.
+    /// A keyed write holds it from its key lookup until its attempt is
+    /// prepared (the key reserved) or the write is refused, so in this
+    /// process a second request with the key looks it up only after the
+    /// first has reserved it or given up: a duplicate is always a replay
+    /// (never `rate_limited` or `approval_required` for a write the first
+    /// request was admitted for), and a request with other input is refused
+    /// `idempotency_conflict` before its anchor. Lanes do not reach another
+    /// process on the same state directory; the ledger's reservation and the
+    /// recheck before a refusal remain the guard there.
+    pub async fn key_lane(&self, principal: &str, key: &str) -> KeyLane {
+        let name = (principal.to_owned(), key.to_owned());
+        let lane = locked(&self.lanes).entry(name.clone()).or_default().clone();
+        let held = lane.lock_owned().await;
+        KeyLane {
+            held: Some(held),
+            lanes: self.lanes.clone(),
+            name,
+        }
+    }
+
+    /// How a replay may wait for the pending original `attempt`: join the
+    /// original this process runs, unless [`REPLAY_WAITERS`] already wait on
+    /// it (`Full`); `NotRunHere` when this process is not running it.
+    pub fn wait_on(&self, attempt: Uuid) -> Waiting {
+        let mut flights = locked(&self.flights);
+        let Some(flight) = flights.get_mut(&attempt) else {
+            return Waiting::NotRunHere;
+        };
+        if flight.waiters >= REPLAY_WAITERS {
+            return Waiting::Full;
+        }
+        flight.waiters += 1;
+        Waiting::Joined(ReplayWait {
+            landed: flight.landed.subscribe(),
+            attempt,
+            flights: self.flights.clone(),
+        })
+    }
+
+    /// The replays now waiting on originals this process runs.
+    pub fn replays_waiting(&self) -> usize {
+        locked(&self.flights)
+            .values()
+            .map(|flight| flight.waiters)
+            .sum()
+    }
+
+    /// This process now runs the keyed attempt.
+    fn take_off(&self, attempt: Uuid) {
+        let (landed, _) = tokio::sync::watch::channel(());
+        locked(&self.flights).insert(attempt, Flight { waiters: 0, landed });
+    }
+
+    /// This process no longer runs the attempt: its waiters wake.
+    pub fn land(&self, attempt: Uuid) {
+        locked(&self.flights).remove(&attempt);
+    }
+
+    fn keyed_candidate(&self, write: &Write<'_>, key: &str) -> ledger::Candidate {
+        let mut candidate = self.candidate(write);
+        candidate.caller_key = Some(key.to_owned());
+        candidate
+    }
+
+    /// Operations § 4 step 4 for a keyed write: the reservation of `key` in
+    /// this principal's namespace. `Err(Conflict)` is a live key with another
+    /// fingerprint (`idempotency_conflict`); any other error is an unavailable
+    /// store.
+    pub fn lookup_key(&self, write: &Write<'_>, key: &str) -> ledger::Result<KeyLookup> {
+        Ok(
+            match self.ledger.lookup(&self.keyed_candidate(write, key))? {
+                None => KeyLookup::Miss,
+                Some(observation) => KeyLookup::Replay(observation),
+            },
+        )
+    }
+
+    /// The grant check that replaces operations § 4 steps 5 and 8 under a
+    /// standing grant: the grant file read now, the grants covering this
+    /// write now, and one slot under the first of them with room in its hour.
+    pub fn check_grant(&self, write: &Write<'_>) -> GrantCheck {
+        // A host without standing grants never reaches this check; were it
+        // to, no grant covers anything.
+        let Some(held) = &self.standing else {
+            return GrantCheck::Uncovered(standing::Uncovered::NoGrant);
+        };
+        let grants = match standing::read(&held.grants) {
+            Err(unreadable) => return GrantCheck::Unreadable(unreadable),
+            Ok(None) => return GrantCheck::Uncovered(standing::Uncovered::NoGrant),
+            Ok(Some(grants)) => grants,
+        };
+        let now = now_ms();
+        let covering = match grants.covering(&self.instance, write.operation, write.input, now) {
+            Ok(covering) => covering,
+            Err(reason) => return GrantCheck::Uncovered(reason),
+        };
+        match held.uses.take(&self.instance, &covering, now) {
+            Ok(standing::Taken::Slot(taken)) => GrantCheck::Admitted(taken),
+            Ok(standing::Taken::AtCap {
+                retry_after_seconds,
+            }) => GrantCheck::AtCap {
+                retry_after_seconds,
+            },
+            Err(standing::UsesUnavailable) => GrantCheck::UsesUnavailable,
+        }
+    }
+
+    /// The slot is not used: no attempt will be prepared for it.
+    pub fn release_grant(&self, taken: &standing::Use) {
+        let released = self
+            .standing
+            .as_ref()
+            .is_some_and(|held| held.uses.release(taken).is_ok());
+        if !released {
+            tracing::warn!(grant = %taken.grant_id, "a standing grant use was not released; it counts until its hour ends");
+        }
+    }
+
+    /// `PrepareAttempt` for an admitted keyed write, reserving `key` in the
+    /// same transaction, then the grant recorded with the attempt. A
+    /// concurrent winner with the same key and input is returned for replay
+    /// and the slot released; an unrecorded grant aborts the attempt.
+    pub fn prepare_keyed(
+        &self,
+        write: &Write<'_>,
+        key: &str,
+        taken: &standing::Use,
+    ) -> ledger::Result<KeyedPreparation> {
+        let prepared = match self.ledger.prepare(&self.keyed_candidate(write, key)) {
+            Ok(ledger::Preparation::Prepared(prepared)) => prepared,
+            Ok(ledger::Preparation::Existing(winner)) => {
+                self.release_grant(taken);
+                return Ok(KeyedPreparation::Existing(winner));
+            }
+            Err(failure) => {
+                self.release_grant(taken);
+                return Err(failure);
+            }
+        };
+        let attempt = prepared.reference();
+        let bound = self
+            .standing
+            .as_ref()
+            .is_some_and(|held| held.uses.bind(taken, attempt.attempt_id).is_ok());
+        if !bound {
+            // Refusal: no write is dispatched without its grant recorded.
+            self.abort_attempt(attempt, "unavailable");
+            return Ok(KeyedPreparation::GrantUnrecorded(attempt));
+        }
+        // Replays of the key in this process wait on this attempt until it
+        // settles or is aborted ([`wait_on`](Self::wait_on)).
+        self.take_off(attempt.attempt_id);
+        Ok(KeyedPreparation::Prepared(prepared))
+    }
+
+    /// The standing grant recorded with one of this host's attempts; none on
+    /// a host without standing grants.
+    pub fn grant_of(&self, attempt_id: &str) -> ledger::Result<Option<String>> {
+        let attempt_id = Uuid::parse_str(attempt_id).map_err(|_| ledger::Failure::InvalidInput)?;
+        let Some(held) = &self.standing else {
+            return Ok(None);
+        };
+        held.uses
+            .grant_of(attempt_id)
+            .map_err(|_| ledger::Failure::MetadataUnavailable)
+    }
+
+    /// The current observation of an attempt this host recorded.
+    pub fn observe_attempt(
+        &self,
+        attempt: ledger::AttemptRef,
+    ) -> ledger::Result<ledger::Observation> {
+        self.ledger.observe(attempt)
     }
 
     /// `false` while the retained final observations are at their bound: the
@@ -171,7 +532,7 @@ impl ServiceState {
             hop: audit::Hop::Execution,
             stage: audit::Stage::Admission,
             request_id: Some(facts.request_id.to_owned()),
-            principal_ref: Some(STATIC_BEARER_PRINCIPAL.to_owned()),
+            principal_ref: Some(facts.principal.to_owned()),
             operation_id: Some(facts.operation.to_owned()),
             connection_ref: None,
             descriptor_revision: Some(facts.descriptor_revision.to_owned()),
@@ -188,12 +549,25 @@ impl ServiceState {
     /// `not_required` approval, fenced by the instance's configuration
     /// revision. Capacity and an unavailable store record nothing.
     pub fn prepare_attempt(&self, write: &Write<'_>) -> ledger::Result<ledger::Prepared> {
-        let candidate = ledger::Candidate {
+        match self.ledger.prepare(&self.candidate(write))? {
+            ledger::Preparation::Prepared(prepared) => Ok(prepared),
+            // Without a key no existing attempt can answer a preparation.
+            ledger::Preparation::Existing(_) => Err(ledger::Failure::Conflict),
+        }
+    }
+
+    /// The attempt candidate of an admitted write: no connection (the
+    /// instance's one configured credential, fenced by its configuration
+    /// revision), `not_required` per-input approval (on a host with standing
+    /// grants, the grant replaces steps 5 and 8), no key until
+    /// [`keyed_candidate`](Self::keyed_candidate).
+    fn candidate(&self, write: &Write<'_>) -> ledger::Candidate {
+        ledger::Candidate {
             namespace: ledger::Namespace {
                 receiver_instance: self.instance.clone(),
                 tenant: None,
                 realm: None,
-                caller: STATIC_BEARER_PRINCIPAL.to_owned(),
+                caller: write.principal.to_owned(),
                 executor: None,
                 origin: ledger::Origin::Direct,
             },
@@ -216,11 +590,6 @@ impl ServiceState {
             caller_key: None,
             request_id: write.request_id.to_owned(),
             approval: ledger::Approval::NotRequired,
-        };
-        match self.ledger.prepare(&candidate)? {
-            ledger::Preparation::Prepared(prepared) => Ok(prepared),
-            // Without a key no existing attempt can answer a preparation.
-            ledger::Preparation::Existing(_) => Err(ledger::Failure::Conflict),
         }
     }
 
@@ -236,9 +605,12 @@ impl ServiceState {
 
     /// `AbortPrepared`: the attempt was not dispatched (`not_attempted`).
     pub fn abort_attempt(&self, attempt: ledger::AttemptRef, cause: &str) -> bool {
-        self.ledger
+        let aborted = self
+            .ledger
             .abort(attempt, settlement("not_attempted", Some(cause)))
-            .is_ok()
+            .is_ok();
+        self.land(attempt.attempt_id);
+        aborted
     }
 
     /// `RecordCompletion` when `applied`, else `RecordUncertainty` with its
@@ -255,6 +627,35 @@ impl ServiceState {
             ledger::Outcome::Unknown(settlement("unknown", cause))
         };
         self.ledger.settle(attempt, &outcome).is_ok()
+    }
+
+    /// [`settle_attempt`](Self::settle_attempt) for a keyed write: an applied
+    /// write's `result` (`Some`) is retained for replay when it fits
+    /// [`RETAINED_RESULT_BYTES`]; otherwise the settlement says
+    /// `result_retained: false`. `None` is not applied.
+    pub fn settle_keyed(
+        &self,
+        attempt: ledger::AttemptRef,
+        result: Option<&Value>,
+        cause: Option<&str>,
+    ) -> bool {
+        let outcome = match result {
+            Some(result) => {
+                let mut settled = settlement("applied", cause);
+                if serde_json::to_vec(result)
+                    .is_ok_and(|bytes| bytes.len() <= RETAINED_RESULT_BYTES)
+                {
+                    settled["result"] = result.clone();
+                } else {
+                    settled["result_retained"] = json!(false);
+                }
+                ledger::Outcome::Applied(settled)
+            }
+            None => ledger::Outcome::Unknown(settlement("unknown", cause)),
+        };
+        let settled = self.ledger.settle(attempt, &outcome).is_ok();
+        self.land(attempt.attempt_id);
+        settled
     }
 
     /// Internal owner read of one of this host's attempts by its public id.
@@ -476,6 +877,7 @@ mod tests {
         let state = ServiceState::open_bounded(&path, "leaf", "fixture", "rev-1", 2).unwrap();
         let admitted = |request_id: &'static str| Admitted {
             request_id,
+            principal: STATIC_BEARER_PRINCIPAL,
             operation: "read",
             descriptor_revision: "rev-1",
             access: audit::Access::Read,
