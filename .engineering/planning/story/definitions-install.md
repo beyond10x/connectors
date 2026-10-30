@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:definitions-install
 kind: story
-status: active
+status: implemented
 title: connectors definitions install fetches a connectors-definitions tag, verifies it against index.json, and records a lock and a cache
 relations:
 - decomposes: epic:catalog-connectors-only-in-definitions
@@ -39,10 +39,11 @@ scope:
   path: ess/system.yaml
 - confidence: cited
   path: website/docs/reference/cli.md
-revision: 11
+revision: 13
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-29T20:20:57Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":2}}}
 - {from: "proposed", to: "active", at: "2026-10-29T20:20:57Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"review_outcome":2}}}
+- {from: "active", to: "implemented", at: "2026-10-30T05:39:52Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"test_result":1,"review_outcome":3}}}
 ---
 ## Outcome
 
@@ -162,3 +163,10 @@ Each against a release served from a local directory in tests:
   first-run default before any install; an installed tag resolves at run time on top of it, and
   `story:instances-resolve-through-locked-index` carries that resolution. This story's install
   therefore writes the lock and cache a running binary reads, and the new acceptance case holds it.
+- D247 (orchestrator, 2026-10-30): "B, as you proposed. Keep the four in FEATURES, state the
+  limitation in the CHANGELOG and the doc comment, and go on with your release. C0 will carry the
+  test that FEATURES equals what the lowerer accepts." The proposal (this wave's coordinating
+  session): install admits `embedded_text`, `query_fixed`, `query_folds` and `rate_limit_headers`
+  by name, while the definition lowerer (`crates/connectors-catalog/src/definition.rs:485`, `:712`)
+  still refuses all four; no instance reads the lock yet, so nothing breaks today. Lowerer support
+  for the four goes to the next connectors wave (D243 C0).
