@@ -807,12 +807,16 @@ owner or the provider, and are applied in the CLI process to the full
 audit record and the mutation ledger have it. The answer is then
 `InvokeShaped`.
 
-A path list is comma-separated paths, each item trimmed. A path is
-`name(.name)*`, where `[]` after a name, or at the start, maps over an array
+A path list is comma-separated paths. `,` separates the items, so a key
+holding `,` cannot be named in `--fields`, not even by a pointer: `/a,b` is the
+two paths `/a` and `b`. Each item is trimmed, so a key with leading or trailing
+whitespace cannot be named either: `/a ` names `a`. A path is `name(.name)*`,
+where `[]` after a name, or at the start, maps over an array
 (`events[].field_name`); a name holds no `.`, `[`, `]`, `,`, `:`, `/`,
-whitespace or control character. A key holding one of them is written as an
-RFC 6901 pointer, a path beginning with `/` whose tokens are member names (`~1`
-is `/`, `~0` is `~`): `/page[after]`. `alias:path` prints the value the path
+whitespace or control character. A key holding `.`, `[`, `]`, `:`, `/`, `~`, or
+whitespace between other characters, is written as an RFC 6901 pointer, a path
+beginning with `/` whose tokens are member names (`~1` is `/`, `~0` is `~`):
+`/page[after]`. `alias:path` prints the value the path
 reaches under `alias`, a name. There are no filters and no indexes. Paths read
 the provider's `result`; for a catalog result, `{status, body, provenance}`
 with an integer `status`, a path whose first name the result does not have
@@ -849,9 +853,9 @@ names, so a write's `outcome_unknown` cannot be projected away.
 Refused before any provider call, as `invalid_input` at `arguments`, exit 2,
 naming `fields` or `each`: a malformed path; an empty item; an alias that is not
 a name; a path without an alias that begins with `[]`; an output name that is
-`missing`, `request_id`, `mutation` or `source_audit`; an alias that repeats
-another output name; more than 256 paths or 64 steps in one path; either flag
-beside `--describe`, which reads no result. `--each` on a write is
+`missing`, `records`, `request_id`, `mutation` or `source_audit`; an alias
+that repeats another output name; more than 256 paths or 64 steps in one path;
+either flag beside `--describe`, which reads no result. `--each` on a write is
 `invalid_input` naming `each`, ahead of `approval_required`; `--fields` on a
 write is admitted.
 
