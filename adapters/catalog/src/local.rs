@@ -206,6 +206,13 @@ enum Scheme {
     /// (`architecture-decision-record:oauth2-grants-and-access-token-issue`).
     #[serde(rename = "oauth2_grant")]
     OAuth2Grant,
+    /// `{"app_id","installation_id","private_key"}`: an RS256 JWT signed with
+    /// the GitHub App's key is exchanged at
+    /// `{api_base}/app/installations/{installation_id}/access_tokens` for an
+    /// installation token sent as `Authorization: Bearer`. The connection is
+    /// the installation (story:catalog-github-app-installation-token).
+    #[serde(rename = "github_app")]
+    GitHubApp,
 }
 impl Scheme {
     fn is_token(&self) -> bool {
@@ -214,6 +221,11 @@ impl Scheme {
     /// A profile whose stored entry is exchanged at `token_url`.
     fn is_oauth(&self) -> bool {
         matches!(self, Self::OAuth2Refresh | Self::OAuth2ClientCredentials)
+    }
+    /// A profile whose stored entry is exchanged for the token a request
+    /// carries, which is kept in memory only ([`OAuth`]).
+    fn exchanges(&self) -> bool {
+        self.is_oauth() || *self == Self::GitHubApp
     }
 }
 
@@ -752,6 +764,10 @@ fn grant_subject(id_token: &str, client_id: &str, subject_pointer: Option<&str>)
     );
     let document: Value =
         serde_json::from_slice(&payload).map_err(|_| Failure::InvalidCredential)?;
+    // Claims are an object; an array would be read as the claims by position.
+    if !document.is_object() {
+        return Err(Failure::InvalidCredential);
+    }
     let subject = match subject_pointer {
         None => None,
         Some(pointer) => match document.pointer(pointer) {
@@ -783,10 +799,261 @@ fn grant_subject(id_token: &str, client_id: &str, subject_pointer: Option<&str>)
     }
     Ok(subject)
 }
-/// The stored entry of either OAuth scheme, as the grant it makes.
+/// The stored entry of an exchanging scheme, as the grant it makes.
 enum Grant {
     Refresh(OAuthEntry),
     ClientCredentials(ClientEntry),
+    App(AppEntry),
+}
+
+/// The longest GitHub App id a `github_app` entry holds: the numeric App id or
+/// its client id, both well below it.
+const APP_ID_LIMIT: usize = 128;
+/// The longest installation id: the digits of a `u64`.
+const INSTALLATION_ID_LIMIT: usize = 20;
+/// The longest PEM private key: a 4096-bit RSA key is about 3.3 KiB.
+const APP_KEY_LIMIT: usize = 16 * 1024;
+/// The PEM labels of the RSA keys a `github_app` entry may hold: PKCS #1, as
+/// GitHub issues it, and unencrypted PKCS #8.
+const PKCS1_LABEL: &str = "RSA PRIVATE KEY";
+const PKCS8_LABEL: &str = "PRIVATE KEY";
+/// How far the App JWT's `iat` is set back against clock drift; GitHub's limit.
+const APP_JWT_BACKDATE_S: u64 = 60;
+/// How long the App JWT is valid from now: under GitHub's ten-minute limit on
+/// `exp - iat` with the backdated `iat`.
+const APP_JWT_LIFETIME_S: u64 = 9 * 60;
+/// An installation token is used until this long before its `expires_at`.
+const APP_TOKEN_SKEW_S: i128 = 5 * 60;
+/// The media type GitHub's REST API answers in.
+const GITHUB_JSON: &str = "application/vnd.github+json";
+
+/// The `github_app` profile's protected entry as stored. The App id and
+/// installation id are numbers or strings of them; the key is PEM text.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AppDocument {
+    #[serde(deserialize_with = "app_id")]
+    app_id: String,
+    #[serde(deserialize_with = "installation_id")]
+    installation_id: u64,
+    #[serde(deserialize_with = "app_key_text")]
+    private_key: Zeroizing<String>,
+}
+/// A number or a string of a JSON document's id.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum NumberOrText {
+    Number(u64),
+    Text(String),
+}
+/// 1 to [`APP_ID_LIMIT`] bytes of ASCII letters, digits, `.`, `_` and `-`.
+fn app_id<'de, D: Deserializer<'de>>(deserializer: D) -> std::result::Result<String, D::Error> {
+    let text = match NumberOrText::deserialize(deserializer)? {
+        NumberOrText::Number(number) => number.to_string(),
+        NumberOrText::Text(text) => text,
+    };
+    if text.is_empty()
+        || text.len() > APP_ID_LIMIT
+        || !text
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+    {
+        return Err(serde::de::Error::custom("invalid protected field"));
+    }
+    Ok(text)
+}
+/// A positive integer of at most [`INSTALLATION_ID_LIMIT`] digits.
+fn installation_id<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<u64, D::Error> {
+    let id = match NumberOrText::deserialize(deserializer)? {
+        NumberOrText::Number(number) => Some(number),
+        NumberOrText::Text(text) => (!text.is_empty()
+            && text.len() <= INSTALLATION_ID_LIMIT
+            && text.bytes().all(|b| b.is_ascii_digit()))
+        .then(|| text.parse().ok())
+        .flatten(),
+    };
+    id.filter(|id| *id > 0)
+        .ok_or_else(|| serde::de::Error::custom("invalid protected field"))
+}
+/// 1 to [`APP_KEY_LIMIT`] bytes of ASCII text.
+fn app_key_text<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Zeroizing<String>, D::Error> {
+    let value = Zeroizing::new(String::deserialize(deserializer)?);
+    if value.is_empty()
+        || value.len() > APP_KEY_LIMIT
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_graphic() || b.is_ascii_whitespace())
+    {
+        return Err(serde::de::Error::custom("invalid protected field"));
+    }
+    Ok(value)
+}
+
+/// A `github_app` entry with its key parsed: every field is checked before a
+/// request is made, so a bad entry is `invalid_input` and nothing is sent.
+struct AppEntry {
+    app_id: String,
+    installation_id: u64,
+    key: ring::signature::RsaKeyPair,
+}
+impl AppEntry {
+    fn parse(document: &[u8]) -> Result<Self> {
+        let document: AppDocument =
+            serde_json::from_slice(document).map_err(|_| Failure::InvalidInput)?;
+        Ok(Self {
+            key: app_key(&document.private_key)?,
+            app_id: document.app_id,
+            installation_id: document.installation_id,
+        })
+    }
+    /// An RS256 JWT for GitHub's App authentication: `iss` the App id, `iat`
+    /// backdated by [`APP_JWT_BACKDATE_S`], `exp` [`APP_JWT_LIFETIME_S`] from
+    /// now. It is a credential for those minutes, so it is zeroized on drop.
+    fn jwt(&self) -> Result<Zeroizing<Vec<u8>>> {
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|_| Failure::Protocol)?
+            .as_secs();
+        let claims = serde_json::to_vec(&json!({
+            "iat": now.saturating_sub(APP_JWT_BACKDATE_S),
+            "exp": now.saturating_add(APP_JWT_LIFETIME_S),
+            "iss": self.app_id,
+        }))
+        .map_err(|_| Failure::Protocol)?;
+        let mut jwt = Zeroizing::new(Vec::with_capacity(1024));
+        jwt.extend_from_slice(
+            URL_SAFE_NO_PAD
+                .encode(br#"{"alg":"RS256","typ":"JWT"}"#)
+                .as_bytes(),
+        );
+        jwt.push(b'.');
+        jwt.extend_from_slice(URL_SAFE_NO_PAD.encode(&claims).as_bytes());
+        let mut signature = vec![0; self.key.public().modulus_len()];
+        self.key
+            .sign(
+                &ring::signature::RSA_PKCS1_SHA256,
+                &ring::rand::SystemRandom::new(),
+                &jwt,
+                &mut signature,
+            )
+            .map_err(|_| Failure::Protocol)?;
+        jwt.push(b'.');
+        jwt.extend_from_slice(URL_SAFE_NO_PAD.encode(&signature).as_bytes());
+        Ok(jwt)
+    }
+}
+/// The RSA key of a PEM document holding one PKCS #1 or unencrypted PKCS #8
+/// key, as ring admits it (2048 to 4096 bits). Anything else, an encrypted
+/// key or one with RFC 1421 headers among them, is `invalid_input`. Every
+/// buffer holding key bytes is zeroized on drop.
+fn app_key(pem: &str) -> Result<ring::signature::RsaKeyPair> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    let rest = pem
+        .trim()
+        .strip_prefix("-----BEGIN ")
+        .ok_or(Failure::InvalidInput)?;
+    let (label, rest) = rest.split_once("-----").ok_or(Failure::InvalidInput)?;
+    if label != PKCS1_LABEL && label != PKCS8_LABEL {
+        return Err(Failure::InvalidInput);
+    }
+    let body = rest
+        .strip_suffix("-----")
+        .and_then(|rest| rest.strip_suffix(label))
+        .and_then(|rest| rest.strip_suffix("-----END "))
+        .ok_or(Failure::InvalidInput)?;
+    let mut encoded = Zeroizing::new(Vec::with_capacity(body.len()));
+    for byte in body.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'+' | b'/' | b'=' => encoded.push(byte),
+            _ if byte.is_ascii_whitespace() => {}
+            _ => return Err(Failure::InvalidInput),
+        }
+    }
+    let der = Zeroizing::new(
+        STANDARD
+            .decode(encoded.as_slice())
+            .map_err(|_| Failure::InvalidInput)?,
+    );
+    if label == PKCS1_LABEL {
+        ring::signature::RsaKeyPair::from_der(&der)
+    } else {
+        ring::signature::RsaKeyPair::from_pkcs8(&der)
+    }
+    .map_err(|_| Failure::InvalidInput)
+}
+/// The answer of GitHub's installation-token exchange. Fields it adds, such
+/// as the token's permissions, are ignored.
+#[derive(Deserialize)]
+struct InstallationToken {
+    #[serde(deserialize_with = "token")]
+    token: Zeroizing<String>,
+    expires_at: String,
+}
+/// One `github_app` exchange through `http`, the instance's own API port: the
+/// JWT for an installation token, used until [`APP_TOKEN_SKEW_S`] before its
+/// `expires_at`. Every refusal is a code; no answer text reaches it.
+async fn app_exchange(http: &ScopedHttp, entry: &AppEntry) -> Result<Exchanged> {
+    let jwt = entry.jwt()?;
+    let installation = entry.installation_id.to_string();
+    let sent = Instant::now();
+    let response = http
+        .post_assertion(
+            &["app", "installations", &installation, "access_tokens"],
+            &jwt,
+            GITHUB_JSON,
+        )
+        .await
+        .map_err(Failure::from_provider)?;
+    let body = Zeroizing::new(response.body);
+    match response.status {
+        200 | 201 => {}
+        // A secondary rate limit is a 403 that names its wait.
+        403 if response.headers.contains_key("retry-after")
+            || response
+                .headers
+                .get("x-ratelimit-remaining")
+                .is_some_and(|remaining| remaining.trim() == "0") =>
+        {
+            return Err(Failure::ProviderRateLimited);
+        }
+        // The JWT or the App's key refused (401), the installation suspended
+        // (403), or not this App's installation (404).
+        401 | 403 | 404 => return Err(Failure::InvalidCredential),
+        429 => return Err(Failure::ProviderRateLimited),
+        500..=599 => return Err(Failure::Unavailable),
+        _ => return Err(Failure::Protocol),
+    }
+    if body.len() > DOCUMENT_LIMIT {
+        return Err(Failure::Protocol);
+    }
+    let answer: InstallationToken = answer_object(&body)?;
+    let expires_at = feed::instant(&answer.expires_at).ok_or(Failure::Protocol)? / 1_000_000_000;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|_| Failure::Protocol)?
+        .as_secs();
+    // A token its issuer says has expired is no token, as an OAuth
+    // `expires_in` of 0 is none: it is never sent.
+    if expires_at <= i128::from(now) {
+        return Err(Failure::Protocol);
+    }
+    let usable =
+        (expires_at - i128::from(now) - APP_TOKEN_SKEW_S).clamp(0, i128::from(CACHE_LIFETIME_S));
+    Ok(Exchanged {
+        access: answer.token,
+        scope: None,
+        id_token: None,
+        // A token within the margin is used for this request and never kept.
+        usable_until: u64::try_from(usable)
+            .ok()
+            .filter(|usable| *usable > 0)
+            .and_then(|usable| sent.checked_add(Duration::from_secs(usable))),
+    })
 }
 
 /// A token endpoint's successful answer. Fields it adds are ignored.
@@ -909,6 +1176,9 @@ impl OAuth {
             .transpose()
             .map_err(Failure::from_service)?;
         let http = bounded.as_ref().unwrap_or(&self.http);
+        if let Grant::App(entry) = grant {
+            return app_exchange(http, entry).await;
+        }
         let sent = Instant::now();
         let segments: Vec<&str> = self.path.iter().map(String::as_str).collect();
         let form: Vec<(&str, &[u8])> = match grant {
@@ -930,6 +1200,8 @@ impl OAuth {
                         .as_bytes(),
                 ),
             ],
+            // Exchanged by `app_exchange` above.
+            Grant::App(_) => return Err(Failure::InvalidConfiguration),
         };
         let response = http
             .post_form(&segments, &form)
@@ -960,12 +1232,14 @@ impl OAuth {
         if body.len() > DOCUMENT_LIMIT {
             return Err(Failure::Protocol);
         }
-        let answer: TokenAnswer = serde_json::from_slice(&body).map_err(|_| Failure::Protocol)?;
+        let answer: TokenAnswer = answer_object(&body)?;
         // A client-credentials answer without `expires_in` (Zendesk clients created
         // before 2026-04-30) is cached for at most `CACHE_LIFETIME_S`; a refused
         // request evicts it sooner.
         let expires_in = match (answer.expires_in, grant) {
-            (Some(0), _) | (None, Grant::Refresh(_)) => return Err(Failure::Protocol),
+            (Some(0), _) | (None, Grant::Refresh(_) | Grant::App(_)) => {
+                return Err(Failure::Protocol);
+            }
             (Some(seconds), _) => seconds,
             (None, Grant::ClientCredentials(_)) => CACHE_LIFETIME_S,
         };
@@ -991,6 +1265,7 @@ impl OAuth {
                     return Err(Failure::Protocol);
                 }
             }
+            Grant::App(_) => return Err(Failure::InvalidConfiguration),
         }
         let usable = expires_in
             .min(CACHE_LIFETIME_S)
@@ -1049,8 +1324,7 @@ impl OAuth {
         if response.body.len() > DOCUMENT_LIMIT {
             return Err(Failure::Protocol);
         }
-        let info: TokenInfo =
-            serde_json::from_slice(&response.body).map_err(|_| Failure::Protocol)?;
+        let info: TokenInfo = answer_object(&response.body)?;
         if info.aud.as_bytes() != entry.client_id.as_bytes() {
             return Err(Failure::Protocol);
         }
@@ -1069,7 +1343,16 @@ fn id_claims(id_token: &str) -> Result<IdClaims> {
     let payload = URL_SAFE_NO_PAD
         .decode(payload.trim_end_matches('='))
         .map_err(|_| Failure::Protocol)?;
-    serde_json::from_slice(&payload).map_err(|_| Failure::Protocol)
+    answer_object(&payload)
+}
+/// A provider's JSON answer read as `T` only when it is an object. A derived
+/// struct is also read from an array, by position, and none of the answers
+/// read here is one: such an array's first string would become a token.
+fn answer_object<T: serde::de::DeserializeOwned>(body: &[u8]) -> Result<T> {
+    if body.iter().find(|byte| !byte.is_ascii_whitespace()) != Some(&b'{') {
+        return Err(Failure::Protocol);
+    }
+    serde_json::from_slice(body).map_err(|_| Failure::Protocol)
 }
 /// A space-separated OAuth scope string as a bounded set.
 fn scope_set(scope: &str) -> Result<BTreeSet<String>> {
@@ -1279,7 +1562,9 @@ impl Local {
                 // be named by its connection: an OAuth credential belongs to a
                 // holder the provider names, and a configured subject would let
                 // repair accept another holder's credential as the same identity
-                // (`connectors_catalog.identity.Profile`).
+                // (`connectors_catalog.identity.Profile`). A `github_app`
+                // connection is the installation its entry names, which the
+                // exchange proves, so its subject is that installation id.
                 IdentitySource::Configuration => {
                     config.auth.scheme.is_oauth()
                         || grant
@@ -1347,6 +1632,14 @@ impl Local {
                     !config.auth.header.eq_ignore_ascii_case("authorization")
                         || !config.auth.bearer
                         || config.auth.account_label.is_some()
+                }
+                // The exchange goes to the instance's own API base, and the
+                // connection is the installation, never a subject read.
+                Scheme::GitHubApp => {
+                    !config.auth.header.eq_ignore_ascii_case("authorization")
+                        || !config.auth.bearer
+                        || config.auth.account_label.is_some()
+                        || identity.source != IdentitySource::Configuration
                 }
             }
             || (!oauth
@@ -1481,6 +1774,27 @@ impl Local {
                     cache: Mutex::new(BTreeMap::new()),
                 }))
             }
+            // A GitHub App's installation token is issued under the API base,
+            // so the exchange reaches the instance's own authority under its
+            // trust roots, without the credential header a request carries.
+            None if config.auth.scheme == Scheme::GitHubApp => Some(Arc::new(OAuth {
+                http: ScopedHttp::new_with_ca_bytes(
+                    &HttpConfig {
+                        base_url: base.clone(),
+                        credential: None,
+                        credential_header: "authorization".into(),
+                        bearer: false,
+                        allow_plaintext: false,
+                        ca_file: None,
+                    },
+                    None,
+                    ca.as_deref(),
+                )
+                .map_err(Failure::from_service)?,
+                path: Vec::new(),
+                scope: None,
+                cache: Mutex::new(BTreeMap::new()),
+            })),
             None => None,
         };
         // A feed's root-relative item links resolve under the origin of the API base.
@@ -1683,6 +1997,21 @@ impl Local {
                 "http_bearer",
                 "http-bearer",
                 vec![field("client_secret", "OAuth client secret", 8192)],
+            ),
+            // The App, its installation and the App's private key. A PEM key
+            // spans lines, so it is entered by file or mounted, not typed.
+            (Scheme::GitHubApp, _) => (
+                "http_bearer",
+                "http-bearer",
+                vec![
+                    field("app_id", "GitHub App ID", APP_ID_LIMIT as u32),
+                    field(
+                        "installation_id",
+                        "GitHub App installation ID",
+                        INSTALLATION_ID_LIMIT as u32,
+                    ),
+                    field("private_key", &config.auth.label, APP_KEY_LIMIT as u32),
+                ],
             ),
             _ => (
                 "http_bearer",
@@ -1903,6 +2232,7 @@ impl Local {
             Scheme::OAuth2ClientCredentials => Grant::ClientCredentials(
                 serde_json::from_slice(&document).map_err(|_| Failure::InvalidInput)?,
             ),
+            Scheme::GitHubApp => Grant::App(AppEntry::parse(&document)?),
             Scheme::Token | Scheme::Basic | Scheme::OAuth2Grant => {
                 return Err(Failure::InvalidConfiguration);
             }
@@ -1955,7 +2285,7 @@ impl Local {
                 }
                 Secret(entry.access_token.as_bytes().to_vec())
             }
-            Scheme::OAuth2Refresh | Scheme::OAuth2ClientCredentials => {
+            Scheme::OAuth2Refresh | Scheme::OAuth2ClientCredentials | Scheme::GitHubApp => {
                 let (oauth, grant, key) = self.oauth_entry(document)?;
                 let access = match oauth.cached(&key) {
                     Some(access) => access,
@@ -2167,7 +2497,7 @@ impl Local {
         if self.auth.scheme == Scheme::OAuth2Grant {
             return self.validate_grant(document, collected_at_ms).await;
         }
-        if !self.auth.scheme.is_oauth() {
+        if !self.auth.scheme.exchanges() {
             let (credential, _) = self.credential(document).await?;
             let derived = Zeroizing::new(credential.0.clone());
             let http = self.with(credential);
@@ -2190,8 +2520,20 @@ impl Local {
                     }
                     self.baseline(subject, Some(granted), collected_at_ms, None)?
                 }
-                (IdentitySource::IdToken, Grant::ClientCredentials(_)) => {
+                (IdentitySource::IdToken, Grant::ClientCredentials(_) | Grant::App(_)) => {
                     return Err(Failure::InvalidConfiguration.into());
+                }
+                // The exchange proved the App's key for the installation, and
+                // the read proves the token it yielded: the connection is that
+                // installation.
+                (IdentitySource::Configuration, Grant::App(entry)) => {
+                    let derived = Zeroizing::new(exchanged.access.as_bytes().to_vec());
+                    let http = self.with(Secret(derived.to_vec()));
+                    let mut baseline = self
+                        .probe_identity(&http, &derived, collected_at_ms)
+                        .await?;
+                    baseline.identity.subject = entry.installation_id.to_string();
+                    baseline
                 }
                 // Refused at load; never reached.
                 (IdentitySource::Configuration, _) => {

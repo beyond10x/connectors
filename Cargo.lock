@@ -679,6 +679,7 @@ dependencies = [
  "hex",
  "httpdate",
  "libc",
+ "num-bigint",
  "rcgen",
  "ring",
  "rusqlite",
