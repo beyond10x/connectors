@@ -610,8 +610,10 @@ $ connectors setup migrate --mode dry-run | jq -c '[.result.entries[]|{connector
 [{"connector":"catalog","instance":"slack","disposition":"kept","reason":"connector_undeclared"},{"connector":"catalog","instance":"slack-bot","disposition":"kept","reason":"connector_undeclared"},{"connector":"catalog","instance":"slack-search","disposition":"kept","reason":"connector_undeclared"}]
 ```
 
-Each entry keeps working as it is, selected as `--connector catalog --instance <alias>` or by the
-deprecated `--adapter <alias>`. To name it as a Slack instance, rewrite it by hand: change
+Since 0.60.0 such an entry is no instance: `instances list` names it in `unmigrated`, and
+selecting it as `catalog/<alias>` or `--connector catalog --instance <alias>` is
+`invalid_configuration` with the rule `legacy_entry_unmigrated`. To name it as a Slack instance,
+rewrite it by hand: change
 `format` to `"connectors-local/5"`, add `[connectors.slack]` with `enabled = true`, and rename
 each legacy table `[adapters.<alias>]` to `[connectors.slack.instances.<instance>]` with `alias =
 "<alias>"` as its first key, the `.permissions` and `.executable` tables with it. Every pin stays

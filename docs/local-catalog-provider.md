@@ -1266,8 +1266,10 @@ declaration.
 ### Existing installations
 
 A configuration written before `connectors-local/5` holds legacy `[adapters.<alias>]` entries
-in the same shape. They keep working: each is selected as `--connector <adapter_id> --instance
-<alias>` (here `--connector catalog --instance forge`) or by the deprecated `--adapter <alias>`.
+in the same shape. They keep working: each is selected by the connector `setup migrate` derives
+for it and its alias (here `gitlab/forge`, or `--connector gitlab --instance forge`), or by the
+deprecated `--adapter <alias>`. An entry no connector is derived for, such as the Slack entry
+`slack-bot`, is no instance: selecting it is `legacy_entry_unmigrated`.
 `setup migrate` moves every entry whose native configuration names a provider with a shipped
 declaration to `[connectors.<connector>.instances.<alias>]`, with every pin unchanged, so its
 connections and approval policy stay valid. The dry run writes nothing; this one ran on a file
