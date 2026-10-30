@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0593-owner-start
 kind: release-plan
-status: draft
+status: implemented
 title: 'Release 0.59.3: a read waits for a slow owner start within its own deadline'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
+transitions:
+- {from: "draft", to: "implemented", at: "2026-10-30T05:24:40Z", actor: "human:timo", revision: 3}
 ---
 ## Outcome
 
