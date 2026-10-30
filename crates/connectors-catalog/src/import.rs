@@ -489,6 +489,7 @@ fn documented_profile(block: &DocumentedAuth) -> Result<Auth, Failure> {
         (Some("basic"), false) => AuthScheme::Basic,
         (Some("oauth2_refresh"), true) => AuthScheme::OAuth2Refresh,
         (Some("oauth2_client_credentials"), true) => AuthScheme::OAuth2ClientCredentials,
+        (Some("github_app"), true) => AuthScheme::GitHubApp,
         (None | Some("token"), true) => AuthScheme::Bearer,
         (None | Some("token"), false) => AuthScheme::Header,
         _ => return Err(refused("names a scheme the definition notation lacks")),

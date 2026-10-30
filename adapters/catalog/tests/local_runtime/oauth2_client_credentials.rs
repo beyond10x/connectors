@@ -230,3 +230,17 @@ fn client_credentials_answer_with_null_expires_in_is_usable() {
         result.err()
     );
 }
+
+/// RFC 6749 5.1: the token answer is a JSON object. An array holding an access
+/// token in the order of the answer's fields is not one, and its first string
+/// is never sent as a bearer token (story:catalog-github-app-installation-token,
+/// the same refusal as an installation-token answer that is an array).
+#[test]
+fn a_client_credentials_answer_that_is_an_array_is_a_protocol_failure() {
+    let result = project_with_answer(json!([format!("{ACCESS_TOKEN}1"), "bearer", 3600]));
+    assert!(
+        matches!(result, Err(Failure::Protocol)),
+        "an array answer was {:?}",
+        result.map(|_| "used")
+    );
+}

@@ -446,3 +446,62 @@ fn a_profile_missing_a_field_its_scheme_needs_is_refused() {
         other => panic!("refused as {other:?}"),
     }
 }
+
+/// story:catalog-github-app-installation-token. `scheme: github_app` needs no
+/// identity block: the connection is the GitHub App installation the token
+/// exchange proves, named by the entry's installation id, and a read of the
+/// installation's repositories proves the token it yields. A given identity
+/// may replace the read or the kind, never name another source or subject.
+#[test]
+fn a_definition_with_scheme_github_app_lowers() {
+    let root = root();
+    let app = |profile: &str| {
+        GITLAB.replace(
+            "  gitlab.pat: {scheme: header, header: PRIVATE-TOKEN, label: GitLab personal access token, identity: {path: user, kind: gitlab.user, subject: /id}, scopes: {path: personal_access_tokens/self, pointer: /scopes, minimum: [api]}}",
+            &format!("  github.app: {{scheme: github_app, label: GitHub App private key{profile}}}"),
+        )
+    };
+    let lowering = lower("github", &app(""), root.path());
+    assert_eq!(
+        lowering.profile("github.app"),
+        serde_json::json!({
+            "profile": "github.app",
+            "scheme": "github_app",
+            "header": "Authorization",
+            "bearer": true,
+            "label": "GitHub App private key",
+            "identity": {
+                "source": "configuration",
+                "path": "installation/repositories",
+                "kind": "github.installation",
+            },
+        })
+    );
+    assert_eq!(lowering.declaration()["provider_id"], "github");
+    let lowering = lower(
+        "github",
+        &app(", identity: {path: installation/token, kind: example.installation}"),
+        root.path(),
+    );
+    assert_eq!(
+        lowering.profile("github.app")["identity"],
+        serde_json::json!({"source": "configuration", "path": "installation/token", "kind": "example.installation"})
+    );
+    for (extra, field) in [
+        (", identity: {source: api}", "identity.source"),
+        (", identity: {subject: /id}", "identity.subject"),
+        (", header: X-Token", "header"),
+        (", prefix: token", "prefix"),
+        (", account_label: Account", "account_label"),
+        (", token_url: https://example.com/token", "token_url"),
+        (", scopes: {requested: [repo]}", "scopes.requested"),
+    ] {
+        match lower("github", &app(extra), root.path()).refusal() {
+            Refusal::AuthMisplaced { key, field: found } => {
+                assert_eq!(key, "github.app", "{extra}");
+                assert_eq!(found, field, "{extra}");
+            }
+            other => panic!("{extra}: refused as {other:?}"),
+        }
+    }
+}
