@@ -338,10 +338,12 @@ impl Client {
                         // reaped here when it exits, and its launch copy stays
                         // until then. Every other failure ends it.
                         Err(error) if error.code == Code::Timeout => {
+                            // One tuple: the launch is `()` on Windows.
+                            let held = (process, launched);
                             let _ = std::thread::Builder::new()
                                 .name("connectors-owner-reaper".into())
                                 .spawn(move || {
-                                    let _launch = launched;
+                                    let (mut process, _launch) = held;
                                     let _ = process.wait();
                                 });
                         }
