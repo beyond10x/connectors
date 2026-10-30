@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.61.0 — 2026-10-30
+
+One command installs a connectors-definitions release, verified file by file, into a read-only
+cache and a lock.
 
 ### Added
 
