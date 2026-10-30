@@ -625,6 +625,19 @@ fn validate_path(path: &Path) -> Checked<()> {
 
 /// The configured directory, after checks 1 and 2.
 fn root(directory: &Path, identity: &Identity) -> Result<File> {
+    let root = configured(directory, identity)?;
+    if !read_only(&root) {
+        return Err(Failure::Unavailable);
+    }
+    // A writable bit on a read-only mount admits no writer: the projected
+    // layout's world-writable sticky volume root is trusted only through `..data`.
+    Ok(root)
+}
+
+/// Check 1, and check 2 but for the read-only mount: `directory` opened below
+/// directories owned by root or the effective user that nobody else can
+/// write, itself a directory owned by root or the effective user.
+fn configured(directory: &Path, identity: &Identity) -> Result<File> {
     validate_path(directory)?;
     let parts = directory
         .components()
@@ -645,17 +658,24 @@ fn root(directory: &Path, identity: &Identity) -> Result<File> {
     let root = open_at(&current, last, libc::O_RDONLY | libc::O_DIRECTORY)
         .map_err(|_| Failure::Unavailable)?;
     let stat = root.metadata().map_err(|_| Failure::Unavailable)?;
-    if !stat.is_dir() || !identity.trusted_owner(stat.uid()) || !read_only(&root) {
+    if !stat.is_dir() || !identity.trusted_owner(stat.uid()) {
         return Err(Failure::Unavailable);
     }
-    // A writable bit on a read-only mount admits no writer: the projected
-    // layout's world-writable sticky volume root is trusted only through `..data`.
     Ok(root)
 }
 
 /// The directory items are read from: the `..data` sibling in the projected
 /// layout, the configured directory itself in the flat one (check 3).
 fn layout(root: File, identity: &Identity) -> Checked<File> {
+    match data(&root, identity)? {
+        Some(sibling) => Ok(sibling),
+        None => Ok(root),
+    }
+}
+
+/// Check 3: the `..data` sibling of the projected layout, `None` in the flat
+/// one (no `..data` at all).
+fn data(root: &File, identity: &Identity) -> Checked<Option<File>> {
     let data = name(OsStr::new(DATA))?;
     let mut stat = std::mem::MaybeUninit::<libc::stat>::uninit();
     // SAFETY: root and data are live; stat is writable storage for one stat.
@@ -669,7 +689,7 @@ fn layout(root: File, identity: &Identity) -> Checked<File> {
     };
     if found != 0 {
         return if std::io::Error::last_os_error().raw_os_error() == Some(libc::ENOENT) {
-            Ok(root)
+            Ok(None)
         } else {
             Err(Refusal::Refused)
         };
@@ -699,13 +719,108 @@ fn layout(root: File, identity: &Identity) -> Checked<File> {
         return Err(Refusal::Refused);
     }
     let sibling = open_at(
-        &root,
+        root,
         OsStr::from_bytes(target),
         libc::O_RDONLY | libc::O_DIRECTORY,
     )
     .map_err(|_| Refusal::Refused)?;
     trusted_directory(&sibling, identity)?;
-    Ok(sibling)
+    Ok(Some(sibling))
+}
+
+/// Open the file the platform delivers at `path` for reading, under the
+/// directory checks an item is read under, for a file that is configuration
+/// rather than a credential (a served host's standing grant file,
+/// docs/running-services.md):
+///
+/// 1. every directory above the file's directory passes check 1;
+/// 2. the file's directory is owned by root or the effective user, and is
+///    not group- or other-writable unless it is on a read-only mount (the
+///    projected layout's sticky volume root);
+/// 3. the last path component is either the file itself (the flat layout),
+///    or the symbolic link `<name> -> ..data/<name>` owned by root or the
+///    effective user that a kubelet writes for a ConfigMap or Secret volume,
+///    which is resolved only through check 3's `..data`. No other symbolic
+///    link is followed anywhere on the path;
+/// 4. `admit` decides on the file's metadata, taken from a descriptor that
+///    cannot read, before the file is opened for reading: whatever stands at
+///    the name, a FIFO or a device node included, is opened only once that
+///    exact inode is admitted.
+///
+/// Nothing at `path` is `Ok(None)`. Every refusal is `Unavailable` and carries
+/// no path, layout or byte. Unlike an item, the file need not be on a
+/// read-only mount, and its own mode is `admit`'s to decide.
+pub fn open_delivered(
+    path: &Path,
+    admit: impl FnOnce(&std::fs::Metadata) -> bool,
+) -> Result<Option<File>> {
+    validate_path(path)?;
+    let identity = Identity::current()?;
+    let (Some(parent), Some(file_name)) = (path.parent(), path.file_name()) else {
+        return Err(Failure::Unavailable);
+    };
+    let directory = configured(parent, &identity)?;
+    let stat = directory.metadata().map_err(|_| Failure::Unavailable)?;
+    if stat.mode() & 0o022 != 0 && !read_only(&directory) {
+        return Err(Failure::Unavailable);
+    }
+    let file_c = name(file_name)?;
+    let mut found = std::mem::MaybeUninit::<libc::stat>::uninit();
+    // SAFETY: directory and file_c are live; found is writable storage for one stat.
+    let looked = unsafe {
+        libc::fstatat(
+            directory.as_raw_fd(),
+            file_c.as_ptr(),
+            found.as_mut_ptr(),
+            libc::AT_SYMLINK_NOFOLLOW,
+        )
+    };
+    if looked != 0 {
+        return if std::io::Error::last_os_error().raw_os_error() == Some(libc::ENOENT) {
+            Ok(None)
+        } else {
+            Err(Failure::Unavailable)
+        };
+    }
+    // SAFETY: fstatat succeeded and initialized found.
+    let found = unsafe { found.assume_init() };
+    let base = if found.st_mode & libc::S_IFMT == libc::S_IFLNK {
+        // The projected layout: exactly `..data/<name>`, then `..data` itself.
+        let mut expected = format!("{DATA}/").into_bytes();
+        expected.extend_from_slice(file_name.as_bytes());
+        let mut target = [0u8; 512];
+        // SAFETY: directory and file_c are live; target has the stated capacity.
+        let length = unsafe {
+            libc::readlinkat(
+                directory.as_raw_fd(),
+                file_c.as_ptr(),
+                target.as_mut_ptr().cast(),
+                target.len(),
+            )
+        };
+        if !identity.trusted_owner(found.st_uid)
+            || usize::try_from(length).ok() != Some(expected.len())
+            || target[..expected.len()] != expected[..]
+        {
+            return Err(Failure::Unavailable);
+        }
+        data(&directory, &identity)?.ok_or(Failure::Unavailable)?
+    } else {
+        directory
+    };
+    let held = match open_at(&base, file_name, libc::O_PATH) {
+        Ok(held) => held,
+        // Removed since it was found: no file is there now.
+        Err(Refusal::Absent) if found.st_mode & libc::S_IFMT != libc::S_IFLNK => {
+            return Ok(None);
+        }
+        Err(_) => return Err(Failure::Unavailable),
+    };
+    let metadata = held.metadata().map_err(|_| Failure::Unavailable)?;
+    if !metadata.is_file() || !admit(&metadata) {
+        return Err(Failure::Unavailable);
+    }
+    reopen_for_reading(&held, &metadata).map(Some)
 }
 
 /// What check 5 reads of an opened item.

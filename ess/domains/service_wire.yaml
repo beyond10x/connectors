@@ -63,6 +63,22 @@ types:
       - {name: operation, type: String}
       - {name: revision, type: String}
       - {name: input, type: Json}
+  # The request a host whose configuration sets `standing_grants` reads on the
+  # first binding (compatibility.md §2.1, "Keyed writes under a standing
+  # grant"): InvokeRequest plus the §4 member `idempotency_key`, which a write
+  # there must carry and any other operation must not. A host without
+  # `standing_grants` reads InvokeRequest.
+  - name: connectors.service_wire.KeyedInvokeRequest
+    kind: struct
+    fields:
+      - {name: version, type: String}
+      - {name: request_id, type: String}
+      - {name: operation, type: String}
+      - {name: revision, type: String}
+      - {name: input, type: Json}
+      # 1 to 256 UTF-8 bytes, compared exactly (operations §5.1); absent, never
+      # null.
+      - {name: idempotency_key, type: "Optional<String>", presence: omitted_when_absent}
   # compatibility.md §5: Error remains {code, message, retry_after_seconds?}.
   # ESS-LIMIT: the 512 UTF-8 byte message ceiling and the positive retry value
   # are codec obligations of this binding.

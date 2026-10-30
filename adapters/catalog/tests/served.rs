@@ -43,6 +43,8 @@ const SOURCE: &str = "/srv/secret";
 const MOUNTED: &str = "/run/connectors/credential";
 const BINARY: &str = "/bin-test/connectors-catalog-provider";
 const CONFIG: &str = "/srv/served.json";
+/// The standing grant file a host that serves writes reads at every write.
+const GRANTS: &str = "/srv/grants.json";
 
 /// One request the provider answered: method, path (without the query) and the
 /// `PRIVATE-TOKEN` it carried.
@@ -115,12 +117,34 @@ impl Provider {
                             .filter(|(name, _)| name.eq_ignore_ascii_case("private-token"))
                             .map(|(_, value)| value.trim().to_owned())
                     });
+                    // A write's body is read whole before the answer, so
+                    // the connection closes with nothing left unread.
+                    let length: usize = head
+                        .lines()
+                        .find_map(|line| {
+                            line.split_once(':')
+                                .filter(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+                                .and_then(|(_, value)| value.trim().parse().ok())
+                        })
+                        .unwrap_or(0);
+                    let mut sent = vec![0; length.min(65_536)];
+                    if stream.read_exact(&mut sent).await.is_err() {
+                        continue;
+                    }
                     let route = target.split('?').next().unwrap_or_default().to_owned();
                     let known = matches!(token.as_deref(), Some(TOKEN | ROTATED));
                     let (status, body) = if !known {
                         (401, json!({"message": "401 Unauthorized"}))
                     } else if method == "GET" && route == "/api/v4/projects/7" {
                         (200, json!({"id": 7, "name": "fixture"}))
+                    } else if method == "POST" && route == "/api/v4/projects/7/issues" {
+                        // GitLab's created issue (`APIEntitiesIssue`).
+                        let sent: Value = serde_json::from_slice(&sent).unwrap_or(Value::Null);
+                        (
+                            201,
+                            json!({"id": 501, "iid": 3, "project_id": 7, "title": sent["title"],
+                                   "state": "opened"}),
+                        )
                     } else {
                         (404, json!({"message": "404 Not Found"}))
                     };
@@ -335,6 +359,29 @@ impl Served {
         self.log.lock().unwrap().clone()
     }
 
+    /// [`Served::new`] whose host reads `grants` as its standing grant file
+    /// (`service.standing_grants`), laid out private in the jail.
+    fn granted(
+        provider: &Provider,
+        instance: &str,
+        profile: &str,
+        catalog: Value,
+        grants: &Value,
+    ) -> Self {
+        let served = Self::new(provider, instance, profile, catalog);
+        let write = |inside: &str, bytes: &[u8]| {
+            let path = served.path(inside);
+            fs::write(&path, bytes).unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        };
+        write(GRANTS, &serde_json::to_vec(grants).unwrap());
+        let mut config: Value =
+            serde_json::from_slice(&fs::read(served.path(CONFIG)).unwrap()).unwrap();
+        config["service"]["standing_grants"] = json!(GRANTS);
+        write(CONFIG, &serde_json::to_vec(&config).unwrap());
+        served
+    }
+
     fn started(provider: &Provider, instance: &str, profile: &str, catalog: Value) -> Self {
         let mut served = Self::new(provider, instance, profile, catalog);
         served.deliver("..2026_10_30_00_00_00.000000001", &document(TOKEN), 0o400);
@@ -473,6 +520,116 @@ async fn a_served_catalog_instance_describes_and_reads() {
         .await;
     assert_ne!(status, 200, "{answer}");
     assert_eq!(provider.seen().len(), 1, "no write reached the provider");
+}
+
+/// story:served-keyed-writes-under-a-standing-approval, its catalog part: with
+/// a standing grant file the served instance describes its writes, and a
+/// keyed `issue.create` the grant covers reaches the provider once with the
+/// mounted credential. The same key and input again is a replay with no
+/// second request; a write to a project the grant does not name, and a write
+/// without a key, are refused before any request.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_served_catalog_write_under_a_standing_grant_is_sent_once() {
+    let provider = Provider::new();
+    let grants = json!({
+        "format": "connectors.standing-grants/1",
+        "grants": [{
+            "id": "g-fixture-issues", "instance": "gitlab.fixture", "operation": "issue.create",
+            "target": [{"pointer": "/id", "value": "7"}],
+            "not_after_unix_ms": 4_000_000_000_000_i64, "max_per_hour": 5
+        }],
+        "revoked": []
+    });
+    let mut served = Served::granted(
+        &provider,
+        "gitlab.fixture",
+        "gitlab.pat",
+        gitlab(&provider),
+        &grants,
+    );
+    served.deliver("..2026_10_30_00_00_00.000000001", &document(TOKEN), 0o400);
+    served.start().expect("the served binary starts");
+    let descriptor = served.describe().await;
+    let create = descriptor["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|operation| operation["id"] == "issue.create")
+        .unwrap_or_else(|| panic!("issue.create is not described: {descriptor}"));
+    assert_eq!(create["profile"], "mutation");
+    let revision = descriptor["revision"].as_str().unwrap();
+
+    let keyed = |request_id: &str, key: Option<&str>, project: &str| {
+        let mut body = json!({
+            "version": "v1alpha2", "request_id": request_id, "operation": "issue.create",
+            "revision": revision, "input": {"id": project, "body": {"title": "Fixture issue"}},
+        });
+        if let Some(key) = key {
+            body["idempotency_key"] = json!(key);
+        }
+        body
+    };
+    let route = "/v1alpha2/invoke";
+    let (status, answer) = served
+        .send(
+            reqwest::Method::POST,
+            route,
+            Some(&keyed("w-1", Some("k-1"), "7")),
+        )
+        .await;
+    assert_eq!(status, 200, "{answer}\n{}", served.log());
+    assert_eq!(
+        answer["result"]["body"]["title"], "Fixture issue",
+        "{answer}"
+    );
+    assert_eq!(answer["mutation"]["classification"], "applied", "{answer}");
+    assert_eq!(answer["mutation"]["replayed"], false, "{answer}");
+    let writes = || {
+        provider
+            .seen()
+            .into_iter()
+            .filter(|seen| seen.method == "POST")
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        writes(),
+        vec![Seen {
+            method: "POST".into(),
+            route: "/api/v4/projects/7/issues".into(),
+            token: Some(TOKEN.into()),
+        }]
+    );
+
+    let (status, replay) = served
+        .send(
+            reqwest::Method::POST,
+            route,
+            Some(&keyed("w-1-again", Some("k-1"), "7")),
+        )
+        .await;
+    assert_eq!(status, 200, "{replay}");
+    assert_eq!(replay["mutation"]["replayed"], true, "{replay}");
+    assert_eq!(replay["mutation"]["attempt"], answer["mutation"]["attempt"]);
+    assert_eq!(replay["result"], answer["result"]);
+
+    for (body, status_wanted, code) in [
+        (keyed("w-2", Some("k-2"), "8"), 403, "approval_required"),
+        (keyed("w-3", None, "7"), 400, "invalid_input"),
+    ] {
+        let (status, refused) = served.send(reqwest::Method::POST, route, Some(&body)).await;
+        assert_eq!(status, status_wanted, "{refused}");
+        assert_eq!(refused["error"]["code"], code, "{refused}");
+        assert!(refused["mutation"].is_null(), "{refused}");
+    }
+    // The legacy route reads no grant, so on this host it runs no write.
+    let legacy = json!({"version": "v1alpha1", "request_id": "w-4", "operation": "issue.create",
+        "revision": revision, "input": {"id": "7", "body": {"title": "Fixture issue"}}});
+    let (status, refused) = served
+        .send(reqwest::Method::POST, "/v1/invoke", Some(&legacy))
+        .await;
+    assert_eq!(status, 501, "{refused}");
+    assert_eq!(refused["error"]["code"], "unsupported", "{refused}");
+    assert_eq!(writes().len(), 1, "one write reached the provider");
 }
 
 /// The credential is the mounted item's bytes at each request: a rotation is
