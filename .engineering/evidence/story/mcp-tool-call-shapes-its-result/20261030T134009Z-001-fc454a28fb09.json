@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T13:40:09Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-tool-call-shapes-its-result",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test -p connectors --test mcp_tool_call_shapes_adversary",
+    "reference": "f266905a1: 1 passed 4 failed (adversary s2/adv) vs f29b2a4a1: 5 passed; mcp_tool_call_shapes 7, local_mcp_server 14, invoke_walks 12 passed; VERIFIED, correction round 1"
+  }
+}

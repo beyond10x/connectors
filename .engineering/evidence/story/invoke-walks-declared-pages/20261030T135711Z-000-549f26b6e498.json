@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T13:57:11Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-walks-declared-pages",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "wave D240 targeted gate on 9179b5e3d (connectors shaping, walk and MCP targets, catalog walk targets, connectors-build projection targets, clippy -D warnings, cli, docs and tool-contract drift checks, aep validate)",
+    "reference": "wave/d240-output-shaping@9179b5e3d"
+  }
+}

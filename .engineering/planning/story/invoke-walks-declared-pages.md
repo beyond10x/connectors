@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:invoke-walks-declared-pages
 kind: story
-status: active
+status: implemented
 title: invoke --walk follows a declared walk and writes or streams NDJSON with a summary
 tags:
 - d240
@@ -11,10 +11,11 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:invoke-shapes-its-result
 - depends_on: story:catalog-operation-declares-its-walk
-revision: 3
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T11:46:45Z", actor: "human:timo", revision: 2, executor: "agent:conn-d240", correlation: "wave-d240-output-shaping"}
 - {from: "proposed", to: "active", at: "2026-10-30T11:46:45Z", actor: "human:timo", revision: 3, executor: "agent:conn-d240", correlation: "wave-d240-output-shaping"}
+- {from: "active", to: "implemented", at: "2026-10-30T13:57:11Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1,"review_outcome":2,"verification":1}}, executor: "agent:conn-d240", correlation: "wave-d240-output-shaping"}
 ---
 ## Problem
 
@@ -55,3 +56,15 @@ already serves two-page walks for comments and audits): two-page walk to a file 
 `end`/`complete`, `--out -`, `--max-pages 1` gives `complete:false` and `resume`, an existing
 `--out` file refused, `--walk` without `--out` refused, undeclared operation refused as
 `unsupported`, write refused, a mid-walk refusal keeps written records.
+
+## Implemented
+
+Wave D240, merged into `wave/d240-output-shaping` at 9179b5e3d; release 0.63.0.
+
+- `apps/connectors/src/walk.rs`: each page is one admitted read; default 20 pages, at most 10,000.
+  `--walk` requires `--out`. The file is created exclusively with mode 0600 and a page lands whole.
+  Positions are kept as SHA-256 values, and a plain position over 16 KiB is `invalid_position`.
+- The `InvokeWalked` summary: `pages`, `records`, `complete`, `end`, `stopped`, `error`, `status`,
+  `resume`, `out`, `missing`.
+- Tests: `invoke_walks.rs` (12), `invoke_walks_adversary.rs` (4), `security_invoke_walks.rs` (4).
+- Reviews: `review-result:adversary-d240-s4-pass-1` and `review-result:security-d240-s3-s4`, fixed.

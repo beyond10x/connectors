@@ -2,17 +2,18 @@
 format: aep.planning-md/3
 id: story:catalog-operation-declares-its-walk
 kind: story
-status: active
+status: implemented
 title: A catalog read declares how its pages are walked and when the walk ends
 tags:
 - d240
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T11:46:44Z", actor: "human:timo", revision: 2, executor: "agent:conn-d240", correlation: "wave-d240-output-shaping"}
 - {from: "proposed", to: "active", at: "2026-10-30T11:46:45Z", actor: "human:timo", revision: 3, executor: "agent:conn-d240", correlation: "wave-d240-output-shaping"}
+- {from: "active", to: "implemented", at: "2026-10-30T13:57:11Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1,"review_outcome":2,"verification":1}}, executor: "agent:conn-d240", correlation: "wave-d240-output-shaping"}
 ---
 ## Problem
 
@@ -62,3 +63,17 @@ the description the owner admits) carries the walk.
 Carrying `walk` through the definition lowerer into `connectors-definition/1`: that format's
 schema is owned by the definitions repository, so it is a follow-up story there
 (`story:definition-lowerer-carries-walk`). Running the walk is `story:invoke-walks-declared-pages`.
+
+## Implemented
+
+Wave D240, merged into `wave/d240-output-shaping` at 9179b5e3d; release 0.63.0.
+
+- `adapters/catalog/src/walk.rs` and the ESS domain `adapters/catalog/spec/ess/domains/walk.yaml`;
+  the declaration reaches callers as `x-connectors-walk` in the operation input schema.
+- Walks declared for Zendesk (5 reads), Gmail, Google Calendar, Google Drive, Confluence v1 and v2,
+  Jira `issues.search`, HubSpot `objects.list` and Slack.
+- `connectors-build` import reports each walk it drops, naming
+  `story:definition-lowerer-carries-walk`.
+- Tests: `walk_declarations.rs`, `walk_adversary.rs`, `walk_import_adversary.rs`,
+  `catalog_walk_model.rs`.
+- Reviews: `review-result:adversary-d240-s3-pass-1` and `review-result:security-d240-s3-s4`, fixed.

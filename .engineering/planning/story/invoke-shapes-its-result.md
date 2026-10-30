@@ -2,17 +2,18 @@
 format: aep.planning-md/3
 id: story:invoke-shapes-its-result
 kind: story
-status: active
+status: implemented
 title: invoke --fields and --each print only the named members of a provider result
 tags:
 - d240
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T11:46:44Z", actor: "human:timo", revision: 2, executor: "agent:conn-d240", correlation: "wave-d240-output-shaping"}
 - {from: "proposed", to: "active", at: "2026-10-30T11:46:44Z", actor: "human:timo", revision: 3, executor: "agent:conn-d240", correlation: "wave-d240-output-shaping"}
+- {from: "active", to: "implemented", at: "2026-10-30T13:57:10Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1,"review_outcome":1,"verification":1}}, executor: "agent:conn-d240", correlation: "wave-d240-output-shaping"}
 ---
 ## Problem
 
@@ -67,3 +68,15 @@ before any call. Path-grammar unit tests in the shaping module.
 
 Filters, a jq or JSONPath dependency, nested caller-declared templates, shaping of `instances
 list`, `operations list` and `connections list` (needs an `ess-cli/1` global; later).
+
+## Implemented
+
+Wave D240, merged into `wave/d240-output-shaping` at 9179b5e3d; release 0.63.0.
+
+- `apps/connectors/src/shape.rs`: field lists, member paths, RFC 6901 pointers and aliases, applied
+  after the owner, the audit record and the mutation ledger hold the full answer.
+- Contract section "Shaping a result" in `contracts/cli/v1alpha1/semantics.md`; `InvokeShaped` in
+  the CLI specification.
+- Tests: `apps/connectors/tests/invoke_shapes.rs` (13), `invoke_shapes_adversary.rs` (3).
+- Review: `review-result:adversary-d240-s1-pass-1`, fixed. The contract was narrowed: a key holding
+  `,` or leading or trailing whitespace cannot be named.
