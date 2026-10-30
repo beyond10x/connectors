@@ -103,8 +103,8 @@ is refused at `operations describe` as well as at invocation.
 
 ```sh
 target/release/connectors --output json connections connect --connector postgres --instance warehouse --profile postgres.password --credential-prompt
-target/release/connectors --output json operations describe --connector postgres --instance warehouse --operation query.read
-target/release/connectors --output json operations invoke --connector postgres --instance warehouse --connection CONNECTION --operation query.read --schema SCHEMA --revision REVISION --input-json '{"query":"SELECT id, opened_at FROM incidents WHERE severity = $1 ORDER BY opened_at DESC","parameters":["critical"],"limit":100}'
+target/release/connectors --output json invoke postgres/warehouse query.read --describe
+target/release/connectors --output json invoke postgres/warehouse query.read --input-json '{"query":"SELECT id, opened_at FROM incidents WHERE severity = $1 ORDER BY opened_at DESC","parameters":["critical"],"limit":100}'
 ```
 
 For automation, `--credential-file /absolute/private/file.json` or
@@ -181,10 +181,10 @@ parameters, never written into the statement. Every answer is the `query.read` s
 `columns`, `rows` of text or `null`, `truncated` and `provenance` — with fixed columns:
 
 ```sh
-target/release/connectors --output json operations invoke --connector postgres --instance warehouse --connection CONNECTION --operation database.list --schema SCHEMA --revision REVISION --input-json '{"limit":100}'
-target/release/connectors --output json operations invoke --connector postgres --instance warehouse --connection CONNECTION --operation table.list --schema SCHEMA --revision REVISION --input-json '{"schema":"public","limit":200}'
-target/release/connectors --output json operations invoke --connector postgres --instance warehouse --connection CONNECTION --operation table.describe --schema SCHEMA --revision REVISION --input-json '{"schema":"public","table":"incidents","limit":200}'
-target/release/connectors --output json operations invoke --connector postgres --instance warehouse --connection CONNECTION --operation index.list --schema SCHEMA --revision REVISION --input-json '{"schema":"public","table":"incidents","limit":200}'
+target/release/connectors --output json invoke postgres/warehouse database.list --input-json '{"limit":100}'
+target/release/connectors --output json invoke postgres/warehouse table.list --input-json '{"schema":"public","limit":200}'
+target/release/connectors --output json invoke postgres/warehouse table.describe --input-json '{"schema":"public","table":"incidents","limit":200}'
+target/release/connectors --output json invoke postgres/warehouse index.list --input-json '{"schema":"public","table":"incidents","limit":200}'
 ```
 
 | operation id | columns |
@@ -286,8 +286,8 @@ configuration revision, so re-copy `configuration_revision` after changing one, 
 profile's own parameters and typed columns:
 
 ```sh
-target/release/connectors --output json operations describe --connector postgres --instance warehouse --operation profile.read
-target/release/connectors --output json operations invoke --connector postgres --instance warehouse --connection CONNECTION --operation profile.read --schema SCHEMA --revision REVISION --input-json '{"profile":"calls-by-number","parameters":{"number":"+99900000101","from":"2026-01-02T00:00:00Z","to":"2026-01-03T00:00:00Z"},"limit":100}'
+target/release/connectors --output json invoke postgres/warehouse profile.read --describe
+target/release/connectors --output json invoke postgres/warehouse profile.read --input-json '{"profile":"calls-by-number","parameters":{"number":"+99900000101","from":"2026-01-02T00:00:00Z","to":"2026-01-03T00:00:00Z"},"limit":100}'
 ```
 
 An answer names the profile, its `call_identifier` and `ordering` columns and each column's

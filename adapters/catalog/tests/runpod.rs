@@ -304,7 +304,7 @@ fn the_documented_policy_admits_exactly_the_two_writes() {
     );
     for (id, ..) in SHIPPED {
         assert!(
-            guide.contains(&format!("--operation {id}")),
+            guide.contains(&format!("invoke runpod/gpu {id} ")),
             "the guide has no example invocation of `{id}`"
         );
     }

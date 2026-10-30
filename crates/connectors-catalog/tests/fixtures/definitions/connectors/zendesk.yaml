@@ -29,7 +29,11 @@ operations:
   ticket.comments:
     op: ListTicketComments
     withhold: [per_page, sort_order]
-    description: List one ticket's comments by cursor, one page per call; the walk sends meta.after_cursor as page[after] and ends on a page with meta.has_more false
+    description: "List one ticket's comments by cursor, one page per call; the walk sends meta.after_cursor as page[after]. When meta.has_more is present it decides: false ends the walk, true continues even past an empty page and is an error without meta.after_cursor. Without meta.has_more the walk ends on a page with no meta.after_cursor or no comments. A cursor seen before is an error."
+  ticket.audits:
+    op: ListAuditsForTicket
+    withhold: [sort_order]
+    description: "List one ticket's audits by cursor, one page per call; the walk sends meta.after_cursor as page[after]. When meta.has_more is present it decides: false ends the walk, true continues even past an empty page and is an error without meta.after_cursor. Without meta.has_more the walk ends on a page with no meta.after_cursor or no audits. A cursor seen before is an error."
   users.incremental:
     op: IncrementalUserExportCursor
     description: Export the users changed since start_time, one page per call; the first call sends start_time, each later call sends the previous page's after_cursor as cursor, and the walk ends on a page with end_of_stream true

@@ -82,12 +82,8 @@ connectors connections connect --connector openrouter --instance router \
 
 ## A first read
 
-Take `--schema` and `--revision` from `operations describe --connector openrouter --instance
-router --operation workspaces.list`, then:
-
 ```sh
-connectors operations invoke --connector openrouter --instance router --connection "$connection" \
-  --operation workspaces.list --schema "$schema" --revision "$revision" --input-json '{}'
+connectors invoke openrouter/router workspaces.list --input-json '{}'
 ```
 
 ## A first guarded write
@@ -99,9 +95,16 @@ returns only that connection's reference and the key's `hash`. The management in
 keys, a second pinned instance `inference` granted only `key.get`, a signing key, an
 `[approval_clock]` table and a policy naming the write; the
 [full guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-openrouter.md#creating-a-key)
-shows each table. Then prepare, issue and invoke:
+shows each table. Then take the connection, and the schema and revision from `invoke --describe`,
+prepare, issue and invoke:
 
 ```sh
+connection=$(connectors --output json connections list --connector openrouter --instance router \
+  | jq -r '.result.connections[0].connection')
+schema=$(connectors --output json invoke openrouter/router key.create --describe \
+  | jq -r .result.schema)
+revision=$(connectors --output json invoke openrouter/router key.create --describe \
+  | jq -r .result.revision)
 connectors approvals prepare --connector openrouter --instance router \
   --connection "$connection" --operation key.create --schema "$schema" --revision "$revision" \
   --input-json '{"body":{"name":"agent-inference","limit":5,"limit_reset":"monthly"}}'
@@ -109,8 +112,7 @@ connectors approvals issue --connector openrouter --instance router \
   --connection "$connection" --operation key.create --schema "$schema" --revision "$revision" \
   --input-json '{"body":{"name":"agent-inference","limit":5,"limit_reset":"monthly"}}' \
   --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof.json"
-connectors operations invoke --connector openrouter --instance router \
-  --connection "$connection" --operation key.create --schema "$schema" --revision "$revision" \
+connectors invoke openrouter/router key.create \
   --input-json '{"body":{"name":"agent-inference","limit":5,"limit_reset":"monthly"}}' \
   --idempotency-key agent-inference-1 --approval-file "$HOME/private/proof.json"
 ```

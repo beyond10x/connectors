@@ -51,9 +51,9 @@ Every release is a source release with `connectors` binaries for Linux and macOS
 - The **local `connectors` CLI** keeps connection metadata in Entity Runtime over an Eventlog SQLite
   store and credentials in the platform's keyring, starts the process that serves each configured
   instance and runs approved writes ([local runtime](./concepts/local-runtime.md)).
-- **Standalone services** answer `describe` and `invoke` over HTTP, alone or behind one federation
-  host ([getting started](./getting-started.md)); see
-  [federate services](./guides/federate-adapter-services.md) for a host in front of an internal service.
+- **Standalone services** answer `describe` and `invoke` over HTTP ([getting started](./getting-started.md));
+  a Rust program can put one federation host in front of several
+  ([federate services](./guides/federate-adapter-services.md), a host for internal services).
 
 ## What it is not
 

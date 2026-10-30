@@ -3,7 +3,7 @@
 //! production CLI, owner, catalog child, a local TLS Slack fixture and the
 //! disposable Secret Service. `approvals prepare` names a subject;
 //! `approvals issue --approve-subject` with that subject issues its approval,
-//! and `operations invoke --approval-file` posts the message once. An
+//! and `invoke slack/bot chat.postMessage --approval-file` posts the message once. An
 //! `invalid_input` from `issue` names the argument it refused: here the proof
 //! output, the only argument `issue` reads that `prepare` does not. The
 //! fixture token is fictional and only ever compared, never printed.
@@ -422,10 +422,18 @@ fn a_slack_bot_post_is_issued_the_approval_its_prepare_named_and_invoked_with_it
     );
     assert!(slack.posts().is_empty(), "issuing posted a message");
 
-    // The write runs once with that proof.
+    // The write runs once with that proof, through `invoke <connector>/<instance>
+    // <operation>` (story:connectors-do-short-invocation): the prepared
+    // target's pins without its `--operation`, which is positional.
+    let pins: Vec<&str> = target
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| !matches!(index, 2 | 3))
+        .map(|(_, arg)| *arg)
+        .collect();
     let invoked = success(run(&[
-        &["operations", "invoke"][..],
-        &target,
+        &["invoke", "slack/bot", "chat.postMessage"][..],
+        &pins,
         &[
             "--approval-file",
             proof.to_str().unwrap(),

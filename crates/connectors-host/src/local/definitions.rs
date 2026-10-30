@@ -1,7 +1,7 @@
 //! The instances of invoked definition files (story:invoke-definition-file,
 //! architecture-decision-record:provider-definitions-and-runtimes D12 point 3).
 //!
-//! `connectors operations invoke --definition <file>` lowers the file into an
+//! `connectors invoke --definition <file>` lowers the file into an
 //! owner-only cache under the state directory, `<state>/definitions/<digest>/`,
 //! and holds the instance's entry in an owner-only file beside it,
 //! `<state>/definitions/instances.toml`. A configuration read with
@@ -259,7 +259,7 @@ pub fn record(paths: &Paths, connector: &str, entry: &Entry) -> Result<()> {
     Err(Failure::ConcurrentRevision)
 }
 
-/// The keys of a native configuration `operations invoke --definition` writes
+/// The keys of a native configuration `invoke --definition` writes
 /// (`apps/connectors/src/local/definition.rs` `native_configuration`).
 const NATIVE_KEYS: [&str; 8] = [
     "format",

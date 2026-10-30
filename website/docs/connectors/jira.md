@@ -50,11 +50,11 @@ endpoint = "https://your-domain.atlassian.net/rest/api/3"
 ```
 
 ```sh
-connectors instances list
+connectors instances list | jq -c '.[] | arrays | .[]'
 ```
 
 ```json
-{"adapters":[{"adapter":"jira.work","adapter_id":"catalog","connector":"jira","instance":"work","instance_id":"jira.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"connector":"jira","instance":"work","instance_id":"jira.work","restart":"never","startup":"on-demand"}
 ```
 
 ## Connect
@@ -71,14 +71,7 @@ The same file connects the [Confluence](./confluence.md) instance as the same At
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector jira --instance work \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector jira --instance work \
-  --operation issues.search | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector jira --instance work \
-  --operation issues.search | jq -r .result.revision)
-connectors operations invoke --connector jira --instance work --connection "$connection" \
-  --operation issues.search --schema "$schema" --revision "$revision" \
+connectors invoke jira/work issues.search \
   --input-json '{"jql":"project = FIX AND updated >= \"2026-09-01 00:00\" ORDER BY updated ASC","maxResults":50}'
 ```
 
@@ -104,10 +97,16 @@ Read the issue's status id (`fields.status.id` of `issue.get`) and the transitio
 {"issueIdOrKey":"FIX-1","current_status":"3","target_status":"10002","body":{"transition":{"id":"31"}}}
 ```
 
-Take the schema and revision of `issue.transition.run` from `operations describe`, then prepare,
-issue and invoke:
+Take the connection, and the schema and revision of `issue.transition.run`
+from `invoke --describe`, then prepare, issue and invoke:
 
 ```sh
+connection=$(connectors --output json connections list --connector jira --instance work \
+  | jq -r '.result.connections[0].connection')
+schema=$(connectors --output json invoke jira/work issue.transition.run --describe \
+  | jq -r .result.schema)
+revision=$(connectors --output json invoke jira/work issue.transition.run --describe \
+  | jq -r .result.revision)
 connectors --output json approvals prepare --connector jira --instance work \
   --connection "$connection" --operation issue.transition.run \
   --schema "$schema" --revision "$revision" --input-file transition.json
@@ -116,8 +115,7 @@ connectors approvals issue --connector jira --instance work \
   --connection "$connection" --operation issue.transition.run \
   --schema "$schema" --revision "$revision" --input-file transition.json \
   --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-fix-1.json"
-connectors operations invoke --connector jira --instance work --connection "$connection" \
-  --operation issue.transition.run --schema "$schema" --revision "$revision" \
+connectors invoke jira/work issue.transition.run \
   --input-file transition.json --approval-file "$HOME/private/proof-fix-1.json" \
   --idempotency-key fix-1-31
 ```

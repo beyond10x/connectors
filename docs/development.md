@@ -287,8 +287,9 @@ jq -n '{format: "connectors-live-read-loop/1", reads: [
   > ~/connectors-live/reads.json
 ```
 
-Each read is resolved once with `operations describe` (retried in the next round if that fails).
-It is then invoked every round with `operations invoke`; those are the only two commands the
+Each read is resolved once with `operations describe` (retried in the next round if that fails),
+which names its connector, instance, schema and revision. It is then invoked every round with
+`invoke <connector>/<instance> <operation>` and those values; those are the only two commands the
 loop issues. A call is answered only when it exits 0 with `{"ok":true}`, any provider `status`
 in the result is 2xx and the provider body is not `{"ok":false}`. Anything else is unanswered:
 a refusal, a timeout, a non-JSON answer, or an exit status that contradicts the envelope.

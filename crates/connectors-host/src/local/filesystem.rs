@@ -427,8 +427,41 @@ pub fn publish_replace(parent: &File, child: &OsStr, contents: &[u8]) -> Result<
     publish(parent, child, contents, 0)
 }
 
+/// [`publish_replace`] whose new file has exactly the permission bits `mode`,
+/// which must be owner-only (no group or other bit): a replacement keeps the
+/// mode of the owner-only file it replaces (story:connectors-do-short-invocation).
+/// On Windows the handle's own admission applies and `mode` is not used.
+pub fn publish_replace_keeping(
+    parent: &File,
+    child: &OsStr,
+    contents: &[u8],
+    mode: u32,
+) -> Result<()> {
+    if mode & 0o077 != 0 || mode & !0o700 != 0 {
+        return Err(Failure::InvalidConfiguration);
+    }
+    #[cfg(unix)]
+    let published = publish_with_mode(parent, child, contents, 0, Some(mode));
+    #[cfg(windows)]
+    let published = publish(parent, child, contents, 0);
+    published
+}
+
 #[cfg(unix)]
 fn publish(parent: &File, child: &OsStr, contents: &[u8], flags: libc::c_uint) -> Result<()> {
+    publish_with_mode(parent, child, contents, flags, None)
+}
+
+/// `publish` with the temporary file's mode set to exactly `mode` before any
+/// byte is written, when given; else it is created `0o600` under the umask.
+#[cfg(unix)]
+fn publish_with_mode(
+    parent: &File,
+    child: &OsStr,
+    contents: &[u8],
+    flags: libc::c_uint,
+    mode: Option<u32>,
+) -> Result<()> {
     #[cfg(target_os = "macos")]
     if flags & NO_REPLACE != 0 {
         qualify_rename_excl(parent)?;
@@ -442,6 +475,20 @@ fn publish(parent: &File, child: &OsStr, contents: &[u8], flags: libc::c_uint) -
         0o600,
     )
     .map_err(|_| Failure::InvalidConfiguration)?;
+    if let Some(mode) = mode {
+        use std::os::unix::fs::PermissionsExt;
+        if file
+            .set_permissions(std::fs::Permissions::from_mode(mode))
+            .is_err()
+        {
+            let temporary_c = name(temp_name)?;
+            // SAFETY: only this call's unguessable temporary name is removed.
+            unsafe {
+                libc::unlinkat(parent.as_raw_fd(), temporary_c.as_ptr(), 0);
+            }
+            return Err(Failure::InvalidConfiguration);
+        }
+    }
     let temporary_c = name(temp_name)?;
     let child_c = name(child)?;
     let result = (|| {

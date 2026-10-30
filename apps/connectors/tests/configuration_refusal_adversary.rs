@@ -35,7 +35,7 @@ fn mismatched_v1(root: &tempfile::TempDir) {
         .unwrap()
         .replace("connectors-local/2", "connectors-local/1")
         + &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=['--connector','jira']\n",
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
@@ -75,11 +75,7 @@ fn every_cli_command_refusing_a_mismatched_entry_names_format_and_entry() {
             "--operation",
             "read",
         ],
-        [
-            vec!["operations", "invoke", "--adapter", "forge"],
-            invoke_tail.to_vec(),
-        ]
-        .concat(),
+        vec!["invoke", "jira/forge", "read", "--input-json", "{}"],
         vec!["approvals", "policy-status", "--adapter", "forge"],
         vec!["approvals", "key-status", "--adapter", "forge"],
         [

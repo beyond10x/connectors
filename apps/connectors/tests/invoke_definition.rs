@@ -1,11 +1,13 @@
-//! story:invoke-definition-file: `operations invoke --definition <file>` is a
-//! third selector, exclusive with `--adapter` and with `--connector` and
-//! `--instance`; a definition whose instance the configuration already holds
-//! is refused by name; a definition the lowerer refuses is refused before any
-//! owner, provider or credential is touched; and the operator's configuration
-//! file is never written (`contracts/cli/v1alpha1/semantics.md` §3, "Invoking a
-//! definition file"). These cases start no provider: the journey through a
-//! disposable HTTPS provider is `adapters/catalog/tests/local_runtime/invoke_definition.rs`.
+//! story:invoke-definition-file, under story:connectors-do-short-invocation:
+//! `invoke --definition <file> <operation>` names its connector by the file,
+//! and a target beside it may only name that connector; a definition whose
+//! instance the configuration already holds is refused by name; a definition
+//! the lowerer refuses is refused before any owner, provider or credential is
+//! touched; and the operator's configuration file is never written
+//! (`contracts/cli/v1alpha1/semantics.md` §3, "Invoking an operation" and
+//! "Invoking a definition file"). These cases start no provider: the journey
+//! through a disposable HTTPS provider is
+//! `adapters/catalog/tests/local_runtime/invoke_definition.rs`.
 use serde_json::Value;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -135,16 +137,15 @@ impl Fixture {
 
     fn args<'a>(definition: &'a str, extra: &[&'a str]) -> Vec<&'a str> {
         let mut args = vec![
-            "operations",
             "invoke",
             "--definition",
             definition,
-            "--operation",
-            "project.get",
             "--input-json",
             r#"{"id":"org/project"}"#,
         ];
         args.extend_from_slice(extra);
+        // The one positional: the operation.
+        args.push("project.get");
         args
     }
 
@@ -196,20 +197,44 @@ fn refused(output: &Output, exit: i32) -> Value {
     envelope["error"]["data"].clone()
 }
 
+/// story:connectors-do-short-invocation: the file names the connector. A
+/// target beside it naming another connector is `invalid_input`
+/// naming `target`, and `invoke` takes no `--adapter`, `--connector` or
+/// `--instance`: each is a parse refusal. Nothing is cached or written.
 #[test]
-fn definition_is_a_third_selector_exclusive_with_the_other_two() {
+fn a_definition_is_named_by_its_file_and_takes_no_other_selector() {
     let fixture = Fixture::new("", b"not read");
     let before = fs::read(fixture.config()).unwrap();
+    for target in ["other", "other/definition"] {
+        let data = refused(&fixture.invoke(&[target]), 2);
+        assert_eq!(
+            (&data["code"], &data["stage"], &data["field"]),
+            (
+                &Value::from("invalid_input"),
+                &Value::from("arguments"),
+                &Value::from("target")
+            ),
+            "story:connectors-do-short-invocation: {target}: {data}"
+        );
+    }
     for extra in [
         &["--adapter", "forge"][..],
         &["--connector", "forge", "--instance", "definition"],
         &["--connector", "forge"],
         &["--instance", "definition"],
     ] {
-        let data = refused(&fixture.invoke(extra), 2);
-        assert_eq!(data["code"], "invalid_input", "{extra:?} {data}");
-        assert_eq!(data["stage"], "arguments", "{extra:?} {data}");
-        assert_eq!(data["next_action"], "none", "{extra:?} {data}");
+        let output = fixture.invoke(extra);
+        assert_eq!(
+            (
+                output.status.code(),
+                String::from_utf8_lossy(&output.stderr)
+            ),
+            (
+                Some(2),
+                "{\"error\":{\"code\":\"cli_parse\",\"data\":{}},\"ok\":false}\n".into()
+            ),
+            "story:connectors-do-short-invocation: {extra:?}"
+        );
     }
     assert_eq!(fs::read(fixture.config()).unwrap(), before);
     assert!(!fixture.state().join("definitions").exists());
@@ -223,14 +248,11 @@ fn definitions_root_and_credential_file_are_refused_without_a_definition() {
         &["--credential-file", "/fixture/client.json"],
     ] {
         let mut args = vec![
-            "operations",
             "invoke",
-            "--adapter",
             "forge",
+            "project.get",
             "--connection",
             "c1",
-            "--operation",
-            "project.get",
             "--schema",
             "s1",
             "--revision",
@@ -240,29 +262,41 @@ fn definitions_root_and_credential_file_are_refused_without_a_definition() {
         ];
         args.extend_from_slice(extra);
         let data = refused(&fixture.run(&args), 2);
-        assert_eq!(data["code"], "invalid_input", "{extra:?} {data}");
-        assert_eq!(data["stage"], "arguments", "{extra:?} {data}");
+        let field = extra[0].trim_start_matches("--").replace('-', "_");
+        assert_eq!(
+            (&data["code"], &data["stage"], &data["field"]),
+            (
+                &Value::from("invalid_input"),
+                &Value::from("arguments"),
+                &Value::from(field)
+            ),
+            "story:connectors-do-short-invocation: {extra:?} {data}"
+        );
     }
 }
 
+/// story:connectors-do-short-invocation: without `--definition` nothing names
+/// the connector, so one positional (the operation) is `invalid_input` naming
+/// the missing `target`, before anything is read.
 #[test]
-fn without_a_definition_schema_and_revision_stay_required() {
+fn without_a_definition_the_target_stays_required() {
     let fixture = Fixture::new("", b"not read");
-    let output = fixture.run(&[
-        "operations",
-        "invoke",
-        "--adapter",
-        "forge",
-        "--connection",
-        "c1",
-        "--operation",
-        "project.get",
-        "--input-json",
-        "{}",
-    ]);
-    assert_eq!(output.status.code(), Some(2), "{output:?}");
-    let envelope: Value = serde_json::from_slice(&output.stderr).unwrap();
-    assert_eq!(envelope["error"]["code"], "cli_parse", "{envelope}");
+    let before = fs::read(fixture.config()).unwrap();
+    let data = refused(
+        &fixture.run(&["invoke", "project.get", "--input-json", "{}"]),
+        2,
+    );
+    assert_eq!(
+        (&data["code"], &data["stage"], &data["field"]),
+        (
+            &Value::from("invalid_input"),
+            &Value::from("arguments"),
+            &Value::from("target")
+        ),
+        "story:connectors-do-short-invocation: {data}"
+    );
+    assert_eq!(fs::read(fixture.config()).unwrap(), before);
+    assert!(!fixture.state().join("definitions").exists());
 }
 
 #[test]
@@ -316,11 +350,9 @@ fn a_definition_that_cannot_be_read_is_invalid_input() {
     let missing = fixture.root.path().join("defs/connectors/absent.yaml");
     let data = refused(
         &fixture.run(&[
-            "operations",
             "invoke",
             "--definition",
             missing.to_str().unwrap(),
-            "--operation",
             "project.get",
             "--input-json",
             "{}",
@@ -329,6 +361,10 @@ fn a_definition_that_cannot_be_read_is_invalid_input() {
     );
     assert_eq!(data["code"], "invalid_input", "{data}");
     assert_eq!(data["stage"], "arguments", "{data}");
+    assert_eq!(
+        data["field"], "definition",
+        "story:connectors-do-short-invocation: {data}"
+    );
 }
 
 /// A definition path that is a named pipe is one that cannot be read, refused

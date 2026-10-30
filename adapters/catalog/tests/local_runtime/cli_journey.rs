@@ -222,14 +222,11 @@ impl Cli {
             operation,
         ]));
         success(self.run(&[
-            "operations",
             "invoke",
-            "--adapter",
-            "gitlab",
+            "gitlab/gitlab",
+            operation,
             "--connection",
             connection,
-            "--operation",
-            operation,
             "--schema",
             description["schema"].as_str().unwrap(),
             "--revision",
@@ -419,14 +416,11 @@ fn gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart() {
     let schema = description["schema"].as_str().unwrap().to_owned();
     let descriptor = description["revision"].as_str().unwrap().to_owned();
     let invoke = [
-        "operations",
         "invoke",
-        "--adapter",
-        "gitlab",
+        "gitlab/gitlab",
+        "project.get",
         "--connection",
         &reference,
-        "--operation",
-        "project.get",
         "--schema",
         &schema,
         "--revision",
@@ -922,14 +916,11 @@ fn a_provider_refusal_reads_dispatch_and_a_host_refusal_reads_admission() {
     let read = |operation: &str, project: &str| {
         let input = json!({"id": project}).to_string();
         cli.run(&[
-            "operations",
             "invoke",
-            "--adapter",
-            "gitlab",
+            "gitlab/gitlab",
+            operation,
             "--connection",
             &reference,
-            "--operation",
-            operation,
             "--schema",
             &schema,
             "--revision",
@@ -1087,14 +1078,11 @@ impl OAuthJourney {
             "project.get",
         ]));
         let output = self.cli.run(&[
-            "operations",
             "invoke",
-            "--adapter",
-            "drive",
+            "gitlab/drive",
+            "project.get",
             "--connection",
             reference,
-            "--operation",
-            "project.get",
             "--schema",
             description["schema"].as_str().unwrap(),
             "--revision",
@@ -1335,14 +1323,11 @@ fn adversary_u23_a_read_result_the_child_admitted_reaches_the_cli_through_the_ow
         "project.get",
     ]));
     let deep = cli.run(&[
-        "operations",
         "invoke",
-        "--adapter",
-        "gitlab",
+        "gitlab/gitlab",
+        "project.get",
         "--connection",
         &reference,
-        "--operation",
-        "project.get",
         "--schema",
         description["schema"].as_str().unwrap(),
         "--revision",

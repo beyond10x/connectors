@@ -83,14 +83,11 @@ fn catalog_cli_failed_repair_and_busy_stop_preserve_authority() {
     let schema = describe["schema"].as_str().unwrap();
     let descriptor = describe["revision"].as_str().unwrap();
     let invoke = [
-        "operations",
         "invoke",
-        "--adapter",
-        "gitlab",
+        "gitlab/gitlab",
+        "project.get",
         "--connection",
         reference,
-        "--operation",
-        "project.get",
         "--schema",
         schema,
         "--revision",
@@ -102,9 +99,22 @@ fn catalog_cli_failed_repair_and_busy_stop_preserve_authority() {
     let before = provider.count();
     let mut invalid = invoke;
     *invalid.last_mut().unwrap() = r#"{"id":"org/project","id":"org/project"}"#;
-    refusal(cli.run(&invalid), "invalid_input");
+    // The generated decoder refuses a repeated key before the owner sees it
+    // (apps/connectors/tests/invoke_short.rs, repeated_input_keys).
+    let repeated = cli.run(&invalid);
+    assert_eq!(
+        (
+            repeated.status.code(),
+            String::from_utf8_lossy(&repeated.stderr)
+        ),
+        (
+            Some(2),
+            "{\"error\":{\"code\":\"cli_dynamic_input\",\"data\":{}},\"ok\":false}\n".into()
+        ),
+        "story:connectors-do-short-invocation: invoke refuses a repeated input key as the decoder's cli_dynamic_input"
+    );
     let mut stale = invoke;
-    stale[9] = "old-schema";
+    stale[6] = "old-schema";
     refusal(cli.run(&stale), "stale_description");
     let configuration = fs::read_to_string(&cli.paths.config).unwrap();
     private(
@@ -248,14 +258,11 @@ fn catalog_cli_read_recollects_expired_evidence_without_reentry() {
         "project.get",
     ]));
     let invoke = [
-        "operations",
         "invoke",
-        "--adapter",
-        "gitlab",
+        "gitlab/gitlab",
+        "project.get",
         "--connection",
         reference,
-        "--operation",
-        "project.get",
         "--schema",
         descriptor["schema"].as_str().unwrap(),
         "--revision",
