@@ -11,7 +11,7 @@ use std::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 pub(super) struct Snapshot {
@@ -392,6 +392,12 @@ impl Snapshot {
             let envelope = reader.read(input)?;
             return Ok(shaping.single(&envelope, primary));
         };
+        // The pages stop short of the request's deadline, which also bounds
+        // writing the reply (stdio.rs): what is left is for the summary.
+        let reader = Reader {
+            until: walk_deadline(until, Instant::now()),
+            ..reader
+        };
         // Each page is one admitted read through the path a single call takes.
         // A page after the first is a new owner read, so it is admitted only
         // while local admission lasts (sessions § 4.1). The summary's envelope
@@ -509,13 +515,7 @@ impl Shaping {
                         }
                         let pages = match arguments.get("max_pages") {
                             None => connectors::walk::DEFAULT_PAGES,
-                            Some(pages) => pages
-                                .as_u64()
-                                .filter(|pages| {
-                                    (1..=u64::from(connectors::walk::MAX_PAGES)).contains(pages)
-                                })
-                                .ok_or_else(|| invalid("max_pages"))?
-                                as u32,
+                            Some(pages) => integral(pages).ok_or_else(|| invalid("max_pages"))?,
                         };
                         return Ok(Self {
                             fields,
@@ -581,6 +581,36 @@ fn tool_result(value: Value, primary: bool) -> Value {
 /// the configured response bound holds in both representations (see
 /// `Snapshot::limits`), less room for the summary and its `resume`, a page
 /// input within the request bound.
+/// What a walk leaves of its request's time for shaping, encoding and writing
+/// its reply.
+const WALK_REPLY_RESERVE: Duration = Duration::from_secs(5);
+
+/// The deadline a walk's pages share: `WALK_REPLY_RESERVE` before the
+/// request's own `until`, or `now` when less than that is left, so that the
+/// next page is refused `timeout` without reaching the owner.
+fn walk_deadline(until: Instant, now: Instant) -> Instant {
+    until
+        .checked_sub(WALK_REPLY_RESERVE)
+        .unwrap_or(now)
+        .max(now)
+}
+
+/// A `max_pages` the advertised schema admits: a JSON Schema integer, which is
+/// any number without a fractional part (`2` and `2.0`), from 1 to
+/// `MAX_PAGES`.
+fn integral(pages: &Value) -> Option<u32> {
+    let max = connectors::walk::MAX_PAGES;
+    match pages.as_u64() {
+        Some(pages) => u32::try_from(pages).ok(),
+        None => pages
+            .as_f64()
+            .filter(|pages| pages.is_finite() && pages.fract() == 0.0 && *pages >= 1.0)
+            .filter(|pages| *pages <= f64::from(max))
+            .map(|pages| pages as u32),
+    }
+    .filter(|pages| (1..=max).contains(pages))
+}
+
 fn walk_bound(input_limit: usize, result_limit: usize) -> usize {
     result_limit.saturating_sub(input_limit.saturating_add(8192))
 }
