@@ -90,6 +90,11 @@ callables:
     input: null
     result: connectors.cli.ConnectorListResult
     errors: {failure: connectors.cli.Failure}
+  definitions-install:
+    target: {kind: local, owner: connectors.cli, action: definitions-install}
+    input: connectors.cli.DefinitionsInstallInput
+    result: connectors.cli.DefinitionsInstallResult
+    errors: {failure: connectors.cli.Failure}
   adapters-list:
     target: {kind: local, owner: connectors.cli, action: adapters-list}
     input: connectors.cli.AdapterListInput
@@ -374,6 +379,15 @@ commands:
     callable: connectors-list
     about: List every connector this build ships, with its auth profiles and the instances the configuration names; needs no configuration and starts no process
     arguments: []
+  - path: [definitions, install]
+    aliases: []
+    callable: definitions-install
+    about: Fetch the connectors-definitions release TAG from SOURCE (an https repository URL or a local directory), check every file against its index.json, and record it in definitions.lock and a read-only cache; grants nothing and starts no process
+    arguments:
+      - field: source
+        source: {kind: option, long: source}
+      - field: tag
+        source: {kind: option, long: tag}
   - path: [instances, list]
     aliases: [[adapters, list]]
     callable: adapters-list

@@ -1,0 +1,24 @@
+[package]
+name = "connectors-definitions-install"
+description = "Fetches a connectors-definitions release by tag from an https repository or a local directory, checks every file against its index.json, and records it in a lock file and a read-only cache keyed by the index's SHA-256; depends on no connectors crate and embeds no catalog."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+flate2.workspace = true
+hex.workspace = true
+reqwest.workspace = true
+rustls.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tar = { version = "0.4.46", default-features = false }
+tokio.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+toml = "1.1"

@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 
 /// The summary of each command group of the binding.
-pub const GROUPS: [(&str, &str); 5] = [
+pub const GROUPS: [(&str, &str); 6] = [
     (
         "approvals",
         "Approval policy, approval proofs and approval-signing keys for writes",
@@ -17,6 +17,10 @@ pub const GROUPS: [(&str, &str); 5] = [
     (
         "connections",
         "The stored credential of an instance: connect, reconnect, inspect, launch and revoke it",
+    ),
+    (
+        "definitions",
+        "Connectors-definitions releases: install one by tag into the lock and the read-only cache",
     ),
     (
         "instances",
