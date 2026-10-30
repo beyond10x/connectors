@@ -325,13 +325,24 @@ fn a_closed_or_empty_stdin_is_one_undecodable_document() {
         .unwrap();
     drop(child.stdin.take());
     let empty = child.wait_with_output().unwrap();
-    for (what, output) in [("closed", closed), ("empty", empty)] {
+    // On Windows the null device is a character device that the standard
+    // library's `is_terminal` reports as a terminal, so a closed (`NUL`)
+    // standard input is the terminal refusal there, naming `input`.
+    let closed_refused = if cfg!(windows) {
+        "{\"error\":{\"code\":\"failure\",\"data\":{\"code\":\"invalid_input\",\"field\":\"input\",\"kind\":\"usage\",\"next_action\":\"none\",\"stage\":\"arguments\"}},\"ok\":false}\n"
+    } else {
+        refused
+    };
+    for (what, output, expected) in [
+        ("closed", closed, closed_refused),
+        ("empty", empty, refused),
+    ] {
         assert_eq!(
             (
                 output.status.code(),
                 String::from_utf8_lossy(&output.stderr).into_owned()
             ),
-            (Some(2), refused.to_owned()),
+            (Some(2), expected.to_owned()),
             "story:connectors-do-short-invocation: {what}"
         );
     }
