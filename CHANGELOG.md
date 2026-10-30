@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Added
+
+- `connectors definitions install --source <source> --tag <tag>` installs a connectors-definitions
+  release (story:definitions-install). It reads `index.json` and the release asset from an `https`
+  repository (`<source>/releases/download/<tag>/`) or a local directory (`<source>/<tag>/`),
+  checks every file against the index, and only then writes a read-only cache entry,
+  `<state>/installed-definitions/<index sha256>/`, and `definitions.lock` beside the configuration
+  file, naming source, tag, commit and index SHA-256. A digest mismatch, an index format version
+  this build does not read and a feature it does not support are refused by name
+  (`digest_mismatch`, `unknown_format_version`, `unmet_feature`), as is an index or asset outside
+  the format (`release_invalid`); a refusal leaves the lock and the cache as they were. A release
+  this binary was never built with installs without a rebuild: install takes only the supported
+  format versions and features from the build. Installing grants nothing, starts no process, and
+  no instance resolves through the lock yet. The four features install admits
+  (`embedded_text`, `query_fixed`, `query_folds`, `rate_limit_headers`) are not yet read by the
+  definition lowerer, which refuses a published definition that uses them. The core is the new library
+  `connectors-definitions-install`, which depends on no connectors crate. Contract:
+  `contracts/cli/v1alpha1/semantics.md`, "Installing a definitions release"; model:
+  `ess/domains/definitions_install.yaml`.
+
 ## 0.59.3 — 2026-10-30
 
 No breaking changes.
