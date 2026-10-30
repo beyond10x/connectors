@@ -14,11 +14,13 @@ use connectors_core::{
 use connectors_sdk::{Adapter, Credential, validate};
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc, time::Instant};
+mod token_review;
 mod v1alpha2;
 use subtle::ConstantTimeEq;
 use tokio::sync::Semaphore;
 
 pub use crate::local::service::ServiceState;
+pub use token_review::{ServiceAccountAdmission, TokenReviewConfig};
 
 /// `urn:connectors:config:v2:service` (`connectors.declarations.ServiceHostConfiguration`):
 /// the v1 members plus the optional `state` directory, which `POST
@@ -49,10 +51,144 @@ pub(crate) struct ServiceConfigV1 {
     pub service_credential: CredentialRef,
 }
 
+/// `urn:connectors:config:v3:service` (`connectors.declarations.ServiceHostConfiguration`):
+/// the v2 members plus the admission members (contracts/service/compatibility.md
+/// § 2.1, Admission). `service_credential` is present exactly under
+/// `static-bearer`. A v1 or v2 document reads here with the same meaning and
+/// serializes to the same bytes. [`ServiceConfig`] stays the closed v2 reader
+/// of the hosts that do not offer the admission profiles.
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(extend("oneOf" = [
+    {
+        "properties": {"admission": {"const": "static-bearer"}},
+        "required": ["service_credential"],
+        "not": {"anyOf": [{"required": ["audience"]}, {"required": ["principal"]}, {"required": ["token_review"]}]}
+    },
+    {
+        "properties": {"admission": {"const": "service-account-token"}},
+        "required": ["admission", "audience", "principal", "token_review"],
+        "not": {"required": ["service_credential"]}
+    }
+]))]
+pub struct ServiceConfigV3 {
+    #[schemars(length(min = 1, max = 128), regex(pattern = "^[A-Za-z0-9_.-]+$"))]
+    pub instance: String,
+    #[schemars(with = "String", length(min = 1, max = 512))]
+    pub listen: SocketAddr,
+    /// The bearer callers present under `static-bearer`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_credential: Option<CredentialRef>,
+    /// The directory of the host's local metadata authority: its audit anchors
+    /// and attempt records. Without it the host serves only `/v1/*`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>", length(min = 1, max = 4096))]
+    pub state: Option<std::path::PathBuf>,
+    /// How the host admits its caller; absent means `static-bearer`.
+    #[serde(default, skip_serializing_if = "AdmissionProfile::is_static_bearer")]
+    pub admission: AdmissionProfile,
+    /// The one audience a `service-account-token` review asks for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(length(min = 1, max = 256))]
+    pub audience: Option<String>,
+    /// The one service account a `service-account-token` host admits,
+    /// `system:serviceaccount:<namespace>:<name>`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(length(min = 1, max = 128), regex(pattern = token_review::PRINCIPAL_PATTERN))]
+    pub principal: Option<String>,
+    /// The TokenReview endpoint of a `service-account-token` host.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token_review: Option<TokenReviewConfig>,
+}
+
+/// `connectors.declarations.ServiceAdmissionProfile`.
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum AdmissionProfile {
+    #[default]
+    StaticBearer,
+    ServiceAccountToken,
+}
+impl AdmissionProfile {
+    fn is_static_bearer(&self) -> bool {
+        *self == Self::StaticBearer
+    }
+}
+
+impl From<ServiceConfig> for ServiceConfigV3 {
+    fn from(config: ServiceConfig) -> Self {
+        Self {
+            instance: config.instance,
+            listen: config.listen,
+            service_credential: Some(config.service_credential),
+            state: config.state,
+            admission: AdmissionProfile::StaticBearer,
+            audience: None,
+            principal: None,
+            token_review: None,
+        }
+    }
+}
+
+impl ServiceConfigV3 {
+    /// The configured admission, refusing a document that mixes the profiles'
+    /// members. `service-account-token` reads its CA here, once.
+    pub fn admission(&self) -> Result<Admission> {
+        let review_members =
+            self.audience.is_some() || self.principal.is_some() || self.token_review.is_some();
+        match self.admission {
+            AdmissionProfile::StaticBearer => {
+                if review_members {
+                    return Err(Error::invalid(
+                        "static-bearer admission takes no audience, principal or token_review",
+                    ));
+                }
+                let Some(credential) = self.service_credential.clone() else {
+                    return Err(Error::invalid(
+                        "static-bearer admission requires service_credential",
+                    ));
+                };
+                Ok(Admission::StaticBearer(Arc::new(credential)))
+            }
+            AdmissionProfile::ServiceAccountToken => {
+                if self.service_credential.is_some() {
+                    return Err(Error::invalid(
+                        "service-account-token admission takes no service_credential",
+                    ));
+                }
+                let (Some(audience), Some(principal), Some(review)) =
+                    (&self.audience, &self.principal, &self.token_review)
+                else {
+                    return Err(Error::invalid(
+                        "service-account-token admission requires audience, principal and token_review",
+                    ));
+                };
+                Ok(Admission::ServiceAccountToken(Arc::new(
+                    ServiceAccountAdmission::new(audience, principal, review)?,
+                )))
+            }
+        }
+    }
+}
+
+/// How a host admits its caller (contracts/service/compatibility.md § 2.1,
+/// Admission): one profile for the whole host.
+#[derive(Clone)]
+pub enum Admission {
+    /// One bearer compared in constant time; the principal is
+    /// [`STATIC_BEARER_PRINCIPAL`](crate::local::service::STATIC_BEARER_PRINCIPAL).
+    StaticBearer(Arc<dyn Credential>),
+    /// One TokenReview per request; the principal is the configured service
+    /// account.
+    ServiceAccountToken(Arc<ServiceAccountAdmission>),
+}
+
 #[derive(Clone)]
 struct Service {
     adapter: Arc<dyn Adapter>,
-    credential: Arc<dyn Credential>,
+    admission: Admission,
     slots: Arc<Semaphore>,
     state: Option<Arc<ServiceState>>,
 }
@@ -62,9 +198,18 @@ pub fn router(adapter: Arc<dyn Adapter>, credential: Arc<dyn Credential>) -> Rou
     router_with_state(adapter, credential, None)
 }
 
+/// A `static-bearer` host.
 pub fn router_with_state(
     adapter: Arc<dyn Adapter>,
     credential: Arc<dyn Credential>,
+    state: Option<Arc<ServiceState>>,
+) -> Router {
+    router_with_admission(adapter, Admission::StaticBearer(credential), state)
+}
+
+pub fn router_with_admission(
+    adapter: Arc<dyn Adapter>,
+    admission: Admission,
     state: Option<Arc<ServiceState>>,
 ) -> Router {
     // The running host retries its retained final observations (audit.md § 3).
@@ -79,26 +224,41 @@ pub fn router_with_state(
         .layer(DefaultBodyLimit::max(REQUEST_LIMIT))
         .with_state(Service {
             adapter,
-            credential,
+            admission,
             slots: Arc::new(Semaphore::new(32)),
             state,
         })
 }
 
-async fn admitted(service: &Service, headers: &HeaderMap) -> Result<()> {
+/// Admission (compatibility.md § 2.1, Admission). It returns the admitted
+/// service principal, or the refusal the route answers before any anchor and
+/// any adapter call.
+async fn admitted(service: &Service, headers: &HeaderMap) -> Result<String> {
+    // Refusal: no bearer at all, before any credential read or review.
     let presented = headers
         .get("authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
         .ok_or_else(|| Error::new(ErrorCode::Unauthorized, "service authentication required"))?;
-    let expected = service.credential.resolve().await?;
-    if !bool::from(expected.0.as_slice().ct_eq(presented.as_bytes())) {
-        return Err(Error::new(
-            ErrorCode::Unauthorized,
-            "service authentication failed",
-        ));
+    match &service.admission {
+        Admission::StaticBearer(credential) => {
+            let expected = credential.resolve().await?;
+            // Refusal: any bearer other than the configured bytes.
+            if !bool::from(expected.0.as_slice().ct_eq(presented.as_bytes())) {
+                return Err(Error::new(
+                    ErrorCode::Unauthorized,
+                    "service authentication failed",
+                ));
+            }
+            Ok(crate::local::service::STATIC_BEARER_PRINCIPAL.to_owned())
+        }
+        Admission::ServiceAccountToken(account) => {
+            // Refusal: every answer but the exact positive review
+            // (`unauthorized`), and every failed review (`unavailable`).
+            account.admit(presented).await?;
+            Ok(account.principal().to_owned())
+        }
     }
-    Ok(())
 }
 
 async fn describe(State(service): State<Service>, headers: HeaderMap) -> HttpResponse {
@@ -113,6 +273,16 @@ async fn invoke(
     headers: HeaderMap,
     body: std::result::Result<Bytes, axum::extract::rejection::BytesRejection>,
 ) -> HttpResponse {
+    // Refusal: `/v1/invoke` writes no anchor, and every invocation under
+    // `service-account-token` is anchored with its service account, so that
+    // profile does not serve this route (compatibility.md § 2.1, Legacy
+    // binding). Answered before any review and any adapter call.
+    if let Admission::ServiceAccountToken(_) = service.admission {
+        return error_http(Error::new(
+            ErrorCode::Unsupported,
+            "this host admits invocations only on /v1alpha2/invoke",
+        ));
+    }
     if let Err(error) = admitted(&service, &headers).await {
         return error_http(error);
     }
@@ -223,8 +393,15 @@ fn legacy(mut error: Error) -> Error {
     error
 }
 
-pub async fn serve(config: ServiceConfig, adapter: Arc<dyn Adapter>) -> Result<()> {
-    config.service_credential.resolve().await?;
+/// Serves a v2 ([`ServiceConfig`], always `static-bearer`) or v3
+/// ([`ServiceConfigV3`]) service configuration.
+pub async fn serve(config: impl Into<ServiceConfigV3>, adapter: Arc<dyn Adapter>) -> Result<()> {
+    let config = config.into();
+    let admission = config.admission()?;
+    match &admission {
+        Admission::StaticBearer(credential) => drop(credential.resolve().await?),
+        Admission::ServiceAccountToken(account) => account.ready().await?,
+    }
     // Host start records the instance before /v1alpha2/invoke is served; a
     // refusal refuses start (compatibility.md § 2.1, Host start).
     let state = match config.state.clone() {
@@ -244,47 +421,44 @@ pub async fn serve(config: ServiceConfig, adapter: Arc<dyn Adapter>) -> Result<(
     let listener = tokio::net::TcpListener::bind(config.listen)
         .await
         .map_err(|_| Error::invalid("service listener cannot be bound"))?;
-    tracing::info!(instance=%config.instance, listen=%listener.local_addr().map_err(|_|Error::internal())?, "adapter service listening");
-    axum::serve(
-        listener,
-        router_with_state(adapter, Arc::new(config.service_credential), state),
-    )
-    .with_graceful_shutdown(async {
-        // Windows has no SIGTERM: Ctrl+C or Ctrl+Break, and closing or
-        // shutting down the console, end the service.
-        #[cfg(windows)]
-        {
-            use tokio::signal::windows;
-            match (
-                windows::ctrl_break(),
-                windows::ctrl_close(),
-                windows::ctrl_shutdown(),
-            ) {
-                (Ok(mut brk), Ok(mut close), Ok(mut shutdown)) => {
-                    tokio::select! {
-                        _=tokio::signal::ctrl_c()=>{},
-                        _=brk.recv()=>{},
-                        _=close.recv()=>{},
-                        _=shutdown.recv()=>{},
+    tracing::info!(instance=%config.instance, listen=%listener.local_addr().map_err(|_|Error::internal())?, admission=?config.admission, "adapter service listening");
+    axum::serve(listener, router_with_admission(adapter, admission, state))
+        .with_graceful_shutdown(async {
+            // Windows has no SIGTERM: Ctrl+C or Ctrl+Break, and closing or
+            // shutting down the console, end the service.
+            #[cfg(windows)]
+            {
+                use tokio::signal::windows;
+                match (
+                    windows::ctrl_break(),
+                    windows::ctrl_close(),
+                    windows::ctrl_shutdown(),
+                ) {
+                    (Ok(mut brk), Ok(mut close), Ok(mut shutdown)) => {
+                        tokio::select! {
+                            _=tokio::signal::ctrl_c()=>{},
+                            _=brk.recv()=>{},
+                            _=close.recv()=>{},
+                            _=shutdown.recv()=>{},
+                        }
+                    }
+                    _ => {
+                        let _ = tokio::signal::ctrl_c().await;
                     }
                 }
-                _ => {
+            }
+            #[cfg(unix)]
+            match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+                Ok(mut terminate) => {
+                    tokio::select! { _=tokio::signal::ctrl_c()=>{}, _=terminate.recv()=>{} }
+                }
+                Err(_) => {
                     let _ = tokio::signal::ctrl_c().await;
                 }
             }
-        }
-        #[cfg(unix)]
-        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
-            Ok(mut terminate) => {
-                tokio::select! { _=tokio::signal::ctrl_c()=>{}, _=terminate.recv()=>{} }
-            }
-            Err(_) => {
-                let _ = tokio::signal::ctrl_c().await;
-            }
-        }
-    })
-    .await
-    .map_err(|_| Error::internal())
+        })
+        .await
+        .map_err(|_| Error::internal())
 }
 
 #[cfg(test)]
@@ -331,9 +505,9 @@ mod tests {
                     entered: entered.clone(),
                     result,
                 }),
-                credential: Arc::new(CredentialRef::Environment {
+                admission: Admission::StaticBearer(Arc::new(CredentialRef::Environment {
                     name: "UNUSED".into(),
-                }),
+                })),
                 slots: Arc::new(Semaphore::new(32)),
                 state: None,
             },

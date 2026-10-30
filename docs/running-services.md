@@ -17,8 +17,48 @@ changing a parent shell's environment cannot update an already running service.
 ```sh
 target/debug/connectors-kubernetes --config kubernetes.yaml
 target/debug/connectors-sql --config sql.yaml
+target/debug/connectors-catalog-provider --config catalog.json
 target/debug/connectors serve --config federation.yaml
 ```
+
+## Admission
+
+A host admits its caller under one profile, chosen by the `service` member of its
+configuration. The [service contract](../contracts/service/compatibility.md), § 2.1,
+gives the exact rules.
+
+- `static-bearer`, the default: the caller's bearer must equal the bytes of
+  `service_credential`, which is read at every request.
+- `service-account-token`: the caller presents its Kubernetes service account token, and the
+  host asks the cluster's TokenReview API about it at every request. It needs the
+  `urn:connectors:config:v3:service` members below and no `service_credential`.
+
+```json
+{
+  "instance": "gitlab.example-org",
+  "listen": "0.0.0.0:7104",
+  "state": "/var/lib/connectors/state",
+  "admission": "service-account-token",
+  "audience": "connectors-gitlab",
+  "principal": "system:serviceaccount:agents:coding-agent",
+  "token_review": {
+    "api": "https://kubernetes.default.svc",
+    "ca_file": "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+    "credential_file": "/var/run/secrets/kubernetes.io/serviceaccount/token"
+  }
+}
+```
+
+The host admits a request only when the review authenticates the token for `audience` as
+`principal`. Any other answer is `unauthorized`. A review that fails, takes longer than
+5 seconds or cannot be reached is `unavailable`. In either case no operation runs. The host
+sends one review per request and keeps none. It never logs the token. Its own token,
+`credential_file`, is read at each review, so a projected token that the kubelet rotates is
+used from the next review on. The host's service account needs the `system:auth-delegator`
+cluster role, or another role that may create `tokenreviews`. Under this profile
+`GET /v1/describe` is admitted the same way, and `POST /v1/invoke` answers `unsupported`.
+Callers invoke through `POST /v1alpha2/invoke`, which records the service account as the
+principal of every call.
 
 The shared CLI discovers the current contract before invoking it:
 
@@ -31,10 +71,68 @@ target/debug/connectors invoke \
 ```
 
 Through the example federation host, the same operation is `kubernetes__endpoints.discover`.
-GitLab has no standalone service: the [catalog provider](local-catalog-provider.md)
-serves it under the local CLI.
 Source prefixes distinguish instances; the gateway does not interpret provider data.
 The first profile supports one federation hop. It never retries a provider request.
+
+## Catalog instances
+
+`connectors-catalog-provider --config <file>` serves one instance of the
+[catalog provider](local-catalog-provider.md) on the host. GitLab, for example, runs this
+way. The file has three members:
+
+```json
+{
+  "service": {
+    "instance": "gitlab.example-org",
+    "listen": "0.0.0.0:7104",
+    "service_credential": {"kind": "file", "path": "/var/run/connectors/service-token"},
+    "state": "/var/lib/connectors/state"
+  },
+  "catalog": {
+    "connector": "gitlab",
+    "instance": "example-org",
+    "endpoint": "https://gitlab.example.com"
+  },
+  "credential": {
+    "binding": "mounted_secret",
+    "directory": "/var/run/connectors/credential"
+  }
+}
+```
+
+- `service` is the host's configuration, as above. Its `instance` must be the catalog
+  instance's id, `<connector>.<instance>`.
+- `catalog` names exactly one source:
+  - `connector`, a connector the binary ships, with `instance` and optionally `endpoint`
+    and `profile`;
+  - `local_config`, a private `connectors-catalog-local/2` file whose paths are absolute;
+  - `definition`, a definition file, with `definitions_root`, the definitions checkout its
+    source is under, `instance` and optionally `endpoint` and `profile`. The binary lowers
+    the definition once at start, in a private temporary directory that it removes again.
+- `credential` names where the instance's credential document comes from. The only binding
+  is `mounted_secret`. The document is the item `<directory>/<instance id>/<profile id>`,
+  for example `gitlab.example-org/gitlab.pat`. Its content is the document the profile's
+  protected entry takes, such as `{"token": "..."}`.
+
+The host reads the item at every request, under all seven
+[mounted-secret checks](local-mounted-secret-custody.md#checks): the directory on a read-only
+mount, the projected `..data` layout or the flat one, an item with one link, no write bit
+and at most 64 KiB, on a read-only filesystem, read once through `/proc/self/fd`. A
+Kubernetes Secret volume passes them, for example one mounted with
+`items: [{key: gitlab-token, path: gitlab.example-org/gitlab.pat}]` and `defaultMode: 0400`.
+No pin is kept: a served instance has no connection whose validated version a pin would
+hold. A rotated Secret is therefore used from the next read on. An item that is absent or
+fails a check answers `unavailable`, and nothing is sent to the provider. Start refuses an
+item it cannot read. The binding exists on Linux only; elsewhere start answers
+`unsupported`.
+
+The served instance lists and runs its reads only. A catalog write is not in its description,
+and invoking one answers `not_found` before anything is recorded or sent. Start also refuses:
+
+- an instance that uses more than one profile;
+- an instance whose profile's material is acquired by OAuth (the CLI writes that, nothing
+  mounts it);
+- an instance with alternative bindings.
 
 ## Supported surfaces
 
@@ -42,6 +140,7 @@ The first profile supports one federation hop. It never retries a provider reque
 |---|---|---|
 | Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover`, optionally `helm_releases.history`/`.status`/`.values`/`.manifest` | Kubernetes API; namespace/kind restrictions; bearer token and CA; Helm release reads need their own `helm_release_reads` selection |
 | SQL | `schema.list`, `query.read`, `database.list`, `table.list`, `table.describe`, `index.list` | PostgreSQL or MySQL; explicit role or user and database; read-only transactions or sessions and deadlines |
+| Catalog | The instance's reads | The provider's HTTPS API; one profile; credential document from a mounted file |
 
 SQL uses the `postgresql-native-text` profile: column names and native type names
 accompany rows of strings or JSON null. Exact numeric, array, timestamp, and JSON

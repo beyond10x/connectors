@@ -52,9 +52,12 @@ pub(super) async fn invoke(
             "service state is not configured",
         );
     };
-    if let Err(error) = admitted(&service, &headers).await {
-        return refused(None, code(error.code), &error.message);
-    }
+    // Refusal before the anchor: `unauthorized` or `unavailable`, no record,
+    // zero adapter calls (compatibility.md § 2.1, Admission).
+    let principal = match admitted(&service, &headers).await {
+        Ok(principal) => principal,
+        Err(error) => return refused(None, code(error.code), &error.message),
+    };
     let Ok(bytes) = body else {
         return refused(None, ErrorCode::Capacity, "request exceeds byte limit");
     };
@@ -95,7 +98,14 @@ pub(super) async fn invoke(
     // Everything from the anchor on runs in a host task the request awaits: a
     // caller that hangs up drops only this await, never an anchor without its
     // final observation, a dispatched write or its settlement (mutations.yaml).
-    let execution = tokio::spawn(execute(service.clone(), state, request, operation, permit));
+    let execution = tokio::spawn(execute(
+        service.clone(),
+        state,
+        principal,
+        request,
+        operation,
+        permit,
+    ));
     match execution.await {
         Ok(response) => answer(response),
         Err(_) => refuse(ErrorCode::Internal, "internal error"),
@@ -117,6 +127,7 @@ enum Staged {
 async fn execute(
     service: Service,
     state: Arc<ServiceState>,
+    principal: String,
     request: InvokeRequest,
     operation: connectors_core::Operation,
     _permit: tokio::sync::OwnedSemaphorePermit,
@@ -134,11 +145,13 @@ async fn execute(
     let anchored = {
         let state = state.clone();
         let request_id = request_id.clone();
+        let principal = principal.clone();
         let operation = request.operation.clone();
         let revision = request.revision.clone();
         tokio::task::spawn_blocking(move || {
             state.anchor(&Admitted {
                 request_id: &request_id,
+                principal: &principal,
                 operation: &operation,
                 descriptor_revision: &revision,
                 access,
@@ -161,9 +174,12 @@ async fn execute(
             let reference = reference.clone();
             let request = request.clone();
             let operation = operation.clone();
-            tokio::task::spawn_blocking(move || stage(&state, &reference, &request, &operation))
-                .await
-                .unwrap_or(Staged::NotRecorded(ErrorCode::Internal))
+            let principal = principal.clone();
+            tokio::task::spawn_blocking(move || {
+                stage(&state, &reference, &principal, &request, &operation)
+            })
+            .await
+            .unwrap_or(Staged::NotRecorded(ErrorCode::Internal))
         };
         // Nothing was dispatched: the final observation records the refusal
         // (audit.md § 1 rule 6; execution_audit.yaml, Failed link).
@@ -304,11 +320,13 @@ async fn execute(
 fn stage(
     state: &ServiceState,
     reference: &audit::Reference,
+    principal: &str,
     request: &InvokeRequest,
     operation: &connectors_core::Operation,
 ) -> Staged {
     let prepared = match state.prepare_attempt(&Write {
         request_id: &request.request_id,
+        principal,
         operation: &request.operation,
         contract: &operation.contract,
         profile: &operation.profile,
