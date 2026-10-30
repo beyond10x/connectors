@@ -164,8 +164,9 @@ when the configuration has a fourth member, `git`:
 - `push_limit_bytes` is the largest push the relay reads, 100 MiB by default and at most 1 GiB.
 - `commit_identity`, optional: the author and the committer every new commit must carry.
 - `pre_push_check`, optional: a command every push must pass, with its timeout (300 s by default).
-- `work_directory` is a private directory the instance owns. It holds one mirror per repository and
-  one quarantine repository per push, which is removed when the push is answered.
+- `work_directory` is a directory the instance owns; start makes it private (mode `0700`). It holds
+  one mirror per repository and one quarantine repository per push, which is removed when the push
+  is answered.
 
 The caller reaches `<host>/git/<owner>/<repo>.git` and is admitted under the host's admission
 profile, as for the operations: `Authorization: Bearer` carries its service account token or the
@@ -181,21 +182,29 @@ checks, in this order, and answers a refusal for every command of the push, whic
 `! [remote rejected]`:
 
 1. The ref policy: every command updates a branch under a prefix. A delete, a tag, any other ref,
-   a shallow push and a signed push are refused. Nothing is sent to the forge.
-2. Quarantine: the relay fetches the repository into its mirror, indexes the pack into a new
-   repository whose objects borrow the mirror's, and requires every new object to be present.
+   a shallow push, a signed push and a push with push options are refused. Nothing is sent to the
+   forge.
+2. Quarantine: the relay fetches the repository into its mirror, without following redirects,
+   indexes the pack into a new repository whose objects borrow the mirror's, and requires every
+   new object to be present. Every object in the pack must be reached from a pushed branch or
+   already be in the mirror, so the checks below see everything the forge would store.
 3. `commit_identity`: every new commit's author and committer.
 4. `pre_push_check`: the command runs in the quarantine repository, with the pushed refs applied,
    `GIT_DIR` set and `CONNECTORS_GIT_REPOSITORY` naming `<owner>/<repo>`. Its standard input has
-   one `<old> <new> <ref>` line per command. Its environment holds no credential. Any exit status
-   but 0 refuses the push; the reason the caller sees does not include the command's output, which
-   is logged.
+   one `<old> <new> <ref>` line per command. Its environment holds no credential. It runs in its
+   own process group, which is killed when it ends or times out. Any exit status but 0 refuses the
+   push; the reason the caller sees does not include the command's output, which is logged.
+
+The check runs as the instance's user, so it can read what the instance reads, the mounted
+credential included. Configure a check that inspects the pushed objects and never runs them; a
+check that builds or tests the pushed tree needs its own sandbox around it.
 
 Only then is the original request sent to the forge's receive-pack, once. The old object id of
 each command is the forge's own compare-and-swap. The forge's report goes back to the caller
 unchanged, and each command is logged as `applied`, `refused` or `unknown`. When the forge's answer
 is lost, the outcome is `unknown`: the caller is told so, and the push is not sent again. A fetch
-shows whether it was applied. At most 4 pushes are worked on at once; another one is `503`.
+shows whether it was applied. A push whose caller hangs up after sending it still runs to its end
+and is logged. At most 4 pushes are worked on at once; another one is `503`.
 
 ## Supported surfaces
 

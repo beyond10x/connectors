@@ -8,7 +8,7 @@ license.workspace = true
 
 [features]
 default = ["service"]
-service = ["dep:connectors-host", "dep:connectors-oauth2", "dep:connectors-custody", "dep:clap", "dep:tokio", "dep:ring", "dep:tempfile", "dep:axum", "dep:reqwest", "dep:rustls", "dep:flate2", "dep:url", "dep:tracing"]
+service = ["dep:connectors-host", "dep:connectors-oauth2", "dep:connectors-custody", "dep:clap", "dep:tokio", "dep:ring", "dep:tempfile", "dep:axum", "dep:reqwest", "dep:rustls", "dep:flate2", "dep:url", "dep:tracing", "dep:libc"]
 
 [[bin]]
 name = "connectors-catalog-provider"
@@ -39,6 +39,7 @@ rustls = { workspace = true, optional = true }
 flate2 = { workspace = true, optional = true }
 url = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
+libc = { version = "0.2", optional = true }
 
 [dev-dependencies]
 entity-core.workspace = true
