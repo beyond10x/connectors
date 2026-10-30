@@ -2092,6 +2092,10 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
             body_prefixes: in_body_order(operation, &operation.body_prefixes),
             conflict_status: operation.conflict_status,
             guard,
+            query_fixed: None,
+            query_folds: None,
+            embedded_text: None,
+            rate_limit_headers: None,
             description: (operation.description != summary)
                 .then(|| operation.description.clone())
                 .flatten(),
