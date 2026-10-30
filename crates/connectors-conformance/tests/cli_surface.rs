@@ -132,6 +132,8 @@ fn the_selected_inventory_has_thirty_four_commands_and_explicit_runtime_obligati
         "approvals issue",
         // story:connectors-do-short-invocation
         "invoke",
+        // story:definitions-install
+        "definitions install",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -1366,9 +1368,10 @@ fn no_alias_or_path_replaces_another_command() {
             reached += 1;
         }
     }
-    // story:connectors-do-short-invocation: `invoke` is one of 33 paths and
-    // `operations invoke` is removed.
-    assert_eq!(reached, 38);
+    // story:connectors-do-short-invocation: `invoke` is one of the paths and
+    // `operations invoke` is removed; `definitions install` (story:definitions-install)
+    // is the newest, 34 commands and 5 aliases.
+    assert_eq!(reached, 39);
     // What the check refuses, the generated tree would hide: an alias onto
     // `connections list` replaces that command without a word.
     let mut colliding = plan.clone();
