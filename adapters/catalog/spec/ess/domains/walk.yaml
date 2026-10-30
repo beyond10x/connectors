@@ -17,9 +17,11 @@ summary: How a read's pages are walked and when the walk ends, declared as the `
 # download, a binary, an embedded text or a text read; a pointer that is not an RFC 6901 pointer
 # led by `/`; a `parameter`, `query` key or `first_only` name that is not a query parameter of the
 # operation as the selection exposes it; a `query` value that is not a string, an integer or a
-# boolean; a `query` key or `first_only` name that is the `parameter`; a `first_only` name in
-# `query` or named twice; an end named twice or not lower snake case) is stated in the owner and
-# pinned by the engine's tests (`adapters/catalog/tests/walk_declarations.rs`).
+# boolean, or that the parameter's admitted schema refuses, bounds included; a `first_only` name
+# every call requires; a `query` key or `first_only` name that is the `parameter`; a `first_only`
+# name in `query` or named twice; an end named twice or not lower snake case) is stated in the
+# owner and pinned by the engine's tests (`adapters/catalog/tests/walk_declarations.rs`,
+# `walk_adversary.rs`).
 
 types:
   # An end's name, which a walk's summary reports: a lower-case ASCII letter, then lower-case

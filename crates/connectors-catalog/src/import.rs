@@ -8,7 +8,10 @@
 //! bytes. Before anything is written, the definition is lowered in memory
 //! ([`definition::select`]) and must give back the shipped selection as a JSON
 //! value; a selection the definition notation cannot say is refused by name
-//! ([`Failure::Unexpressible`]) rather than written approximately.
+//! ([`Failure::Unexpressible`]) rather than written approximately. One member
+//! is the exception: a read's `walk` has no definition field yet
+//! (story:definition-lowerer-carries-walk), so it is left out of the definition
+//! and reported per operation in [`Imported::dropped`] instead of refused.
 //!
 //! What the selection does not say is taken from the Connectors files that do:
 //! - the source is the file under `adapters/` whose name and SHA-256 the
@@ -78,6 +81,30 @@ pub struct Imported {
     pub definition: PathBuf,
     /// Every file written, the definition first, in the order written.
     pub written: Vec<PathBuf>,
+    /// The selection's members the definition does not say, in file order: today only
+    /// a read's `walk` (story:definition-lowerer-carries-walk). Empty when the
+    /// definition says the whole selection.
+    pub dropped: Vec<Dropped>,
+}
+
+/// One selection member an import left out of the definition instead of refusing it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Dropped {
+    /// The selection's operation id.
+    pub operation: String,
+    /// The member left out, such as `walk`.
+    pub member: String,
+}
+
+impl std::fmt::Display for Dropped {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "`{}` `{}`: the definition notation has no field for it yet \
+             (story:definition-lowerer-carries-walk)",
+            self.operation, self.member
+        )
+    }
 }
 
 /// Why an import was refused. Nothing is written when one is.
@@ -2165,10 +2192,21 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
     let mut expected: Value = serde_json::from_slice(&selection_bytes)
         .map_err(|error| Failure::Malformed(error.to_string()))?;
     // A read's `walk` has no definition field yet (story:definition-lowerer-carries-walk):
-    // until it has, the definition lowers the selection without it.
+    // until it has, the definition lowers the selection without it, and the import
+    // reports each walk it left out.
+    let mut dropped = Vec::new();
     for operation in expected["operations"].as_array_mut().into_iter().flatten() {
-        if let Some(operation) = operation.as_object_mut() {
-            operation.remove("walk");
+        if let Some(operation) = operation.as_object_mut()
+            && operation.remove("walk").is_some()
+        {
+            dropped.push(Dropped {
+                operation: operation
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
+                member: "walk".to_owned(),
+            });
         }
     }
     if lowered != expected {
@@ -2280,6 +2318,7 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
         name,
         definition: definition_path,
         written,
+        dropped,
     })
 }
 
