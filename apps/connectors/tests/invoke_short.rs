@@ -29,7 +29,6 @@ use std::{
     io::Write,
     path::Path,
     process::{Command, Output, Stdio},
-    time::{Duration, Instant},
 };
 
 /// A directory holding no executable (`cli_surface_minor.rs`).
@@ -688,6 +687,7 @@ fn repeated_input_keys_are_refused_before_any_provider_call() {
 #[test]
 fn a_terminal_stdin_without_an_input_flag_is_refused_without_reading() {
     use std::os::fd::{FromRawFd, OwnedFd};
+    use std::time::{Duration, Instant};
     let root = configured(&[&MAIN], "");
     let (mut master, mut slave) = (-1, -1);
     // SAFETY: two out-pointers to live integers; no name, settings or size.
