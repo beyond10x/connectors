@@ -383,6 +383,19 @@ struct Request {
     describe: bool,
     fields: Option<String>,
     each: Option<String>,
+    /// The input source as given, for a walk, which reads the document once.
+    document: Option<Document>,
+    walk: bool,
+    max_pages: Option<String>,
+    out: Option<String>,
+}
+
+/// Where an `invoke`'s input document comes from.
+#[derive(Clone)]
+enum Document {
+    Inline(OsString),
+    File(PathBuf),
+    Stdin,
 }
 
 /// What `--fields` and `--each` ask of a successful answer
@@ -477,12 +490,27 @@ fn parse(args: &[OsString]) -> Option<Request> {
         (Some(operation), None) => (None, operation),
         (None, None) => return None,
     };
-    let describe = match text("describe").as_deref() {
-        None | Some("false") => false,
-        Some("true") => true,
+    let flag = |field: &str| match text(field).as_deref() {
+        None | Some("false") => Some(false),
+        Some("true") => Some(true),
         // Not a Boolean: the generated runner refuses it.
-        Some(_) => return None,
+        Some(_) => None,
     };
+    let describe = flag("describe")?;
+    let walk = flag("walk")?;
+    let given_raw = |id: &str| {
+        given(id)
+            .then(|| leaf.get_raw(id).and_then(|mut values| values.next()))
+            .flatten()
+            .map(OsString::from)
+    };
+    let document = given_raw("source:input:inline")
+        .map(Document::Inline)
+        .or_else(|| given_raw("source:input:file").map(|path| Document::File(path.into())))
+        .or_else(|| {
+            leaf.get_flag("source:input:stdin")
+                .then_some(Document::Stdin)
+        });
     Some(Request {
         program: args.first()?.clone(),
         globals,
@@ -506,6 +534,10 @@ fn parse(args: &[OsString]) -> Option<Request> {
         describe,
         fields: text("fields"),
         each: text("each"),
+        document,
+        walk,
+        max_pages: text("max_pages"),
+        out: text("out"),
     })
 }
 
@@ -554,6 +586,7 @@ pub(super) fn prepare(
     match prepared {
         Ok(Prepared::Run(args, shaping)) => Ok((args, shaping)),
         Ok(Prepared::Described(result)) => Err(success(result, json)),
+        Ok(Prepared::Walk(walking)) => Err(walking.run()),
         Err(reply) => Err(definition::render(reply, json)),
     }
 }
@@ -561,6 +594,204 @@ pub(super) fn prepare(
 enum Prepared {
     Run(Vec<OsString>, Option<Shaping>),
     Described(Value),
+    Walk(Box<Walking>),
+}
+
+/// The caller's document of a walk: JSON, or text that does not decode, which
+/// one plain invoke of it refuses as it refuses any.
+enum Caller {
+    Json(Value),
+    Raw(OsString),
+}
+
+/// Where a walk writes its records.
+enum Out {
+    Stdout,
+    File { file: std::fs::File, path: PathBuf },
+}
+
+impl Out {
+    /// `--out`: `-`, or a new file created owner-only, never over an
+    /// existing path.
+    fn create(out: &str) -> Result<Out, HandlerReply> {
+        if out == "-" {
+            return Ok(Out::Stdout);
+        }
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+        let file = options.open(out).map_err(|_| refused("out"))?;
+        Ok(Out::File {
+            file,
+            path: out.into(),
+        })
+    }
+
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<()> {
+        use std::io::Write;
+        match self {
+            Out::Stdout => {
+                let mut stdout = std::io::stdout().lock();
+                stdout.write_all(bytes)?;
+                stdout.flush()
+            }
+            Out::File { file, .. } => file.write_all(bytes),
+        }
+    }
+
+    /// The file this walk created, removed while it is still the one created
+    /// and empty: a walk that read nothing leaves nothing behind.
+    fn discard(self) {
+        #[cfg(unix)]
+        if let Out::File { file, path } = self {
+            use std::os::unix::fs::MetadataExt;
+            if let (Ok(ours), Ok(there)) = (file.metadata(), std::fs::symlink_metadata(&path))
+                && (ours.dev(), ours.ino()) == (there.dev(), there.ino())
+                && there.len() == 0
+            {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
+    }
+}
+
+/// An admitted `invoke --walk`: each page is the rewritten command line with
+/// the page's input, run as a plain invoke is (`super::run_selected`).
+pub(super) struct Walking {
+    /// The command line before the input argument, and after it.
+    before: Vec<OsString>,
+    after: Vec<OsString>,
+    walk: connectors::walk::Walk,
+    caller: Caller,
+    max_pages: u32,
+    fields: Option<shape::Fields>,
+    out: Out,
+    /// `--out` as given, which the summary names.
+    named: String,
+    json: bool,
+}
+
+impl Walking {
+    /// The walk run, its records written to `--out` and its summary as the
+    /// output; a refused first page is that page's own output.
+    fn run(self) -> ProcessOutput {
+        let Walking {
+            before,
+            after,
+            walk,
+            caller,
+            max_pages,
+            fields,
+            mut out,
+            named,
+            json,
+        } = self;
+        let page = |input: OsString| {
+            let mut args = before.clone();
+            args.push(input);
+            args.extend(after.iter().cloned());
+            super::run_selected(args, None)
+        };
+        let caller = match caller {
+            Caller::Json(caller) => caller,
+            Caller::Raw(input) => {
+                out.discard();
+                return page(input);
+            }
+        };
+        let mut refused_output = None;
+        let walked = connectors::walk::run(
+            &walk,
+            &caller,
+            max_pages,
+            fields.as_ref(),
+            |input| {
+                let output = page(format!("--input-json={input}").into());
+                // The page's InvokeResult, in the envelope of the output mode;
+                // its provider `result` is the page.
+                if output.exit_code == 0
+                    && let Ok(mut answer) = serde_json::from_str::<Value>(&output.stdout)
+                {
+                    let invoked = if json {
+                        answer.get_mut("result").map(Value::take)
+                    } else {
+                        Some(answer)
+                    };
+                    if let Some(result) =
+                        invoked.and_then(|mut invoked| invoked.get_mut("result").map(Value::take))
+                    {
+                        return connectors::walk::Page::Answered(result);
+                    }
+                }
+                let error = page_error(&output, json);
+                refused_output = Some(output);
+                connectors::walk::Page::Refused(error)
+            },
+            |records| {
+                let mut lines = String::new();
+                for record in records {
+                    lines.push_str(&record.to_string());
+                    lines.push('\n');
+                }
+                out.write(lines.as_bytes()).map_err(|_| "write")
+            },
+        );
+        if walked.pages == 0
+            && let Some(connectors::walk::Stopped::Refused(_)) = walked.stopped
+            && let Some(output) = refused_output
+        {
+            out.discard();
+            return output;
+        }
+        let mut summary = walked.summary();
+        summary.insert("out".into(), json!(named));
+        success(Value::Object(summary), json)
+    }
+}
+
+/// The failure envelope's `error` a refused page printed: `{code, data}` from
+/// its JSON envelope, or from the human `code` or `code: data` line; a page
+/// that printed no failure and no readable answer is `cli_result`.
+fn page_error(output: &ProcessOutput, json: bool) -> Value {
+    let text = output.stderr.trim_end();
+    if text.is_empty() {
+        return json!({"code": "cli_result", "data": {}});
+    }
+    if json && let Ok(mut envelope) = serde_json::from_str::<Value>(text) {
+        return envelope["error"].take();
+    }
+    let (code, data) = match text.split_once(": ") {
+        Some((code, data)) => (
+            code,
+            serde_json::from_str(data).unwrap_or_else(|_| json!({})),
+        ),
+        None => (text, json!({})),
+    };
+    json!({"code": code, "data": data})
+}
+
+/// The caller's document of a walk, read once from its source.
+fn caller_document(document: Option<&Document>) -> Result<Caller, HandlerReply> {
+    let read = |path: Option<&std::path::Path>| {
+        protected::document(path).map_err(|error| early_failure(error, &Value::Null))
+    };
+    let text = match document {
+        Some(Document::Inline(text)) => match text.to_str() {
+            Some(text) => text.to_owned(),
+            None => {
+                let mut arg = OsString::from("--input-json=");
+                arg.push(text);
+                return Ok(Caller::Raw(arg));
+            }
+        },
+        Some(Document::File(path)) => read(Some(path))?,
+        Some(Document::Stdin) | None => read(None)?,
+    };
+    Ok(match serde_json::from_str(&text) {
+        Ok(value) => Caller::Json(value),
+        Err(_) => Caller::Raw(format!("--input-json={text}").into()),
+    })
 }
 
 /// The one success envelope, as the generated runner writes a handler's.
@@ -627,6 +858,29 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
         Some(_) if request.describe => return Err(refused("each")),
         Some(text) => Some(shape::Path::parse(text).map_err(|_| refused("each"))?),
         None => None,
+    };
+    // A walk's own arguments (story:invoke-walks-declared-pages): its records
+    // are one per line already, and `--describe` reads no page.
+    let walking = if request.walk {
+        if request.describe {
+            return Err(refused("walk"));
+        }
+        if each.is_some() {
+            return Err(refused("each"));
+        }
+        let max_pages = connectors::walk::max_pages(request.max_pages.as_deref())
+            .map_err(|_| refused("max_pages"))?;
+        match request.out.as_deref() {
+            Some(out) if !out.is_empty() => Some((max_pages, out)),
+            _ => return Err(refused("out")),
+        }
+    } else {
+        for (field, value) in [("max_pages", &request.max_pages), ("out", &request.out)] {
+            if value.is_some() {
+                return Err(refused(field));
+            }
+        }
+        None
     };
     // With no input flag the document is standard input, which is never read
     // when it is a terminal: nothing would end it.
@@ -736,6 +990,8 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
         )));
     }
     match effect {
+        // A write is invoked once, never page by page.
+        Effect::Write if walking.is_some() => return Err(refused("walk")),
         // A write prints its one answer: `--each` would split it.
         Effect::Write if each.is_some() => return Err(refused("each")),
         Effect::Read if request.idempotency_key.is_some() => {
@@ -762,15 +1018,50 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
     ] {
         rewritten.push(format!("--{long}={value}").into());
     }
+    // An operation id may begin with `-`: after `--` both are values.
+    let after: Vec<OsString> = vec![
+        "--".into(),
+        format!("{connector}/{instance}").into(),
+        request.operation.clone().into(),
+    ];
+    if let Some((max_pages, out)) = walking {
+        // The walk the description declares; one that declares none, or a
+        // carried value that is no walk, has no pages to read.
+        let walk = descriptor
+            .operation(&request.operation)
+            .ok()
+            .and_then(|operation| connectors::walk::Walk::declared(&operation.input_schema).ok())
+            .flatten()
+            .ok_or_else(|| {
+                let mut reply = owner_failure(Code::Unsupported.into());
+                if let HandlerReply::Error { data, .. } | HandlerReply::UsageError { data, .. } =
+                    &mut reply
+                {
+                    data["field"] = json!("walk");
+                }
+                reply
+            })?;
+        let caller = caller_document(request.document.as_ref())?;
+        // Created last, once nothing before the first page can refuse.
+        let out_file = Out::create(out)?;
+        return Ok(Prepared::Walk(Box::new(Walking {
+            before: rewritten,
+            after,
+            walk,
+            caller,
+            max_pages,
+            fields,
+            out: out_file,
+            named: out.to_owned(),
+            json: request.json,
+        })));
+    }
     rewritten.extend(input);
     rewritten.extend(request.approval_file.iter().cloned());
     if let Some(key) = &request.idempotency_key {
         rewritten.push(format!("--idempotency-key={key}").into());
     }
-    // An operation id may begin with `-`: after `--` both are values.
-    rewritten.push("--".into());
-    rewritten.push(format!("{connector}/{instance}").into());
-    rewritten.push(request.operation.clone().into());
+    rewritten.extend(after);
     let shaping = (fields.is_some() || each.is_some()).then_some(Shaping {
         fields,
         each,
@@ -1089,6 +1380,40 @@ mod tests {
                 "story:connectors-do-short-invocation: {malformed:?}"
             );
         }
+    }
+
+    /// story:invoke-walks-declared-pages: a refused page's `error` is read
+    /// from its failure envelope in JSON mode and from its `code` or
+    /// `code: data` line in human mode; a page with neither answer nor
+    /// failure is `cli_result`.
+    #[test]
+    fn a_refused_page_error_is_read_in_either_output_mode() {
+        let refused = |stderr: &str| ProcessOutput {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: stderr.into(),
+        };
+        let error = json!({"code":"failure","data":{"code":"service_failure",
+            "service_code":"rate_limited"}});
+        assert_eq!(
+            page_error(
+                &refused(&format!("{}\n", json!({"ok":false,"error":error}))),
+                true
+            ),
+            error
+        );
+        assert_eq!(
+            page_error(&refused(&format!("failure: {}\n", error["data"])), false),
+            error
+        );
+        assert_eq!(
+            page_error(&refused("cli_interrupted\n"), false),
+            json!({"code":"cli_interrupted","data":{}})
+        );
+        assert_eq!(
+            page_error(&refused(""), true),
+            json!({"code":"cli_result","data":{}})
+        );
     }
 
     /// story:connectors-do-short-invocation: an `invalid_input` that names no
