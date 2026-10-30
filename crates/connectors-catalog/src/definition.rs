@@ -125,6 +125,9 @@ pub const CONNECTOR_FORMAT: &str = "connectors-catalog-connector/1";
 /// `Authorization: Basic`, `bearer` `Authorization: Bearer`, `header` the token
 /// in `header`, behind `prefix` when one is given; the two OAuth schemes
 /// exchange the stored entry at `token_url` for a bearer access token.
+/// `github_app` signs a JWT with the stored GitHub App key and exchanges it
+/// under the base URL for an installation token sent as `Authorization:
+/// Bearer`; its connection is the installation the entry names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AuthScheme {
@@ -135,7 +138,15 @@ pub enum AuthScheme {
     OAuth2Refresh,
     #[serde(rename = "oauth2_client_credentials")]
     OAuth2ClientCredentials,
+    #[serde(rename = "github_app")]
+    GitHubApp,
 }
+
+/// The read a `github_app` profile proves its installation token with when the
+/// definition names none: the repositories the installation may reach.
+const GITHUB_APP_IDENTITY_PATH: &str = "installation/repositories";
+/// The identity kind of a `github_app` connection when the definition names none.
+const GITHUB_APP_IDENTITY_KIND: &str = "github.installation";
 
 impl AuthScheme {
     fn is_oauth(self) -> bool {
@@ -1949,10 +1960,44 @@ fn profile_block(id: &str, profile: &Auth, base_url: &str) -> Result<Fields, Ref
     };
     let scheme = profile.scheme.ok_or_else(|| missing("scheme"))?;
     let label = profile.label.as_ref().ok_or_else(|| missing("label"))?;
-    let identity = profile
-        .identity
-        .as_ref()
-        .ok_or_else(|| missing("identity"))?;
+    let identity = match (&profile.identity, scheme) {
+        // The connection is the installation the token exchange proves, named
+        // by the entry's installation id: the definition may replace the read
+        // or the kind, never the source or the subject.
+        (identity, AuthScheme::GitHubApp) => {
+            let given = identity.clone().unwrap_or(AuthIdentity {
+                source: None,
+                path: None,
+                kind: None,
+                subject: None,
+            });
+            if given
+                .source
+                .is_some_and(|source| source != IdentitySource::Configuration)
+            {
+                return Err(misplaced("identity.source"));
+            }
+            if given.subject.is_some() {
+                return Err(misplaced("identity.subject"));
+            }
+            AuthIdentity {
+                source: Some(IdentitySource::Configuration),
+                path: Some(
+                    given
+                        .path
+                        .unwrap_or_else(|| GITHUB_APP_IDENTITY_PATH.to_owned()),
+                ),
+                kind: Some(
+                    given
+                        .kind
+                        .unwrap_or_else(|| GITHUB_APP_IDENTITY_KIND.to_owned()),
+                ),
+                subject: None,
+            }
+        }
+        (Some(identity), _) => identity.clone(),
+        (None, _) => return Err(missing("identity")),
+    };
     let source = identity.source.unwrap_or(IdentitySource::Api);
     let mut probe = Fields::new();
     match source {
@@ -1984,12 +2029,15 @@ fn profile_block(id: &str, profile: &Auth, base_url: &str) -> Result<Fields, Ref
         AuthScheme::Basic => Some("basic"),
         AuthScheme::OAuth2Refresh => Some("oauth2_refresh"),
         AuthScheme::OAuth2ClientCredentials => Some("oauth2_client_credentials"),
+        AuthScheme::GitHubApp => Some("github_app"),
         AuthScheme::Bearer | AuthScheme::Header => None,
     };
     if let Some(word) = word {
         block.push(field("scheme", text(word)));
     }
     let header = match (&profile.header, scheme) {
+        // The installation token has one placement, `Authorization: Bearer`.
+        (Some(_), AuthScheme::GitHubApp) => return Err(misplaced("header")),
         (Some(header), _) => header.clone(),
         (None, AuthScheme::Header) => return Err(missing("header")),
         (None, _) => "Authorization".to_owned(),

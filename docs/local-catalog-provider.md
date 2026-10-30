@@ -547,6 +547,46 @@ The complete configuration used against the sandbox is
   offered to the host as `http_bearer` with the fields `client_id` and
   `client_secret`, with no acquisition: connect it with the hidden prompt or a
   protected credential file.
+- `github_app` is for a GitHub App installation. The protected entry is
+  `{"app_id":"...","installation_id":...,"private_key":"..."}` and nothing
+  else: the App id (a number, or 1 to 128 letters, digits, `.`, `_` and `-`),
+  the installation id (a positive integer, as a number or a string of at most
+  20 digits) and the App's RSA private key as PEM text of at most 16 KiB,
+  PKCS #1 (`RSA PRIVATE KEY`, as GitHub issues it) or unencrypted PKCS #8
+  (`PRIVATE KEY`), 2048 to 4096 bits. A missing or extra field, or a key that
+  does not load, is `invalid_input` before any request. The provider signs an
+  RS256 JWT with the key (`iss` the App id, `iat` 60 seconds back against
+  clock drift, `exp` nine minutes from now), posts it with no body as
+  `Authorization: Bearer <JWT>` and `Accept: application/vnd.github+json` to
+  `<api_base>/app/installations/<installation_id>/access_tokens` under the
+  instance's own trust roots, and sends the installation token it answers as
+  `Authorization: Bearer <installation token>`. The token lives in the provider
+  process only, keyed by a digest of the entry, until five minutes before its
+  `expires_at`; a token answered with less than that left is used for one
+  request and not kept. It is never returned, logged, stored or written into a
+  result or an error. A `401`, `404` or `403` of the exchange is an invalid
+  credential (a bad JWT or key, another App's installation, a suspended
+  installation), a `403` naming a rate limit and a `429` are a provider rate
+  limit, a 5xx is `unavailable`; no answer text is kept. The profile must state
+  `"header": "Authorization"` and `"bearer": true` and an identity with
+  `"source": "configuration"` (below): the connection is the installation, and
+  its subject is the installation id. It refuses `prefix`, `account_label`,
+  `token_url`, `token_ca_file`, `authorize_url` and `requested_scopes`, and is
+  offered to the host as `http_bearer` with the fields `app_id`,
+  `installation_id` and `private_key`, with no acquisition: the entry rotates
+  nothing, so [mounted-secret custody](local-mounted-secret-custody.md) admits
+  it. Connect it with a protected credential file, since a PEM key spans lines.
+
+```json
+"auth": {
+  "profile": "github.app",
+  "scheme": "github_app",
+  "header": "Authorization",
+  "bearer": true,
+  "label": "GitHub App private key",
+  "identity": {"source": "configuration", "path": "installation/repositories", "kind": "github.installation"}
+}
+```
 - `access`, optional: one read validation makes after the identity read and the
   scope read, as `{"path": "...", "query": {"name": "value"}}` relative to the
   provider authority, with no `?` in the path and at most 16 query pairs. A `401`
@@ -581,7 +621,10 @@ The complete configuration used against the sandbox is
   `subject_pointer`, and is only for a static credential (`token` or `basic`):
   under `oauth2_refresh` or `oauth2_client_credentials` it is refused at load,
   because a reconnect would then accept another holder's OAuth credential as the same
-  identity. Anything else is refused at load too. The rules are modeled as
+  identity. A `github_app` profile requires it: the exchange proves the App's key
+  for the installation, the read proves the installation token, and the subject
+  is the entry's installation id rather than the instance id. Anything else is
+  refused at load too. The rules are modeled as
   `connectors_catalog.identity.Probe` and `connectors_catalog.identity.Profile`
   in `adapters/catalog/spec/ess`.
 
@@ -1383,11 +1426,13 @@ appeared, which opened merge request 11 at the moved head and was classified
   only (`adapters/catalog/tests/binary_responses.rs`).
 - One authentication profile per configuration: a token in one header, a
   basic profile (`"scheme": "basic"`) sending an account and API token as HTTP
-  basic, an OAuth refresh profile (`"scheme": "oauth2_refresh"`), or an OAuth
-  client-credentials profile (`"scheme": "oauth2_client_credentials"`). Signing
-  profiles and rotating refresh tokens are not offered by this provider. The
-  basic and both OAuth profiles have run only against the local fixture, not
-  a live provider, and the provider does not acquire the OAuth entry itself.
+  basic, an OAuth refresh profile (`"scheme": "oauth2_refresh"`), an OAuth
+  client-credentials profile (`"scheme": "oauth2_client_credentials"`), or a
+  GitHub App installation profile (`"scheme": "github_app"`). Profiles that sign
+  each request and rotating refresh tokens are not offered by this provider. The
+  basic, both OAuth and the GitHub App profiles have run only against the local
+  fixture, not a live provider, and the provider does not acquire the OAuth entry
+  itself.
 - Pagination and error envelopes are not declared; a paged read returns one page
   as the provider answers it.
 - A read answered `429` is sent once more, and never a third time, after the

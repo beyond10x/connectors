@@ -477,6 +477,41 @@ impl ScopedHttp {
         bounded_response(response).await
     }
 
+    /// Trusted composition only. One POST without a body to fixed segments
+    /// under the captured target and TLS configuration, carrying `assertion`
+    /// as `Authorization: Bearer`, marked sensitive, and `accept` as `Accept`:
+    /// an exchange whose signed assertion is itself the credential, such as a
+    /// GitHub App's JWT for an installation token. It never carries this
+    /// capability's own credential header or fixed header; the header value
+    /// built from the assertion is zeroized once copied, and the response is
+    /// bounded like a write's.
+    pub async fn post_assertion(
+        &self,
+        segments: &[&str],
+        assertion: &[u8],
+        accept: &str,
+    ) -> Result<HttpResponse> {
+        if segments.is_empty() {
+            return Err(Error::invalid("an assertion endpoint is one fixed path"));
+        }
+        let url = self.url(segments)?;
+        let accept = reqwest::header::HeaderValue::from_str(accept)
+            .map_err(|_| Error::invalid("invalid accept header"))?;
+        let mut value = zeroize::Zeroizing::new(Vec::with_capacity(7 + assertion.len()));
+        value.extend_from_slice(b"Bearer ");
+        value.extend_from_slice(assertion);
+        let mut authorization = reqwest::header::HeaderValue::from_bytes(&value)
+            .map_err(|_| Error::new(ErrorCode::Unauthorized, "invalid provider credential"))?;
+        authorization.set_sensitive(true);
+        let request = self
+            .client
+            .post(url)
+            .header(reqwest::header::AUTHORIZATION, authorization)
+            .header(reqwest::header::ACCEPT, accept);
+        let response = self.send(request).await?;
+        bounded_response(response).await
+    }
+
     fn remaining(&self) -> Result<Option<Duration>> {
         self.provider_until
             .map(|until| {
@@ -1343,6 +1378,90 @@ mod tests {
             body,
             b"grant_type=refresh_token&value=a+b%26c%3Dd%2F%FF%7E*-._Z9".as_slice()
         );
+    }
+
+    /// story:catalog-github-app-installation-token: the assertion travels as
+    /// the bearer value with the caller's `Accept`, without a body, and never
+    /// beside the capability's own credential or fixed header.
+    #[tokio::test]
+    async fn an_assertion_post_sends_the_assertion_as_bearer_and_never_the_credential_header() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut head = Vec::new();
+            while !head.ends_with(b"\r\n\r\n") {
+                head.push(socket.read_u8().await.unwrap());
+            }
+            let answer = br#"{"token":"answered"}"#;
+            socket
+                .write_all(
+                    format!(
+                        "HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        answer.len()
+                    )
+                    .as_bytes(),
+                )
+                .await
+                .unwrap();
+            socket.write_all(answer).await.unwrap();
+            String::from_utf8(head).unwrap()
+        });
+        let http = ScopedHttp::new_with_ca_bytes(
+            &HttpConfig {
+                base_url: format!("http://{address}/api/v3"),
+                credential: None,
+                credential_header: "authorization".into(),
+                bearer: true,
+                allow_plaintext: true,
+                ca_file: None,
+            },
+            None,
+            None,
+        )
+        .unwrap()
+        .with_fixed_header("x-fixture", "fixed")
+        .unwrap()
+        .with_credential(Arc::new(FixtureCredential));
+        let response = http
+            .post_assertion(
+                &["app", "installations", "7", "access_tokens"],
+                b"header.claims.signature",
+                "application/vnd.github+json",
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status, 201);
+        assert_eq!(response.body, br#"{"token":"answered"}"#);
+        let head = server.await.unwrap();
+        assert!(
+            head.starts_with("POST /api/v3/app/installations/7/access_tokens HTTP/1.1\r\n"),
+            "{head}"
+        );
+        let lower = head.to_ascii_lowercase();
+        assert!(lower.contains("authorization: bearer header.claims.signature\r\n"));
+        assert_eq!(lower.matches("authorization:").count(), 1);
+        assert!(lower.contains("accept: application/vnd.github+json\r\n"));
+        assert!(!head.contains("fixture-credential"));
+        assert!(!lower.contains("x-fixture"));
+        assert!(!lower.contains("content-type:"));
+        for segments in [&[][..], &[""][..], &[".."][..]] {
+            let Err(error) = http
+                .post_assertion(segments, b"x", "application/json")
+                .await
+            else {
+                panic!("an unaddressed assertion was sent");
+            };
+            assert_eq!(error.code, ErrorCode::InvalidInput);
+        }
+        let Err(error) = http
+            .post_assertion(&["token"], b"line\nbreak", "application/json")
+            .await
+        else {
+            panic!("an assertion that is no header value was sent");
+        };
+        assert_eq!(error.code, ErrorCode::Unauthorized);
     }
 
     #[tokio::test]

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Added
+
+- Catalog auth scheme `github_app`: an instance authenticates as a GitHub App installation. The
+  stored entry holds the App id, the installation id and the App's RSA private key (PEM, PKCS #1
+  or PKCS #8). The provider signs a nine-minute RS256 JWT, exchanges it at
+  `{api_base}/app/installations/{installation_id}/access_tokens` for an installation token, sends
+  that token as `Authorization: Bearer` and keeps it in memory only, reused until five minutes
+  before its `expires_at`. The token is never returned, logged, stored or written into an error.
+  The connection is the installation (`identity.source` `configuration`, subject the installation
+  id). A definition declares it as `scheme: github_app` with a label and no identity block.
+  Nothing in the entry rotates, so `mounted_secret` custody admits the profile. See
+  `docs/local-catalog-provider.md`. Run against a local fixture only, not against GitHub.
+
 ## 0.59.3 — 2026-10-30
 
 No breaking changes.
