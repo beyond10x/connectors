@@ -45,12 +45,26 @@
       "value": {"version":"v1alpha2","request_id":"write-1","operation":"item.write","revision":"rev-1","input":{},"connection":"c1"}
     },
     {
-      "id": "v1alpha2-invoke-refuses-idempotency-key",
+      "id": "request-idempotency-key",
+      "schema_valid": true,
+      "expect": "round_trip",
+      "value": {"version":"v1alpha2","request_id":"write-1","operation":"item.write","revision":"rev-1","input":{},"idempotency_key":"k1"}
+    },
+    {
+      "id": "request-empty-idempotency-key-invalid-input",
+      "schema_valid": true,
+      "expect": "refuse",
+      "code": "invalid_input",
+      "request_id": "write-1",
+      "value": {"version":"v1alpha2","request_id":"write-1","operation":"item.write","revision":"rev-1","input":{},"idempotency_key":""}
+    },
+    {
+      "id": "request-null-idempotency-key-invalid-input",
       "schema_valid": false,
       "expect": "refuse",
-      "code": "unsupported",
+      "code": "invalid_input",
       "request_id": null,
-      "value": {"version":"v1alpha2","request_id":"write-1","operation":"item.write","revision":"rev-1","input":{},"idempotency_key":"k1"}
+      "value": {"version":"v1alpha2","request_id":"write-1","operation":"item.write","revision":"rev-1","input":{},"idempotency_key":null}
     },
     {
       "id": "v1alpha2-invoke-refuses-approval",

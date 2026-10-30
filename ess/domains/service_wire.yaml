@@ -50,11 +50,13 @@ types:
       - {name: audit_ref, type: "Optional<String>", presence: null_when_absent}
       - {name: audit_status, type: connectors.service_wire.AuditStatus}
   # First v1alpha2 binding: POST /v1alpha2/invoke only (compatibility.md §2.1).
-  # The closed request admits the five original v1alpha1 members and none of
-  # the §4 invocation additions. `version` is a String so the codec decodes a
-  # wrong version and answers `unsupported` (§2) instead of a decode refusal.
-  # `input` is the operation-local payload, checked against the selected
-  # operation's own input schema, not by this envelope.
+  # The closed request admits the five original v1alpha1 members and, of the
+  # §4 invocation additions, only `idempotency_key`: a write on this binding is
+  # keyed and admitted under a standing grant (connectors.standing_approvals),
+  # and the host refuses a key on any other operation. `version` is a String so
+  # the codec decodes a wrong version and answers `unsupported` (§2) instead of
+  # a decode refusal. `input` is the operation-local payload, checked against
+  # the selected operation's own input schema, not by this envelope.
   - name: connectors.service_wire.InvokeRequest
     kind: struct
     fields:
@@ -63,6 +65,9 @@ types:
       - {name: operation, type: String}
       - {name: revision, type: String}
       - {name: input, type: Json}
+      # 1 to 256 UTF-8 bytes, compared exactly (operations §5.1); absent, never
+      # null.
+      - {name: idempotency_key, type: "Optional<String>", presence: omitted_when_absent}
   # compatibility.md §5: Error remains {code, message, retry_after_seconds?}.
   # ESS-LIMIT: the 512 UTF-8 byte message ceiling and the positive retry value
   # are codec obligations of this binding.
@@ -184,8 +189,8 @@ types:
 # encoding predicate, no cross-record read): exact selected route/version;
 # the status/result/error and audit_status/audit_ref combinations as checked
 # rules rather than annotations; a `result` that is JSON null under success;
-# arbitrary operation-local schema payloads; the refusal of a §4 invocation
-# member on the first binding (compatibility.md §2.1), which the closed
+# arbitrary operation-local schema payloads; the refusal of a refused §4 invocation
+# member (`connection`, `approval`, `executor`) on the first binding (compatibility.md §2.1), which the closed
 # InvokeRequest rejects as an unknown member while the codec answers `unsupported`;
 # numeric/string bounds and canonical encoding; error/status/effect combinations;
 # co-presence of original attempt/request references, safe lookup disclosure and

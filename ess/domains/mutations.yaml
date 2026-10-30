@@ -444,15 +444,24 @@ views:
 # lifecycle state or transport data, so none derives it here.
 #
 # The HTTP host's attempt ledger (contracts/service/compatibility.md § 2.1,
-# `mutation`). For every admitted `external_write` invocation of
-# POST /v1alpha2/invoke, after its acknowledged audit anchor
-# (connectors.execution_audit.AcknowledgeAnchor):
-# PrepareAttempt (`connection_ref` and the fingerprint's connection absent,
-# `approval_mode: not_required`, no `idempotency_key`, `publication_fence` the
-# instance's configuration revision), LinkAnchorAttempt, OpenDispatch, the one
-# provider dispatch, then RecordCompletion for a definitive success or
-# RecordUncertainty for anything else. A failed link or a refused OpenDispatch
-# aborts the attempt (AbortPrepared, `not_attempted`) with zero adapter calls.
+# `mutation` and "Keyed writes under a standing grant"). Every
+# `external_write` invocation of POST /v1alpha2/invoke carries an
+# `idempotency_key` and is admitted only under a standing grant
+# (connectors.standing_approvals). Before its audit anchor the host looks the
+# key up in the caller's namespace (a live key for this exact request is a
+# replay; for another request `idempotency_conflict`), then counts one use of
+# a covering grant (connectors.standing_approvals.CountUse). After its
+# acknowledged audit anchor (connectors.execution_audit.AcknowledgeAnchor):
+# PrepareAttempt with the key (`connection_ref` and the fingerprint's
+# connection absent, `approval_mode: not_required`, `publication_fence` the
+# instance's configuration revision), reserving the key in the same
+# transaction (KeyReservation `pending`), BindUse naming the attempt,
+# LinkAnchorAttempt, OpenDispatch, the one provider dispatch, then
+# RecordCompletion for a definitive success or RecordUncertainty for anything
+# else. A concurrent request that reserved the key first makes PrepareAttempt
+# answer the existing attempt: its use is released (ReleaseUse) and it is
+# answered as a replay. A failed link or a refused OpenDispatch aborts the
+# attempt (AbortPrepared, `not_attempted`) with zero adapter calls.
 # The legacy adapter port answers only a value or a generic error; a generic
 # error, a deadline or a result that breaks the declared output schema after
 # dispatch is not definitive no-effect evidence
@@ -467,27 +476,40 @@ views:
 # for recovery when not acknowledged. The anchor, the attempt,
 # the dispatch, its settlement and the audit final observation run in a host
 # task the request awaits, so a caller hanging up never cancels any of them.
+# Replay: the same key with the same fingerprint is answered from the attempt,
+# `replayed: true`, with no grant check, no count and no dispatch: Completed
+# with the retained result (or `capacity`, `applied`, when the result was not
+# retained), Aborted or Failed `not_attempted`, Indeterminate
+# `outcome_unknown`. A Prepared or Dispatching original is awaited for at most
+# 25 seconds, then answered `outcome_unknown`. The host does not recover a
+# pending attempt after a restart, so the replay of an original a crash
+# interrupted is `outcome_unknown`, never a second dispatch.
 # Store: the local metadata authority in the configured state directory
 # (connectors.declarations.ServiceHostConfiguration `state`), the store the
-# host's audit anchors use (components.yaml local-metadata-authority).
+# host's audit anchors use (components.yaml local-metadata-authority). Keys
+# and attempts survive a restart.
 # Bounds: at most 100,000 retained attempts per instance, refused as
 # `capacity` before the attempt (no attempt, no `mutation`, zero adapter
-# calls), never evicting; each terminal text at most 1,024 bytes. Retention: no
-# expiry and no deletion; the attempt outlives its audit anchor's references
-# exactly as audit.md § 4 states for the audit side. No key reservation is
-# made, so replay retention never applies.
+# calls), never evicting; a Completed attempt retains its result up to
+# 65,536 bytes (`result_retained: false` above it) beside its settlement text
+# of at most 1,024 bytes. Retention: no expiry and no deletion; the attempt
+# outlives its audit anchor's references exactly as audit.md § 4 states for
+# the audit side. The HTTP host never runs ExpireKeyReservation: a key stays
+# live for as long as its attempt is retained, so a key once used is never
+# admitted for another request.
 # Clock: known settlement (RecordCompletion, AbortPrepared) takes `settled_at`
 # from the HTTP host's system wall clock as a zero-width
 # connectors.mutations.SettlementClockInterval, floored by the mutation
 # connectors.clock.LocalClockFloor of its state directory: a sample below the
 # floor refuses the settlement and leaves the attempt in its earlier state.
-# This is a record time, not trusted time: no key reservation, replay expiry
-# or approval window ever reads an HTTP-host attempt's `settled_at`, which is
-# why the trusted `roughtime-clock/1` source (contracts/service/clock.md) is
-# not required here. The state directory is the HTTP host's own; a local
-# owner's state directory, whose floor guards trusted observations, is not
-# shared with it. Unknown settlement needs no clock.
-# ESS-LIMIT: the per-instance count, the byte bound, the absence of a
+# This is a record time, not trusted time: the reservation's
+# `replay_expires_at` is recorded from it, but no expiry, key decision or
+# approval window on the HTTP host ever reads it, which is why the trusted
+# `roughtime-clock/1` source (contracts/service/clock.md) is not required
+# here. The state directory is the HTTP host's own; a local owner's state
+# directory, whose floor guards trusted observations, is not shared with it.
+# Unknown settlement needs no clock.
+# ESS-LIMIT: the per-instance count, the byte bounds, the absence of a
 # connection on exactly these attempts and the clock provenance are host
 # obligations: ESS 0.56 has no cross-record count, byte-length, recording-host
 # or trusted-time construct (the earlier ESS-LIMIT entries on this domain).

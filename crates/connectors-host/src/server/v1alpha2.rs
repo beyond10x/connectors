@@ -5,11 +5,32 @@
 //! dispatch and settles it after, and its Response carries the `mutation`
 //! naming that attempt (ess/domains/mutations.yaml, "The HTTP host's attempt
 //! ledger").
+//!
+//! Every write is keyed and admitted only under a standing grant
+//! (ess/domains/standing_approvals.yaml). Before the anchor, in this order,
+//! each refusal answered with no record, no attempt and zero adapter calls:
+//!
+//! | Check | Refusal |
+//! |---|---|
+//! | `idempotency_key` on an operation that is not a write | `unsupported` |
+//! | a write without `idempotency_key` | `invalid_input` |
+//! | the key is live for another request (other input, operation or revision) | `idempotency_conflict` |
+//! | the key reservation store cannot be read | `unavailable` |
+//! | the grant file cannot be read safely | `unavailable` |
+//! | no grant covers instance, operation, every target member, `not_after`, revocation | `approval_required` |
+//! | every covering grant has `max_per_hour` uses in the last hour | `rate_limited` |
+//! | the use store fails | `unavailable` |
+//!
+//! A live key for this exact request is a replay: the original attempt's
+//! outcome, `replayed: true`, with no grant check, no count and no adapter
+//! call. Before `approval_required` or `rate_limited` the key is looked up
+//! again, so a concurrent winner is replayed instead (operations § 4 step 5).
 use super::{Service, admitted};
 use crate::local::{
     audit, mutations,
     mutations::AttemptRef,
-    service::{Admitted, ServiceState, Write},
+    service::{Admitted, GrantCheck, KeyLookup, KeyedPreparation, ServiceState, Write},
+    standing,
 };
 use axum::{
     Json,
@@ -38,6 +59,10 @@ use std::{
 /// Effect declaration rule); the legacy Descriptor carries no `effects`.
 const MUTATION_PROFILE: &str = "mutation";
 const DEADLINE: Duration = Duration::from_secs(20);
+/// How long a replay waits for a pending original before it answers
+/// `outcome_unknown`: the original's own deadline and its settlement.
+const REPLAY_WAIT: Duration = Duration::from_secs(25);
+const REPLAY_POLL: Duration = Duration::from_millis(50);
 
 pub(super) async fn invoke(
     State(service): State<Service>,
@@ -86,6 +111,13 @@ pub(super) async fn invoke(
     if let Err(error) = validate(&operation.input_schema, &request.input) {
         return refuse(code(error.code), &error.message);
     }
+    // Refusal: a key promises a replay only a write's attempt can give.
+    if operation.profile != MUTATION_PROFILE && request.idempotency_key.is_some() {
+        return refuse(
+            ErrorCode::Unsupported,
+            "idempotency_key is accepted only for a write",
+        );
+    }
     let Ok(permit) = service.slots.clone().try_acquire_owned() else {
         return refuse(ErrorCode::Capacity, "service concurrency limit reached");
     };
@@ -120,6 +152,115 @@ enum Staged {
     NotRecorded(ErrorCode),
     /// The attempt was recorded and not dispatched (`not_attempted`).
     NotAttempted(AttemptRef, CauseStage),
+    /// A concurrent request with the same key and input holds the attempt.
+    Replay(mutations::Observation),
+}
+
+/// What the keyed admission of a write found before the anchor.
+enum Keyed {
+    /// A new attempt under this grant use.
+    New { key: String, taken: standing::Use },
+    /// The key names an attempt for this exact request.
+    Replay(mutations::Observation),
+}
+
+/// A refusal before the anchor: no record, no attempt, zero adapter calls.
+struct Refused {
+    code: ErrorCode,
+    message: &'static str,
+    retry_after_seconds: Option<u64>,
+}
+
+impl Refused {
+    fn new(code: ErrorCode, message: &'static str) -> Self {
+        Self {
+            code,
+            message,
+            retry_after_seconds: None,
+        }
+    }
+}
+
+/// Operations § 4 steps 4 and 5 under a standing grant: the key, then the
+/// grant, each refusal named (module docs).
+fn admit_write(
+    state: &ServiceState,
+    principal: &str,
+    request: &InvokeRequest,
+    operation: &connectors_core::Operation,
+) -> std::result::Result<Keyed, Refused> {
+    let write = Write {
+        request_id: &request.request_id,
+        principal,
+        operation: &request.operation,
+        contract: &operation.contract,
+        profile: &operation.profile,
+        descriptor_revision: &request.revision,
+        input: &request.input,
+    };
+    // Refusal: a write is keyed.
+    let Some(key) = request.idempotency_key.clone() else {
+        return Err(Refused::new(
+            ErrorCode::InvalidInput,
+            "a write requires idempotency_key",
+        ));
+    };
+    let lookup = |write: &Write<'_>| match state.lookup_key(write, &key) {
+        Ok(found) => Ok(found),
+        // Refusal: the key is live for another request; neither the stored
+        // request nor the differing axis is disclosed.
+        Err(mutations::Failure::Conflict) => Err(Refused::new(
+            ErrorCode::IdempotencyConflict,
+            "idempotency_key is in use for another request",
+        )),
+        // Refusal: the reservation cannot be read, so no replay or new
+        // attempt can be decided.
+        Err(_) => Err(Refused::new(
+            ErrorCode::Unavailable,
+            "the key reservation store is unavailable",
+        )),
+    };
+    if let KeyLookup::Replay(original) = lookup(&write)? {
+        return Ok(Keyed::Replay(original));
+    }
+    // A refusal after a miss first looks for a concurrent winner.
+    let unless_won = |refused: Refused| match lookup(&write)? {
+        KeyLookup::Replay(original) => Ok(Keyed::Replay(original)),
+        KeyLookup::Miss => Err(refused),
+    };
+    match state.check_grant(&write) {
+        GrantCheck::Admitted(taken) => Ok(Keyed::New { key, taken }),
+        // Refusal: the grant file is a symbolic link, writable by others,
+        // oversized or malformed.
+        GrantCheck::Unreadable(reason) => {
+            tracing::warn!(?reason, "the standing grant file was refused");
+            Err(Refused::new(
+                ErrorCode::Unavailable,
+                "standing grants are unavailable",
+            ))
+        }
+        // Refusal: no grant covers this write; the axis is not named.
+        GrantCheck::Uncovered(reason) => {
+            tracing::info!(request_id = %request.request_id, ?reason, "no standing grant covers the write");
+            unless_won(Refused::new(
+                ErrorCode::ApprovalRequired,
+                "no standing grant covers this write",
+            ))
+        }
+        // Refusal: the covering grants used their hour.
+        GrantCheck::AtCap {
+            retry_after_seconds,
+        } => unless_won(Refused {
+            code: ErrorCode::RateLimited,
+            message: "the standing grant's hourly writes are used",
+            retry_after_seconds: Some(retry_after_seconds),
+        }),
+        // Refusal: the hourly count cannot be kept.
+        GrantCheck::UsesUnavailable => Err(Refused::new(
+            ErrorCode::Unavailable,
+            "the standing grant count is unavailable",
+        )),
+    }
 }
 
 /// The anchor, then for a write the attempt (prepare, link, open), the one
@@ -138,6 +279,36 @@ async fn execute(
         audit::Access::Write
     } else {
         audit::Access::Read
+    };
+
+    let keyed = if write {
+        let admitted = {
+            let state = state.clone();
+            let principal = principal.clone();
+            let request = request.clone();
+            let operation = operation.clone();
+            tokio::task::spawn_blocking(move || {
+                admit_write(&state, &principal, &request, &operation)
+            })
+            .await
+            .unwrap_or_else(|_| Err(Refused::new(ErrorCode::Internal, "internal error")))
+        };
+        match admitted {
+            Ok(keyed) => Some(keyed),
+            Err(refused) => {
+                return Refusal {
+                    request_id: Some(request_id),
+                    error: Error {
+                        code: refused.code,
+                        message: refused.message.to_owned(),
+                        retry_after_seconds: refused.retry_after_seconds,
+                    },
+                }
+                .into_response();
+            }
+        }
+    } else {
+        None
     };
 
     // The anchor is acknowledged before any adapter call; without it nothing
@@ -160,6 +331,9 @@ async fn execute(
         .await
     };
     let Ok(Ok(reference)) = anchored else {
+        if let Some(Keyed::New { taken, .. }) = &keyed {
+            state.release_grant(taken);
+        }
         return Refusal {
             request_id: Some(request_id),
             error: Error::new(ErrorCode::Unavailable, "execution audit is unavailable"),
@@ -168,23 +342,31 @@ async fn execute(
     };
 
     let mut attempt = None;
-    if write {
-        let staged = {
-            let state = state.clone();
-            let reference = reference.clone();
-            let request = request.clone();
-            let operation = operation.clone();
-            let principal = principal.clone();
-            tokio::task::spawn_blocking(move || {
-                stage(&state, &reference, &principal, &request, &operation)
-            })
-            .await
-            .unwrap_or(Staged::NotRecorded(ErrorCode::Internal))
+    if let Some(keyed) = keyed {
+        let staged = match keyed {
+            Keyed::Replay(original) => Staged::Replay(original),
+            Keyed::New { key, taken } => {
+                let state = state.clone();
+                let reference = reference.clone();
+                let request = request.clone();
+                let operation = operation.clone();
+                let principal = principal.clone();
+                tokio::task::spawn_blocking(move || {
+                    stage(
+                        &state, &reference, &principal, &request, &operation, &key, &taken,
+                    )
+                })
+                .await
+                .unwrap_or(Staged::NotRecorded(ErrorCode::Internal))
+            }
         };
         // Nothing was dispatched: the final observation records the refusal
         // (audit.md § 1 rule 6; execution_audit.yaml, Failed link).
         match staged {
             Staged::Open(opened) => attempt = Some(opened),
+            Staged::Replay(original) => {
+                return replay(&state, &reference, request_id, original).await;
+            }
             Staged::NotRecorded(code) => {
                 let complete = finish(
                     &state,
@@ -262,10 +444,15 @@ async fn execute(
     let cause_text = cause.as_ref().map(|cause| text(cause.code));
     let settled = {
         let state = state.clone();
-        let applied = answer.is_ok();
+        let result = answer.as_ref().ok().cloned();
         let cause_text = cause_text.clone();
         tokio::task::spawn_blocking(move || {
-            state.settle_attempt(attempt, applied, cause_text.as_deref())
+            state.settle_attempt(
+                attempt,
+                result.is_some(),
+                cause_text.as_deref(),
+                result.as_ref(),
+            )
         })
         .await
         .unwrap_or(false)
@@ -316,15 +503,20 @@ async fn execute(
     }
 }
 
-/// `PrepareAttempt`, `LinkAnchorAttempt` and `OpenDispatch`, in that order.
+/// The keyed `PrepareAttempt` (reserving the key in the same transaction)
+/// with its grant recorded, `LinkAnchorAttempt` and `OpenDispatch`, in that
+/// order. A concurrent winner holding the key is replayed instead.
+#[allow(clippy::too_many_arguments)]
 fn stage(
     state: &ServiceState,
     reference: &audit::Reference,
     principal: &str,
     request: &InvokeRequest,
     operation: &connectors_core::Operation,
+    key: &str,
+    taken: &standing::Use,
 ) -> Staged {
-    let prepared = match state.prepare_attempt(&Write {
+    let write = Write {
         request_id: &request.request_id,
         principal,
         operation: &request.operation,
@@ -332,9 +524,20 @@ fn stage(
         profile: &operation.profile,
         descriptor_revision: &request.revision,
         input: &request.input,
-    }) {
-        Ok(prepared) => prepared,
+    };
+    let prepared = match state.prepare_keyed(&write, key, taken) {
+        Ok(KeyedPreparation::Prepared(prepared)) => prepared,
+        Ok(KeyedPreparation::Existing(original)) => return Staged::Replay(original),
+        // Refusal: the attempt was prepared and aborted because its grant
+        // could not be recorded with it.
+        Ok(KeyedPreparation::GrantUnrecorded(attempt)) => {
+            return Staged::NotAttempted(attempt, CauseStage::AttemptStore);
+        }
         Err(mutations::Failure::Capacity) => return Staged::NotRecorded(ErrorCode::Capacity),
+        // Refusal: a concurrent request reserved the key for other input.
+        Err(mutations::Failure::Conflict) => {
+            return Staged::NotRecorded(ErrorCode::IdempotencyConflict);
+        }
         Err(_) => return Staged::NotRecorded(ErrorCode::Unavailable),
     };
     let attempt = prepared.reference();
@@ -373,6 +576,102 @@ fn observation(
         replayed: false,
         cause,
     }
+}
+
+/// A keyed replay (operations § 5.1): the original attempt's outcome,
+/// `replayed: true`, naming the original attempt and its request. Nothing is
+/// dispatched, no grant is read and nothing is counted. A pending original is
+/// awaited up to [`REPLAY_WAIT`] and then answered `outcome_unknown`. This
+/// request's own anchor records what it answered.
+async fn replay(
+    state: &Arc<ServiceState>,
+    reference: &audit::Reference,
+    request_id: String,
+    original: mutations::Observation,
+) -> InvokeResponse {
+    let attempt = original.reference;
+    let mut current = original;
+    let waited = Instant::now();
+    while matches!(
+        current.state,
+        mutations::State::Prepared | mutations::State::Dispatching
+    ) && waited.elapsed() < REPLAY_WAIT
+    {
+        tokio::time::sleep(REPLAY_POLL).await;
+        let observed = {
+            let state = state.clone();
+            tokio::task::spawn_blocking(move || state.observe_attempt(attempt)).await
+        };
+        match observed {
+            Ok(Ok(observation)) => current = observation,
+            _ => break,
+        }
+    }
+    let replayed = |classification, cause| MutationObservation {
+        classification,
+        attempt: AttemptId::parse(&attempt.attempt_id.to_string()).map(|id| AttemptReference {
+            instance: state.instance().to_owned(),
+            id,
+        }),
+        original_request_id: Some(current.request_id.clone()),
+        replayed: true,
+        cause,
+    };
+    let settled = current.result.as_ref();
+    let (outcome, answer, mutation) = match current.state {
+        mutations::State::Completed => {
+            match settled.and_then(|settlement| settlement.get("result")) {
+                Some(result) => (
+                    audit::Outcome::Success,
+                    Ok(result.clone()),
+                    replayed(EffectKnowledge::Applied, None),
+                ),
+                // The write applied and its result was too large to retain.
+                None => (
+                    audit::Outcome::Error,
+                    Err(Error::new(
+                        ErrorCode::Capacity,
+                        "the write applied; its result was not retained for replay",
+                    )),
+                    replayed(EffectKnowledge::Applied, None),
+                ),
+            }
+        }
+        mutations::State::Aborted | mutations::State::Failed => (
+            audit::Outcome::Refused,
+            Err(Error::new(
+                ErrorCode::Unavailable,
+                "the original write was not attempted",
+            )),
+            replayed(EffectKnowledge::NotAttempted, None),
+        ),
+        mutations::State::Indeterminate => (
+            audit::Outcome::Unknown,
+            Err(Error::new(
+                ErrorCode::OutcomeUnknown,
+                "the original write was dispatched and its outcome is unknown",
+            )),
+            replayed(EffectKnowledge::Unknown, None),
+        ),
+        // Still pending after the wait: never dispatched again from here.
+        mutations::State::Prepared | mutations::State::Dispatching => (
+            audit::Outcome::Unknown,
+            Err(Error::new(
+                ErrorCode::OutcomeUnknown,
+                "the original write has not settled",
+            )),
+            replayed(
+                EffectKnowledge::Unknown,
+                Some(DiagnosticCause {
+                    code: BaseErrorCode::Timeout,
+                    stage: CauseStage::Observation,
+                }),
+            ),
+        ),
+    };
+    let code = answer.as_ref().err().map(|error| text(error.code));
+    let complete = finish(state, reference, outcome, code).await;
+    respond(request_id, reference, complete, answer, Some(mutation))
 }
 
 async fn finish(
