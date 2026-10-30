@@ -18,6 +18,7 @@ connectors-sdk = { path = "crates/connectors-sdk" }
 connectors-client = { path = "crates/connectors-client" }
 connectors-host = { path = "crates/connectors-host" }
 connectors-custody = { path = "crates/connectors-custody" }
+connectors-definitions-install = { path = "crates/connectors-definitions-install" }
 connectors-oauth2 = { path = "crates/connectors-oauth2" }
 entity-core = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.3" }
 entity-eventlog = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.3", features = ["sqlite", "sync-bridge"] }

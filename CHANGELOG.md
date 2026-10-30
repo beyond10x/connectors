@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+### Added
+
+- `connectors definitions install --source <source> --tag <tag>` installs a connectors-definitions
+  release (story:definitions-install). It reads `index.json` and the release asset from an `https`
+  repository (`<source>/releases/download/<tag>/`) or a local directory (`<source>/<tag>/`),
+  checks every file against the index, and only then writes a read-only cache entry,
+  `<state>/installed-definitions/<index sha256>/`, and `definitions.lock` beside the configuration
+  file, naming source, tag, commit and index SHA-256. A digest mismatch, an index format version
+  this build does not read and a feature it does not support are refused by name
+  (`digest_mismatch`, `unknown_format_version`, `unmet_feature`), as is an index or asset outside
+  the format (`release_invalid`); a refusal leaves the lock and the cache as they were. A release
+  this binary was never built with installs without a rebuild: install takes only the supported
+  format versions and features from the build. Installing grants nothing, starts no process, and
+  no instance resolves through the lock yet. The four features install admits
+  (`embedded_text`, `query_fixed`, `query_folds`, `rate_limit_headers`) are exactly those the
+  definition lowerer reads, held equal by a test. The core is the new library
+  `connectors-definitions-install`, which depends on no connectors crate. Contract:
+  `contracts/cli/v1alpha1/semantics.md`, "Installing a definitions release"; model:
+  `ess/domains/definitions_install.yaml`.
+- A published definition that uses `rate_limit_headers` (on `defaults` or an operation),
+  `query_fixed`, `query_folds` or `embedded_text` now lowers, so `operations invoke --definition`
+  and `connectors-build definition` accept connectors-definitions 0.5.2's `connectors/github.yaml`
+  (story:definition-lowerer-reads-published-features). Each member reaches the catalog provider's
+  selection as written; `rate_limit_headers` on `defaults` applies to every operation that sets
+  none, and a default `envelope` does not apply to an `embedded_text` read. `query_fixed` or
+  `query_folds` on a write, and `embedded_text` other than on a read answering JSON that sets no
+  `response`, `envelope`, `binary` or `download`, are refused when lowering, as the catalog
+  provider would refuse them.
+
 ## 0.59.3 — 2026-10-30
 
 No breaking changes.

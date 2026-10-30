@@ -1,0 +1,82 @@
+domain: connectors.definitions_install
+summary: What `connectors definitions install` reads and writes. Index is a connectors-definitions release's published index.json as this build reads it; Lock pins one installed release for one connectors configuration; CacheEntry is the read-only copy of that release's files, keyed by the SHA-256 of its index.json.
+
+# Normative owner: contracts/cli/v1alpha1/semantics.md §3, "Installing a definitions
+# release" (story:definitions-install, ADR D5 of provider-definitions-and-runtimes).
+# Index mirrors connectors_definitions.release.ReleaseIndex, which the
+# connectors-definitions repository owns (spec/domains/release.yaml there); this
+# domain declares the one format version this build reads and the features it can
+# lower, the two things install takes from the build. Nothing else install reads is
+# embedded at build time.
+#
+# Relations, stated here because no entity declares them (these are values, not
+# entities): one Lock per connectors configuration names one release by source, tag,
+# commit and index_sha256, and the release outlives the Lock. One CacheEntry per
+# installed index_sha256; several may coexist, and an entry never changes once
+# verified. Removing an old entry is not decided. Neither a Lock nor a CacheEntry
+# grants anything: no connection, no operation admission, no OAuth exchange and no
+# write authority. Which instance resolves through the locked index is
+# story:instances-resolve-through-locked-index.
+types:
+  # The index format versions this build reads. Any other `schema` is refused as
+  # unknown_format_version before anything else in the index is read.
+  - name: connectors.definitions_install.IndexSchemaId
+    kind: enum
+    variants: ["urn:beyond10x:connectors-definitions-index:1"]
+  # The optional definition members this build can lower. A release whose features
+  # name any other is refused as unmet_feature, naming the first such feature.
+  - name: connectors.definitions_install.Feature
+    kind: enum
+    variants: [embedded_text, query_fixed, query_folds, rate_limit_headers]
+  # Lower-case hexadecimal SHA-256, as the index writes it. The 64-character length
+  # is checked by the installer, not declared (see artifact_provenance.Sha256Hex).
+  - name: connectors.definitions_install.HexDigest
+    kind: newtype
+    of: String
+    alphabet: "0123456789abcdef"
+  - name: connectors.definitions_install.Asset
+    kind: struct
+    fields:
+      - {name: name, type: String}
+      - {name: sha256, type: connectors.definitions_install.HexDigest}
+  # path is relative to the release, without the tarball's top directory; files are
+  # sorted by path in byte order and named once each.
+  - name: connectors.definitions_install.IndexFile
+    kind: struct
+    fields:
+      - {name: path, type: String}
+      - {name: sha256, type: connectors.definitions_install.HexDigest}
+      - {name: size, type: Integer}
+  # features is a list of String rather than of Feature: an index naming a feature
+  # this build does not know is still read, and then refused by that name.
+  - name: connectors.definitions_install.Index
+    kind: struct
+    fields:
+      - {name: schema, type: connectors.definitions_install.IndexSchemaId}
+      - {name: tag, type: String}
+      - {name: commit, type: connectors.definitions_install.HexDigest}
+      - {name: features, type: "List<String>"}
+      - {name: asset, type: connectors.definitions_install.Asset}
+      - {name: files, type: "List<connectors.definitions_install.IndexFile>"}
+  - name: connectors.definitions_install.LockFormat
+    kind: enum
+    variants: [connectors-definitions-lock/1]
+  # `definitions.lock`, beside the configuration file: source as install recorded it
+  # (the https repository URL, or the local directory's canonical path), the tag, the
+  # commit the index names and the SHA-256 of the index.json bytes install verified.
+  - name: connectors.definitions_install.Lock
+    kind: struct
+    fields:
+      - {name: format, type: connectors.definitions_install.LockFormat}
+      - {name: source, type: String}
+      - {name: tag, type: String}
+      - {name: commit, type: connectors.definitions_install.HexDigest}
+      - {name: index_sha256, type: connectors.definitions_install.HexDigest}
+  # `<state>/installed-definitions/<index_sha256>/`: index.json, the exact bytes whose
+  # SHA-256 names the entry, and files/<path> for every file the index names. Every
+  # file and directory of an entry is read-only.
+  - name: connectors.definitions_install.CacheEntry
+    kind: struct
+    fields:
+      - {name: index_sha256, type: connectors.definitions_install.HexDigest}
+      - {name: index, type: connectors.definitions_install.Index}

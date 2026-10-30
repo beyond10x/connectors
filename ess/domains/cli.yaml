@@ -677,7 +677,7 @@ types:
     variants: [usage, operational, interrupted]
   - name: connectors.cli.FailureCode
     kind: enum
-    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer]
+    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer, digest_mismatch, unknown_format_version, unmet_feature, release_invalid]
   - name: connectors.cli.FailureStage
     kind: enum
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop]
@@ -820,6 +820,16 @@ types:
       # enforced by the host and pinned by tests.
       - {name: cause, type: "Optional<connectors.cli.FailureCause>"}
       - {name: attempts, type: "Optional<Integer>"}
+      # ESS-LIMIT: feature appears only on `definitions install`'s unmet_feature: the first
+      # feature, in the index's sorted order, that the release requires and this build does
+      # not support. file appears only on its digest_mismatch: the path, relative to the
+      # release, of the file whose bytes differ from its index.json entry, or the release
+      # asset's name when the asset's own SHA-256 differs
+      # (contracts/cli/v1alpha1/semantics.md §3, "Installing a definitions release"). As for
+      # instance_id above, ESS declares no invariant on a CLI type, so the presence rules are
+      # enforced by the host and pinned by tests.
+      - {name: feature, type: "Optional<String>"}
+      - {name: file, type: "Optional<String>"}
   # setup check names its prerequisites: configuration, metadata, artifact:<alias>,
   # keyring and persistent_custody_qualification under a platform binding; under the
   # explicitly selected mounted_secret binding, mounted_custody (the configured
@@ -1129,6 +1139,35 @@ types:
     kind: struct
     fields:
       - {name: connectors, type: "List<connectors.cli.ConnectorSummary>"}
+  # `connectors definitions install` (story:definitions-install;
+  # contracts/cli/v1alpha1/semantics.md §3, "Installing a definitions release").
+  # source is an https repository URL or a local directory, tag the release tag.
+  # The result names what the lock records (connectors.definitions_install.Lock):
+  # source as recorded, tag, commit and index_sha256; features the release's
+  # sorted features and files the number of files its index names; lock_path the
+  # lock file and cache_path the read-only cache entry keyed by index_sha256.
+  # cache_entry is created when this command wrote the entry, existing when an
+  # entry for the same index_sha256 was already there and its files verified.
+  - name: connectors.cli.DefinitionsInstallInput
+    kind: struct
+    fields:
+      - {name: source, type: "String"}
+      - {name: tag, type: "String"}
+  - name: connectors.cli.DefinitionsCacheEntry
+    kind: enum
+    variants: [created, existing]
+  - name: connectors.cli.DefinitionsInstallResult
+    kind: struct
+    fields:
+      - {name: source, type: "String"}
+      - {name: tag, type: "String"}
+      - {name: commit, type: "String"}
+      - {name: index_sha256, type: "String"}
+      - {name: features, type: "List<String>"}
+      - {name: files, type: "Integer"}
+      - {name: lock_path, type: "String"}
+      - {name: cache_path, type: "String"}
+      - {name: cache_entry, type: "connectors.cli.DefinitionsCacheEntry"}
   - name: connectors.cli.AdapterListInput
     kind: struct
     fields:
