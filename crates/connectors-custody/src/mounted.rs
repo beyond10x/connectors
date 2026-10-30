@@ -400,6 +400,17 @@ pub fn read(directory: &Path, pins: &Path, item: &Item) -> Result<Reading> {
     Ok(Reading { material, pin })
 }
 
+/// Read `item` from the configured `directory` once under checks 1 to 7 and
+/// pin nothing: the bytes the platform delivers now. A served instance reads
+/// its credential this way at each request, so it follows the platform's
+/// rotation; it has no connection whose validated version a pin would hold
+/// (docs/running-services.md). Every refusal is the same `Unavailable` (an
+/// absent item `Missing`) as [`MountedSecret::read_item`]'s, and carries no
+/// path, layout or bytes.
+pub fn read_current(directory: &Path, item: &Item) -> Result<Material> {
+    read_item(directory, item, &Identity::current()?)
+}
+
 /// Passive state of a configured mounted directory: `Available` only when it
 /// passes its checks on a read-only mount. Reads no item.
 pub fn inspect(directory: &Path) -> State {

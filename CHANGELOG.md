@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+No breaking changes.
+
+### Added
+
+- A served host can admit its caller by a Kubernetes service account token instead of a static
+  bearer. With `admission: service-account-token` in a `urn:connectors:config:v3:service`
+  configuration, the host sends each request's bearer to the configured TokenReview endpoint
+  and admits it only when the review authenticates it for the configured `audience` as the
+  configured `principal` (`system:serviceaccount:<namespace>:<name>`). Any other answer is
+  `unauthorized`; a review that fails, times out or cannot be reached is `unavailable`. In both
+  cases no operation runs. Reviews are not cached, and the token is never logged. The audit
+  anchor names the service account. Under this profile `POST /v1/invoke` answers
+  `unsupported`. `static-bearer` stays the default, and v1 and v2 configurations read
+  unchanged.
+- `connectors-catalog-provider --config <file>` serves one catalog instance on the HTTP host:
+  a shipped connector's instance, a local catalog configuration, or a definition file under a
+  definitions checkout. The instance's credential document is a file the platform mounts. The
+  host reads it at every request under the `mounted_secret` checks, so a rotated Secret is used
+  from the next read on. A missing or refused item answers `unavailable` and sends nothing. The
+  served host lists and runs the instance's reads only; a catalog write is not offered. See
+  [Run connector services](docs/running-services.md#catalog-instances).
+
 ## 0.59.3 — 2026-10-30
 
 No breaking changes.
