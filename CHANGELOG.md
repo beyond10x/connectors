@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+No breaking changes.
+
 ### Added
 
 - `connectors definitions install --source <source> --tag <tag>` installs a connectors-definitions
@@ -49,6 +51,25 @@
   id). A definition declares it as `scheme: github_app` with a label and no identity block.
   Nothing in the entry rotates, so `mounted_secret` custody admits the profile. See
   `docs/local-catalog-provider.md`. Run against a local fixture only, not against GitHub.
+- A served host can admit its caller by a Kubernetes service account token instead of a static
+  bearer. With `admission: service-account-token` in a `urn:connectors:config:v3:service`
+  configuration, the host sends each request's bearer to the configured TokenReview endpoint
+  and admits it only when the review authenticates it for the configured `audience` as the
+  configured `principal` (`system:serviceaccount:<namespace>:<name>`). Any other answer is
+  `unauthorized`; a review that fails, times out or cannot be reached is `unavailable`. In both
+  cases no operation runs. At most 8 reviews run at once; a request that arrives while 8 are
+  under way is `unavailable` at once, with no review sent. Reviews are not cached, and the
+  token is never logged. The audit
+  anchor names the service account. Under this profile `POST /v1/invoke` answers
+  `unsupported`. `static-bearer` stays the default, and v1 and v2 configurations read
+  unchanged.
+- `connectors-catalog-provider --config <file>` serves one catalog instance on the HTTP host:
+  a shipped connector's instance, a local catalog configuration, or a definition file under a
+  definitions checkout. The instance's credential document is a file the platform mounts. The
+  host reads it at every request under the `mounted_secret` checks, so a rotated Secret is used
+  from the next read on. A missing or refused item answers `unavailable` and sends nothing. The
+  served host lists and runs the instance's reads only; a catalog write is not offered. See
+  [Run connector services](docs/running-services.md#catalog-instances).
 
 ### Fixed
 
@@ -59,6 +80,11 @@
 - The catalog provider refuses an OAuth token answer, a `tokeninfo` answer or `id_token` claims
   that are a JSON array as `protocol` (stored grant claims as an invalid credential). Before, the
   array was read field by field in order, so its first string could be sent as the access token.
+- A served host whose standard error is a closed pipe, for example after its supervisor exited,
+  now answers requests normally. Before, the first log line it could not write ended the
+  request: a read the provider had answered came back `internal` (HTTP 500) with no final audit
+  observation, and an admission refusal closed the connection with no answer. Every binary that
+  uses the shared log setup now drops a log line it cannot write.
 
 ## 0.59.3 — 2026-10-30
 

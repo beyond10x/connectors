@@ -25,7 +25,7 @@ Rendered from [`contracts/service/v1alpha2/semantics.md`](https://github.com/bey
 | Field | Value |
 |---|---|
 | Wire version | `v1alpha2` on `/v1alpha2/describe` and `/v1alpha2/invoke`; legacy `/v1/...` is a separate explicit projection |
-| Admission profiles | `static-bearer` (today's shared service token), `identity-audience` (Identity access token for an exact Connectors-owned audience), `delegated` (federation hop carrying a gateway-signed verified context) |
+| Admission profiles | `static-bearer` (today's shared service token), `service-account-token` (a projected Kubernetes service-account token for the instance's configured audience, checked with a TokenReview at each request and admitted only as the one configured `system:serviceaccount:<namespace>:<name>` principal; implemented on the first binding, [compatibility §2.1](./compatibility.md#21-first-binding-post-v1alpha2invoke), Admission), `identity-audience` (Identity access token for an exact Connectors-owned audience), `delegated` (federation hop carrying a gateway-signed verified context) |
 | Vocabulary | verified context (tenant, principal, optional realm, authority, optional executor), policy decision, grant reference, audit reference, executor assertion |
 | Preserved structure | operation ids, input/output schemas, limits, success/error response variants and request correlation, `/healthz`, one-hop federation, descriptor revision and `stale_description` protocol |
 

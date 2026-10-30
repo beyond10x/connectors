@@ -523,6 +523,29 @@ pub fn profiles(connector: &str) -> Result<Vec<String>> {
 
 fn derived(instance: &Instance<'_>) -> Result<(Configuration, Sources)> {
     let (declaration, files) = declaration(instance.connector)?;
+    let selection_name = declaration.selection.clone();
+    let config = instance_configuration(declaration, instance)?;
+    let selection = files
+        .iter()
+        .find(|(name, _)| *name == selection_name)
+        .ok_or(Failure::InvalidConfiguration)?;
+    let selection = read_selection(selection.1, &config.provider)?;
+    let (bundle, bundle_sha256) = shipped_bundle(&config.provider)?;
+    let sources = Sources {
+        bundle,
+        bundle_sha256: Some(bundle_sha256),
+        selection: Some(selection),
+    };
+    Ok((config, sources))
+}
+
+/// The native configuration `declaration` gives `instance`: its id
+/// `<connector>.<name>`, the endpoint and API path, and the one profile it
+/// uses. A shipped declaration and a lowered definition's are read alike.
+fn instance_configuration(
+    declaration: Declaration,
+    instance: &Instance<'_>,
+) -> Result<Configuration> {
     let instance_id = format!("{}.{}", declaration.connector_id, instance.name);
     if !connectors_core::valid_id(instance.name) || !connectors_core::valid_id(&instance_id) {
         return Err(Failure::InvalidInput);
@@ -561,13 +584,7 @@ fn derived(instance: &Instance<'_>) -> Result<(Configuration, Sources)> {
             connectors_catalog_provider::origin(&endpoint).ok_or(Failure::InvalidConfiguration)?;
         auth.token_url = Some(format!("{origin}{path}"));
     }
-    let selection = files
-        .iter()
-        .find(|(name, _)| *name == declaration.selection)
-        .ok_or(Failure::InvalidConfiguration)?;
-    let selection = read_selection(selection.1, &declaration.catalog_provider)?;
-    let (bundle, bundle_sha256) = shipped_bundle(&declaration.catalog_provider)?;
-    let config = Configuration {
+    Ok(Configuration {
         format: FORMAT.into(),
         instance: instance_id,
         provider: declaration.catalog_provider,
@@ -581,13 +598,7 @@ fn derived(instance: &Instance<'_>) -> Result<(Configuration, Sources)> {
         operations_file: None,
         bindings: None,
         oauth2_client_id: None,
-    };
-    let sources = Sources {
-        bundle,
-        bundle_sha256: Some(bundle_sha256),
-        selection: Some(selection),
-    };
-    Ok((config, sources))
+    })
 }
 
 /// Sensitive input intentionally has no Debug or Serialize implementation.
@@ -1502,6 +1513,57 @@ impl Local {
     pub fn derive(instance: &Instance<'_>) -> Result<Self> {
         let (config, sources) = derived(instance)?;
         Self::configure(config, Some(sources))
+    }
+    /// An instance of a lowered definition (`connectors_catalog::definition`),
+    /// configured from the declaration the lowering wrote as an instance of a
+    /// shipped connector is from its own; `out` is the lowering's bundle
+    /// directory. Everything is read here: nothing under `out` is read again.
+    /// The instance is `<connector>.<name>` under the declaration's connector.
+    pub fn derive_lowered(
+        lowered: &connectors_catalog::definition::Lowered,
+        out: &Path,
+        name: &str,
+        endpoint: Option<&str>,
+        profile: Option<&str>,
+    ) -> Result<Self> {
+        let file =
+            std::fs::File::open(&lowered.connector).map_err(|_| Failure::InvalidConfiguration)?;
+        let bytes = filesystem::read_bounded(file, 1024 * 1024)
+            .map_err(|_| Failure::InvalidConfiguration)?;
+        let declaration: Declaration =
+            connectors_core::read_json(&bytes).map_err(|_| Failure::InvalidConfiguration)?;
+        if declaration.format != DECLARATION_FORMAT
+            || declaration.adapter_id != "catalog"
+            || declaration.catalog_provider != lowered.provider
+            || !connectors_core::valid_id(&declaration.connector_id)
+            || !connectors_core::valid_id(&declaration.provider_id)
+            || lowered.operations.file_name() != Some(std::ffi::OsStr::new(&declaration.selection))
+        {
+            return Err(Failure::InvalidConfiguration);
+        }
+        let connector = declaration.connector_id.clone();
+        let instance = Instance {
+            connector: &connector,
+            name,
+            endpoint,
+            profile,
+        };
+        let config = instance_configuration(declaration, &instance)?;
+        let selection = read_selection_file(&lowered.operations, &config.provider)?;
+        let bundle = bundle::load(out, &config.provider).map_err(Failure::from_service)?;
+        let bundle_sha256 = bundle::read_index(out).ok().and_then(|index| {
+            index
+                .find(&config.provider)
+                .map(|entry| entry.bundle_sha256.clone())
+        });
+        Self::configure(
+            config,
+            Some(Sources {
+                bundle,
+                bundle_sha256,
+                selection: Some(selection),
+            }),
+        )
     }
     /// `shipped` carries the compiled-in bundle and selection of a derived
     /// configuration; without it they are read from the configuration's paths.
