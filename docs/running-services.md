@@ -194,6 +194,35 @@ refuses:
 - with a grant file, a write whose answer carries a credential it created: the served host
   has nowhere to keep it.
 
+### The state directory
+
+`service.state` is the host's metadata directory. Start creates it with mode `0700` when it is
+absent and never changes an existing directory's mode. Start checks every directory from `/`
+down to `state`: each must be owned by the host user or root and must not be writable by group
+or others, and `state` itself must be owned by the host user with mode `0700`. The refusal names
+the first directory that fails and why, for example:
+
+```text
+service state cannot be opened for this instance: "/var/lib/connectors", an ancestor of state, is writable by group or others
+```
+
+For `state` itself it states the whole target: owned by the host user with mode `0700`, no
+group or other bits. A directory the host cannot open at all (one it has no search permission
+on, or a missing parent it cannot create in) refuses start with the closed text
+`service state cannot be opened for this instance`, without a name.
+
+A persistent volume whose root is `0777` therefore refuses start when it is mounted at
+`state` or above it, however private `state` is. Keep that root out of the path in one of
+these ways:
+
+- mount a subdirectory of the volume (`subPath`) as `state`: the host user's, mode `0700`;
+- mount a subdirectory of the volume as the parent of `state`: owned by the host user or root,
+  not group- or other-writable, and searchable by the host user;
+- have an init container set the volume root to `0755`, searchable by the host user, owned by
+  the host user or root, before the host starts.
+
+An `fsGroup` makes the volume group-writable, and it is refused the same way.
+
 ## Standing write grants
 
 Standing grants are optional. A host without `standing_grants` in its service configuration
