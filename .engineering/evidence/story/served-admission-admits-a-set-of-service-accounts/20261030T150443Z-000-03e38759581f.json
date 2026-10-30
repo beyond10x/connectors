@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T15:04:43Z",
+  "actor": "human:timo",
+  "artifact": "story:served-admission-admits-a-set-of-service-accounts",
+  "kind": "story",
+  "revision": 12,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-host --lib server::token_review; --test http_service_account_token (18) --test http_service_account_token_review (7); host lib 645 passed",
+    "reference": "commit 4553a4f7a"
+  }
+}

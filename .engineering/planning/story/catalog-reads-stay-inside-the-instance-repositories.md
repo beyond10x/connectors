@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-reads-stay-inside-the-instance-repositories
 kind: story
-status: active
+status: implemented
 title: Catalog reads of a GitHub App instance reach only the repositories the instance lists
 summary: 'D275: reads reached all 74 repositories the installation sees.'
 relations:
@@ -16,10 +16,11 @@ scope:
   path: adapters/catalog/tests/served.rs
 - confidence: cited
   path: docs/running-services.md
-revision: 10
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T13:43:06Z", actor: "human:timo", revision: 9, executor: "agent:conn-d275-w621", correlation: "wave-d275-0621"}
 - {from: "proposed", to: "active", at: "2026-10-30T13:43:06Z", actor: "human:timo", revision: 10, executor: "agent:conn-d275-w621", correlation: "wave-d275-0621"}
+- {from: "active", to: "implemented", at: "2026-10-30T15:04:49Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 # Story: catalog-reads-stay-inside-the-instance-repositories
 

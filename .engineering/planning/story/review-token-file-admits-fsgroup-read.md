@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:review-token-file-admits-fsgroup-read
 kind: story
-status: active
+status: implemented
 title: The review token file is admitted at 0640 when its group is one the process holds
 summary: 'D275: a pod with fsGroup sees the projected token as 0640 and the host refuses it.'
 relations:
@@ -20,10 +20,11 @@ scope:
   path: crates/connectors-host/tests/service.rs
 - confidence: cited
   path: docs/running-services.md
-revision: 12
+revision: 13
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T13:43:04Z", actor: "human:timo", revision: 11, executor: "agent:conn-d275-w621", correlation: "wave-d275-0621"}
 - {from: "proposed", to: "active", at: "2026-10-30T13:43:04Z", actor: "human:timo", revision: 12, executor: "agent:conn-d275-w621", correlation: "wave-d275-0621"}
+- {from: "active", to: "implemented", at: "2026-10-30T15:16:16Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 # Story: review-token-file-admits-fsgroup-read
 

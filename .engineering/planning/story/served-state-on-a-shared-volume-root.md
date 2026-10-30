@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:served-state-on-a-shared-volume-root
 kind: story
-status: active
+status: implemented
 title: A host whose state sits on a world-writable volume root says what to change
 summary: 'D275: state on a 0777 PVC root is refused without saying which directory or why.'
 relations:
@@ -20,10 +20,11 @@ scope:
   path: docs/local-container.md
 - confidence: cited
   path: docs/running-services.md
-revision: 12
+revision: 13
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T13:43:05Z", actor: "human:timo", revision: 11, executor: "agent:conn-d275-w621", correlation: "wave-d275-0621"}
 - {from: "proposed", to: "active", at: "2026-10-30T13:43:06Z", actor: "human:timo", revision: 12, executor: "agent:conn-d275-w621", correlation: "wave-d275-0621"}
+- {from: "active", to: "implemented", at: "2026-10-30T15:04:46Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 # Story: served-state-on-a-shared-volume-root
 

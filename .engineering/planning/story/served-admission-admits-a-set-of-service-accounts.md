@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:served-admission-admits-a-set-of-service-accounts
 kind: story
-status: active
+status: implemented
 title: A served host admits a configured set of service accounts, or a namespace and a name pattern
 summary: 'D275: one instance serves several agent service accounts.'
 relations:
@@ -22,10 +22,11 @@ scope:
   path: docs/running-services.md
 - confidence: inferred
   path: ess/domains/declarations.yaml
-revision: 12
+revision: 13
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T13:43:02Z", actor: "human:timo", revision: 11, executor: "agent:conn-d275-w621", correlation: "wave-d275-0621"}
 - {from: "proposed", to: "active", at: "2026-10-30T13:43:03Z", actor: "human:timo", revision: 12, executor: "agent:conn-d275-w621", correlation: "wave-d275-0621"}
+- {from: "active", to: "implemented", at: "2026-10-30T15:04:43Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 # Story: served-admission-admits-a-set-of-service-accounts
 

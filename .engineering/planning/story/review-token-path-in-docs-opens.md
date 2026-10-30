@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:review-token-path-in-docs-opens
 kind: story
-status: active
+status: implemented
 title: The documented review credential_file path is one the host opens
 summary: 'D275: the documented serviceaccount/token path is a symbolic link the host refuses.'
 relations:
@@ -20,10 +20,11 @@ scope:
   path: crates/connectors-host/tests/service.rs
 - confidence: cited
   path: docs/running-services.md
-revision: 12
+revision: 13
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T13:43:05Z", actor: "human:timo", revision: 11, executor: "agent:conn-d275-w621", correlation: "wave-d275-0621"}
 - {from: "proposed", to: "active", at: "2026-10-30T13:43:05Z", actor: "human:timo", revision: 12, executor: "agent:conn-d275-w621", correlation: "wave-d275-0621"}
+- {from: "active", to: "implemented", at: "2026-10-30T15:16:18Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 # Story: review-token-path-in-docs-opens
 
