@@ -8,7 +8,7 @@ license.workspace = true
 
 [features]
 default = ["service"]
-service = ["dep:connectors-host", "dep:connectors-oauth2", "dep:clap", "dep:tokio", "dep:ring"]
+service = ["dep:connectors-host", "dep:connectors-oauth2", "dep:connectors-custody", "dep:clap", "dep:tokio", "dep:ring", "dep:tempfile"]
 
 [[bin]]
 name = "connectors-catalog-provider"
@@ -21,6 +21,8 @@ connectors-sdk.workspace = true
 connectors-catalog = { path = "../../crates/connectors-catalog" }
 connectors-host = { workspace = true, optional = true }
 connectors-oauth2 = { workspace = true, optional = true }
+connectors-custody = { workspace = true, optional = true }
+tempfile = { workspace = true, optional = true }
 async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -47,5 +49,7 @@ tokio.workspace = true
 tempfile.workspace = true
 hex.workspace = true
 connectors-host.workspace = true
+connectors-custody = { workspace = true, features = ["test-support"] }
+reqwest.workspace = true
 rcgen = "0.14"
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }

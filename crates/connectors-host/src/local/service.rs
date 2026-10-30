@@ -43,6 +43,10 @@ const CANONICALIZATION: &str = "adapter-v1-canonical-json";
 /// The facts the host verified for one admitted invocation.
 pub struct Admitted<'a> {
     pub request_id: &'a str,
+    /// The admitted service principal: [`STATIC_BEARER_PRINCIPAL`], or the
+    /// configured service account under `service-account-token`
+    /// (compatibility.md § 2.1, Audit anchor).
+    pub principal: &'a str,
     pub operation: &'a str,
     pub descriptor_revision: &'a str,
     pub access: audit::Access,
@@ -51,6 +55,8 @@ pub struct Admitted<'a> {
 /// The facts of one admitted `external_write` the host records an attempt for.
 pub struct Write<'a> {
     pub request_id: &'a str,
+    /// The admitted service principal, the attempt's caller.
+    pub principal: &'a str,
     pub operation: &'a str,
     pub contract: &'a str,
     pub profile: &'a str,
@@ -171,7 +177,7 @@ impl ServiceState {
             hop: audit::Hop::Execution,
             stage: audit::Stage::Admission,
             request_id: Some(facts.request_id.to_owned()),
-            principal_ref: Some(STATIC_BEARER_PRINCIPAL.to_owned()),
+            principal_ref: Some(facts.principal.to_owned()),
             operation_id: Some(facts.operation.to_owned()),
             connection_ref: None,
             descriptor_revision: Some(facts.descriptor_revision.to_owned()),
@@ -193,7 +199,7 @@ impl ServiceState {
                 receiver_instance: self.instance.clone(),
                 tenant: None,
                 realm: None,
-                caller: STATIC_BEARER_PRINCIPAL.to_owned(),
+                caller: write.principal.to_owned(),
                 executor: None,
                 origin: ledger::Origin::Direct,
             },
@@ -476,6 +482,7 @@ mod tests {
         let state = ServiceState::open_bounded(&path, "leaf", "fixture", "rev-1", 2).unwrap();
         let admitted = |request_id: &'static str| Admitted {
             request_id,
+            principal: STATIC_BEARER_PRINCIPAL,
             operation: "read",
             descriptor_revision: "rev-1",
             access: audit::Access::Read,

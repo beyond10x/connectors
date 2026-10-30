@@ -4,8 +4,9 @@ Run from the repository root on Linux with Rust, Docker, `kubectl`, `jq`, and
 OpenSSL installed. These commands create a disposable Kubernetes server and
 PostgreSQL database. They never select the user's default Kubernetes context.
 Kubernetes uses a private bearer credential and its cluster CA; SQL uses a
-restricted reader role. GitLab has no standalone service: it runs through the
-catalog provider under the local CLI, and its acceptance is recorded separately
+restricted reader role. GitLab is not part of this run: it runs through the catalog
+provider, under the local CLI or as a [served catalog instance](running-services.md#catalog-instances),
+and its acceptance is recorded separately
 in [`gitlab-sandbox-20260913/`](https://github.com/beyond10x/connectors/tree/history/evidence-2026-10/docs/evidence/gitlab-sandbox-20260913) on branch `history/evidence-2026-10`.
 
 The example uses fixed local container names and service ports 17100–17103. Choose
