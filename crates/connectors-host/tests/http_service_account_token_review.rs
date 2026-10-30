@@ -242,9 +242,18 @@ impl Drop for Host {
 }
 
 async fn host_with(root: &Path, api: &str, ca: &Path) -> Host {
+    host_admitting(root, api, ca, ("principal", json!(PRINCIPAL))).await
+}
+
+/// A host whose `principal` is replaced by `accounts`: `principal`,
+/// `principals` or `service_accounts` with its value.
+async fn host_admitting(root: &Path, api: &str, ca: &Path, accounts: (&str, Value)) -> Host {
     let credential = root.join("instance-token");
     private_file(&credential, INSTANCE_TOKEN.as_bytes());
-    let config = read(root, &account_document(api, ca, &credential)).unwrap();
+    let mut document = account_document(api, ca, &credential);
+    document.as_object_mut().unwrap().remove("principal");
+    document[accounts.0] = accounts.1;
+    let config = read(root, &document).unwrap();
     let admission = config.admission().unwrap();
     let state = root.join("state");
     std::fs::create_dir(&state).unwrap();
@@ -648,6 +657,93 @@ async fn neither_token_reaches_a_log_a_response_or_a_record() {
             body,
             json!({"apiVersion":"authentication.k8s.io/v1","kind":"TokenReview","spec":{"token":CALLER_TOKEN,"audiences":[AUDIENCE]}})
         );
+    }
+}
+
+/// Invariant 1 under an account set: a pattern whose name is the bare `*`
+/// admits only a reviewed username of the exact form
+/// `system:serviceaccount:<namespace>:<name>` within the anchor's 128 bytes,
+/// in the literal namespace; a list admits only its entries byte for byte.
+/// Every other answer is `unauthorized` with zero adapter calls, and nothing
+/// is anchored.
+#[tokio::test]
+async fn an_account_set_admits_no_username_outside_its_accounts() {
+    let token = format!("Bearer {CALLER_TOKEN}");
+    let near = |principal: &str| {
+        vec![
+            principal.to_uppercase(),
+            format!("{principal} "),
+            format!("{principal}\n"),
+            format!(" {principal}"),
+            format!("{principal}:extra"),
+            format!("{principal}\u{0}"),
+        ]
+    };
+    let mut pattern_refusals = near(PRINCIPAL);
+    pattern_refusals.extend([
+        "system:serviceaccount:agents:".to_owned(),
+        "system:serviceaccount:agents".to_owned(),
+        "system:serviceaccount:agents:-example".to_owned(),
+        "system:serviceaccount:agents:example..agent".to_owned(),
+        "system:serviceaccount:agents:Example".to_owned(),
+        "system:serviceaccount:agents:example agent".to_owned(),
+        "system:serviceaccount:agents:example/agent".to_owned(),
+        format!("system:serviceaccount:agents:{}", "a".repeat(100)),
+        "system:serviceaccount:agents-x:example".to_owned(),
+        "system:serviceaccount::example".to_owned(),
+        "system:serviceaccounts:agents:example".to_owned(),
+        "agents:example".to_owned(),
+    ]);
+    let listed = "system:serviceaccount:agents:second-agent";
+    let mut list_refusals = near(PRINCIPAL);
+    list_refusals.extend(near(listed));
+    list_refusals.push("system:serviceaccount:agents:third-agent".to_owned());
+    let cases = [
+        (
+            (
+                "service_accounts",
+                json!({"namespace": "agents", "name": "*"}),
+            ),
+            pattern_refusals,
+        ),
+        (("principals", json!([PRINCIPAL, listed])), list_refusals),
+    ];
+    for (accounts, refusals) in cases {
+        let root = tempfile::tempdir().unwrap();
+        let double = double(root.path()).await;
+        let host = host_admitting(root.path(), &double.api, &double.ca, accounts).await;
+        for username in &refusals {
+            double.json(
+                201,
+                &review_with(
+                    json!({"authenticated": true, "audiences": [AUDIENCE], "user": {"username": username}}),
+                ),
+            );
+            let (status, text) = send(
+                &host,
+                reqwest::Method::POST,
+                "/v1alpha2/invoke",
+                Some(token.as_bytes()),
+                Some(&invocation("write", "w")),
+            )
+            .await;
+            assert_eq!(status, 401, "{username:?} answered {status}: {text}");
+        }
+        assert_eq!(double.seen(), refusals.len());
+        assert_eq!(host.calls.load(Ordering::SeqCst), 0);
+
+        // The listed and matching account is admitted, as a control.
+        double.json(201, &positive());
+        let (status, text) = send(
+            &host,
+            reqwest::Method::POST,
+            "/v1alpha2/invoke",
+            Some(token.as_bytes()),
+            Some(&invocation("read", "r")),
+        )
+        .await;
+        assert_eq!(status, 200, "{text}");
+        assert_eq!(host.calls.load(Ordering::SeqCst), 1);
     }
 }
 
