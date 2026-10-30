@@ -429,6 +429,38 @@ fn legacy(mut error: Error) -> Error {
     error
 }
 
+/// The start refusal for a `state` that cannot be opened. A refused directory
+/// is named (the configured path or one of its ancestors, never OS text) with
+/// its fixed reason; any other failure keeps the closed text.
+fn state_refusal(
+    configured: &std::path::Path,
+    refusal: crate::local::filesystem::Refusal,
+) -> Error {
+    use crate::local::filesystem::{Reason, Refusal};
+    const REFUSED: &str = "service state cannot be opened for this instance";
+    let Refusal::Refused(refused) = refusal else {
+        return Error::invalid(REFUSED);
+    };
+    let directory = &refused.directory;
+    // `state` itself is told its whole target, whichever check failed first:
+    // fixing one bit at a time would only move the refusal to the next check.
+    if directory == configured {
+        return Error::invalid(format!(
+            "{REFUSED}: {directory:?}, the state directory, must be owned by the host user \
+             with mode 0700, no group or other bits"
+        ));
+    }
+    let reason = match refused.reason {
+        Reason::Owner => "is owned by neither the host user nor root",
+        Reason::Writable => "is writable by group or others",
+        // An ancestor is admitted without the private check; kept for totality.
+        Reason::NotPrivate => "is not private",
+    };
+    Error::invalid(format!(
+        "{REFUSED}: {directory:?}, an ancestor of state, {reason}"
+    ))
+}
+
 /// Serves a v2 ([`ServiceConfig`], always `static-bearer`) or v3
 /// ([`ServiceConfigV3`]) service configuration.
 pub async fn serve(config: impl Into<ServiceConfigV3>, adapter: Arc<dyn Adapter>) -> Result<()> {
@@ -461,12 +493,18 @@ pub async fn serve_with_routes(
         Some(path) => {
             let descriptor = adapter.descriptor();
             let instance = config.instance.clone();
+            let configured = path.clone();
             let state = tokio::task::spawn_blocking(move || {
-                ServiceState::open(&path, &instance, &descriptor.adapter, &descriptor.revision)
+                ServiceState::open_explained(
+                    &path,
+                    &instance,
+                    &descriptor.adapter,
+                    &descriptor.revision,
+                )
             })
             .await
             .map_err(|_| Error::internal())?
-            .map_err(|_| Error::invalid("service state cannot be opened for this instance"))?;
+            .map_err(|refusal| state_refusal(&configured, refusal))?;
             let state = state
                 .with_standing_grants(config.standing_grants.clone())
                 .map_err(|_| Error::invalid("standing grant uses cannot be opened"))?;
