@@ -55,7 +55,13 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+#[cfg(unix)]
 mod git;
+/// The `git` member: the relay on Unix; elsewhere start refuses it.
+#[cfg(unix)]
+type GitSection = git::GitConfig;
+#[cfg(not(unix))]
+type GitSection = Value;
 
 /// An `external_write` operation's profile (contracts/operations/v1alpha1/
 /// semantics.md § 2); a read never carries it.
@@ -75,7 +81,7 @@ pub struct Configuration {
     /// The git smart-HTTP relay (`git`), served beside the operations when
     /// present.
     #[serde(default)]
-    pub git: Option<git::GitConfig>,
+    pub git: Option<GitSection>,
 }
 
 /// Which catalog instance is served: exactly one of a shipped `connector`, a
@@ -131,6 +137,25 @@ pub async fn run(path: &Path) -> Result<()> {
             "service.instance must be the catalog instance's id",
         ));
     }
+    serve(config, bridge).await
+}
+
+/// Elsewhere than on Unix there is no git relay, and a `git` member refuses
+/// start.
+#[cfg(not(unix))]
+async fn serve(config: Configuration, bridge: Bridge<Local>) -> Result<()> {
+    if config.git.is_some() {
+        return Err(Error::new(
+            ErrorCode::Unsupported,
+            "git: the relay runs on Unix only",
+        ));
+    }
+    connectors_host::server::serve(config.service, Arc::new(bridge)).await
+}
+
+/// The operations, and the git relay beside them when `git` is set.
+#[cfg(unix)]
+async fn serve(config: Configuration, bridge: Bridge<Local>) -> Result<()> {
     let relay = match config.git {
         None => None,
         Some(git) => {
@@ -156,6 +181,7 @@ pub async fn run(path: &Path) -> Result<()> {
     .await
 }
 
+#[cfg(unix)]
 /// The forge token of the instance's profile, derived from the mounted
 /// document at each use; the git relay sends it and nothing else does.
 pub struct Upstream {
@@ -163,6 +189,7 @@ pub struct Upstream {
     credential: Mounted,
 }
 
+#[cfg(unix)]
 impl Upstream {
     async fn token(&self) -> Result<Secret> {
         let document = self.credential.read().await?;
