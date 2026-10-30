@@ -2231,6 +2231,7 @@ impl Local {
     }
     /// Whether [`Self::upstream_token`] serves this profile: a `token`
     /// profile without a prefix, or a `github_app` profile.
+    #[cfg(unix)]
     pub fn has_upstream_token(&self) -> bool {
         match self.auth.scheme {
             Scheme::Token => self.auth.prefix.is_none(),
@@ -2243,6 +2244,7 @@ impl Local {
     /// the installation token a `github_app` entry is exchanged for, from the
     /// same in-memory cache the operations use. Any other profile is
     /// `unsupported`.
+    #[cfg(unix)]
     pub async fn upstream_token(&self, document: Secret) -> Result<Secret> {
         if !self.has_upstream_token() {
             return Err(Failure::Unsupported);

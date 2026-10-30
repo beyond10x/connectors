@@ -297,7 +297,8 @@ static bearer (with a stock `git`, `-c http.extraHeader="Authorization: Bearer <
 refused caller gets `401` or `503`, before any forge request. The forge receives the instance's
 token in HTTP basic authentication (`x-access-token:<token>`): the stored token of a `token`
 profile without a prefix, or the installation token of a `github_app` profile. Start refuses any
-other profile, and refuses when `git` is not on `PATH`.
+other profile, and refuses when `git` is not on `PATH`. The relay runs on Unix; elsewhere start
+answers `unsupported` to a `git` member.
 
 Clone and fetch (upload-pack) and both advertisements are relayed as they are. A push
 (receive-pack) is read whole, up to `push_limit_bytes`; a larger one is `413`. The relay then
