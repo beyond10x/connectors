@@ -35,32 +35,33 @@ fn adversary_no_field_takes_the_records_member_of_invoke_shaped() {
     }
 }
 
-/// semantics.md: "a name holds no `.`, `[`, `]`, `,`, `:`, `/`, whitespace or control
-/// character. A key holding one of them is written as an RFC 6901 pointer". The pointer for
-/// the key `a,b` is `/a,b`, but the path list is split at every comma first, so it becomes the
-/// two paths `/a` and `b` and the key cannot be named at all.
+/// semantics.md: "A key holding `,` cannot be named in `--fields`: `,` separates the items".
+/// The pointer `/a,b` is therefore the two items `/a` and `b`, not the key `a,b`.
 #[test]
 fn adversary_a_pointer_names_a_key_holding_a_comma() {
     let value = json!({"a,b": 1, "a": 2, "b": 3});
-    let fields = Fields::parse("/a,b").expect("the pointer `/a,b` parses");
+    let fields = Fields::parse("/a,b").expect("`/a,b` parses as two items");
     let shaped = fields.apply(&value);
     assert_eq!(
         (Value::Object(shaped.value), shaped.missing),
-        (json!({"a,b": 1}), Vec::<String>::new()),
-        "story:invoke-shapes-its-result: a key holding `,` is written as a pointer"
+        (json!({"a": 2, "b": 3}), Vec::<String>::new()),
+        "story:invoke-shapes-its-result: a key holding `,` cannot be named in --fields, so \
+         `/a,b` is the two items `/a` and `b` (decided by the coordinator in correction round 1)"
     );
 }
 
-/// semantics.md: a key holding whitespace is written as an RFC 6901 pointer. Each item is
-/// trimmed before it is read as a pointer, so `/a ` names the key `a`, not `a `.
+/// semantics.md: "Each item is trimmed, so a key with leading or trailing whitespace cannot be
+/// named in `--fields`". The pointer `/a ` is trimmed to `/a` and names the key `a`.
 #[test]
 fn adversary_a_pointer_names_a_key_ending_in_whitespace() {
     let value = json!({"a ": 1, "a": 2});
-    let fields = Fields::parse("/a ").expect("the pointer `/a ` parses");
+    let fields = Fields::parse("/a ").expect("`/a ` parses");
     let shaped = fields.apply(&value);
     assert_eq!(
         (Value::Object(shaped.value), shaped.missing),
-        (json!({"a ": 1}), Vec::<String>::new()),
-        "story:invoke-shapes-its-result: a key holding whitespace is written as a pointer"
+        (json!({"a": 2}), Vec::<String>::new()),
+        "story:invoke-shapes-its-result: items are trimmed, so a key with leading or trailing \
+         whitespace cannot be named in --fields and `/a ` names `a` (decided by the coordinator \
+         in correction round 1)"
     );
 }

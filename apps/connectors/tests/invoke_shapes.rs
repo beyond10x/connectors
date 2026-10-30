@@ -45,7 +45,13 @@ fn a_write_keeps_request_id_mutation_and_source_audit() {
         "story:invoke-shapes-its-result"
     );
     // A field may not take one of their names, so none can be replaced.
-    for reserved in ["mutation", "x:a,request_id", "source_audit:a", "missing"] {
+    for reserved in [
+        "mutation",
+        "x:a,request_id",
+        "source_audit:a",
+        "missing",
+        "records",
+    ] {
         assert!(
             connectors::shape::Fields::parse(reserved).is_err(),
             "story:invoke-shapes-its-result: {reserved:?}"
@@ -58,6 +64,7 @@ fn a_write_keeps_request_id_mutation_and_source_audit() {
 mod jailed {
     use super::{Value, json};
     use crate::mounted::*;
+    use connectors_custody::mounted::fixture::{Jail, Map};
     use connectors_host::local::{registry, runtime};
     use std::{collections::BTreeSet, fs, io::Write, os::unix::fs::PermissionsExt, path::Path};
 
@@ -469,6 +476,50 @@ mod jailed {
         );
     }
 
+    /// story:invoke-shapes-its-result: under `--output human` the shaped
+    /// result is printed bare, one line of JSON without the `ok` envelope.
+    #[test]
+    fn fields_under_human_output_print_the_shaped_result_bare() {
+        let container = connected();
+        let human = |extra: &[&str]| {
+            let input = json!({"ticket_id": 101}).to_string();
+            Jail::output(
+                container
+                    .jail
+                    .command("/bin-test/connectors", Map::Own)
+                    .args([
+                        "--output",
+                        "human",
+                        "--config",
+                        CONFIG,
+                        "--state-dir",
+                        STATE,
+                    ])
+                    .args(["invoke", "zendesk/support", SHOW, "--input-json", &input])
+                    .args(extra)
+                    .env_clear()
+                    .stdin(std::process::Stdio::null()),
+            )
+        };
+        let output = human(&["--fields", "status"]);
+        assert!(output.status.success(), "{output:?}");
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            "{\"status\":200}\n",
+            "story:invoke-shapes-its-result"
+        );
+        let output = human(&["--fields", "ticket.id,state:ticket.status"]);
+        assert!(output.status.success(), "{output:?}");
+        let text = String::from_utf8(output.stdout).unwrap();
+        assert_eq!(text.lines().count(), 1, "{text}");
+        assert_eq!(
+            serde_json::from_str::<Value>(&text).unwrap(),
+            json!({"ticket":{"id":101},"state":"open"}),
+            "story:invoke-shapes-its-result: {text}"
+        );
+        assert_eq!(container.seen("invocations"), [SHOW, SHOW]);
+    }
+
     /// story:invoke-shapes-its-result: a catalog result whose status is not
     /// 2xx is printed whole, byte for byte the answer without `--fields`, and
     /// so is `--each`.
@@ -544,6 +595,7 @@ mod jailed {
             ("--fields", "ticket.id,", "fields"),
             ("--fields", "x:a,x:b", "fields"),
             ("--fields", "missing", "fields"),
+            ("--fields", "records:ticket.id", "fields"),
             ("--fields", "/a~2", "fields"),
             ("--each", "audits[]", "each"),
             ("--each", "a:audits", "each"),

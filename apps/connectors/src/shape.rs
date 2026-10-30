@@ -23,8 +23,15 @@ pub const MAX_STEPS: usize = 64;
 /// The members a shaped `invoke` answer keeps whatever the fields name, so that a write's
 /// outcome cannot be projected away.
 pub const KEPT: [&str; 3] = ["request_id", "mutation", "source_audit"];
-/// The output names no field may take: [`KEPT`] and `missing`, which the answer adds itself.
-pub const RESERVED: [&str; 4] = ["missing", "mutation", "request_id", "source_audit"];
+/// The output names no field may take: [`KEPT`], and `missing` and `records`, which the answer
+/// adds itself.
+pub const RESERVED: [&str; 5] = [
+    "missing",
+    "mutation",
+    "records",
+    "request_id",
+    "source_audit",
+];
 
 /// A path list or path the grammar refuses.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -523,6 +530,8 @@ mod tests {
             "request_id",
             "mutation.classification",
             "source_audit",
+            "records",
+            "records:a",
             "m:a,m:b",
             "ticket:a,ticket.id",
             "ticket.id,ticket:a",
