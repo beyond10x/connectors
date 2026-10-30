@@ -23,7 +23,7 @@ out here. A command that needs a Zendesk account is shown without output.
 
 | Reads | Writes |
 |---|---|
-| `tickets.incremental`, `ticket.show`, `ticket.comments`, `users.incremental`, `user.show`, `organizations.incremental`, `organization.show` | `ticket.update`, `ticket.note` and `ticket.draft_reply`, each `effect: write` and run only under an issued approval. Each reads the ticket first and sends nothing unless its `updated_at` is the stamp you read, and then sends `safe_update`, so Zendesk refuses a ticket changed in between; both are refused as `service_failure` with `service_code: conflict`. `ticket.update` sets `group_id`, `tags` (replacing the whole set), `priority` or `type`; `ticket.note` adds a private note; `ticket.draft_reply` adds a private note whose first line marks it as a draft reply, and nothing reaches the requester |
+| `tickets.incremental`, `ticket.show`, `ticket.comments`, `ticket.audits`, `users.incremental`, `user.show`, `organizations.incremental`, `organization.show` | `ticket.update`, `ticket.note` and `ticket.draft_reply`, each `effect: write` and run only under an issued approval. Each reads the ticket first and sends nothing unless its `updated_at` is the stamp you read, and then sends `safe_update`, so Zendesk refuses a ticket changed in between; both are refused as `service_failure` with `service_code: conflict`. `ticket.update` sets `group_id`, `tags` (replacing the whole set), `priority` or `type`; `ticket.note` adds a private note; `ticket.draft_reply` adds a private note whose first line marks it as a draft reply, and nothing reaches the requester |
 
 The incremental exports take `start_time` in Unix seconds and return what changed since.
 
@@ -51,11 +51,11 @@ profile = "zendesk.oauth"
 ```
 
 ```sh
-connectors instances list
+connectors instances list | jq -c '.[] | arrays | .[]'
 ```
 
 ```json
-{"adapters":[{"adapter":"zendesk.support","adapter_id":"catalog","connector":"zendesk","instance":"support","instance_id":"zendesk.support","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"connector":"zendesk","instance":"support","instance_id":"zendesk.support","restart":"never","startup":"on-demand"}
 ```
 
 ## Connect
@@ -75,18 +75,27 @@ document is `{"account": "<email>/token", "token": "<API token>"}`.
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector zendesk --instance support \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector zendesk --instance support \
-  --operation tickets.incremental | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector zendesk --instance support \
-  --operation tickets.incremental | jq -r .result.revision)
-connectors operations invoke --connector zendesk --instance support --connection "$connection" \
-  --operation tickets.incremental --schema "$schema" --revision "$revision" \
+connectors invoke zendesk/support tickets.incremental \
   --input-json '{"start_time":1790000000}'
 ```
 
 Send the answer's `after_cursor` as `cursor` until `end_of_stream` is `true`.
+
+A ticket's history is `ticket.audits`: each audit's author, time, `via` channel and source, and its
+events, field changes with their previous value included. Send `meta.after_cursor` as
+`page[after]`. When a page carries `meta.has_more`, it decides: `false` ends the walk, `true`
+continues even past an empty page and is an error without `meta.after_cursor`. Without
+`meta.has_more`, stop on a page with no `meta.after_cursor` or no audits. A cursor seen before is
+an error. Zendesk's API document says `has_more` is included when the input sets
+`include_boundary_indicators`, so setting it is recommended. `ticket.comments` walks and ends the
+same way:
+
+```sh
+connectors invoke zendesk/support ticket.audits \
+  --input-json '{"ticket_id":101,"page[size]":100,"include_boundary_indicators":true}'
+echo '{"ticket_id":101,"page[size]":100,"include_boundary_indicators":true,"page[after]":"<meta.after_cursor>"}' \
+  | connectors invoke zendesk/support ticket.audits
+```
 
 ## A first guarded write
 
@@ -111,10 +120,16 @@ Read the ticket with `ticket.show` and pin its `ticket.updated_at` as `updated_s
 {"ticket_id": 101, "body": {"ticket": {"comment": {"body": "Checked the billing history."}, "updated_stamp": "2025-09-16T10:00:00Z"}}}
 ```
 
-Take the schema and revision of `ticket.note` from `operations describe`, then prepare, issue and
-invoke:
+Take the connection, and the schema and revision of `ticket.note` from `invoke --describe`, then
+prepare, issue and invoke:
 
 ```sh
+connection=$(connectors --output json connections list --connector zendesk --instance support \
+  | jq -r '.result.connections[0].connection')
+schema=$(connectors --output json invoke zendesk/support ticket.note --describe \
+  | jq -r .result.schema)
+revision=$(connectors --output json invoke zendesk/support ticket.note --describe \
+  | jq -r .result.revision)
 subject_sha256=$(connectors --output json approvals prepare --connector zendesk --instance support \
   --connection "$connection" --operation ticket.note \
   --schema "$schema" --revision "$revision" --input-file note.json \
@@ -124,8 +139,7 @@ connectors approvals issue --connector zendesk --instance support \
   --connection "$connection" --operation ticket.note \
   --schema "$schema" --revision "$revision" --input-file note.json \
   --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-note-101.json"
-connectors operations invoke --connector zendesk --instance support --connection "$connection" \
-  --operation ticket.note --schema "$schema" --revision "$revision" \
+connectors invoke zendesk/support ticket.note \
   --input-file note.json --approval-file "$HOME/private/proof-note-101.json" \
   --idempotency-key note-101
 ```

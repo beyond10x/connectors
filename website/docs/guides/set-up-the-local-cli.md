@@ -8,14 +8,13 @@ source: apps/connectors/tests/local_cli.rs, apps/connectors/tests/derived_instan
 
 # Set up the local CLI
 
-The grouped `connectors` commands (`setup`, `instances`, `connections`, `operations`,
-`approvals`) work through a local owner process, a private TOML configuration and a metadata
+The grouped `connectors` commands (`setup`, `instances`, `connections`, `operations`, `approvals`)
+and `invoke` work through a local owner process, a private TOML configuration and a metadata
 store. This guide creates both in a scratch directory, checks the machine's prerequisites and
 configures two instances. It needs no credential and contacts no provider. Run it from
 `target/try` as in [Getting started](../getting-started.md), after
-`cargo build --locked -p connectors -p connectors-catalog-provider`. The words connector,
-instance and connection are those of the
-[README vocabulary](https://github.com/beyond10x/connectors#vocabulary).
+`cargo build --locked -p connectors -p connectors-catalog-provider`. The words connector, instance
+and connection are those of the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary).
 
 ## Create the configuration and the store
 
@@ -124,19 +123,21 @@ Neither pins anything else: `connectors` derives each instance from the
 `connectors-catalog-provider` in its own directory and the connector declaration shipped with it,
 which give the executable and its SHA-256, the configuration revision and every operation. A
 connector that declares more than one auth profile (Zendesk) also takes `profile` on the
-instance. `default_instance` selects an instance for a command that names none.
+instance. `default_instance` selects an instance for a command that names none; `invoke` always
+names its connector and does not read it.
 
 ```sh
-../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" instances list
+../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" instances list \
+  | jq -c '.[] | arrays | .[]'
 ```
 
 ```json
-{"adapters":[{"adapter":"gitlab.work","adapter_id":"catalog","connector":"gitlab","instance":"work","instance_id":"gitlab.work","restart":"never","startup":"on-demand"},{"adapter":"gmail.private","adapter_id":"catalog","connector":"gmail","instance":"private","instance_id":"gmail.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"connector":"gitlab","instance":"work","instance_id":"gitlab.work","restart":"never","startup":"on-demand"}
+{"connector":"gmail","instance":"private","instance_id":"gmail.private","restart":"never","startup":"on-demand"}
 ```
 
-The result also carries each instance's legacy `adapter` alias and its internal `adapter_id`,
-kept for the deprecation window. A command that acts on one instance names it with `--connector`
-and `--instance`; no connection exists yet:
+Each item names its instance by connector and instance only. A command that acts on one instance
+names it with `--connector` and `--instance`; no connection exists yet:
 
 ```sh
 ../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
@@ -144,8 +145,31 @@ and `--instance`; no connection exists yet:
 ```
 
 ```json
-{"connections":[],"observed_at_ms":1792181808006,"source":"authority","stale":false,"valid_until_ms":1792182108006}
+{"connections":[],"observed_at_ms":1793314648161,"source":"authority","stale":false,"valid_until_ms":1793314948161}
 ```
+
+## Invoke an operation
+
+`invoke` takes the connector and, after a `/`, the instance, then the operation. The instance may
+be left out while the connector has only one, and the input is read from standard input when no
+input flag is given. The connection, schema and revision default to the instance's own; without a
+connection the call is refused before anything is started:
+
+```sh
+printf '{"id":"group/project","merge_request_iid":9}\n' \
+  | ../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
+    --output json invoke gitlab merge_request.get
+```
+
+```json
+{"error":{"code":"failure","data":{"code":"connection_unresolved","connections":[],"kind":"operational","next_action":"create_connection","stage":"admission"}},"ok":false}
+```
+
+`connections` lists each connection the instance holds, with its state, and is empty here. A
+connector with two instances, named without one, is refused as `instance_ambiguous`, listing
+each as `<connector>/<instance>`. `--describe` prints an operation's input schema, its effect
+(read or write), schema and revision without calling the provider, once the instance holds a
+connection.
 
 `setup init` never overwrites:
 

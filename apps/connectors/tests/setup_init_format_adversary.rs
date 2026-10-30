@@ -104,7 +104,7 @@ fn legacy_root(with_entry: bool) -> (tempfile::TempDir, std::path::PathBuf, Vec<
     assert!(text.contains("format = \"connectors-local/1\""));
     if with_entry {
         text += &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=['--connector','jira']\n",
             "a".repeat(64)
         );
     }

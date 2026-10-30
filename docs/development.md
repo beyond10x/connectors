@@ -65,12 +65,12 @@ release profile and the bridge deadline are unchanged.
 
 ## Pinned tools
 
-The repository pins released tool versions, not source builds: ESS 0.75.0 in
+The repository pins released tool versions, not source builds: ESS 0.77.0 in
 [`crates/connectors-spec/toolchain.json`](../crates/connectors-spec/toolchain.json)
 and AEP 0.71.3 in [`crates/connectors-build/aep-toolchain.json`](../crates/connectors-build/aep-toolchain.json).
 Use the `ess` and `aep` executables the Beyond10x plugins install (`b10x upgrade`
 keeps them current). The Cargo dependencies select Entity Runtime 0.30.3 and the
-Eventlog release it builds on (0.8.3); ESS 0.75.0, like 0.56.0 through 0.74.0, additionally brings
+Eventlog release it builds on (0.8.3); ESS 0.77.0, like 0.56.0 through 0.76.0, additionally brings
 Entity Runtime Core 0.28.0 through `ess-entity-runtime`. The CLI binding stays
 `ess-cli/1` with all three globals, so the committed `ess-cli-plan/1` plan keeps its
 bytes; ESS 0.57.0 and later generate a CLI runtime that reads an `ess-cli-plan/2` plan's optional
@@ -287,8 +287,9 @@ jq -n '{format: "connectors-live-read-loop/1", reads: [
   > ~/connectors-live/reads.json
 ```
 
-Each read is resolved once with `operations describe` (retried in the next round if that fails).
-It is then invoked every round with `operations invoke`; those are the only two commands the
+Each read is resolved once with `operations describe` (retried in the next round if that fails),
+which names its connector, instance, schema and revision. It is then invoked every round with
+`invoke <connector>/<instance> <operation>` and those values; those are the only two commands the
 loop issues. A call is answered only when it exits 0 with `{"ok":true}`, any provider `status`
 in the result is 2xx and the provider body is not `{"ok":false}`. Anything else is unanswered:
 a refusal, a timeout, a non-JSON answer, or an exit status that contradicts the envelope.

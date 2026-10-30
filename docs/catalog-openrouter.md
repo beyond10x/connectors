@@ -84,7 +84,13 @@ Bind the provider to the local CLI as [the catalog provider guide](local-catalog
 describes, with `private_protocol = "connectors-private/2"`,
 `profiles = ["openrouter.api-key"]` and
 `operations = ["key.get", "workspaces.list", "keys.list"]`, here as the legacy
-`[adapters.<alias>]` entry `router`. Enter the management key through the protected credential prompt
+`[adapters.<alias>]` entry `router`. The run below was made before 0.60.0 with such entries.
+Since 0.60.0, `invoke` does not reach a legacy catalog entry no connector is derived for, and a
+native OpenRouter configuration is one: `instances list` names it in `unmigrated`, and selecting it
+as an instance is `legacy_entry_unmigrated`. Pin each entry as an instance with its alias,
+`[connectors.openrouter.instances.router]` with `alias = "router"` as the
+[OpenRouter page](../website/docs/connectors/openrouter.md) shows, and `invoke openrouter/router`
+names it; the `--adapter router` selectors below keep naming it by alias. Enter the management key through the protected credential prompt
 on your controlling terminal; it never goes in chat, an argument or the
 environment:
 
@@ -108,43 +114,40 @@ connectors --output json connections connect --adapter router --profile openrout
 {"ok":true,"result":{"connection":{"external_identity":{"kind":"openrouter.key","subject":"fixture-management-key"},"observed_at_ms":1792138503681,"source":"authority","stale":false,"summary":{"adapter":"router","connection":"conn_33da5ec3f2a4497b96d2b94fe09c4067_5be7ecc5b52c4e619b94774b2938760b","instance_id":"fixture-openrouter","profile":"openrouter.api-key","revision":"00520724-5059-4573-8045-82f550bf2945","state":"ready"},"valid_until_ms":1792138562854}}}
 ```
 
-Each read takes `--schema` and `--revision` from `operations describe`
-(`operations describe --operation key.get`, with the deprecated `--adapter router` selector the run used).
+`invoke` takes the instance's one connection and its current schema and revision;
+`invoke openrouter/router key.get --describe` prints them with the input schema. The run,
+made before 0.60.0, described and invoked with the deprecated `--adapter router` selector and
+printed the results below, here without the `adapter` member a 0.60.0 result no longer carries.
 Connect evidence lasts 60 seconds; revalidate before reading after that.
 
 The management key's own record:
 
 ```sh
-connectors --output json operations invoke --adapter router --connection "$connection" \
-  --operation key.get --schema "$schema" --revision "$revision" --input-json '{}'
+connectors --output json invoke openrouter/router key.get --input-json '{}'
 ```
 
 ```json
-{"ok":true,"result":{"adapter":"router","operation":"key.get","result":{"body":{"data":{"is_free_tier":false,"is_management_key":true,"label":"fixture-management-key","limit":100,"limit_remaining":74.5,"usage":25.5}},"provenance":{"instance":"fixture-openrouter","observed_at_unix_ms":1792138519516,"resource":"/api/v1/key","source_revision":"fe4f1ad414f5bd25e69b387598d23f3abd24fe74801cd157c633e30bbf766142"},"status":200},"revision":"d1d435a539acd78d46e4d4dd6adc33a50f34f9a6ca3d0c4cbf03a89d384b4caf"}}
+{"ok":true,"result":{"operation":"key.get","result":{"body":{"data":{"is_free_tier":false,"is_management_key":true,"label":"fixture-management-key","limit":100,"limit_remaining":74.5,"usage":25.5}},"provenance":{"instance":"fixture-openrouter","observed_at_unix_ms":1792138519516,"resource":"/api/v1/key","source_revision":"fe4f1ad414f5bd25e69b387598d23f3abd24fe74801cd157c633e30bbf766142"},"status":200},"revision":"d1d435a539acd78d46e4d4dd6adc33a50f34f9a6ca3d0c4cbf03a89d384b4caf"}}
 ```
 
 The second workspace, one page at offset 1:
 
 ```sh
-connectors --output json operations invoke --adapter router --connection "$connection" \
-  --operation workspaces.list --schema "$schema" --revision "$revision" \
-  --input-json '{"offset":1,"limit":1}'
+connectors --output json invoke openrouter/router workspaces.list --input-json '{"offset":1,"limit":1}'
 ```
 
 ```json
-{"ok":true,"result":{"adapter":"router","operation":"workspaces.list","result":{"body":{"data":[{"created_at":"2026-09-15T15:45:00Z","id":"ws-two","name":"beta","slug":"beta"}],"total_count":2},"provenance":{"instance":"fixture-openrouter","observed_at_unix_ms":1792138520578,"resource":"/api/v1/workspaces","source_revision":"fe4f1ad414f5bd25e69b387598d23f3abd24fe74801cd157c633e30bbf766142"},"status":200},"revision":"d1d435a539acd78d46e4d4dd6adc33a50f34f9a6ca3d0c4cbf03a89d384b4caf"}}
+{"ok":true,"result":{"operation":"workspaces.list","result":{"body":{"data":[{"created_at":"2026-09-15T15:45:00Z","id":"ws-two","name":"beta","slug":"beta"}],"total_count":2},"provenance":{"instance":"fixture-openrouter","observed_at_unix_ms":1792138520578,"resource":"/api/v1/workspaces","source_revision":"fe4f1ad414f5bd25e69b387598d23f3abd24fe74801cd157c633e30bbf766142"},"status":200},"revision":"d1d435a539acd78d46e4d4dd6adc33a50f34f9a6ca3d0c4cbf03a89d384b4caf"}}
 ```
 
 The keys of one workspace, from offset 1:
 
 ```sh
-connectors --output json operations invoke --adapter router --connection "$connection" \
-  --operation keys.list --schema "$schema" --revision "$revision" \
-  --input-json '{"workspace_id":"ws-two","offset":1}'
+connectors --output json invoke openrouter/router keys.list --input-json '{"workspace_id":"ws-two","offset":1}'
 ```
 
 ```json
-{"ok":true,"result":{"adapter":"router","operation":"keys.list","result":{"body":{"data":[{"created_at":"2026-09-15T15:45:00Z","disabled":false,"hash":"hash-two","label":"second","name":"second","workspace_id":"ws-two"}]},"provenance":{"instance":"fixture-openrouter","observed_at_unix_ms":1792138521604,"resource":"/api/v1/keys","source_revision":"fe4f1ad414f5bd25e69b387598d23f3abd24fe74801cd157c633e30bbf766142"},"status":200},"revision":"d1d435a539acd78d46e4d4dd6adc33a50f34f9a6ca3d0c4cbf03a89d384b4caf"}}
+{"ok":true,"result":{"operation":"keys.list","result":{"body":{"data":[{"created_at":"2026-09-15T15:45:00Z","disabled":false,"hash":"hash-two","label":"second","name":"second","workspace_id":"ws-two"}]},"provenance":{"instance":"fixture-openrouter","observed_at_unix_ms":1792138521604,"resource":"/api/v1/keys","source_revision":"fe4f1ad414f5bd25e69b387598d23f3abd24fe74801cd157c633e30bbf766142"},"status":200},"revision":"d1d435a539acd78d46e4d4dd6adc33a50f34f9a6ca3d0c4cbf03a89d384b4caf"}}
 ```
 
 ## Limits
@@ -337,8 +340,8 @@ connectors --output json operations describe --adapter router --operation key.cr
 ```
 
 Prepare the exact input; the answer's `subject_sha256` is what the operator approves.
-Every `approvals` and `operations invoke` command of the create takes the same target
-arguments:
+Every `approvals` command of the create takes the same target arguments, and `invoke` names
+the instance `openrouter/router`:
 
 ```sh
 connectors --output json approvals prepare --adapter router --connection "$connection" \
@@ -367,14 +370,13 @@ connectors --output json approvals issue --adapter router --connection "$connect
 Create one inference key, with an idempotency key and the proof:
 
 ```sh
-connectors --output json operations invoke --adapter router --connection "$connection" \
-  --operation key.create --schema "$schema" --revision "$revision" \
+connectors --output json invoke openrouter/router key.create \
   --input-json '{"body":{"name":"agent-inference","limit":5,"limit_reset":"monthly"}}' \
   --idempotency-key agent-inference-1 --approval-file "$HOME/private/proof.json"
 ```
 
 ```json
-{"ok":true,"result":{"adapter":"router","mutation":{"attempt":{"id":"dd6a29f9-c185-4e68-9853-b85ede63782e","instance":"fixture-openrouter"},"cause":null,"classification":"applied","original_request_id":"4dcde91f-6f3a-410b-b514-34703492833f","replayed":false},"operation":"key.create","request_id":"4dcde91f-6f3a-410b-b514-34703492833f","result":{"connection":"conn_790fd41e80cf486eaa6919ea9daa0105_998895dc177a43d18290423a9f9cca78","custody":"stored","hash":"fixture-created-key-hash"},"revision":"f6c0eff9ac3a2d424e8962bdbf1c9a7ee6e1c2ee038a7c7b331c5e4bfd9d527d","source_audit":{"audit_ref":"4146bcf4-2e31-499b-9a0f-4638cdb86561","audit_status":"complete","instance":"fixture-openrouter"}}}
+{"ok":true,"result":{"mutation":{"attempt":{"id":"dd6a29f9-c185-4e68-9853-b85ede63782e","instance":"fixture-openrouter"},"cause":null,"classification":"applied","original_request_id":"4dcde91f-6f3a-410b-b514-34703492833f","replayed":false},"operation":"key.create","request_id":"4dcde91f-6f3a-410b-b514-34703492833f","result":{"connection":"conn_790fd41e80cf486eaa6919ea9daa0105_998895dc177a43d18290423a9f9cca78","custody":"stored","hash":"fixture-created-key-hash"},"revision":"f6c0eff9ac3a2d424e8962bdbf1c9a7ee6e1c2ee038a7c7b331c5e4bfd9d527d","source_audit":{"audit_ref":"4146bcf4-2e31-499b-9a0f-4638cdb86561","audit_status":"complete","instance":"fixture-openrouter"}}}
 ```
 
 The result is the new connection of the `inference` alias and the key's `hash`; the key
@@ -390,12 +392,11 @@ connectors --output json connections list --adapter inference
 ```
 
 ```sh
-connectors --output json operations invoke --adapter inference --connection "$inference_connection" \
-  --operation key.get --schema "$schema" --revision "$revision" --input-json '{}'
+connectors --output json invoke openrouter/inference key.get --input-json '{}'
 ```
 
 ```json
-{"ok":true,"result":{"adapter":"inference","operation":"key.get","result":{"body":{"data":{"is_free_tier":false,"is_management_key":false,"label":"fixture-inference-key","limit":5,"limit_remaining":5,"usage":0}},"provenance":{"instance":"fixture-openrouter-inference","observed_at_unix_ms":1792184933383,"resource":"/api/v1/key","source_revision":"fe4f1ad414f5bd25e69b387598d23f3abd24fe74801cd157c633e30bbf766142"},"status":200},"revision":"245b9a6afdcf9639a7e0ce7e44d4fed76a22f44f575acd356c6ce9b67acf677d"}}
+{"ok":true,"result":{"operation":"key.get","result":{"body":{"data":{"is_free_tier":false,"is_management_key":false,"label":"fixture-inference-key","limit":5,"limit_remaining":5,"usage":0}},"provenance":{"instance":"fixture-openrouter-inference","observed_at_unix_ms":1792184933383,"resource":"/api/v1/key","source_revision":"fe4f1ad414f5bd25e69b387598d23f3abd24fe74801cd157c633e30bbf766142"},"status":200},"revision":"245b9a6afdcf9639a7e0ce7e44d4fed76a22f44f575acd356c6ce9b67acf677d"}}
 ```
 
 An approval proof is for one input; the same input sent again with the same

@@ -47,7 +47,7 @@ Configure a [bounded authenticated clock](local-clock.md), initialize
 ```
 
 Discover the exact `schema` and descriptor `revision` using
-`connectors operations describe --connector gitlab --instance forge --operation merge_request.merge`.
+`connectors invoke gitlab/forge merge_request.merge --describe`.
 Put the intended business input in `merge.json`: the project path or numeric id,
 the project-local MR IID, the expected successful head pipeline id, and the PUT
 body with the exact lowercase source SHA:
@@ -64,10 +64,8 @@ output contains metadata; the proof stays in the owner-private file.
 Invoke the same target and input:
 
 ```sh
-connectors operations invoke --connector gitlab --instance forge \
-  --connection "$connection" --operation merge_request.merge \
-  --schema "$schema" --revision "$revision" --input-file merge.json \
-  --approval-file "$proof_file" --idempotency-key "$business_key" --output json
+connectors --output json invoke gitlab/forge merge_request.merge --input-file merge.json \
+  --approval-file "$proof_file" --idempotency-key "$business_key"
 ```
 
 The optional key is an opaque string of 1–256 bytes. Reuse the exact key for

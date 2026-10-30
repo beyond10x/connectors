@@ -247,7 +247,7 @@ and evidence.
 
 ## Reusing a stored credential
 
-`operations invoke --definition` may make the definition's first connection from
+`invoke --definition` may make the definition's first connection from
 a credential another instance of the same connector already holds, when the
 operator answers its one question with a listed candidate
 ([CLI semantics](../contracts/cli/v1alpha1/semantics.md#invoking-a-definition-file),

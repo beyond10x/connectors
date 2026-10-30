@@ -156,7 +156,7 @@ as the prerequisite `artifact:cluster`, and `instances list` shows it:
 
 ```console
 $ target/release/connectors --output json instances list
-{"ok":true,"result":{"adapters":[{"adapter":"cluster","adapter_id":"kubernetes","connector":"kubernetes","instance":"cluster","instance_id":"kubernetes-local","restart":"never","startup":"on-demand"}],"source":"configuration"}}
+{"ok":true,"result":{"adapters":[{"connector":"kubernetes","instance":"cluster","instance_id":"kubernetes-local","restart":"never","startup":"on-demand"}],"source":"configuration"}}
 ```
 
 Omitted permission sets deny access, and an operation left out of `operations` is
@@ -172,7 +172,7 @@ Use the hidden native token prompt on your foreground controlling terminal:
 
 ```sh
 target/release/connectors --output json connections connect --connector kubernetes --instance cluster --profile kubernetes.token --credential-prompt
-target/release/connectors --output json operations describe --connector kubernetes --instance cluster --operation resources.list
+target/release/connectors --output json invoke kubernetes/cluster resources.list --describe
 ```
 
 For automation, `--credential-file /absolute/private/file.json` or
@@ -182,11 +182,11 @@ ancestors. Stdin accepts a deliberate same-session anonymous pipe or admitted
 private regular file. Sources are mutually exclusive. Protected values are not
 accepted as argv or printed in results.
 
-Retain the connection reference returned by connect, then the descriptor revision
-and schema identity returned by operation describe:
+Invoke an operation; the instance's one usable connection and its current schema
+and descriptor revision are taken when none is named:
 
 ```sh
-target/release/connectors --output json operations invoke --connector kubernetes --instance cluster --connection CONNECTION --operation resources.list --schema SCHEMA --revision REVISION --input-json '{"namespace":"default","kind":"pods","limit":50}'
+target/release/connectors --output json invoke kubernetes/cluster resources.list --input-json '{"namespace":"default","kind":"pods","limit":50}'
 ```
 
 Business JSON also supports `--input-file` and `--input-stdin`. The owner validates
@@ -352,8 +352,8 @@ to.
 
 ## Read resources, endpoints and hosts
 
-Use `operations describe` for each operation's current schema and descriptor
-revision, then invoke with the saved connection as above. The request shapes are:
+`invoke kubernetes/cluster <operation> --describe` prints an operation's input schema; invoke
+with the saved connection as above. The request shapes are:
 
 | Operation id | Example input |
 |---|---|

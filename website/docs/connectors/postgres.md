@@ -103,14 +103,7 @@ database, `reader@incidents`.
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector postgres --instance warehouse \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector postgres --instance warehouse \
-  --operation query.read | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector postgres --instance warehouse \
-  --operation query.read | jq -r .result.revision)
-connectors operations invoke --connector postgres --instance warehouse --connection "$connection" \
-  --operation query.read --schema "$schema" --revision "$revision" \
+connectors invoke postgres/warehouse query.read \
   --input-json '{"query":"SELECT id, opened_at FROM incidents WHERE severity = $1 ORDER BY opened_at DESC","parameters":["critical"],"limit":100}'
 ```
 
