@@ -30,9 +30,9 @@ use std::path::{Path, PathBuf};
 pub const INDEX_SCHEMAS: &[&str] = &["urn:beyond10x:connectors-definitions-index:1"];
 /// The optional definition members install admits, sorted: the four connectors-definitions
 /// 0.3.0 and later declare. A release whose `features` names another is refused as
-/// [`Refusal::UnmetFeature`]. The definition lowerer (`connectors-catalog`) does not
-/// read these members yet; until it does, an installed release is stored and locked
-/// but no instance resolves through it.
+/// [`Refusal::UnmetFeature`]. They are exactly the members the definition lowerer
+/// reads (`connectors-catalog`'s `definition::READ_FEATURES`, D247); this crate does not
+/// depend on that one, so `tests/lowerer_features.rs` holds the two lists equal.
 pub const FEATURES: &[&str] = &[
     "embedded_text",
     "query_fixed",
