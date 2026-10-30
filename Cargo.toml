@@ -5,7 +5,7 @@ members = ["crates/*", "adapters/catalog", "adapters/grafana", "adapters/kuberne
 exclude = ["apps/connectors-cli-contract", "adapters/mcp/generated/launch-cli", "adapters/mcp/generated/launch-types", "adapters/mcp/generated/configuration-types", "adapters/mcp/generated/supervision", "crates/connectors-core/generated/operation-types"]
 
 [workspace.package]
-version = "0.59.1"
+version = "0.60.0"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
@@ -25,13 +25,13 @@ entity-eventlog = { git = "https://github.com/beyond10x/entity-runtime", tag = "
 entity-executor = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.3" }
 entity-store = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.3" }
 eventlog-core = { git = "https://github.com/beyond10x/eventlog", tag = "0.8.3" }
-ess-conformance = { git = "https://github.com/beyond10x/ess", tag = "0.75.0" }
-ess-compiler = { git = "https://github.com/beyond10x/ess", tag = "0.75.0" }
-ess-domain = { git = "https://github.com/beyond10x/ess", tag = "0.75.0" }
-ess-entity-runtime = { git = "https://github.com/beyond10x/ess", tag = "0.75.0" }
-ess-primitives = { git = "https://github.com/beyond10x/ess", tag = "0.75.0" }
-ess-service-contract = { git = "https://github.com/beyond10x/ess", tag = "0.75.0" }
-ess-synth = { git = "https://github.com/beyond10x/ess", tag = "0.75.0" }
+ess-conformance = { git = "https://github.com/beyond10x/ess", tag = "0.77.0" }
+ess-compiler = { git = "https://github.com/beyond10x/ess", tag = "0.77.0" }
+ess-domain = { git = "https://github.com/beyond10x/ess", tag = "0.77.0" }
+ess-entity-runtime = { git = "https://github.com/beyond10x/ess", tag = "0.77.0" }
+ess-primitives = { git = "https://github.com/beyond10x/ess", tag = "0.77.0" }
+ess-service-contract = { git = "https://github.com/beyond10x/ess", tag = "0.77.0" }
+ess-synth = { git = "https://github.com/beyond10x/ess", tag = "0.77.0" }
 async-trait = "0.1"
 axum = "0.8.9"
 base64 = "0.23"

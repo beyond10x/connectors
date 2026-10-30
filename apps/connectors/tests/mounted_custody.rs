@@ -459,7 +459,7 @@ fn mounted_reconnect_publishes_the_new_credential_as_repair_does() {
             "connections",
             verb,
             "--connector",
-            "catalog",
+            CONNECTOR,
             "--instance",
             ALIAS,
             "--connection",

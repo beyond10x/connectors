@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-29T16:41:19Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0591-capacity-probe",
+  "kind": "release-plan",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "v0.59.1 on merge 65c928d72 of PR 218: CI gate green; release page by b10x-bot[bot] with 4 archives and SHA256SUMS (sha256sum -c OK); verify-release.sh exit 0",
+    "reference": "v0.59.1"
+  }
+}

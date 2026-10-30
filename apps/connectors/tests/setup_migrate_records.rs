@@ -346,17 +346,13 @@ fn migrate_and_compare(run: &dyn Fn(&[&str]) -> Output, config: &Path) -> Value 
 /// credential: nothing was re-entered or revalidated.
 fn read(run: &dyn Fn(&[&str]) -> Output, connector: &str, alias: &str, connection: &str) {
     let schema = connectors_host::local::owner::schema(&bootstrap(alias, "catalog"), READ).unwrap();
+    let target = format!("{connector}/{alias}");
     let read = success(&run(&[
-        "operations",
         "invoke",
-        "--connector",
-        connector,
-        "--instance",
-        alias,
+        &target,
+        READ,
         "--connection",
         connection,
-        "--operation",
-        READ,
         "--schema",
         &schema,
         "--revision",

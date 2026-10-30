@@ -47,11 +47,11 @@ enabled = true
 ```
 
 ```sh
-connectors instances list
+connectors instances list | jq -c '.[] | arrays | .[]'
 ```
 
 ```json
-{"adapters":[{"adapter":"hubspot.work","adapter_id":"catalog","connector":"hubspot","instance":"work","instance_id":"hubspot.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"connector":"hubspot","instance":"work","instance_id":"hubspot.work","restart":"never","startup":"on-demand"}
 ```
 
 ## Connect
@@ -66,14 +66,7 @@ connectors connections connect --connector hubspot --instance work \
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector hubspot --instance work \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector hubspot --instance work \
-  --operation objects.list | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector hubspot --instance work \
-  --operation objects.list | jq -r .result.revision)
-connectors operations invoke --connector hubspot --instance work --connection "$connection" \
-  --operation objects.list --schema "$schema" --revision "$revision" \
+connectors invoke hubspot/work objects.list \
   --input-json '{"objectType":"contacts","limit":50}'
 ```
 

@@ -56,11 +56,11 @@ The instance uses Calendar's default endpoint, `https://www.googleapis.com/calen
 nothing.
 
 ```sh
-connectors instances list
+connectors instances list | jq -c '.[] | arrays | .[]'
 ```
 
 ```json
-{"adapters":[{"adapter":"calendar.private","adapter_id":"catalog","connector":"calendar","instance":"private","instance_id":"calendar.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"connector":"calendar","instance":"private","instance_id":"calendar.private","restart":"never","startup":"on-demand"}
 ```
 
 ## Connect
@@ -76,14 +76,7 @@ two Calendar scopes fails validation as insufficient scope.
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector calendar --instance private \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector calendar --instance private \
-  --operation events.list | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector calendar --instance private \
-  --operation events.list | jq -r .result.revision)
-connectors operations invoke --connector calendar --instance private --connection "$connection" \
-  --operation events.list --schema "$schema" --revision "$revision" \
+connectors invoke calendar/private events.list \
   --input-json '{"calendarId":"primary","timeMin":"2026-10-01T00:00:00Z","maxResults":50}'
 ```
 
@@ -109,10 +102,16 @@ Move an event. Read it with `events.get` and pin its `etag` in `move.json`:
  "body": {"start": {"dateTime": "2026-10-20T10:00:00Z"}, "end": {"dateTime": "2026-10-20T10:30:00Z"}}}
 ```
 
-Take the schema and revision of `events.patch` from `operations describe`, then prepare, issue
-and invoke:
+Take the connection, and the schema and revision of `events.patch` from `invoke --describe`, then
+prepare, issue and invoke:
 
 ```sh
+connection=$(connectors --output json connections list --connector calendar --instance private \
+  | jq -r '.result.connections[0].connection')
+schema=$(connectors --output json invoke calendar/private events.patch --describe \
+  | jq -r .result.schema)
+revision=$(connectors --output json invoke calendar/private events.patch --describe \
+  | jq -r .result.revision)
 connectors --output json approvals prepare --connector calendar --instance private \
   --connection "$connection" --operation events.patch \
   --schema "$schema" --revision "$revision" --input-file move.json
@@ -121,8 +120,7 @@ connectors approvals issue --connector calendar --instance private \
   --connection "$connection" --operation events.patch \
   --schema "$schema" --revision "$revision" --input-file move.json \
   --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-move-1.json"
-connectors operations invoke --connector calendar --instance private --connection "$connection" \
-  --operation events.patch --schema "$schema" --revision "$revision" \
+connectors invoke calendar/private events.patch \
   --input-file move.json --approval-file "$HOME/private/proof-move-1.json" \
   --idempotency-key move-1
 ```

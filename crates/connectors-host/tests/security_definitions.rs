@@ -1,6 +1,6 @@
 //! story:invoke-definition-file, security review: an invoked definition's
 //! entry, held in `<state>/definitions/instances.toml`, is admitted only in the
-//! shape `operations invoke --definition` records it. That command pins the
+//! shape `invoke --definition` records it. That command pins the
 //! installed catalog provider (`Installation::pinned`) on the native
 //! configuration of the entry's own cache directory
 //! (`<state>/definitions/<digest>/native.json`), and a definition never names
@@ -72,7 +72,7 @@ fn security_an_entry_naming_another_executable_or_argv_is_not_held() {
     );
 }
 
-/// The entry `operations invoke --definition` records under `paths`: the
+/// The entry `invoke --definition` records under `paths`: the
 /// catalog provider on `--local-config` of its own cache entry.
 fn pinned(paths: &Paths) -> Entry {
     let digest = "b".repeat(64);

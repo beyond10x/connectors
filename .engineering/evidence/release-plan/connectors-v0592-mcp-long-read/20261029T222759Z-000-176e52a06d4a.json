@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-29T22:27:59Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0592-mcp-long-read",
+  "kind": "release-plan",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "v0.59.2 tagged by b10x-bot[bot] on merge db6050273 of PR 219; release page by b10x-bot[bot] with 4 archives and SHA256SUMS, sha256sum -c OK; verify-release.sh exit 0 (Windows host job passed on re-run after an unrelated clock-check failure, story:windows-clock-check-bracket-flake)",
+    "reference": "https://github.com/beyond10x/connectors/releases/tag/v0.59.2"
+  }
+}

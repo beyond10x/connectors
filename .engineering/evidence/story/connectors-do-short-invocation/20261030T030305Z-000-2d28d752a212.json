@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T03:03:05Z",
+  "actor": "human:timo",
+  "artifact": "story:connectors-do-short-invocation",
+  "kind": "story",
+  "revision": 18,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test --workspace --locked --offline --no-fail-fast on fc35e3da4: 3403 passed, 3 failed (stale doc/citation checks, fixed in df4d2e1d1; the 3 targets then 5/5, 9/9, 20/20); gate --msrv on df4d2e1d1: test step failed only on load flakes (connectors-host a_read_invoke_against_a_grown_store_replays_it_at_most_once; local_mcp_server stdin_close_still_answers_requests_already_read), each passing alone; filed as story:owner-path-tests-hold-under-load",
+    "reference": "df4d2e1d1"
+  }
+}

@@ -91,14 +91,7 @@ Connecting proves the token with `GET api/v1/status/buildinfo`, which runs no qu
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector prometheus --instance metrics \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector prometheus --instance metrics \
-  --operation series.query | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector prometheus --instance metrics \
-  --operation series.query | jq -r .result.revision)
-connectors operations invoke --connector prometheus --instance metrics --connection "$connection" \
-  --operation series.query --schema "$schema" --revision "$revision" \
+connectors invoke prometheus/metrics series.query \
   --input-json '{"query":"up{job=\"api\"}"}'
 ```
 
