@@ -614,9 +614,34 @@ Every value satisfies `(delivery == inherited_handle or not (defined(handle_vari
 
 `connectors.cli.CustodyBackend` is one of `secret_service`, `macos_keychain`, `windows_credential_manager` and `mounted_secret`.
 
+### `DefinitionsCacheEntry`
+
+`connectors.cli.DefinitionsCacheEntry` is one of `created` and `existing`.
+
+### `DefinitionsInstallInput`
+
+`connectors.cli.DefinitionsInstallInput` is a record of two fields:
+
+- `source` — `String`
+- `tag` — `String`
+
+### `DefinitionsInstallResult`
+
+`connectors.cli.DefinitionsInstallResult` is a record of nine fields:
+
+- `source` — `String`
+- `tag` — `String`
+- `commit` — `String`
+- `index_sha256` — `String`
+- `features` — `List<String>`
+- `files` — `Integer`
+- `lock_path` — `String`
+- `cache_path` — `String`
+- `cache_entry` — `connectors.cli.DefinitionsCacheEntry`
+
 ### `Failure`
 
-`connectors.cli.Failure` is a record of 26 fields:
+`connectors.cli.Failure` is a record of 28 fields:
 
 - `kind` — `connectors.cli.FailureKind`
 - `code` — `connectors.cli.FailureCode`
@@ -644,6 +669,8 @@ Every value satisfies `(delivery == inherited_handle or not (defined(handle_vari
 - `field` — `Optional<String>`, which may be absent
 - `cause` — `Optional<connectors.cli.FailureCause>`, which may be absent
 - `attempts` — `Optional<Integer>`, which may be absent
+- `feature` — `Optional<String>`, which may be absent
+- `file` — `Optional<String>`, which may be absent
 
 ### `FailureCause`
 
@@ -651,7 +678,7 @@ Every value satisfies `(delivery == inherited_handle or not (defined(handle_vari
 
 ### `FailureCode`
 
-`connectors.cli.FailureCode` is one of `invalid_input`, `invalid_configuration`, `configuration_exists`, `protected_entry_unavailable`, `custody_unavailable`, `custody_read_only`, `metadata_unavailable`, `revision_conflict`, `outcome_unknown`, `identity_mismatch`, `lifecycle_conflict`, `incarnation_mismatch`, `readiness_mismatch`, `description_unavailable`, `stale_description`, `not_found`, `revoked`, `forbidden`, `not_granted`, `unavailable`, `timeout`, `capacity`, `stale_cursor`, `unsupported`, `interrupted`, `service_failure`, `approval_required`, `approval_refused`, `approval_replayed`, `idempotency_conflict`, `owner_build_mismatch`, `confirmation_required` and `metadata_schema_newer`.
+`connectors.cli.FailureCode` is one of `invalid_input`, `invalid_configuration`, `configuration_exists`, `protected_entry_unavailable`, `custody_unavailable`, `custody_read_only`, `metadata_unavailable`, `revision_conflict`, `outcome_unknown`, `identity_mismatch`, `lifecycle_conflict`, `incarnation_mismatch`, `readiness_mismatch`, `description_unavailable`, `stale_description`, `not_found`, `revoked`, `forbidden`, `not_granted`, `unavailable`, `timeout`, `capacity`, `stale_cursor`, `unsupported`, `interrupted`, `service_failure`, `approval_required`, `approval_refused`, `approval_replayed`, `idempotency_conflict`, `owner_build_mismatch`, `confirmation_required`, `metadata_schema_newer`, `digest_mismatch`, `unknown_format_version`, `unmet_feature` and `release_invalid`.
 
 ### `FailureKind`
 
@@ -1199,7 +1226,7 @@ Every value satisfies `(support == weaker or not (defined(weaker_form)))`, `(not
 
 `connectors.cli.StartupMode` is one of `on-demand` and `automatic`.
 
-76 of the types above are reached by nothing else in this system: `connectors.cli.AdapterDescribeInput`, `connectors.cli.AdapterDescribeResult`, `connectors.cli.AdapterListInput`, `connectors.cli.AdapterListResult`, `connectors.cli.AdapterStatusInput`, `connectors.cli.AdapterStatusResult`, `connectors.cli.AdapterStopInput`, `connectors.cli.AdapterStopResult`, `connectors.cli.ApprovalClockCheckInput`, `connectors.cli.ApprovalClockCheckResult`, `connectors.cli.ApprovalIssueInput`, `connectors.cli.ApprovalIssueResult`, `connectors.cli.ApprovalKeyInitInput`, `connectors.cli.ApprovalKeyRecoverInput`, `connectors.cli.ApprovalKeyRetireInput`, `connectors.cli.ApprovalKeyRevokeInput`, `connectors.cli.ApprovalKeyRotateInput`, `connectors.cli.ApprovalKeyStatusInput`, `connectors.cli.ApprovalKeysResult`, `connectors.cli.ApprovalPolicyResult`, `connectors.cli.ApprovalPolicySetInput`, `connectors.cli.ApprovalPolicyStatusInput`, `connectors.cli.ApprovalPrepareInput`, `connectors.cli.ApprovalPrepareResult`, `connectors.cli.ConnectionConnectInput`, `connectors.cli.ConnectionConnectResult`, `connectors.cli.ConnectionCreateRequest`, `connectors.cli.ConnectionDescribeInput`, `connectors.cli.ConnectionDescribeResult`, `connectors.cli.ConnectionLaunchInput`, `connectors.cli.ConnectionLaunchResult`, `connectors.cli.ConnectionListInput`, `connectors.cli.ConnectionListResult`, `connectors.cli.ConnectionReconnectInput`, `connectors.cli.ConnectionReconnectRequest`, `connectors.cli.ConnectionReconnectResult`, `connectors.cli.ConnectionRevalidateInput`, `connectors.cli.ConnectionRevalidateResult`, `connectors.cli.ConnectionRevokeInput`, `connectors.cli.ConnectionRevokeResult`, `connectors.cli.ConnectionStatusInput`, `connectors.cli.ConnectionStatusResult`, `connectors.cli.ConnectionTokenInput`, `connectors.cli.ConnectionTokenResult`, `connectors.cli.ConnectorListResult`, `connectors.cli.ConsumerCredentialDeliveryStatement`, `connectors.cli.LegacyDescribeInput`, `connectors.cli.LegacyDescribeResult`, `connectors.cli.LegacyInvokeInput`, `connectors.cli.LegacyInvokeResult`, `connectors.cli.LocalCaptureAdmission`, `connectors.cli.LocalCustodyBinding`, `connectors.cli.LocalOperationPolicy`, `connectors.cli.LocalOwnerBuild`, `connectors.cli.LocalOwnerBuildRequest`, `connectors.cli.LocalOwnerCached`, `connectors.cli.LocalOwnerCachedRequest`, `connectors.cli.LocalOwnerGreeting`, `connectors.cli.LocalOwnerHello`, `connectors.cli.LocalOwnerReuseRequest`, `connectors.cli.LocalRevalidationAdmission`, `connectors.cli.OperationDescribeInput`, `connectors.cli.OperationDescribeResult`, `connectors.cli.OperationInvokeInput`, `connectors.cli.OperationInvokeResult`, `connectors.cli.OperationListInput`, `connectors.cli.OperationListResult`, `connectors.cli.PlatformGuaranteeStatement`, `connectors.cli.PrivateBaseline`, `connectors.cli.SetupCheckResult`, `connectors.cli.SetupCheckpointsEnableInput`, `connectors.cli.SetupCheckpointsEnableResult`, `connectors.cli.SetupInitResult`, `connectors.cli.SetupMigrateInput`, `connectors.cli.SetupMigrateResult` and `connectors.cli.SetupOwnerStopResult`. No entity, view, command, event, error or crossing names them, so it is either vocabulary something outside this specification uses or a leftover — and only a person can tell which.
+78 of the types above are reached by nothing else in this system: `connectors.cli.AdapterDescribeInput`, `connectors.cli.AdapterDescribeResult`, `connectors.cli.AdapterListInput`, `connectors.cli.AdapterListResult`, `connectors.cli.AdapterStatusInput`, `connectors.cli.AdapterStatusResult`, `connectors.cli.AdapterStopInput`, `connectors.cli.AdapterStopResult`, `connectors.cli.ApprovalClockCheckInput`, `connectors.cli.ApprovalClockCheckResult`, `connectors.cli.ApprovalIssueInput`, `connectors.cli.ApprovalIssueResult`, `connectors.cli.ApprovalKeyInitInput`, `connectors.cli.ApprovalKeyRecoverInput`, `connectors.cli.ApprovalKeyRetireInput`, `connectors.cli.ApprovalKeyRevokeInput`, `connectors.cli.ApprovalKeyRotateInput`, `connectors.cli.ApprovalKeyStatusInput`, `connectors.cli.ApprovalKeysResult`, `connectors.cli.ApprovalPolicyResult`, `connectors.cli.ApprovalPolicySetInput`, `connectors.cli.ApprovalPolicyStatusInput`, `connectors.cli.ApprovalPrepareInput`, `connectors.cli.ApprovalPrepareResult`, `connectors.cli.ConnectionConnectInput`, `connectors.cli.ConnectionConnectResult`, `connectors.cli.ConnectionCreateRequest`, `connectors.cli.ConnectionDescribeInput`, `connectors.cli.ConnectionDescribeResult`, `connectors.cli.ConnectionLaunchInput`, `connectors.cli.ConnectionLaunchResult`, `connectors.cli.ConnectionListInput`, `connectors.cli.ConnectionListResult`, `connectors.cli.ConnectionReconnectInput`, `connectors.cli.ConnectionReconnectRequest`, `connectors.cli.ConnectionReconnectResult`, `connectors.cli.ConnectionRevalidateInput`, `connectors.cli.ConnectionRevalidateResult`, `connectors.cli.ConnectionRevokeInput`, `connectors.cli.ConnectionRevokeResult`, `connectors.cli.ConnectionStatusInput`, `connectors.cli.ConnectionStatusResult`, `connectors.cli.ConnectionTokenInput`, `connectors.cli.ConnectionTokenResult`, `connectors.cli.ConnectorListResult`, `connectors.cli.ConsumerCredentialDeliveryStatement`, `connectors.cli.DefinitionsInstallInput`, `connectors.cli.DefinitionsInstallResult`, `connectors.cli.LegacyDescribeInput`, `connectors.cli.LegacyDescribeResult`, `connectors.cli.LegacyInvokeInput`, `connectors.cli.LegacyInvokeResult`, `connectors.cli.LocalCaptureAdmission`, `connectors.cli.LocalCustodyBinding`, `connectors.cli.LocalOperationPolicy`, `connectors.cli.LocalOwnerBuild`, `connectors.cli.LocalOwnerBuildRequest`, `connectors.cli.LocalOwnerCached`, `connectors.cli.LocalOwnerCachedRequest`, `connectors.cli.LocalOwnerGreeting`, `connectors.cli.LocalOwnerHello`, `connectors.cli.LocalOwnerReuseRequest`, `connectors.cli.LocalRevalidationAdmission`, `connectors.cli.OperationDescribeInput`, `connectors.cli.OperationDescribeResult`, `connectors.cli.OperationInvokeInput`, `connectors.cli.OperationInvokeResult`, `connectors.cli.OperationListInput`, `connectors.cli.OperationListResult`, `connectors.cli.PlatformGuaranteeStatement`, `connectors.cli.PrivateBaseline`, `connectors.cli.SetupCheckResult`, `connectors.cli.SetupCheckpointsEnableInput`, `connectors.cli.SetupCheckpointsEnableResult`, `connectors.cli.SetupInitResult`, `connectors.cli.SetupMigrateInput`, `connectors.cli.SetupMigrateResult` and `connectors.cli.SetupOwnerStopResult`. No entity, view, command, event, error or crossing names them, so it is either vocabulary something outside this specification uses or a leftover — and only a person can tell which.
 
 ## Entities
 
@@ -1595,4 +1622,4 @@ It may invoke [`ExpireConnectionListCursor`](#expireconnectionlistcursor), [`Rai
 
 ---
 
-Generated from connectors v1 · model digest `503006db7344c6fb103bd0dff091b4eadab55220141fd343b9c57f98f554790a` · contract digest `slice-sha256/2:e70678a18300156906cb1991843d9cb9699d1ae328ac04eb7d7983c214d1f62b`. Do not edit this file; change the specification and regenerate it with `ess generate`.
+Generated from connectors v1 · model digest `add0e894fb2d8d349038a6c6741f1155e02b73765c1d0821d45655b53bb6ab94` · contract digest `slice-sha256/2:e97bf6bf6d32f9611a68f2db4eea6c1de214e5c55ec6d1ddacf3e26b2cb1abcc`. Do not edit this file; change the specification and regenerate it with `ess generate`.
