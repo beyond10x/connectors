@@ -577,16 +577,14 @@ dependencies = [
 
 [[package]]
 name = "connectors"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
  "clap",
- "clap_complete",
  "connectors-catalog",
  "connectors-catalog-provider",
  "connectors-cli-contract",
- "connectors-client",
  "connectors-core",
  "connectors-custody",
  "connectors-definitions-install",
@@ -604,15 +602,15 @@ dependencies = [
  "tar",
  "tempfile",
  "time",
- "tokio",
  "toml",
+ "toml_edit",
  "uuid",
  "zeroize",
 ]
 
 [[package]]
 name = "connectors-build"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "clap",
@@ -643,7 +641,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-catalog"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "connectors-core",
  "flate2",
@@ -661,7 +659,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-catalog-provider"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -709,7 +707,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-client"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "connectors-core",
  "futures-util",
@@ -722,7 +720,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-conformance"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -744,7 +742,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-contracts"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -752,7 +750,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-core"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "connectors-operation-types",
  "hex",
@@ -764,7 +762,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-custody"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "clap",
  "core-foundation",
@@ -784,7 +782,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-definitions-install"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "connectors-catalog",
  "flate2",
@@ -803,7 +801,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-docs"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "clap",
  "connectors",
@@ -818,7 +816,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-grafana"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "clap",
@@ -840,7 +838,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-host"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -886,7 +884,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-kubernetes"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -916,7 +914,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-loki"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "clap",
@@ -938,7 +936,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-mcp"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "clap",
  "connectors-core",
@@ -980,7 +978,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-oauth2"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "base64 0.23.1",
  "getrandom 0.3.4",
@@ -1005,7 +1003,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-prometheus"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "clap",
@@ -1027,7 +1025,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-sdk"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -1044,7 +1042,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-spec"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "connectors-core",
  "connectors-host",
@@ -1058,7 +1056,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-sql"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -1090,7 +1088,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-tavily"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "clap",
@@ -1106,7 +1104,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-tool-contracts"
-version = "0.59.3"
+version = "0.61.0"
 dependencies = [
  "async-trait",
  "b10x-tool-contract",
@@ -3979,6 +3977,7 @@ dependencies = [
  "indexmap",
  "toml_datetime",
  "toml_parser",
+ "toml_writer",
  "winnow",
 ]
 

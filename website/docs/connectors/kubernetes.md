@@ -90,8 +90,8 @@ Copy `configuration_revision` from the bootstrap verbatim; it is not the SHA-256
 operation left out of `operations` is refused. In the guide's run:
 
 ```console
-$ target/release/connectors --output json instances list
-{"ok":true,"result":{"adapters":[{"adapter":"cluster","adapter_id":"kubernetes","connector":"kubernetes","instance":"cluster","instance_id":"kubernetes-local","restart":"never","startup":"on-demand"}],"source":"configuration"}}
+$ target/release/connectors --output json instances list | jq -c '.result[] | arrays | .[]'
+{"connector":"kubernetes","instance":"cluster","instance_id":"kubernetes-local","restart":"never","startup":"on-demand"}
 ```
 
 ## Connect
@@ -109,14 +109,7 @@ is covered in the full guide.
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector kubernetes --instance cluster \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector kubernetes --instance cluster \
-  --operation resources.list | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector kubernetes --instance cluster \
-  --operation resources.list | jq -r .result.revision)
-connectors operations invoke --connector kubernetes --instance cluster --connection "$connection" \
-  --operation resources.list --schema "$schema" --revision "$revision" \
+connectors invoke kubernetes/cluster resources.list \
   --input-json '{"namespace":"default","kind":"pods","limit":50}'
 ```
 
@@ -142,10 +135,16 @@ connectors approvals policy-set --connector kubernetes --instance cluster --inpu
 {"namespace":"default","pod":"api-7d4b9c","container":"api","command":["cat","/etc/os-release"],"timeout_seconds":10}
 ```
 
-Take the schema and revision of `pods.exec` from `operations describe`, then prepare, issue and
-invoke:
+Take the connection, and the schema and revision of `pods.exec` from `invoke --describe`, then
+prepare, issue and invoke:
 
 ```sh
+connection=$(connectors --output json connections list --connector kubernetes --instance cluster \
+  | jq -r '.result.connections[0].connection')
+schema=$(connectors --output json invoke kubernetes/cluster pods.exec --describe \
+  | jq -r .result.schema)
+revision=$(connectors --output json invoke kubernetes/cluster pods.exec --describe \
+  | jq -r .result.revision)
 connectors --output json approvals prepare --connector kubernetes --instance cluster \
   --connection "$connection" --operation pods.exec \
   --schema "$schema" --revision "$revision" --input-file exec.json
@@ -154,8 +153,7 @@ connectors approvals issue --connector kubernetes --instance cluster \
   --connection "$connection" --operation pods.exec \
   --schema "$schema" --revision "$revision" --input-file exec.json \
   --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-exec-1.json"
-connectors operations invoke --connector kubernetes --instance cluster --connection "$connection" \
-  --operation pods.exec --schema "$schema" --revision "$revision" \
+connectors invoke kubernetes/cluster pods.exec \
   --input-file exec.json --approval-file "$HOME/private/proof-exec-1.json" \
   --idempotency-key exec-1
 ```

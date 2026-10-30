@@ -8,6 +8,7 @@ Commands:
   connections  
   definitions  
   instances    
+  invoke       Invoke one operation of a connector's instance; the instance, connection, schema and revision default to the only ones that fit
   list         List every connector this build ships, with its auth profiles and the instances the configuration names; needs no configuration and starts no process
   operations   
   setup        

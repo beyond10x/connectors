@@ -194,7 +194,7 @@ async fn adversary_no_spelling_or_value_of_the_keyset_parameters_reaches_commits
 
 // ---------------------------------------------------------------------------
 // Through the adapter process: what `operations describe` reads, and what
-// `operations invoke` answers.
+// `invoke` answers.
 
 fn private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).unwrap();

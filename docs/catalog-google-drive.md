@@ -230,7 +230,7 @@ profile and the provider executable are derived from the shipped connector:
 
 ```console
 $ connectors instances list
-{"adapters":[{"adapter":"drive.private","adapter_id":"catalog","connector":"drive","instance":"private","instance_id":"drive.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"adapters":[{"connector":"drive","instance":"private","instance_id":"drive.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
 ```
 
 Then connect it with the Google client file, as
