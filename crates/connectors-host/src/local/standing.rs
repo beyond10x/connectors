@@ -8,15 +8,22 @@
 //! - [`read`]: the grant file the operator mounts, named by the service
 //!   configuration's `standing_grants`. It is read on every call, so a removed
 //!   grant or one listed in `revoked` admits nothing from the next call on.
-//!   The read refuses (`Unreadable`, answered `unavailable`) a file that is a
-//!   symbolic link as its last path component, not a regular file, writable by
-//!   its group or by others, owned by anyone but the effective user or root,
-//!   over [`FILE_LIMIT`] bytes, or not exactly one strict
+//!   On Linux it is read as the `mounted_secret` binding reads its directory
+//!   (`read_file`): a ConfigMap or Secret volume's `<name> -> ..data/<name>`
+//!   layout is followed, and that layout's `..data` swap is how a changed
+//!   file arrives. The read refuses (`Unreadable`, answered `unavailable`) a
+//!   path through a directory another user can write or through any other
+//!   symbolic link, a file that is not a regular file, writable by its group
+//!   or by others, owned by anyone but the effective user or root, over
+//!   [`FILE_LIMIT`] bytes, or not exactly one strict
 //!   `connectors.standing-grants/1` document. An absent file holds no grant.
-//! - [`Uses`]: the hourly count, `standing-grants.sqlite3` in the instance's
-//!   state directory beside the attempt ledger. Every write admitted under a
-//!   grant is one `GrantUse` row; the row names the write's attempt, which is
-//!   how the grant id is recorded with the attempt. It survives a restart.
+//! - [`Uses`]: the hourly count, `standing-grants.sqlite3` (mode 0600) in the
+//!   instance's state directory beside the attempt ledger. Every write
+//!   admitted under a grant is one `GrantUse` row; the row names the write's
+//!   attempt, which is how the grant id is recorded with the attempt. It
+//!   survives a restart. A use that names no attempt is deleted once its hour
+//!   has passed, in batches of at most [`PRUNE_BATCH`] per take; a use that
+//!   names an attempt is kept, as the attempt is.
 //!
 //! Nothing here grants caller authority: the host checks admission, the key and
 //! the grant, in that order, before any attempt or provider request.
@@ -24,10 +31,7 @@ use super::filesystem as fs;
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, params};
 use serde::Deserialize;
 use serde_json::Value;
-use std::{
-    collections::BTreeSet,
-    path::{Path, PathBuf},
-};
+use std::{collections::BTreeSet, path::Path};
 use uuid::Uuid;
 
 /// The grant file's `format`.
@@ -255,34 +259,81 @@ impl Uncovered {
     }
 }
 
-/// Unix: opened with `O_NOFOLLOW`, then checked on the opened descriptor.
+/// Unix: the file itself is admitted when it is a regular file, not group-
+/// or world-writable, owned by the effective user or root.
 #[cfg(unix)]
+fn admitted(metadata: &std::fs::Metadata) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    metadata.is_file()
+        && metadata.mode() & 0o022 == 0
+        && (metadata.uid() == fs::uid() || metadata.uid() == 0)
+}
+
+/// Linux: read as the `mounted_secret` binding reads its directory
+/// (`connectors_custody::mounted::open_delivered`). Every directory above the
+/// file's own is owned by root or the effective user and writable by nobody
+/// else; the file's directory is owned by one of them and is not group- or
+/// world-writable unless it is a read-only mount; the name is the file
+/// itself or the link `<name> -> ..data/<name>` a ConfigMap or Secret volume
+/// presents, resolved only through its `..data` (a link to a `..`-prefixed
+/// sibling owned by root or the effective user). No other symbolic link is
+/// followed. The file is opened only after that inode is [`admitted`], so a
+/// FIFO or a device at the name is refused without being opened. Every
+/// refusal is [`Unreadable::Custody`].
+#[cfg(target_os = "linux")]
 fn read_file(path: &Path) -> Result<Option<Vec<u8>>, Unreadable> {
-    use std::{
-        io::Read,
-        os::unix::fs::{MetadataExt, OpenOptionsExt},
+    match connectors_custody::mounted::open_delivered(path, admitted) {
+        Ok(Some(file)) => read_bounded(file).map(Some),
+        Ok(None) => Ok(None),
+        Err(_) => Err(Unreadable::Custody),
+    }
+}
+
+/// Other Unix (macOS): every directory to the file's is walked from `/`
+/// without following a symbolic link, each owned by root or the effective
+/// user and not group- or world-writable; the file is opened with
+/// `O_NOFOLLOW | O_NONBLOCK` beneath it and checked on the descriptor. No
+/// projected volume layout is admitted there: a symbolic link at the name is
+/// refused.
+#[cfg(all(unix, not(target_os = "linux")))]
+fn read_file(path: &Path) -> Result<Option<Vec<u8>>, Unreadable> {
+    use std::os::{fd::AsRawFd, fd::FromRawFd, unix::ffi::OsStrExt};
+    let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+        return Err(Unreadable::Custody);
     };
-    let file = match std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK)
-        .open(path)
-    {
-        Ok(file) => file,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        // ELOOP: the last component is a symbolic link.
-        Err(error) if error.raw_os_error() == Some(libc::ELOOP) => {
-            return Err(Unreadable::Custody);
-        }
-        Err(_) => return Err(Unreadable::Io),
+    fs::validate_path(path).map_err(|_| Unreadable::Custody)?;
+    let directory = fs::directory(parent, false, false).map_err(|_| Unreadable::Custody)?;
+    let name = std::ffi::CString::new(name.as_bytes()).map_err(|_| Unreadable::Custody)?;
+    // SAFETY: the directory descriptor and NUL-terminated name remain live.
+    let fd = unsafe {
+        libc::openat(
+            directory.as_raw_fd(),
+            name.as_ptr(),
+            libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK,
+        )
     };
+    if fd < 0 {
+        let error = std::io::Error::last_os_error();
+        return match error.raw_os_error() {
+            Some(libc::ENOENT) => Ok(None),
+            // ELOOP: the name is a symbolic link.
+            Some(libc::ELOOP) => Err(Unreadable::Custody),
+            _ => Err(Unreadable::Io),
+        };
+    }
+    // SAFETY: openat returned a new, owned descriptor.
+    let file = unsafe { std::fs::File::from_raw_fd(fd) };
     let metadata = file.metadata().map_err(|_| Unreadable::Io)?;
-    if !metadata.is_file()
-        || metadata.mode() & 0o022 != 0
-        || (metadata.uid() != fs::uid() && metadata.uid() != 0)
-    {
+    if !admitted(&metadata) {
         return Err(Unreadable::Custody);
     }
-    if metadata.len() > FILE_LIMIT as u64 {
+    read_bounded(file).map(Some)
+}
+
+/// At most [`FILE_LIMIT`] bytes of an admitted file.
+fn read_bounded(file: std::fs::File) -> Result<Vec<u8>, Unreadable> {
+    use std::io::Read;
+    if file.metadata().map_err(|_| Unreadable::Io)?.len() > FILE_LIMIT as u64 {
         return Err(Unreadable::Oversized);
     }
     let mut bytes = Vec::new();
@@ -292,14 +343,13 @@ fn read_file(path: &Path) -> Result<Option<Vec<u8>>, Unreadable> {
     if bytes.len() > FILE_LIMIT {
         return Err(Unreadable::Oversized);
     }
-    Ok(Some(bytes))
+    Ok(bytes)
 }
 
 /// Windows: a final reparse point refuses, and the opened handle must be
 /// owner-only, as the service credential file is.
 #[cfg(windows)]
 fn read_file(path: &Path) -> Result<Option<Vec<u8>>, Unreadable> {
-    use std::io::Read;
     let file = match fs::windows::open_no_follow(path) {
         Ok(file) => file,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -309,22 +359,15 @@ fn read_file(path: &Path) -> Result<Option<Vec<u8>>, Unreadable> {
     if !metadata.is_file() || fs::windows::check_owner_only(&file).is_err() {
         return Err(Unreadable::Custody);
     }
-    if metadata.len() > FILE_LIMIT as u64 {
-        return Err(Unreadable::Oversized);
-    }
-    let mut bytes = Vec::new();
-    file.take(FILE_LIMIT as u64 + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|_| Unreadable::Io)?;
-    if bytes.len() > FILE_LIMIT {
-        return Err(Unreadable::Oversized);
-    }
-    Ok(Some(bytes))
+    read_bounded(file).map(Some)
 }
 
 /// The use store failed; the host answers `unavailable` and dispatches nothing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct UsesUnavailable;
+
+/// The most rows one pass deletes from the use store.
+const PRUNE_BATCH: u32 = 256;
 
 /// One taken slot under a grant.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -344,20 +387,45 @@ pub enum Taken {
 }
 
 /// `connectors.standing_approvals.GrantUse` rows (module docs).
+///
+/// One handle holds one SQLite connection, and every call on it runs behind
+/// its mutex: the uses one host process takes are serialized in that process
+/// and never wait on each other in SQLite's busy handler, where a burst of
+/// writers on slow storage could each wait out the busy timeout and answer
+/// `unavailable` (the cause of a 503 under parallel load). Every write is one
+/// `BEGIN IMMEDIATE` transaction, which takes SQLite's write lock before it
+/// reads, so another handle on the same file (another process, or a second
+/// handle in this one) waits in the busy handler and never meets the lock
+/// upgrade SQLite refuses without waiting.
 pub struct Uses {
-    path: PathBuf,
+    connection: std::sync::Mutex<Connection>,
 }
 
+/// How long one SQLite call waits for another handle's write lock.
+const BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
 impl Uses {
-    /// The store in the state directory `directory`, created when absent.
+    /// The store in the state directory `directory`, created when absent as
+    /// an owner-only file (0600), as the metadata authority's are. An existing
+    /// store that is not an owner-only regular file with one link, owned by
+    /// the effective user, is refused (`UsesUnavailable`).
     pub fn open(directory: &Path) -> Result<Self, UsesUnavailable> {
-        let uses = Self {
-            path: directory.join(USES_FILE),
-        };
-        let connection = uses.connection()?;
+        let path = directory.join(USES_FILE);
+        create_private(directory)?;
+        let connection = Connection::open_with_flags(
+            &path,
+            OpenFlags::SQLITE_OPEN_READ_WRITE
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )
+        .map_err(|_| UsesUnavailable)?;
+        connection
+            .busy_timeout(BUSY_TIMEOUT)
+            .map_err(|_| UsesUnavailable)?;
         connection
             .execute_batch(
-                "CREATE TABLE IF NOT EXISTS grant_uses(
+                "BEGIN IMMEDIATE;
+                CREATE TABLE IF NOT EXISTS grant_uses(
                     use_id TEXT PRIMARY KEY NOT NULL,
                     grant_id TEXT NOT NULL,
                     instance_id TEXT NOT NULL,
@@ -367,25 +435,33 @@ impl Uses {
                     CHECK ((state='bound') = (attempt_id IS NOT NULL))
                 ) STRICT;
                 CREATE INDEX IF NOT EXISTS grant_uses_window
-                    ON grant_uses(instance_id, grant_id, admitted_at_ms);",
+                    ON grant_uses(instance_id, grant_id, admitted_at_ms);
+                COMMIT;",
             )
             .map_err(|_| UsesUnavailable)?;
-        Ok(uses)
+        Ok(Self {
+            connection: std::sync::Mutex::new(connection),
+        })
     }
 
-    fn connection(&self) -> Result<Connection, UsesUnavailable> {
-        let connection = Connection::open_with_flags(
-            &self.path,
-            OpenFlags::SQLITE_OPEN_READ_WRITE
-                | OpenFlags::SQLITE_OPEN_CREATE
-                | OpenFlags::SQLITE_OPEN_NO_MUTEX
-                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-        )
-        .map_err(|_| UsesUnavailable)?;
-        connection
-            .busy_timeout(std::time::Duration::from_secs(5))
+    fn connection(&self) -> std::sync::MutexGuard<'_, Connection> {
+        // A panic while the lock was held left no open transaction: rusqlite
+        // rolls back a dropped one.
+        self.connection.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// One `BEGIN IMMEDIATE` transaction on this handle's connection.
+    fn write<T>(
+        &self,
+        action: impl FnOnce(&rusqlite::Transaction<'_>) -> rusqlite::Result<T>,
+    ) -> Result<T, UsesUnavailable> {
+        let mut connection = self.connection();
+        let tx = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|_| UsesUnavailable)?;
-        Ok(connection)
+        let value = action(&tx).map_err(|_| UsesUnavailable)?;
+        tx.commit().map_err(|_| UsesUnavailable)?;
+        Ok(value)
     }
 
     /// Takes one slot under the first of `grants` with room in the window
@@ -400,15 +476,18 @@ impl Uses {
         grants: &[&Grant],
         now_ms: i64,
     ) -> Result<Taken, UsesUnavailable> {
-        let mut connection = self.connection()?;
+        let mut connection = self.connection();
         let tx = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|_| UsesUnavailable)?;
         let since = now_ms.saturating_sub(WINDOW_MS);
-        // Uses that no longer count and name no attempt are dropped.
+        // Retention: uses whose hour has ended and that name no attempt are
+        // dropped, at most PRUNE_BATCH per take. A bound use is kept: it
+        // records the grant with its attempt, which the ledger keeps.
         tx.execute(
-            "DELETE FROM grant_uses WHERE state!='bound' AND admitted_at_ms<?1",
-            [since],
+            "DELETE FROM grant_uses WHERE rowid IN (SELECT rowid FROM grant_uses
+             WHERE state!='bound' AND admitted_at_ms<?1 LIMIT ?2)",
+            params![since, PRUNE_BATCH],
         )
         .map_err(|_| UsesUnavailable)?;
         let mut retry_after: Option<i64> = None;
@@ -446,13 +525,12 @@ impl Uses {
 
     /// Records the grant with the write's attempt: the use becomes `bound`.
     pub fn bind(&self, taken: &Use, attempt_id: Uuid) -> Result<(), UsesUnavailable> {
-        let changed = self
-            .connection()?
-            .execute(
+        let changed = self.write(|tx| {
+            tx.execute(
                 "UPDATE grant_uses SET state='bound', attempt_id=?2 WHERE use_id=?1 AND state='counted'",
                 params![taken.use_id.to_string(), attempt_id.to_string()],
             )
-            .map_err(|_| UsesUnavailable)?;
+        })?;
         if changed == 1 {
             Ok(())
         } else {
@@ -463,18 +541,18 @@ impl Uses {
     /// No attempt was prepared for this use: it stops counting. A failed
     /// release leaves it counting until its hour ends, never the other way.
     pub fn release(&self, taken: &Use) -> Result<(), UsesUnavailable> {
-        self.connection()?
-            .execute(
+        self.write(|tx| {
+            tx.execute(
                 "UPDATE grant_uses SET state='released' WHERE use_id=?1 AND state='counted'",
                 [taken.use_id.to_string()],
             )
-            .map_err(|_| UsesUnavailable)?;
+        })?;
         Ok(())
     }
 
     /// The grant recorded with `attempt_id`, if a grant admitted it.
     pub fn grant_of(&self, attempt_id: Uuid) -> Result<Option<String>, UsesUnavailable> {
-        self.connection()?
+        self.connection()
             .query_row(
                 "SELECT grant_id FROM grant_uses WHERE attempt_id=?1 AND state='bound'",
                 [attempt_id.to_string()],
@@ -483,6 +561,35 @@ impl Uses {
             .optional()
             .map_err(|_| UsesUnavailable)
     }
+
+    /// How many uses the store holds, counting or not.
+    pub fn rows(&self) -> Result<u32, UsesUnavailable> {
+        self.connection()
+            .query_row("SELECT count(*) FROM grant_uses", [], |row| row.get(0))
+            .map_err(|_| UsesUnavailable)
+    }
+}
+
+/// The store file, created as the metadata authority creates its own
+/// (`filesystem::publish_new`: an owner-only file, mode 0600 on Unix,
+/// published under its name only when the name is free), then admitted as
+/// that authority admits its own before SQLite opens it: a regular file
+/// owned by the effective user, no group or other access, one link
+/// (`filesystem::private_file_metadata_at`). The check reads the name's
+/// metadata and opens nothing, so it cancels no lock another connection
+/// holds. SQLite creates its journal with the database file's mode. The
+/// directory is reached without following a symbolic link, below directories
+/// no other user can write (`filesystem::directory`); that it is owner-only
+/// is the state directory's own check at host start.
+fn create_private(directory: &Path) -> Result<(), UsesUnavailable> {
+    use super::Failure;
+    let name = std::ffi::OsStr::new(USES_FILE);
+    let parent = fs::directory(directory, false, false).map_err(|_| UsesUnavailable)?;
+    match fs::publish_new(&parent, name, &[]) {
+        Ok(()) | Err(Failure::ConfigurationExists) => {}
+        Err(_) => return Err(UsesUnavailable),
+    }
+    fs::private_file_metadata_at(&parent, name).map_err(|_| UsesUnavailable)
 }
 
 #[cfg(test)]
@@ -501,6 +608,21 @@ mod tests {
             "target": [{"pointer": "/owner", "value": "acme"}, {"pointer": "/repo", "value": "widgets"}],
             "not_after_unix_ms": 2_000_000_000_000_i64, "max_per_hour": max
         })
+    }
+
+    /// A state directory as the host admits one: owner-only.
+    fn state_directory() -> (tempfile::TempDir, std::path::PathBuf) {
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("state");
+        std::fs::create_dir(&state).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&state, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        #[cfg(windows)]
+        fs::windows::owner_only(&state);
+        (root, state)
     }
 
     #[test]
@@ -586,8 +708,8 @@ mod tests {
 
     #[test]
     fn the_cap_counts_the_window_and_a_released_use_frees_its_slot() {
-        let root = tempfile::tempdir().unwrap();
-        let uses = Uses::open(root.path()).unwrap();
+        let (_root, state) = state_directory();
+        let uses = Uses::open(&state).unwrap();
         let parsed: Grant = serde_json::from_value(grant("g1", 2)).unwrap();
         let grants = [&parsed];
         let Taken::Slot(first) = uses.take("leaf", &grants, 10_000).unwrap() else {
@@ -616,5 +738,145 @@ mod tests {
             uses.take("leaf", &grants, 10_000 + WINDOW_MS + 1).unwrap(),
             Taken::Slot(_)
         ));
+    }
+
+    /// Retention of the use store: a use past its hour that names no attempt
+    /// (released, or counted by a write that never prepared one) is deleted
+    /// by the next take; a bound use stays, so the grant stays recorded with
+    /// its attempt.
+    #[test]
+    fn uses_past_their_hour_that_name_no_attempt_are_deleted() {
+        let (_root, state) = state_directory();
+        let uses = Uses::open(&state).unwrap();
+        let parsed: Grant = serde_json::from_value(grant("g1", 10)).unwrap();
+        let grants = [&parsed];
+        let slot = |now| match uses.take("leaf", &grants, now).unwrap() {
+            Taken::Slot(taken) => taken,
+            Taken::AtCap { .. } => panic!("slot refused"),
+        };
+        let bound = slot(1_000);
+        let attempt = Uuid::new_v4();
+        uses.bind(&bound, attempt).unwrap();
+        let released = slot(2_000);
+        uses.release(&released).unwrap();
+        let _abandoned = slot(3_000);
+        assert_eq!(uses.rows().unwrap(), 3);
+        // Within the hour nothing is deleted.
+        let _fresh = slot(WINDOW_MS);
+        assert_eq!(uses.rows().unwrap(), 4);
+        // An hour after the last of them: released and abandoned are gone.
+        let _late = slot(3_000 + WINDOW_MS + 1);
+        assert_eq!(uses.rows().unwrap(), 3);
+        assert_eq!(uses.grant_of(attempt).unwrap().as_deref(), Some("g1"));
+    }
+
+    /// The use store is created owner-only, and an existing one that is not
+    /// is refused, as the metadata authority refuses its own.
+    #[cfg(unix)]
+    #[test]
+    fn the_use_store_is_owner_only() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        let (_root, state) = state_directory();
+        drop(Uses::open(&state).unwrap());
+        let store = state.join(USES_FILE);
+        assert_eq!(std::fs::metadata(&store).unwrap().mode() & 0o777, 0o600);
+        std::fs::set_permissions(&store, std::fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(Uses::open(&state).is_err());
+    }
+
+    #[cfg(unix)]
+    fn put(path: &Path, bytes: &[u8], mode: u32) {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::write(path, bytes).unwrap();
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).unwrap();
+    }
+
+    /// The flat layout: the file itself at the name.
+    #[cfg(unix)]
+    #[test]
+    fn a_regular_grant_file_is_read_and_an_absent_one_holds_no_grant() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("grants.json");
+        assert!(read(&path).unwrap().is_none());
+        put(&path, &document(json!([grant("g1", 1)]), json!([])), 0o644);
+        assert!(read(&path).unwrap().is_some());
+    }
+
+    /// A symbolic link at the name to any file but `..data/<name>` is
+    /// refused, as is a file in a directory another user can write.
+    #[cfg(unix)]
+    #[test]
+    fn a_foreign_link_or_a_writable_directory_is_refused() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = tempfile::tempdir().unwrap();
+        let bytes = document(json!([grant("g1", 1)]), json!([]));
+        let real = root.path().join("real.json");
+        put(&real, &bytes, 0o644);
+        let link = root.path().join("grants.json");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        assert_eq!(read(&link).err(), Some(Unreadable::Custody));
+
+        let shared = root.path().join("shared");
+        std::fs::create_dir(&shared).unwrap();
+        put(&shared.join("grants.json"), &bytes, 0o644);
+        std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o777)).unwrap();
+        assert_eq!(
+            read(&shared.join("grants.json")).err(),
+            Some(Unreadable::Custody)
+        );
+        // The same file below a writable directory is refused as well.
+        let below = shared.join("below");
+        std::fs::create_dir(&below).unwrap();
+        put(&below.join("grants.json"), &bytes, 0o644);
+        assert_eq!(
+            read(&below.join("grants.json")).err(),
+            Some(Unreadable::Custody)
+        );
+    }
+
+    /// The projected layout of a ConfigMap or Secret volume:
+    /// `<name> -> ..data/<name>`, `..data -> ..<generation>`. It is read, a
+    /// swapped `..data` is read from the next call, and a link at the name to
+    /// another file inside `..data` is refused.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_projected_volume_layout_is_read_through_its_data_link() {
+        let root = tempfile::tempdir().unwrap();
+        let volume = root.path().join("volume");
+        std::fs::create_dir(&volume).unwrap();
+        let publish = |generation: &str, revoked: Value| {
+            let data = volume.join(format!("..{generation}"));
+            std::fs::create_dir(&data).unwrap();
+            put(
+                &data.join("grants.json"),
+                &document(json!([grant("g1", 1)]), revoked),
+                0o644,
+            );
+            put(&data.join("other.json"), b"{}", 0o644);
+            let staged = volume.join("..data_tmp");
+            std::os::unix::fs::symlink(format!("..{generation}"), &staged).unwrap();
+            std::fs::rename(&staged, volume.join("..data")).unwrap();
+        };
+        publish("2026_10_30_01", json!([]));
+        std::os::unix::fs::symlink("..data/grants.json", volume.join("grants.json")).unwrap();
+        let input = json!({"owner": "acme", "repo": "widgets"});
+        let first = read(&volume.join("grants.json")).unwrap().unwrap();
+        assert!(first.covering("leaf", "issue.create", &input, 0).is_ok());
+        publish("2026_10_30_02", json!(["g1"]));
+        let second = read(&volume.join("grants.json")).unwrap().unwrap();
+        assert_eq!(
+            second.covering("leaf", "issue.create", &input, 0).err(),
+            Some(Uncovered::Revoked)
+        );
+        std::os::unix::fs::symlink("..data/grants.json", volume.join("renamed.json")).unwrap();
+        assert_eq!(
+            read(&volume.join("renamed.json")).err(),
+            Some(Unreadable::Custody)
+        );
+        std::os::unix::fs::symlink("..data/other.json", volume.join("grants2.json")).unwrap();
+        assert_eq!(
+            read(&volume.join("grants2.json")).err(),
+            Some(Unreadable::Custody)
+        );
     }
 }

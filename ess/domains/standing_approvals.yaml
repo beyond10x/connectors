@@ -184,7 +184,8 @@ actors:
 # at or after `now - 3,600 s`, later ones included.
 # ESS-LIMIT: reading the grant file, the JSON-pointer match of a target, the
 # count of sibling uses in a window, the order across the grant store and the
-# attempt ledger, and the file's custody checks (no symbolic link,
-# owner-only writable, at most 64 KiB) are host obligations: ESS has no
+# attempt ledger, and the file's custody checks (no symbolic link but a
+# volume's `..data` layout, owner-only writable, at most 64 KiB) are host
+# obligations: ESS has no
 # cross-record count, no file-read or pointer construct and no cross-store
 # transaction.
