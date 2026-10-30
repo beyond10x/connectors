@@ -563,7 +563,8 @@ The complete configuration used against the sandbox is
   `Authorization: Bearer <installation token>`. The token lives in the provider
   process only, keyed by a digest of the entry, until five minutes before its
   `expires_at`; a token answered with less than that left is used for one
-  request and not kept. It is never returned, logged, stored or written into a
+  request and not kept, and one whose `expires_at` is not in the future, or an
+  answer that is not a JSON object, is `protocol` and is never sent. It is never returned, logged, stored or written into a
   result or an error. A `401`, `404` or `403` of the exchange is an invalid
   credential (a bad JWT or key, another App's installation, a suspended
   installation), a `403` naming a rate limit and a `429` are a provider rate

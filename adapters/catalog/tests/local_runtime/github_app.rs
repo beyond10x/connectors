@@ -246,6 +246,7 @@ struct Seen {
     route: String,
     query: String,
     accept: Option<String>,
+    user_agent: Option<String>,
     authorization: Option<String>,
     body: Vec<u8>,
 }
@@ -397,6 +398,7 @@ impl GitHub {
                             route: route.clone(),
                             query,
                             accept: header("accept"),
+                            user_agent: header("user-agent"),
                             authorization: authorization.clone(),
                             body,
                         });
@@ -923,3 +925,32 @@ fn a_github_app_configuration_outside_its_shape_is_refused() {
     }));
     assert!(!refused(&|_| {}));
 }
+
+/// GitHub refuses a request without a `User-Agent`: the exchange and the
+/// operation both name this build, `connectors/<version>`.
+#[test]
+fn the_exchange_and_the_operation_carry_the_connectors_user_agent() {
+    let github = GitHub::new();
+    let mut child = github.spawn();
+    project(&mut child, &entry()).unwrap();
+    let requests = github.requests();
+    assert_eq!(
+        requests
+            .iter()
+            .map(|seen| seen.route.as_str())
+            .collect::<Vec<_>>(),
+        [EXCHANGE_ROUTE, PROJECT_ROUTE]
+    );
+    let expected = format!("connectors/{}", env!("CARGO_PKG_VERSION"));
+    for seen in requests {
+        assert_eq!(
+            seen.user_agent.as_deref(),
+            Some(expected.as_str()),
+            "{}",
+            seen.route
+        );
+    }
+}
+
+#[path = "github_app_adversary.rs"]
+mod adversary;

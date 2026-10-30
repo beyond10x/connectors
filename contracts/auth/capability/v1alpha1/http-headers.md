@@ -17,6 +17,7 @@ nonsecret header on a native port, `ScopedHttp::with_fixed_header`
   - credential and cookie: `authorization`, `proxy-authorization`, `cookie`;
   - routing and forwarding: `host`, `forwarded`, `x-forwarded-*`, `x-real-ip`;
   - method override: `x-http-method-override`, `x-http-method`, `x-method-override`;
+  - identification: `user-agent`;
   - framing and negotiation: `transfer-encoding`, `connection`, `proxy-connection`,
     `keep-alive`, `te`, `trailer`, `expect`, `accept`, `accept-encoding`;
   - content: `content-*`;
@@ -29,6 +30,14 @@ nonsecret header on a native port, `ScopedHttp::with_fixed_header`
   exchange (`post_form`) carries neither.
 - The value is part of the admitted configuration, so a change is a new configuration
   revision.
+
+## Implemented: the client's `User-Agent`
+
+Every request a port makes, the credential-free form and assertion exchanges included, carries
+`User-Agent: connectors/<version>`, set by the transport's HTTP client; some providers refuse a
+request without one (GitHub's REST API). Neither a port's credential header nor a fixed header
+may take that name, each refused as `invalid_input` at composition, so no configuration or
+definition replaces it.
 
 What stays proposed: operator-declared `http.extra_headers`, more than one header,
 case-variant duplicate detection across several declared headers, and the mediated-parent
