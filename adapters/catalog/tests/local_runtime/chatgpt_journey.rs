@@ -151,14 +151,11 @@ impl ChatgptJourney {
             "models.list",
         ]));
         let output = self.cli.run(&[
-            "operations",
             "invoke",
-            "--adapter",
-            ALIAS,
+            &format!("chatgpt/{ALIAS}"),
+            "models.list",
             "--connection",
             reference,
-            "--operation",
-            "models.list",
             "--schema",
             description["schema"].as_str().unwrap(),
             "--revision",

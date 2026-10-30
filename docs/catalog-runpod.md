@@ -185,7 +185,7 @@ connection's subject, is `runpod.gpu`:
 
 ```console
 $ connectors instances list
-{"adapters":[{"adapter":"runpod.gpu","adapter_id":"catalog","connector":"runpod","instance":"gpu","instance_id":"runpod.gpu","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"adapters":[{"connector":"runpod","instance":"gpu","instance_id":"runpod.gpu","restart":"never","startup":"on-demand"}],"source":"configuration"}
 ```
 
 Connect with the credential document `{"token": "<Runpod API key>"}` in an
@@ -206,17 +206,15 @@ revision; the pinned form it writes is described in
 List the running pods with one name:
 
 ```sh
-connectors operations invoke --connector runpod --instance gpu --connection "$connection" \
-  --operation pods.list --schema "$schema" --revision "$revision" \
-  --input-json '{"name":"worker-a","desiredStatus":"RUNNING"}' --output json
+connectors --output json invoke runpod/gpu pods.list \
+  --input-json '{"name":"worker-a","desiredStatus":"RUNNING"}'
 ```
 
 Read one pod's daily billing records (`billing.pods` is a read, so it needs no approval):
 
 ```sh
-connectors operations invoke --connector runpod --instance gpu --connection "$connection" \
-  --operation billing.pods --schema "$schema" --revision "$revision" \
-  --input-json '{"bucketSize":"day","podId":"<pod id>"}' --output json
+connectors --output json invoke runpod/gpu billing.pods \
+  --input-json '{"bucketSize":"day","podId":"<pod id>"}'
 ```
 
 Create a pod (`create.json`, approved as above):
@@ -229,19 +227,15 @@ Create a pod (`create.json`, approved as above):
 ```
 
 ```sh
-connectors operations invoke --connector runpod --instance gpu --connection "$connection" \
-  --operation pod.create --schema "$schema" --revision "$revision" \
-  --input-file create.json --approval-file "$proof_file" \
-  --idempotency-key "$business_key" --output json
+connectors --output json invoke runpod/gpu pod.create --input-file create.json \
+  --approval-file "$proof_file" --idempotency-key "$business_key"
 ```
 
 Terminate it (`terminate.json` is `{"podId": "<id from the create result>"}`):
 
 ```sh
-connectors operations invoke --connector runpod --instance gpu --connection "$connection" \
-  --operation pod.terminate --schema "$schema" --revision "$revision" \
-  --input-file terminate.json --approval-file "$proof_file" \
-  --idempotency-key "$business_key" --output json
+connectors --output json invoke runpod/gpu pod.terminate --input-file terminate.json \
+  --approval-file "$proof_file" --idempotency-key "$business_key"
 ```
 
 ## Limits

@@ -134,11 +134,47 @@ pub(super) fn invoke(call: &Invocation<'_>, deadline: u64) -> owner::Result<Valu
     client.invoke(alias, &call.input, document, deadline)
 }
 
-pub(super) fn dispatch(
+/// A refusal of [`dispatch_tagged`], with the input field it is about where
+/// the step that refused knows it (story:connectors-do-short-invocation).
+pub(super) struct Refused {
+    pub(super) error: Box<owner::Error>,
+    pub(super) field: Option<&'static str>,
+}
+impl From<owner::Error> for Refused {
+    fn from(error: owner::Error) -> Self {
+        Self {
+            error: Box::new(error),
+            field: None,
+        }
+    }
+}
+impl From<Code> for Refused {
+    fn from(code: Code) -> Self {
+        owner::Error::from(code).into()
+    }
+}
+impl From<connectors_host::local::Failure> for Refused {
+    fn from(failure: connectors_host::local::Failure) -> Self {
+        owner::Error::from(failure).into()
+    }
+}
+fn about(field: &'static str) -> impl Fn(owner::Error) -> Refused {
+    move |error| Refused {
+        error: Box::new(error),
+        field: Some(field),
+    }
+}
+
+/// Invoke the operation of `call` through the alias its `adapter` names (the
+/// `invoke` handler states it), naming the argument a refusal is about where it
+/// is known: an idempotency key or approval file given on a read, an
+/// idempotency key outside its bounds, and an approval file that cannot be
+/// read.
+pub(super) fn dispatch_tagged(
     call: &Invocation<'_>,
     read_deadline: u64,
     deadline: Option<owner::mutation::Deadline>,
-) -> owner::Result<HandlerReply> {
+) -> Result<HandlerReply, Refused> {
     use connectors_host::local::{protected, runtime::Effect};
     use owner::{approval_issuance::Request, mutation};
     let paths = Paths::resolve(
@@ -157,10 +193,13 @@ pub(super) fn dispatch(
     let key = call.input["idempotency_key"].as_str();
     let proof_path = call.input["approval_file"].as_str();
     if requirement.effect == Effect::Read {
-        if key.is_some() || proof_path.is_some() {
-            return Err(Code::InvalidInput.into());
+        if key.is_some() {
+            return Err(about("idempotency_key")(Code::InvalidInput.into()));
         }
-        return invoke(call, read_deadline).map(HandlerReply::Success);
+        if proof_path.is_some() {
+            return Err(about("approval_file")(Code::InvalidInput.into()));
+        }
+        return Ok(invoke(call, read_deadline).map(HandlerReply::Success)?);
     }
     if requirement.effect != Effect::Write {
         return Err(Code::Unsupported.into());
@@ -174,13 +213,18 @@ pub(super) fn dispatch(
         revision: text("revision")?,
         input: text("input")?,
     };
+    // A key outside its bounds is refused by the observation below; it is the
+    // argument that refusal is about.
+    if key.is_some_and(|key| key.is_empty() || key.len() > 256) {
+        return Err(about("idempotency_key")(Code::InvalidInput.into()));
+    }
     // Current result-access admission and exact-key observation happen before
     // even opening the proof file, unlocking custody or starting the owner.
     let original = mutation::observe_original(&paths, alias, &request, key, until)?;
     if let Some(original) = &original
         && !original.pending
     {
-        return project(call, &bootstrap, original.delivery.clone());
+        return Ok(project(call, &bootstrap, original.delivery.clone())?);
     }
     let pending = original.is_some();
     let value = {
@@ -199,9 +243,9 @@ pub(super) fn dispatch(
                 // Another caller may have reserved the same key while protected
                 // entry failed. Reveal only a currently admitted exact winner.
                 if let Some(value) = mutation::observe(&paths, alias, &request, key, until)? {
-                    return project(call, &bootstrap, value);
+                    return Ok(project(call, &bootstrap, value)?);
                 }
-                return Err(error);
+                return Err(about("approval_file")(error));
             }
         };
         let result = owner::WriteClient::connect(&paths, true, deadline)
@@ -227,12 +271,12 @@ pub(super) fn dispatch(
                 }
                 return Ok(reply);
             }
-            Err(error) => return Err(error),
+            Err(error) => return Err(error.into()),
         }
     };
     // No payload enters the generated success carrier without native validation.
     // The owner is the authority for current admission and effect classification.
-    project(call, &bootstrap, value)
+    Ok(project(call, &bootstrap, value)?)
 }
 
 fn project(
@@ -302,7 +346,7 @@ fn project(
     })
 }
 
-/// story:owner-read-answers-json-value: every `operations invoke` answer
+/// story:owner-read-answers-json-value: every `invoke` answer
 /// carries the provider result as a JSON value. A read's answer comes from the
 /// owner (`owner/supervisor.rs`) and passes the native result check here; a
 /// write's is projected here from the owner's delivery, fresh, replayed or
@@ -409,7 +453,7 @@ mod json_value_tests {
         assert_eq!(init.exit_code, 0, "{}", init.stderr);
         let text = std::fs::read_to_string(&config).unwrap()
             + &format!(
-                "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[adapters.forge.permissions]\nprofiles=['token']\noperations=['{READ}','{WRITE}']\n",
+                "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=['--connector','jira']\n[adapters.forge.permissions]\nprofiles=['token']\noperations=['{READ}','{WRITE}']\n",
                 "a".repeat(64)
             );
         std::fs::write(&config, text).unwrap();
@@ -432,7 +476,7 @@ mod json_value_tests {
     fn target() -> Target {
         Target::Local {
             owner: "connectors.cli".into(),
-            action: "operations-invoke".into(),
+            action: "invoke".into(),
         }
     }
 
@@ -446,15 +490,15 @@ mod json_value_tests {
         let (context, schema) = configured(root.path());
         let target = target();
         let call = Invocation {
-            callable: "operations-invoke",
+            callable: "invoke",
             target: &target,
             context,
-            input: json!({"adapter":"forge","connection":"connection","operation":READ,
+            input: json!({"target":"jira/forge","connection":"connection","operation":READ,
                           "schema":schema,"revision":"desc-1","input":"{}"}),
         };
         let mut validator =
             super::super::session::NativeValidator(super::super::session::Session::new(&[]));
-        let answer = |result: Value| json!({"adapter":"forge","operation":READ,"revision":"desc-1","result":result});
+        let answer = |result: Value| json!({"connector":"jira","instance":"forge","operation":READ,"revision":"desc-1","result":result});
         assert!(
             validator
                 .validate(&call, DynamicPhase::Result, &answer(json!({"id": 7})))
@@ -480,7 +524,7 @@ mod json_value_tests {
         let (context, _) = configured(root.path());
         let target = target();
         let call = Invocation {
-            callable: "operations-invoke",
+            callable: "invoke",
             target: &target,
             context,
             input: json!({"adapter":"forge","connection":"connection","operation":WRITE,
@@ -515,7 +559,7 @@ mod json_value_tests {
         let (context, _) = configured(root.path());
         let target = target();
         let call = Invocation {
-            callable: "operations-invoke",
+            callable: "invoke",
             target: &target,
             context,
             input: json!({"adapter":"forge","connection":"connection","operation":WRITE,

@@ -568,12 +568,31 @@ fn journey_case(mode: u8) {
         args
     };
     let before = provider.count();
-    let mut missing = args("operations", "invoke");
+    // `invoke` names the instance and operation positionally
+    // (story:connectors-do-short-invocation); the pins and input stay.
+    let mut missing = vec!["invoke", "gitlab/gitlab", "merge_request.merge"];
+    missing.extend(
+        target
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| !matches!(index, 0 | 1 | 4 | 5))
+            .map(|(_, arg)| *arg),
+    );
     missing.extend(["--idempotency-key", "owned-merge"]);
     let missing_result = refusal(cli.run(&missing), "approval_required");
+    // `invoke` refuses a write without a proof at admission, before any
+    // mutation record exists, and names the approval steps instead.
     assert_eq!(
-        missing_result["mutation"]["classification"],
-        "not_attempted"
+        (&missing_result["stage"], &missing_result["approval_steps"]),
+        (
+            &json!("admission"),
+            &json!([
+                "approvals prepare",
+                "approvals clock-check",
+                "approvals issue"
+            ])
+        ),
+        "story:connectors-do-short-invocation: a write without --approval-file is refused before any provider call, naming the approval steps: {missing_result}"
     );
     assert_eq!(provider.count(), before);
     let prepared = success(cli.run(&args("approvals", "prepare")));

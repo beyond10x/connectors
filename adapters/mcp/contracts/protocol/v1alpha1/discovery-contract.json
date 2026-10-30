@@ -253,25 +253,24 @@
     {
       "id": "outbound-operation-invoke",
       "path": [
-        "operations",
         "invoke"
       ],
       "flags": [
-        "adapter",
         "connection",
-        "operation",
         "schema",
         "revision",
         "input-json",
         "input-file",
         "input-stdin",
         "approval-file",
-        "idempotency-key"
+        "idempotency-key",
+        "describe"
       ],
       "constraints": [
-        "exact operation, schema and revision",
-        "connection explicit where required",
-        "exactly one business input source",
+        "positional target <connector>[/<instance>] and operation",
+        "schema and revision default to the instance's current description and are pins when given",
+        "connection defaults to the instance's one usable connection",
+        "at most one business input source; standard input when none is given and it is not a terminal",
         "approval-file and idempotency-key follow the selected mutation profile",
         "no automatic business retry"
       ],

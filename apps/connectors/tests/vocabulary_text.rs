@@ -112,7 +112,9 @@ fn help_says_adapter_only_on_a_deprecated_line() {
         refused.push(format!("connectors-catalog-provider --help: {line}"));
     }
     assert!(refused.is_empty(), "{}", refused.join("\n"));
-    // Root, 7 groups, 34 command paths and 5 aliases.
+    // Root, 7 groups, 34 command paths and 5 aliases: `invoke` is one, and
+    // `operations invoke` is removed (story:connectors-do-short-invocation).
+    // `definitions install` is the newest (story:definitions-install).
     assert_eq!(paths.len(), 47, "{paths:?}");
 }
 
@@ -273,6 +275,8 @@ fn a_failure_rendered_for_a_person_never_says_adapter() {
             rendered += 1;
         }
     }
-    // 37 codes, 11 stages and 15 next actions.
-    assert_eq!(rendered, 63);
+    // 39 codes, 11 stages and 15 next actions; `instance_ambiguous` and
+    // `connection_unresolved` (story:connectors-do-short-invocation) and the four
+    // refusals of `definitions install` (story:definitions-install) are the newest.
+    assert_eq!(rendered, 65);
 }

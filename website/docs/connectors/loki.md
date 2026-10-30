@@ -93,14 +93,7 @@ instance, not a Loki account.
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector loki --instance logs \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector loki --instance logs \
-  --operation logs.query_range | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector loki --instance logs \
-  --operation logs.query_range | jq -r .result.revision)
-connectors operations invoke --connector loki --instance logs --connection "$connection" \
-  --operation logs.query_range --schema "$schema" --revision "$revision" \
+connectors invoke loki/logs logs.query_range \
   --input-json '{"query":"{app=\"api\"} |= \"error\"","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000","limit":100}'
 ```
 

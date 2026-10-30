@@ -60,11 +60,11 @@ The instance uses Drive's default endpoint, `https://www.googleapis.com/drive/v3
 nothing: everything else comes from the declaration shipped with `connectors-catalog-provider`.
 
 ```sh
-connectors instances list
+connectors instances list | jq -c '.[] | arrays | .[]'
 ```
 
 ```json
-{"adapters":[{"adapter":"drive.private","adapter_id":"catalog","connector":"drive","instance":"private","instance_id":"drive.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"connector":"drive","instance":"private","instance_id":"drive.private","restart":"never","startup":"on-demand"}
 ```
 
 ## Connect
@@ -81,14 +81,7 @@ scope. `gmail.private` and `drive.private` are two instances and two consents.
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector drive --instance private \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector drive --instance private \
-  --operation files.list | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector drive --instance private \
-  --operation files.list | jq -r .result.revision)
-connectors operations invoke --connector drive --instance private --connection "$connection" \
-  --operation files.list --schema "$schema" --revision "$revision" \
+connectors invoke drive/private files.list \
   --input-json '{"q":"trashed = false","pageSize":10,"fields":"nextPageToken,files(id,name,mimeType)"}'
 ```
 
@@ -114,10 +107,16 @@ then pin it in `rename.json`:
 {"fileId": "<id>", "version": "<version>", "fields": "id,name,version", "body": {"name": "Q4 plan"}}
 ```
 
-Take the schema and revision of `files.update` from `operations describe`, then prepare, issue
-and invoke:
+Take the connection, and the schema and revision of `files.update` from `invoke --describe`, then
+prepare, issue and invoke:
 
 ```sh
+connection=$(connectors --output json connections list --connector drive --instance private \
+  | jq -r '.result.connections[0].connection')
+schema=$(connectors --output json invoke drive/private files.update --describe \
+  | jq -r .result.schema)
+revision=$(connectors --output json invoke drive/private files.update --describe \
+  | jq -r .result.revision)
 connectors --output json approvals prepare --connector drive --instance private \
   --connection "$connection" --operation files.update \
   --schema "$schema" --revision "$revision" --input-file rename.json
@@ -126,8 +125,7 @@ connectors approvals issue --connector drive --instance private \
   --connection "$connection" --operation files.update \
   --schema "$schema" --revision "$revision" --input-file rename.json \
   --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-rename-1.json"
-connectors operations invoke --connector drive --instance private --connection "$connection" \
-  --operation files.update --schema "$schema" --revision "$revision" \
+connectors invoke drive/private files.update \
   --input-file rename.json --approval-file "$HOME/private/proof-rename-1.json" \
   --idempotency-key rename-1
 ```

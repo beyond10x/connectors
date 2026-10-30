@@ -162,7 +162,7 @@ fn a_refused_instance_selection_names_adapter_on_the_three_approval_commands_onl
         "--input-json",
         "{}",
     ];
-    let commands: [(&str, Vec<&str>, Option<&str>); 6] = [
+    let commands: [(&str, Vec<&str>, Option<&str>); 5] = [
         (
             "policy-set",
             vec![
@@ -194,11 +194,6 @@ fn a_refused_instance_selection_names_adapter_on_the_three_approval_commands_onl
             Some("adapter"),
         ),
         ("policy-status", vec!["approvals", "policy-status"], None),
-        (
-            "invoke",
-            [&["operations", "invoke"][..], &target].concat(),
-            None,
-        ),
         ("describe", vec!["connections", "describe"], None),
     ];
     let mut seen = Vec::new();
@@ -211,5 +206,20 @@ fn a_refused_instance_selection_names_adapter_on_the_three_approval_commands_onl
             expected.push((label, Value::from("invalid_input"), field.map(Value::from)));
         }
     }
-    assert_eq!(seen, expected);
+    // `invoke` selects by its target, so the half selections are a target
+    // naming only a connector or only an instance, and the field is `target`.
+    for selection in ["slack/", "/main"] {
+        let args = ["invoke", selection, "item.write", "--input-json", "{}"];
+        let data = failure(&command(root.path(), &args, None));
+        seen.push(("invoke", data["code"].clone(), data.get("field").cloned()));
+        expected.push((
+            "invoke",
+            Value::from("invalid_input"),
+            Some(Value::from("target")),
+        ));
+    }
+    assert_eq!(
+        seen, expected,
+        "story:connectors-do-short-invocation: `adapter` is named by the three approval commands only; `invoke` names its `target`"
+    );
 }

@@ -259,13 +259,49 @@ fn resolve_parameter<'a>(document: &'a Value, parameter: &'a Value) -> Result<&'
     ))
 }
 
+/// The object a `deepObject` schema is sent as: the schema itself when it is
+/// an object, or the one object alternative of a `oneOf` whose every other
+/// alternative is a scalar this model carries, such as Zendesk's `page` (an
+/// offset page number or the cursor pairs), with the gap that leaves: the
+/// scalar alternatives are not declared.
+fn deep_object_schema<'a>(schema: &'a Value, name: &str) -> Option<(&'a Value, Option<String>)> {
+    if single_type(schema) == Some("object") {
+        return Some((schema, None));
+    }
+    let alternatives = schema.get("oneOf").and_then(Value::as_array)?;
+    let (objects, scalars): (Vec<&Value>, Vec<&Value>) = alternatives
+        .iter()
+        .partition(|alternative| single_type(alternative) == Some("object"));
+    match objects.as_slice() {
+        [object]
+            if schema.get("type").is_none()
+                && scalars.iter().all(|s| ValueType::of_schema(s).is_some()) =>
+        {
+            let gap = (!scalars.is_empty()).then(|| {
+                format!(
+                    "query parameter `{name}` is a `deepObject` over a `oneOf` whose scalar \
+                     alternative this pass does not declare; only its `{name}[property]` pairs \
+                     are sent"
+                )
+            });
+            Some((object, gap))
+        }
+        _ => None,
+    }
+}
+
+/// The parameters a `deepObject` is sent as, and the gap that leaves.
+type Expansion = (Vec<Parameter>, Option<String>);
+
 /// A query parameter declared `style: deepObject` (exploded, the only form
 /// OpenAPI defines) over an inline object schema whose every property is a
 /// scalar this model carries, sent as one `name[property]=value` pair per
-/// property given: the parameters it expands to, in property order. `None`
-/// when it is not a `deepObject`; an error when it is one this pass does not
-/// expand, which is then named and sent as one value as given.
-fn deep_object(parameter: &Value, name: &str) -> Option<Result<Vec<Parameter>, String>> {
+/// property given: the parameters it expands to, in property order, and the
+/// gap the expansion leaves when the object is one alternative of a `oneOf`
+/// ([`deep_object_schema`]). `None` when it is not a `deepObject`; an error
+/// when it is one this pass does not expand, which is then named and sent as
+/// one value as given.
+fn deep_object(parameter: &Value, name: &str) -> Option<Result<Expansion, String>> {
     if parameter.get("style").and_then(Value::as_str) != Some("deepObject") {
         return None;
     }
@@ -275,18 +311,22 @@ fn deep_object(parameter: &Value, name: &str) -> Option<Result<Vec<Parameter>, S
              pass does not expand into `{name}[property]` pairs; it is sent as one value as given"
         ))
     };
-    let schema = parameter.get("schema");
+    let Some((schema, gap)) = parameter
+        .get("schema")
+        .and_then(|s| deep_object_schema(s, name))
+    else {
+        return Some(refused());
+    };
     let exploded = parameter.get("explode").and_then(Value::as_bool) != Some(false);
     let Some(properties) = schema
-        .filter(|s| single_type(s) == Some("object"))
-        .and_then(|s| s.get("properties"))
+        .get("properties")
         .and_then(Value::as_object)
         .filter(|p| exploded && !p.is_empty())
     else {
         return Some(refused());
     };
     let required: Vec<&str> = schema
-        .and_then(|s| s.get("required"))
+        .get("required")
         .and_then(Value::as_array)
         .map(|r| r.iter().filter_map(Value::as_str).collect())
         .unwrap_or_default();
@@ -309,7 +349,7 @@ fn deep_object(parameter: &Value, name: &str) -> Option<Result<Vec<Parameter>, S
             repeated: false,
         });
     }
-    Some(Ok(out))
+    Some(Ok((out, gap)))
 }
 
 fn parameters(
@@ -349,7 +389,7 @@ fn parameters(
                         None
                     };
                     let (expansion, deep_gap) = match deep {
-                        Some(Ok(expansion)) => (Some(expansion), None),
+                        Some(Ok((expansion, gap))) => (Some(expansion), gap),
                         Some(Err(reason)) => (None, Some(reason)),
                         None => (None, None),
                     };

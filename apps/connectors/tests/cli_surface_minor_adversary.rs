@@ -136,7 +136,7 @@ fn configured() -> (tempfile::TempDir, String) {
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
         + &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[adapters.forge.permissions]\nprofiles=['token']\noperations=['{OPERATION}']\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=['--connector','jira']\n[adapters.forge.permissions]\nprofiles=['token']\noperations=['{OPERATION}']\n",
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
@@ -153,23 +153,22 @@ fn configured() -> (tempfile::TempDir, String) {
     (root, schema)
 }
 
-fn selected<'a>(verb: &'a [&'a str], schema: &'a str) -> Vec<&'a str> {
-    [
-        verb,
-        &[
-            "--adapter",
-            "forge",
-            "--connection",
-            "conn-1",
-            "--operation",
-            OPERATION,
-            "--schema",
-            schema,
-            "--revision",
-            REVISION,
-        ][..],
+/// `invoke jira/forge` of [`OPERATION`] on `conn-1`, its schema and revision
+/// pinned so the call reaches the input checks with no provider running; the
+/// legacy entry is named by the connector its arguments declare
+/// (story:connectors-do-short-invocation).
+fn selected(schema: &str) -> Vec<&str> {
+    vec![
+        "invoke",
+        "jira/forge",
+        OPERATION,
+        "--connection",
+        "conn-1",
+        "--schema",
+        schema,
+        "--revision",
+        REVISION,
     ]
-    .concat()
 }
 
 fn nested(depth: usize) -> String {
@@ -201,13 +200,13 @@ fn c05_wrong_input_is_classified_the_same_from_inline_and_stdin() {
     ];
     let mut wrong = Vec::new();
     for (case, document, expected) in &cases {
-        let mut inline = selected(&["operations", "invoke"], &schema);
+        let mut inline = selected(&schema);
         inline.extend(["--input-json", document.as_str()]);
         let got = answer(&command(&root, &inline));
         if got != *expected {
             wrong.push(format!("inline {case}: {got}"));
         }
-        let mut stdin = selected(&["operations", "invoke"], &schema);
+        let mut stdin = selected(&schema);
         stdin.push("--input-stdin");
         let got = answer(&with_stdin(&root, &stdin, document.as_bytes()));
         if got != *expected {
@@ -215,7 +214,7 @@ fn c05_wrong_input_is_classified_the_same_from_inline_and_stdin() {
         }
     }
     let oversized = format!("{{\"name\":\"{}\"}}", "a".repeat(1024 * 1024 + 1));
-    let mut stdin = selected(&["operations", "invoke"], &schema);
+    let mut stdin = selected(&schema);
     stdin.push("--input-stdin");
     let got = answer(&with_stdin(&root, &stdin, oversized.as_bytes()));
     if got != "2/true/failure/invalid_input" {

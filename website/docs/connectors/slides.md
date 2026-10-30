@@ -52,11 +52,11 @@ enabled = true
 The instance uses Slides' default endpoint, `https://slides.googleapis.com`, and pins nothing.
 
 ```sh
-connectors instances list
+connectors instances list | jq -c '.[] | arrays | .[]'
 ```
 
 ```json
-{"adapters":[{"adapter":"slides.private","adapter_id":"catalog","connector":"slides","instance":"private","instance_id":"slides.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"connector":"slides","instance":"private","instance_id":"slides.private","restart":"never","startup":"on-demand"}
 ```
 
 ## Connect
@@ -72,14 +72,7 @@ Consent in a browser on the same machine within 240 seconds. A consent without t
 ## A first read
 
 ```sh
-connection=$(connectors --output json connections list --connector slides --instance private \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json operations describe --connector slides --instance private \
-  --operation presentations.get | jq -r .result.schema)
-revision=$(connectors --output json operations describe --connector slides --instance private \
-  --operation presentations.get | jq -r .result.revision)
-connectors operations invoke --connector slides --instance private --connection "$connection" \
-  --operation presentations.get --schema "$schema" --revision "$revision" \
+connectors invoke slides/private presentations.get \
   --input-json '{"presentationId":"<id>","fields":"revisionId,slides(objectId)"}'
 ```
 
@@ -103,10 +96,16 @@ Add a slide at the revision the read above answered, in `slide.json`:
 {"presentationId": "<id>", "body": {"requests": [{"createSlide": {}}], "writeControl": {"requiredRevisionId": "<revisionId>"}}}
 ```
 
-Take the schema and revision of `presentations.batchUpdate` from `operations describe`, then
-prepare, issue and invoke:
+Take the connection, and the schema and revision of `presentations.batchUpdate`
+from `invoke --describe`, then prepare, issue and invoke:
 
 ```sh
+connection=$(connectors --output json connections list --connector slides --instance private \
+  | jq -r '.result.connections[0].connection')
+schema=$(connectors --output json invoke slides/private presentations.batchUpdate --describe \
+  | jq -r .result.schema)
+revision=$(connectors --output json invoke slides/private presentations.batchUpdate --describe \
+  | jq -r .result.revision)
 connectors --output json approvals prepare --connector slides --instance private \
   --connection "$connection" --operation presentations.batchUpdate \
   --schema "$schema" --revision "$revision" --input-file slide.json
@@ -115,8 +114,7 @@ connectors approvals issue --connector slides --instance private \
   --connection "$connection" --operation presentations.batchUpdate \
   --schema "$schema" --revision "$revision" --input-file slide.json \
   --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-slide-1.json"
-connectors operations invoke --connector slides --instance private --connection "$connection" \
-  --operation presentations.batchUpdate --schema "$schema" --revision "$revision" \
+connectors invoke slides/private presentations.batchUpdate \
   --input-file slide.json --approval-file "$HOME/private/proof-slide-1.json" \
   --idempotency-key slide-1
 ```

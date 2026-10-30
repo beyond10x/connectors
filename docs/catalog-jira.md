@@ -136,8 +136,7 @@ the end of a walk are in it.
   not-found.
 
   ```sh
-  connectors operations invoke --connector jira --instance work --connection "$connection" \
-    --operation issue.transitions --schema "$schema" --revision "$revision" \
+  connectors invoke jira/work issue.transitions \
     --input-json '{"issueIdOrKey":"FIX-1","expand":"transitions.fields"}'
   ```
 
@@ -363,7 +362,7 @@ derived from the shipped connector:
 
 ```console
 $ connectors instances list
-{"adapters":[{"adapter":"jira.work","adapter_id":"catalog","connector":"jira","instance":"work","instance_id":"jira.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"adapters":[{"connector":"jira","instance":"work","instance_id":"jira.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
 ```
 
 Connect with the credential document `{"account": "<email>", "token": "<API token>"}`

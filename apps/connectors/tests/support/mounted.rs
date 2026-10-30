@@ -31,6 +31,10 @@ pub const CUSTODY: &str = "/run/connectors/custody";
 pub const SOURCE: &str = "/srv/secret";
 pub const STAMP: &str = "..2026_10_13_00_00_00.000000001";
 pub const ALIAS: &str = "forge";
+/// The declared connector the fixture entry names in its arguments, so the
+/// legacy entry is the instance `CONNECTOR/forge`; the test binary reads the
+/// two words after `--` as filters that match no test.
+pub const CONNECTOR: &str = "jira";
 pub const PROFILE: &str = "fixture.token";
 pub const OAUTH_PROFILE: &str = "fixture.oauth";
 /// A profile shaped as the catalog's `github_app`: three fields, nothing to
@@ -261,7 +265,13 @@ impl Container {
         Self {
             jail,
             adapter_digest,
-            adapter_args: vec!["--exact".into(), adapter_fixture.into(), "--".into()],
+            adapter_args: vec![
+                "--exact".into(),
+                adapter_fixture.into(),
+                "--".into(),
+                "--connector".into(),
+                CONNECTOR.into(),
+            ],
         }
     }
 
@@ -406,15 +416,13 @@ impl Container {
 
     pub fn invoke(&self, connection: &str) -> Output {
         let schema = self.schema();
+        let target = format!("{CONNECTOR}/{ALIAS}");
         self.run(&[
-            "operations",
             "invoke",
-            "--adapter",
-            ALIAS,
+            &target,
+            READ,
             "--connection",
             connection,
-            "--operation",
-            READ,
             "--schema",
             &schema,
             "--revision",

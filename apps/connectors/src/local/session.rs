@@ -79,10 +79,17 @@ impl Session {
                 "expected_revision",
                 "operation",
                 "device",
+                "target",
+                "endpoint",
             ] {
                 if let Ok(Some(value)) = leaf.try_get_one::<String>(&format!("field:{field}")) {
                     selectors[field] = json!(value);
                 }
+            }
+            // A connect's `<connector>/<instance>` selects as its options do;
+            // a target that cannot is refused by `endpoint::prepare`.
+            if command.callable == "connections-connect" {
+                selectors = super::endpoint::selection(&selectors).unwrap_or(selectors);
             }
             Some(Selection {
                 callable: command.callable.clone(),
@@ -109,6 +116,10 @@ impl Session {
             .as_ref()
             .map(|s| (s.callable.as_str(), &s.context))
     }
+    /// The preparsed selectors, when the arguments parsed.
+    pub fn selectors(&self) -> Option<&Value> {
+        self.selection.as_ref().map(|s| &s.selectors)
+    }
     pub fn signals(&mut self) -> owner::Result<()> {
         if self.signals.is_none() {
             self.signals = Some(protected::Signals::install()?);
@@ -126,7 +137,7 @@ impl Session {
         self.signals()?;
         let is_write = (|| {
             let selection = self.selection.as_ref()?;
-            if selection.callable != "operations-invoke" {
+            if selection.callable != "invoke" {
                 return None;
             }
             let paths = Paths::resolve(
@@ -134,7 +145,7 @@ impl Session {
                 selection.context.state_dir.as_deref(),
             )
             .ok()?;
-            let alias = super::select::alias_at(&selection.selectors, &paths).ok()?;
+            let alias = super::invoke::alias_at(&selection.selectors, &paths).ok()?;
             let bootstrap = owner::cached(&paths, &alias).ok()?;
             let operation = selection.selectors["operation"].as_str()?;
             Some(
@@ -151,7 +162,7 @@ impl Session {
             .is_some_and(|s| matches!(s.callable.as_str(), "approval-prepare" | "approval-issue"));
         // An approval command's refused business document names `input`
         // (contracts/cli/v1alpha1/semantics.md, "The refused argument"); an
-        // approved write's `operations invoke` names nothing.
+        // approved write's `invoke` names its own (`invoke::early_failure`).
         let named = |mut error: owner::Error| {
             if approval && error.code == Code::InvalidInput && error.field.is_none() {
                 error.field = Some(owner::Argument::Input);
@@ -361,6 +372,10 @@ impl Session {
             // so admission refusals retain their actionable CLI semantics.
             let reply = if matches!(callable.as_str(), "approval-prepare" | "approval-issue") {
                 super::approval_failure(error)
+            } else if callable == "invoke" {
+                // Every `invalid_input` of `invoke` names its argument.
+                let selectors = self.selection.as_ref().map(|s| &s.selectors);
+                super::invoke::early_failure(error, selectors.unwrap_or(&Value::Null))
             } else {
                 super::owner_failure(error)
             };
@@ -456,7 +471,8 @@ impl DynamicValidator for NativeValidator {
                 call.context.config.as_deref(),
                 call.context.state_dir.as_deref(),
             )?;
-            let alias = super::select::alias_at(&call.input, &paths)?;
+            // `invoke` is the one dynamic callable: its target selects the alias.
+            let alias = super::invoke::alias_at(&call.input, &paths)?;
             let bootstrap = owner::operation_snapshot(&paths, &alias, &call.input)?;
             let descriptor = bootstrap.descriptor()?;
             let operation = descriptor

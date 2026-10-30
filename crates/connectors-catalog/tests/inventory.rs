@@ -616,3 +616,76 @@ fn a_deep_object_this_pass_cannot_expand_is_named_and_kept_as_one_value() {
         && r.contains("`page`")
         && r.contains("named like another declared parameter")));
 }
+
+/// story:catalog-zendesk-ticket-audits: a `deepObject` whose schema is a
+/// `oneOf` of one object and scalars, as Zendesk's `page` (an offset page
+/// number or the cursor pairs), is expanded into the object's pairs. The
+/// scalar alternative is not declared, and that is named as a gap.
+#[test]
+fn a_deep_object_over_one_object_and_scalars_is_its_pairs_and_names_the_scalar() {
+    use connectors_catalog::inventory::ValueType;
+    let page = |schema: serde_json::Value| {
+        json!({"name": "page", "in": "query", "style": "deepObject", "explode": true,
+               "schema": schema})
+    };
+    let document = json!({
+        "openapi": "3.0.3",
+        "paths": {
+            "/dual": {"get": {"operationId": "dual", "parameters": [page(json!({"oneOf": [
+                {"type": "integer"},
+                {"type": "object", "properties": {
+                    "size": {"type": "integer", "minimum": 1},
+                    "after": {"type": "string"},
+                    "before": {"type": "string"}}}]}))], "responses": {}}},
+            "/two": {"get": {"operationId": "twoObjects", "parameters": [page(json!({"oneOf": [
+                {"type": "object", "properties": {"size": {"type": "integer"}}},
+                {"type": "object", "properties": {"after": {"type": "string"}}}]}))], "responses": {}}},
+            "/nested": {"get": {"operationId": "nestedBranch", "parameters": [page(json!({"oneOf": [
+                {"type": "string"},
+                {"type": "object", "properties": {"inner": {"type": "object"}}}]}))], "responses": {}}}
+        }
+    });
+    let inventory = extract(&document);
+    let shapes = |id: &str| -> Vec<(String, Option<ValueType>)> {
+        inventory
+            .operations
+            .iter()
+            .find(|o| o.operation_id.as_deref() == Some(id))
+            .unwrap()
+            .parameters
+            .iter()
+            .map(|p| (p.name.clone(), p.value_type))
+            .collect()
+    };
+    assert_eq!(
+        shapes("dual"),
+        vec![
+            ("page[after]".to_owned(), Some(ValueType::String)),
+            ("page[before]".to_owned(), Some(ValueType::String)),
+            ("page[size]".to_owned(), Some(ValueType::Integer)),
+        ]
+    );
+    // Two object branches, or an object branch this pass cannot expand, stay
+    // one value as before.
+    assert_eq!(shapes("twoObjects"), vec![("page".to_owned(), None)]);
+    assert_eq!(shapes("nestedBranch"), vec![("page".to_owned(), None)]);
+    let reason = |id: &str| -> Vec<&str> {
+        inventory
+            .unsupported
+            .iter()
+            .filter(|u| u.designation == id)
+            .map(|u| u.reason.as_str())
+            .collect()
+    };
+    let dual = reason("dual");
+    assert_eq!(dual.len(), 1, "{dual:?}");
+    assert!(
+        dual[0].contains("`page`") && dual[0].contains("scalar alternative"),
+        "{dual:?}"
+    );
+    for id in ["twoObjects", "nestedBranch"] {
+        let named = reason(id);
+        assert_eq!(named.len(), 1, "{id}: {named:?}");
+        assert!(named[0].contains("does not expand"), "{id}: {named:?}");
+    }
+}

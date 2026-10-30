@@ -18,7 +18,6 @@ changing a parent shell's environment cannot update an already running service.
 target/debug/connectors-kubernetes --config kubernetes.yaml
 target/debug/connectors-sql --config sql.yaml
 target/debug/connectors-catalog-provider --config catalog.json
-target/debug/connectors serve --config federation.yaml
 ```
 
 ## Admission
@@ -62,19 +61,34 @@ cluster role, or another role that may create `tokenreviews`. Under this profile
 Callers invoke through `POST /v1alpha2/invoke`, which records the service account as the
 principal of every call.
 
-The shared CLI discovers the current contract before invoking it:
+Under `static-bearer`, a caller presents the service credential as a bearer token, reads the
+current descriptor with `GET /v1/describe` and names its revision in `POST /v1/invoke`:
 
 ```sh
-target/debug/connectors describe \
-  --endpoint http://127.0.0.1:7102/ --allow-plaintext --token-file service.secret
-target/debug/connectors invoke \
-  --endpoint http://127.0.0.1:7102/ --allow-plaintext --token-file service.secret \
-  --operation endpoints.discover --input examples/requests/kubernetes-endpoints.json
+token="authorization: Bearer $(cat service.secret)"
+revision=$(curl -s -H "$token" http://127.0.0.1:7102/v1/describe | jq -r .revision)
+jq -n --arg revision "$revision" --slurpfile input examples/requests/kubernetes-endpoints.json \
+  '{version: "v1alpha1", request_id: "discover-1", operation: "endpoints.discover",
+    revision: $revision, input: $input[0]}' \
+  | curl -s -H "$token" -H 'content-type: application/json' --data @- \
+    http://127.0.0.1:7102/v1/invoke
 ```
 
-Through the example federation host, the same operation is `kubernetes__endpoints.discover`.
-Source prefixes distinguish instances; the gateway does not interpret provider data.
-The first profile supports one federation hop. It never retries a provider request.
+The `connectors` command does not call a standalone service: its `describe`, `invoke --endpoint`
+and `serve` commands were removed in 0.60.0. The local CLI reaches a provider through a configured
+instance; `connections connect <connector>/<instance> --endpoint <url>` saves the provider
+address there.
+
+GitLab is served by the [catalog provider](local-catalog-provider.md): under the local CLI,
+or on the host as a [catalog instance](#catalog-instances).
+
+A federation host puts several services behind one endpoint. It is the library
+`connectors_host::federation`, which a Rust program embeds and serves with
+`connectors_host::server::serve`; `examples/federation.yaml` is its configuration, and
+[Federate services](../website/docs/guides/federate-adapter-services.md) shows the program's
+shape. Through it the operation above is `kubernetes__endpoints.discover`. Source prefixes
+distinguish instances; the host does not interpret provider data. It supports one federation hop
+and never retries a provider request.
 
 ## Catalog instances
 
@@ -233,8 +247,8 @@ key is never forgotten, so it is never admitted for another request. A write tha
 flight when the host stopped stays pending: its key answers `outcome_unknown` at once and is
 not sent again.
 
-`connectors invoke` sends `POST /v1/invoke` with no key, so on a host with standing grants it
-runs reads only. A Rust caller sends a keyed write with `Client::invoke_v1alpha2_keyed`;
+`POST /v1/invoke`, as in the `curl` example above, carries no key, so on a host with standing
+grants it runs reads only. A Rust caller sends a keyed write with `Client::invoke_v1alpha2_keyed`;
 `Client::invoke_v1alpha2` sends no key, which such a host refuses for a write as
 `invalid_input`.
 
