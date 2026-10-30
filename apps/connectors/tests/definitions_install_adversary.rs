@@ -5,13 +5,12 @@
 //! `<state>/installed-definitions/` equal those recorded before the command).
 //! Releases are served from a temporary directory; no network is used.
 #![cfg(unix)]
-use connectors_definitions_install::{ASSET_LIMIT, INDEX_LIMIT, UNPACKED_LIMIT};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
-    io::{Read, Write},
+    io::Write,
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::{Command, Output, Stdio},
@@ -222,6 +221,8 @@ fn refusal(output: &Output) -> Value {
     reason = "libc::wait4 reaps the child to read its peak resident set"
 )]
 fn an_archive_that_inflates_past_the_stated_bounds_is_refused_within_them() {
+    use connectors_definitions_install::{ASSET_LIMIT, INDEX_LIMIT, UNPACKED_LIMIT};
+    use std::io::Read;
     let fixture = Fixture::new(true);
     let tag = "0.3.1";
     let files = BTreeMap::from([("auth/token.yaml".to_owned(), b"profile: token\n".to_vec())]);
