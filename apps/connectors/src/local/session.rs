@@ -35,6 +35,11 @@ pub(super) struct Session {
     pub launched: Option<i32>,
     /// The access token `connections token --reveal` issued, printed alone.
     pub revealed: Option<connectors_oauth2::Secret>,
+    /// What `invoke --fields` or `--each` asks of the answer.
+    pub shaping: Option<super::invoke::Shaping>,
+    /// The full answer of an `invoke` given `--fields` or `--each`, kept for
+    /// shaping once the runner has checked and printed it.
+    pub answer: Option<Value>,
 }
 impl Session {
     pub fn new(args: &[OsString]) -> Shared {
@@ -108,6 +113,8 @@ impl Session {
             cancelled: false,
             launched: None,
             revealed: None,
+            shaping: None,
+            answer: None,
         }))
     }
     /// The preparsed callable and its context, when the arguments parsed.
