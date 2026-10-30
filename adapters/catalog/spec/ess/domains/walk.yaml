@@ -1,0 +1,79 @@
+domain: connectors_catalog.walk
+summary: How a read's pages are walked and when the walk ends, declared as the `walk` member of a read in a `connectors-catalog-operations/1` selection.
+
+# Normative owner: docs/local-catalog-provider.md, "Configure the provider" (`walk`). The engine
+# reads it as a member of a read selection, checks it when the selection loads and carries it in
+# the operation's declared input schema under `x-connectors-walk`, an annotation, so the
+# admitted description (and `invoke --describe`) carries it. Pointers, parameters, conditions and
+# link parameters are the feed vocabulary's (`feed.yaml`); a Pointer here is never empty.
+#
+# One page is decided so: while `continues` holds the walk goes on whatever `ends` say, and a page
+# without a next position is broken; otherwise the first end that holds ends the walk by its
+# name; otherwise the walk goes on to the position at `next`, or is broken when the page names
+# none. A position the walk already sent breaks it. The second page on sends the position as
+# `parameter`, leaves out `first_only` and every page sends `query`.
+#
+# What the engine refuses when the selection loads beyond these invariants (a walk on a write, a
+# download, a binary, an embedded text or a text read; a pointer that is not an RFC 6901 pointer
+# led by `/`; a `parameter`, `query` key or `first_only` name that is not a query parameter of the
+# operation as the selection exposes it; a `query` value that is not a string, an integer or a
+# boolean; a `query` key or `first_only` name that is the `parameter`; a `first_only` name in
+# `query` or named twice; an end named twice or not lower snake case) is stated in the owner and
+# pinned by the engine's tests (`adapters/catalog/tests/walk_declarations.rs`).
+
+types:
+  # An end's name, which a walk's summary reports: a lower-case ASCII letter, then lower-case
+  # letters, digits and `_`, at most 64 bytes, such as `has_more_false` or `end_of_stream`.
+  - name: connectors_catalog.walk.EndName
+    kind: newtype
+    of: String
+
+  # One named end condition, exactly one test:
+  # - `when`: the value at its pointer equals its `equals`;
+  # - `absent`: the value at the pointer is absent, null or the empty string;
+  # - `present`: the value at the pointer is present and neither null nor the empty string;
+  # - `empty`: the value at the pointer is absent, null or an empty array.
+  - name: connectors_catalog.walk.End
+    kind: struct
+    fields:
+      - {name: name, type: connectors_catalog.walk.EndName}
+      - {name: when, type: "Optional<connectors_catalog.feed.Condition>"}
+      - {name: absent, type: "Optional<connectors_catalog.feed.Pointer>"}
+      - {name: present, type: "Optional<connectors_catalog.feed.Pointer>"}
+      - {name: empty, type: "Optional<connectors_catalog.feed.Pointer>"}
+    invariants:
+      - name.count >= 1
+      - name.count <= 64
+      - any: [defined(when), defined(absent), defined(present), defined(empty)]
+      - any: [{not: defined(when)}, all: [{not: defined(absent)}, {not: defined(present)}, {not: defined(empty)}]]
+      - any: [{not: defined(absent)}, all: [{not: defined(present)}, {not: defined(empty)}]]
+      - any: [{not: defined(present)}, {not: defined(empty)}]
+
+  # A walk: `parameter` carries the position from the second page on; `next` points at it in a
+  # page's answer, or with `url_parameter` at a link whose one such query parameter, decoded, is
+  # the position; `records` points at the page's records (absent or null is none); `query` holds
+  # values every page sends; `first_only` names query parameters only the first page sends.
+  - name: connectors_catalog.walk.Walk
+    kind: struct
+    fields:
+      - {name: parameter, type: connectors_catalog.feed.Parameter}
+      - {name: next, type: connectors_catalog.feed.Pointer}
+      - {name: url_parameter, type: "Optional<connectors_catalog.feed.UrlParameter>"}
+      - {name: records, type: connectors_catalog.feed.Pointer}
+      - {name: query, type: "Optional<Map<String, Json>>"}
+      - {name: first_only, type: "Optional<List<connectors_catalog.feed.Parameter>>"}
+      - {name: continues, type: "Optional<connectors_catalog.feed.Condition>"}
+      - {name: ends, type: "List<connectors_catalog.walk.End>"}
+    invariants:
+      - parameter.count >= 1
+      - next.count >= 1
+      - records.count >= 1
+      - any: [{not: defined(url_parameter)}, {url_parameter.count: {gte: 1, lte: 128}}]
+      - ends.count >= 1
+      - ends.count <= 8
+
+  # The member of a read selection that declares its walk.
+  - name: connectors_catalog.walk.ReadWalk
+    kind: struct
+    fields:
+      - {name: walk, type: "Optional<connectors_catalog.walk.Walk>"}

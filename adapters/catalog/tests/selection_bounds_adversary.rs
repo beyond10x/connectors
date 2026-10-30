@@ -351,6 +351,9 @@ fn bounds_round_trip_and_unbounded_selections_serialise_as_before() {
         let added: &[&str] = match selection.id.as_str() {
             "issue.transition.run" => &["body_keys"],
             "attachment.content" => &["binary"],
+            // story:catalog-operation-declares-its-walk: the cursor read
+            // declares its walk and nothing else.
+            "issues.search" => &["walk"],
             "issue.create" | "issue.link.add" => {
                 &["body_keys", "body_nonempty", "body_required", "body_types"]
             }
