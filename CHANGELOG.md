@@ -15,7 +15,9 @@
   the format (`release_invalid`); a refusal leaves the lock and the cache as they were. A release
   this binary was never built with installs without a rebuild: install takes only the supported
   format versions and features from the build. Installing grants nothing, starts no process, and
-  no instance resolves through the lock yet. The core is the new library
+  no instance resolves through the lock yet. The four features install admits
+  (`embedded_text`, `query_fixed`, `query_folds`, `rate_limit_headers`) are not yet read by the
+  definition lowerer, which refuses a published definition that uses them. The core is the new library
   `connectors-definitions-install`, which depends on no connectors crate. Contract:
   `contracts/cli/v1alpha1/semantics.md`, "Installing a definitions release"; model:
   `ess/domains/definitions_install.yaml`.

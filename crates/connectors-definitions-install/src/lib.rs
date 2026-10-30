@@ -28,8 +28,11 @@ use std::path::{Path, PathBuf};
 
 /// The `index.json` format versions this build reads.
 pub const INDEX_SCHEMAS: &[&str] = &["urn:beyond10x:connectors-definitions-index:1"];
-/// The optional definition members this build can lower, sorted. A release whose
-/// `features` names another is refused as [`Refusal::UnmetFeature`].
+/// The optional definition members install admits, sorted: the four connectors-definitions
+/// 0.3.0 and later declare. A release whose `features` names another is refused as
+/// [`Refusal::UnmetFeature`]. The definition lowerer (`connectors-catalog`) does not
+/// read these members yet; until it does, an installed release is stored and locked
+/// but no instance resolves through it.
 pub const FEATURES: &[&str] = &[
     "embedded_text",
     "query_fixed",
