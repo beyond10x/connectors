@@ -889,9 +889,12 @@ The complete configuration used against the sandbox is
   `embedded_text` or a text read; a pointer that is not led by `/` or escapes
   a `~` other than `~0` and `~1`; a `parameter`, `query` key or `first_only`
   name that is not a query parameter of the operation as the selection exposes
-  it (withheld, fixed and credential parameters are not); a `query` value of
-  another type; a `query` key or `first_only` name that is the `parameter`, or
-  a `first_only` name in `query` or named twice; an `url_parameter` that is not
+  it (withheld, fixed and credential parameters are not); a `query` value that
+  is not a string, an integer or a boolean, or that the parameter's schema in
+  the admitted description refuses, bounds included; a `first_only` name the
+  admitted description requires on every call; a `query` key or `first_only`
+  name that is the `parameter`, or a `first_only` name in `query` or named
+  twice; an `url_parameter` that is not
   1 to 128 visible ASCII characters; no end or more than eight; an end without
   exactly one test, with a name that is not lower snake case or named twice;
   or an unknown member is refused when the selection loads, each by name. The
