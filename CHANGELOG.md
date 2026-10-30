@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 0.59.3 — 2026-10-30
+
+No breaking changes.
+
+### Fixed
+
+- A read with no owner running no longer times out for ever on a large store. The owner it
+  starts verifies the whole store before it answers, and the CLI waited for that at most
+  10 seconds, then ended the owner and answered `timeout` at `admission`; every retry did the
+  same. A read on `operations invoke` now waits for the owner it starts within its own
+  30-second deadline. Other commands that start an owner, such as `connections revalidate`,
+  wait up to 60 seconds for it; a running owner is still reached within 10 seconds. A command
+  that finds an owner another process is starting waits for it up to 60 seconds, and a command
+  that times out leaves the owner it started to finish its start, so the next command reaches
+  it. Writes keep their 10-second wait.
+
 ## 0.59.2 — 2026-10-29
 
 No breaking changes.
