@@ -597,8 +597,9 @@ enum Prepared {
     Walk(Box<Walking>),
 }
 
-/// The caller's document of a walk: JSON, or text that does not decode, which
-/// one plain invoke of it refuses as it refuses any.
+/// The caller's document of a walk: JSON, or text that does not decode under
+/// the strict reader (a key named twice included), which one plain invoke of
+/// it refuses as it refuses any.
 enum Caller {
     Json(Value),
     Raw(OsString),
@@ -628,15 +629,27 @@ impl Out {
         })
     }
 
+    /// One page's lines written whole or not at all: a file is cut back to
+    /// its length before the page when a write fails partway. Standard
+    /// output cannot be taken back, so a reader of `--out -` may see part of
+    /// the page the summary does not count.
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<()> {
-        use std::io::Write;
+        use std::io::{Seek, SeekFrom, Write};
         match self {
             Out::Stdout => {
                 let mut stdout = std::io::stdout().lock();
                 stdout.write_all(bytes)?;
                 stdout.flush()
             }
-            Out::File { file, .. } => file.write_all(bytes),
+            Out::File { file, .. } => {
+                let before = file.stream_position()?;
+                let written = file.write_all(bytes);
+                if written.is_err() {
+                    let _ = file.set_len(before);
+                    let _ = file.seek(SeekFrom::Start(before));
+                }
+                written
+            }
         }
     }
 
@@ -788,7 +801,9 @@ fn caller_document(document: Option<&Document>) -> Result<Caller, HandlerReply> 
         Some(Document::File(path)) => read(Some(path))?,
         Some(Document::Stdin) | None => read(None)?,
     };
-    Ok(match serde_json::from_str(&text) {
+    // The repository's strict reader: a document naming a key twice is not
+    // walked, and the one plain invoke of it refuses it as it refuses any.
+    Ok(match connectors_core::read_json::<Value>(text.as_bytes()) {
         Ok(value) => Caller::Json(value),
         Err(_) => Caller::Raw(format!("--input-json={text}").into()),
     })
