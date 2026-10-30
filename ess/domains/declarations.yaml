@@ -127,8 +127,10 @@ types:
   # name. At most 128 bytes, the `principal_ref` bound of
   # contracts/service/audit.md § 4, because the anchor records it verbatim.
   # ESS-LIMIT: the fixed `system:serviceaccount:` prefix and the two-segment
-  # shape are checked by the reader (crates/connectors-host/src/server.rs
-  # `ServiceAccountPrincipal`); ESS 0.77 has no prefix or pattern invariant.
+  # shape are checked when the host builds its admission at start
+  # (`valid_principal` in crates/connectors-host/src/server/token_review.rs,
+  # and `PRINCIPAL_PATTERN` in the configuration schema); ESS 0.77 has no
+  # prefix or pattern invariant.
   - name: connectors.declarations.ServiceAccountPrincipal
     kind: newtype
     of: String

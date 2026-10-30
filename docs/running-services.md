@@ -52,7 +52,9 @@ gives the exact rules.
 The host admits a request only when the review authenticates the token for `audience` as
 `principal`. Any other answer is `unauthorized`. A review that fails, takes longer than
 5 seconds or cannot be reached is `unavailable`. In either case no operation runs. The host
-sends one review per request and keeps none. It never logs the token. Its own token,
+sends one review per request and keeps none. At most 8 reviews run at once: a request that
+arrives while 8 are under way is `unavailable` at once and sends no review, so a caller can
+retry it. The host never logs the token. Its own token,
 `credential_file`, is read at each review, so a projected token that the kubelet rotates is
 used from the next review on. The host's service account needs the `system:auth-delegator`
 cluster role, or another role that may create `tokenreviews`. Under this profile

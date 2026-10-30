@@ -10,7 +10,11 @@
 //! - a definite review that does not name the configured audience and
 //!   principal as authenticated is `unauthorized`;
 //! - anything else (no answer, a timeout, another HTTP status, an oversized or
-//!   undecodable body, the instance's own token unusable) is `unavailable`.
+//!   undecodable body, the instance's own token unusable) is `unavailable`;
+//! - a request that finds all [`CONCURRENT_REVIEWS`] review slots taken is
+//!   `unavailable` at once: no review is sent and nothing waits, so callers
+//!   presenting any bearer cannot queue reviews against the instance's own
+//!   account.
 //!
 //! Nothing is cached across requests. The presented token is sent only in the
 //! review body and never logged.
@@ -23,6 +27,12 @@ use connectors_sdk::AuthProbe;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{path::PathBuf, sync::Arc, time::Duration};
+use tokio::sync::Semaphore;
+
+/// The most TokenReviews one host has in flight. Admission runs before the
+/// host's concurrency permit, so this is what bounds the reviews a stream of
+/// requests can start (compatibility.md § 2.1, Admission).
+pub const CONCURRENT_REVIEWS: usize = 8;
 
 const API_VERSION: &str = "authentication.k8s.io/v1";
 const KIND: &str = "TokenReview";
@@ -66,6 +76,8 @@ pub struct ServiceAccountAdmission {
     credential: CredentialRef,
     review: Arc<dyn AuthProbe>,
     deadline: Duration,
+    /// [`CONCURRENT_REVIEWS`] slots; one is held for each review in flight.
+    slots: Semaphore,
 }
 
 impl ServiceAccountAdmission {
@@ -103,6 +115,7 @@ impl ServiceAccountAdmission {
             credential,
             review: http.probe_capability(&REVIEW_PATH)?,
             deadline: REVIEW_DEADLINE,
+            slots: Semaphore::new(CONCURRENT_REVIEWS),
         })
     }
 
@@ -132,6 +145,11 @@ impl ServiceAccountAdmission {
         if token.len() > TOKEN_LIMIT {
             return Err(unauthorized("service authentication failed"));
         }
+        // Refusal: every review slot is taken. Nothing is sent and nothing
+        // waits for a slot; the slot is held until this review is decided.
+        let Ok(_slot) = self.slots.try_acquire() else {
+            return Err(unavailable("review capacity"));
+        };
         let request = json!({
             "apiVersion": API_VERSION,
             "kind": KIND,

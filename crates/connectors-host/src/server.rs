@@ -20,7 +20,7 @@ use subtle::ConstantTimeEq;
 use tokio::sync::Semaphore;
 
 pub use crate::local::service::ServiceState;
-pub use token_review::{ServiceAccountAdmission, TokenReviewConfig};
+pub use token_review::{CONCURRENT_REVIEWS, ServiceAccountAdmission, TokenReviewConfig};
 
 /// `urn:connectors:config:v2:service` (`connectors.declarations.ServiceHostConfiguration`):
 /// the v1 members plus the optional `state` directory, which `POST
@@ -254,7 +254,8 @@ async fn admitted(service: &Service, headers: &HeaderMap) -> Result<String> {
         }
         Admission::ServiceAccountToken(account) => {
             // Refusal: every answer but the exact positive review
-            // (`unauthorized`), and every failed review (`unavailable`).
+            // (`unauthorized`); every failed review, and a request that finds
+            // all CONCURRENT_REVIEWS slots taken, with no review (`unavailable`).
             account.admit(presented).await?;
             Ok(account.principal().to_owned())
         }
