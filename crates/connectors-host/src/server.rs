@@ -99,6 +99,13 @@ pub struct ServiceConfigV3 {
     /// The TokenReview endpoint of a `service-account-token` host.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub token_review: Option<TokenReviewConfig>,
+    /// The instance's standing write grants
+    /// (`connectors.standing_approvals.GrantFile`), read on every write on
+    /// `POST /v1alpha2/invoke`. Absent, or naming an absent file: no grant,
+    /// so every write there is `approval_required`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>", length(min = 1, max = 4096))]
+    pub standing_grants: Option<std::path::PathBuf>,
 }
 
 /// `connectors.declarations.ServiceAdmissionProfile`.
@@ -128,6 +135,7 @@ impl From<ServiceConfig> for ServiceConfigV3 {
             audience: None,
             principal: None,
             token_review: None,
+            standing_grants: None,
         }
     }
 }
@@ -416,7 +424,9 @@ pub async fn serve(config: impl Into<ServiceConfigV3>, adapter: Arc<dyn Adapter>
             .await
             .map_err(|_| Error::internal())?
             .map_err(|_| Error::invalid("service state cannot be opened for this instance"))?;
-            Some(Arc::new(state))
+            Some(Arc::new(
+                state.with_standing_grants(config.standing_grants.clone()),
+            ))
         }
     };
     let listener = tokio::net::TcpListener::bind(config.listen)

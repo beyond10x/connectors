@@ -42,9 +42,11 @@ types:
       # Absent together with AttemptRecord.connection_ref, exactly for an
       # attempt the HTTP host records (contracts/service/compatibility.md § 2.1:
       # POST /v1alpha2/invoke has no connection member and the host resolves no
-      # Connection). Present for every local-owner attempt and every keyed
-      # reservation (KeyReservation invariant below; the HTTP host refuses
-      # `idempotency_key`).
+      # Connection). Present for every local-owner attempt and its keyed
+      # reservation. A keyed write the HTTP host admits under a standing grant
+      # (connectors.standing_approvals) has a reservation with both absent: the
+      # instance's one configured credential is its connection, fenced by the
+      # configuration revision (KeyReservation invariant below).
       - {name: connection_ref, type: "Optional<String>"}
       - {name: connection_revision, type: "Optional<String>"}
       - {name: contract_ref, type: String}
@@ -71,12 +73,13 @@ entities:
     # docs/local-er-metadata.md:102: a nonempty key; the recorded canonicalization
     # (a new identifier is a specification change); a direct origin is the
     # receiver and has no route, a federated origin is the route's gateway; only
-    # a settled known result (Replayable, Expired) has settlement and expiry.
+    # a settled known result (Replayable, Expired) has settlement and expiry;
+    # the connection and its revision are both present or both absent.
     invariants:
       - caller_key != ""
       - fingerprint.canonicalization_version == "adapter-v1-canonical-json"
-      - "defined(fingerprint.connection_ref)"
-      - "defined(fingerprint.connection_revision)"
+      - any: ["defined(fingerprint.connection_ref)", {not: "defined(fingerprint.connection_revision)"}]
+      - any: ["defined(fingerprint.connection_revision)", {not: "defined(fingerprint.connection_ref)"}]
       - any: [namespace.origin.kind != direct, namespace.origin.authority_ref == namespace.receiver_instance]
       - any: [namespace.origin.kind != direct, {not: "defined(fingerprint.route.gateway_instance)"}]
       - any: [namespace.origin.kind != federated, "defined(fingerprint.route.gateway_instance)"]

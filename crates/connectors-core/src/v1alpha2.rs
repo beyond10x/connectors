@@ -260,8 +260,9 @@ pub enum ResponseStatus {
     Error,
 }
 
-/// `connectors.service_wire.InvokeRequest`: the five v1alpha1 members, closed.
-/// `version` is text so a wrong version decodes and is answered `unsupported`.
+/// `connectors.service_wire.InvokeRequest`: the five v1alpha1 members and the
+/// optional `idempotency_key`, closed. `version` is text so a wrong version
+/// decodes and is answered `unsupported`.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct InvokeRequest {
@@ -270,11 +271,32 @@ pub struct InvokeRequest {
     pub operation: String,
     pub revision: String,
     pub input: Value,
+    /// The caller's key of a keyed write (compatibility § 2.1, Keyed writes
+    /// under a standing grant): absent, never null; 1 to [`KEY_LIMIT`] bytes,
+    /// compared exactly. The host refuses it on an operation that is not a
+    /// write.
+    #[serde(
+        default,
+        deserialize_with = "omittable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub idempotency_key: Option<String>,
 }
 
+/// Largest `idempotency_key`, in UTF-8 bytes (operations § 5.1; the ledger's
+/// `caller_key` bound).
+pub const KEY_LIMIT: usize = 256;
+
 /// The § 4 invocation members the first binding refuses with `unsupported`.
-const UNSUPPORTED_MEMBERS: [&str; 4] = ["connection", "idempotency_key", "approval", "executor"];
-const REQUEST_MEMBERS: [&str; 5] = ["version", "request_id", "operation", "revision", "input"];
+const UNSUPPORTED_MEMBERS: [&str; 3] = ["connection", "approval", "executor"];
+const REQUEST_MEMBERS: [&str; 6] = [
+    "version",
+    "request_id",
+    "operation",
+    "revision",
+    "input",
+    "idempotency_key",
+];
 
 /// A request this binding answers without dispatch: the code, and the
 /// request ID the answer echoes (`None` before a valid envelope exists).
@@ -306,11 +328,14 @@ impl InvokeRequest {
     /// Decode a request body on `/v1alpha2/invoke` (compatibility § 2, § 2.1).
     ///
     /// Malformed or ambiguous JSON, a duplicate member at any depth, a missing
-    /// or mistyped member and any unknown member other than the four § 4
-    /// members are `invalid_input`. A § 4 member (`connection`,
-    /// `idempotency_key`, `approval`, `executor`) is `unsupported`. Neither is
-    /// a valid envelope, so neither echoes a request ID. A valid envelope whose
-    /// `version` is not [`VERSION`] is `unsupported` with its request ID.
+    /// or mistyped member (a null `idempotency_key` included) and any unknown
+    /// member other than the three refused § 4 members are `invalid_input`. A
+    /// refused § 4 member (`connection`, `approval`, `executor`) is
+    /// `unsupported`. Neither is a valid envelope, so neither echoes a request
+    /// ID. A valid envelope whose `version` is not [`VERSION`] is
+    /// `unsupported` with its request ID; one whose `idempotency_key` is empty
+    /// or longer than [`KEY_LIMIT`] bytes is `invalid_input` with its request
+    /// ID.
     pub fn decode(bytes: &[u8]) -> std::result::Result<Self, Refusal> {
         let refuse = |request_id, code, message: &str| Refusal {
             request_id,
@@ -342,6 +367,17 @@ impl InvokeRequest {
                 Some(request.request_id),
                 ErrorCode::Unsupported,
                 "unsupported request version",
+            ));
+        }
+        if request
+            .idempotency_key
+            .as_ref()
+            .is_some_and(|key| key.is_empty() || key.len() > KEY_LIMIT)
+        {
+            return Err(refuse(
+                Some(request.request_id),
+                ErrorCode::InvalidInput,
+                "idempotency_key must be 1 to 256 bytes",
             ));
         }
         Ok(request)
@@ -500,10 +536,12 @@ impl InvokeResponse {
     ///
     /// - `source_audit` is always omitted;
     /// - `audit_status: not_required` is never answered;
-    /// - `mutation.replayed` is false, and `mutation.original_request_id`,
-    ///   when set, is this response's `request_id`;
-    /// - `error.code` is one of the 13 base codes or `outcome_unknown`
-    ///   (`cause.code` is a [`BaseErrorCode`] by declaration).
+    /// - a `mutation` that is not `replayed` names this response's
+    ///   `request_id` as its `original_request_id`, when set; a replayed one
+    ///   names the original attempt's request (keyed replay, § 2.1);
+    /// - `error.code` is one of the 13 base codes, `outcome_unknown`,
+    ///   `approval_required` or `idempotency_conflict` (`cause.code` is a
+    ///   [`BaseErrorCode`] by declaration).
     pub fn first_binding_rules(&self) -> std::result::Result<(), Violation> {
         if self.source_audit.is_some() {
             return Err(Violation("source_audit is not answered on this binding"));
@@ -511,20 +549,17 @@ impl InvokeResponse {
         if self.audit_status == AuditStatus::NotRequired {
             return Err(Violation("not_required is not answered on this binding"));
         }
-        if let Some(mutation) = &self.mutation {
-            if mutation.replayed {
-                return Err(Violation("this binding does not replay"));
-            }
-            if mutation
+        if let Some(mutation) = &self.mutation
+            && !mutation.replayed
+            && mutation
                 .original_request_id
                 .as_ref()
                 .is_some_and(|original| Some(original) != self.request_id.as_ref())
-            {
-                return Err(Violation("original_request_id is not this request's ID"));
-            }
+        {
+            return Err(Violation("original_request_id is not this request's ID"));
         }
         if let Some(error) = &self.error
-            && !(error.code.is_base() || error.code == ErrorCode::OutcomeUnknown)
+            && !(error.code.is_base() || FIRST_BINDING_EXTENDED.contains(&error.code))
         {
             return Err(Violation("error code is not emitted on this binding"));
         }
@@ -557,6 +592,15 @@ impl InvokeResponse {
         Ok(serde_json::to_vec(self).expect("an invoke response is serializable"))
     }
 }
+
+/// The extended codes the first binding emits besides the 13 base codes
+/// (compatibility § 2.1, Response): an uncertain dispatched write, a write no
+/// standing grant covers, and a live key reused for other input.
+pub const FIRST_BINDING_EXTENDED: [ErrorCode; 3] = [
+    ErrorCode::OutcomeUnknown,
+    ErrorCode::ApprovalRequired,
+    ErrorCode::IdempotencyConflict,
+];
 
 /// A rule of the v1alpha2 envelope that a value breaks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]

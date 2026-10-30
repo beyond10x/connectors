@@ -120,6 +120,10 @@ impl Client {
     /// binding and is reported `unsupported`. Every answer is read as the
     /// § 5 Response and checked for correlation and its HTTP mapping.
     ///
+    /// This sends no `idempotency_key`, so a write through it is refused
+    /// `invalid_input`; a write goes through
+    /// [`invoke_v1alpha2_keyed`](Self::invoke_v1alpha2_keyed).
+    ///
     /// A successful write carries its `mutation`, whose `attempt` names the
     /// `AttemptRecord` the host recorded. A [`Failure`] carries the
     /// `mutation` when the host recorded an attempt; a failure without one is
@@ -130,6 +134,22 @@ impl Client {
         operation: &str,
         input: Value,
     ) -> std::result::Result<Invoked, Box<Failure>> {
+        self.invoke_v1alpha2_keyed(descriptor, operation, input, None)
+            .await
+    }
+
+    /// [`invoke_v1alpha2`](Self::invoke_v1alpha2) with the caller's
+    /// `idempotency_key`, which a write on that binding requires (compatibility.md
+    /// § 2.1, Keyed writes under a standing grant). Resending the same key and
+    /// input is safe: the host replays the original outcome and makes no second
+    /// provider request. The client itself never resends.
+    pub async fn invoke_v1alpha2_keyed(
+        &self,
+        descriptor: &Descriptor,
+        operation: &str,
+        input: Value,
+        idempotency_key: Option<&str>,
+    ) -> std::result::Result<Invoked, Box<Failure>> {
         descriptor.operation(operation).map_err(Failure::local)?;
         let request = v1alpha2::InvokeRequest {
             version: v1alpha2::VERSION.into(),
@@ -137,6 +157,7 @@ impl Client {
             operation: operation.into(),
             revision: descriptor.revision.clone(),
             input,
+            idempotency_key: idempotency_key.map(str::to_owned),
         };
         let body = request.encode().map_err(|_| {
             Failure::new(

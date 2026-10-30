@@ -51,9 +51,8 @@ pub struct Route {
 pub struct Fingerprint {
     pub operation: OperationRef,
     /// Both present for a local-owner attempt, both absent for one the HTTP
-    /// host records: `POST /v1alpha2/invoke` resolves no Connection
-    /// (`ess/domains/idempotency.yaml`, RequestFingerprint). A keyed
-    /// candidate needs both.
+    /// host records, keyed or not: `POST /v1alpha2/invoke` resolves no
+    /// Connection (`ess/domains/idempotency.yaml`, RequestFingerprint).
     pub connection_ref: Option<String>,
     pub connection_revision: Option<String>,
     pub contract_ref: String,
@@ -230,9 +229,10 @@ impl Candidate {
         {
             identifier(value)?;
         }
-        if f.connection_ref.is_some() != f.connection_revision.is_some()
-            || (self.caller_key.is_some() && f.connection_ref.is_none())
-        {
+        // A keyed candidate without a connection is the HTTP host's write
+        // under a standing grant: its gate is the instance's adapter and
+        // configuration revision (`ess/domains/idempotency.yaml`).
+        if f.connection_ref.is_some() != f.connection_revision.is_some() {
             return Err(Failure::InvalidInput);
         }
         if f.operation.instance != n.receiver_instance

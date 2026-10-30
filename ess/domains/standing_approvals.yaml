@@ -1,0 +1,181 @@
+domain: connectors.standing_approvals
+summary: Standing write grants an operator mounts for a served instance, and the hourly count of writes admitted under each.
+# Normative owner: contracts/service/compatibility.md § 2.1 (Keyed writes under a
+# standing grant) and contracts/operations/v1alpha1/semantics.md § 4 (the checks
+# that replace steps 5 and 8 under a grant). Decided by
+# architecture-decision-record:standing-scoped-approval (option A of
+# decision-blocker:standing-write-approval-mode), served placement.
+#
+# A grant is operator configuration, not caller authority and not a signed
+# token: the served host reads the grant file named by its service
+# configuration (connectors.declarations.ServiceHostConfiguration
+# `standing_grants`) on every write and records nothing about the grant itself.
+# Whoever can change the instance's mounted configuration can widen its grants,
+# the same boundary as the instance's mounted provider credential.
+types:
+  # One target member: a JSON pointer (RFC 6901) into the operation's input and
+  # the exact JSON value it must hold. An input whose member at `pointer` is
+  # missing or differs is outside the grant.
+  - name: connectors.standing_approvals.TargetMember
+    kind: struct
+    fields:
+      - {name: pointer, type: String}
+      - {name: value, type: Json}
+  # One grant as the operator writes it. `target` has at least one member, and
+  # no pointer twice. `not_after` is exclusive: a write is admitted only while
+  # the host's clock reads before it. `max_per_hour` (1 to 10,000) bounds the
+  # writes admitted under this grant in any 3,600-second window; a replay of a
+  # key is not admitted again and is not counted.
+  - name: connectors.standing_approvals.StandingGrant
+    kind: struct
+    fields:
+      - {name: id, type: String}
+      - {name: instance, type: String}
+      - {name: operation, type: String}
+      - {name: target, type: "List<connectors.standing_approvals.TargetMember>"}
+      - {name: not_after_unix_ms, type: Integer}
+      - {name: max_per_hour, type: Integer}
+    invariants:
+      - not_after_unix_ms: {gte: 0, lte: 9007199254740991}
+      - max_per_hour: {gte: 1, lte: 10000}
+  # The mounted file. A grant whose id is listed in `revoked` admits nothing,
+  # from the next call on; so does a grant the file no longer lists.
+  - name: connectors.standing_approvals.GrantFile
+    kind: struct
+    fields:
+      - {name: format, type: String}
+      - {name: grants, type: "List<connectors.standing_approvals.StandingGrant>"}
+      - {name: revoked, type: "List<String>"}
+    invariants:
+      - format == "connectors.standing-grants/1"
+
+entities:
+  # One write admitted under a grant: the hourly count is the number of uses of
+  # a grant admitted in the last 3,600 seconds, and `attempt_id` records the
+  # grant id with the write's attempt (ADR decision 2).
+  - name: connectors.standing_approvals.GrantUse
+    identity: {name: use_id, type: Uuid}
+    fields:
+      - {name: grant_id, type: String}
+      - {name: instance_id, type: String}
+      - {name: admitted_at_unix_ms, type: Integer}
+      - {name: attempt_id, type: "Optional<connectors.mutations.AttemptId>"}
+    invariants:
+      - admitted_at_unix_ms: {gte: 0, lte: 9007199254740991}
+    relations:
+      - {name: instance, kind: references, target: connectors.declarations.ServiceConfiguration, cardinality: one, via: instance_id}
+      - {name: attempt, kind: references, target: connectors.mutations.AttemptRecord, cardinality: one, via: attempt_id}
+    lifecycle:
+      initial: Counted
+      states: [Counted, Bound, Released]
+      terminal: [Bound, Released]
+      transitions:
+        - {name: bind, from: [Counted], to: Bound}
+        - {name: release, from: [Counted], to: Released}
+    # Counted: the slot is taken and counts against the cap. Bound: the write's
+    # attempt was prepared and names this use; it keeps counting for its hour.
+    # Released: no attempt was prepared for it (a concurrent winner held the
+    # key, or the store refused), so it no longer counts.
+
+commands:
+  - name: connectors.standing_approvals.CountUse
+    input:
+      - {name: use_id, type: Uuid}
+      - {name: grant_id, type: String}
+      - {name: instance_id, type: String}
+      - {name: admitted_at_unix_ms, type: Integer}
+    outcomes:
+      - name: counted
+        creates: connectors.standing_approvals.GrantUse
+        instance: use_id
+        emits: [connectors.standing_approvals.UseCounted]
+        payload:
+          connectors.standing_approvals.UseCounted:
+            use_id: input.use_id
+        sets:
+          grant_id: input.grant_id
+          instance_id: input.instance_id
+          admitted_at_unix_ms: input.admitted_at_unix_ms
+  - name: connectors.standing_approvals.BindUse
+    input:
+      - {name: use_id, type: Uuid}
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+    outcomes:
+      - name: bound
+        moves: connectors.standing_approvals.GrantUse.bind
+        instance: use_id
+        emits: [connectors.standing_approvals.UseBound]
+        payload:
+          connectors.standing_approvals.UseBound:
+            use_id: input.use_id
+            attempt_id: input.attempt_id
+        sets: {attempt_id: input.attempt_id}
+      - {name: conflict, wrong_state: true, error: connectors.standing_approvals.UseStateConflict}
+  - name: connectors.standing_approvals.ReleaseUse
+    input: [{name: use_id, type: Uuid}]
+    outcomes:
+      - {name: released, moves: connectors.standing_approvals.GrantUse.release, instance: use_id, emits: [connectors.standing_approvals.UseReleased], payload: {connectors.standing_approvals.UseReleased: {use_id: input.use_id}}}
+      - {name: conflict, wrong_state: true, error: connectors.standing_approvals.UseStateConflict}
+
+events:
+  - name: connectors.standing_approvals.UseCounted
+    fields: [{name: use_id, type: Uuid}]
+  - name: connectors.standing_approvals.UseBound
+    fields:
+      - {name: use_id, type: Uuid}
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+  - name: connectors.standing_approvals.UseReleased
+    fields: [{name: use_id, type: Uuid}]
+
+errors:
+  - name: connectors.standing_approvals.UseStateConflict
+    fields:
+      - {name: state, type: connectors.standing_approvals.GrantUse.State}
+
+views:
+  - name: connectors.standing_approvals.GrantUses
+    source: connectors.standing_approvals.GrantUse
+    consistency: read_your_writes
+    fields:
+      - {name: use_id, type: Uuid}
+      - {name: grant_id, type: String}
+      - {name: instance_id, type: String}
+      - {name: admitted_at_unix_ms, type: Integer}
+      - {name: attempt_id, type: "Optional<connectors.mutations.AttemptId>"}
+      - {name: state, type: connectors.standing_approvals.GrantUse.State}
+
+actors:
+  # The HTTP service host on POST /v1alpha2/invoke.
+  - name: connectors.standing_approvals.ServiceHost
+    may:
+      - connectors.standing_approvals.BindUse
+      - connectors.standing_approvals.CountUse
+      - connectors.standing_approvals.ReleaseUse
+
+# The admission order on POST /v1alpha2/invoke for an operation whose profile
+# is `mutation` (compatibility.md § 2.1): a missing key is `invalid_input`; a
+# live key with the same fingerprint replays its original attempt, with no grant
+# check and no count; with another fingerprint it is `idempotency_conflict`; a
+# grant file that cannot be read safely is `unavailable`; no grant covering
+# instance, operation, every target member, `not_after` and revocation is
+# `approval_required`, naming no axis; a covering grant whose count in the last
+# 3,600 seconds has reached `max_per_hour` is `rate_limited` with
+# `retry_after_seconds`. Each refusal is before the audit anchor, makes no
+# provider request and records no attempt. Then, in one host critical section,
+# the winner recheck, CountUse, the keyed PrepareAttempt and BindUse.
+# Store: `standing-grants.sqlite3` in the instance's state directory, beside the
+# attempt ledger's metadata authority; it survives a restart, as the keyed
+# reservation does. A pending reservation found after a restart is never
+# dispatched again: the ledger's recovery settles it `unknown`, and its key
+# answers `outcome_unknown`.
+# Clock: the host's system wall clock, read for `not_after`, the window and
+# `admitted_at_unix_ms`. A served grant is operator configuration on the
+# operator's own deployment, so no trusted-time source is required; a clock that
+# moves backwards shortens no window, because the count reads every use admitted
+# at or after `now - 3,600 s`, later ones included.
+# ESS-LIMIT: reading the grant file, the JSON-pointer match of a target, the
+# count of sibling uses in a window, the one critical section across the grant
+# store and the attempt ledger, and the file's custody checks (no symbolic link,
+# owner-only writable, at most 64 KiB) are host obligations: ESS has no
+# cross-record count, no file-read or pointer construct and no cross-store
+# transaction.
