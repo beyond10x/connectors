@@ -6,7 +6,13 @@
 //! naming that attempt (ess/domains/mutations.yaml, "The HTTP host's attempt
 //! ledger").
 //!
-//! Every write is keyed and admitted only under a standing grant
+//! A host whose service configuration has no `standing_grants` reads the
+//! request with [`InvokeRequest::decode`], which refuses `idempotency_key`
+//! `unsupported`, and records, dispatches and settles a write unkeyed.
+//!
+//! A host whose configuration sets `standing_grants`
+//! ([`ServiceState::keyed`]) reads it with [`KeyedInvokeRequest::decode`],
+//! and every write there is keyed and admitted only under a standing grant
 //! (ess/domains/standing_approvals.yaml). Before the anchor, in this order,
 //! each refusal answered with no record, no attempt and zero adapter calls:
 //!
@@ -43,8 +49,8 @@ use connectors_core::{
     RESPONSE_LIMIT,
     v1alpha2::{
         AttemptId, AttemptReference, AuditStatus, BaseErrorCode, CauseStage, DiagnosticCause,
-        EffectKnowledge, Error, ErrorCode, InvokeRequest, InvokeResponse, MutationObservation,
-        Refusal, ResponseStatus, Version,
+        EffectKnowledge, Error, ErrorCode, InvokeRequest, InvokeResponse, KeyedInvokeRequest,
+        MutationObservation, Refusal, ResponseStatus, Version,
     },
 };
 use connectors_sdk::validate;
@@ -57,7 +63,7 @@ use std::{
 /// An `external_write` operation declares `profile: mutation`, and a read
 /// profile cannot carry it (contracts/operations/v1alpha1/semantics.md § 2,
 /// Effect declaration rule); the legacy Descriptor carries no `effects`.
-const MUTATION_PROFILE: &str = "mutation";
+pub(super) const MUTATION_PROFILE: &str = "mutation";
 const DEADLINE: Duration = Duration::from_secs(20);
 /// How long a replay waits for a pending original before it answers
 /// `outcome_unknown`: the original's own deadline and its settlement.
@@ -86,7 +92,14 @@ pub(super) async fn invoke(
     let Ok(bytes) = body else {
         return refused(None, ErrorCode::Capacity, "request exceeds byte limit");
     };
-    let request = match InvokeRequest::decode(&bytes) {
+    // Without standing grants the reader is the unchanged one: a key is
+    // refused `unsupported` with no request ID (module docs).
+    let decoded = if state.keyed() {
+        KeyedInvokeRequest::decode(&bytes)
+    } else {
+        InvokeRequest::decode(&bytes).map(KeyedInvokeRequest::from)
+    };
+    let request = match decoded {
         Ok(request) => request,
         Err(refusal) => return answer(refusal.into_response()),
     };
@@ -111,7 +124,8 @@ pub(super) async fn invoke(
     if let Err(error) = validate(&operation.input_schema, &request.input) {
         return refuse(code(error.code), &error.message);
     }
-    // Refusal: a key promises a replay only a write's attempt can give.
+    // Refusal (keyed host only; the unchanged reader refused the key above):
+    // a key promises a replay only a write's attempt can give.
     if operation.profile != MUTATION_PROFILE && request.idempotency_key.is_some() {
         return refuse(
             ErrorCode::Unsupported,
@@ -186,7 +200,7 @@ impl Refused {
 fn admit_write(
     state: &ServiceState,
     principal: &str,
-    request: &InvokeRequest,
+    request: &KeyedInvokeRequest,
     operation: &connectors_core::Operation,
 ) -> std::result::Result<Keyed, Refused> {
     let write = Write {
@@ -269,7 +283,7 @@ async fn execute(
     service: Service,
     state: Arc<ServiceState>,
     principal: String,
-    request: InvokeRequest,
+    request: KeyedInvokeRequest,
     operation: connectors_core::Operation,
     _permit: tokio::sync::OwnedSemaphorePermit,
 ) -> InvokeResponse {
@@ -281,7 +295,9 @@ async fn execute(
         audit::Access::Read
     };
 
-    let keyed = if write {
+    // Keyed admission runs only on a host with standing grants; without them
+    // a write goes straight to its unkeyed attempt (module docs).
+    let keyed = if write && state.keyed() {
         let admitted = {
             let state = state.clone();
             let principal = principal.clone();
@@ -342,23 +358,26 @@ async fn execute(
     };
 
     let mut attempt = None;
-    if let Some(keyed) = keyed {
-        let staged = match keyed {
-            Keyed::Replay(original) => Staged::Replay(original),
-            Keyed::New { key, taken } => {
-                let state = state.clone();
-                let reference = reference.clone();
-                let request = request.clone();
-                let operation = operation.clone();
-                let principal = principal.clone();
-                tokio::task::spawn_blocking(move || {
-                    stage(
-                        &state, &reference, &principal, &request, &operation, &key, &taken,
-                    )
-                })
-                .await
-                .unwrap_or(Staged::NotRecorded(ErrorCode::Internal))
+    if write {
+        let grant = match keyed {
+            Some(Keyed::Replay(original)) => {
+                return replay(&state, &reference, request_id, original).await;
             }
+            Some(Keyed::New { key, taken }) => Some((key, taken)),
+            None => None,
+        };
+        let staged = {
+            let state = state.clone();
+            let reference = reference.clone();
+            let request = request.clone();
+            let operation = operation.clone();
+            let principal = principal.clone();
+            tokio::task::spawn_blocking(move || {
+                let grant = grant.as_ref().map(|(key, taken)| (key.as_str(), taken));
+                stage(&state, &reference, &principal, &request, &operation, grant)
+            })
+            .await
+            .unwrap_or(Staged::NotRecorded(ErrorCode::Internal))
         };
         // Nothing was dispatched: the final observation records the refusal
         // (audit.md § 1 rule 6; execution_audit.yaml, Failed link).
@@ -447,12 +466,11 @@ async fn execute(
         let result = answer.as_ref().ok().cloned();
         let cause_text = cause_text.clone();
         tokio::task::spawn_blocking(move || {
-            state.settle_attempt(
-                attempt,
-                result.is_some(),
-                cause_text.as_deref(),
-                result.as_ref(),
-            )
+            if state.keyed() {
+                state.settle_keyed(attempt, result.as_ref(), cause_text.as_deref())
+            } else {
+                state.settle_attempt(attempt, result.is_some(), cause_text.as_deref())
+            }
         })
         .await
         .unwrap_or(false)
@@ -503,18 +521,18 @@ async fn execute(
     }
 }
 
-/// The keyed `PrepareAttempt` (reserving the key in the same transaction)
-/// with its grant recorded, `LinkAnchorAttempt` and `OpenDispatch`, in that
-/// order. A concurrent winner holding the key is replayed instead.
-#[allow(clippy::too_many_arguments)]
+/// `PrepareAttempt`, `LinkAnchorAttempt` and `OpenDispatch`, in that order.
+/// Without a grant (a host with no standing grants) the attempt is unkeyed,
+/// as at the wave base. With one, `PrepareAttempt` reserves the key in the
+/// same transaction and records the grant, and a concurrent winner holding
+/// the key is replayed instead.
 fn stage(
     state: &ServiceState,
     reference: &audit::Reference,
     principal: &str,
-    request: &InvokeRequest,
+    request: &KeyedInvokeRequest,
     operation: &connectors_core::Operation,
-    key: &str,
-    taken: &standing::Use,
+    grant: Option<(&str, &standing::Use)>,
 ) -> Staged {
     let write = Write {
         request_id: &request.request_id,
@@ -524,6 +542,14 @@ fn stage(
         profile: &operation.profile,
         descriptor_revision: &request.revision,
         input: &request.input,
+    };
+    let Some((key, taken)) = grant else {
+        let prepared = match state.prepare_attempt(&write) {
+            Ok(prepared) => prepared,
+            Err(mutations::Failure::Capacity) => return Staged::NotRecorded(ErrorCode::Capacity),
+            Err(_) => return Staged::NotRecorded(ErrorCode::Unavailable),
+        };
+        return link_and_open(state, reference, prepared);
     };
     let prepared = match state.prepare_keyed(&write, key, taken) {
         Ok(KeyedPreparation::Prepared(prepared)) => prepared,
@@ -540,6 +566,16 @@ fn stage(
         }
         Err(_) => return Staged::NotRecorded(ErrorCode::Unavailable),
     };
+    link_and_open(state, reference, prepared)
+}
+
+/// `LinkAnchorAttempt`, then `OpenDispatch`; either failing aborts the
+/// prepared attempt as `not_attempted`.
+fn link_and_open(
+    state: &ServiceState,
+    reference: &audit::Reference,
+    prepared: mutations::Prepared,
+) -> Staged {
     let attempt = prepared.reference();
     if !state.link_attempt(reference, attempt) {
         state.abort_attempt(attempt, "unavailable");
@@ -719,7 +755,7 @@ fn respond(
 /// the cause a write's `unknown` observation names.
 async fn dispatch(
     service: &Service,
-    request: &InvokeRequest,
+    request: &KeyedInvokeRequest,
     operation: &connectors_core::Operation,
 ) -> std::result::Result<Value, (Error, DiagnosticCause)> {
     let failed = |code: ErrorCode, base: BaseErrorCode, stage, message: String| {

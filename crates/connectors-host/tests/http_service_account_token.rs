@@ -300,9 +300,7 @@ async fn serve(root: &Path, admission: Admission) -> Host {
     });
     let descriptor = adapter.descriptor();
     let state = Arc::new(
-        ServiceState::open(&path, INSTANCE, &descriptor.adapter, &descriptor.revision)
-            .unwrap()
-            .with_standing_grants(Some(standing_grants(root))),
+        ServiceState::open(&path, INSTANCE, &descriptor.adapter, &descriptor.revision).unwrap(),
     );
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -329,28 +327,8 @@ async fn account_host(root: &Path, double: &Double) -> Host {
     .await
 }
 
-/// A write carries its request ID as its `idempotency_key`
-/// (story:served-keyed-writes-under-a-standing-approval).
 fn request(operation: &str, request_id: &str) -> Value {
-    let mut body = json!({"version":"v1alpha2","request_id":request_id,"operation":operation,"revision":"rev-1","input":{"value":1}});
-    if operation == "write" {
-        body["idempotency_key"] = json!(request_id);
-    }
-    body
-}
-
-/// A standing grant for the write on the input every request sends, so a
-/// keyed write is admitted
-/// (story:served-keyed-writes-under-a-standing-approval).
-fn standing_grants(root: &Path) -> PathBuf {
-    let document = json!({"format": "connectors.standing-grants/1", "revoked": [], "grants": [{
-        "id": "g-write", "instance": INSTANCE, "operation": "write",
-        "target": [{"pointer": "/value", "value": 1}],
-        "not_after_unix_ms": 4_000_000_000_000_i64, "max_per_hour": 10_000}]});
-    let path = root.join("grants.json");
-    std::fs::write(&path, serde_json::to_vec(&document).unwrap()).unwrap();
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
-    path
+    json!({"version":"v1alpha2","request_id":request_id,"operation":operation,"revision":"rev-1","input":{"value":1}})
 }
 
 async fn send(

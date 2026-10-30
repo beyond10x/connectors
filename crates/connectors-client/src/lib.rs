@@ -120,10 +120,6 @@ impl Client {
     /// binding and is reported `unsupported`. Every answer is read as the
     /// § 5 Response and checked for correlation and its HTTP mapping.
     ///
-    /// This sends no `idempotency_key`, so a write through it is refused
-    /// `invalid_input`; a write goes through
-    /// [`invoke_v1alpha2_keyed`](Self::invoke_v1alpha2_keyed).
-    ///
     /// A successful write carries its `mutation`, whose `attempt` names the
     /// `AttemptRecord` the host recorded. A [`Failure`] carries the
     /// `mutation` when the host recorded an attempt; a failure without one is
@@ -134,22 +130,6 @@ impl Client {
         operation: &str,
         input: Value,
     ) -> std::result::Result<Invoked, Box<Failure>> {
-        self.invoke_v1alpha2_keyed(descriptor, operation, input, None)
-            .await
-    }
-
-    /// [`invoke_v1alpha2`](Self::invoke_v1alpha2) with the caller's
-    /// `idempotency_key`, which a write on that binding requires (compatibility.md
-    /// § 2.1, Keyed writes under a standing grant). Resending the same key and
-    /// input is safe: the host replays the original outcome and makes no second
-    /// provider request. The client itself never resends.
-    pub async fn invoke_v1alpha2_keyed(
-        &self,
-        descriptor: &Descriptor,
-        operation: &str,
-        input: Value,
-        idempotency_key: Option<&str>,
-    ) -> std::result::Result<Invoked, Box<Failure>> {
         descriptor.operation(operation).map_err(Failure::local)?;
         let request = v1alpha2::InvokeRequest {
             version: v1alpha2::VERSION.into(),
@@ -157,7 +137,6 @@ impl Client {
             operation: operation.into(),
             revision: descriptor.revision.clone(),
             input,
-            idempotency_key: idempotency_key.map(str::to_owned),
         };
         let body = request.encode().map_err(|_| {
             Failure::new(
@@ -178,6 +157,62 @@ impl Client {
         let status = response.status().as_u16();
         let bytes = bounded(response).await.map_err(Failure::local)?;
         let response = match v1alpha2::InvokeResponse::decode(&bytes) {
+            Ok(response) => response,
+            Err(_) if status == 404 => {
+                return Err(Failure::new(
+                    v1alpha2::ErrorCode::Unsupported,
+                    "service does not serve POST /v1alpha2/invoke",
+                ));
+            }
+            Err(error) => return Err(Failure::from_error(error)),
+        };
+        read_v1alpha2(&request.request_id, status, response)
+    }
+
+    /// [`invoke_v1alpha2`](Self::invoke_v1alpha2) with the caller's
+    /// `idempotency_key`, for a host that runs keyed writes under a standing
+    /// grant (compatibility.md § 2.1, Keyed writes under a standing grant).
+    /// Resending the same key and input is safe: the host replays the original
+    /// outcome, `mutation.replayed: true`, and makes no second provider
+    /// request. The client itself never resends. The answer is read under the
+    /// keyed rules, which admit a replay, `approval_required` and
+    /// `idempotency_conflict`. A host without standing grants refuses the key
+    /// `unsupported`.
+    pub async fn invoke_v1alpha2_keyed(
+        &self,
+        descriptor: &Descriptor,
+        operation: &str,
+        input: Value,
+        idempotency_key: &str,
+    ) -> std::result::Result<Invoked, Box<Failure>> {
+        descriptor.operation(operation).map_err(Failure::local)?;
+        let request = v1alpha2::KeyedInvokeRequest {
+            version: v1alpha2::VERSION.into(),
+            request_id: uuid::Uuid::new_v4().to_string(),
+            operation: operation.into(),
+            revision: descriptor.revision.clone(),
+            input,
+            idempotency_key: Some(idempotency_key.to_owned()),
+        };
+        let body = request.encode().map_err(|_| {
+            Failure::new(
+                v1alpha2::ErrorCode::InvalidInput,
+                "invocation input cannot be encoded",
+            )
+        })?;
+        let response = self
+            .transport
+            .http
+            .post(self.url("v1alpha2/invoke").map_err(Failure::local)?)
+            .bearer_auth(&self.token)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(body)
+            .send()
+            .await
+            .map_err(|error| Failure::local(transport_error(error)))?;
+        let status = response.status().as_u16();
+        let bytes = bounded(response).await.map_err(Failure::local)?;
+        let response = match v1alpha2::InvokeResponse::decode_keyed(&bytes) {
             Ok(response) => response,
             Err(_) if status == 404 => {
                 return Err(Failure::new(

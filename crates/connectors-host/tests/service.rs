@@ -587,11 +587,7 @@ mod v1alpha2_ledger {
             state: path.clone(),
             break_store: break_store.clone(),
         });
-        let state = Arc::new(
-            ServiceState::open(&path, "leaf", "fixture", "rev-1")
-                .unwrap()
-                .with_standing_grants(Some(standing_grants(root.path()))),
-        );
+        let state = Arc::new(ServiceState::open(&path, "leaf", "fixture", "rev-1").unwrap());
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let app = router_with_state(adapter, Arc::new(FixedSecret), Some(state.clone()));
@@ -621,33 +617,8 @@ mod v1alpha2_ledger {
         let bytes = response.bytes().await.unwrap();
         (status, InvokeResponse::decode(&bytes).unwrap())
     }
-    /// A write carries its request ID as its `idempotency_key`
-    /// (story:served-keyed-writes-under-a-standing-approval).
     fn request(operation: &str, request_id: &str) -> Value {
-        let mut body = json!({"version":"v1alpha2","request_id":request_id,"operation":operation,"revision":"rev-1","input":{"value":1}});
-        if operation.ends_with("write") {
-            body["idempotency_key"] = json!(request_id);
-        }
-        body
-    }
-    /// A standing grant for each write on the input every request sends, so
-    /// a keyed write is admitted
-    /// (story:served-keyed-writes-under-a-standing-approval).
-    fn standing_grants(root: &Path) -> PathBuf {
-        let grants: Vec<Value> = ["write", "lost-write"]
-            .iter()
-            .map(|operation| {
-                json!({"id": format!("g-{operation}"), "instance": "leaf", "operation": operation,
-                    "target": [{"pointer": "/value", "value": 1}],
-                    "not_after_unix_ms": 4_000_000_000_000_i64, "max_per_hour": 10_000})
-            })
-            .collect();
-        let document =
-            json!({"format": "connectors.standing-grants/1", "grants": grants, "revoked": []});
-        let path = root.join("grants.json");
-        std::fs::write(&path, serde_json::to_vec(&document).unwrap()).unwrap();
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
-        path
+        json!({"version":"v1alpha2","request_id":request_id,"operation":operation,"revision":"rev-1","input":{"value":1}})
     }
     fn audit_record(path: &Path, audit_ref: &str) -> audit::Record {
         audit::Store::new(path, 100_000)
@@ -680,11 +651,7 @@ mod v1alpha2_ledger {
         assert_eq!(record.reference.attempt_id.to_string(), attempt.id.as_str());
         assert_eq!(record.request_id, "write-1");
         assert_eq!(record.state, mutations::State::Completed);
-        assert_eq!(
-            record.result,
-            Some(json!({"classification":"applied","result":{"value":1}})),
-            "story:served-keyed-writes-under-a-standing-approval: a keyed write retains its result for replay"
-        );
+        assert_eq!(record.result, Some(json!({"classification":"applied"})));
         assert!(record.settled_at_ms.is_some());
         // The audit anchor names the same attempt (LinkAnchorAttempt).
         let anchored = audit_record(&host.path, &response.audit_ref.unwrap());

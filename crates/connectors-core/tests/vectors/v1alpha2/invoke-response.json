@@ -71,7 +71,7 @@
     {
       "id": "response-replayed-original",
       "schema_valid": true,
-      "expect": "round_trip",
+      "expect": "refuse",
       "value": {"version":"v1alpha2","request_id":"write-7","status":"success","result":{},"audit_ref":"aud-10","audit_status":"complete","mutation":{"classification":"applied","attempt":{"instance":"fixture","id":"00000000-0000-4000-8000-00000000000A"},"original_request_id":"write-original","replayed":true,"cause":null}}
     },
     {

@@ -43,7 +43,8 @@ types:
       # attempt the HTTP host records (contracts/service/compatibility.md § 2.1:
       # POST /v1alpha2/invoke has no connection member and the host resolves no
       # Connection). Present for every local-owner attempt and its keyed
-      # reservation. A keyed write the HTTP host admits under a standing grant
+      # reservation. An HTTP host without standing grants makes no reservation.
+      # A keyed write an HTTP host with standing grants admits
       # (connectors.standing_approvals) has a reservation with both absent: the
       # instance's one configured credential is its connection, fenced by the
       # configuration revision (KeyReservation invariant below).

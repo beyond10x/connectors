@@ -2,8 +2,7 @@
 
 ## Unreleased
 
-One breaking change: a write on `POST /v1alpha2/invoke` now needs `idempotency_key` and a
-standing grant (see Changed).
+No breaking changes.
 
 ### Added
 
@@ -71,41 +70,33 @@ standing grant (see Changed).
   from the next read on. A missing or refused item answers `unavailable` and sends nothing. The
   served host lists and runs the instance's reads only; a catalog write is not offered. See
   [Run connector services](docs/running-services.md#catalog-instances).
-- A served host runs keyed writes under a standing grant
-  (story:served-keyed-writes-under-a-standing-approval). `standing_grants` in the service
-  configuration names a `connectors.standing-grants/1` file the operator mounts; each grant
-  names the instance, one operation, the input members a write must hold (a JSON pointer and
-  its exact value), an expiry and `max_per_hour`. The host reads the file on every write, so an
-  edit or a revocation applies from the next call on, and refuses it as `unavailable` when it is
-  a symlink, writable by group or others, owned by another user than the host's or root, over
+- Opt-in keyed writes under a standing grant on a served host
+  (story:served-keyed-writes-under-a-standing-approval). A host whose service configuration
+  has no `standing_grants` is unchanged: a write on `POST /v1alpha2/invoke` is dispatched
+  unkeyed and `idempotency_key` is still `unsupported`. Setting `standing_grants` (it requires
+  `state`) names a `connectors.standing-grants/1` file the operator mounts; each grant names the
+  instance, one operation, the input members a write must hold (a JSON pointer and its exact
+  value), an expiry and `max_per_hour`. On such a host every write on `POST /v1alpha2/invoke`
+  needs `idempotency_key` and a covering grant, and `POST /v1/invoke`, which records no attempt,
+  refuses writes as `unsupported`. The host reads the file on every write, so an edit or a
+  revocation applies from the next call on, and refuses it as `unavailable` when it is a
+  symlink, writable by group or others, owned by another user than the host's or root, over
   64 KiB or malformed. A write without `idempotency_key` is `invalid_input`, a key used for
   another request `idempotency_conflict`, a write no grant covers `approval_required`, a grant
   over its hour `rate_limited` with `retry_after_seconds`; none of them records an attempt or
   reaches the provider. The same key and input again replays the original outcome with
   `replayed: true` and never sends again; concurrent requests with one key make one provider
-  request. Keys and hourly counts survive a restart; keys do not expire. With a grant file,
-  `connectors-catalog-provider --config` lists and runs the instance's writes too. Rust callers
-  send a key with `Client::invoke_v1alpha2_keyed`. Contract: `contracts/service/compatibility.md`
-  § 2.1, "Keyed writes under a standing grant"; model: `ess/domains/standing_approvals.yaml`;
-  operator guide: [Standing write grants](docs/running-services.md#standing-write-grants).
-  Scenarios added: `v1alpha2-invoke-keyed-write-under-standing-grant`,
-  `v1alpha2-invoke-keyed-replay`, `v1alpha2-invoke-write-outside-grant-refused`.
-
-### Changed
-
-- Breaking: a write on `POST /v1alpha2/invoke` (an operation with the `mutation` profile) is
-  dispatched only with `idempotency_key` and under a covering standing grant. Before, the host
-  dispatched it with neither; now a write without a key is `invalid_input` and a host with no
-  grant file admits no write (`approval_required`). Migration: mount a grant file and set
-  `standing_grants`, and send each write through `Client::invoke_v1alpha2_keyed` with a key per
-  intended effect; `Client::invoke_v1alpha2` now carries reads only.
-- `idempotency_key` is a member of the `v1alpha2` request. On a read it is still refused as
-  `unsupported`, so scenario `v1alpha2-invoke-refuses-idempotency-key` now sends it on a
-  non-keyed operation. Scenario `v1alpha2-invoke-keyed-or-approval-operation-unsupported` is
-  withdrawn: the three keyed scenarios above replace it.
-- An applied keyed write's settlement in the host's state keeps the provider result, up to
-  64 KiB, so a replay can answer it. A replay of a larger result answers `capacity`, with the
-  write still reported as applied.
+  request. An applied keyed write keeps its provider result, up to 64 KiB, for the replay; a
+  replay of a larger result answers `capacity`, with the write still reported as applied. Keys
+  and hourly counts survive a restart; keys do not expire. With a grant file,
+  `connectors-catalog-provider --config` lists and runs the instance's writes too; without one
+  it serves reads only, as before. Rust callers send a key with the new
+  `Client::invoke_v1alpha2_keyed`; `Client::invoke_v1alpha2` is unchanged. Contract:
+  `contracts/service/compatibility.md` § 2.1, "Keyed writes under a standing grant"; model:
+  `ess/domains/standing_approvals.yaml`; operator guide:
+  [Standing write grants](docs/running-services.md#standing-write-grants). Scenarios added:
+  `v1alpha2-invoke-keyed-write-under-standing-grant`, `v1alpha2-invoke-keyed-replay`,
+  `v1alpha2-invoke-write-outside-grant-refused`.
 
 ### Fixed
 

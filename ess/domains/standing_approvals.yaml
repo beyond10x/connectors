@@ -11,7 +11,10 @@ summary: Standing write grants an operator mounts for a served instance, and the
 # configuration (connectors.declarations.ServiceHostConfiguration
 # `standing_grants`) on every write and records nothing about the grant itself.
 # Whoever can change the instance's mounted configuration can widen its grants,
-# the same boundary as the instance's mounted provider credential.
+# the same boundary as the instance's mounted provider credential. A host
+# whose configuration has no `standing_grants` reads no grant and counts no
+# use: it dispatches a write unkeyed (connectors.mutations, "The HTTP host's
+# attempt ledger").
 types:
   # One target member: a JSON pointer (RFC 6901) into the operation's input and
   # the exact JSON value it must hold. An input whose member at `pointer` is
@@ -152,8 +155,9 @@ actors:
       - connectors.standing_approvals.CountUse
       - connectors.standing_approvals.ReleaseUse
 
-# The admission order on POST /v1alpha2/invoke for an operation whose profile
-# is `mutation` (compatibility.md § 2.1): a missing key is `invalid_input`; a
+# The admission order on POST /v1alpha2/invoke, on a host whose configuration
+# sets `standing_grants`, for an operation whose profile is `mutation`
+# (compatibility.md § 2.1): a missing key is `invalid_input`; a
 # live key with the same fingerprint replays its original attempt, with no grant
 # check and no count; with another fingerprint it is `idempotency_conflict`; a
 # grant file that cannot be read safely is `unavailable`; no grant covering
@@ -161,21 +165,26 @@ actors:
 # `approval_required`, naming no axis; a covering grant whose count in the last
 # 3,600 seconds has reached `max_per_hour` is `rate_limited` with
 # `retry_after_seconds`. Each refusal is before the audit anchor, makes no
-# provider request and records no attempt. Then, in one host critical section,
-# the winner recheck, CountUse, the keyed PrepareAttempt and BindUse.
+# provider request and records no attempt. CountUse takes the use before the
+# anchor (a winner recheck precedes `approval_required` and `rate_limited`).
+# After the anchor the keyed PrepareAttempt reserves the key in the ledger's
+# transaction, and BindUse names the attempt; a concurrent request that
+# reserved the key first makes PrepareAttempt answer its attempt, and this
+# request's use is released (ReleaseUse) and it is answered as a replay. A
+# use that cannot be bound aborts the attempt before dispatch.
 # Store: `standing-grants.sqlite3` in the instance's state directory, beside the
 # attempt ledger's metadata authority; it survives a restart, as the keyed
 # reservation does. A pending reservation found after a restart is never
-# dispatched again: the ledger's recovery settles it `unknown`, and its key
-# answers `outcome_unknown`.
+# dispatched again: the HTTP host does not recover it, and a replay of its key
+# answers `outcome_unknown` after the replay wait.
 # Clock: the host's system wall clock, read for `not_after`, the window and
 # `admitted_at_unix_ms`. A served grant is operator configuration on the
 # operator's own deployment, so no trusted-time source is required; a clock that
 # moves backwards shortens no window, because the count reads every use admitted
 # at or after `now - 3,600 s`, later ones included.
 # ESS-LIMIT: reading the grant file, the JSON-pointer match of a target, the
-# count of sibling uses in a window, the one critical section across the grant
-# store and the attempt ledger, and the file's custody checks (no symbolic link,
+# count of sibling uses in a window, the order across the grant store and the
+# attempt ledger, and the file's custody checks (no symbolic link,
 # owner-only writable, at most 64 KiB) are host obligations: ESS has no
 # cross-record count, no file-read or pointer construct and no cross-store
 # transaction.
