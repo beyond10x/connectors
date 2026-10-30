@@ -779,7 +779,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-definitions-install"
-version = "0.59.1"
+version = "0.60.0"
 dependencies = [
  "flate2",
  "hex",
