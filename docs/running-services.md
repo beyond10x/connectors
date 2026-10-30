@@ -8,7 +8,8 @@ Connector, instance and connection are the terms of the [vocabulary](../README.m
 
 Copy the matching file from `examples/`, choose a unique instance/listener, configure
 the permitted resources, and bind private credential files or environment references.
-Credential files must be regular files owned by the running user with mode `0600`.
+Credential files must be regular files owned by the running user with mode `0600`; the
+TokenReview `credential_file` alone may also be `0640` or `0440` (Admission, below).
 Credentials never belong in operation input. Config changes require a restart.
 Credential file replacement is resolved on subsequent requests, including gateway
 downstream credentials. Environment references reflect the process environment;
@@ -43,13 +44,43 @@ gives the exact rules.
   "token_review": {
     "api": "https://kubernetes.default.svc",
     "ca_file": "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
-    "credential_file": "/var/run/secrets/kubernetes.io/serviceaccount/token"
+    "credential_file": "/var/run/secrets/kubernetes.io/serviceaccount/..data/token"
   }
 }
 ```
 
+`credential_file` names `..data/token` because the conventional `serviceaccount/token` is a
+symbolic link to it, and the host refuses a symbolic link as the last path component. The
+token must be a regular file of at most 8 KiB, either `0600` and owned by the running user,
+or exactly `0640` or `0440`, as the kubelet presents it to a pod with `fsGroup`: owned by
+the running user or root, with a group the process holds as its effective or a
+supplementary group. Any other mode with a bit for group or others is refused, among them a
+group-writable file, one with any bit for others, a setuid, setgid or sticky bit and owner
+execute beside group read, and so is a `0640` file whose group the process does not hold;
+every other credential file keeps the `0600` rule.
+
 The host admits a request only when the review authenticates the token for `audience` as
-`principal`. Any other answer is `unauthorized`. A review that fails, takes longer than
+an admitted service account. Name the accounts in exactly one of three ways:
+
+- `principal`: one account, `system:serviceaccount:<namespace>:<name>`, at most 128 bytes.
+- `principals`: a list of 1 to 64 such accounts. Each is admitted, and no other.
+- `service_accounts`: a namespace and a name pattern, such as
+  `{"namespace": "agents", "name": "*-agent"}`. The namespace is a literal DNS label, with
+  no wildcard. The name is 1 to
+  128 bytes of `a-z`, `0-9`, `-`, `.` and `*`, and `*` is its only wildcard: it matches any
+  run of characters, or none. The pattern must match the whole name, so `*-agent` admits
+  `coding-agent` but not `coding-agent-2`. With each `*` read as one letter, the pattern
+  must be a valid account name, and the whole account
+  `system:serviceaccount:<namespace>:<name>` must fit in 128 bytes. A pattern such as `-*`,
+  `*-` or `a..b`, which no account name can match, is refused.
+
+None of the three, more than one of them, an empty list or one longer than 64, an invalid
+entry and an empty or invalid pattern are refused at start, with a message that names the
+key. A key written with no value (`principals:` in YAML, `null` in JSON) is refused, not
+read as absent.
+
+A review that names any other account, another audience or no authenticated user is
+`unauthorized`. A review that fails, takes longer than
 5 seconds or cannot be reached is `unavailable`. In either case no operation runs. The host
 sends one review per request and keeps none. At most 8 reviews run at once: a request that
 arrives while 8 are under way is `unavailable` at once and sends no review, so a caller can
@@ -58,8 +89,8 @@ retry it. The host never logs the token. Its own token,
 used from the next review on. The host's service account needs the `system:auth-delegator`
 cluster role, or another role that may create `tokenreviews`. Under this profile
 `GET /v1/describe` is admitted the same way, and `POST /v1/invoke` answers `unsupported`.
-Callers invoke through `POST /v1alpha2/invoke`, which records the service account as the
-principal of every call.
+Callers invoke through `POST /v1alpha2/invoke`, which records the service account the
+review named, its username verbatim, as the principal of every call.
 
 Under `static-bearer`, a caller presents the service credential as a bearer token, reads the
 current descriptor with `GET /v1/describe` and names its revision in `POST /v1/invoke`:
@@ -125,6 +156,25 @@ way. The file has three members:
   - `definition`, a definition file, with `definitions_root`, the definitions checkout its
     source is under, `instance` and optionally `endpoint` and `profile`. The binary lowers
     the definition once at start, in a private temporary directory that it removes again.
+
+  `catalog.repositories`, optional, lists the repositories the instance's operations reach,
+  as `<owner>/<repo>`, for example `["example-org/service"]`. Entries are read as
+  [`git.repositories`](#git-relay) is: owners and names compare without case and a trailing
+  `.git`, in any case, is dropped. Start refuses an empty list, `null`, or an entry that is
+  not `<owner>/<repo>`.
+  With the list set:
+  - an operation whose input has both an `owner` and a `repo` member, a write included,
+    runs only for a listed repository. Any other repository is `not_found`, with the
+    message a repository the provider does not have gets, and the instance neither reads
+    its credential nor sends a request. A write is refused before the host records it, so
+    its key is not used;
+  - every other operation (a search, notifications, an organization listing, the user
+    read) is left out of the description, so the host answers `not_found`. A page
+    filtered to the listed repositories could be shorter than its page size, and a
+    caller walking the pages would stop early.
+
+  Without the list every described operation runs for any repository the credential
+  reaches.
 - `credential` names where the instance's credential document comes from. The only binding
   is `mounted_secret`. The document is the item `<directory>/<instance id>/<profile id>`,
   for example `gitlab.example-org/gitlab.pat`. Its content is the document the profile's
@@ -154,6 +204,35 @@ refuses:
 - an instance with alternative bindings;
 - with a grant file, a write whose answer carries a credential it created: the served host
   has nowhere to keep it.
+
+### The state directory
+
+`service.state` is the host's metadata directory. Start creates it with mode `0700` when it is
+absent and never changes an existing directory's mode. Start checks every directory from `/`
+down to `state`: each must be owned by the host user or root and must not be writable by group
+or others, and `state` itself must be owned by the host user with mode `0700`. The refusal names
+the first directory that fails and why, for example:
+
+```text
+service state cannot be opened for this instance: "/var/lib/connectors", an ancestor of state, is writable by group or others
+```
+
+For `state` itself it states the whole target: owned by the host user with mode `0700`, no
+group or other bits. A directory the host cannot open at all (one it has no search permission
+on, or a missing parent it cannot create in) refuses start with the closed text
+`service state cannot be opened for this instance`, without a name.
+
+A persistent volume whose root is `0777` therefore refuses start when it is mounted at
+`state` or above it, however private `state` is. Keep that root out of the path in one of
+these ways:
+
+- mount a subdirectory of the volume (`subPath`) as `state`: the host user's, mode `0700`;
+- mount a subdirectory of the volume as the parent of `state`: owned by the host user or root,
+  not group- or other-writable, and searchable by the host user;
+- have an init container set the volume root to `0755`, searchable by the host user, owned by
+  the host user or root, before the host starts.
+
+An `fsGroup` makes the volume group-writable, and it is refused the same way.
 
 ## Standing write grants
 
@@ -281,7 +360,9 @@ when the configuration has a fourth member, `git`:
 - `upstream` is the forge's git base over `https`. A repository is
   `<upstream>/<owner>/<repo>.git`. `ca_file`, when set, is the only root of its TLS.
 - `repositories` lists the relayed repositories as `<owner>/<repo>`. Any other repository is
-  `404`, and nothing is sent to the forge.
+  `404`, and nothing is sent to the forge. The relay reads this list only; operations read
+  [`catalog.repositories`](#catalog-instances), and neither list is read for the other. To
+  keep both to the same repositories, list them in both.
 - `ref_prefixes` lists the branch prefixes a push may update: `agent/` admits
   `refs/heads/agent/<name>`.
 - `push_limit_bytes` is the largest push the relay reads, 100 MiB by default and at most 1 GiB.

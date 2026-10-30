@@ -770,3 +770,358 @@ async fn a_served_definition_instance_describes_its_operations() {
     assert_eq!(status, 404, "{answer}\n{}", served.log());
     assert_eq!(provider.seen().len(), 1, "no write reached the provider");
 }
+
+/// The vendored source of a forge whose repository read and write take
+/// `owner` and `repo`, beside a search and the user read, which take neither.
+const REPOSITORY_OPENAPI: &str = r#"{"openapi":"3.0.3","info":{"title":"Fixture repository forge","version":"1"},
+"servers":[{"url":"https://forge.example.com/api/v4"}],
+"paths":{
+"/user":{"get":{"operationId":"getUser","responses":{"200":{"description":"ok","content":{"application/json":{"schema":{"type":"object","properties":{"id":{"type":"integer"}}}}}}}}},
+"/personal_access_tokens/self":{"get":{"operationId":"getTokenSelf","responses":{"200":{"description":"ok","content":{"application/json":{"schema":{"type":"object"}}}}}}},
+"/search/repositories":{"get":{"operationId":"searchRepositories","parameters":[{"name":"q","in":"query","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"ok","content":{"application/json":{"schema":{"type":"object"}}}}}}},
+"/repos/{owner}/{repo}":{"get":{"operationId":"getRepository","parameters":[{"name":"owner","in":"path","required":true,"schema":{"type":"string"}},{"name":"repo","in":"path","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"ok","content":{"application/json":{"schema":{"type":"object"}}}}}}},
+"/repos/{owner}/{repo}/issues":{"post":{"operationId":"createIssue","parameters":[{"name":"owner","in":"path","required":true,"schema":{"type":"string"}},{"name":"repo","in":"path","required":true,"schema":{"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"type":"object","properties":{"title":{"type":"string"}}}}}},"responses":{"201":{"description":"created","content":{"application/json":{"schema":{"type":"object"}}}}}}}
+}}"#;
+
+/// Lay out, in `served`'s jail, a definition of [`REPOSITORY_OPENAPI`] with
+/// a repository read, a search, the user read and a repository write.
+fn define_repository_forge(served: &Served) {
+    let defs = served.path("/srv/defs");
+    fs::create_dir_all(defs.join("upstream/forge")).unwrap();
+    fs::create_dir_all(defs.join("connectors")).unwrap();
+    let mut gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    gzip.write_all(REPOSITORY_OPENAPI.as_bytes()).unwrap();
+    fs::write(
+        defs.join("upstream/forge/openapi.json.gz"),
+        gzip.finish().unwrap(),
+    )
+    .unwrap();
+    let sha256 = hex::encode(Sha256::digest(REPOSITORY_OPENAPI.as_bytes()));
+    let definition = format!(
+        "schema: urn:beyond10x:connectors-definition:1\n\
+         source:\n  openapi: upstream/forge/openapi.json.gz\n  sha256: {sha256}\n\
+         base_url: https://{{hostname}}/api/v4\n\
+         config: {{hostname: {{type: string, default: forge.example.com}}}}\n\
+         auth:\n  forge.pat:\n    scheme: header\n    header: PRIVATE-TOKEN\n\
+         \x20   label: Fixture personal access token\n\
+         \x20   identity: {{path: user, kind: forge.user, subject: /id}}\n\
+         \x20   scopes: {{path: personal_access_tokens/self, pointer: /scopes, minimum: [api]}}\n\
+         operations:\n\
+         \x20 repo.get: {{op: getRepository, description: Read one repository}}\n\
+         \x20 repos.search: {{op: searchRepositories, description: Search repositories}}\n\
+         \x20 user.get: {{op: getUser, description: Read the user}}\n\
+         \x20 issue.create:\n    op: createIssue\n    effect: write\n    body: {{title: string!}}\n"
+    );
+    fs::write(defs.join("connectors/forge.yaml"), definition).unwrap();
+}
+
+/// The `catalog` member of a [`define_repository_forge`] instance, with
+/// `repositories` as `catalog.repositories` unless it is null.
+fn repository_catalog(provider: &Provider, repositories: Value) -> Value {
+    let mut catalog = json!({
+        "definition": "/srv/defs/connectors/forge.yaml",
+        "definitions_root": "/srv/defs",
+        "instance": "fixture",
+        "endpoint": provider.endpoint(),
+    });
+    if !repositories.is_null() {
+        catalog["repositories"] = repositories;
+    }
+    catalog
+}
+
+/// story:catalog-reads-stay-inside-the-instance-repositories: with
+/// `catalog.repositories` the served instance describes only the operations
+/// that take `owner` and `repo`, sends a read or a write only for a listed
+/// repository (case and `.git` aside), and answers any other repository as it
+/// answers a missing one, `not_found`, with no request to the provider.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_served_repository_list_bounds_reads_and_writes_to_its_repositories() {
+    let provider = Provider::new();
+    let grant = |id: &str, owner: &str| {
+        json!({
+            "id": id, "instance": "forge.fixture", "operation": "issue.create",
+            "target": [{"pointer": "/owner", "value": owner}],
+            "not_after_unix_ms": 4_000_000_000_000_i64, "max_per_hour": 5
+        })
+    };
+    let grants = json!({
+        "format": "connectors.standing-grants/1",
+        "grants": [grant("g-listed", "example-org"), grant("g-other", "other-org")],
+        "revoked": []
+    });
+    let mut served = Served::granted(
+        &provider,
+        "forge.fixture",
+        "forge.pat",
+        repository_catalog(&provider, json!(["Example-Org/Service.git"])),
+        &grants,
+    );
+    define_repository_forge(&served);
+    served.deliver("..2026_10_30_00_00_00.000000001", &document(TOKEN), 0o400);
+    served
+        .start()
+        .expect("the served binary starts with a repository list");
+
+    let descriptor = served.describe().await;
+    let mut listed = operations(&descriptor);
+    listed.sort();
+    assert_eq!(
+        listed,
+        vec!["issue.create".to_owned(), "repo.get".to_owned()],
+        "only the operations that take owner and repo are described"
+    );
+    let revision = descriptor["revision"].as_str().unwrap();
+
+    // A listed repository is read through the provider, which has no such
+    // repository: the answer of a missing repository.
+    let (status, missing) = served
+        .invoke(
+            revision,
+            "read-listed",
+            "repo.get",
+            json!({"owner": "example-org", "repo": "service"}),
+        )
+        .await;
+    assert_eq!(status, 404, "{missing}\n{}", served.log());
+    assert_eq!(missing["error"]["code"], "not_found", "{missing}");
+    assert_eq!(
+        provider.seen(),
+        vec![Seen {
+            method: "GET".into(),
+            route: "/api/v4/repos/example-org/service".into(),
+            token: Some(TOKEN.into()),
+        }]
+    );
+
+    // Any other repository: the same answer, and nothing is sent.
+    for (id, input) in [
+        (
+            "other-owner",
+            json!({"owner": "other-org", "repo": "service"}),
+        ),
+        (
+            "other-repo",
+            json!({"owner": "example-org", "repo": "other"}),
+        ),
+        (
+            "traversal",
+            json!({"owner": "example-org", "repo": "service/../../other-org/service"}),
+        ),
+    ] {
+        let (status, answer) = served.invoke(revision, id, "repo.get", input).await;
+        assert_eq!(status, 404, "{id}: {answer}\n{}", served.log());
+        assert_eq!(answer["error"], missing["error"], "{id}: {answer}");
+    }
+    // Operations without both members are not described, so not served.
+    for (id, operation, input) in [
+        ("search", "repos.search", json!({"q": "service"})),
+        ("user", "user.get", json!({})),
+    ] {
+        let (status, answer) = served.invoke(revision, id, operation, input).await;
+        assert_eq!(status, 404, "{id}: {answer}");
+        assert_eq!(answer["error"]["code"], "not_found", "{id}: {answer}");
+    }
+    assert_eq!(
+        provider.seen().len(),
+        1,
+        "no other read reached the provider"
+    );
+
+    // A write takes the same check: one the grant covers, to a repository
+    // the list does not name, is `not_found` before the host records it, with
+    // no request.
+    let keyed = |request_id: &str, key: &str, owner: &str, repo: &str| {
+        json!({
+            "version": "v1alpha2", "request_id": request_id, "operation": "issue.create",
+            "revision": revision, "idempotency_key": key,
+            "input": {"owner": owner, "repo": repo, "body": {"title": "Fixture issue"}},
+        })
+    };
+    let route = "/v1alpha2/invoke";
+    // The key is not used up: the same key again is the same refusal, not a
+    // replay of a recorded attempt.
+    for request_id in ["w-other", "w-other-again"] {
+        let (status, refused) = served
+            .send(
+                reqwest::Method::POST,
+                route,
+                Some(&keyed(request_id, "k-other", "other-org", "service")),
+            )
+            .await;
+        assert_eq!(status, 404, "{request_id}: {refused}\n{}", served.log());
+        assert_eq!(
+            refused["error"], missing["error"],
+            "{request_id}: {refused}"
+        );
+        assert!(refused["mutation"].is_null(), "{request_id}: {refused}");
+        assert!(refused["audit_ref"].is_null(), "{request_id}: {refused}");
+    }
+    let writes = || {
+        provider
+            .seen()
+            .into_iter()
+            .filter(|seen| seen.method == "POST")
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        writes(),
+        vec![],
+        "no write to an unlisted repository is sent"
+    );
+    // To the listed repository it is sent.
+    let (_, answer) = served
+        .send(
+            reqwest::Method::POST,
+            route,
+            Some(&keyed("w-listed", "k-listed", "example-org", "Service")),
+        )
+        .await;
+    assert_eq!(
+        writes(),
+        vec![Seen {
+            method: "POST".into(),
+            route: "/api/v4/repos/example-org/Service/issues".into(),
+            token: Some(TOKEN.into()),
+        }],
+        "{answer}\n{}",
+        served.log()
+    );
+}
+
+/// A `catalog.repositories` that is null, empty or invalid refuses start;
+/// without the key every operation is described and any repository is read.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_served_repository_list_that_is_empty_or_invalid_refuses_start() {
+    let provider = Provider::new();
+    for repositories in [
+        Value::Null,
+        json!([]),
+        json!(["example-org"]),
+        json!(["example-org/"]),
+        json!(["example-org/service/extra"]),
+        json!(["../service"]),
+    ] {
+        let mut served = Served::new(&provider, "forge.fixture", "forge.pat", {
+            let mut catalog = repository_catalog(&provider, Value::Null);
+            catalog["repositories"] = repositories.clone();
+            catalog
+        });
+        define_repository_forge(&served);
+        served.deliver("..2026_10_30_00_00_00.000000001", &document(TOKEN), 0o400);
+        let Err(log) = served.start() else {
+            panic!("{repositories} must refuse start");
+        };
+        assert!(log.contains("catalog: "), "{repositories}: {log}");
+        assert!(log.contains("repositor"), "{repositories}: {log}");
+    }
+
+    let mut served = Served::new(
+        &provider,
+        "forge.fixture",
+        "forge.pat",
+        repository_catalog(&provider, Value::Null),
+    );
+    define_repository_forge(&served);
+    served.deliver("..2026_10_30_00_00_00.000000001", &document(TOKEN), 0o400);
+    served
+        .start()
+        .expect("the served binary starts without a list");
+    let descriptor = served.describe().await;
+    let mut listed = operations(&descriptor);
+    listed.sort();
+    assert_eq!(listed, vec!["repo.get", "repos.search", "user.get"]);
+    let revision = descriptor["revision"].as_str().unwrap();
+    let (status, answer) = served
+        .invoke(
+            revision,
+            "read-any",
+            "repo.get",
+            json!({"owner": "other-org", "repo": "service"}),
+        )
+        .await;
+    assert_eq!(status, 404, "{answer}\n{}", served.log());
+    assert_eq!(
+        provider.seen(),
+        vec![Seen {
+            method: "GET".into(),
+            route: "/api/v4/repos/other-org/service".into(),
+            token: Some(TOKEN.into()),
+        }]
+    );
+}
+
+/// Adversary (story:catalog-reads-stay-inside-the-instance-repositories):
+/// a configuration that names `catalog.repositories` but gives it no list
+/// (`repositories:` with nothing after it in YAML, or a template that
+/// renders an empty value as `null`) is not a list, so it must refuse start
+/// as `git.repositories: null` does; it must never serve every repository
+/// the credential reaches.
+#[tokio::test(flavor = "multi_thread")]
+async fn adversary_a_null_repository_list_refuses_start_and_never_fails_open() {
+    let provider = Provider::new();
+    let mut catalog = repository_catalog(&provider, Value::Null);
+    catalog["repositories"] = Value::Null;
+    let mut served = Served::new(&provider, "forge.fixture", "forge.pat", catalog);
+    define_repository_forge(&served);
+    served.deliver("..2026_10_30_00_00_00.000000001", &document(TOKEN), 0o400);
+    if served.start().is_ok() {
+        let descriptor = served.describe().await;
+        let revision = descriptor["revision"].as_str().unwrap().to_owned();
+        let (status, answer) = served
+            .invoke(
+                &revision,
+                "read-unlisted",
+                "repo.get",
+                json!({"owner": "other-org", "repo": "service"}),
+            )
+            .await;
+        panic!(
+            "`catalog.repositories: null` started and serves every repository: \
+             described {:?}; repo.get other-org/service answered {status} {answer}; \
+             the provider saw {:?}",
+            operations(&descriptor),
+            provider.seen(),
+        );
+    }
+}
+
+/// Adversary: names compare without case and a trailing `.git` is dropped
+/// (docs/running-services.md, Catalog instances), so the entry
+/// `Example-Org/Service.GIT` names the repository `example-org/service`, and
+/// a read of it reaches the provider.
+#[tokio::test(flavor = "multi_thread")]
+async fn adversary_an_uppercase_git_suffix_in_the_list_still_names_the_repository() {
+    let provider = Provider::new();
+    let mut served = Served::new(
+        &provider,
+        "forge.fixture",
+        "forge.pat",
+        repository_catalog(&provider, json!(["Example-Org/Service.GIT"])),
+    );
+    define_repository_forge(&served);
+    served.deliver("..2026_10_30_00_00_00.000000001", &document(TOKEN), 0o400);
+    served
+        .start()
+        .expect("the served binary starts with the list");
+    let descriptor = served.describe().await;
+    let revision = descriptor["revision"].as_str().unwrap().to_owned();
+    let (status, answer) = served
+        .invoke(
+            &revision,
+            "read-listed",
+            "repo.get",
+            json!({"owner": "example-org", "repo": "service"}),
+        )
+        .await;
+    assert_eq!(status, 404, "{answer}\n{}", served.log());
+    assert_eq!(
+        provider.seen(),
+        vec![Seen {
+            method: "GET".into(),
+            route: "/api/v4/repos/example-org/service".into(),
+            token: Some(TOKEN.into()),
+        }],
+        "the listed repository is read: {answer}"
+    );
+}

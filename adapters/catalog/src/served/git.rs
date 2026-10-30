@@ -30,7 +30,7 @@
 //! report is relayed to the caller unchanged, and each command is logged as
 //! `applied`, `refused` or `unknown`. A push whose answer is lost is
 //! `unknown`, the caller is told so, and it is never sent again.
-use super::Upstream;
+use super::{Repository, Upstream};
 use axum::{
     Router,
     body::{Body, Bytes},
@@ -133,13 +133,6 @@ fn default_check_seconds() -> u64 {
     DEFAULT_CHECK_SECONDS
 }
 
-/// One configured repository.
-#[derive(Clone)]
-struct Repository {
-    owner: String,
-    name: String,
-}
-
 impl Repository {
     fn path(&self) -> String {
         format!("{}/{}", self.owner, self.name)
@@ -168,17 +161,6 @@ pub struct Relay {
 
 fn invalid(message: &str) -> Error {
     Error::invalid(format!("git: {message}"))
-}
-
-/// `1..=100` bytes of letters, digits, `.`, `_` and `-`, not `.` or `..`.
-fn valid_segment(segment: &str) -> bool {
-    !segment.is_empty()
-        && segment.len() <= 100
-        && segment != "."
-        && segment != ".."
-        && segment
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
 }
 
 /// A ref name git itself would accept (git-check-ref-format), restricted to
@@ -229,23 +211,7 @@ impl Relay {
                 "upstream must be an https URL without credentials, query or fragment",
             ));
         }
-        let mut repositories = Vec::new();
-        for entry in &config.repositories {
-            let Some((owner, name)) = entry.split_once('/') else {
-                return Err(invalid("a repository is <owner>/<repo>"));
-            };
-            let name = name.strip_suffix(".git").unwrap_or(name);
-            if !valid_segment(owner) || !valid_segment(name) {
-                return Err(invalid("a repository is <owner>/<repo>"));
-            }
-            repositories.push(Repository {
-                owner: owner.to_owned(),
-                name: name.to_owned(),
-            });
-        }
-        if repositories.is_empty() {
-            return Err(invalid("repositories lists at least one repository"));
-        }
+        let repositories = super::repositories(&config.repositories).map_err(invalid)?;
         if config.ref_prefixes.is_empty()
             || !config
                 .ref_prefixes
@@ -328,14 +294,9 @@ impl Relay {
         })
     }
 
-    /// The configured repository `owner`/`repo` names, with or without
-    /// `.git`; owners and names compare without case, as the forge's do.
+    /// The configured repository `owner`/`repo` names ([`super::listed`]).
     fn repository(&self, owner: &str, repo: &str) -> Option<Repository> {
-        let repo = repo.strip_suffix(".git").unwrap_or(repo);
-        self.repositories
-            .iter()
-            .find(|r| r.owner.eq_ignore_ascii_case(owner) && r.name.eq_ignore_ascii_case(repo))
-            .cloned()
+        super::listed(&self.repositories, owner, repo).cloned()
     }
 
     fn url(&self, repository: &Repository, suffix: &str) -> String {
