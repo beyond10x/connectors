@@ -333,6 +333,9 @@ fn execute(args: Args) -> Result<()> {
         for path in &imported.written {
             println!("{}", path.display());
         }
+        for dropped in &imported.dropped {
+            eprintln!("dropped {dropped}");
+        }
         return Ok(());
     }
     if let Action::Definition {
