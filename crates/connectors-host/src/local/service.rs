@@ -263,6 +263,18 @@ impl ServiceState {
         Self::open_bounded(path, instance, adapter, revision, PENDING_LIMIT)
     }
 
+    /// [`Self::open`], naming the state directory or ancestor whose
+    /// admission refused start, and why. Every other failure is the closed
+    /// [`Failure`] `open` returns.
+    pub fn open_explained(
+        path: &Path,
+        instance: &str,
+        adapter: &str,
+        revision: &str,
+    ) -> std::result::Result<Self, fs::Refusal> {
+        Self::open_bounded_explained(path, instance, adapter, revision, PENDING_LIMIT)
+    }
+
     fn open_bounded(
         path: &Path,
         instance: &str,
@@ -270,12 +282,33 @@ impl ServiceState {
         revision: &str,
         pending_limit: usize,
     ) -> Result<Self> {
+        Self::open_bounded_explained(path, instance, adapter, revision, pending_limit)
+            .map_err(fs::Refusal::failure)
+    }
+
+    fn open_bounded_explained(
+        path: &Path,
+        instance: &str,
+        adapter: &str,
+        revision: &str,
+        pending_limit: usize,
+    ) -> std::result::Result<Self, fs::Refusal> {
         for value in [instance, adapter, revision] {
             if !connectors_core::valid_id(value) {
-                return Err(Failure::InvalidConfiguration);
+                return Err(Failure::InvalidConfiguration.into());
             }
         }
-        drop(fs::directory(path, true, true)?);
+        drop(fs::explained_directory(path, true, true)?);
+        Self::opened(path, instance, adapter, revision, pending_limit).map_err(fs::Refusal::Failure)
+    }
+
+    fn opened(
+        path: &Path,
+        instance: &str,
+        adapter: &str,
+        revision: &str,
+        pending_limit: usize,
+    ) -> Result<Self> {
         drop(Metadata::initialize(path)?);
         record_instance(path, instance, adapter, revision)?;
         Ok(Self {
