@@ -128,13 +128,115 @@ fails a check answers `unavailable`, and nothing is sent to the provider. Start 
 item it cannot read. The binding exists on Linux only; elsewhere start answers
 `unsupported`.
 
-The served instance lists and runs its reads only. A catalog write is not in its description,
-and invoking one answers `not_found` before anything is recorded or sent. Start also refuses:
+Without a grant file the served instance lists and runs its reads only. A catalog write is
+not in its description, and invoking one answers `not_found` before anything is recorded or
+sent. With `service.standing_grants` set, the description lists the instance's writes too,
+and each runs only as [standing write grants](#standing-write-grants) describe. Start also
+refuses:
 
 - an instance that uses more than one profile;
 - an instance whose profile's material is acquired by OAuth (the CLI writes that, nothing
   mounts it);
-- an instance with alternative bindings.
+- an instance with alternative bindings;
+- with a grant file, a write whose answer carries a credential it created: the served host
+  has nowhere to keep it.
+
+## Standing write grants
+
+Standing grants are optional. A host without `standing_grants` in its service configuration
+is unchanged: `POST /v1alpha2/invoke` dispatches a write with no key, `idempotency_key` is
+refused as `unsupported`, and a served catalog instance lists its reads only.
+
+With `standing_grants` set, the host runs a write (an operation with the `mutation` profile)
+only under a standing grant: a file the operator mounts that names, per operation, the
+targets a caller may write to and how often. There is no per-call approval. The rules are in
+the [service contract](../contracts/service/compatibility.md#21-first-binding-post-v1alpha2invoke),
+"Keyed writes under a standing grant".
+
+Point the host at the file with `standing_grants` in its service configuration, here the
+`service` member of the catalog example above. It requires `state`; without it the host does
+not start.
+
+```json
+{
+  "instance": "gitlab.example-org",
+  "listen": "0.0.0.0:7104",
+  "service_credential": {"kind": "file", "path": "/var/run/connectors/service-token"},
+  "state": "/var/lib/connectors/state",
+  "standing_grants": "/var/run/connectors/grants/grants.json"
+}
+```
+
+```json
+{
+  "format": "connectors.standing-grants/1",
+  "grants": [
+    {
+      "id": "issues-in-widgets",
+      "instance": "gitlab.example-org",
+      "operation": "issue.create",
+      "target": [{"pointer": "/id", "value": "7"}],
+      "not_after_unix_ms": 1798761600000,
+      "max_per_hour": 20
+    }
+  ],
+  "revoked": []
+}
+```
+
+A grant covers a write when it names the host's instance and the operation, is not listed
+in `revoked`, its `not_after_unix_ms` is still in the future, and every `target` member holds
+in the input: the JSON pointer finds that exact value. `max_per_hour` (1 to 10,000) caps the
+writes admitted under the grant in any 3,600 seconds. A file holds at most 256 grants, each
+with 1 to 16 target members.
+
+The host reads the file on every write, so an edit, a revocation or a removed grant applies
+from the next call on, without a restart. With no file at the path, no write is admitted.
+The file may be a plain file or a key of a Kubernetes Secret or ConfigMap volume: on Linux
+the host reads the volume's `grants.json -> ..data/grants.json` link through `..data`, as
+the [`mounted_secret` custody binding](local-mounted-secret-custody.md) reads its items, and
+follows no other symlink. The host refuses the file, and answers `unavailable` without
+sending anything, when any directory above it is owned by a user other than the running
+user or root or is writable by group or others (its own directory may be, on a read-only
+mount such as a volume's), when it is reached through any other symlink or is not a regular
+file, is writable by group or others, is owned by a user other than the running user or
+root, is larger than 64 KiB, or is malformed. Whoever can change the file can widen what
+the instance writes, as whoever can change its mounted credential can: mount it read-only,
+with mode `0400`, `0440` or `0644` on a volume and `0400` or `0600` otherwise.
+
+The caller sends every write with `idempotency_key`, a string of at most 256 bytes it chooses
+per intended effect. The host answers, before anything is recorded or sent:
+
+| Request | Answer |
+|---|---|
+| A write without `idempotency_key` | `invalid_input` (400) |
+| `idempotency_key` on a read | `unsupported` (400) |
+| A key already used for a different operation or input | `idempotency_conflict` (409) |
+| A write no grant covers, or any write with no file at the path | `approval_required` (403) |
+| A covering grant has used its hour | `rate_limited` (429), with `retry_after_seconds` |
+| The grant file or the host's state cannot be read | `unavailable` (503) |
+| A write on `POST /v1/invoke`, which records no attempt and reads no grant | `unsupported` (501) |
+
+A write that passes is recorded as one attempt and sent at most once. Sending the same key
+and input again never sends again: it answers the original attempt's outcome, marked
+`replayed: true`, and checks no grant, so a revoked grant does not hide what already
+happened. If the original is still running, the repeat waits up to 25 seconds, without
+taking one of the host's in-flight slots, and then answers `outcome_unknown`; at most 4
+repeats wait on one write, and a fifth answers `outcome_unknown` at once. To answer a
+replay, the host keeps an applied write's result, up to 64 KiB, in its `state` directory; a
+replay of a larger one answers `capacity` and still reports the write as applied. The host
+admits requests with one key one at a time, so concurrent requests with one key make one
+provider request and take one use of the grant: the others are replays, or
+`idempotency_conflict` when their input differs. Keys and the hourly counts are kept in the
+host's `state` directory (`standing-grants.sqlite3`, mode `0600`) and survive a restart; a
+key is never forgotten, so it is never admitted for another request. A write that was in
+flight when the host stopped stays pending: its key answers `outcome_unknown` at once and is
+not sent again.
+
+`connectors invoke` sends `POST /v1/invoke` with no key, so on a host with standing grants it
+runs reads only. A Rust caller sends a keyed write with `Client::invoke_v1alpha2_keyed`;
+`Client::invoke_v1alpha2` sends no key, which such a host refuses for a write as
+`invalid_input`.
 
 ## Supported surfaces
 
@@ -142,7 +244,7 @@ and invoking one answers `not_found` before anything is recorded or sent. Start 
 |---|---|---|
 | Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover`, optionally `helm_releases.history`/`.status`/`.values`/`.manifest` | Kubernetes API; namespace/kind restrictions; bearer token and CA; Helm release reads need their own `helm_release_reads` selection |
 | SQL | `schema.list`, `query.read`, `database.list`, `table.list`, `table.describe`, `index.list` | PostgreSQL or MySQL; explicit role or user and database; read-only transactions or sessions and deadlines |
-| Catalog | The instance's reads | The provider's HTTPS API; one profile; credential document from a mounted file |
+| Catalog | The instance's reads; its writes under a standing grant file | The provider's HTTPS API; one profile; credential document from a mounted file |
 
 SQL uses the `postgresql-native-text` profile: column names and native type names
 accompany rows of strings or JSON null. Exact numeric, array, timestamp, and JSON
@@ -173,5 +275,6 @@ the request budget includes cleanup. Remote termination cannot be guaranteed aft
 a network partition or process loss. See the [service contract](../contracts/service/v1alpha1/semantics.md)
 for the exact budgets. Live timeout, caller-drop and TLS checks run in the SQL adapter's ignored tests.
 
-No service in this slice advertises OAuth acquisition, writes, durable events, process
-execution, or media sessions. Those remain separate contracts in the full design.
+No service in this slice advertises OAuth acquisition, writes outside a standing grant,
+durable events, process execution, or media sessions. Those remain separate contracts in
+the full design.

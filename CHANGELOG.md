@@ -70,6 +70,39 @@ No breaking changes.
   from the next read on. A missing or refused item answers `unavailable` and sends nothing. The
   served host lists and runs the instance's reads only; a catalog write is not offered. See
   [Run connector services](docs/running-services.md#catalog-instances).
+- Opt-in keyed writes under a standing grant on a served host
+  (story:served-keyed-writes-under-a-standing-approval). A host whose service configuration
+  has no `standing_grants` is unchanged: a write on `POST /v1alpha2/invoke` is dispatched
+  unkeyed and `idempotency_key` is still `unsupported`. Setting `standing_grants` (it requires
+  `state`) names a `connectors.standing-grants/1` file the operator mounts; each grant names the
+  instance, one operation, the input members a write must hold (a JSON pointer and its exact
+  value), an expiry and `max_per_hour`. On such a host every write on `POST /v1alpha2/invoke`
+  needs `idempotency_key` and a covering grant, and `POST /v1/invoke`, which records no attempt,
+  refuses writes as `unsupported`. The host reads the file on every write, so an edit or a
+  revocation applies from the next call on. The file may be a key of a Kubernetes Secret or
+  ConfigMap volume (on Linux its `..data` link is read as the `mounted_secret` custody binding
+  reads an item); the host refuses it as `unavailable` when it is reached through any other
+  symlink or a directory another user can write, is writable by group or others, owned by
+  another user than the host's or root, over 64 KiB or malformed. A write without
+  `idempotency_key` is `invalid_input`, a key used for another request `idempotency_conflict`,
+  a write no grant covers `approval_required`, a grant over its hour `rate_limited` with
+  `retry_after_seconds`; none of them records an attempt or reaches the provider. The same key
+  and input again replays the original outcome with `replayed: true` and never sends again;
+  the host admits requests with one key one at a time, so concurrent requests with one key
+  make one provider request and take one grant use. A replay of a write still running waits
+  up to 25 s without holding an in-flight slot, at most 4 per write; a further one, or one
+  whose write a restart interrupted, answers `outcome_unknown` at once. An applied keyed write
+  keeps its provider result, up to 64 KiB, for the replay; a replay of a larger result answers
+  `capacity`, with the write still reported as applied. Keys and hourly counts survive a
+  restart in `standing-grants.sqlite3` (mode 0600); keys do not expire. With a grant file,
+  `connectors-catalog-provider --config` lists and runs the instance's writes too; without one
+  it serves reads only, as before. Rust callers send a key with the new
+  `Client::invoke_v1alpha2_keyed`; `Client::invoke_v1alpha2` is unchanged. Contract:
+  `contracts/service/compatibility.md` § 2.1, "Keyed writes under a standing grant"; model:
+  `ess/domains/standing_approvals.yaml`; operator guide:
+  [Standing write grants](docs/running-services.md#standing-write-grants). Scenarios added:
+  `v1alpha2-invoke-keyed-write-under-standing-grant`, `v1alpha2-invoke-keyed-replay`,
+  `v1alpha2-invoke-write-outside-grant-refused`.
 
 ### Fixed
 
