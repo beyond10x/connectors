@@ -26,6 +26,10 @@ commands that called a standalone service are gone.
 - `instances list` items no longer carry `adapter` or `adapter_id`: each is `connector`,
   `instance`, `instance_id`, `startup` and `restart`. An invoke result carries no `adapter`
   member; it names `connector` and `instance`.
+- A legacy catalog entry is named, in `instances list` and every selection, by the connector
+  `setup migrate` derives for it. `--connector catalog --instance <alias>` and the target
+  `catalog/<alias>` no longer select such an entry; they are `not_found`. Name it as
+  `<connector>/<alias>`, or keep the deprecated `--adapter <alias>`.
 
 ### Added
 
@@ -79,8 +83,6 @@ commands that called a standalone service are gone.
 - `connections revalidate` and `revoke` given the instance's configuration revision in place of a
   connection revision are `invalid_input` at `arguments`, exit status 2; any other stale revision
   stays `lifecycle_conflict`.
-- A legacy catalog entry is named, in `instances list` and every selection, by the connector
-  `setup migrate` derives for it.
 - `--adapter` on a command that takes none, such as `invoke`, is a parse refusal without a
   deprecation notice.
 - `connectors-build live-read-loop` invokes each read as `invoke <connector>/<instance>`.

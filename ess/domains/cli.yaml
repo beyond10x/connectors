@@ -720,9 +720,9 @@ types:
   # `definition`, or the moved `definition-<16 hex>` the file resolves to, in the
   # configuration, or whose instance id an entry there already uses; the configured
   # one is never replaced. legacy_entry_unmigrated (story:connectors-do-short-invocation):
-  # a selection names a legacy `[adapters.<alias>]` entry of the catalog provider by
-  # the name `catalog` gave it (an `invoke` target `catalog/<alias>`, or `--connector
-  # catalog --instance <alias>`) and `setup migrate` derives no connector for it, so it
+  # a selection names a legacy `[adapters.<alias>]` entry of the built-in provider by
+  # the name that provider gave it (an `invoke` target `<provider>/<alias>`, or
+  # `--connector <provider> --instance <alias>`) and `setup migrate` derives no connector for it, so it
   # is no instance; `setup migrate` reports why it stays. It names the rule only, never
   # a path or OS text.
   - name: connectors.cli.ConfigurationRule
@@ -1177,8 +1177,8 @@ types:
       - {name: limit, type: "Optional<Integer>"}
       - {name: cursor, type: "Optional<String>"}
   # story:connectors-do-short-invocation: `instances list` names each instance by its
-  # connector and instance only, a legacy `[adapters.<alias>]` entry of the catalog
-  # provider by the connector `setup migrate` derives for it. A legacy catalog entry
+  # connector and instance only, a legacy `[adapters.<alias>]` entry of the built-in
+  # provider by the connector `setup migrate` derives for it. A legacy built-in entry
   # no connector is derived for is no instance: it is left out of adapters and its
   # alias is listed, sorted, in unmigrated, present only when there is one.
   - name: connectors.cli.AdapterListResult
