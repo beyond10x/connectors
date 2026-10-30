@@ -63,16 +63,19 @@ commands that called a standalone service are gone.
   replacement is a `[connectors.<connector>]` instance.
 - Zendesk read `ticket.audits` (`ListAuditsForTicket`) returns one ticket's audits by cursor
   (`page[size]`, `page[after]`). Each audit carries its author, time, via channel and source, and
-  its events, field changes included. A walk ends on a page with `meta.has_more` false, with no
-  `meta.after_cursor`, or with no audits. Sending `include_boundary_indicators: true` is
+  its events, field changes included. When `meta.has_more` is present it decides the walk: false
+  ends it, and true continues even past an empty page and is an error without
+  `meta.after_cursor`. Without `meta.has_more`, a page with no `meta.after_cursor` or no audits
+  ends the walk. A cursor seen before is an error. Sending `include_boundary_indicators: true` is
   recommended so that pages carry `has_more`. The catalog inventory now expands a deepObject
   `page` that is either an offset number or cursor pairs into its cursor pairs.
 
 ### Changed
 
-- Zendesk `ticket.comments`: a walk now also ends on a page with no `meta.after_cursor` or with no
-  comments, not only on `meta.has_more` false, which the pinned API document never declares for
-  comments.
+- Zendesk `ticket.comments`: the walk follows the rule of `ticket.audits`. `meta.has_more`
+  decides when present; without it, a page with no `meta.after_cursor` or no comments ends the
+  walk; a cursor seen before is an error. Before, it ended only on `meta.has_more` false, which the
+  pinned API document never declares for comments.
 - `connections revalidate` and `revoke` given the instance's configuration revision in place of a
   connection revision are `invalid_input` at `arguments`, exit status 2; any other stale revision
   stays `lifecycle_conflict`.
