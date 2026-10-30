@@ -7,7 +7,7 @@ title: The definition lowerer reads rate_limit_headers, query_fixed, query_folds
 summary: A published GitHub definition lowers, and install admits exactly what the lowerer reads (D247)
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T03:14:34Z", actor: "human:timo", revision: 2, executor: "agent:conn-d243-c1", correlation: "wave-d243-c1"}
 - {from: "proposed", to: "active", at: "2026-10-30T03:14:34Z", actor: "human:timo", revision: 3, executor: "agent:conn-d243-c1", correlation: "wave-d243-c1"}
@@ -43,7 +43,7 @@ In `cargo test -p connectors-catalog`:
 - `query_folds_reach_the_selection`
 - `embedded_text_reaches_the_selection`
 - `the_released_github_definition_lowers`: connectors-definitions 0.5.2 `connectors/github.yaml`,
-  byte for byte, lowers against its pinned OpenAPI source, and every one of its 12 operations is
+  byte for byte, lowers against its pinned OpenAPI source, and every one of its 10 operations is
   in the lowered selection.
 
 D247, in a test target that links both crates:
