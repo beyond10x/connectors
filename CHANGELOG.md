@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.62.0 — 2026-10-30
+
+A served catalog instance takes a GitHub App credential, admits a Kubernetes service account,
+runs writes under a standing grant when asked to, and relays git smart-HTTP, so an agent pod
+clones and pushes with no forge credential of its own. The lowerer reads the four features
+connectors-definitions 0.5.2 publishes.
 
 No breaking changes.
 
@@ -121,6 +126,21 @@ No breaking changes.
   request: a read the provider had answered came back `internal` (HTTP 500) with no final audit
   observation, and an admission refusal closed the connection with no answer. Every binary that
   uses the shared log setup now drops a log line it cannot write.
+
+### Limitations
+
+- Keyed writes under a standing grant stay opt-in (D269). A host without `standing_grants`
+  dispatches unkeyed writes as before; the default changes only after the consumers send
+  `Client::invoke_v1alpha2_keyed`, so no consumer breaks.
+- Keyed attempts on the HTTP host never expire, and a keyed write cut off by a restart is not
+  recovered: its replay answers `outcome_unknown`.
+- `connectors-oauth2` and the local host's OAuth handling still read a token answer that is a
+  JSON array field by field; only the catalog provider refuses it.
+- The lowerer and the catalog engine check a definition's members separately; one shared check
+  is still to come.
+- The git relay's `pre_push_check` runs as the instance's user, so it can read what the instance
+  reads; configure a check that inspects the pushed objects and never runs them
+  (story:git-relay-pre-push-check-sandbox).
 
 ## 0.61.0 — 2026-10-30
 

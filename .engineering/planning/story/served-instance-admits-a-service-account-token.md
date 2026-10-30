@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:served-instance-admits-a-service-account-token
 kind: story
-status: active
+status: implemented
 title: A served catalog instance admits a projected service-account token for one configured principal
 summary: A v1alpha2 admission profile checked with TokenReview, and catalog providers on the served host
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T03:14:35Z", actor: "human:timo", revision: 2, executor: "agent:conn-d243-c1", correlation: "wave-d243-c1"}
 - {from: "proposed", to: "active", at: "2026-10-30T03:14:35Z", actor: "human:timo", revision: 3, executor: "agent:conn-d243-c1", correlation: "wave-d243-c1"}
+- {from: "active", to: "implemented", at: "2026-10-30T10:11:27Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}, executor: "agent:conn-d265-c4", correlation: "wave-d265-c4"}
 ---
 ## Outcome
 

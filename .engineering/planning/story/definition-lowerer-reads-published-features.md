@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:definition-lowerer-reads-published-features
 kind: story
-status: active
+status: implemented
 title: The definition lowerer reads rate_limit_headers, query_fixed, query_folds and embedded_text
 summary: A published GitHub definition lowers, and install admits exactly what the lowerer reads (D247)
 relations:
 - serves: vision:independent-contract-adapters
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T03:14:34Z", actor: "human:timo", revision: 2, executor: "agent:conn-d243-c1", correlation: "wave-d243-c1"}
 - {from: "proposed", to: "active", at: "2026-10-30T03:14:34Z", actor: "human:timo", revision: 3, executor: "agent:conn-d243-c1", correlation: "wave-d243-c1"}
+- {from: "active", to: "implemented", at: "2026-10-30T10:11:27Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}, executor: "agent:conn-d265-c4", correlation: "wave-d265-c4"}
 ---
 ## Outcome
 

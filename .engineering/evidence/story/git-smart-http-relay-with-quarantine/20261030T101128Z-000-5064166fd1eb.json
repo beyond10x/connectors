@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T10:11:28Z",
+  "actor": "human:timo",
+  "artifact": "story:git-smart-http-relay-with-quarantine",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "local 0.62.0 gate on wave/d265-c4 503d55ea9: connectors-catalog-provider and connectors-host tests (1127 passed), clippy, drift checks, ESS and AEP validate",
+    "reference": "adapters/catalog/tests/git_relay.rs"
+  }
+}

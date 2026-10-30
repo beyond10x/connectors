@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:catalog-github-app-installation-token
 kind: story
-status: active
+status: implemented
 title: A GitHub App installation-token scheme under mounted custody
 summary: 'github_app: a 9-minute RS256 JWT exchanged for an installation token kept in memory, never returned'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T03:14:34Z", actor: "human:timo", revision: 2, executor: "agent:conn-d243-c1", correlation: "wave-d243-c1"}
 - {from: "proposed", to: "active", at: "2026-10-30T03:14:35Z", actor: "human:timo", revision: 3, executor: "agent:conn-d243-c1", correlation: "wave-d243-c1"}
+- {from: "active", to: "implemented", at: "2026-10-30T10:11:27Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}, executor: "agent:conn-d265-c4", correlation: "wave-d265-c4"}
 ---
 ## Outcome
 
