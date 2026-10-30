@@ -51,8 +51,10 @@ use serde_json::Value;
 use std::{
     collections::BTreeSet,
     path::{Path, PathBuf},
+    sync::Arc,
     time::{Duration, Instant},
 };
+mod git;
 
 /// An `external_write` operation's profile (contracts/operations/v1alpha1/
 /// semantics.md § 2); a read never carries it.
@@ -69,6 +71,10 @@ pub struct Configuration {
     pub service: ServiceConfigV3,
     pub catalog: Catalog,
     pub credential: CredentialConfig,
+    /// The git smart-HTTP relay (`git`), served beside the operations when
+    /// present.
+    #[serde(default)]
+    pub git: Option<git::GitConfig>,
 }
 
 /// Which catalog instance is served: exactly one of a shipped `connector`, a
@@ -119,7 +125,52 @@ pub async fn run(path: &Path) -> Result<()> {
             "service.instance must be the catalog instance's id",
         ));
     }
-    connectors_host::server::serve(config.service, std::sync::Arc::new(bridge)).await
+    let relay = match config.git {
+        None => None,
+        Some(git) => {
+            // The relay's own instance: its token cache is its own, and the
+            // bridge keeps the one it dispatches with.
+            let upstream = Upstream {
+                local: config.catalog.local()?,
+                credential: Mounted {
+                    directory: config.credential.directory.clone(),
+                    alias: bridge.credential.alias.clone(),
+                    profile: bridge.credential.profile.clone(),
+                },
+            };
+            Some(Arc::new(git::Relay::new(git, Arc::new(upstream))?))
+        }
+    };
+    connectors_host::server::serve_with_routes(config.service, Arc::new(bridge), |admission| {
+        match relay {
+            Some(relay) => git::routes(relay, admission),
+            None => axum::Router::new(),
+        }
+    })
+    .await
+}
+
+/// The forge token of the instance's profile, derived from the mounted
+/// document at each use; the git relay sends it and nothing else does.
+pub struct Upstream {
+    local: Local,
+    credential: Mounted,
+}
+
+impl Upstream {
+    async fn token(&self) -> Result<Secret> {
+        let document = self.credential.read().await?;
+        self.local
+            .upstream_token(document)
+            .await
+            .map_err(|failure| {
+                error(Refusal {
+                    failure,
+                    reason: None,
+                    retry_after_seconds: None,
+                })
+            })
+    }
 }
 
 fn refused(what: &str, failure: Failure) -> Error {

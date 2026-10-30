@@ -70,6 +70,19 @@ No breaking changes.
   from the next read on. A missing or refused item answers `unavailable` and sends nothing. The
   served host lists and runs the instance's reads only; a catalog write is not offered. See
   [Run connector services](docs/running-services.md#catalog-instances).
+- A served catalog instance can relay git smart-HTTP (story:git-smart-http-relay-with-quarantine).
+  With a `git` member in its configuration it serves `/git/<owner>/<repo>.git` for clone, fetch
+  and push to the repositories it lists, under the host's admission profile, and sends each
+  request to the forge with its own profile's token (a `token` profile's, or a `github_app`
+  installation token) in HTTP basic authentication; the caller holds no forge credential. A push
+  is read whole up to `push_limit_bytes` and is refused, with nothing sent to the forge's
+  receive-pack, when a command is not a branch under `ref_prefixes` (deletes and tags included),
+  when its pack does not index into a quarantine repository beside the instance's mirror, when a
+  new commit's author or committer is not `commit_identity`, or when `pre_push_check`, a configured
+  command run in the quarantine with no credential, exits non-zero. A passing push is sent once;
+  each command is logged `applied`, `refused` or `unknown`, and a push whose answer is lost is
+  reported `unknown` and never resent. See
+  [Run connector services](docs/running-services.md#git-relay).
 
 ### Fixed
 
