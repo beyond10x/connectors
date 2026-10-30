@@ -50,14 +50,25 @@ types:
       - {name: audit_ref, type: "Optional<String>", presence: null_when_absent}
       - {name: audit_status, type: connectors.service_wire.AuditStatus}
   # First v1alpha2 binding: POST /v1alpha2/invoke only (compatibility.md §2.1).
-  # The closed request admits the five original v1alpha1 members and, of the
-  # §4 invocation additions, only `idempotency_key`: a write on this binding is
-  # keyed and admitted under a standing grant (connectors.standing_approvals),
-  # and the host refuses a key on any other operation. `version` is a String so
-  # the codec decodes a wrong version and answers `unsupported` (§2) instead of
-  # a decode refusal. `input` is the operation-local payload, checked against
-  # the selected operation's own input schema, not by this envelope.
+  # The closed request admits the five original v1alpha1 members and none of
+  # the §4 invocation additions. `version` is a String so the codec decodes a
+  # wrong version and answers `unsupported` (§2) instead of a decode refusal.
+  # `input` is the operation-local payload, checked against the selected
+  # operation's own input schema, not by this envelope.
   - name: connectors.service_wire.InvokeRequest
+    kind: struct
+    fields:
+      - {name: version, type: String}
+      - {name: request_id, type: String}
+      - {name: operation, type: String}
+      - {name: revision, type: String}
+      - {name: input, type: Json}
+  # The request a host whose configuration sets `standing_grants` reads on the
+  # first binding (compatibility.md §2.1, "Keyed writes under a standing
+  # grant"): InvokeRequest plus the §4 member `idempotency_key`, which a write
+  # there must carry and any other operation must not. A host without
+  # `standing_grants` reads InvokeRequest.
+  - name: connectors.service_wire.KeyedInvokeRequest
     kind: struct
     fields:
       - {name: version, type: String}
@@ -189,8 +200,8 @@ types:
 # encoding predicate, no cross-record read): exact selected route/version;
 # the status/result/error and audit_status/audit_ref combinations as checked
 # rules rather than annotations; a `result` that is JSON null under success;
-# arbitrary operation-local schema payloads; the refusal of a refused §4 invocation
-# member (`connection`, `approval`, `executor`) on the first binding (compatibility.md §2.1), which the closed
+# arbitrary operation-local schema payloads; the refusal of a §4 invocation
+# member on the first binding (compatibility.md §2.1), which the closed
 # InvokeRequest rejects as an unknown member while the codec answers `unsupported`;
 # numeric/string bounds and canonical encoding; error/status/effect combinations;
 # co-presence of original attempt/request references, safe lookup disclosure and

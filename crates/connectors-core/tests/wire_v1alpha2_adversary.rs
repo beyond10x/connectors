@@ -59,27 +59,18 @@ fn first_binding_refuses_audit_status_not_required() {
     );
 }
 
-/// § 2.1 `mutation`: a keyed replay is `replayed: true` and names the
-/// original attempt and its request; a replay naming no attempt is refused.
+/// § 2.1 `mutation`: "`replayed: false` (no replay on this binding)".
 #[test]
-fn first_binding_reads_a_keyed_replay_and_refuses_one_without_its_attempt() {
+fn first_binding_refuses_a_replayed_mutation() {
     let mut response = applied_write();
     response["mutation"]["replayed"] = json!(true);
-    response["mutation"]["original_request_id"] = json!("write-original");
-    assert!(
-        decode(&response).is_ok(),
-        "story:served-keyed-writes-under-a-standing-approval: § 2.1 replays a keyed write, yet decode refused replayed: true"
-    );
-    response["mutation"]["attempt"] = json!(null);
-    response["mutation"]["original_request_id"] = json!(null);
     assert!(
         decode(&response).is_err(),
-        "§ 5: replayed names its original attempt, yet decode accepted a replay without one"
+        "§ 2.1: no replay on this binding, yet decode accepted replayed: true"
     );
 }
 
-/// § 2.1 `mutation`: "`original_request_id` is this request's ID" unless the
-/// observation is a replay.
+/// § 2.1 `mutation`: "`original_request_id` is this request's ID".
 #[test]
 fn first_binding_refuses_an_original_request_id_other_than_the_request_id() {
     let mut response = applied_write();
@@ -90,30 +81,16 @@ fn first_binding_refuses_an_original_request_id_other_than_the_request_id() {
     );
 }
 
-/// § 2.1 `Response`: "The binding emits the 13 base error codes,
-/// `outcome_unknown`, `approval_required` and `idempotency_conflict`; no other
-/// extended code."
+/// § 2.1 `Response`: "The binding emits the 13 base error codes and
+/// `outcome_unknown`; no other extended code."
 #[test]
-fn first_binding_reads_approval_required_and_idempotency_conflict() {
-    for code in ["approval_required", "idempotency_conflict"] {
-        let response = json!({
-            "version": "v1alpha2",
-            "request_id": "write-1",
-            "status": "error",
-            "error": {"code": code, "message": "refused"},
-            "audit_ref": null,
-            "audit_status": "unavailable"
-        });
-        assert!(
-            decode(&response).is_ok(),
-            "story:served-keyed-writes-under-a-standing-approval: § 2.1 emits {code}, yet decode refused it"
-        );
-    }
-}
-
-#[test]
-fn first_binding_refuses_an_extended_code_it_does_not_emit() {
-    for code in ["approval_refused", "not_granted", "revoked"] {
+fn first_binding_refuses_an_extended_code_other_than_outcome_unknown() {
+    for code in [
+        "approval_required",
+        "not_granted",
+        "idempotency_conflict",
+        "revoked",
+    ] {
         let response = json!({
             "version": "v1alpha2",
             "request_id": "write-1",
@@ -181,7 +158,6 @@ fn request_encode_never_writes_bytes_decode_refuses_private_token_key() {
         operation: "item.write".into(),
         revision: "rev-1".into(),
         input,
-        idempotency_key: None,
     };
     for key in [
         "$serde_json::private::RawValue",

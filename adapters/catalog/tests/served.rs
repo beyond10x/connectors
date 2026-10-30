@@ -621,6 +621,14 @@ async fn a_served_catalog_write_under_a_standing_grant_is_sent_once() {
         assert_eq!(refused["error"]["code"], code, "{refused}");
         assert!(refused["mutation"].is_null(), "{refused}");
     }
+    // The legacy route reads no grant, so on this host it runs no write.
+    let legacy = json!({"version": "v1alpha1", "request_id": "w-4", "operation": "issue.create",
+        "revision": revision, "input": {"id": "7", "body": {"title": "Fixture issue"}}});
+    let (status, refused) = served
+        .send(reqwest::Method::POST, "/v1/invoke", Some(&legacy))
+        .await;
+    assert_eq!(status, 501, "{refused}");
+    assert_eq!(refused["error"]["code"], "unsupported", "{refused}");
     assert_eq!(writes().len(), 1, "one write reached the provider");
 }
 

@@ -90,16 +90,29 @@ pub struct Host {
 }
 
 impl Host {
+    /// A host whose configuration has no `standing_grants`.
     pub async fn start() -> Self {
+        Self::serve(false).await
+    }
+
+    /// A host whose configuration sets `standing_grants` to the grants of
+    /// [`GRANTED_VALUES`].
+    pub async fn start_with_standing_grants() -> Self {
+        Self::serve(true).await
+    }
+
+    async fn serve(standing: bool) -> Self {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("state");
         std::fs::create_dir(&path).unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
         let calls = Arc::new(AtomicUsize::new(0));
+        let grants = standing.then(|| standing_grants(root.path()));
         let state = Arc::new(
             ServiceState::open(&path, "leaf", "fixture", "rev-1")
                 .unwrap()
-                .with_standing_grants(Some(standing_grants(root.path()))),
+                .with_standing_grants(grants)
+                .unwrap(),
         );
         let app = router_with_state(
             Arc::new(Fixture(calls.clone())),

@@ -102,14 +102,7 @@ async fn host() -> Host {
     let adapter = Arc::new(Fixture {
         calls: calls.clone(),
     });
-    let state = Arc::new(
-        ServiceState::open(&path, INSTANCE, "fixture", "rev-1")
-            .unwrap()
-            .with_standing_grants(Some(standing_grants(
-                root.path(),
-                &["write", "panicking-write"],
-            ))),
-    );
+    let state = Arc::new(ServiceState::open(&path, INSTANCE, "fixture", "rev-1").unwrap());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let app = router_with_state(adapter, Arc::new(FixedSecret), Some(state.clone()));
@@ -125,29 +118,8 @@ async fn host() -> Host {
         _root: root,
     }
 }
-/// Every operation here is a write: each carries its request ID as its
-/// `idempotency_key` (story:served-keyed-writes-under-a-standing-approval).
 fn request(operation: &str, request_id: &str) -> Value {
-    json!({"version":"v1alpha2","request_id":request_id,"operation":operation,"revision":"rev-1","input":{"value":1},"idempotency_key":request_id})
-}
-/// A standing grant for each of `operations` on the input every request
-/// sends, so a keyed write is admitted
-/// (story:served-keyed-writes-under-a-standing-approval).
-fn standing_grants(root: &Path, operations: &[&str]) -> PathBuf {
-    let grants: Vec<Value> = operations
-        .iter()
-        .map(|operation| {
-            json!({"id": format!("g-{operation}"), "instance": INSTANCE, "operation": operation,
-                "target": [{"pointer": "/value", "value": 1}],
-                "not_after_unix_ms": 4_000_000_000_000_i64, "max_per_hour": 10_000})
-        })
-        .collect();
-    let document =
-        json!({"format": "connectors.standing-grants/1", "grants": grants, "revoked": []});
-    let path = root.join("grants.json");
-    std::fs::write(&path, serde_json::to_vec(&document).unwrap()).unwrap();
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
-    path
+    json!({"version":"v1alpha2","request_id":request_id,"operation":operation,"revision":"rev-1","input":{"value":1}})
 }
 async fn invoke(host: &Host, body: Value) -> (u16, InvokeResponse) {
     let _ = rustls::crypto::ring::default_provider().install_default();

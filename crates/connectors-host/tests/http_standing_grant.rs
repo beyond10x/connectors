@@ -4,7 +4,10 @@
 //! story:served-keyed-writes-under-a-standing-approval).
 //!
 //! Every case runs against a fixture adapter that counts its provider
-//! requests, and every refusal asserts that the count did not move.
+//! requests, and every refusal asserts that the count did not move. Every
+//! host here sets `standing_grants` (a grant file absent when a write arrives
+//! holds no grant), except [`plain`], which shows that a host without it is
+//! unchanged.
 //!
 //! Unix only: its fixtures use Unix mode bits and symbolic links.
 #![cfg(unix)]
@@ -155,7 +158,8 @@ async fn start(root: Arc<tempfile::TempDir>) -> Host {
     let state = Arc::new(
         ServiceState::open(&path, INSTANCE, "fixture", "rev-1")
             .unwrap()
-            .with_standing_grants(Some(grants.clone())),
+            .with_standing_grants(Some(grants.clone()))
+            .unwrap(),
     );
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -174,7 +178,50 @@ async fn start(root: Arc<tempfile::TempDir>) -> Host {
     }
 }
 
-async fn invoke(host: &Host, body: &Value) -> (u16, InvokeResponse) {
+/// A host whose configuration has no `standing_grants`, with a covering
+/// grant file beside its state that it must not read.
+async fn plain() -> Host {
+    let root = Arc::new(tempfile::tempdir().unwrap());
+    let path = root.path().join("state");
+    std::fs::create_dir(&path).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let grants = root.path().join("grants.json");
+    let requests = Arc::new(AtomicUsize::new(0));
+    let gate = Arc::new(RwLock::new(()));
+    let adapter = Arc::new(Fixture {
+        requests: requests.clone(),
+        gate: gate.clone(),
+    });
+    let state = Arc::new(
+        ServiceState::open(&path, INSTANCE, "fixture", "rev-1")
+            .unwrap()
+            .with_standing_grants(None)
+            .unwrap(),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let app = router_with_state(adapter, Arc::new(FixedSecret), Some(state.clone()));
+    let task = tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+    let host = Host {
+        endpoint: format!("http://{address}/v1alpha2/invoke"),
+        task,
+        state,
+        grants,
+        requests,
+        gate,
+        root,
+    };
+    host.write_grants(&grant_file(
+        json!([grant("g-widgets", 10, LATER)]),
+        json!([]),
+    ));
+    host
+}
+
+/// One request read with the first binding's unchanged rules.
+async fn invoke_unkeyed(host: &Host, body: &Value) -> (u16, InvokeResponse) {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let response = reqwest::Client::new()
         .post(&host.endpoint)
@@ -186,6 +233,38 @@ async fn invoke(host: &Host, body: &Value) -> (u16, InvokeResponse) {
     let status = response.status().as_u16();
     let bytes = response.bytes().await.unwrap();
     (status, InvokeResponse::decode(&bytes).unwrap())
+}
+
+/// One `POST /v1/invoke` of `operation` on `host`: the status and the body.
+async fn invoke_legacy(host: &Host, request_id: &str, operation: &str) -> (u16, Value) {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let endpoint = host.endpoint.replace("/v1alpha2/invoke", "/v1/invoke");
+    let body = json!({"version": WIRE_VERSION, "request_id": request_id, "operation": operation,
+        "revision": "rev-1", "input": widgets("legacy")});
+    let response = reqwest::Client::new()
+        .post(endpoint)
+        .bearer_auth(TOKEN)
+        .body(serde_json::to_vec(&body).unwrap())
+        .send()
+        .await
+        .unwrap();
+    let status = response.status().as_u16();
+    (status, response.json().await.unwrap())
+}
+
+/// The keyed reader for every host with standing grants.
+async fn invoke(host: &Host, body: &Value) -> (u16, InvokeResponse) {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let response = reqwest::Client::new()
+        .post(&host.endpoint)
+        .bearer_auth(TOKEN)
+        .body(serde_json::to_vec(body).unwrap())
+        .send()
+        .await
+        .unwrap();
+    let status = response.status().as_u16();
+    let bytes = response.bytes().await.unwrap();
+    (status, InvokeResponse::decode_keyed(&bytes).unwrap())
 }
 
 fn write(operation: &str, request_id: &str, key: Option<&str>, input: Value) -> Value {
@@ -569,8 +648,9 @@ async fn reads_are_unchanged_by_a_standing_grant() {
     }
 }
 
-/// compatibility.md § 2.1, `v1alpha2-invoke-refuses-idempotency-key`: a key on
-/// an operation that is not a write is `unsupported` before the anchor.
+/// compatibility.md § 2.1, Keyed writes under a standing grant: on a host
+/// with standing grants the reader admits the key, and a key on an operation
+/// that is not a write is `unsupported` before the anchor, naming the request.
 #[tokio::test]
 async fn a_key_on_a_read_is_refused_unsupported_with_no_request() {
     let host = host(Some(grant_file(
@@ -590,9 +670,9 @@ async fn a_key_on_a_read_is_refused_unsupported_with_no_request() {
 /// The host-side gate against one host: a write is dispatched only when it
 /// is keyed and a standing grant covers it; every other request below is
 /// refused before the anchor with its named code. Of the six requests only
-/// the last reaches the provider. This replaces the first binding's
-/// `v1alpha2-invoke-keyed-or-approval-operation-unsupported`
-/// (story:served-keyed-writes-under-a-standing-approval).
+/// the last reaches the provider. A host without standing grants keeps the
+/// first binding's `v1alpha2-invoke-keyed-or-approval-operation-unsupported`
+/// ([`plain`]).
 #[tokio::test]
 async fn the_host_gate_dispatches_only_a_keyed_write_a_grant_covers() {
     let host = host(Some(grant_file(
@@ -793,4 +873,73 @@ async fn an_unsafe_grant_file_is_refused_unavailable_with_no_request() {
         .await;
         assert_refused_before_anything(&host, &refused, ErrorCode::Unavailable, 503, 0, 0);
     }
+}
+
+/// A host without `standing_grants` is the wave base's host: an unkeyed write
+/// is dispatched once and its `mutation` names its attempt, read with the
+/// first binding's unchanged rules; no grant is read or recorded, though a
+/// covering grant file lies beside the state.
+#[tokio::test]
+async fn a_host_without_standing_grants_dispatches_an_unkeyed_write_once_naming_its_attempt() {
+    let host = plain().await;
+    assert!(!host.state.keyed());
+    let (status, response) =
+        invoke_unkeyed(&host, &write("issue.create", "w-1", None, widgets("first"))).await;
+    assert_eq!(status, 200, "{response:?}");
+    assert_eq!(response.status, ResponseStatus::Success);
+    assert_eq!(response.audit_status, AuditStatus::Complete);
+    let mutation = response.mutation.unwrap();
+    assert_eq!(mutation.classification, EffectKnowledge::Applied);
+    assert!(!mutation.replayed);
+    assert_eq!(mutation.original_request_id.as_deref(), Some("w-1"));
+    let attempt = mutation.attempt.unwrap();
+    assert_eq!(attempt.instance, INSTANCE);
+    assert_eq!(host.state.grant_of(attempt.id.as_str()).unwrap(), None);
+    assert_eq!(host.state.attempt_count().unwrap(), 1);
+    assert_eq!(host.requests(), 1);
+}
+
+/// A host without `standing_grants` keeps
+/// `v1alpha2-invoke-refuses-idempotency-key` and
+/// `v1alpha2-invoke-keyed-or-approval-operation-unsupported`: a key, on a
+/// write or a read, is `unsupported` with no request ID, before the anchor,
+/// with no attempt and no provider request.
+#[tokio::test]
+async fn a_host_without_standing_grants_refuses_a_key_unsupported_with_no_request_id() {
+    let host = plain().await;
+    for operation in ["issue.create", "issue.read"] {
+        let refused = invoke_unkeyed(
+            &host,
+            &write(operation, "w-1", Some("key-1"), widgets("first")),
+        )
+        .await;
+        assert_refused_before_anything(&host, &refused, ErrorCode::Unsupported, 400, 0, 0);
+        assert!(refused.1.request_id.is_none(), "{operation}");
+    }
+}
+
+/// `POST /v1/invoke` records no attempt and reads no grant, so a host with
+/// standing grants refuses a write there `unsupported` with no provider
+/// request, even one a grant covers; reads there are unchanged. A host
+/// without them still dispatches the write there, as at the wave base.
+#[tokio::test]
+async fn the_legacy_route_runs_no_write_on_a_host_with_standing_grants() {
+    let keyed = host(Some(grant_file(
+        json!([grant("g-widgets", 10, LATER)]),
+        json!([]),
+    )))
+    .await;
+    let (status, refused) = invoke_legacy(&keyed, "l-1", "issue.create").await;
+    assert_eq!(status, 501, "{refused}");
+    assert_eq!(refused["error"]["code"], "unsupported", "{refused}");
+    assert_eq!(keyed.requests(), 0, "a legacy write reached the provider");
+    let (status, read) = invoke_legacy(&keyed, "l-2", "issue.read").await;
+    assert_eq!(status, 200, "{read}");
+    assert_eq!(keyed.requests(), 1);
+    assert_eq!(keyed.state.attempt_count().unwrap(), 0);
+
+    let plain = plain().await;
+    let (status, written) = invoke_legacy(&plain, "l-3", "issue.create").await;
+    assert_eq!(status, 200, "{written}");
+    assert_eq!(plain.requests(), 1);
 }

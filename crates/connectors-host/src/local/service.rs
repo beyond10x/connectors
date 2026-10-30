@@ -8,11 +8,13 @@
 //! An acknowledged anchor is one prerequisite for dispatch, never caller,
 //! credential or dispatch authority by itself (contracts/service/audit.md § 1).
 //! The attempt ledger follows `ess/domains/mutations.yaml`, "The HTTP host's
-//! attempt ledger". Every write is keyed and admitted under a standing grant
-//! (`ess/domains/standing_approvals.yaml`): the keyed reservation is the
-//! ledger's own (`mutation_keys`, in the metadata authority) and the hourly
-//! count is [`standing::Uses`] beside it. Both are durable, so a restart keeps
-//! every key and every counted use.
+//! attempt ledger". Without `standing_grants` a write is recorded unkeyed
+//! ([`ServiceState::prepare_attempt`]), as before standing grants existed.
+//! With them ([`ServiceState::with_standing_grants`]) every write is keyed and
+//! admitted under a standing grant (`ess/domains/standing_approvals.yaml`):
+//! the keyed reservation is the ledger's own (`mutation_keys`, in the metadata
+//! authority) and the hourly count is [`standing::Uses`] beside it. Both are
+//! durable, so a restart keeps every key and every counted use.
 use super::{
     Failure, Result, audit, filesystem as fs, metadata::Metadata, mutations as ledger, standing,
 };
@@ -76,9 +78,9 @@ pub struct Write<'a> {
 
 /// The HTTP host's settlement time (mutations.yaml, Clock): a zero-width
 /// system wall-clock sample, which the ledger floors with the mutation
-/// `LocalClockFloor`. It also starts a keyed attempt's 24-hour replay
-/// retention; the served host's grants are its operator's configuration, so
-/// its own clock is the clock they are read against (standing_approvals.yaml).
+/// `LocalClockFloor`. Record time only: this host runs no key expiry, so no
+/// replay window reads it. Standing grants are read against the host's own
+/// clock ([`now_ms`]), as its operator's configuration (standing_approvals.yaml).
 struct RecordClock;
 impl ledger::Clock for RecordClock {
     fn now(&self) -> ledger::Result<ledger::ClockInterval> {
@@ -102,11 +104,16 @@ pub struct ServiceState {
     /// Exact final observations whose append was not acknowledged, retained
     /// unchanged for idempotent recovery (audit.md § 3).
     pending: Mutex<Retained>,
-    /// The hourly count of writes admitted under each standing grant.
+    /// Present only when the service configuration sets `standing_grants`:
+    /// then, and only then, writes are keyed and need a covering grant.
+    standing: Option<Standing>,
+}
+
+/// A host's standing grants: the operator's grant file, read on every write,
+/// and the hourly count of writes admitted under each grant.
+struct Standing {
+    grants: PathBuf,
     uses: standing::Uses,
-    /// The operator's grant file (`standing_grants`), read on every write;
-    /// `None` means no grant.
-    grants: Option<PathBuf>,
 }
 
 /// How a keyed write's key stands before any grant is read.
@@ -194,23 +201,45 @@ impl ServiceState {
                 RecordClock,
                 ledger::Limits {
                     attempts_per_instance: ATTEMPTS_PER_INSTANCE,
-                    result_bytes: RETAINED_RESULT_BYTES + SETTLEMENT_BYTES,
+                    result_bytes: SETTLEMENT_BYTES,
                 },
             )
             .map_err(|_| Failure::InvalidConfiguration)?,
             pending_limit,
             pending: Mutex::new(Retained::default()),
-            uses: standing::Uses::open(path).map_err(|_| Failure::MetadataUnavailable)?,
-            grants: None,
+            standing: None,
         })
     }
 
-    /// The grant file this host reads on every write (the service
-    /// configuration's `standing_grants`). Without one every write is
-    /// `approval_required`.
-    pub fn with_standing_grants(mut self, grants: Option<PathBuf>) -> Self {
-        self.grants = grants;
-        self
+    /// The service configuration's `standing_grants`. `None` leaves the host
+    /// as it was: writes unkeyed, nothing more opened. `Some(path)` makes every
+    /// write keyed and admitted only under a grant the file at `path` holds
+    /// when the write arrives; it opens the hourly use count
+    /// (`standing-grants.sqlite3`) in the state directory, and lets an
+    /// attempt's settlement retain its result for replay.
+    pub fn with_standing_grants(mut self, grants: Option<PathBuf>) -> Result<Self> {
+        let Some(grants) = grants else {
+            return Ok(self);
+        };
+        self.ledger = ledger::Store::new(
+            &self.path,
+            RecordClock,
+            ledger::Limits {
+                attempts_per_instance: ATTEMPTS_PER_INSTANCE,
+                result_bytes: RETAINED_RESULT_BYTES + SETTLEMENT_BYTES,
+            },
+        )
+        .map_err(|_| Failure::InvalidConfiguration)?;
+        self.standing = Some(Standing {
+            grants,
+            uses: standing::Uses::open(&self.path).map_err(|_| Failure::MetadataUnavailable)?,
+        });
+        Ok(self)
+    }
+
+    /// `true` when the host runs keyed writes under standing grants.
+    pub fn keyed(&self) -> bool {
+        self.standing.is_some()
     }
 
     pub fn instance(&self) -> &str {
@@ -240,20 +269,22 @@ impl ServiceState {
     /// standing grant: the grant file read now, the grants covering this
     /// write now, and one slot under the first of them with room in its hour.
     pub fn check_grant(&self, write: &Write<'_>) -> GrantCheck {
-        let grants = match &self.grants {
-            None => return GrantCheck::Uncovered(standing::Uncovered::NoGrant),
-            Some(path) => match standing::read(path) {
-                Err(unreadable) => return GrantCheck::Unreadable(unreadable),
-                Ok(None) => return GrantCheck::Uncovered(standing::Uncovered::NoGrant),
-                Ok(Some(grants)) => grants,
-            },
+        // A host without standing grants never reaches this check; were it
+        // to, no grant covers anything.
+        let Some(held) = &self.standing else {
+            return GrantCheck::Uncovered(standing::Uncovered::NoGrant);
+        };
+        let grants = match standing::read(&held.grants) {
+            Err(unreadable) => return GrantCheck::Unreadable(unreadable),
+            Ok(None) => return GrantCheck::Uncovered(standing::Uncovered::NoGrant),
+            Ok(Some(grants)) => grants,
         };
         let now = now_ms();
         let covering = match grants.covering(&self.instance, write.operation, write.input, now) {
             Ok(covering) => covering,
             Err(reason) => return GrantCheck::Uncovered(reason),
         };
-        match self.uses.take(&self.instance, &covering, now) {
+        match held.uses.take(&self.instance, &covering, now) {
             Ok(standing::Taken::Slot(taken)) => GrantCheck::Admitted(taken),
             Ok(standing::Taken::AtCap {
                 retry_after_seconds,
@@ -266,7 +297,11 @@ impl ServiceState {
 
     /// The slot is not used: no attempt will be prepared for it.
     pub fn release_grant(&self, taken: &standing::Use) {
-        if self.uses.release(taken).is_err() {
+        let released = self
+            .standing
+            .as_ref()
+            .is_some_and(|held| held.uses.release(taken).is_ok());
+        if !released {
             tracing::warn!(grant = %taken.grant_id, "a standing grant use was not released; it counts until its hour ends");
         }
     }
@@ -293,7 +328,11 @@ impl ServiceState {
             }
         };
         let attempt = prepared.reference();
-        if self.uses.bind(taken, attempt.attempt_id).is_err() {
+        let bound = self
+            .standing
+            .as_ref()
+            .is_some_and(|held| held.uses.bind(taken, attempt.attempt_id).is_ok());
+        if !bound {
             // Refusal: no write is dispatched without its grant recorded.
             self.abort_attempt(attempt, "unavailable");
             return Ok(KeyedPreparation::GrantUnrecorded(attempt));
@@ -301,10 +340,14 @@ impl ServiceState {
         Ok(KeyedPreparation::Prepared(prepared))
     }
 
-    /// The standing grant recorded with one of this host's attempts.
+    /// The standing grant recorded with one of this host's attempts; none on
+    /// a host without standing grants.
     pub fn grant_of(&self, attempt_id: &str) -> ledger::Result<Option<String>> {
         let attempt_id = Uuid::parse_str(attempt_id).map_err(|_| ledger::Failure::InvalidInput)?;
-        self.uses
+        let Some(held) = &self.standing else {
+            return Ok(None);
+        };
+        held.uses
             .grant_of(attempt_id)
             .map_err(|_| ledger::Failure::MetadataUnavailable)
     }
@@ -349,10 +392,22 @@ impl ServiceState {
         }
     }
 
+    /// `PrepareAttempt` for an admitted write: no connection, no key,
+    /// `not_required` approval, fenced by the instance's configuration
+    /// revision. Capacity and an unavailable store record nothing.
+    pub fn prepare_attempt(&self, write: &Write<'_>) -> ledger::Result<ledger::Prepared> {
+        match self.ledger.prepare(&self.candidate(write))? {
+            ledger::Preparation::Prepared(prepared) => Ok(prepared),
+            // Without a key no existing attempt can answer a preparation.
+            ledger::Preparation::Existing(_) => Err(ledger::Failure::Conflict),
+        }
+    }
+
     /// The attempt candidate of an admitted write: no connection (the
     /// instance's one configured credential, fenced by its configuration
-    /// revision), `not_required` per-input approval (a standing grant replaces
-    /// steps 5 and 8), no key until [`keyed_candidate`](Self::keyed_candidate).
+    /// revision), `not_required` per-input approval (on a host with standing
+    /// grants, the grant replaces steps 5 and 8), no key until
+    /// [`keyed_candidate`](Self::keyed_candidate).
     fn candidate(&self, write: &Write<'_>) -> ledger::Candidate {
         ledger::Candidate {
             namespace: ledger::Namespace {
@@ -403,29 +458,44 @@ impl ServiceState {
     }
 
     /// `RecordCompletion` when `applied`, else `RecordUncertainty` with its
-    /// cause. An applied write's `result` is retained for keyed replay when it
-    /// fits [`RETAINED_RESULT_BYTES`]; otherwise the settlement says
-    /// `result_retained: false`. `true` when the ledger acknowledged the
-    /// settlement.
+    /// cause. `true` when the ledger acknowledged the settlement.
     pub fn settle_attempt(
         &self,
         attempt: ledger::AttemptRef,
         applied: bool,
         cause: Option<&str>,
-        result: Option<&Value>,
     ) -> bool {
         let outcome = if applied {
-            let mut settled = settlement("applied", cause);
-            let retained = result.filter(|value| {
-                serde_json::to_vec(value).is_ok_and(|bytes| bytes.len() <= RETAINED_RESULT_BYTES)
-            });
-            match retained {
-                Some(value) => settled["result"] = value.clone(),
-                None => settled["result_retained"] = json!(false),
-            }
-            ledger::Outcome::Applied(settled)
+            ledger::Outcome::Applied(settlement("applied", cause))
         } else {
             ledger::Outcome::Unknown(settlement("unknown", cause))
+        };
+        self.ledger.settle(attempt, &outcome).is_ok()
+    }
+
+    /// [`settle_attempt`](Self::settle_attempt) for a keyed write: an applied
+    /// write's `result` (`Some`) is retained for replay when it fits
+    /// [`RETAINED_RESULT_BYTES`]; otherwise the settlement says
+    /// `result_retained: false`. `None` is not applied.
+    pub fn settle_keyed(
+        &self,
+        attempt: ledger::AttemptRef,
+        result: Option<&Value>,
+        cause: Option<&str>,
+    ) -> bool {
+        let outcome = match result {
+            Some(result) => {
+                let mut settled = settlement("applied", cause);
+                if serde_json::to_vec(result)
+                    .is_ok_and(|bytes| bytes.len() <= RETAINED_RESULT_BYTES)
+                {
+                    settled["result"] = result.clone();
+                } else {
+                    settled["result_retained"] = json!(false);
+                }
+                ledger::Outcome::Applied(settled)
+            }
+            None => ledger::Outcome::Unknown(settlement("unknown", cause)),
         };
         self.ledger.settle(attempt, &outcome).is_ok()
     }

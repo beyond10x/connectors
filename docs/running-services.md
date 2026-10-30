@@ -143,14 +143,19 @@ refuses:
 
 ## Standing write grants
 
-A served host runs a write (an operation with the `mutation` profile) only under a standing
-grant: a file the operator mounts that names, per operation, the targets a caller may write
-to and how often. There is no per-call approval. The rules are in the
-[service contract](../contracts/service/compatibility.md#21-first-binding-post-v1alpha2invoke),
+Standing grants are optional. A host without `standing_grants` in its service configuration
+is unchanged: `POST /v1alpha2/invoke` dispatches a write with no key, `idempotency_key` is
+refused as `unsupported`, and a served catalog instance lists its reads only.
+
+With `standing_grants` set, the host runs a write (an operation with the `mutation` profile)
+only under a standing grant: a file the operator mounts that names, per operation, the
+targets a caller may write to and how often. There is no per-call approval. The rules are in
+the [service contract](../contracts/service/compatibility.md#21-first-binding-post-v1alpha2invoke),
 "Keyed writes under a standing grant".
 
 Point the host at the file with `standing_grants` in its service configuration, here the
-`service` member of the catalog example above:
+`service` member of the catalog example above. It requires `state`; without it the host does
+not start.
 
 ```json
 {
@@ -201,9 +206,10 @@ per intended effect. The host answers, before anything is recorded or sent:
 | A write without `idempotency_key` | `invalid_input` (400) |
 | `idempotency_key` on a read | `unsupported` (400) |
 | A key already used for a different operation or input | `idempotency_conflict` (409) |
-| A write no grant covers, or any write with no grant file | `approval_required` (403) |
+| A write no grant covers, or any write with no file at the path | `approval_required` (403) |
 | A covering grant has used its hour | `rate_limited` (429), with `retry_after_seconds` |
 | The grant file or the host's state cannot be read | `unavailable` (503) |
+| A write on `POST /v1/invoke`, which records no attempt and reads no grant | `unsupported` (501) |
 
 A write that passes is recorded as one attempt and sent at most once. Sending the same key
 and input again never sends again: it answers the original attempt's outcome, marked
@@ -216,8 +222,10 @@ and the hourly counts are kept in the host's `state` directory and survive a res
 is never forgotten, so it is never admitted for another request. A write that was in flight
 when the host stopped stays pending: its key answers `outcome_unknown` and is not sent again.
 
-`connectors invoke` sends no key, so it runs reads only on this route. A Rust caller uses
-`Client::invoke_v1alpha2_keyed`.
+`connectors invoke` sends `POST /v1/invoke` with no key, so on a host with standing grants it
+runs reads only. A Rust caller sends a keyed write with `Client::invoke_v1alpha2_keyed`;
+`Client::invoke_v1alpha2` sends no key, which such a host refuses for a write as
+`invalid_input`.
 
 ## Supported surfaces
 

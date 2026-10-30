@@ -12,6 +12,9 @@
 //! [`InvokeResponse::decode`] and [`InvokeResponse::encode`] add the first
 //! binding's narrowing ([`InvokeResponse::first_binding_rules`]). The rules of `contracts/service/compatibility.md`
 //! § 2.1 that select a request's refusal code are [`InvokeRequest::decode`]'s.
+//! A host with standing grants reads [`KeyedInvokeRequest`] instead and writes
+//! under [`InvokeResponse::keyed_binding_rules`] (§ 2.1, Keyed writes under a
+//! standing grant); a host without them is unchanged.
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -260,9 +263,8 @@ pub enum ResponseStatus {
     Error,
 }
 
-/// `connectors.service_wire.InvokeRequest`: the five v1alpha1 members and the
-/// optional `idempotency_key`, closed. `version` is text so a wrong version
-/// decodes and is answered `unsupported`.
+/// `connectors.service_wire.InvokeRequest`: the five v1alpha1 members, closed.
+/// `version` is text so a wrong version decodes and is answered `unsupported`.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct InvokeRequest {
@@ -271,32 +273,11 @@ pub struct InvokeRequest {
     pub operation: String,
     pub revision: String,
     pub input: Value,
-    /// The caller's key of a keyed write (compatibility § 2.1, Keyed writes
-    /// under a standing grant): absent, never null; 1 to [`KEY_LIMIT`] bytes,
-    /// compared exactly. The host refuses it on an operation that is not a
-    /// write.
-    #[serde(
-        default,
-        deserialize_with = "omittable",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub idempotency_key: Option<String>,
 }
 
-/// Largest `idempotency_key`, in UTF-8 bytes (operations § 5.1; the ledger's
-/// `caller_key` bound).
-pub const KEY_LIMIT: usize = 256;
-
 /// The § 4 invocation members the first binding refuses with `unsupported`.
-const UNSUPPORTED_MEMBERS: [&str; 3] = ["connection", "approval", "executor"];
-const REQUEST_MEMBERS: [&str; 6] = [
-    "version",
-    "request_id",
-    "operation",
-    "revision",
-    "input",
-    "idempotency_key",
-];
+const UNSUPPORTED_MEMBERS: [&str; 4] = ["connection", "idempotency_key", "approval", "executor"];
+const REQUEST_MEMBERS: [&str; 5] = ["version", "request_id", "operation", "revision", "input"];
 
 /// A request this binding answers without dispatch: the code, and the
 /// request ID the answer echoes (`None` before a valid envelope exists).
@@ -328,14 +309,11 @@ impl InvokeRequest {
     /// Decode a request body on `/v1alpha2/invoke` (compatibility § 2, § 2.1).
     ///
     /// Malformed or ambiguous JSON, a duplicate member at any depth, a missing
-    /// or mistyped member (a null `idempotency_key` included) and any unknown
-    /// member other than the three refused § 4 members are `invalid_input`. A
-    /// refused § 4 member (`connection`, `approval`, `executor`) is
-    /// `unsupported`. Neither is a valid envelope, so neither echoes a request
-    /// ID. A valid envelope whose `version` is not [`VERSION`] is
-    /// `unsupported` with its request ID; one whose `idempotency_key` is empty
-    /// or longer than [`KEY_LIMIT`] bytes is `invalid_input` with its request
-    /// ID.
+    /// or mistyped member and any unknown member other than the four § 4
+    /// members are `invalid_input`. A § 4 member (`connection`,
+    /// `idempotency_key`, `approval`, `executor`) is `unsupported`. Neither is
+    /// a valid envelope, so neither echoes a request ID. A valid envelope whose
+    /// `version` is not [`VERSION`] is `unsupported` with its request ID.
     pub fn decode(bytes: &[u8]) -> std::result::Result<Self, Refusal> {
         let refuse = |request_id, code, message: &str| Refusal {
             request_id,
@@ -352,6 +330,99 @@ impl InvokeRequest {
             .filter(|k| !REQUEST_MEMBERS.contains(k))
             .collect();
         if unknown.iter().any(|k| !UNSUPPORTED_MEMBERS.contains(k)) {
+            return Err(invalid());
+        }
+        if !unknown.is_empty() {
+            return Err(refuse(
+                None,
+                ErrorCode::Unsupported,
+                "invocation member is not supported on this binding",
+            ));
+        }
+        let request: Self = serde_json::from_value(value).map_err(|_| invalid())?;
+        if request.version != VERSION {
+            return Err(refuse(
+                Some(request.request_id),
+                ErrorCode::Unsupported,
+                "unsupported request version",
+            ));
+        }
+        Ok(request)
+    }
+
+    /// Encode the envelope, refusing an `input` [`decode`](Self::decode) could
+    /// not read back (`readable_payload`). The version is written as held.
+    pub fn encode(&self) -> std::result::Result<Vec<u8>, Violation> {
+        readable_payload(&self.input)?;
+        Ok(serde_json::to_vec(self).expect("an invocation envelope is serializable"))
+    }
+}
+
+/// `connectors.service_wire.InvokeRequest` on a host that runs keyed writes
+/// under a standing grant (compatibility § 2.1, Keyed writes under a standing
+/// grant): [`InvokeRequest`]'s five members and the optional
+/// `idempotency_key`, closed. Only such a host reads it; every other host reads
+/// [`InvokeRequest`], which refuses the key `unsupported`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct KeyedInvokeRequest {
+    pub version: String,
+    pub request_id: String,
+    pub operation: String,
+    pub revision: String,
+    pub input: Value,
+    /// The caller's key of a write: absent, never null; 1 to [`KEY_LIMIT`]
+    /// bytes, compared exactly. The host refuses it on an operation that is
+    /// not a write.
+    #[serde(
+        default,
+        deserialize_with = "omittable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub idempotency_key: Option<String>,
+}
+
+/// Largest `idempotency_key`, in UTF-8 bytes (operations § 5.1; the ledger's
+/// `caller_key` bound).
+pub const KEY_LIMIT: usize = 256;
+
+/// The § 4 members a keyed host refuses with `unsupported`.
+const KEYED_UNSUPPORTED_MEMBERS: [&str; 3] = ["connection", "approval", "executor"];
+const KEYED_REQUEST_MEMBERS: [&str; 6] = [
+    "version",
+    "request_id",
+    "operation",
+    "revision",
+    "input",
+    "idempotency_key",
+];
+
+impl KeyedInvokeRequest {
+    /// Decode a request body on `/v1alpha2/invoke` of a host with standing
+    /// grants. As [`InvokeRequest::decode`], except that `idempotency_key` is
+    /// a member: a null one is `invalid_input` without a request ID, and an
+    /// empty one or one longer than [`KEY_LIMIT`] bytes is `invalid_input`
+    /// with its request ID. `connection`, `approval` and `executor` stay
+    /// `unsupported`.
+    pub fn decode(bytes: &[u8]) -> std::result::Result<Self, Refusal> {
+        let refuse = |request_id, code, message: &str| Refusal {
+            request_id,
+            error: Error::new(code, message),
+        };
+        let invalid = || refuse(None, ErrorCode::InvalidInput, "invalid invocation envelope");
+        let value: Value = crate::read_json(bytes).map_err(|_| invalid())?;
+        let Value::Object(members) = &value else {
+            return Err(invalid());
+        };
+        let unknown: Vec<&str> = members
+            .keys()
+            .map(String::as_str)
+            .filter(|k| !KEYED_REQUEST_MEMBERS.contains(k))
+            .collect();
+        if unknown
+            .iter()
+            .any(|k| !KEYED_UNSUPPORTED_MEMBERS.contains(k))
+        {
             return Err(invalid());
         }
         if !unknown.is_empty() {
@@ -388,6 +459,21 @@ impl InvokeRequest {
     pub fn encode(&self) -> std::result::Result<Vec<u8>, Violation> {
         readable_payload(&self.input)?;
         Ok(serde_json::to_vec(self).expect("an invocation envelope is serializable"))
+    }
+}
+
+impl From<InvokeRequest> for KeyedInvokeRequest {
+    /// The same request with no key: what a host with standing grants reads
+    /// from a request that sends none.
+    fn from(request: InvokeRequest) -> Self {
+        Self {
+            version: request.version,
+            request_id: request.request_id,
+            operation: request.operation,
+            revision: request.revision,
+            input: request.input,
+            idempotency_key: None,
+        }
     }
 }
 
@@ -536,12 +622,10 @@ impl InvokeResponse {
     ///
     /// - `source_audit` is always omitted;
     /// - `audit_status: not_required` is never answered;
-    /// - a `mutation` that is not `replayed` names this response's
-    ///   `request_id` as its `original_request_id`, when set; a replayed one
-    ///   names the original attempt's request (keyed replay, § 2.1);
-    /// - `error.code` is one of the 13 base codes, `outcome_unknown`,
-    ///   `approval_required` or `idempotency_conflict` (`cause.code` is a
-    ///   [`BaseErrorCode`] by declaration).
+    /// - `mutation.replayed` is false, and `mutation.original_request_id`,
+    ///   when set, is this response's `request_id`;
+    /// - `error.code` is one of the 13 base codes or `outcome_unknown`
+    ///   (`cause.code` is a [`BaseErrorCode`] by declaration).
     pub fn first_binding_rules(&self) -> std::result::Result<(), Violation> {
         if self.source_audit.is_some() {
             return Err(Violation("source_audit is not answered on this binding"));
@@ -549,17 +633,20 @@ impl InvokeResponse {
         if self.audit_status == AuditStatus::NotRequired {
             return Err(Violation("not_required is not answered on this binding"));
         }
-        if let Some(mutation) = &self.mutation
-            && !mutation.replayed
-            && mutation
+        if let Some(mutation) = &self.mutation {
+            if mutation.replayed {
+                return Err(Violation("this binding does not replay"));
+            }
+            if mutation
                 .original_request_id
                 .as_ref()
                 .is_some_and(|original| Some(original) != self.request_id.as_ref())
-        {
-            return Err(Violation("original_request_id is not this request's ID"));
+            {
+                return Err(Violation("original_request_id is not this request's ID"));
+            }
         }
         if let Some(error) = &self.error
-            && !(error.code.is_base() || FIRST_BINDING_EXTENDED.contains(&error.code))
+            && !(error.code.is_base() || error.code == ErrorCode::OutcomeUnknown)
         {
             return Err(Violation("error code is not emitted on this binding"));
         }
@@ -591,12 +678,71 @@ impl InvokeResponse {
         }
         Ok(serde_json::to_vec(self).expect("an invoke response is serializable"))
     }
+
+    /// How the first binding narrows § 5 on a host with standing grants
+    /// (compatibility § 2.1, Keyed writes under a standing grant): as
+    /// [`first_binding_rules`](Self::first_binding_rules), except that
+    ///
+    /// - a `replayed` mutation names the original attempt's request, not
+    ///   this response's;
+    /// - `error.code` may also be [`KEYED_BINDING_EXTENDED`]'s
+    ///   `approval_required` or `idempotency_conflict`.
+    pub fn keyed_binding_rules(&self) -> std::result::Result<(), Violation> {
+        if self.source_audit.is_some() {
+            return Err(Violation("source_audit is not answered on this binding"));
+        }
+        if self.audit_status == AuditStatus::NotRequired {
+            return Err(Violation("not_required is not answered on this binding"));
+        }
+        if let Some(mutation) = &self.mutation
+            && !mutation.replayed
+            && mutation
+                .original_request_id
+                .as_ref()
+                .is_some_and(|original| Some(original) != self.request_id.as_ref())
+        {
+            return Err(Violation("original_request_id is not this request's ID"));
+        }
+        if let Some(error) = &self.error
+            && !(error.code.is_base() || KEYED_BINDING_EXTENDED.contains(&error.code))
+        {
+            return Err(Violation("error code is not emitted on this binding"));
+        }
+        Ok(())
+    }
+
+    /// [`decode`](Self::decode) under
+    /// [`keyed_binding_rules`](Self::keyed_binding_rules): the reader of an
+    /// answer to a [`KeyedInvokeRequest`].
+    pub fn decode_keyed(bytes: &[u8]) -> std::result::Result<Self, Error> {
+        let refused = || {
+            Error::new(
+                ErrorCode::UpstreamProtocol,
+                "response is not a valid v1alpha2 invoke envelope",
+            )
+        };
+        let response: Self = crate::read_json(bytes).map_err(|_| refused())?;
+        response.keyed_binding_rules().map_err(|_| refused())?;
+        Ok(response)
+    }
+
+    /// [`encode`](Self::encode) under
+    /// [`keyed_binding_rules`](Self::keyed_binding_rules): the writer of a
+    /// host with standing grants.
+    pub fn encode_keyed(&self) -> std::result::Result<Vec<u8>, Violation> {
+        self.section5_rules()?;
+        self.keyed_binding_rules()?;
+        if let Some(result) = &self.result {
+            readable_payload(result)?;
+        }
+        Ok(serde_json::to_vec(self).expect("an invoke response is serializable"))
+    }
 }
 
-/// The extended codes the first binding emits besides the 13 base codes
-/// (compatibility § 2.1, Response): an uncertain dispatched write, a write no
-/// standing grant covers, and a live key reused for other input.
-pub const FIRST_BINDING_EXTENDED: [ErrorCode; 3] = [
+/// The extended codes a host with standing grants emits besides the 13 base
+/// codes (compatibility § 2.1, Response): an uncertain dispatched write, a
+/// write no standing grant covers, and a live key reused for other input.
+pub const KEYED_BINDING_EXTENDED: [ErrorCode; 3] = [
     ErrorCode::OutcomeUnknown,
     ErrorCode::ApprovalRequired,
     ErrorCode::IdempotencyConflict,

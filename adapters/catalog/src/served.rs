@@ -21,6 +21,8 @@
 //!    is `idempotency_conflict`; a write no grant in the file covers is
 //!    `approval_required`; a grant's hour used up is `rate_limited`; a grant
 //!    file that cannot be read safely is `unavailable`. Each before the anchor.
+//!    On `POST /v1/invoke`, which reads no grant, a write is `unsupported`
+//!    before any adapter call.
 //! 4. [`Bridge::invoke`]: an operation outside the described reads and writes
 //!    is `unsupported` before the credential is read. This repeats 2.
 //! 5. The mounted credential: an item absent, or refused by any check, is

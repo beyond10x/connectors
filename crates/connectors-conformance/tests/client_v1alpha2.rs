@@ -21,10 +21,8 @@ async fn the_returned_attempt_id_is_the_one_the_host_recorded() {
     let host = Host::start().await;
     let client = Client::new(&host.endpoint, TOKEN.into(), true).unwrap();
     let descriptor = client.describe().await.unwrap();
-    // A write is keyed and admitted under the host's standing grant
-    // (story:served-keyed-writes-under-a-standing-approval).
     let invoked = client
-        .invoke_v1alpha2_keyed(&descriptor, "write", json!({"value":1}), Some("write-1"))
+        .invoke_v1alpha2(&descriptor, "write", json!({"value":1}))
         .await
         .unwrap();
     assert_eq!(invoked.result, json!({"value":1}));
