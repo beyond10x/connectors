@@ -1560,6 +1560,7 @@ impl Engine {
                         selection.id
                     )));
                 }
+                check_walk_pages(selection, walk, &declaration.input_schema)?;
                 declaration.input_schema[walk::KEYWORD] =
                     serde_json::to_value(walk).map_err(|_| Error::internal())?;
             }
@@ -3301,6 +3302,36 @@ fn check_walk_parameters(selection: &Selection, operation: &Operation) -> Result
                 "selection `{}` walk `{member}` `{name}` is not a query parameter of its operation",
                 selection.id
             )));
+        }
+    }
+    Ok(())
+}
+
+/// Every page the walk shapes is one the admitted input schema takes: each
+/// `query` value is a value of its parameter's schema, the selection's bounds
+/// included, and no `first_only` parameter is one every call requires, since
+/// the pages after the first leave it out.
+fn check_walk_pages(selection: &Selection, walk: &walk::Walk, input_schema: &Value) -> Result<()> {
+    let refused = |reason: String| {
+        Err(refuse(format!(
+            "selection `{}` walk {reason}",
+            selection.id
+        )))
+    };
+    for (name, value) in &walk.query {
+        let schema = &input_schema["properties"][name.as_str()];
+        if connectors_sdk::validate(schema, value).is_err() {
+            return refused(format!(
+                "`query` `{name}` is {value}, which its parameter's schema refuses"
+            ));
+        }
+    }
+    let required = input_schema["required"].as_array();
+    for name in &walk.first_only {
+        if required.is_some_and(|required| required.iter().any(|r| r == name.as_str())) {
+            return refused(format!(
+                "`first_only` `{name}` is required on every call, so a page after the first cannot leave it out"
+            ));
         }
     }
     Ok(())
