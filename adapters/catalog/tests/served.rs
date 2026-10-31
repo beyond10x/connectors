@@ -45,6 +45,37 @@ const BINARY: &str = "/bin-test/connectors-catalog-provider";
 const CONFIG: &str = "/srv/served.json";
 /// The standing grant file a host that serves writes reads at every write.
 const GRANTS: &str = "/srv/grants.json";
+/// The provider's answers to `PUT /repos/example-org/service/pulls/<n>/merge`,
+/// by pull request: GitHub's documented refusals of a merge ("Merge a pull
+/// request": 405 when the merge cannot be performed, 409 when the head moved
+/// since the given `sha`, 422 when validation fails, as for a branch that must
+/// be brought up to date first) and an ordinary server error. Each refusal
+/// body has GitHub's shape, `message` and `documentation_url`; none is a
+/// recorded answer.
+const MERGE_ANSWERS: [(&str, u16, &str); 4] = [
+    (
+        "/api/v4/repos/example-org/service/pulls/1/merge",
+        405,
+        r#"{"message":"Pull Request is not mergeable","documentation_url":"https://docs.github.com/rest/pulls/pulls#merge-a-pull-request"}"#,
+    ),
+    (
+        "/api/v4/repos/example-org/service/pulls/2/merge",
+        409,
+        r#"{"message":"Head branch was modified. Review and try the merge again.","documentation_url":"https://docs.github.com/rest/pulls/pulls#merge-a-pull-request"}"#,
+    ),
+    (
+        "/api/v4/repos/example-org/service/pulls/3/merge",
+        422,
+        r#"{"message":"Head branch is not up to date with the base branch","documentation_url":"https://docs.github.com/rest/pulls/pulls#merge-a-pull-request"}"#,
+    ),
+    (
+        "/api/v4/repos/example-org/service/pulls/5/merge",
+        502,
+        r#"{"message":"Server Error"}"#,
+    ),
+];
+/// The merge whose connection the provider cuts without an answer.
+const MERGE_CUT: &str = "/api/v4/repos/example-org/service/pulls/4/merge";
 
 /// One request the provider answered: method, path (without the query) and the
 /// `PRIVATE-TOKEN` it carried.
@@ -133,6 +164,20 @@ impl Provider {
                     }
                     let route = target.split('?').next().unwrap_or_default().to_owned();
                     let known = matches!(token.as_deref(), Some(TOKEN | ROTATED));
+                    // A merge the provider never answers: the connection is
+                    // cut after the request was read whole.
+                    if known && method == "PUT" && route == MERGE_CUT {
+                        observed.lock().unwrap().push(Seen {
+                            method,
+                            route,
+                            token,
+                        });
+                        drop(stream);
+                        continue;
+                    }
+                    let merge = MERGE_ANSWERS
+                        .iter()
+                        .find(|(merged, _, _)| method == "PUT" && route == *merged);
                     let (status, body) = if !known {
                         (401, json!({"message": "401 Unauthorized"}))
                     } else if method == "GET" && route == "/api/v4/projects/7" {
@@ -145,6 +190,8 @@ impl Provider {
                             json!({"id": 501, "iid": 3, "project_id": 7, "title": sent["title"],
                                    "state": "opened"}),
                         )
+                    } else if let Some((_, status, body)) = merge {
+                        (*status, serde_json::from_str(body).unwrap())
                     } else {
                         (404, json!({"message": "404 Not Found"}))
                     };
@@ -786,17 +833,30 @@ const REPOSITORY_OPENAPI: &str = r#"{"openapi":"3.0.3","info":{"title":"Fixture 
 /// Lay out, in `served`'s jail, a definition of [`REPOSITORY_OPENAPI`] with
 /// a repository read, a search, the user read and a repository write.
 fn define_repository_forge(served: &Served) {
+    define_forge(
+        served,
+        REPOSITORY_OPENAPI,
+        "\x20 repo.get: {op: getRepository, description: Read one repository}\n\
+         \x20 repos.search: {op: searchRepositories, description: Search repositories}\n\
+         \x20 user.get: {op: getUser, description: Read the user}\n\
+         \x20 issue.create:\n    op: createIssue\n    effect: write\n    body: {title: string!}\n",
+    );
+}
+
+/// Lay out, in `served`'s jail, a token-profile definition of `openapi`
+/// whose `operations` member is `operations`.
+fn define_forge(served: &Served, openapi: &str, operations: &str) {
     let defs = served.path("/srv/defs");
     fs::create_dir_all(defs.join("upstream/forge")).unwrap();
     fs::create_dir_all(defs.join("connectors")).unwrap();
     let mut gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
-    gzip.write_all(REPOSITORY_OPENAPI.as_bytes()).unwrap();
+    gzip.write_all(openapi.as_bytes()).unwrap();
     fs::write(
         defs.join("upstream/forge/openapi.json.gz"),
         gzip.finish().unwrap(),
     )
     .unwrap();
-    let sha256 = hex::encode(Sha256::digest(REPOSITORY_OPENAPI.as_bytes()));
+    let sha256 = hex::encode(Sha256::digest(openapi.as_bytes()));
     let definition = format!(
         "schema: urn:beyond10x:connectors-definition:1\n\
          source:\n  openapi: upstream/forge/openapi.json.gz\n  sha256: {sha256}\n\
@@ -806,11 +866,7 @@ fn define_repository_forge(served: &Served) {
          \x20   label: Fixture personal access token\n\
          \x20   identity: {{path: user, kind: forge.user, subject: /id}}\n\
          \x20   scopes: {{path: personal_access_tokens/self, pointer: /scopes, minimum: [api]}}\n\
-         operations:\n\
-         \x20 repo.get: {{op: getRepository, description: Read one repository}}\n\
-         \x20 repos.search: {{op: searchRepositories, description: Search repositories}}\n\
-         \x20 user.get: {{op: getUser, description: Read the user}}\n\
-         \x20 issue.create:\n    op: createIssue\n    effect: write\n    body: {{title: string!}}\n"
+         operations:\n{operations}"
     );
     fs::write(defs.join("connectors/forge.yaml"), definition).unwrap();
 }
@@ -1124,4 +1180,167 @@ async fn adversary_an_uppercase_git_suffix_in_the_list_still_names_the_repositor
         }],
         "the listed repository is read: {answer}"
     );
+}
+
+/// The vendored source of a forge with GitHub's "Merge a pull request":
+/// `PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge`.
+const MERGE_OPENAPI: &str = r#"{"openapi":"3.0.3","info":{"title":"Fixture merging forge","version":"1"},
+"servers":[{"url":"https://forge.example.com/api/v4"}],
+"paths":{
+"/user":{"get":{"operationId":"getUser","responses":{"200":{"description":"ok","content":{"application/json":{"schema":{"type":"object","properties":{"id":{"type":"integer"}}}}}}}}},
+"/personal_access_tokens/self":{"get":{"operationId":"getTokenSelf","responses":{"200":{"description":"ok","content":{"application/json":{"schema":{"type":"object"}}}}}}},
+"/repos/{owner}/{repo}/pulls/{pull_number}/merge":{"put":{"operationId":"mergePullRequest","parameters":[{"name":"owner","in":"path","required":true,"schema":{"type":"string"}},{"name":"repo","in":"path","required":true,"schema":{"type":"string"}},{"name":"pull_number","in":"path","required":true,"schema":{"type":"integer"}}],"requestBody":{"content":{"application/json":{"schema":{"type":"object","properties":{"merge_method":{"type":"string"}}}}}},"responses":{"200":{"description":"merged","content":{"application/json":{"schema":{"type":"object","properties":{"merged":{"type":"boolean"},"sha":{"type":"string"},"message":{"type":"string"}}}}}}}}}
+}}"#;
+
+/// story:served-merge-refusal-answers-refused: a served `pull_request.merge`
+/// the provider definitely refuses (405, 409, 422 with GitHub's bodies)
+/// answers that refusal's code with the provider's message, the mutation
+/// classified `refused`, and a replay of the same key answers the same
+/// refusal with no second request. A cut connection and a 5xx say nothing
+/// about the merge: `outcome_unknown`, classified `unknown`.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_served_merge_the_provider_refuses_answers_refused_with_its_message() {
+    let provider = Provider::new();
+    let grants = json!({
+        "format": "connectors.standing-grants/1",
+        "grants": [{
+            "id": "g-merges", "instance": "forge.fixture", "operation": "pull_request.merge",
+            "target": [{"pointer": "/owner", "value": "example-org"}],
+            "not_after_unix_ms": 4_000_000_000_000_i64, "max_per_hour": 20
+        }],
+        "revoked": []
+    });
+    let mut served = Served::granted(
+        &provider,
+        "forge.fixture",
+        "forge.pat",
+        repository_catalog(&provider, Value::Null),
+        &grants,
+    );
+    define_forge(
+        &served,
+        MERGE_OPENAPI,
+        "\x20 user.get: {op: getUser, description: Read the user}\n\
+         \x20 pull_request.merge:\n    op: mergePullRequest\n    effect: write\n    body: {merge_method: string}\n",
+    );
+    served.deliver("..2026_10_30_00_00_00.000000001", &document(TOKEN), 0o400);
+    served.start().expect("the served binary starts");
+    let descriptor = served.describe().await;
+    let revision = descriptor["revision"].as_str().unwrap().to_owned();
+    let merge = |request_id: &str, key: &str, pull: u64| {
+        json!({
+            "version": "v1alpha2", "request_id": request_id, "operation": "pull_request.merge",
+            "revision": revision, "idempotency_key": key,
+            "input": {"owner": "example-org", "repo": "service", "pull_number": pull,
+                      "body": {"merge_method": "squash"}},
+        })
+    };
+    let route = "/v1alpha2/invoke";
+    let puts = || {
+        provider
+            .seen()
+            .into_iter()
+            .filter(|seen| seen.method == "PUT")
+            .count()
+    };
+
+    for (pull, status_wanted, code, message) in [
+        (1, 403, "forbidden", "Pull Request is not mergeable"),
+        (
+            2,
+            400,
+            "invalid_input",
+            "Head branch was modified. Review and try the merge again.",
+        ),
+        (
+            3,
+            400,
+            "invalid_input",
+            "Head branch is not up to date with the base branch",
+        ),
+    ] {
+        let before = puts();
+        let request_id = format!("merge-{pull}");
+        let key = format!("k-merge-{pull}");
+        let (status, refused) = served
+            .send(
+                reqwest::Method::POST,
+                route,
+                Some(&merge(&request_id, &key, pull)),
+            )
+            .await;
+        assert_eq!(status, status_wanted, "{pull}: {refused}\n{}", served.log());
+        assert_eq!(refused["status"], "error", "{pull}: {refused}");
+        assert_eq!(refused["error"]["code"], code, "{pull}: {refused}");
+        let text = refused["error"]["message"].as_str().unwrap_or_default();
+        assert!(
+            text.contains(message),
+            "{pull}: the provider's message is carried: {refused}"
+        );
+        assert_eq!(
+            refused["mutation"]["classification"], "refused",
+            "{pull}: {refused}"
+        );
+        assert_eq!(refused["mutation"]["replayed"], false, "{pull}: {refused}");
+        assert_eq!(
+            refused["mutation"]["original_request_id"], request_id,
+            "{pull}: {refused}"
+        );
+        assert!(
+            refused["mutation"]["attempt"]["id"].is_string(),
+            "{pull}: {refused}"
+        );
+        assert_eq!(puts(), before + 1, "{pull}: one merge request was sent");
+
+        // The same key and input again: the original refusal, replayed.
+        let (status, replay) = served
+            .send(
+                reqwest::Method::POST,
+                route,
+                Some(&merge(&format!("{request_id}-again"), &key, pull)),
+            )
+            .await;
+        assert_eq!(status, status_wanted, "{pull}: {replay}\n{}", served.log());
+        assert_eq!(replay["error"], refused["error"], "{pull}: {replay}");
+        assert_eq!(
+            replay["mutation"]["classification"], "refused",
+            "{pull}: {replay}"
+        );
+        assert_eq!(replay["mutation"]["replayed"], true, "{pull}: {replay}");
+        assert_eq!(
+            replay["mutation"]["attempt"], refused["mutation"]["attempt"],
+            "{pull}: {replay}"
+        );
+        assert_eq!(puts(), before + 1, "{pull}: a replay sends nothing");
+    }
+
+    // A cut connection and a server error say nothing about the merge.
+    for pull in [4, 5] {
+        let before = puts();
+        let (status, unknown) = served
+            .send(
+                reqwest::Method::POST,
+                route,
+                Some(&merge(
+                    &format!("merge-{pull}"),
+                    &format!("k-merge-{pull}"),
+                    pull,
+                )),
+            )
+            .await;
+        assert_eq!(status, 502, "{pull}: {unknown}\n{}", served.log());
+        assert_eq!(
+            unknown["error"]["code"], "outcome_unknown",
+            "{pull}: {unknown}"
+        );
+        assert_eq!(
+            unknown["mutation"]["classification"], "unknown",
+            "{pull}: {unknown}"
+        );
+        assert_eq!(
+            puts(),
+            before + 1,
+            "{pull}: one merge request, never resent"
+        );
+    }
 }
