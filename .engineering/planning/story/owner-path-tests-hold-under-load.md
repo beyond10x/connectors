@@ -6,7 +6,7 @@ status: draft
 title: Owner and store path tests hold under machine load
 relations:
 - informed_by: story:connectors-do-short-invocation
-revision: 6
+revision: 7
 ---
 ## Problem
 
@@ -33,6 +33,12 @@ The connectors-host library test
 `local::config::derived_instance_tests::printing_the_bootstrap_is_bounded_when_a_descendant_keeps_the_output`
 (`crates/connectors-host/src/local/config.rs:2938`, `started.elapsed() < 5 s`) failed in the 0.62.0
 local gate on 2026-10-30 at load average 30, then passed alone in 0.57 s.
+
+In the targeted run on 2026-10-30, `apps/connectors/tests/local_mcp_server.rs` failed
+`production_stdio_withdrawal_framing_and_cancellation` (line 837, "the call never reached the
+provider" within 5 s) and `stdin_close_still_answers_requests_already_read` at load average 27.
+That run was on the integration head of wave D240. Three runs alone at load average 17 passed
+14 of 14.
 
 ## Outcome
 

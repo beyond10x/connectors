@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.63.0 — 2026-10-30
+
+`invoke` prints only what an agent asks for, and walks a declared page sequence itself, so one
+page of 40 ticket audits no longer costs about 38 KB of context and no agent writes its own
+cursor loop. The local MCP server takes the same shaping and walk arguments.
+
+### Breaking
+
+- MCP `tools/list`: every tool's `outputSchema.properties.result` is now any JSON, and the
+  operation's own output schema moves to `_meta["io.beyond10x.connectors/operation"].output_schema`
+  (story:mcp-tool-call-shapes-its-result). A client that validated `structuredContent` against the
+  operation schema reads it from `_meta` instead.
+
+### Added
+
+- `invoke --fields <paths>` prints only the named members of the provider result, and
+  `invoke --each <path>` prints one NDJSON line per element of an array, the envelope last
+  (story:invoke-shapes-its-result). A path is dotted names, `[]` over an array, `alias:path`, or an
+  RFC 6901 pointer for a key holding `.`, `[`, `]`, `:`, `/` or `~`. A path that matches nothing is
+  listed in `result.missing`. `--fields status` is a status-only probe. A refusal and a catalog
+  result whose status is not 2xx are printed whole; on a write `request_id`, `mutation` and
+  `source_audit` are always printed. Shaping runs after the owner, the audit record and the
+  mutation ledger have the full answer, and is never sent to the provider.
+- A catalog read may declare a `walk` (position parameter, next-position pointer, records pointer,
+  fixed query, named end conditions) in its selection (story:catalog-operation-declares-its-walk).
+  It reaches callers in the operation's input schema as `x-connectors-walk`, so `invoke --describe`
+  shows it. Declared for Zendesk (ticket comments, ticket audits, the incremental exports), Gmail,
+  Google Calendar, Google Drive, Confluence, Jira `issues.search`, HubSpot `objects.list` and Slack.
+  The configuration revision of these providers' instances changes, because their selection files
+  change; their bundles do not.
+- `invoke --walk --out <file|-> [--max-pages n]` follows a declared walk (story:invoke-walks-declared-pages).
+  Each page is one admitted read. Records are written as NDJSON to a new owner-only file, or to
+  stdout with `--out -`, and a summary (`pages`, `records`, `complete`, `end`, `stopped`, `resume`)
+  is printed last. `--max-pages` is 1 to 10,000, default 20. A walk that stops early keeps the
+  records it wrote and gives the input for the next call as `resume`. `--walk` without `--out`,
+  on a write, or on an operation that declares no walk is refused before any call.
+- MCP `tools/call` takes `fields`, `each`, `walk` and `max_pages` beside `input`, with the CLI's
+  semantics; a walk returns its records as `items`, bounded by the response size, never a file.
+
+### Limitations
+
+- An operation lowered from a `connectors-definition/1` file declares no walk yet; `--walk` on it
+  is refused as `unsupported` (story:definition-lowerer-carries-walk). `connectors-build` import
+  of a selection with walks reports each dropped walk.
+- `--fields` cannot name a key holding `,` or with leading or trailing whitespace.
+- Shaping applies to `invoke` and MCP `tools/call` only, not to the list commands.
+
+
 ## 0.62.1 — 2026-10-30
 
 Findings from a cluster rehearsal of 0.62.0's served forge access: one instance serves several

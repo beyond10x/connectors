@@ -743,49 +743,51 @@ fn a_derived_configuration_refuses_what_it_cannot_derive() {
 /// Jira pins moved when `issue.create` and `issue.comment.add` required their
 /// new `id` present after the write, and again with the two `confluence-v1`
 /// pins when the Jira and Confluence v1 selections gained their `feed` (and
-/// Jira `projects.list` and `project.get`).
+/// Jira `projects.list` and `project.get`). The eighteen pins of Confluence,
+/// Google Calendar, Drive and Gmail, HubSpot, Jira, Slack and Zendesk moved
+/// when their selections declared a `walk` (story:catalog-operation-declares-its-walk).
 #[test]
 fn documented_native_configurations_keep_their_revisions() {
     let pinned: BTreeMap<String, &str> = [
         (
             "00 catalog-confluence.md",
-            "42702bda6cd24595ff5f69750b3fdda271fb380f71d73f073eac2a0014719def",
+            "d762bc44764155933d3eddf9247cd733138d238af8300799e17e57a16cdca265",
         ),
         (
             "01 catalog-confluence.md",
-            "86a936572eaa670f31dfb80ea503d568c7e3732384bbe46207047796a5599e28",
+            "df461239a3e29d679d70ebd5388f42bbff7fcdd6469d5c6f431f01697e1e7b92",
         ),
         (
             "02 catalog-confluence.md",
-            "3b2d03659dc0d1603da69c65eb6c727cb025c71a2a9d414a7ea7be8f71c84bd0",
+            "94e3ff9c147d1952540a7bf9614ade926eebcdd148e25c8b892966009321bc4a",
         ),
         (
             "03 catalog-confluence.md",
-            "cc01bd621a306d99e9c32c429dd2c8b20593583142db6128c1cfcfe7a7e71901",
+            "e2c0e02574a8722bd6fcf8d2555e90361ba400b945d9d0d33d7b09cd34a5ae12",
         ),
         (
             "04 catalog-confluence.md",
-            "42702bda6cd24595ff5f69750b3fdda271fb380f71d73f073eac2a0014719def",
+            "d762bc44764155933d3eddf9247cd733138d238af8300799e17e57a16cdca265",
         ),
         (
             "05 catalog-google-calendar.md",
-            "ac90599c7a1255715ebc16c8c0ec17cc4925985676880d2e1ba189988005c459",
+            "f5e32d1fa594a4bdeb0bf391d256e545d9c443acb965db912cd4ce62398d1a62",
         ),
         (
             "06 catalog-google-calendar.md",
-            "36d1eb4505ba0be70273d91e8fdda3368474123c5773be6d32a7191e4d281428",
+            "bf808c6246efaabfd8a53f594992550331e7d0f489d7f5e496365c0bc9e299b9",
         ),
         (
             "07 catalog-google-drive.md",
-            "c9ff1845cca4a082e724aab12c226409ede2d62ba2d7897d63feeba0c79f49ce",
+            "bd5b9027875019f49c099fb490f8ed65ed1f4dcc7bf09da0ad19a3505573c1f7",
         ),
         (
             "08 catalog-google-drive.md",
-            "d673ca0a9d79874a1dd83e6ef9f28be01ca9937a6f94429314e45ac704d0ef6a",
+            "27aa4e87e571bb8ba4920e571775c81c9383eac8fe171a70e7188b122562326d",
         ),
         (
             "09 catalog-google-gmail.md",
-            "c5167a1d610da35a2225dc895719e2b72709bde2b044f8a9db62d75ef5461dd1",
+            "cb6961af72d33dad02e2dffd043a04d024b336a44834b5035b2868781e4a033e",
         ),
         (
             "10 catalog-google-slides.md",
@@ -793,19 +795,19 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "11 catalog-hubspot.md",
-            "ab1aae40aff91fa177426e3dddd3ab78bcc1d7ac1a60a960d0ca6d951106e17e",
+            "f22df2fc89858454b75fc46c55187aa467458a05c8fd0d476cf052dd73e70fe9",
         ),
         (
             "12 catalog-jira.md",
-            "dffb974880505f1da2a2a943b605841096792ee98be3b29b5846349b225a4a66",
+            "825e16fc6a087d3f237b49e2a29dbb1e1d44ede342bbf3b8fe4cfa80ac4db3a2",
         ),
         (
             "13 catalog-jira.md",
-            "3521245f808b67229f3d206ca08656863ec85b7c30bbff94f089f873fcaa40b0",
+            "041eaf60314d7910ff42446d5be5ee9b9ebddcb3d55ea7dd88586481e11d6934",
         ),
         (
             "14 catalog-jira.md",
-            "2c5a6e6c8dd7eefd3311a36fb5b1e0742cd49bb518bbcc55489f3f0dcee0b058",
+            "dacdbb2d66a8b6ce5f1d63ec131196e5eaf93852dd0a450388dd85e32e761f3e",
         ),
         (
             "15 catalog-openrouter.md",
@@ -825,19 +827,19 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "19 catalog-slack.md",
-            "23e877ed8e54ad38b319d0ffd0c482203719b26ecd094e7e65bc8d976a6af6ca",
+            "e7220d48c9c68cfbb78e363d2a6ea5d4ce3e2595c4baad8f86492b02b010f79b",
         ),
         (
             "20 catalog-slack.md",
-            "1dc8109ddc54339d4cbcabbedc13c427fa4a180d2a74213bc4505a7e44fa8404",
+            "abe8a377d7f6cc4e17df36e888e4df0c4a55cfad753b4eb1b1039ac2509a1009",
         ),
         (
             "21 catalog-zendesk.md",
-            "740803bc0d062be63c6d7b9c83929a4d07047e5f963a1501659eb33fe827583c",
+            "51e91ea435719292acb4f82190b0726dfbf4792eebf83f5330684d0b55a05208",
         ),
         (
             "22 catalog-zendesk.md",
-            "c98a025250b95a73586fc720f398e3efb738ff321bef17a31c7a273565ca44c2",
+            "8805dd84dc3975e41e558d0aa4dd56eb35415b4c2aaffc0530bf9e86472a446a",
         ),
         (
             "23 local-catalog-provider.md",

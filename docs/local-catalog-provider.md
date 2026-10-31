@@ -852,6 +852,56 @@ The complete configuration used against the sandbox is
   a write, beside `response`, `envelope`, `binary` or `download`, or a pointer
   without a leading `/` is refused when the selection loads. The member is
   modelled as `connectors_catalog.selection.ReadEmbeddedText`.
+- `walk` is optional, for a read answering JSON: `{"parameter": "<query
+  parameter>", "next": "<pointer>", "url_parameter": "<name>", "records":
+  "<pointer>", "query": {"<query parameter>": <value>}, "first_only":
+  ["<query parameter>", …], "continues": {"pointer": "<pointer>", "equals":
+  <value>}, "ends": [{"name": "<name>", "<test>": …}, …]}` declares how the
+  read's pages are walked and when the walk ends, so a caller follows the
+  provider's own rule instead of re-deriving it from the description. The
+  second page on sends the position as `parameter`; the position is the value
+  at the RFC 6901 pointer `next` in the previous page's answer (a string of at
+  most 16 KiB or an integer), or, with `url_parameter`, that one query
+  parameter of the link at `next` (a link of at most 16 KiB), form-decoded. `records` points at the page's records, an array
+  (absent or null is no records). Every page sends `query`, each value a
+  string, an integer or a boolean, such as Zendesk's
+  `include_boundary_indicators: true`; only the first page sends the
+  `first_only` parameters, such as Zendesk's `start_time` before the export
+  continues by `cursor`. Each page is decided in order: while `continues`
+  holds, the walk goes on whatever `ends` say, and a page without a position
+  is an error; otherwise the first end that holds ends the walk, and its
+  `name` (lower snake case, at most 64 bytes, such as `has_more_false`) says
+  which; otherwise the walk goes on to the position, and a page that names
+  none is an error. A position sent before in the same walk is an error, so a
+  walk cannot loop; positions are compared by the query value they send (so
+  `"5"` and `5` are one position), a position the first page's input already
+  carries counts as sent, and the walk keeps a SHA-256 of each, not its text. Each end takes exactly one test: `when` (`{"pointer",
+  "equals"}`, the value there equals `equals`), `absent` (a pointer whose
+  value is absent, null or the empty string), `present` (one whose value is
+  neither) or `empty` (one whose value is absent, null or an empty array).
+  Zendesk's `ticket.audits` declares
+  `"continues": {"pointer": "/meta/has_more", "equals": true}` and the ends
+  `has_more_false`, `no_cursor` (`absent` `/meta/after_cursor`) and
+  `no_records` (`empty` `/audits`). The provider runs no walk: it declares the
+  walk in the operation's input schema under `x-connectors-walk`, an annotation
+  no validator asserts, so `operations describe` and `invoke --describe` show
+  it inside `input_schema`, an invoke can read it from the same admitted
+  description as the schema and revision, and the `schema` digest an invoke
+  pins covers it with the rest of the input schema. A walk on a write, a `download`, a `binary`, an
+  `embedded_text` or a text read; a pointer that is not led by `/` or escapes
+  a `~` other than `~0` and `~1`; a `parameter`, `query` key or `first_only`
+  name that is not a query parameter of the operation as the selection exposes
+  it (withheld, fixed and credential parameters are not); a `query` value that
+  is not a string, an integer or a boolean, or that the parameter's schema in
+  the admitted description refuses, bounds included; a `first_only` name the
+  admitted description requires on every call; a `query` key or `first_only`
+  name that is the `parameter`, or a `first_only` name in `query` or named
+  twice; an `url_parameter` that is not
+  1 to 128 visible ASCII characters; no end or more than eight; an end without
+  exactly one test, with a name that is not lower snake case or named twice;
+  or an unknown member is refused when the selection loads, each by name. The
+  member is modelled as `connectors_catalog.walk.ReadWalk` in
+  `adapters/catalog/spec/ess`.
 - `refusal_texts` is optional, for a write: `[{"pointers": ["<pointer>", …],
   "contains": ["<text>", …], "code": "capacity"}, …]`. It is for a provider
   that documents no distinct status for a refusal and whose own clients

@@ -38,13 +38,13 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     // its target (or `--definition`), connection and pins are resolved and
     // stated, `--describe` is answered and a write without approval is
     // refused.
-    let args = match invoke::prepare(args) {
-        Ok(args) => args,
+    let (args, shaping) = match invoke::prepare(args) {
+        Ok(prepared) => prepared,
         Err(answered) => return answered,
     };
     let deprecations = select::deprecations(&args);
     let json = select::json_output(&args);
-    let mut output = run_selected(args);
+    let mut output = run_selected(args, shaping);
     if !deprecations.is_empty() {
         select::deprecate(&mut output, json, &deprecations);
     }
@@ -64,8 +64,12 @@ fn help_output(mut stdout: String, root: bool) -> connectors_cli_contract::Proce
     }
 }
 
-fn run_selected(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
+fn run_selected(
+    args: Vec<OsString>,
+    shaping: Option<invoke::Shaping>,
+) -> connectors_cli_contract::ProcessOutput {
     let session = session::Session::new(&args);
+    session.borrow_mut().shaping = shaping;
     if let Some(output) = configuration_preflight(&session.borrow()) {
         return output;
     }
@@ -82,6 +86,19 @@ fn run_selected(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
         Some(&mut session::NativeValidator(session.clone())),
     );
     session.borrow_mut().finish(&mut output);
+    // `invoke --fields` or `--each` (story:invoke-shapes-its-result): the full
+    // answer the runner checked and printed is shaped; a refusal is not.
+    let answer = session.borrow_mut().answer.take();
+    if output.exit_code == 0
+        && let Some(answer) = answer
+        && let Some(stdout) = session
+            .borrow()
+            .shaping
+            .as_ref()
+            .and_then(|shaping| shaping.render(&answer))
+    {
+        output.stdout = stdout;
+    }
     // `list` under `--output human` is a table, not the result's JSON text.
     if output.exit_code == 0
         && let Some(("connectors-list", context)) = session.borrow().selected()
@@ -140,8 +157,20 @@ impl Handler for LocalHandler {
         // `invoke` selects by its target and names the connector and instance
         // itself (story:connectors-do-short-invocation).
         if call.callable == "invoke" {
-            let session = self.0.borrow();
-            return invoke::dispatch(call, session.deadline, session.mutation_deadline);
+            let (deadline, mutation_deadline) = {
+                let session = self.0.borrow();
+                (session.deadline, session.mutation_deadline)
+            };
+            let reply = invoke::dispatch(call, deadline, mutation_deadline);
+            // The full answer is kept for `--fields` and `--each`, which shape
+            // it once the runner has checked and printed it.
+            let mut session = self.0.borrow_mut();
+            if session.shaping.is_some()
+                && let HandlerReply::Success(result) = &reply
+            {
+                session.answer = Some(result.clone());
+            }
+            return reply;
         }
         // A connect's target selects as `--connector` and `--instance` do; its
         // endpoint was written before the runner started.

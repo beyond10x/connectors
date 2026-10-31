@@ -9,3 +9,4 @@ domains:
   - connectors_catalog.guard
   - connectors_catalog.identity
   - connectors_catalog.selection
+  - connectors_catalog.walk

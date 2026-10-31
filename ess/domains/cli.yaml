@@ -1515,6 +1515,15 @@ types:
   # auth files and defaults to the parent of the directory holding it; credential_file is
   # the OAuth client file the existing consent reads when the instance is connected first.
   # All three are path metadata, given only with definition.
+  # fields and each (story:invoke-shapes-its-result) are presentation only: a comma-separated
+  # path list and one path the CLI applies to the full answer after the owner, the audit
+  # record and the mutation ledger have it. They are not part of the approval subject, never
+  # reach the owner or the provider, and the answer is then InvokeShaped.
+  # walk, max_pages and out (story:invoke-walks-declared-pages) run the walk the operation
+  # declares as a loop in the CLI: each page is one invoke of this command with the page's
+  # input, admitted, audited and bounded as any. max_pages is 1 to 10000 (default 20); out is
+  # a new owner-only file the records are written to, or `-` for standard output. None of
+  # them reaches the owner or the provider, and the answer is then InvokeWalked.
   - name: connectors.cli.InvokeInput
     kind: struct
     fields:
@@ -1530,6 +1539,11 @@ types:
       - {name: definitions_root, type: "Optional<String>"}
       - {name: credential_file, type: "Optional<String>"}
       - {name: describe, type: "Optional<Boolean>"}
+      - {name: fields, type: "Optional<String>"}
+      - {name: each, type: "Optional<String>"}
+      - {name: walk, type: "Optional<Boolean>"}
+      - {name: max_pages, type: "Optional<Integer>"}
+      - {name: out, type: "Optional<String>"}
   # An invoke's answer names the connector and instance; it never carries an adapter member.
   - name: connectors.cli.InvokeResult
     kind: struct
@@ -1542,6 +1556,53 @@ types:
       - {name: request_id, type: "Optional<String>"}
       - {name: mutation, type: "Optional<connectors.cli.MutationObservation>"}
       - {name: source_audit, type: "Optional<connectors.service_wire.SourceAudit>"}
+  # story:invoke-shapes-its-result: the answer of `invoke --fields` or `--each`, printed in
+  # place of InvokeResult unless the invoke was refused or its result is a provider result
+  # with an HTTP status that is not 2xx (then InvokeResult is printed whole).
+  # ESS-LIMIT: beside the members declared here the result holds the members --fields names,
+  # each under its first path name or its alias, which no field may make one of these. ess-cli/1
+  # binds one result type to a command, so the generated runner checks the full InvokeResult
+  # and the CLI shapes it afterwards; the open members are enforced by the host and pinned by
+  # apps/connectors/tests/invoke_shapes.rs. records is the number of elements --each printed,
+  # one NDJSON line each before this envelope; missing lists the paths that matched nothing,
+  # as written, when any did; request_id, mutation and source_audit are the InvokeResult's,
+  # copied when it has them.
+  - name: connectors.cli.InvokeShaped
+    kind: struct
+    fields:
+      - {name: records, type: "Optional<Integer>"}
+      - {name: missing, type: "Optional<List<String>>"}
+      - {name: request_id, type: "Optional<String>"}
+      - {name: mutation, type: "Optional<connectors.cli.MutationObservation>"}
+      - {name: source_audit, type: "Optional<connectors.service_wire.SourceAudit>"}
+  # story:invoke-walks-declared-pages: the answer of `invoke --walk`, printed last on standard
+  # output in place of InvokeResult (contracts/cli/v1alpha1/semantics.md, "Walking pages").
+  # ESS-LIMIT: ess-cli/1 binds one result type to a command, so the generated runner checks
+  # each page's full InvokeResult and the CLI prints this summary afterwards; the presence
+  # rules below are enforced by the host and pinned by apps/connectors/tests/invoke_walks.rs.
+  # pages and records count the pages read whose records were written and those records.
+  # complete is true exactly when end is present: end names the declared end that held.
+  # Otherwise stopped names why the walk stopped: max_pages, refused (error is the refused
+  # page's failure envelope error, code and data), status (a provider result whose HTTP status,
+  # in status, is not 2xx), write (a record could not be written), or the name of a page
+  # the declared walk cannot go on from (continues_without_position, no_position,
+  # invalid_position, repeated_position, records_not_a_list). resume is the input of the
+  # page that would have been read next, given back to a walk to read on; it is absent when
+  # the walk cannot go on. out is the --out given. missing lists the --fields paths no record
+  # had, as written, when there was a record.
+  - name: connectors.cli.InvokeWalked
+    kind: struct
+    fields:
+      - {name: pages, type: "Integer"}
+      - {name: records, type: "Integer"}
+      - {name: complete, type: "Boolean"}
+      - {name: end, type: "Optional<String>"}
+      - {name: stopped, type: "Optional<String>"}
+      - {name: error, type: "Optional<Json>"}
+      - {name: status, type: "Optional<Integer>"}
+      - {name: resume, type: "Optional<Json>"}
+      - {name: out, type: "String"}
+      - {name: missing, type: "Optional<List<String>>"}
   # `invoke --describe`: the operation as the instance's current admitted description
   # states it, with the schema and revision an invoke pins. effect is the description's
   # classification, read or write: a description that leaves an effect unknown is never
@@ -1680,7 +1741,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:1253, docs/local-connection-registry.md:222-223;
+    # contracts/cli/v1alpha1/semantics.md:1387, docs/local-connection-registry.md:222-223;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1840,7 +1901,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1257) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1391) and the host
     # removal path (er.rs:4538-4540) only expires Active cursors. The error name is
     # the decision; no source names one.
 

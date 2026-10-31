@@ -176,7 +176,7 @@ fn assert_lowers_to_the_shipped_files(temp: &Path, name: &str, file: &Path, root
     );
     let written: Value =
         serde_json::from_slice(&std::fs::read(&lowered.operations).unwrap()).unwrap();
-    let expected: Value = serde_json::from_slice(
+    let mut expected: Value = serde_json::from_slice(
         &std::fs::read(
             repository()
                 .join("adapters/catalog/providers")
@@ -185,6 +185,12 @@ fn assert_lowers_to_the_shipped_files(temp: &Path, name: &str, file: &Path, root
         .unwrap(),
     )
     .unwrap();
+    // story:catalog-operation-declares-its-walk: a shipped read's `walk` has
+    // no definition field yet (story:definition-lowerer-carries-walk), so the
+    // lowered selection is compared without it.
+    for operation in expected["operations"].as_array_mut().unwrap() {
+        operation.as_object_mut().unwrap().remove("walk");
+    }
     // Field by field first, so a difference names its operation and field;
     // then the whole value, so nothing outside the operations escapes.
     let written_operations = written["operations"].as_array().unwrap();
