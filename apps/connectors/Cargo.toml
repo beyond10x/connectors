@@ -1,6 +1,6 @@
 [package]
 name = "connectors"
-description = "The connectors command: local setup, connector instances, connections, operations and approvals through a local owner, and the describe, invoke and serve service commands."
+description = "The connectors command: invoke a connector's operations, and set up instances, connections and approvals through a local owner."
 version.workspace = true
 edition.workspace = true
 rust-version = "1.91"
@@ -11,24 +11,25 @@ base64.workspace = true
 connectors-catalog = { path = "../../crates/connectors-catalog" }
 connectors-catalog-provider = { path = "../../adapters/catalog" }
 connectors-core.workspace = true
+connectors-definitions-install.workspace = true
 connectors-sdk.workspace = true
-connectors-client.workspace = true
 connectors-host.workspace = true
 connectors-oauth2.workspace = true
 connectors-mcp = { path = "../../adapters/mcp/runtime" }
 connectors_cli_contract.workspace = true
 clap.workspace = true
-clap_complete = "4"
 hex.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 time.workspace = true
-tokio.workspace = true
+toml_edit = { version = "=0.25.15", default-features = false, features = ["parse", "display"] }
 uuid.workspace = true
 
 [dev-dependencies]
 connectors-custody = { workspace = true, features = ["test-support"] }
 async-trait.workspace = true
+flate2.workspace = true
+tar = { version = "0.4.46", default-features = false }
 hex.workspace = true
 libc = "0.2"
 rusqlite = { version = "=0.40.2", features = ["bundled"] }
@@ -41,3 +42,21 @@ connectors-host = { workspace = true, features = ["test-support"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
+
+# These test binaries are also the stand-in catalog provider the CLI starts
+# with provider arguments, which the standard test harness refuses.
+[[test]]
+name = "connect_endpoint"
+harness = false
+
+[[test]]
+name = "connect_endpoint_adversary"
+harness = false
+
+[[test]]
+name = "setup_migrate_short"
+harness = false
+
+[[test]]
+name = "short_form_adversary"
+harness = false

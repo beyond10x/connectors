@@ -17,9 +17,16 @@ Configuration, connection, approval and invocation work as described there;
 this page covers what differs for Slack. The terms connector, instance and connection are those
 of the [vocabulary](../README.md#vocabulary).
 
-Slack runs as two pinned instances of the connector `slack`, one per selection set: a bot
-instance and a user instance ([Configure the two instances](#configure-the-two-instances)). The
-catalog provider ships no connector declaration for Slack, so neither is derived.
+Slack runs as two instances of the connector `slack`, one per selection set: a bot instance and
+a user instance ([Configure the two instances](#configure-the-two-instances)). Since 0.63.1 the
+catalog provider ships a connector declaration for the bot selection,
+[`adapters/catalog/providers/slack/connector.json`](../adapters/catalog/providers/slack/connector.json):
+the connector `slack`, its default endpoint `https://slack.com/api`, the profile `slack.bot` and
+the selection `operations.json`, lowered from the definition `connectors/slack.yaml` of
+`beyond10x/connectors-definitions`. A bot instance can therefore be derived from the connector
+name alone (`--connector slack --instance <name>`). A provider directory holds one declaration,
+so the user selection has none: the user instance stays pinned, and a derived instance refuses
+the profile `slack.user`.
 
 ## Source and bundle
 
@@ -570,7 +577,7 @@ token under the same connection reference and revision. In this run the fixture 
 accepting the bot token, then accepted it again:
 
 ```console
-$ connectors operations invoke --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation conversations.list --schema 2771ae0cbcfa853c69da89e1603d017e397120ce4ffd0891c23ed0d0b5f3f365 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-json '{}'
+$ connectors invoke slack/bot conversations.list --input-json '{}'
 {"error":{"code":"failure","data":{"code":"service_failure","kind":"operational","next_action":"repair_connection","service_code":"unauthorized","service_reason":"invalid_auth","stage":"dispatch"}},"ok":false}
 $ connectors connections list --connector slack --instance bot | jq -c '[.result.connections[]|{connection,revision,state}]'
 [{"connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","revision":"691cd61d-0a34-4ba9-8ab2-f499f90c71f6","state":"stale"}]
@@ -602,16 +609,21 @@ it.
 
 ### Move the entries to instances
 
-`setup migrate` keeps Slack entries where they are: the catalog provider ships no Slack
-connector declaration.
+Since 0.63.1, when the catalog provider ships Slack's declaration, `setup migrate` moves all
+three entries, the user-selection entry included, to pinned instances of the connector `slack`
+under their aliases. This dry run used the 0.63.1 binaries on a scratch configuration with the
+three entries:
 
 ```console
 $ connectors setup migrate --mode dry-run | jq -c '[.result.entries[]|{connector,instance,disposition,reason}]'
-[{"connector":"catalog","instance":"slack","disposition":"kept","reason":"connector_undeclared"},{"connector":"catalog","instance":"slack-bot","disposition":"kept","reason":"connector_undeclared"},{"connector":"catalog","instance":"slack-search","disposition":"kept","reason":"connector_undeclared"}]
+[{"connector":"slack","instance":"slack","disposition":"migrated","reason":null},{"connector":"slack","instance":"slack-bot","disposition":"migrated","reason":null},{"connector":"slack","instance":"slack-search","disposition":"migrated","reason":null}]
 ```
 
-Each entry keeps working as it is, selected as `--connector catalog --instance <alias>` or by the
-deprecated `--adapter <alias>`. To name it as a Slack instance, rewrite it by hand: change
+Before 0.63.1 it kept each as `connector_undeclared`, and since 0.60.0 such an entry is no
+instance: `instances list` names it in `unmigrated`, and selecting it as `catalog/<alias>` or
+`--connector catalog --instance <alias>` is `invalid_configuration` with the rule
+`legacy_entry_unmigrated`. The run below predates 0.63.1, so it names the instances by hand
+instead of by alias: change
 `format` to `"connectors-local/5"`, add `[connectors.slack]` with `enabled = true`, and rename
 each legacy table `[adapters.<alias>]` to `[connectors.slack.instances.<instance>]` with `alias =
 "<alias>"` as its first key, the `.permissions` and `.executable` tables with it. Every pin stays
@@ -755,8 +767,8 @@ published under; after any of them changes, publish it again with
 
 Each write is approved by digest over its exact input, once. `approvals prepare` resolves the
 subject without the clock, the provider or the credential. Take `--schema` and `--revision` from
-`operations describe --connector slack --instance bot --operation chat.postMessage`. The input is
-the JSON body under `body`:
+`connectors invoke slack/bot chat.postMessage --describe`. The input is the JSON body under
+`body`:
 
 ```console
 $ connectors approvals prepare --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation chat.postMessage --schema fd40561da56fd3a5b2f1cd9fe47106914c45c80dc7cc27dc4bdca4f9a45efae2 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-file ~/private/post.json | jq -c '.result.preparation|{subject_sha256, presentation}'
@@ -772,7 +784,7 @@ $ connectors approvals clock-check --connector slack --instance bot | jq -c '.re
 [{"address":"51.81.57.55:2002","result":"agreed"},{"address":"148.113.255.71:2002","result":"agreed"}]
 $ connectors approvals issue --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation chat.postMessage --schema fd40561da56fd3a5b2f1cd9fe47106914c45c80dc7cc27dc4bdca4f9a45efae2 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-file ~/private/post.json --approve-subject 5da23cd1ba119d43b499bb9689ab76e210e6dfbeec7dbda0ac65e025d299bf5d --proof-output ~/private/proof-post-1.json | jq -c '.result|{connector,instance,disposition,subject_sha256}'
 {"connector":"slack","instance":"bot","disposition":"published","subject_sha256":"5da23cd1ba119d43b499bb9689ab76e210e6dfbeec7dbda0ac65e025d299bf5d"}
-$ connectors operations invoke --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation chat.postMessage --schema fd40561da56fd3a5b2f1cd9fe47106914c45c80dc7cc27dc4bdca4f9a45efae2 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-file ~/private/post.json --approval-file ~/private/proof-post-1.json --idempotency-key post-1 | jq -c '.result|{classification: .mutation.classification, status: .result.status, body: .result.body}'
+$ connectors invoke slack/bot chat.postMessage --input-file ~/private/post.json --approval-file ~/private/proof-post-1.json --idempotency-key post-1 | jq -c '.result|{classification: .mutation.classification, status: .result.status, body: .result.body}'
 {"classification":"applied","status":200,"body":{"channel":"C0000000001","message":{"text":"migration check","ts":"1780000700.000700"},"ok":true,"ts":"1780000700.000700"}}
 ```
 
@@ -798,7 +810,7 @@ $ connectors connections revalidate --connector slack --instance bot --connectio
 {"state":"ready","revision":"691cd61d-0a34-4ba9-8ab2-f499f90c71f6","identity":{"kind":"slack.user","subject":"U0000000001"}}
 $ connectors connections revalidate --connector slack --instance search --connection conn_352bbc77ccfb465fbef6d1648d68811a_c019ec9863e6448fa9d13fb2ad322cd8 --expected-revision 87b27e15-155e-4ac5-953b-22b00189b442 | jq -c '.result.connection|{state:.summary.state,revision:.summary.revision,identity:.external_identity}'
 {"state":"ready","revision":"87b27e15-155e-4ac5-953b-22b00189b442","identity":{"kind":"slack.user","subject":"U0000000001"}}
-$ connectors operations invoke --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation conversations.list --schema 2771ae0cbcfa853c69da89e1603d017e397120ce4ffd0891c23ed0d0b5f3f365 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-json '{}' | jq -c '.result.result|{status,body}'
+$ connectors invoke slack/bot conversations.list --input-json '{}' | jq -c '.result.result|{status,body}'
 {"status":200,"body":{"channels":[{"id":"C0000000001","name":"general"}],"ok":true,"response_metadata":{"next_cursor":""}}}
    ```
 

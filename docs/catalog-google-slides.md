@@ -200,7 +200,7 @@ derived from the shipped connector:
 
 ```console
 $ connectors instances list
-{"adapters":[{"adapter":"slides.private","adapter_id":"catalog","connector":"slides","instance":"private","instance_id":"slides.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"adapters":[{"connector":"slides","instance":"private","instance_id":"slides.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
 ```
 
 Then connect it with the Google client file, as

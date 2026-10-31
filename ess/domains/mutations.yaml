@@ -450,10 +450,17 @@ views:
 # PrepareAttempt (`connection_ref` and the fingerprint's connection absent,
 # `approval_mode: not_required`, no `idempotency_key`, `publication_fence` the
 # instance's configuration revision), LinkAnchorAttempt, OpenDispatch, the one
-# provider dispatch, then RecordCompletion for a definitive success or
-# RecordUncertainty for anything else. A failed link or a refused OpenDispatch
+# provider dispatch, then RecordCompletion for a definitive success,
+# RecordRefusal for the provider's definitive refusal, or RecordUncertainty for
+# anything else. A failed link or a refused OpenDispatch
 # aborts the attempt (AbortPrepared, `not_attempted`) with zero adapter calls.
-# The legacy adapter port answers only a value or a generic error; a generic
+# The definitive refusal is the one the adapter's write port answers as
+# refused (`invoke_write_at`; the provider engine's refusal of a 4xx answer,
+# such as 405, 409 or 422 to a merge): Failed / `refused`, answered with the
+# refusal's base code and safe message, both kept in `terminal_result_json`
+# for a replay. A 5xx, a cut connection or a timeout is never a refusal.
+# An adapter that does not override that port answers only a value or a
+# generic error; a generic
 # error, a deadline or a result that breaks the declared output schema after
 # dispatch is not definitive no-effect evidence
 # (contracts/operations/v1alpha1/semantics.md § 4 rule 11), so it is
@@ -487,6 +494,35 @@ views:
 # not required here. The state directory is the HTTP host's own; a local
 # owner's state directory, whose floor guards trusted observations, is not
 # shared with it. Unknown settlement needs no clock.
+# The above is a host without `standing_grants`. A host whose configuration
+# sets it (compatibility.md § 2.1, "Keyed writes under a standing grant";
+# connectors.standing_approvals) keys every such write. One host process
+# admits requests with one caller and key one at a time, from the lookup until
+# the key is reserved or the request is refused. Before its audit
+# anchor the host looks the key up in the caller's namespace (a live key for
+# this exact request is a replay; for another request
+# `idempotency_conflict`), then counts one use of a covering grant
+# (connectors.standing_approvals.CountUse). PrepareAttempt then carries the key
+# and reserves it in the same transaction (KeyReservation `pending`), and
+# BindUse names the attempt before LinkAnchorAttempt. A concurrent request
+# that reserved the key first makes PrepareAttempt answer the existing
+# attempt: its use is released (ReleaseUse) and it is answered as a replay.
+# Replay: the same key with the same fingerprint is answered from the attempt,
+# `replayed: true`, with no grant check, no count and no dispatch: Completed
+# with the retained result (or `capacity`, `applied`, when the result was not
+# retained), Aborted `not_attempted`, Failed `refused` with the original
+# refusal's code and message, Indeterminate
+# `outcome_unknown`. A Prepared or Dispatching original the same process runs
+# is awaited for at most 25 seconds by at most 4 replays, then answered
+# `outcome_unknown`; the host does not recover a pending attempt after a
+# restart, so the replay of an original a crash interrupted is
+# `outcome_unknown` at once, never a second dispatch. Keys and attempts
+# survive a restart. A Completed attempt there retains its result up to
+# 65,536 bytes (`result_retained: false` above it) beside its settlement
+# text. That host never runs ExpireKeyReservation: a key stays live for as
+# long as its attempt is retained, so a key once used is never admitted for
+# another request; the reservation's `replay_expires_at` is recorded from the
+# record time above, and no expiry or key decision on the HTTP host reads it.
 # ESS-LIMIT: the per-instance count, the byte bound, the absence of a
 # connection on exactly these attempts and the clock provenance are host
 # obligations: ESS 0.56 has no cross-record count, byte-length, recording-host

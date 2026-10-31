@@ -381,14 +381,11 @@ fn persistent_kubernetes_cli_owner_and_keyring_restart() {
     let schema = describe["schema"].as_str().unwrap().to_owned();
     let descriptor = describe["revision"].as_str().unwrap().to_owned();
     let invoke = [
-        "operations",
         "invoke",
-        "--adapter",
-        "cluster",
+        "kubernetes/cluster",
+        "resources.list",
         "--connection",
         &reference,
-        "--operation",
-        "resources.list",
         "--schema",
         &schema,
         "--revision",
@@ -536,14 +533,11 @@ fn kubernetes_cli_refuses_a_changed_cluster_identity_and_preserves_the_saved_cre
         "endpoints.discover",
     ]));
     let result = success(cli.run(&[
-        "operations",
         "invoke",
-        "--adapter",
-        "cluster",
+        "kubernetes/cluster",
+        "endpoints.discover",
         "--connection",
         &reference,
-        "--operation",
-        "endpoints.discover",
         "--schema",
         describe["schema"].as_str().unwrap(),
         "--revision",
@@ -604,14 +598,11 @@ fn kubernetes_cli_reads_helm_release_history_and_redacted_values() {
             operation,
         ]));
         let output = cli.run(&[
-            "operations",
             "invoke",
-            "--adapter",
-            "cluster",
+            "kubernetes/cluster",
+            operation,
             "--connection",
             &reference,
-            "--operation",
-            operation,
             "--schema",
             describe["schema"].as_str().unwrap(),
             "--revision",
@@ -694,14 +685,11 @@ fn kubernetes_cli_reads_helm_release_history_and_redacted_values() {
         "helm_releases.history",
     ]));
     let outside = [
-        "operations",
         "invoke",
-        "--adapter",
-        "cluster",
+        "kubernetes/cluster",
+        "helm_releases.history",
         "--connection",
         &reference,
-        "--operation",
-        "helm_releases.history",
         "--schema",
         describe["schema"].as_str().unwrap(),
         "--revision",
@@ -770,14 +758,11 @@ fn kubernetes_cli_reads_namespaces_single_objects_events_and_rollout_history() {
             operation,
         ]));
         cli.run(&[
-            "operations",
             "invoke",
-            "--adapter",
-            "cluster",
+            "kubernetes/cluster",
+            operation,
             "--connection",
             &reference,
-            "--operation",
-            operation,
             "--schema",
             describe["schema"].as_str().unwrap(),
             "--revision",
@@ -975,14 +960,11 @@ fn a_real_cluster_session_persists_across_cli_and_owner_restart() {
     let schema = describe["schema"].as_str().unwrap().to_owned();
     let descriptor = describe["revision"].as_str().unwrap().to_owned();
     let pods = [
-        "operations",
         "invoke",
-        "--adapter",
-        "cluster",
+        "kubernetes/cluster",
+        "resources.list",
         "--connection",
         &reference,
-        "--operation",
-        "resources.list",
         "--schema",
         &schema,
         "--revision",
@@ -1000,14 +982,11 @@ fn a_real_cluster_session_persists_across_cli_and_owner_restart() {
 
     // A namespace outside the configured scope is refused before any request.
     let outside = [
-        "operations",
         "invoke",
-        "--adapter",
-        "cluster",
+        "kubernetes/cluster",
+        "resources.list",
         "--connection",
         &reference,
-        "--operation",
-        "resources.list",
         "--schema",
         &schema,
         "--revision",
@@ -1047,14 +1026,11 @@ fn a_real_cluster_session_persists_across_cli_and_owner_restart() {
         "endpoints.discover",
     ]));
     let listed = success(cli.run(&[
-        "operations",
         "invoke",
-        "--adapter",
-        "cluster",
+        "kubernetes/cluster",
+        "endpoints.discover",
         "--connection",
         &reference,
-        "--operation",
-        "endpoints.discover",
         "--schema",
         describe["schema"].as_str().unwrap(),
         "--revision",
@@ -1485,14 +1461,11 @@ impl RealJourney {
             operation,
         ]));
         self.cli.command(&[
-            "operations",
             "invoke",
-            "--adapter",
-            "cluster",
+            "kubernetes/cluster",
+            operation,
             "--connection",
             connection,
-            "--operation",
-            operation,
             "--schema",
             description["schema"].as_str().unwrap(),
             "--revision",

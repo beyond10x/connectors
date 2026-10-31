@@ -156,15 +156,30 @@ pub enum Rule {
     /// A configuration text is larger than [`CONFIG_LIMIT`], the most a read
     /// admits: the text `setup migrate` would write, which it then does not.
     ConfigTooLarge,
-    /// An `operations invoke --definition` whose connector already has an
-    /// instance named `definition` here, or whose instance id an entry here
-    /// already uses (story:invoke-definition-file): the configured one is never
-    /// replaced.
+    /// An `invoke --definition` whose connector already has an instance named
+    /// `definition` here, or whose instance id an entry here already uses
+    /// (story:invoke-definition-file): the configured one is never replaced.
     DefinitionInstanceConfigured,
+    /// A selection names a legacy `[adapters.<alias>]` entry of the catalog
+    /// provider by the name `catalog` gave it, and `setup migrate` derives no
+    /// connector for it, so it is no instance
+    /// (story:connectors-do-short-invocation).
+    LegacyEntryUnmigrated,
 }
 
 /// The most bytes a configuration read admits.
 pub const CONFIG_LIMIT: usize = 1024 * 1024;
+
+/// Whether an instance's `endpoint` is admitted: 1 to 2048 bytes, without a
+/// control or whitespace character. `connections connect --endpoint` writes
+/// only such a value (story:connectors-do-short-invocation).
+pub fn endpoint_admitted(endpoint: &str) -> bool {
+    !endpoint.is_empty()
+        && endpoint.len() <= 2048
+        && !endpoint
+            .chars()
+            .any(|c| c.is_control() || c.is_whitespace())
+}
 
 impl Rule {
     pub fn as_str(self) -> &'static str {
@@ -176,6 +191,7 @@ impl Rule {
             Self::ApprovalClockFormatRetired => "approval_clock_format_retired",
             Self::ConfigTooLarge => "config_too_large",
             Self::DefinitionInstanceConfigured => "definition_instance_configured",
+            Self::LegacyEntryUnmigrated => "legacy_entry_unmigrated",
         }
     }
 }
@@ -421,11 +437,19 @@ pub struct Connector {
 /// connector declaration. An instance that carries no pin at all is
 /// `derived` (story:connector-instance-derived-fields): the installed catalog
 /// provider derives its entry, held under the alias `<connector>.<instance>`.
+/// A derived instance may state its `alias` and `instance_id`, the short form
+/// a migrated legacy entry keeps its names in
+/// (story:migrate-writes-the-short-instance-form).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Instance {
     pub description: Option<String>,
     pub endpoint: Option<String>,
     pub alias: String,
+    /// The instance id a derived instance states (`instance_id`), in place
+    /// of `<connector>.<instance>`; the provider derives it with
+    /// `--instance-id`. Always `None` for a pinned instance, whose id is its
+    /// entry's.
+    pub instance_id: Option<String>,
     /// Whether the entry is derived rather than pinned; a derived instance is
     /// written back without pins.
     pub derived: bool,
@@ -449,7 +473,7 @@ struct ConnectorTable {
 
 /// `[connectors.<connector>.instances.<instance>]` as written: the instance's
 /// own keys and the legacy entry's pins.
-#[derive(Deserialize, Serialize)]
+#[derive(Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct InstanceTable {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -508,6 +532,7 @@ impl InstanceTable {
             description: self.description,
             endpoint: self.endpoint,
             alias: self.alias?,
+            instance_id: None,
             derived: false,
             profile: None,
             awaiting_profile: None,
@@ -537,11 +562,11 @@ impl InstanceTable {
         }
     }
 
-    /// Whether the table states no pin: only `description` and `endpoint`.
+    /// Whether the table states no pin but the names a derived instance may
+    /// state: only `description`, `endpoint`, `profile`, `alias` and
+    /// `instance_id`.
     fn unpinned(&self) -> bool {
-        self.alias.is_none()
-            && self.instance_id.is_none()
-            && self.adapter_id.is_none()
+        self.adapter_id.is_none()
             && self.configuration_revision.is_none()
             && self.credential_revision.is_none()
             && self.protocol.is_none()
@@ -571,8 +596,8 @@ impl InstanceTable {
         name: &str,
         installation: &Installation,
     ) -> Result<(Instance, Option<Adapter>)> {
-        let (mut instance, args) = self.underived(connector, name)?;
-        match installation.derive(&instance.alias, args, instance.profile.is_some())? {
+        let (mut instance, args, id) = self.underived(connector, name)?;
+        match installation.derive(&id, args, instance.profile.is_some())? {
             Derived::Entry(adapter) => Ok((instance, Some(*adapter))),
             Derived::Awaiting(profiles) => {
                 instance.awaiting_profile = Some(profiles);
@@ -583,9 +608,11 @@ impl InstanceTable {
 
     /// The instance `name` of the connector `connector` as [`Self::derived`]
     /// admits it before the provider is started, and the arguments the
-    /// provider would be started with: everything a derivation checks except
-    /// what only the provider answers.
-    fn underived(self, connector: &str, name: &str) -> Result<(Instance, Vec<String>)> {
+    /// provider would be started with, and the instance id it must print:
+    /// everything a derivation checks except what only the provider answers.
+    /// A stated `alias` replaces `<connector>.<instance>` as the entry's key
+    /// and a stated `instance_id` as its id, passed as `--instance-id`.
+    fn underived(self, connector: &str, name: &str) -> Result<(Instance, Vec<String>, String)> {
         // `<connector>.<instance>` stays unambiguous: neither name has a `.`.
         let plain = |value: &str| {
             !value.is_empty()
@@ -593,48 +620,53 @@ impl InstanceTable {
                     .bytes()
                     .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
         };
-        let endpoint_admitted = self.endpoint.as_deref().is_none_or(|endpoint| {
-            !endpoint.is_empty()
-                && endpoint.len() <= 2048
-                && !endpoint
-                    .chars()
-                    .any(|c| c.is_control() || c.is_whitespace())
-        });
+        let endpoint_admitted = self.endpoint.as_deref().is_none_or(endpoint_admitted);
         if !plain(connector)
             || !plain(name)
             || !endpoint_admitted
             || self.profile.as_deref().is_some_and(|p| !selector(p))
+            || self.alias.as_deref().is_some_and(|a| !selector(a))
+            || self.instance_id.as_deref().is_some_and(|i| !selector(i))
         {
             return Err(Failure::InvalidConfiguration);
         }
+        let default = format!("{connector}.{name}");
         let mut args = ["--connector", connector, "--instance", name]
             .map(str::to_owned)
             .to_vec();
+        if let Some(id) = &self.instance_id {
+            args.extend(["--instance-id".to_owned(), id.clone()]);
+        }
         if let Some(endpoint) = &self.endpoint {
             args.extend(["--endpoint".to_owned(), endpoint.clone()]);
         }
         if let Some(profile) = &self.profile {
             args.extend(["--profile".to_owned(), profile.clone()]);
         }
+        let id = self.instance_id.clone().unwrap_or_else(|| default.clone());
         let instance = Instance {
             description: self.description,
             endpoint: self.endpoint,
-            alias: format!("{connector}.{name}"),
+            alias: self.alias.unwrap_or(default),
+            instance_id: self.instance_id,
             derived: true,
             profile: self.profile,
             awaiting_profile: None,
         };
-        Ok((instance, args))
+        Ok((instance, args, id))
     }
 
-    /// The table written for a derived instance: its own keys, no pin.
-    fn bare(instance: Instance) -> Self {
+    /// The table written for the derived instance `name` of `connector`: its
+    /// own keys, no pin, and its `alias` only when it is not
+    /// `<connector>.<instance>`.
+    fn bare(instance: Instance, connector: &str, name: &str) -> Self {
+        let alias = (instance.alias != format!("{connector}.{name}")).then_some(instance.alias);
         Self {
             description: instance.description,
             endpoint: instance.endpoint,
             profile: instance.profile,
-            alias: None,
-            instance_id: None,
+            alias,
+            instance_id: instance.instance_id,
             adapter_id: None,
             configuration_revision: None,
             credential_revision: None,
@@ -684,14 +716,14 @@ impl From<Config> for Written {
         let connectors = config.connectors.map(|connectors| {
             connectors
                 .into_iter()
-                .map(|(name, connector)| {
+                .map(|(connector_name, connector)| {
                     let instances = connector
                         .instances
                         .into_iter()
                         .filter_map(|(name, instance)| {
                             let adapter = adapters.remove(&instance.alias);
                             let table = if instance.derived {
-                                InstanceTable::bare(instance)
+                                InstanceTable::bare(instance, &connector_name, &name)
                             } else {
                                 InstanceTable::written(instance, adapter?)
                             };
@@ -702,7 +734,7 @@ impl From<Config> for Written {
                         enabled: connector.enabled,
                         instances,
                     };
-                    (name, table)
+                    (connector_name, table)
                 })
                 .collect()
         });
@@ -743,7 +775,7 @@ impl Config {
                         table.derived(&name, &instance_name, installation)?
                     }
                     Derivation::Deferred if unpinned => {
-                        let (instance, _) = table.underived(&name, &instance_name)?;
+                        let (instance, _, _) = table.underived(&name, &instance_name)?;
                         // The entry a derivation would insert under this alias.
                         if self.adapters.contains_key(&instance.alias) {
                             return Err(Failure::InvalidConfiguration.into());
@@ -797,8 +829,10 @@ impl Config {
             })
         };
         let mut aliases = BTreeSet::new();
-        for (name, connector) in connectors {
-            if !selector(name) || (!connector.enabled && !connector.instances.is_empty()) {
+        let mut ids = BTreeSet::new();
+        for (connector_name, connector) in connectors {
+            if !selector(connector_name) || (!connector.enabled && !connector.instances.is_empty())
+            {
                 return Err(Failure::InvalidConfiguration.into());
             }
             for (name, instance) in &connector.instances {
@@ -811,6 +845,23 @@ impl Config {
                         && self.adapters.contains_key(&instance.alias))
                 {
                     return Err(Failure::InvalidConfiguration.into());
+                }
+                // A derived instance's id, entry or not (one awaiting its
+                // profile, one listed without deriving), is no other
+                // instance's and no legacy entry's: the entries' own rule
+                // checks only the entries there are.
+                if instance.derived {
+                    let id = instance
+                        .instance_id
+                        .clone()
+                        .unwrap_or_else(|| format!("{connector_name}.{name}"));
+                    let taken = self
+                        .adapters
+                        .iter()
+                        .any(|(alias, entry)| *alias != instance.alias && entry.instance_id == id);
+                    if taken || !ids.insert(id) {
+                        return Err(Failure::InvalidConfiguration.into());
+                    }
                 }
             }
         }
@@ -1015,15 +1066,38 @@ impl Config {
     /// entry moves. An alias that is no legacy entry, or a connector that
     /// cannot hold it ([`Config::can_hold`]), is refused.
     pub fn with_instances(&self, moved: &BTreeMap<String, String>) -> Result<Self> {
+        self.with_short_instances(moved, &BTreeMap::new())
+    }
+
+    /// [`Config::with_instances`], except that each alias of `short` is
+    /// written as the short-form instance `[connectors.<connector>.instances.<alias>]`
+    /// instead: derived, stating that alias only when it is not
+    /// `<connector>.<alias>`, the instance id and the endpoint and profile of
+    /// its [`ShortForm`], and no pin. Its legacy entry is no longer written;
+    /// reading the file back derives the instance's entry. An alias of
+    /// `short` that `moved` does not move is refused.
+    pub fn with_short_instances(
+        &self,
+        moved: &BTreeMap<String, String>,
+        short: &BTreeMap<String, ShortForm>,
+    ) -> Result<Self> {
         let mut config = self.clone();
         if moved.is_empty() {
-            return Ok(config);
+            return if short.is_empty() {
+                Ok(config)
+            } else {
+                Err(Failure::InvalidConfiguration)
+            };
         }
         let legacy = self.legacy_aliases();
+        if short.keys().any(|alias| !moved.contains_key(alias)) {
+            return Err(Failure::InvalidConfiguration);
+        }
         for (alias, connector) in moved {
             if !legacy.contains(&alias.as_str()) || !config.can_hold(connector, alias) {
                 return Err(Failure::InvalidConfiguration);
             }
+            let form = short.get(alias);
             config
                 .connectors
                 .get_or_insert_with(BTreeMap::new)
@@ -1037,10 +1111,11 @@ impl Config {
                     alias.clone(),
                     Instance {
                         description: None,
-                        endpoint: None,
+                        endpoint: form.and_then(|form| form.endpoint.clone()),
                         alias: alias.clone(),
-                        derived: false,
-                        profile: None,
+                        instance_id: form.map(|form| form.instance_id.clone()),
+                        derived: form.is_some(),
+                        profile: form.and_then(|form| form.profile.clone()),
                         awaiting_profile: None,
                     },
                 );
@@ -1177,8 +1252,8 @@ impl Installation {
         })
     }
 
-    /// What the provider derives for the instance `alias`, started with
-    /// `args`: its entry or, when the instance names no profile (`stated`
+    /// What the provider derives for the instance whose id is `instance`,
+    /// started with `args`: its entry or, when the instance names no profile (`stated`
     /// false), the provider refuses the selection and the connector declares
     /// more than one profile, those profiles. It is remembered for the life
     /// of this process per provider file and arguments, because an owner
@@ -1186,7 +1261,7 @@ impl Installation {
     /// in any way ([`file_identity`]) is derived again. A remembered digest
     /// that no longer matches the file is refused when a child starts, from
     /// its sealed snapshot.
-    fn derive(&self, alias: &str, args: Vec<String>, stated: bool) -> Result<Derived> {
+    fn derive(&self, instance: &str, args: Vec<String>, stated: bool) -> Result<Derived> {
         type Key = (PathBuf, Vec<String>, Vec<u64>, usize);
         static DERIVED: std::sync::OnceLock<std::sync::Mutex<BTreeMap<Key, Derived>>> =
             std::sync::OnceLock::new();
@@ -1218,7 +1293,7 @@ impl Installation {
         };
         executable.validate()?;
         let derived = match executable.print("--print-local-bootstrap") {
-            Ok(printed) => Derived::Entry(Box::new(self.entry(alias, executable, &printed)?.0)),
+            Ok(printed) => Derived::Entry(Box::new(self.entry(instance, executable, &printed)?.0)),
             // Only a refusal is asked about; a provider past its deadline is
             // not started again.
             Err(Unprinted::Refused) if !stated => {
@@ -1249,7 +1324,7 @@ impl Installation {
     /// that entry reports, which must name the same instance and revision.
     fn entry(
         &self,
-        alias: &str,
+        instance: &str,
         executable: Executable,
         printed: &[u8],
     ) -> Result<(Adapter, super::runtime::Bootstrap)> {
@@ -1257,7 +1332,7 @@ impl Installation {
         let printed: super::runtime::Bootstrap =
             serde_json::from_slice(printed).map_err(|_| Failure::InvalidConfiguration)?;
         if printed.validate().is_err()
-            || printed.instance != alias
+            || printed.instance != instance
             || printed.adapter != "catalog"
             || printed.protocol != connectors_core::WIRE_VERSION
         {
@@ -1437,6 +1512,96 @@ pub fn installed_provider() -> Option<PathBuf> {
         "connectors-catalog-provider{}",
         std::env::consts::EXE_SUFFIX
     )))
+}
+
+/// The instance id and provider authority the installed catalog provider
+/// derives for the instance `name` of `connector` at `endpoint`, with
+/// `profile` when the instance states one: the provider started as a derived
+/// instance's is ([`InstanceTable::underived`]), and its `connectors-private/2`
+/// child's bootstrap. Nothing is remembered. `connections connect --endpoint`
+/// asks before it writes the endpoint, so an instance that holds a connection
+/// is never moved to another provider authority
+/// (story:connectors-do-short-invocation).
+pub fn derived_authority(
+    connector: &str,
+    name: &str,
+    endpoint: &str,
+    profile: Option<&str>,
+    instance_id: Option<&str>,
+) -> Result<(String, String)> {
+    let table = InstanceTable {
+        endpoint: Some(endpoint.to_owned()),
+        profile: profile.map(str::to_owned),
+        instance_id: instance_id.map(str::to_owned),
+        ..InstanceTable::default()
+    };
+    let (_, args, id) = table.underived(connector, name)?;
+    let installation = Installation::installed().ok_or(Failure::InvalidConfiguration)?;
+    let (adapter, bootstrap) = installation.pinned(&id, args)?;
+    Ok((adapter.instance_id, bootstrap.provider_authority))
+}
+
+/// What a migrated legacy entry's short-form instance states besides its
+/// alias (story:migrate-writes-the-short-instance-form): the entry's own
+/// instance id, and the endpoint and profile only where they differ from the
+/// connector declaration's defaults.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ShortForm {
+    pub instance_id: String,
+    pub endpoint: Option<String>,
+    pub profile: Option<String>,
+}
+
+/// The entry the installed catalog provider derives for the short-form
+/// instance `name` of `connector`, exactly as reading a configuration that
+/// holds it derives it ([`InstanceTable::derived`]). An instance whose
+/// connector declares several profiles and that states none derives nothing
+/// and is refused here.
+pub fn short_entry(connector: &str, name: &str, short: &ShortForm) -> Result<Adapter> {
+    let installation = Installation::installed().ok_or(Failure::InvalidConfiguration)?;
+    let table = InstanceTable {
+        instance_id: Some(short.instance_id.clone()),
+        endpoint: short.endpoint.clone(),
+        profile: short.profile.clone(),
+        ..InstanceTable::default()
+    };
+    match table.derived(connector, name, &installation)? {
+        (_, Some(adapter)) => Ok(adapter),
+        (_, None) => Err(Failure::InvalidConfiguration),
+    }
+}
+
+/// Per key of the configuration revision's digest input, the digest of its
+/// value, as the installed catalog provider prints it for `args`
+/// (`--print-revision-inputs`). Two configurations whose revisions differ
+/// differ in at least one key.
+pub fn revision_inputs(args: &[String]) -> Result<BTreeMap<String, String>> {
+    let provider = installed_provider().ok_or(Failure::InvalidConfiguration)?;
+    fs::validate_path(&provider)?;
+    let selection = Executable {
+        path: provider,
+        sha256: String::new(),
+        args: args.to_vec(),
+    };
+    let mut source = selection.source()?;
+    let executable = Executable {
+        sha256: digest(&mut source)?,
+        ..selection
+    };
+    executable.validate()?;
+    let printed = executable
+        .print("--print-revision-inputs")
+        .map_err(|_| Failure::InvalidConfiguration)?;
+    let inputs: BTreeMap<String, String> =
+        serde_json::from_slice(&printed).map_err(|_| Failure::InvalidConfiguration)?;
+    if inputs.len() > 64
+        || inputs
+            .iter()
+            .any(|(key, value)| key.len() > 64 || value.len() > 64)
+    {
+        return Err(Failure::InvalidConfiguration);
+    }
+    Ok(inputs)
 }
 
 impl Config {
@@ -3043,6 +3208,115 @@ mod derived_instance_tests {
             "{text}"
         );
         assert!(written["adapters"].as_table().unwrap().is_empty(), "{text}");
+    }
+
+    /// story:migrate-writes-the-short-instance-form: a derived instance may
+    /// state `alias` and `instance_id`, the names a migrated legacy entry
+    /// keeps. The provider derives it with `--instance-id`, the entry is held
+    /// under the alias, and both are written back, still without a pin.
+    #[test]
+    fn a_short_instance_keeps_the_alias_and_instance_id_it_states() {
+        let fixture = Fixture::gmail("mail-local");
+        let body = GMAIL.replace(
+            "instances.private]\n",
+            "instances.private]\nalias='mail'\ninstance_id='mail-local'\n",
+        );
+        let config = fixture.read(&body).unwrap();
+        assert_eq!(config.adapters.keys().collect::<Vec<_>>(), ["mail"]);
+        let entry = &config.adapters["mail"];
+        assert_eq!(entry.instance_id, "mail-local");
+        assert_eq!(
+            entry.executable.args,
+            [
+                "--connector",
+                "gmail",
+                "--instance",
+                "private",
+                "--instance-id",
+                "mail-local"
+            ]
+        );
+        assert_eq!(config.names("mail"), Some(("gmail", "private")));
+        assert_eq!(
+            config
+                .select(Selector::Instance {
+                    connector: "gmail",
+                    instance: "private"
+                })
+                .map(|selected| selected.alias),
+            Some("mail")
+        );
+        let text = toml::to_string(&config).unwrap();
+        let written: toml::Value = toml::from_str(&text).unwrap();
+        assert_eq!(
+            written["connectors"]["gmail"]["instances"]["private"],
+            toml::Value::Table(toml::map::Map::from_iter([
+                ("alias".to_owned(), toml::Value::String("mail".into())),
+                (
+                    "instance_id".to_owned(),
+                    toml::Value::String("mail-local".into())
+                ),
+            ])),
+            "{text}"
+        );
+        assert!(written["adapters"].as_table().unwrap().is_empty(), "{text}");
+        // Only the id: the alias stays `<connector>.<instance>`.
+        let id_only = GMAIL.replace(
+            "instances.private]\n",
+            "instances.private]\ninstance_id='mail-local'\n",
+        );
+        let config = fixture.read(&id_only).unwrap();
+        assert_eq!(config.adapters["gmail.private"].instance_id, "mail-local");
+        // The provider must print the stated id, and an id or alias that is
+        // no selector is refused before it starts.
+        assert_eq!(Fixture::gmail("gmail.private").read(&body).err(), INVALID);
+        for refused in [
+            body.replace("instance_id='mail-local'", "instance_id='a/b'"),
+            body.replace("alias='mail'", "alias='a b'"),
+        ] {
+            assert_eq!(fixture.read(&refused).err(), INVALID, "{refused}");
+        }
+    }
+
+    /// An explicit `instance_id` stays unique: two instances, or an instance
+    /// and a legacy entry, stating one id refuse the file, derived or not
+    /// (`connectors list` reads without deriving).
+    #[test]
+    fn a_duplicate_explicit_instance_id_is_refused() {
+        let fixture = Fixture::gmail("mail-local");
+        let one = "[connectors.gmail]\nenabled=true\n[connectors.gmail.instances.private]\nalias='mail'\ninstance_id='mail-local'\n";
+        assert!(fixture.read(one).is_ok());
+        let two = format!(
+            "{one}[connectors.gmail.instances.work]\nalias='work'\ninstance_id='mail-local'\n"
+        );
+        assert_eq!(fixture.read(&two).err(), INVALID);
+        let legacy = |id: &str| {
+            format!(
+                "[adapters.old]\ninstance_id='{id}'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.old.executable]\npath='/opt/connectors/bin/connectors-catalog-provider'\nsha256='{}'\n",
+                "1".repeat(64)
+            )
+        };
+        assert!(
+            fixture
+                .read(&format!("{}{one}", legacy("old-local")))
+                .is_ok()
+        );
+        assert_eq!(
+            fixture
+                .read(&format!("{}{one}", legacy("mail-local")))
+                .err(),
+            INVALID
+        );
+        let listed = |body: &str| {
+            fixture.read_from(body, None).ok();
+            Config::listed_instances(&fixture.root.path().join("config/config.toml"))
+        };
+        assert!(listed(one).is_ok());
+        assert_eq!(listed(&two).err(), INVALID);
+        assert_eq!(
+            listed(&format!("{}{one}", legacy("mail-local"))).err(),
+            INVALID
+        );
     }
 }
 

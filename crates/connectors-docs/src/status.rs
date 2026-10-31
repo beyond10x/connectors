@@ -97,7 +97,7 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Service boundary",
         "One-hop federation",
-        "connectors serve puts one gateway in front of several standalone services, prefixes their operations and reports a downstream failure without retrying it.",
+        "The connectors_host::federation library puts one gateway in front of several standalone services, prefixes their operations and reports a downstream failure without retrying it.",
         "crates/connectors-host/tests/service.rs::federation_preserves_result_and_reports_downstream_failure",
         "/docs/guides/federate-adapter-services",
     ),

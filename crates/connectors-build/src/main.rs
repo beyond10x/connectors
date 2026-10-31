@@ -333,6 +333,9 @@ fn execute(args: Args) -> Result<()> {
         for path in &imported.written {
             println!("{}", path.display());
         }
+        for dropped in &imported.dropped {
+            eprintln!("dropped {dropped}");
+        }
         return Ok(());
     }
     if let Action::Definition {
@@ -880,13 +883,19 @@ mod tests {
         let lowered: Value =
             serde_json::from_slice(&std::fs::read(out.join("slack/user-operations.json")).unwrap())
                 .unwrap();
-        let shipped: Value = serde_json::from_slice(
+        let mut shipped: Value = serde_json::from_slice(
             &std::fs::read(
                 repository().join("adapters/catalog/providers/slack/user-operations.json"),
             )
             .unwrap(),
         )
         .unwrap();
+        // story:catalog-operation-declares-its-walk: a shipped read's `walk` has
+        // no definition field yet (story:definition-lowerer-carries-walk), so the
+        // lowered selection is compared without it.
+        for operation in shipped["operations"].as_array_mut().unwrap() {
+            operation.as_object_mut().unwrap().remove("walk");
+        }
         assert_eq!(lowered, shipped);
     }
 

@@ -31,8 +31,15 @@ pub const CUSTODY: &str = "/run/connectors/custody";
 pub const SOURCE: &str = "/srv/secret";
 pub const STAMP: &str = "..2026_10_13_00_00_00.000000001";
 pub const ALIAS: &str = "forge";
+/// The declared connector the fixture entry names in its arguments, so the
+/// legacy entry is the instance `CONNECTOR/forge`; the test binary reads the
+/// two words after `--` as filters that match no test.
+pub const CONNECTOR: &str = "jira";
 pub const PROFILE: &str = "fixture.token";
 pub const OAUTH_PROFILE: &str = "fixture.oauth";
+/// A profile shaped as the catalog's `github_app`: three fields, nothing to
+/// acquire and nothing that rotates (story:catalog-github-app-installation-token).
+pub const GITHUB_APP_PROFILE: &str = "fixture.app";
 pub const READ: &str = "fixture.whoami";
 pub const REVISION: &str = "desc-1";
 pub const SECRET: &[u8] = b"fictional-mounted-token-0001";
@@ -97,6 +104,21 @@ pub fn bootstrap() -> runtime::Bootstrap {
         descriptor: serde_json::to_string(&descriptor).unwrap(),
         profiles: vec![
             profile(PROFILE, None),
+            runtime::Profile {
+                fields: [
+                    ("app_id", 128),
+                    ("installation_id", 20),
+                    ("private_key", 16_384),
+                ]
+                .into_iter()
+                .map(|(name, max_bytes)| runtime::EntryField {
+                    name: name.into(),
+                    label: name.into(),
+                    max_bytes,
+                })
+                .collect(),
+                ..profile(GITHUB_APP_PROFILE, None)
+            },
             profile(
                 OAUTH_PROFILE,
                 Some(runtime::Acquisition::Consent(runtime::Consent {
@@ -243,7 +265,13 @@ impl Container {
         Self {
             jail,
             adapter_digest,
-            adapter_args: vec!["--exact".into(), adapter_fixture.into(), "--".into()],
+            adapter_args: vec![
+                "--exact".into(),
+                adapter_fixture.into(),
+                "--".into(),
+                "--connector".into(),
+                CONNECTOR.into(),
+            ],
         }
     }
 
@@ -257,7 +285,7 @@ impl Container {
     pub fn configure(&self, format: &str, custody: &str) {
         let uid = connectors_host::local::filesystem::uid();
         let text = format!(
-            "format='{format}'\nowner_uid={uid}\n{custody}\n[adapters.{ALIAS}]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.{ALIAS}.permissions]\nprofiles=['{PROFILE}','{OAUTH_PROFILE}']\noperations=['{READ}']\n[adapters.{ALIAS}.executable]\npath='/bin-test/adapter'\nsha256='{}'\nargs={}\n",
+            "format='{format}'\nowner_uid={uid}\n{custody}\n[adapters.{ALIAS}]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.{ALIAS}.permissions]\nprofiles=['{PROFILE}','{OAUTH_PROFILE}','{GITHUB_APP_PROFILE}']\noperations=['{READ}']\n[adapters.{ALIAS}.executable]\npath='/bin-test/adapter'\nsha256='{}'\nargs={}\n",
             self.adapter_digest,
             serde_json::to_string(&self.adapter_args).unwrap()
         );
@@ -388,15 +416,13 @@ impl Container {
 
     pub fn invoke(&self, connection: &str) -> Output {
         let schema = self.schema();
+        let target = format!("{CONNECTOR}/{ALIAS}");
         self.run(&[
-            "operations",
             "invoke",
-            "--adapter",
-            ALIAS,
+            &target,
+            READ,
             "--connection",
             connection,
-            "--operation",
-            READ,
             "--schema",
             &schema,
             "--revision",

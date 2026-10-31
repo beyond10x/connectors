@@ -83,7 +83,7 @@ pub struct Condition {
 }
 
 impl Condition {
-    fn holds(&self, value: &Value) -> bool {
+    pub(crate) fn holds(&self, value: &Value) -> bool {
         value.pointer(&self.pointer) == Some(&self.equals)
     }
 }
@@ -1969,7 +1969,7 @@ fn days(year: i64, month: i64, day: i64) -> i64 {
 }
 
 /// An RFC 3339 date-time as nanoseconds since the Unix epoch, or `None` when it is not one.
-pub(crate) fn instant(text: &str) -> Option<i128> {
+pub fn instant(text: &str) -> Option<i128> {
     let bytes = text.as_bytes();
     let number = |range: std::ops::Range<usize>| -> Option<i64> {
         let digits = bytes.get(range)?;

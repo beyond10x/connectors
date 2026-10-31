@@ -152,6 +152,14 @@ their own, so a new worktree does not recompile every dependency: `RUSTC_WRAPPER
 port 4226, never a wrapper set globally. Set them in the build's environment, not in a committed
 Cargo configuration, and keep the caller's `TMPDIR` short (the server binds its startup socket
 there).
+Never leave `RUSTC_WRAPPER` unset for `connectors-build gate`: a host-wide `rustc-wrapper` then
+applies, and on 2026-10-31 the gate's `oauth2_boundary` tests failed in a worktree with `sccache:
+error: path must be shorter than SUN_LEN`; set the variables above, or `RUSTC_WRAPPER=` (empty).
+A unit that edits `ess/domains` or a cited contract runs, with its targeted tests, the gate's
+generation and drift steps (`connectors-build metadata-entities --check`, `ess-boundary`, `cli
+--check`, `mcp-bindings --check`, `service-metadata --check`, `connectors-docs generate --check`)
+and `cargo test -p connectors-build --tests`, whose line-citation tests read `ess/domains/cli.yaml`:
+in wave D298 four of these failed four full gates one after another.
 
 For documentation-only changes, check links, factual support claims and AEP
 consistency; do not rerun unrelated live-provider tests. Report actual commands,

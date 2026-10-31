@@ -7,11 +7,15 @@
      "bounds": {"limit": {"minimum": 1, "maximum": 250}}},
     {"id": "space.pages", "operation_id": "getPagesInSpace", "effect": "read",
      "description": "List one space's pages, one page per call; the walk follows the cursor in _links.next and ends on a page without it",
-     "bounds": {"limit": {"minimum": 1, "maximum": 250}}},
+     "bounds": {"limit": {"minimum": 1, "maximum": 250}},
+     "walk": {"parameter": "cursor", "next": "/_links/next", "url_parameter": "cursor", "records": "/results",
+              "ends": [{"name": "no_next_link", "absent": "/_links/next"}]}},
     {"id": "page.get", "operation_id": "getPageById", "effect": "read",
      "description": "Read one page; ask for body-format storage to receive its body"},
     {"id": "page.comments", "operation_id": "getPageFooterComments", "effect": "read",
      "description": "List one page's footer comments, one page per call; the walk follows the cursor in _links.next and ends on a page without it",
-     "bounds": {"limit": {"minimum": 1, "maximum": 250}}}
+     "bounds": {"limit": {"minimum": 1, "maximum": 250}},
+     "walk": {"parameter": "cursor", "next": "/_links/next", "url_parameter": "cursor", "records": "/results",
+              "ends": [{"name": "no_next_link", "absent": "/_links/next"}]}}
   ]
 }

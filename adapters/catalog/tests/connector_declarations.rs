@@ -22,7 +22,7 @@ const DECLARATION_FORMAT: &str = "connectors-catalog-connector/1";
 const GMAIL_READONLY: &str = "https://www.googleapis.com/auth/gmail.readonly";
 const GMAIL_COMPOSE: &str = "https://www.googleapis.com/auth/gmail.compose";
 /// The catalog providers that ship no declaration and stay pinned.
-const UNDECLARED: [&str; 2] = ["openrouter", "slack"];
+const UNDECLARED: [&str; 1] = ["openrouter"];
 
 fn root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -213,13 +213,15 @@ fn gmail_derived_from_its_declaration_has_the_reference_revision() {
     assert_eq!(actual["instance"], "gmail.private");
 }
 
-/// Slack holds two selections run as two instances, and OpenRouter one selection
-/// run as a management and an inference instance joined by custody, so neither
-/// ships a declaration and both stay pinned; every other catalog provider
-/// directory ships exactly one,
-/// naming its own directory, its own selection and a distinct connector.
+/// OpenRouter holds one selection run as a management and an inference instance
+/// joined by custody, so it ships no declaration and stays pinned; every other
+/// catalog provider directory ships exactly one, naming its own directory, its
+/// own selection and a distinct connector. Slack's declares the bot selection
+/// (`operations.json`) as the connector `slack`; its user selection
+/// (`user-operations.json`) stays a pinned instance, because a directory holds
+/// one declaration.
 #[test]
-fn every_catalog_provider_but_slack_and_openrouter_ships_one_declaration() {
+fn every_catalog_provider_but_openrouter_ships_one_declaration() {
     let declarations = declarations();
     let directories: BTreeSet<String> = fs::read_dir(root().join("providers"))
         .unwrap()
@@ -268,6 +270,7 @@ fn every_catalog_provider_but_slack_and_openrouter_ships_one_declaration() {
             "jira",
             "opsgenie",
             "runpod",
+            "slack",
             "slides",
             "zendesk",
         ]
@@ -302,6 +305,15 @@ fn declared_profiles_are_the_documented_ones_with_every_scope() {
             );
             continue;
         };
+        // A configuration of another selection of the provider (Slack's user
+        // selection) is a pinned instance its declaration does not cover.
+        let selection = format!("/{}", declaration["selection"].as_str().unwrap());
+        if config["operations_file"]
+            .as_str()
+            .is_some_and(|file| !file.ends_with(&selection))
+        {
+            continue;
+        }
         let id = config["auth"]["profile"].as_str().unwrap();
         let profile = declaration["profiles"]
             .as_array()
@@ -423,10 +435,10 @@ fn every_declared_profile_derives_what_its_hand_written_configuration_derives() 
             checked.push(format!("{connector} {id}"));
         }
     }
-    // Twelve connectors, Zendesk with two profiles: a lane that finds no
-    // declaration checks nothing and must not pass. ChatGPT's one profile and Claude's two
+    // Thirteen connectors, Slack's since 0.63.1, Zendesk with two profiles: a lane that finds
+    // no declaration checks nothing and must not pass. ChatGPT's one profile and Claude's two
     // are refused.
-    assert_eq!(checked.len(), 13, "{checked:?}");
+    assert_eq!(checked.len(), 14, "{checked:?}");
     assert_eq!(
         refused,
         [
@@ -653,7 +665,7 @@ fn a_stated_endpoint_replaces_the_default() {
 }
 
 /// What a derived configuration refuses: an unknown or undeclared connector
-/// (Slack), a connector without a default endpoint and no stated one, a
+/// (OpenRouter), a connector without a default endpoint and no stated one, a
 /// connector of several profiles without one named, a profile it does not
 /// declare, an instance name that is not an id, and both forms at once.
 #[test]
@@ -667,7 +679,21 @@ fn a_derived_configuration_refuses_what_it_cannot_derive() {
     // 1 is a refusal by the provider, 2 a usage error before it loads anything.
     for (code, args) in [
         (1, vec!["--connector", "outlook", "--instance", "private"]),
-        (1, vec!["--connector", "slack", "--instance", "private"]),
+        (
+            1,
+            vec!["--connector", "openrouter", "--instance", "private"],
+        ),
+        (
+            1,
+            vec![
+                "--connector",
+                "slack",
+                "--instance",
+                "private",
+                "--profile",
+                "slack.user",
+            ],
+        ),
         (
             1,
             vec!["--connector", "google-gmail", "--instance", "private"],
@@ -737,55 +763,93 @@ fn a_derived_configuration_refuses_what_it_cannot_derive() {
     assert_eq!(zendesk["profiles"][0]["id"], "zendesk.basic");
 }
 
+/// Acceptance (story:slack-connector-declaration): given only the connector
+/// name `slack` and an instance name, the provider derives the bot instance the
+/// Slack guide documents, with the guide's bot selection and profile, and so
+/// its revision; the user selection's profile is not the connector's.
+#[test]
+fn slack_derived_from_its_declaration_is_the_documented_bot_instance() {
+    let (_, mut reference) = documented()
+        .into_iter()
+        .find(|(page, config)| {
+            page == "catalog-slack.md" && config["auth"]["profile"] == "slack.bot"
+        })
+        .expect("the Slack guide documents the bot instance");
+    assert_eq!(
+        reference["operations_file"],
+        "providers/slack/operations.json"
+    );
+    reference["instance"] = json!("slack.work");
+    let expected = legacy(&reference);
+    let actual = bootstrap(derived(&["--connector", "slack", "--instance", "work"]));
+    assert_eq!(
+        actual["configuration_revision"],
+        expected["configuration_revision"]
+    );
+    assert_eq!(actual, expected);
+    assert_eq!(actual["instance"], "slack.work");
+    let user = derived(&[
+        "--connector",
+        "slack",
+        "--instance",
+        "work",
+        "--profile",
+        "slack.user",
+    ]);
+    assert_eq!(user.status.code(), Some(1));
+}
+
 /// Every configuration the guides document keeps the revision it computed
 /// before declarations existed (measured on `06339356e3`). A regenerated
 /// bundle or selection moves these legitimately, in the same change: the three
 /// Jira pins moved when `issue.create` and `issue.comment.add` required their
 /// new `id` present after the write, and again with the two `confluence-v1`
 /// pins when the Jira and Confluence v1 selections gained their `feed` (and
-/// Jira `projects.list` and `project.get`).
+/// Jira `projects.list` and `project.get`). The eighteen pins of Confluence,
+/// Google Calendar, Drive and Gmail, HubSpot, Jira, Slack and Zendesk moved
+/// when their selections declared a `walk` (story:catalog-operation-declares-its-walk).
 #[test]
 fn documented_native_configurations_keep_their_revisions() {
     let pinned: BTreeMap<String, &str> = [
         (
             "00 catalog-confluence.md",
-            "42702bda6cd24595ff5f69750b3fdda271fb380f71d73f073eac2a0014719def",
+            "d762bc44764155933d3eddf9247cd733138d238af8300799e17e57a16cdca265",
         ),
         (
             "01 catalog-confluence.md",
-            "86a936572eaa670f31dfb80ea503d568c7e3732384bbe46207047796a5599e28",
+            "df461239a3e29d679d70ebd5388f42bbff7fcdd6469d5c6f431f01697e1e7b92",
         ),
         (
             "02 catalog-confluence.md",
-            "3b2d03659dc0d1603da69c65eb6c727cb025c71a2a9d414a7ea7be8f71c84bd0",
+            "94e3ff9c147d1952540a7bf9614ade926eebcdd148e25c8b892966009321bc4a",
         ),
         (
             "03 catalog-confluence.md",
-            "cc01bd621a306d99e9c32c429dd2c8b20593583142db6128c1cfcfe7a7e71901",
+            "e2c0e02574a8722bd6fcf8d2555e90361ba400b945d9d0d33d7b09cd34a5ae12",
         ),
         (
             "04 catalog-confluence.md",
-            "42702bda6cd24595ff5f69750b3fdda271fb380f71d73f073eac2a0014719def",
+            "d762bc44764155933d3eddf9247cd733138d238af8300799e17e57a16cdca265",
         ),
         (
             "05 catalog-google-calendar.md",
-            "ac90599c7a1255715ebc16c8c0ec17cc4925985676880d2e1ba189988005c459",
+            "f5e32d1fa594a4bdeb0bf391d256e545d9c443acb965db912cd4ce62398d1a62",
         ),
         (
             "06 catalog-google-calendar.md",
-            "36d1eb4505ba0be70273d91e8fdda3368474123c5773be6d32a7191e4d281428",
+            "bf808c6246efaabfd8a53f594992550331e7d0f489d7f5e496365c0bc9e299b9",
         ),
         (
             "07 catalog-google-drive.md",
-            "c9ff1845cca4a082e724aab12c226409ede2d62ba2d7897d63feeba0c79f49ce",
+            "bd5b9027875019f49c099fb490f8ed65ed1f4dcc7bf09da0ad19a3505573c1f7",
         ),
         (
             "08 catalog-google-drive.md",
-            "d673ca0a9d79874a1dd83e6ef9f28be01ca9937a6f94429314e45ac704d0ef6a",
+            "27aa4e87e571bb8ba4920e571775c81c9383eac8fe171a70e7188b122562326d",
         ),
         (
             "09 catalog-google-gmail.md",
-            "c5167a1d610da35a2225dc895719e2b72709bde2b044f8a9db62d75ef5461dd1",
+            "cb6961af72d33dad02e2dffd043a04d024b336a44834b5035b2868781e4a033e",
         ),
         (
             "10 catalog-google-slides.md",
@@ -793,19 +857,19 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "11 catalog-hubspot.md",
-            "ab1aae40aff91fa177426e3dddd3ab78bcc1d7ac1a60a960d0ca6d951106e17e",
+            "f22df2fc89858454b75fc46c55187aa467458a05c8fd0d476cf052dd73e70fe9",
         ),
         (
             "12 catalog-jira.md",
-            "dffb974880505f1da2a2a943b605841096792ee98be3b29b5846349b225a4a66",
+            "825e16fc6a087d3f237b49e2a29dbb1e1d44ede342bbf3b8fe4cfa80ac4db3a2",
         ),
         (
             "13 catalog-jira.md",
-            "3521245f808b67229f3d206ca08656863ec85b7c30bbff94f089f873fcaa40b0",
+            "041eaf60314d7910ff42446d5be5ee9b9ebddcb3d55ea7dd88586481e11d6934",
         ),
         (
             "14 catalog-jira.md",
-            "2c5a6e6c8dd7eefd3311a36fb5b1e0742cd49bb518bbcc55489f3f0dcee0b058",
+            "dacdbb2d66a8b6ce5f1d63ec131196e5eaf93852dd0a450388dd85e32e761f3e",
         ),
         (
             "15 catalog-openrouter.md",
@@ -825,19 +889,19 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "19 catalog-slack.md",
-            "23e877ed8e54ad38b319d0ffd0c482203719b26ecd094e7e65bc8d976a6af6ca",
+            "e7220d48c9c68cfbb78e363d2a6ea5d4ce3e2595c4baad8f86492b02b010f79b",
         ),
         (
             "20 catalog-slack.md",
-            "1dc8109ddc54339d4cbcabbedc13c427fa4a180d2a74213bc4505a7e44fa8404",
+            "abe8a377d7f6cc4e17df36e888e4df0c4a55cfad753b4eb1b1039ac2509a1009",
         ),
         (
             "21 catalog-zendesk.md",
-            "60a56bb42996cb06670413c3924c75285c8fe3f09b4df0cfcedf3a923a54eae5",
+            "51e91ea435719292acb4f82190b0726dfbf4792eebf83f5330684d0b55a05208",
         ),
         (
             "22 catalog-zendesk.md",
-            "56c177a9a9bec9ff41b937ea8c74222ee2eed53d9eb2fe576fc9938bc7d4fbf0",
+            "8805dd84dc3975e41e558d0aa4dd56eb35415b4c2aaffc0530bf9e86472a446a",
         ),
         (
             "23 local-catalog-provider.md",
@@ -880,4 +944,136 @@ fn documented_native_configurations_keep_their_revisions() {
         ))
         .unwrap()
     );
+}
+
+/// story:migrate-writes-the-short-instance-form: `--instance-id` derives the
+/// instance under the id it names instead of `<connector>.<instance>`, so a
+/// migrated instance keeps its old id. The derivation is exactly the
+/// hand-written configuration with that `instance`: the same bootstrap and
+/// revision. An id that is not one is refused, and `--instance-id` without a
+/// connector is a usage error.
+#[test]
+fn an_instance_id_derives_the_instance_under_that_id() {
+    let mut reference = read_json(&root().join("tests/connector_declarations/gmail.json"));
+    reference["instance"] = json!("mail-local");
+    let expected = legacy(&reference);
+    let actual = bootstrap(derived(&[
+        "--connector",
+        "gmail",
+        "--instance",
+        "mail",
+        "--instance-id",
+        "mail-local",
+    ]));
+    assert_eq!(actual["instance"], "mail-local");
+    assert_eq!(
+        actual["configuration_revision"],
+        expected["configuration_revision"]
+    );
+    assert_eq!(actual, expected);
+    let unnamed = bootstrap(derived(&["--connector", "gmail", "--instance", "mail"]));
+    assert_eq!(unnamed["instance"], "gmail.mail");
+    assert_ne!(
+        unnamed["configuration_revision"],
+        actual["configuration_revision"]
+    );
+    for (code, args) in [
+        (
+            1,
+            vec![
+                "--connector",
+                "gmail",
+                "--instance",
+                "mail",
+                "--instance-id",
+                "a/b",
+            ],
+        ),
+        (
+            1,
+            vec![
+                "--connector",
+                "gmail",
+                "--instance",
+                "mail",
+                "--instance-id",
+                "",
+            ],
+        ),
+        (2, vec!["--instance-id", "mail-local"]),
+    ] {
+        let output = derived(&args);
+        assert_eq!(output.status.code(), Some(code), "{args:?}");
+        assert!(output.stdout.is_empty(), "{args:?} printed");
+    }
+}
+
+/// `--print-revision-inputs` prints, per key of the configuration revision's
+/// digest input, the digest of that key's value: a derived instance and the
+/// hand-written configuration it equals print the same, and one that requests
+/// other scopes differs in `auth` alone, which `setup migrate` names.
+#[test]
+fn revision_inputs_name_the_key_in_which_two_configurations_differ() {
+    let inputs = |output: Output| -> BTreeMap<String, String> {
+        serde_json::from_value(bootstrap(output)).unwrap()
+    };
+    let mut reference = read_json(&root().join("tests/connector_declarations/gmail.json"));
+    reference["instance"] = json!("mail-local");
+    let printed = |config: &Value| {
+        let file = written(config.clone());
+        inputs(run(&[
+            "--local-config",
+            file.path.to_str().unwrap(),
+            "--print-revision-inputs",
+        ]))
+    };
+    let derived = inputs(run(&[
+        "--connector",
+        "gmail",
+        "--instance",
+        "mail",
+        "--instance-id",
+        "mail-local",
+        "--print-revision-inputs",
+    ]));
+    let keys: BTreeSet<&str> = derived.keys().map(String::as_str).collect();
+    for key in [
+        "format",
+        "instance",
+        "provider",
+        "bundle_sha256",
+        "source_sha256",
+        "api_base",
+        "auth",
+        "operations",
+    ] {
+        assert!(keys.contains(key), "{key}: {derived:?}");
+    }
+    assert!(
+        derived
+            .values()
+            .all(|digest| digest.len() == 64 && digest.bytes().all(|b| b.is_ascii_hexdigit())),
+        "{derived:?}"
+    );
+    assert_eq!(printed(&reference), derived);
+    let mut narrower = reference.clone();
+    narrower["auth"]["requested_scopes"] = json!(["openid", GMAIL_READONLY]);
+    narrower["auth"]["minimum_scopes"] = json!([GMAIL_READONLY]);
+    let differing: Vec<String> = {
+        let narrower = printed(&narrower);
+        keys.iter()
+            .filter(|key| narrower.get(**key) != derived.get(**key))
+            .map(|key| (*key).to_owned())
+            .collect()
+    };
+    assert_eq!(differing, ["auth"]);
+    let mut elsewhere = reference.clone();
+    elsewhere["api_base"] = json!("https://mail.example.test");
+    let elsewhere = printed(&elsewhere);
+    let differing: Vec<&str> = keys
+        .iter()
+        .copied()
+        .filter(|key| elsewhere.get(*key) != derived.get(*key))
+        .collect();
+    assert_eq!(differing, ["api_base"]);
 }

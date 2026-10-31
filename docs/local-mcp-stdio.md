@@ -88,8 +88,19 @@ The configured exposure selects the Connection; MCP input cannot select another.
 The result's `structuredContent` is the complete owner service response, including
 request identity, audit reference/status, business result or error. The text
 content represents that same response. Large numbers remain exact. The advertised
-output schema describes this service envelope, with the operation schema under
-`result`. `resultType: "complete"` describes MCP completion, not dataset completeness.
+output schema describes this service envelope; its `result` is any JSON, and the
+operation's own output schema is in the tool's
+`_meta["io.beyond10x.connectors/operation"].output_schema`.
+`resultType: "complete"` describes MCP completion, not dataset completeness.
+
+Beside `input`, a call may pass `fields` and `each`, the CLI's `--fields` and
+`--each` strings, and on a tool whose operation declares a walk `walk: true`
+with an optional `max_pages`. The shaped value replaces the response's
+`result` in both representations; `each` and a walk return their records as
+`result.items`, and a walk returns the summary `invoke --walk` prints beside
+them, never a file. Malformed arguments are refused as invalid params naming
+the argument, before any read
+([projection contract](../adapters/mcp/contracts/server/v1alpha1/projection.md#shaping-a-tool-result)).
 
 For `2025-11-25`, first send `initialize` with that version, capabilities and
 clientInfo, then `notifications/initialized`. Subsequent calls use the same names,

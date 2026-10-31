@@ -1,0 +1,52 @@
+schema: urn:beyond10x:connectors-definition:1
+source:
+  openapi: upstream/github/api.github.com.yaml.gz
+  sha256: 5e9edc27c465626b020eb6d9b4d5892e93b4e96f8c7af53ff952ac59b48c0df9
+base_url: https://api.github.com
+auth:
+  github.token:
+    scheme: bearer
+    label: GitHub token
+    identity: {path: user, kind: github.user, subject: /id}
+defaults:
+  rate_limit_headers: {remaining: x-ratelimit-remaining, reset: x-ratelimit-reset}
+operations:
+  review_requests.list:
+    op: search/issues-and-pull-requests
+    query_fixed: {q: "is:pr is:open review-requested:@me"}
+    query_folds: {since: {into: q, prefix: "updated:>=", format: timestamp}}
+    bounds: {per_page: {minimum: 1, maximum: 100}, page: {minimum: 1, maximum: 1000}}
+    withhold: [sort, order]
+    description: "List the open pull requests that request the authenticated user's review, one page per call of at most per_page; since (an ISO 8601 date or date-time) keeps those updated at or after it; the walk ends on a page shorter than per_page whose incomplete_results is false (true means the search timed out: retry later, not done); the search serves at most the first 1,000 results of a query whatever total_count says, and a page past them is refused as invalid_input with GitHub's reason \"Only the first 1000 search results are available\", so a walk at per_page 100 ends at page 10"
+  issues.assigned:
+    op: issues/list
+    query_fixed: {filter: assigned, state: open}
+    bounds: {per_page: {minimum: 1, maximum: 100}}
+    description: List the open issues and pull requests assigned to the authenticated user, one page per call of at most per_page; since keeps those updated at or after it; the walk ends on a page shorter than per_page
+  notifications.list:
+    op: activity/list-notifications-for-authenticated-user
+    bounds: {per_page: {minimum: 1, maximum: 50}}
+    description: List the authenticated user's notifications, unread unless all is true, one page per call of at most per_page; since keeps those updated after it; the walk ends on a page shorter than per_page; nothing is marked as read
+  user.me: {op: users/get-authenticated, description: Read the authenticated user}
+  repos.list:
+    op: repos/list-for-org
+    bounds: {per_page: {minimum: 1, maximum: 100}}
+    description: List an organization's repositories, one page per call of at most per_page, ordered by sort and direction; the walk ends on a page shorter than per_page
+  repo.get:
+    op: repos/get
+    description: "Read one repository by owner and repo: description, topics, homepage, stars, pushed_at, archived and visibility among its members"
+  releases.list:
+    op: repos/list-releases
+    bounds: {per_page: {minimum: 1, maximum: 100}}
+    description: List a repository's releases, newest first, one page per call of at most per_page; the walk ends on a page shorter than per_page
+  release.latest:
+    op: repos/get-latest-release
+    description: Read a repository's latest published release, neither a draft nor a prerelease
+  readme.raw:
+    op: repos/get-readme
+    embedded_text: {content: /content, encoding: /encoding, size: /size, max_bytes: 1048576}
+    description: Read a repository's README at ref, or its default branch, as text of at most 1 MiB
+  file.raw:
+    op: repos/get-content
+    embedded_text: {content: /content, encoding: /encoding, size: /size, max_bytes: 1048576}
+    description: Read one file of a repository at path and ref, or its default branch, as text of at most 1 MiB; a directory, a binary file or a larger file is refused

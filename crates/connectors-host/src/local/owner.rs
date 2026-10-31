@@ -511,7 +511,7 @@ pub fn cached(paths: &Paths, alias: &str) -> Result<runtime::Bootstrap> {
     Ok(bootstrap)
 }
 /// The description a read command (`operations describe`, `operations list`,
-/// `operations invoke`) works from: the cached one, or, when none is cached for
+/// `invoke`) works from: the cached one, or, when none is cached for
 /// the instance's configured selection, the one the owner caches by starting
 /// the configured, digest-pinned adapter, without reading or asking for any
 /// credential. It starts it only when the instance holds a connection, the
@@ -1424,6 +1424,7 @@ mod reuse_tests {
             description: None,
             endpoint: None,
             alias: alias.into(),
+            instance_id: None,
             derived: false,
             profile: None,
             awaiting_profile: None,

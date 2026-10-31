@@ -92,20 +92,47 @@ installed beside `connectors`: the executable and its SHA-256, the configuration
 every operation. `default_instance` selects an instance for a command that names none.
 
 ```sh
-connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" instances list
+connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" instances list \
+  | jq -c '.[] | arrays | .[]'
 ```
 
 ```json
-{"adapters":[{"adapter":"gitlab.work","adapter_id":"catalog","connector":"gitlab","instance":"work","instance_id":"gitlab.work","restart":"never","startup":"on-demand"},{"adapter":"gmail.private","adapter_id":"catalog","connector":"gmail","instance":"private","instance_id":"gmail.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
+{"connector":"gitlab","instance":"work","instance_id":"gitlab.work","restart":"never","startup":"on-demand"}
+{"connector":"gmail","instance":"private","instance_id":"gmail.private","restart":"never","startup":"on-demand"}
 ```
 
-Results keep the legacy `adapter` alias and the internal `adapter_id` beside `connector` and
-`instance` for the deprecation window.
+Each item names its instance by `connector` and `instance`. A legacy catalog entry for which no
+connector is derived is left out of the items and named in an `unmigrated` list instead; see
+[Move a legacy configuration](#move-a-legacy-configuration).
+
+`connections connect <connector>/<instance> --endpoint <url>` adds an instance with that endpoint,
+and the connector's table when it is missing, before it asks for the credential; every other
+byte of the file stays as it was. A different endpoint on an existing instance is refused and
+writes nothing.
 
 ### Select an instance
 
-A command that acts on one instance takes `--connector` and `--instance`; an instance name is
-unique within its connector only:
+`invoke` names its instance as `<connector>/<instance>`, then the operation, and reads the input
+from standard input when no input flag is given:
+
+```sh
+printf '{"id":"group/project","merge_request_iid":9}' \
+  | connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
+    invoke gitlab/work merge_request.get
+```
+
+The instance may be left out while its connector has one. With a second GitLab instance `oss`
+in the file, `invoke gitlab merge_request.get` is refused, exit status 2, naming both:
+
+```text
+failure: {"code":"instance_ambiguous","instances":["gitlab/oss","gitlab/work"],"kind":"usage","next_action":"none","stage":"arguments"}
+```
+
+`invoke` does not read `default_instance`. The connection, schema and revision default to the
+instance's own, and `invoke <connector>/<instance> <operation> --describe` prints the operation's
+input schema, effect, schema and revision without calling the provider. Other commands that act
+on one instance take `--connector` and `--instance`; an instance name is unique within its
+connector only:
 
 ```sh
 connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
@@ -113,7 +140,7 @@ connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
 ```
 
 ```json
-{"connections":[],"observed_at_ms":1792181808006,"source":"authority","stale":false,"valid_until_ms":1792182108006}
+{"connections":[],"observed_at_ms":1793314944444,"source":"authority","stale":false,"valid_until_ms":1793315244444}
 ```
 
 The deprecated `--adapter <alias>` still selects the same instance (`--adapter gitlab.work`) and
@@ -175,8 +202,13 @@ instead, whose value prints no token in `Debug` or `Display`.
 
 ### Move a legacy configuration
 
-A legacy `[adapters.<alias>]` entry keeps working: it is selected as connector `adapter_id`,
-instance `<alias>`, until it is moved. `setup migrate` moves each catalog entry whose provider
+A legacy `[adapters.<alias>]` entry keeps working until it is moved. A catalog entry is named by
+the connector `setup migrate` derives for it and its alias (`gitlab/forge` below); any other entry
+by its `adapter_id` and its alias. A catalog entry no connector is derived for, such as a
+legacy-format OpenRouter entry, is no instance: `instances list` names it in
+`unmigrated`, and selecting it is `invalid_configuration` with the rule
+`legacy_entry_unmigrated`. Its replacement is a `[connectors.<connector>]` instance.
+`setup migrate` moves each catalog entry whose provider
 ships a connector to `[connectors.<connector>.instances.<alias>]`, keeping its instance id,
 configuration revision, executable and custody item names byte for byte, so its connections and
 approval policy stay valid with no new consent. Other entries stay where they are, each with its
@@ -225,7 +257,7 @@ records each release's scope and remaining work; the [status page](https://beyon
 | [Confluence](https://beyond10x.github.io/connectors/docs/connectors/confluence/) (catalog provider) | [11](https://beyond10x.github.io/connectors/docs/connectors/confluence/): 4 under `confluence` (REST v2), 7 under `confluence-v1` (REST v1) | Confluence Cloud REST v2 from the pinned OpenAPI document, and REST v1 from a document this repository writes from Atlassian's reference pages; profile `atlassian.basic`, shared with Jira; reads only, one page per call; verified against local fixtures only, see [the Confluence guide](docs/catalog-confluence.md) |
 | [Zendesk](https://beyond10x.github.io/connectors/docs/connectors/zendesk/) (catalog provider) | [10](https://beyond10x.github.io/connectors/docs/connectors/zendesk/) | Zendesk Support API from the pinned OpenAPI document; two profiles, `zendesk.oauth` (OAuth client credentials) and `zendesk.basic` (API token), chosen per instance by `profile`; the incremental exports read from a `start_time`; the three ticket writes are refused as `conflict` unless the ticket's `updated_at` is the caller's stamp, a note and a draft reply are private comments; the writes are verified with `zendesk.basic` only; verified against a local fixture only, see [the Zendesk guide](docs/catalog-zendesk.md) |
 | [HubSpot](https://beyond10x.github.io/connectors/docs/connectors/hubspot/) (catalog provider) | [2](https://beyond10x.github.io/connectors/docs/connectors/hubspot/) | HubSpot CRM Objects `2026-09` from the pinned OpenAPI document; private-app token as `Authorization: Bearer` from keyring custody, profile `hubspot.private-app`; reads only, any object type, no time filter; verified against a local fixture only, see [the HubSpot guide](docs/catalog-hubspot.md) |
-| [Slack](https://beyond10x.github.io/connectors/docs/connectors/slack/) (catalog provider) | [22](https://beyond10x.github.io/connectors/docs/connectors/slack/): 17 on the bot-token instance, 5 on a second instance with a user token | Slack Web API from the pinned Swagger 2.0 document projected to OpenAPI; two pinned instances, since no Slack connector declaration ships: a bot token as `Authorization: Bearer` from keyring custody, and a user token under `slack.user` for search; the document's `token` parameter is never sent; each write is a required-approval mutation guarded by an `auth.test` preflight and an answer that must both carry `"ok": true`, and `files.delete` also reads the file with `files.info` first; one page per call; `file.download` reads a file's `url_private` as base64 with its media type, length and SHA-256, at most 2 MiB, only on a connection whose `hosts` admits `https://files.slack.com` with the credential; a Slack error is returned as `200` with `"ok": false`; verified against a local fixture only, see [the Slack guide](docs/catalog-slack.md) |
+| [Slack](https://beyond10x.github.io/connectors/docs/connectors/slack/) (catalog provider) | [22](https://beyond10x.github.io/connectors/docs/connectors/slack/): 17 on the bot-token instance, 5 on a second instance with a user token | Slack Web API from the pinned Swagger 2.0 document projected to OpenAPI; a bot instance derived from the shipped declaration (or pinned), with a bot token as `Authorization: Bearer` from keyring custody, and a pinned user instance with a user token under `slack.user` for search; the document's `token` parameter is never sent; each write is a required-approval mutation guarded by an `auth.test` preflight and an answer that must both carry `"ok": true`, and `files.delete` also reads the file with `files.info` first; one page per call; `file.download` reads a file's `url_private` as base64 with its media type, length and SHA-256, at most 2 MiB, only on a connection whose `hosts` admits `https://files.slack.com` with the credential; a Slack error is returned as `200` with `"ok": false`; verified against a local fixture only, see [the Slack guide](docs/catalog-slack.md) |
 | [Opsgenie](https://beyond10x.github.io/connectors/docs/connectors/opsgenie/) (catalog provider) | [5](https://beyond10x.github.io/connectors/docs/connectors/opsgenie/) | Opsgenie REST API from the pinned Swagger 2.0 document projected to OpenAPI, with the incident-to-alert link added by a cited amendment; API integration key as `Authorization: GenieKey <key>` (`auth.prefix`) from keyring custody, proved with `GET /v2/alerts`; reads only, one page per call over a `createdAt` window the caller advances; verified against a local fixture only, see [the Opsgenie guide](docs/catalog-opsgenie.md) |
 | [Runpod](https://beyond10x.github.io/connectors/docs/connectors/runpod/) (catalog provider) | [4](https://beyond10x.github.io/connectors/docs/connectors/runpod/) | Runpod REST API v1 from the pinned OpenAPI source; API key as `Authorization: Bearer` from keyring custody; both writes are unguarded required-approval mutations, a create refused for lack of capacity is refused with code `capacity`, a create without a definite answer is `unknown`; verified against a local fixture only, see [the Runpod guide](docs/catalog-runpod.md) |
 | [OpenRouter](https://beyond10x.github.io/connectors/docs/connectors/openrouter/) (catalog provider) | [4](https://beyond10x.github.io/connectors/docs/connectors/openrouter/) | OpenRouter API from the pinned OpenAPI document; management key as `Authorization: Bearer` from keyring custody, profile `openrouter.api-key`; two pinned instances, since no OpenRouter connector declaration ships; `key.create` is an unguarded required-approval write whose created key is held in custody as a new connection of a second instance and never returned; one page per call; verified against a local fixture only, see [the OpenRouter guide](docs/catalog-openrouter.md) |
@@ -245,8 +277,11 @@ for a container with no keyring, which refuses OAuth refresh and approval signin
 ([§5.2](contracts/auth/custody/v1alpha1/semantics.md#52-the-read-only-mounted-secret-binding),
 [guide](docs/local-mounted-secret-custody.md)); on macOS the login keychain; on Windows the
 Credential Manager. Kubernetes and SQL also run as separate Rust services, which advertise no
-writes; writes run only through the local CLI under approval. MCP has specified contracts and no
-runtime; the two decision blockers on its contracts are cleared
+writes; writes run only through the local CLI under approval. On Linux,
+`connectors server --transport stdio` is a local MCP server that offers admitted read-only
+operations as tools through the same owner and custody ([guide](docs/local-mcp-stdio.md)); it
+offers no resources, prompts, writes or outbound MCP, and on macOS and Windows it exits with
+`mcp_unavailable`. The two decision blockers on the MCP contracts are cleared
 ([MCP](https://beyond10x.github.io/connectors/docs/connectors/mcp/)).
 
 ## Get started

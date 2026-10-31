@@ -1,25 +1,25 @@
-//! `operations invoke --definition <file>` (story:invoke-definition-file;
+//! `invoke --definition <file> <operation>` (story:invoke-definition-file;
+//! story:connectors-do-short-invocation;
 //! architecture-decision-record:provider-definitions-and-runtimes D12 point 3;
-//! `contracts/cli/v1alpha1/semantics.md` §3, "Invoking a definition file").
+//! `contracts/cli/v1alpha1/semantics.md` §3, "Invoking a definition file"):
+//! the preparation of `super::invoke` runs [`prepare_with`], or [`lower`] for
+//! `--describe`, with the target when one is named.
 //!
-//! A command line that names `--definition` is prepared here, before the
-//! generated runner reads it. The definition is lowered with the reference
-//! lowerer into an owner-only cache under the state directory, keyed by the
-//! digest of the definition and its source; the installed catalog provider is
-//! pinned on the lowered native configuration and that entry is recorded beside
-//! the operator's configuration as the instance `definition` of the
-//! definition's connector (`connectors_host::local::definitions`). When the
-//! instance holds no connection the command asks once whether to connect and,
-//! on yes, runs the profile's own acquisition; when another instance of the
-//! connector holds a connection whose credential can be reused, the question
-//! lists those, and a chosen one is copied and validated by the owner
-//! (story:invoke-definition-reuse-credential). The command line is then
-//! rewritten to select that instance and its connection, with the schema and
-//! revision of the lowered description where the caller gave none, and the
-//! generated runner admits, approves, audits and invokes it as it does any
-//! configured instance's. The operator's configuration file is never written.
+//! The definition is lowered with the reference lowerer into an owner-only
+//! cache under the state directory, keyed by the digest of the definition and
+//! its source; the installed catalog provider is pinned on the lowered native
+//! configuration and that entry is recorded beside the operator's
+//! configuration as the instance `definition` of the definition's connector
+//! (`connectors_host::local::definitions`). When the instance holds no
+//! connection the command asks once whether to connect and, on yes, runs the
+//! profile's own acquisition; when another instance of the connector holds a
+//! connection whose credential can be reused, the question lists those, and a
+//! chosen one is copied and validated by the owner
+//! (story:invoke-definition-reuse-credential). `invoke` then selects that
+//! instance and its connection, and the generated runner admits, approves,
+//! audits and invokes it as it does any configured instance's. The operator's
+//! configuration file is never written.
 use super::*;
-use clap::parser::ValueSource;
 use connectors_catalog::definition as lowering;
 use connectors_cli_contract::ProcessOutput;
 use connectors_host::local::{
@@ -40,155 +40,35 @@ const DEFINITION_LIMIT: u64 = 1024 * 1024;
 const SOURCE_LIMIT: u64 = 256 * 1024 * 1024;
 /// How long the connect question waits for its answer.
 const QUESTION_MS: u64 = 300_000;
-/// The fields this step reads, rewrites or removes; every other argument of the
-/// command line is kept as it was given.
-const OWNED: [&str; 10] = [
-    "adapter",
-    "connector",
-    "instance",
-    "connection",
-    "operation",
-    "schema",
-    "revision",
-    "definition",
-    "definitions_root",
-    "credential_file",
-];
 
 /// What the command line asks for.
-struct Request {
-    /// The program name the command line was given under.
-    program: OsString,
-    definition: Option<PathBuf>,
-    root: Option<PathBuf>,
-    credential_file: Option<PathBuf>,
+pub(super) struct Request {
+    pub(super) root: Option<PathBuf>,
+    pub(super) credential_file: Option<PathBuf>,
     /// `--adapter`, `--connector` or `--instance` was given.
-    selected: bool,
-    operation: String,
-    connection: Option<String>,
-    schema: Option<String>,
-    revision: Option<String>,
-    config: Option<PathBuf>,
-    state: Option<PathBuf>,
-    json: bool,
-    /// The process globals as given, then the kept arguments.
-    globals: Vec<OsString>,
-    kept: Vec<OsString>,
+    pub(super) selected: bool,
+    /// The connector and, if named, the instance an `invoke` target names
+    /// (story:connectors-do-short-invocation); `None` when no target is named,
+    /// on `invoke --definition <file> <operation>`:
+    /// the file then names the connector and its instance.
+    pub(super) target: Option<(String, Option<String>)>,
+    pub(super) operation: String,
+    pub(super) connection: Option<String>,
+    pub(super) config: Option<PathBuf>,
+    pub(super) state: Option<PathBuf>,
 }
 
-/// The arguments the generated runner reads: `args` unchanged unless they are
-/// an `operations invoke` naming `--definition`, which is prepared and answered
-/// as the rewritten command line, or refused with the one failure envelope.
-pub(super) fn prepare(args: Vec<OsString>) -> Result<Vec<OsString>, ProcessOutput> {
-    let Some(request) = parse(&args) else {
-        return Ok(args);
-    };
-    let usage = || failure("invalid_input", "arguments", "none", true);
-    let prepared = match &request.definition {
-        Some(definition) => run(&request, definition),
-        // `--definitions-root` and `--credential-file` belong to `--definition`.
-        None if request.root.is_some() || request.credential_file.is_some() => Err(usage()),
-        None => return Ok(args),
-    };
-    let json = request.json;
-    prepared.map_err(|reply| render(reply, json))
-}
-
-/// The generated command with `--schema` and `--revision` of `operations
-/// invoke` optional, which only a definition may leave out.
-fn relaxed() -> clap::Command {
-    connectors_cli_contract::command().mut_subcommand("operations", |group| {
-        group.mut_subcommand("invoke", |invoke| {
-            invoke
-                .mut_arg("field:schema", |arg| arg.required(false))
-                .mut_arg("field:revision", |arg| arg.required(false))
-        })
-    })
-}
-
-/// The request of an `operations invoke` command line, `None` for any other
-/// command line or one the relaxed command does not parse: the generated
-/// runner then refuses or runs it as before.
-fn parse(args: &[OsString]) -> Option<Request> {
-    let command = relaxed();
-    let matches = command.clone().try_get_matches_from(args).ok()?;
-    let ("operations", group) = matches.subcommand()? else {
-        return None;
-    };
-    let ("invoke", leaf) = group.subcommand()? else {
-        return None;
-    };
-    let given = |id: &str| leaf.value_source(id) == Some(ValueSource::CommandLine);
-    let text = |field: &str| {
-        let id = format!("field:{field}");
-        given(&id)
-            .then(|| leaf.get_one::<String>(&id).cloned())
-            .flatten()
-    };
-    let plan = connectors_cli_contract::plan();
-    let mut globals = Vec::new();
-    for (id, long) in [
-        ("global_config", plan.globals.config.clone()),
-        ("global_state", Some(plan.globals.state.clone())),
-        ("global_output", plan.globals.output.clone()),
-    ] {
-        let (Some(long), Some(ValueSource::CommandLine)) = (long, matches.value_source(id)) else {
-            continue;
-        };
-        let value = matches.get_raw(id)?.next()?;
-        let mut arg = OsString::from(format!("--{long}="));
-        arg.push(value);
-        globals.push(arg);
-    }
-    let invoke = command
-        .find_subcommand("operations")?
-        .find_subcommand("invoke")?;
-    let mut kept = Vec::new();
-    for arg in invoke.get_arguments() {
-        let id = arg.get_id().as_str();
-        let owned = id
-            .strip_prefix("field:")
-            .is_some_and(|field| OWNED.contains(&field));
-        if owned || !given(id) {
-            continue;
-        }
-        let long = arg.get_long()?;
-        if arg.get_action().takes_values() {
-            let value = leaf.get_raw(id)?.next()?;
-            let mut arg = OsString::from(format!("--{long}="));
-            arg.push(value);
-            kept.push(arg);
-        } else {
-            kept.push(OsString::from(format!("--{long}")));
-        }
-    }
-    let json = matches
-        .get_one::<String>("global_output")
-        .map(String::as_str)
-        == Some("json");
-    Some(Request {
-        program: args.first()?.clone(),
-        definition: text("definition").map(PathBuf::from),
-        root: text("definitions_root").map(PathBuf::from),
-        credential_file: text("credential_file").map(PathBuf::from),
-        selected: ["adapter", "connector", "instance"]
-            .iter()
-            .any(|field| text(field).is_some()),
-        operation: text("operation")?,
-        connection: text("connection"),
-        schema: text("schema"),
-        revision: text("revision"),
-        config: matches.get_one::<PathBuf>("global_config").cloned(),
-        state: matches.get_one::<PathBuf>("global_state").cloned(),
-        json,
-        globals,
-        kept,
-    })
+/// The instance a prepared definition selects and the connection it holds.
+pub(super) struct Prepared {
+    pub(super) connector: String,
+    pub(super) instance: String,
+    pub(super) alias: String,
+    pub(super) connection: String,
 }
 
 /// The one failure envelope a refused preparation writes, as the generated
 /// runner writes a handler's.
-fn render(reply: HandlerReply, json: bool) -> ProcessOutput {
+pub(super) fn render(reply: HandlerReply, json: bool) -> ProcessOutput {
     let (code, data, usage) = match reply {
         HandlerReply::UsageError { code, data } => (code, data, true),
         HandlerReply::Error { code, data } => (code, data, false),
@@ -224,29 +104,39 @@ fn usage() -> HandlerReply {
     failure("invalid_input", "arguments", "none", true)
 }
 
-/// Prepare `definition` and answer the rewritten command line.
-///
-/// The interrupt handler is installed before anything else runs: reading the
-/// configuration may start the installed provider to derive an unpinned
-/// instance, and pinning the definition's entry starts it twice, so no child
-/// is ever started before an interruption is caught. An interruption at any
-/// point of the preparation ends the command as interrupted, whatever the step
-/// it arrived in answered, refusals included.
-fn run(request: &Request, definition: &Path) -> Result<Vec<OsString>, HandlerReply> {
-    let signals = protected::Signals::install().map_err(owner_failure)?;
-    let prepared = prepare_with(request, definition, &signals);
-    if signals.interrupted() {
-        return Err(owner_failure(owner::Code::Interrupted.into()));
+/// An `invoke` target naming another connector or instance than the one the
+/// definition prepares (story:connectors-do-short-invocation).
+fn other_target() -> HandlerReply {
+    let mut reply = usage();
+    if let HandlerReply::UsageError { data, .. } = &mut reply {
+        data["field"] = json!("target");
     }
-    prepared
+    reply
 }
 
-/// [`run`], under the interrupt handler `signals`.
-fn prepare_with(
+/// A definition lowered, cached and derived as the instance a run of it
+/// selects, before anything is recorded or any connection resolved.
+pub(super) struct Lowered {
+    paths: Paths,
+    pub(super) connector: String,
+    pub(super) instance: String,
+    alias: String,
+    digest: String,
+    native: PathBuf,
+    pub(super) adapter: connectors_host::local::config::Adapter,
+    /// The description the installed provider reported for it.
+    pub(super) reported: connectors_host::local::runtime::Bootstrap,
+}
+
+/// The first part of [`prepare_with`], under the interrupt handler `signals`:
+/// what `invoke --definition --describe` answers from
+/// (story:connectors-do-short-invocation). It records nothing, resolves, asks
+/// for or creates no connection, and reads no `--credential-file`.
+pub(super) fn lower(
     request: &Request,
     definition: &Path,
     signals: &protected::Signals,
-) -> Result<Vec<OsString>, HandlerReply> {
+) -> Result<Lowered, HandlerReply> {
     // A third selector: never beside `--adapter` or `--connector`/`--instance`.
     if request.selected {
         return Err(usage());
@@ -263,6 +153,15 @@ fn prepare_with(
         .ok_or_else(usage)?
         .to_owned();
     let connector = parsed.id.clone().unwrap_or_else(|| stem.clone());
+    // `invoke` names the connector the definition declares; nothing is
+    // cached, derived or recorded for another.
+    if request
+        .target
+        .as_ref()
+        .is_some_and(|(named, _)| *named != connector)
+    {
+        return Err(other_target());
+    }
     let alias = definitions::alias(&connector);
     // The connector, the file stem and the catalog (the stem when the file
     // names none) name an alias, the selection file and the bundle's
@@ -348,6 +247,61 @@ fn prepare_with(
             reported,
         ),
     };
+    // An `invoke` target that names an instance names this one; nothing is
+    // recorded for another.
+    if request
+        .target
+        .as_ref()
+        .and_then(|(_, named)| named.as_ref())
+        .is_some_and(|named| *named != instance)
+    {
+        return Err(other_target());
+    }
+    Ok(Lowered {
+        paths,
+        connector,
+        instance,
+        alias,
+        digest,
+        native,
+        adapter,
+        reported,
+    })
+}
+
+/// Prepare `definition` and answer the instance it selects, under the
+/// interrupt handler `signals`.
+///
+/// The interrupt handler is installed before anything else runs: reading the
+/// configuration may start the installed provider to derive an unpinned
+/// instance, and pinning the definition's entry starts it twice, so no child
+/// is ever started before an interruption is caught. An interruption at any
+/// point of the preparation ends the command as interrupted, whatever the step
+/// it arrived in answered, refusals included.
+pub(super) fn prepare_with(
+    request: &Request,
+    definition: &Path,
+    signals: &protected::Signals,
+) -> Result<Prepared, HandlerReply> {
+    let Lowered {
+        paths,
+        connector,
+        instance,
+        alias,
+        digest,
+        native,
+        adapter,
+        reported,
+    } = lower(request, definition, signals)?;
+    // Nothing after an interruption runs (`interrupted`).
+    let interrupted = || {
+        if signals.interrupted() {
+            Err(owner_failure(owner::Code::Interrupted.into()))
+        } else {
+            Ok(())
+        }
+    };
+    interrupted()?;
     let recorded = definitions::record(
         &paths,
         &connector,
@@ -382,41 +336,24 @@ fn prepare_with(
     };
     interrupted()?;
     let connection = connection?;
-    let (schema, revision) = match (&request.schema, &request.revision) {
-        (Some(schema), Some(revision)) => (schema.clone(), revision.clone()),
-        (schema, revision) => {
-            let described = described(
-                &paths,
-                &alias,
-                &adapter,
-                reported,
-                &connection,
-                &request.operation,
-            );
-            interrupted()?;
-            let (described_schema, described_revision) = described?;
-            (
-                schema.clone().unwrap_or(described_schema),
-                revision.clone().unwrap_or(described_revision),
-            )
-        }
-    };
+    // The invoke reads the description through that connection: it must state
+    // the operation.
+    let described = described(
+        &paths,
+        &alias,
+        &adapter,
+        reported,
+        &connection,
+        &request.operation,
+    );
     interrupted()?;
-    let mut rewritten = vec![request.program.clone()];
-    rewritten.extend(request.globals.iter().cloned());
-    rewritten.extend(["operations", "invoke"].map(OsString::from));
-    for (long, value) in [
-        ("connector", connector.as_str()),
-        ("instance", instance.as_str()),
-        ("connection", connection.as_str()),
-        ("operation", request.operation.as_str()),
-        ("schema", schema.as_str()),
-        ("revision", revision.as_str()),
-    ] {
-        rewritten.push(OsString::from(format!("--{long}={value}")));
-    }
-    rewritten.extend(request.kept.iter().cloned());
-    Ok(rewritten)
+    described?;
+    Ok(Prepared {
+        connector,
+        instance,
+        alias,
+        connection,
+    })
 }
 
 /// A plain name: ASCII letters, digits, `-` and `_`, as a derived instance's

@@ -14,11 +14,16 @@ use connectors_core::{
 use connectors_sdk::{Adapter, Credential, validate};
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc, time::Instant};
+mod token_review;
 mod v1alpha2;
 use subtle::ConstantTimeEq;
 use tokio::sync::Semaphore;
 
 pub use crate::local::service::ServiceState;
+pub use token_review::{
+    Accounts as ServiceAccounts, CONCURRENT_REVIEWS, ServiceAccountAdmission,
+    ServiceAccountPattern, TokenReviewConfig,
+};
 
 /// `urn:connectors:config:v2:service` (`connectors.declarations.ServiceHostConfiguration`):
 /// the v1 members plus the optional `state` directory, which `POST
@@ -49,10 +54,238 @@ pub(crate) struct ServiceConfigV1 {
     pub service_credential: CredentialRef,
 }
 
+/// `urn:connectors:config:v3:service` (`connectors.declarations.ServiceHostConfiguration`):
+/// the v2 members plus the admission members (contracts/service/compatibility.md
+/// § 2.1, Admission). `service_credential` is present exactly under
+/// `static-bearer`. A v1 or v2 document reads here with the same meaning and
+/// serializes to the same bytes. [`ServiceConfig`] stays the closed v2 reader
+/// of the hosts that do not offer the admission profiles.
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(extend("oneOf" = [
+    {
+        "properties": {"admission": {"const": "static-bearer"}},
+        "required": ["service_credential"],
+        "not": {"anyOf": [
+            {"required": ["audience"]},
+            {"required": ["principal"]},
+            {"required": ["principals"]},
+            {"required": ["service_accounts"]},
+            {"required": ["token_review"]}
+        ]}
+    },
+    {
+        "properties": {"admission": {"const": "service-account-token"}},
+        "required": ["admission", "audience", "token_review"],
+        "not": {"required": ["service_credential"]},
+        "oneOf": [
+            {"required": ["principal"]},
+            {"required": ["principals"]},
+            {"required": ["service_accounts"]}
+        ]
+    }
+]))]
+pub struct ServiceConfigV3 {
+    #[schemars(length(min = 1, max = 128), regex(pattern = "^[A-Za-z0-9_.-]+$"))]
+    pub instance: String,
+    #[schemars(with = "String", length(min = 1, max = 512))]
+    pub listen: SocketAddr,
+    /// The bearer callers present under `static-bearer`. Like every member
+    /// whose presence selects or refuses a profile, it is absent or a value,
+    /// never `null` ([`present`]).
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(with = "CredentialRef")]
+    pub service_credential: Option<CredentialRef>,
+    /// The directory of the host's local metadata authority: its audit anchors
+    /// and attempt records. Without it the host serves only `/v1/*`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>", length(min = 1, max = 4096))]
+    pub state: Option<std::path::PathBuf>,
+    /// How the host admits its caller; absent means `static-bearer`.
+    #[serde(default, skip_serializing_if = "AdmissionProfile::is_static_bearer")]
+    pub admission: AdmissionProfile,
+    /// The one audience a `service-account-token` review asks for.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(with = "String", length(min = 1, max = 256))]
+    pub audience: Option<String>,
+    /// The one service account a `service-account-token` host admits,
+    /// `system:serviceaccount:<namespace>:<name>`.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(
+        with = "String",
+        length(min = 1, max = 128),
+        regex(pattern = token_review::PRINCIPAL_PATTERN)
+    )]
+    pub principal: Option<String>,
+    /// The service accounts a `service-account-token` host admits, 1 to 64
+    /// of the `principal` form; instead of `principal`.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(
+        with = "Vec<String>",
+        length(min = 1, max = 64),
+        inner(length(min = 1, max = 128), regex(pattern = token_review::PRINCIPAL_PATTERN))
+    )]
+    pub principals: Option<Vec<String>>,
+    /// The namespace and name pattern of the service accounts a
+    /// `service-account-token` host admits; instead of `principal`.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(with = "ServiceAccountPattern")]
+    pub service_accounts: Option<ServiceAccountPattern>,
+    /// The TokenReview endpoint of a `service-account-token` host.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(with = "TokenReviewConfig")]
+    pub token_review: Option<TokenReviewConfig>,
+    /// The instance's standing write grants
+    /// (`connectors.standing_approvals.GrantFile`). Absent: the host is
+    /// unchanged, and a write on `POST /v1alpha2/invoke` is dispatched unkeyed
+    /// as before. Present: every write there is keyed and needs a grant the
+    /// file holds when the write arrives (a file absent at that moment holds
+    /// none, so the write is `approval_required`), and `POST /v1/invoke`
+    /// refuses writes. Requires `state`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>", length(min = 1, max = 4096))]
+    pub standing_grants: Option<std::path::PathBuf>,
+}
+
+/// A member of [`ServiceConfigV3`] that is absent (`None`, by
+/// `#[serde(default)]`) or a value, never `null`. The schema gives these
+/// members a non-null type and reads their presence in `required`, `oneOf`
+/// and `not`, so a `null` the reader took for absent would make the two
+/// disagree (a YAML `principals:` with no value is such a `null`).
+fn present<'de, D, T>(deserializer: D) -> std::result::Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
+}
+
+/// `connectors.declarations.ServiceAdmissionProfile`.
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum AdmissionProfile {
+    #[default]
+    StaticBearer,
+    ServiceAccountToken,
+}
+impl AdmissionProfile {
+    fn is_static_bearer(&self) -> bool {
+        *self == Self::StaticBearer
+    }
+}
+
+impl From<ServiceConfig> for ServiceConfigV3 {
+    fn from(config: ServiceConfig) -> Self {
+        Self {
+            instance: config.instance,
+            listen: config.listen,
+            service_credential: Some(config.service_credential),
+            state: config.state,
+            admission: AdmissionProfile::StaticBearer,
+            audience: None,
+            principal: None,
+            principals: None,
+            service_accounts: None,
+            token_review: None,
+            standing_grants: None,
+        }
+    }
+}
+
+impl ServiceConfigV3 {
+    /// The configured admission, refusing a document that mixes the profiles'
+    /// members. `service-account-token` reads its CA here, once.
+    pub fn admission(&self) -> Result<Admission> {
+        let review_members = self.audience.is_some()
+            || self.principal.is_some()
+            || self.principals.is_some()
+            || self.service_accounts.is_some()
+            || self.token_review.is_some();
+        match self.admission {
+            AdmissionProfile::StaticBearer => {
+                if review_members {
+                    return Err(Error::invalid(
+                        "static-bearer admission takes no audience, principal, principals, service_accounts or token_review",
+                    ));
+                }
+                let Some(credential) = self.service_credential.clone() else {
+                    return Err(Error::invalid(
+                        "static-bearer admission requires service_credential",
+                    ));
+                };
+                Ok(Admission::StaticBearer(Arc::new(credential)))
+            }
+            AdmissionProfile::ServiceAccountToken => {
+                if self.service_credential.is_some() {
+                    return Err(Error::invalid(
+                        "service-account-token admission takes no service_credential",
+                    ));
+                }
+                let (Some(audience), Some(review)) = (&self.audience, &self.token_review) else {
+                    return Err(Error::invalid(
+                        "service-account-token admission requires audience and token_review",
+                    ));
+                };
+                let accounts = match (&self.principal, &self.principals, &self.service_accounts) {
+                    (Some(principal), None, None) => token_review::Accounts::one(principal)?,
+                    (None, Some(principals), None) => token_review::Accounts::listed(principals)?,
+                    (None, None, Some(pattern)) => token_review::Accounts::pattern(pattern)?,
+                    _ => {
+                        return Err(Error::invalid(
+                            "service-account-token admission requires exactly one of principal, principals or service_accounts",
+                        ));
+                    }
+                };
+                Ok(Admission::ServiceAccountToken(Arc::new(
+                    ServiceAccountAdmission::new(audience, accounts, review)?,
+                )))
+            }
+        }
+    }
+}
+
+/// How a host admits its caller (contracts/service/compatibility.md § 2.1,
+/// Admission): one profile for the whole host.
+#[derive(Clone)]
+pub enum Admission {
+    /// One bearer compared in constant time; the principal is
+    /// [`STATIC_BEARER_PRINCIPAL`](crate::local::service::STATIC_BEARER_PRINCIPAL).
+    StaticBearer(Arc<dyn Credential>),
+    /// One TokenReview per request; the principal is the service account the
+    /// review named, one the configuration admits.
+    ServiceAccountToken(Arc<ServiceAccountAdmission>),
+}
+
 #[derive(Clone)]
 struct Service {
     adapter: Arc<dyn Adapter>,
-    credential: Arc<dyn Credential>,
+    admission: Admission,
     slots: Arc<Semaphore>,
     state: Option<Arc<ServiceState>>,
 }
@@ -62,9 +295,18 @@ pub fn router(adapter: Arc<dyn Adapter>, credential: Arc<dyn Credential>) -> Rou
     router_with_state(adapter, credential, None)
 }
 
+/// A `static-bearer` host.
 pub fn router_with_state(
     adapter: Arc<dyn Adapter>,
     credential: Arc<dyn Credential>,
+    state: Option<Arc<ServiceState>>,
+) -> Router {
+    router_with_admission(adapter, Admission::StaticBearer(credential), state)
+}
+
+pub fn router_with_admission(
+    adapter: Arc<dyn Adapter>,
+    admission: Admission,
     state: Option<Arc<ServiceState>>,
 ) -> Router {
     // The running host retries its retained final observations (audit.md § 3).
@@ -79,26 +321,54 @@ pub fn router_with_state(
         .layer(DefaultBodyLimit::max(REQUEST_LIMIT))
         .with_state(Service {
             adapter,
-            credential,
+            admission,
             slots: Arc::new(Semaphore::new(32)),
             state,
         })
 }
 
-async fn admitted(service: &Service, headers: &HeaderMap) -> Result<()> {
-    let presented = headers
-        .get("authorization")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-        .ok_or_else(|| Error::new(ErrorCode::Unauthorized, "service authentication required"))?;
-    let expected = service.credential.resolve().await?;
-    if !bool::from(expected.0.as_slice().ct_eq(presented.as_bytes())) {
-        return Err(Error::new(
-            ErrorCode::Unauthorized,
-            "service authentication failed",
-        ));
+/// Admission (compatibility.md § 2.1, Admission). It returns the admitted
+/// service principal, or the refusal the route answers before any anchor and
+/// any adapter call.
+async fn admitted(service: &Service, headers: &HeaderMap) -> Result<String> {
+    service.admission.admit(headers).await
+}
+
+impl Admission {
+    /// Admits the caller of one request by its `Authorization: Bearer`, under
+    /// this host's profile, and returns the admitted service principal. Routes
+    /// a composition adds ([`serve_with_routes`]) answer this refusal before
+    /// they read the body.
+    pub async fn admit(&self, headers: &HeaderMap) -> Result<String> {
+        // Refusal: no bearer at all, before any credential read or review.
+        let presented = headers
+            .get("authorization")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .ok_or_else(|| {
+                Error::new(ErrorCode::Unauthorized, "service authentication required")
+            })?;
+        match self {
+            Admission::StaticBearer(credential) => {
+                let expected = credential.resolve().await?;
+                // Refusal: any bearer other than the configured bytes.
+                if !bool::from(expected.0.as_slice().ct_eq(presented.as_bytes())) {
+                    return Err(Error::new(
+                        ErrorCode::Unauthorized,
+                        "service authentication failed",
+                    ));
+                }
+                Ok(crate::local::service::STATIC_BEARER_PRINCIPAL.to_owned())
+            }
+            Admission::ServiceAccountToken(account) => {
+                // Refusal: every answer but the exact positive review
+                // (`unauthorized`); every failed review, and a request that finds
+                // all CONCURRENT_REVIEWS slots taken, with no review (`unavailable`).
+                // The principal is the reviewed username, verbatim.
+                account.admit(presented).await
+            }
+        }
     }
-    Ok(())
 }
 
 async fn describe(State(service): State<Service>, headers: HeaderMap) -> HttpResponse {
@@ -113,6 +383,16 @@ async fn invoke(
     headers: HeaderMap,
     body: std::result::Result<Bytes, axum::extract::rejection::BytesRejection>,
 ) -> HttpResponse {
+    // Refusal: `/v1/invoke` writes no anchor, and every invocation under
+    // `service-account-token` is anchored with its service account, so that
+    // profile does not serve this route (compatibility.md § 2.1, Legacy
+    // binding). Answered before any review and any adapter call.
+    if let Admission::ServiceAccountToken(_) = service.admission {
+        return error_http(Error::new(
+            ErrorCode::Unsupported,
+            "this host admits invocations only on /v1alpha2/invoke",
+        ));
+    }
     if let Err(error) = admitted(&service, &headers).await {
         return error_http(error);
     }
@@ -165,6 +445,18 @@ async fn execute(service: &Service, request: &Invocation) -> Result<serde_json::
         ));
     }
     let operation = descriptor.operation(&request.operation)?;
+    // Refusal: on a host with standing grants a write runs only keyed, under
+    // a grant, on `/v1alpha2/invoke`; this route records no attempt and reads
+    // no grant, so it never dispatches one (compatibility.md § 2.1, Keyed
+    // writes under a standing grant). A host without them is unchanged.
+    if operation.profile == v1alpha2::MUTATION_PROFILE
+        && service.state.as_ref().is_some_and(|state| state.keyed())
+    {
+        return Err(Error::new(
+            ErrorCode::Unsupported,
+            "on this host a write runs only on /v1alpha2/invoke",
+        ));
+    }
     validate(&operation.input_schema, &request.input)?;
     let _permit = service
         .slots
@@ -223,8 +515,63 @@ fn legacy(mut error: Error) -> Error {
     error
 }
 
-pub async fn serve(config: ServiceConfig, adapter: Arc<dyn Adapter>) -> Result<()> {
-    config.service_credential.resolve().await?;
+/// The start refusal for a `state` that cannot be opened. A refused directory
+/// is named (the configured path or one of its ancestors, never OS text) with
+/// its fixed reason; any other failure keeps the closed text.
+fn state_refusal(
+    configured: &std::path::Path,
+    refusal: crate::local::filesystem::Refusal,
+) -> Error {
+    use crate::local::filesystem::{Reason, Refusal};
+    const REFUSED: &str = "service state cannot be opened for this instance";
+    let Refusal::Refused(refused) = refusal else {
+        return Error::invalid(REFUSED);
+    };
+    let directory = &refused.directory;
+    // `state` itself is told its whole target, whichever check failed first:
+    // fixing one bit at a time would only move the refusal to the next check.
+    if directory == configured {
+        return Error::invalid(format!(
+            "{REFUSED}: {directory:?}, the state directory, must be owned by the host user \
+             with mode 0700, no group or other bits"
+        ));
+    }
+    let reason = match refused.reason {
+        Reason::Owner => "is owned by neither the host user nor root",
+        Reason::Writable => "is writable by group or others",
+        // An ancestor is admitted without the private check; kept for totality.
+        Reason::NotPrivate => "is not private",
+    };
+    Error::invalid(format!(
+        "{REFUSED}: {directory:?}, an ancestor of state, {reason}"
+    ))
+}
+
+/// Serves a v2 ([`ServiceConfig`], always `static-bearer`) or v3
+/// ([`ServiceConfigV3`]) service configuration.
+pub async fn serve(config: impl Into<ServiceConfigV3>, adapter: Arc<dyn Adapter>) -> Result<()> {
+    serve_with_routes(config, adapter, |_| Router::new()).await
+}
+
+/// [`serve`], with the routes `routes` builds from the host's admission
+/// merged beside the host's own. The added routes carry their own body
+/// limits and must call [`Admission::admit`] before anything else.
+pub async fn serve_with_routes(
+    config: impl Into<ServiceConfigV3>,
+    adapter: Arc<dyn Adapter>,
+    routes: impl FnOnce(Admission) -> Router,
+) -> Result<()> {
+    let config = config.into();
+    let admission = config.admission()?;
+    // Refusal: keys and grant uses are kept in `state`; a grant file without
+    // it would admit writes that nothing could replay or count.
+    if config.standing_grants.is_some() && config.state.is_none() {
+        return Err(Error::invalid("standing_grants requires state"));
+    }
+    match &admission {
+        Admission::StaticBearer(credential) => drop(credential.resolve().await?),
+        Admission::ServiceAccountToken(account) => account.ready().await?,
+    }
     // Host start records the instance before /v1alpha2/invoke is served; a
     // refusal refuses start (compatibility.md § 2.1, Host start).
     let state = match config.state.clone() {
@@ -232,22 +579,32 @@ pub async fn serve(config: ServiceConfig, adapter: Arc<dyn Adapter>) -> Result<(
         Some(path) => {
             let descriptor = adapter.descriptor();
             let instance = config.instance.clone();
+            let configured = path.clone();
             let state = tokio::task::spawn_blocking(move || {
-                ServiceState::open(&path, &instance, &descriptor.adapter, &descriptor.revision)
+                ServiceState::open_explained(
+                    &path,
+                    &instance,
+                    &descriptor.adapter,
+                    &descriptor.revision,
+                )
             })
             .await
             .map_err(|_| Error::internal())?
-            .map_err(|_| Error::invalid("service state cannot be opened for this instance"))?;
+            .map_err(|refusal| state_refusal(&configured, refusal))?;
+            let state = state
+                .with_standing_grants(config.standing_grants.clone())
+                .map_err(|_| Error::invalid("standing grant uses cannot be opened"))?;
             Some(Arc::new(state))
         }
     };
     let listener = tokio::net::TcpListener::bind(config.listen)
         .await
         .map_err(|_| Error::invalid("service listener cannot be bound"))?;
-    tracing::info!(instance=%config.instance, listen=%listener.local_addr().map_err(|_|Error::internal())?, "adapter service listening");
+    tracing::info!(instance=%config.instance, listen=%listener.local_addr().map_err(|_|Error::internal())?, admission=?config.admission, "adapter service listening");
+    let added = routes(admission.clone());
     axum::serve(
         listener,
-        router_with_state(adapter, Arc::new(config.service_credential), state),
+        router_with_admission(adapter, admission, state).merge(added),
     )
     .with_graceful_shutdown(async {
         // Windows has no SIGTERM: Ctrl+C or Ctrl+Break, and closing or
@@ -331,9 +688,9 @@ mod tests {
                     entered: entered.clone(),
                     result,
                 }),
-                credential: Arc::new(CredentialRef::Environment {
+                admission: Admission::StaticBearer(Arc::new(CredentialRef::Environment {
                     name: "UNUSED".into(),
-                }),
+                })),
                 slots: Arc::new(Semaphore::new(32)),
                 state: None,
             },

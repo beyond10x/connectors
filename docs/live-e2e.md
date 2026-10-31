@@ -4,8 +4,9 @@ Run from the repository root on Linux with Rust, Docker, `kubectl`, `jq`, and
 OpenSSL installed. These commands create a disposable Kubernetes server and
 PostgreSQL database. They never select the user's default Kubernetes context.
 Kubernetes uses a private bearer credential and its cluster CA; SQL uses a
-restricted reader role. GitLab has no standalone service: it runs through the
-catalog provider under the local CLI, and its acceptance is recorded separately
+restricted reader role. GitLab is not part of this run: it runs through the catalog
+provider, under the local CLI or as a [served catalog instance](running-services.md#catalog-instances),
+and its acceptance is recorded separately
 in [`gitlab-sandbox-20260913/`](https://github.com/beyond10x/connectors/tree/history/evidence-2026-10/docs/evidence/gitlab-sandbox-20260913) on branch `history/evidence-2026-10`.
 
 The example uses fixed local container names and service ports 17100–17103. Choose
@@ -112,11 +113,14 @@ target/debug/connectors-kubernetes --config .local/e2e/kubernetes.json
 ## Discover an endpoint and explicitly bind SQL
 
 ```sh
-printf '%s\n' '{"namespace":"engineering","limit":100}' > .local/e2e/discover.json
-target/debug/connectors invoke --endpoint http://127.0.0.1:17102/ \
-  --allow-plaintext --token-file .local/e2e/service.secret \
-  --operation endpoints.discover --input .local/e2e/discover.json \
-  > .local/e2e/discovered-endpoints.json
+token="authorization: Bearer $(cat .local/e2e/service.secret)"
+revision=$(curl -s -H "$token" http://127.0.0.1:17102/v1/describe | jq -r .revision)
+jq -n --arg revision "$revision" '{version: "v1alpha1", request_id: "discover-1",
+  operation: "endpoints.discover", revision: $revision,
+  input: {namespace: "engineering", limit: 100}}' \
+  | curl -s -H "$token" -H 'content-type: application/json' --data @- \
+    http://127.0.0.1:17102/v1/invoke \
+  | jq .result > .local/e2e/discovered-endpoints.json
 jq '.items[] | select(.service == "postgres")' .local/e2e/discovered-endpoints.json
 ```
 
@@ -156,11 +160,12 @@ jq -n '{service:{instance:"engineering-live",listen:"127.0.0.1:17100",
   > .local/e2e/federation.json
 ```
 
-Start the gateway in a fourth terminal after the three leaf services are listening:
-
-```sh
-target/debug/connectors serve --config .local/e2e/federation.json
-```
+Start the gateway in a fourth terminal after the three leaf services are listening. No command
+of this repository serves it since 0.60.0, which removed `connectors serve`: the gateway is a
+Rust program that embeds `connectors_host::federation` with this configuration, as
+[Federate services](../website/docs/guides/federate-adapter-services.md) shows, listening on
+`127.0.0.1:17100`. The acceptance executable describes the gateway before any scenario group and
+has no option to leave the federated groups out, so without a gateway it fails at that describe.
 
 Run the live Rust acceptance executable from another terminal:
 

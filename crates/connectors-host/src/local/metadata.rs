@@ -49,7 +49,7 @@ const AUDIT_MIGRATION: &str = include_str!("metadata/audit.sql");
 /// `MetadataUnavailable`, which callers read as "the store is gone". The bound
 /// only has to separate a live queue from a holder that never releases.
 pub const WAIT_BOUND: Duration = Duration::from_secs(30);
-const NAME: &str = "metadata.sqlite3";
+pub(crate) const NAME: &str = "metadata.sqlite3";
 const LOCK: &str = "metadata.lock";
 /// The registry's durable clock floor, beside the lock that guards it.
 const REGISTRY_FLOOR: &str = "registry-clock.floor";
@@ -480,6 +480,33 @@ impl Metadata {
     pub fn authority_at(path: &Path) -> Result<uuid::Uuid> {
         let dir = fs::directory(path, false, true).map_err(|_| Failure::MetadataUnavailable)?;
         let lock = lifecycle_lock(&dir)?;
+        Self::authority_locked(path, dir, lock)
+    }
+
+    /// [`Metadata::authority_at`] when the lifecycle lock is free at the call,
+    /// `None` when another holder has it, such as an owner recording the work
+    /// it serves: the caller waits on no holder. The read and the handle
+    /// release end by `until`. Nothing is created or migrated.
+    pub(super) fn authority_unless_locked_until(
+        path: &Path,
+        until: Instant,
+    ) -> Result<Option<uuid::Uuid>> {
+        deadline::within(until, || {
+            let dir = fs::directory(path, false, true).map_err(|_| Failure::MetadataUnavailable)?;
+            let lock = fs::private_file_at(&dir, OsStr::new(LOCK))
+                .map_err(|_| Failure::MetadataUnavailable)?;
+            if !lock_within(&lock, Duration::ZERO)? {
+                return Ok(None);
+            }
+            Self::authority_locked(path, dir, lock).map(Some)
+        })
+    }
+
+    fn authority_locked(
+        path: &Path,
+        dir: std::fs::File,
+        lock: std::fs::File,
+    ) -> Result<uuid::Uuid> {
         let metadata = Self::open_connection(path, dir, lock, true)?;
         let app: i64 = metadata
             .connection
@@ -1381,18 +1408,31 @@ fn lifecycle_lock(directory: &std::fs::File) -> Result<std::fs::File> {
 }
 
 fn acquire_lifecycle_lock(file: &std::fs::File) -> Result<()> {
-    let deadline = deadline::cutoff(lifecycle_lock_wait());
+    if lock_within(file, lifecycle_lock_wait())? {
+        Ok(())
+    } else {
+        Err(Failure::MetadataUnavailable)
+    }
+}
+
+/// Takes the lifecycle lock on `file` within `wait` and the scoped cutoff:
+/// `false` when another holder kept it that long. `Duration::ZERO` tries once.
+fn lock_within(file: &std::fs::File, wait: Duration) -> Result<bool> {
+    let deadline = deadline::cutoff(wait);
     #[cfg(unix)]
     loop {
         self::deadline::check()?;
         // SAFETY: file owns the live descriptor. Dropping it releases the lock.
         let result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_NB | libc::LOCK_EX) };
         if result == 0 {
-            return Ok(());
+            return Ok(true);
         }
         let kind = std::io::Error::last_os_error().kind();
-        if kind != std::io::ErrorKind::WouldBlock || Instant::now() >= deadline {
+        if kind != std::io::ErrorKind::WouldBlock {
             return Err(Failure::MetadataUnavailable);
+        }
+        if Instant::now() >= deadline {
+            return Ok(false);
         }
         std::thread::sleep(
             Duration::from_millis(5).min(deadline.saturating_duration_since(Instant::now())),
@@ -1404,13 +1444,14 @@ fn acquire_lifecycle_lock(file: &std::fs::File) -> Result<()> {
     loop {
         self::deadline::check()?;
         match file.try_lock() {
-            Ok(()) => return Ok(()),
+            Ok(()) => return Ok(true),
             Err(std::fs::TryLockError::WouldBlock) if Instant::now() < deadline => {
                 std::thread::sleep(
                     Duration::from_millis(5)
                         .min(deadline.saturating_duration_since(Instant::now())),
                 );
             }
+            Err(std::fs::TryLockError::WouldBlock) => return Ok(false),
             Err(_) => return Err(Failure::MetadataUnavailable),
         }
     }

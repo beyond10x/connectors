@@ -3,7 +3,9 @@
   "provider": "jira",
   "operations": [
     {"id": "issues.search", "operation_id": "searchAndReconsileIssuesUsingJql", "effect": "read",
-     "description": "Search issues by JQL, one page per call; a JQL `updated >=` clause filters by time, and the walk ends on a page without nextPageToken"},
+     "description": "Search issues by JQL, one page per call; a JQL `updated >=` clause filters by time, and the walk ends on a page without nextPageToken",
+     "walk": {"parameter": "nextPageToken", "next": "/nextPageToken", "records": "/issues",
+              "ends": [{"name": "no_next_page_token", "absent": "/nextPageToken"}]}},
     {"id": "issue.comments", "operation_id": "getComments", "effect": "read",
      "description": "List one issue's comments, one page per call; the walk ends when startAt plus the page's comments reaches total"},
     {"id": "issue.changelog", "operation_id": "getChangeLogs", "effect": "read",

@@ -1,12 +1,12 @@
-//! story:invoke-definition-file, the one connect question of `operations
-//! invoke --definition` (`contracts/cli/v1alpha1/semantics.md` §3, "Invoking
-//! a definition file"). The question is the operator's whole consent to send
-//! the credential they are about to type to the host the file names, so it
-//! names that host, as the reuse question names each candidate's provider
-//! authority; and a yes is a consent to the entry it was asked for, so an entry
-//! another run recorded over it while it waited is the contract's
-//! `revision_conflict` with `retry_explicitly`, not a connect under the other
-//! file's entry.
+//! story:invoke-definition-file, the one connect question of `invoke
+//! --definition <file> <operation>` (story:connectors-do-short-invocation;
+//! `contracts/cli/v1alpha1/semantics.md` §3, "Invoking a definition file").
+//! The question is the operator's whole consent to send the credential they
+//! are about to type to the host the file names, so it names that host, as
+//! the reuse question names each candidate's provider authority; and a yes is
+//! a consent to the entry it was asked for, so an entry another run recorded
+//! over it while it waited is the contract's `revision_conflict` with
+//! `retry_explicitly`, not a connect under the other file's entry.
 //!
 //! The CLI runs on a fresh pseudo-terminal as the foreground of its own
 //! session, with the built catalog provider named by
@@ -324,11 +324,9 @@ impl Fixture {
 
 fn invoke(definition: &str) -> Vec<&str> {
     vec![
-        "operations",
         "invoke",
         "--definition",
         definition,
-        "--operation",
         "project.get",
         "--input-json",
         r#"{"id":"org/project"}"#,

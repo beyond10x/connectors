@@ -50,7 +50,7 @@ endpoint = "https://gitlab.example.com"
 $ target/release/connectors --output json setup check | jq -c '[.result.prerequisites[]|{name,state}]'
 [{"name":"configuration","state":"ready"},{"name":"metadata","state":"ready"},{"name":"artifact:gitlab.forge","state":"ready"},{"name":"keyring","state":"ready"},{"name":"persistent_custody_qualification","state":"ready"}]
 $ target/release/connectors --output json instances list
-{"ok":true,"result":{"adapters":[{"adapter":"gitlab.forge","adapter_id":"catalog","connector":"gitlab","instance":"forge","instance_id":"gitlab.forge","restart":"never","startup":"on-demand"}],"source":"configuration"}}
+{"ok":true,"result":{"adapters":[{"connector":"gitlab","instance":"forge","instance_id":"gitlab.forge","restart":"never","startup":"on-demand"}],"source":"configuration"}}
 ```
 
 Connect with the hidden token prompt, then describe an operation:
@@ -346,17 +346,18 @@ against the local HTTPS GitLab fixture (the ignored test
 `cli_journey::serve_the_raw_file_fixture` in
 `adapters/catalog/tests/local_runtime.rs`), whose files and languages are
 synthetic. Its disposable tree is named with `--config` and `--state-dir`, which
-the commands omit, and `$schema` and `$revision` come from
-`operations describe --operation <id>`, with the deprecated `--adapter gitlab` selector the run used.
+the commands omit. The run, made before 0.60.0, described and invoked with the deprecated
+`--adapter gitlab` selector. Below is the 0.60.0 form on the instance `gitlab/forge`, which takes
+its connection, schema and revision, and the results without the `adapter` member a 0.60.0
+result no longer carries.
 
 ```sh
-connectors --output json operations invoke --adapter gitlab --connection "$connection" \
-  --operation file.raw --schema "$schema" --revision "$revision" \
+connectors --output json invoke gitlab/forge file.raw \
   --input-json '{"id":"org/project","file_path":"docs/guide.md","ref":"v1.0.0"}'
 ```
 
 ```json
-{"ok":true,"result":{"adapter":"gitlab","operation":"file.raw","result":{"body":"# Guide\nfirst release\n","provenance":{"instance":"fixture-gitlab","observed_at_unix_ms":1792194048246,"resource":"/api/v4/projects/{id}/repository/files/{file_path}/raw","source_revision":"f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"},"status":200},"revision":"7b95112a56d28803c09f5d58beedcc4ce448b4ae7086358faee060fa770f8ebe"}}
+{"ok":true,"result":{"operation":"file.raw","result":{"body":"# Guide\nfirst release\n","provenance":{"instance":"fixture-gitlab","observed_at_unix_ms":1792194048246,"resource":"/api/v4/projects/{id}/repository/files/{file_path}/raw","source_revision":"f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"},"status":200},"revision":"7b95112a56d28803c09f5d58beedcc4ce448b4ae7086358faee060fa770f8ebe"}}
 ```
 
 A file that is not UTF-8 (`latin1.txt` in the fixture) fails with exit status 1:
@@ -373,13 +374,12 @@ transport refuses the body while reading it, before the catalog provider answers
 ```
 
 ```sh
-connectors --output json operations invoke --adapter gitlab --connection "$connection" \
-  --operation project.languages --schema "$schema" --revision "$revision" \
+connectors --output json invoke gitlab/forge project.languages \
   --input-json '{"id":"org/project"}'
 ```
 
 ```json
-{"ok":true,"result":{"adapter":"gitlab","operation":"project.languages","result":{"body":{"Dockerfile":8.58,"Rust":71.42,"Shell":20.0},"provenance":{"instance":"fixture-gitlab","observed_at_unix_ms":1792194050329,"resource":"/api/v4/projects/{id}/languages","source_revision":"f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"},"status":200},"revision":"7b95112a56d28803c09f5d58beedcc4ce448b4ae7086358faee060fa770f8ebe"}}
+{"ok":true,"result":{"operation":"project.languages","result":{"body":{"Dockerfile":8.58,"Rust":71.42,"Shell":20.0},"provenance":{"instance":"fixture-gitlab","observed_at_unix_ms":1792194050329,"resource":"/api/v4/projects/{id}/languages","source_revision":"f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"},"status":200},"revision":"7b95112a56d28803c09f5d58beedcc4ce448b4ae7086358faee060fa770f8ebe"}}
 ```
 
 Neither read has run against a live GitLab.
@@ -509,7 +509,7 @@ The complete configuration used against the sandbox is
   evicts it, and `validate` always exchanges afresh. A token answer carrying a
   different `refresh_token` is refused as an invalid credential and nothing is
   kept. `invalid_grant` and `invalid_client` are an invalid credential; on an
-  `operations invoke` of a read on an existing connection the CLI reports it
+  `invoke` of a read on an existing connection the CLI reports it
   with `next_action: repair_connection`, and while connecting with
   `retry_explicitly`. A guarded write refused for its credential reports
   `retry_status` until `story:guarded-write-credential-refusal-says-repair`
@@ -547,6 +547,47 @@ The complete configuration used against the sandbox is
   offered to the host as `http_bearer` with the fields `client_id` and
   `client_secret`, with no acquisition: connect it with the hidden prompt or a
   protected credential file.
+- `github_app` is for a GitHub App installation. The protected entry is
+  `{"app_id":"...","installation_id":...,"private_key":"..."}` and nothing
+  else: the App id (a number, or 1 to 128 letters, digits, `.`, `_` and `-`),
+  the installation id (a positive integer, as a number or a string of at most
+  20 digits) and the App's RSA private key as PEM text of at most 16 KiB,
+  PKCS #1 (`RSA PRIVATE KEY`, as GitHub issues it) or unencrypted PKCS #8
+  (`PRIVATE KEY`), 2048 to 4096 bits. A missing or extra field, or a key that
+  does not load, is `invalid_input` before any request. The provider signs an
+  RS256 JWT with the key (`iss` the App id, `iat` 60 seconds back against
+  clock drift, `exp` nine minutes from now), posts it with no body as
+  `Authorization: Bearer <JWT>` and `Accept: application/vnd.github+json` to
+  `<api_base>/app/installations/<installation_id>/access_tokens` under the
+  instance's own trust roots, and sends the installation token it answers as
+  `Authorization: Bearer <installation token>`. The token lives in the provider
+  process only, keyed by a digest of the entry, until five minutes before its
+  `expires_at`; a token answered with less than that left is used for one
+  request and not kept, and one whose `expires_at` is not in the future, or an
+  answer that is not a JSON object, is `protocol` and is never sent. It is never returned, logged, stored or written into a
+  result or an error. A `401`, `404` or `403` of the exchange is an invalid
+  credential (a bad JWT or key, another App's installation, a suspended
+  installation), a `403` naming a rate limit and a `429` are a provider rate
+  limit, a 5xx is `unavailable`; no answer text is kept. The profile must state
+  `"header": "Authorization"` and `"bearer": true` and an identity with
+  `"source": "configuration"` (below): the connection is the installation, and
+  its subject is the installation id. It refuses `prefix`, `account_label`,
+  `token_url`, `token_ca_file`, `authorize_url` and `requested_scopes`, and is
+  offered to the host as `http_bearer` with the fields `app_id`,
+  `installation_id` and `private_key`, with no acquisition: the entry rotates
+  nothing, so [mounted-secret custody](local-mounted-secret-custody.md) admits
+  it. Connect it with a protected credential file, since a PEM key spans lines.
+
+```json
+"auth": {
+  "profile": "github.app",
+  "scheme": "github_app",
+  "header": "Authorization",
+  "bearer": true,
+  "label": "GitHub App private key",
+  "identity": {"source": "configuration", "path": "installation/repositories", "kind": "github.installation"}
+}
+```
 - `access`, optional: one read validation makes after the identity read and the
   scope read, as `{"path": "...", "query": {"name": "value"}}` relative to the
   provider authority, with no `?` in the path and at most 16 query pairs. A `401`
@@ -581,7 +622,10 @@ The complete configuration used against the sandbox is
   `subject_pointer`, and is only for a static credential (`token` or `basic`):
   under `oauth2_refresh` or `oauth2_client_credentials` it is refused at load,
   because a reconnect would then accept another holder's OAuth credential as the same
-  identity. Anything else is refused at load too. The rules are modeled as
+  identity. A `github_app` profile requires it: the exchange proves the App's key
+  for the installation, the read proves the installation token, and the subject
+  is the entry's installation id rather than the instance id. Anything else is
+  refused at load too. The rules are modeled as
   `connectors_catalog.identity.Probe` and `connectors_catalog.identity.Profile`
   in `adapters/catalog/spec/ess`.
 
@@ -808,6 +852,56 @@ The complete configuration used against the sandbox is
   a write, beside `response`, `envelope`, `binary` or `download`, or a pointer
   without a leading `/` is refused when the selection loads. The member is
   modelled as `connectors_catalog.selection.ReadEmbeddedText`.
+- `walk` is optional, for a read answering JSON: `{"parameter": "<query
+  parameter>", "next": "<pointer>", "url_parameter": "<name>", "records":
+  "<pointer>", "query": {"<query parameter>": <value>}, "first_only":
+  ["<query parameter>", …], "continues": {"pointer": "<pointer>", "equals":
+  <value>}, "ends": [{"name": "<name>", "<test>": …}, …]}` declares how the
+  read's pages are walked and when the walk ends, so a caller follows the
+  provider's own rule instead of re-deriving it from the description. The
+  second page on sends the position as `parameter`; the position is the value
+  at the RFC 6901 pointer `next` in the previous page's answer (a string of at
+  most 16 KiB or an integer), or, with `url_parameter`, that one query
+  parameter of the link at `next` (a link of at most 16 KiB), form-decoded. `records` points at the page's records, an array
+  (absent or null is no records). Every page sends `query`, each value a
+  string, an integer or a boolean, such as Zendesk's
+  `include_boundary_indicators: true`; only the first page sends the
+  `first_only` parameters, such as Zendesk's `start_time` before the export
+  continues by `cursor`. Each page is decided in order: while `continues`
+  holds, the walk goes on whatever `ends` say, and a page without a position
+  is an error; otherwise the first end that holds ends the walk, and its
+  `name` (lower snake case, at most 64 bytes, such as `has_more_false`) says
+  which; otherwise the walk goes on to the position, and a page that names
+  none is an error. A position sent before in the same walk is an error, so a
+  walk cannot loop; positions are compared by the query value they send (so
+  `"5"` and `5` are one position), a position the first page's input already
+  carries counts as sent, and the walk keeps a SHA-256 of each, not its text. Each end takes exactly one test: `when` (`{"pointer",
+  "equals"}`, the value there equals `equals`), `absent` (a pointer whose
+  value is absent, null or the empty string), `present` (one whose value is
+  neither) or `empty` (one whose value is absent, null or an empty array).
+  Zendesk's `ticket.audits` declares
+  `"continues": {"pointer": "/meta/has_more", "equals": true}` and the ends
+  `has_more_false`, `no_cursor` (`absent` `/meta/after_cursor`) and
+  `no_records` (`empty` `/audits`). The provider runs no walk: it declares the
+  walk in the operation's input schema under `x-connectors-walk`, an annotation
+  no validator asserts, so `operations describe` and `invoke --describe` show
+  it inside `input_schema`, an invoke can read it from the same admitted
+  description as the schema and revision, and the `schema` digest an invoke
+  pins covers it with the rest of the input schema. A walk on a write, a `download`, a `binary`, an
+  `embedded_text` or a text read; a pointer that is not led by `/` or escapes
+  a `~` other than `~0` and `~1`; a `parameter`, `query` key or `first_only`
+  name that is not a query parameter of the operation as the selection exposes
+  it (withheld, fixed and credential parameters are not); a `query` value that
+  is not a string, an integer or a boolean, or that the parameter's schema in
+  the admitted description refuses, bounds included; a `first_only` name the
+  admitted description requires on every call; a `query` key or `first_only`
+  name that is the `parameter`, or a `first_only` name in `query` or named
+  twice; an `url_parameter` that is not
+  1 to 128 visible ASCII characters; no end or more than eight; an end without
+  exactly one test, with a name that is not lower snake case or named twice;
+  or an unknown member is refused when the selection loads, each by name. The
+  member is modelled as `connectors_catalog.walk.ReadWalk` in
+  `adapters/catalog/spec/ess`.
 - `refusal_texts` is optional, for a write: `[{"pointers": ["<pointer>", …],
   "contains": ["<text>", …], "code": "capacity"}, …]`. It is for a provider
   that documents no distinct status for a refusal and whose own clients
@@ -1099,7 +1193,7 @@ its revision and prints the bootstrap it printed before. Through the CLI:
   revalidation that binds another one says so as `"rebound": {"from": "v1", "to": "v2"}`.
 - `operations list` and `operations describe` with `--connection` describe the binding that
   connection reads through; without it, the first binding.
-- `operations invoke` reads under the binding the connection's evidence selected. An id that
+- `invoke` reads under the binding the connection's evidence selected. An id that
   binding does not serve is `not_found` before any request, and the revision of another
   binding's description is `stale_description`: describe again with `--connection`.
 - The instance's `permissions.operations` names ids of every binding it allows.
@@ -1207,8 +1301,8 @@ and `merge_requests.list` (`assignee_username`, `not[assignee_username]`,
 A derived instance ([Set up a GitLab instance](#set-up-a-gitlab-instance)) is the usual
 binding. This section is the reference for the other one, a pinned instance: it names a native
 configuration of its own, as above, and pins its executable, configuration revision and
-permissions. Existing installations use it, and so does a connector the catalog provider ships
-no declaration for, such as Slack ([the Slack guide](catalog-slack.md)), or an instance that
+permissions. Existing installations use it, and so does a selection the catalog provider ships
+no declaration for, such as Slack's user selection ([the Slack guide](catalog-slack.md)), or an instance that
 needs what an instance table cannot state, such as a `ca_file` or a narrower selection.
 
 The local CLI requires Linux x86_64 and the
@@ -1258,20 +1352,39 @@ sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
 args = ["--local-config", "/absolute/path/gitlab-catalog.json"]
 ```
 
-An instance table with any of these pins must carry all of them, `alias` included; one with
-none is derived. `alias` is the name the deprecated `--adapter` selector and mounted custody
-items use. The connector name of a pinned instance is a name only: it is not checked against a
-declaration.
+An instance table with any of these pins besides `alias` and `instance_id` must carry all of
+them, `alias` included; one with none is derived. `alias` is the name the deprecated `--adapter`
+selector and mounted custody items use. The connector name of a pinned instance is a name only:
+it is not checked against a declaration.
+
+A derived instance may state `alias` and `instance_id`, and nothing else besides `endpoint`,
+`profile` and `description`. This short form is what `setup migrate` writes for an entry the
+installed provider derives unchanged: the provider is started with `--instance-id`, so the
+instance keeps its old id, and its entry is held under the alias:
+
+```toml
+[connectors.gitlab.instances.forge]
+alias = "forge"
+instance_id = "gitlab-sandbox"
+endpoint = "https://gitlab.example.com"
+```
+
+No two instances, and no instance and legacy entry, may resolve to one instance id; such a file
+is refused.
 
 ### Existing installations
 
 A configuration written before `connectors-local/5` holds legacy `[adapters.<alias>]` entries
-in the same shape. They keep working: each is selected as `--connector <adapter_id> --instance
-<alias>` (here `--connector catalog --instance forge`) or by the deprecated `--adapter <alias>`.
+in the same shape. They keep working: each is selected by the connector `setup migrate` derives
+for it and its alias (here `gitlab/forge`, or `--connector gitlab --instance forge`), or by the
+deprecated `--adapter <alias>`. An entry no connector is derived for, such as an OpenRouter
+entry, is no instance: selecting it is `legacy_entry_unmigrated`.
 `setup migrate` moves every entry whose native configuration names a provider with a shipped
-declaration to `[connectors.<connector>.instances.<alias>]`, with every pin unchanged, so its
-connections and approval policy stay valid. The dry run writes nothing; this one ran on a file
-with a GitLab entry `forge`, a Kubernetes entry `cluster` and a Slack entry `slack-bot`:
+declaration to `[connectors.<connector>.instances.<alias>]`, in the short form or with every
+pin unchanged (below), so its connections and approval policy stay valid. The dry run writes nothing; this one ran on a file
+with a GitLab entry `forge`, a Kubernetes entry `cluster` and a Slack entry `slack-bot`, before
+0.63.1 shipped Slack's declaration; since then `slack-bot` migrates to the connector `slack` as
+`forge` does to `gitlab`:
 
 ```console
 $ connectors --output json setup migrate --mode dry-run | jq -c '.result | {disposition, format_before, format_after, entries: [.entries[] | {connector, instance, disposition, reason}]}'
@@ -1288,8 +1401,41 @@ rollback. The migrated `forge` is the pinned instance above. The entries it keep
 `reason` ([migrating legacy adapter entries](../contracts/cli/v1alpha1/semantics.md#migrating-adapter-entries)):
 Kubernetes and the other non-catalog implementations can be rewritten by hand as the
 [Kubernetes guide](local-kubernetes-cli.md) shows, and Slack as [the Slack guide](catalog-slack.md)
-shows. Moving a migrated instance to a derived one is a new instance: its instance id and
-configuration revision change, so it needs a new connection.
+shows.
+
+Since 0.64.0 a migrated entry is written in the short form above when the installed provider,
+started with `--instance-id` and the endpoint and profile read from the entry's native
+configuration, derives the same instance id, configuration revision, credential revision,
+permissions and startup, no approval policy is published for the instance, and the operation
+curation beside the configuration (`<config>.operation-curation.json`) does not name the entry's
+alias or executable selection: the short form starts the provider with other arguments, and a
+policy or curation is bound to those. A curation file that is present but unreadable keeps every
+entry pinned. Each migrated entry
+names its `form`; a `pinned` one names why in `pinned_field`. For another revision that is the
+first key of the revision's digest input the two configurations differ in, as
+`connectors-catalog-provider --print-revision-inputs` prints them: `auth` for other scopes,
+`api_base` for an API base no endpoint of the connector produces. `before` and `after` show
+that the instance id and revision stay; the executable selection is the derived one. This dry run
+read a file with two legacy GitLab entries at `https://gitlab.example.com`: `forge`, whose native
+configuration, credential revision and permissions are the ones the provider derives, and
+`forge-ro`, whose profile requires `read_api` instead of `api`:
+
+```console
+$ connectors --output json setup migrate --dry-run | jq -c '.result.entries[] | {adapter, form, pinned_field, before: .before | {instance_id, configuration_revision}, after: .after | {instance_id, configuration_revision}}'
+{"adapter":"forge","form":"short","pinned_field":null,"before":{"instance_id":"gitlab-forge","configuration_revision":"176f1ddf503bcb5ee3ed52b1862a4fc5116f3b86af83bdd63991296f0806b317"},"after":{"instance_id":"gitlab-forge","configuration_revision":"176f1ddf503bcb5ee3ed52b1862a4fc5116f3b86af83bdd63991296f0806b317"}}
+{"adapter":"forge-ro","form":"pinned","pinned_field":"auth","before":{"instance_id":"gitlab-forge-ro","configuration_revision":"9734736cade35e04da8dbe3bb5f43acc6d33906bd607d4ba660259ec9aee2fb3"},"after":{"instance_id":"gitlab-forge-ro","configuration_revision":"9734736cade35e04da8dbe3bb5f43acc6d33906bd607d4ba660259ec9aee2fb3"}}
+$ connectors --output json setup migrate --dry-run | jq -r .result.configuration | sed -n '/instances.forge\]/,/^$/p'
+[connectors.gitlab.instances.forge]
+endpoint = "https://gitlab.example.com"
+alias = "forge"
+instance_id = "gitlab-forge"
+```
+
+An entry whose permissions are narrower than every operation the connector ships stays pinned
+(`permissions`): the derived instance would permit them all.
+
+Moving a pinned instance to a derived one by hand without its `instance_id` is a new instance:
+its instance id and configuration revision change, so it needs a new connection.
 
 ### Connect and keep the connection ready
 
@@ -1307,7 +1453,7 @@ target/release/connectors --output json operations describe --connector gitlab -
 Connect runs the declared identity and scope reads and refuses a token below
 `minimum_scopes`. Validation evidence lasts the `auth` object's `evidence_lifetime_ms`
 (60 seconds when omitted, at most 300 000 ms); after expiry the
-connection reports `pending`. The next `operations invoke` of a read recollects
+connection reports `pending`. The next `invoke` of a read recollects
 the evidence once from the credential already in custody, with no re-entry, as
 `connections revalidate --connector gitlab --instance forge --connection CONNECTION --expected-revision REVISION`
 would, and is then served: a connection connected or revalidated once keeps
@@ -1333,8 +1479,7 @@ binary read), and provenance whose `source_revision` is the pinned source's
 SHA-256.
 
 ```sh
-connectors operations invoke --connector gitlab --instance forge --connection "$connection" \
-  --operation merge_request.get --schema "$schema" --revision "$revision" \
+connectors invoke gitlab/forge merge_request.get \
   --input-json '{"id":"group/project","merge_request_iid":9}'
 ```
 
@@ -1383,11 +1528,13 @@ appeared, which opened merge request 11 at the moved head and was classified
   only (`adapters/catalog/tests/binary_responses.rs`).
 - One authentication profile per configuration: a token in one header, a
   basic profile (`"scheme": "basic"`) sending an account and API token as HTTP
-  basic, an OAuth refresh profile (`"scheme": "oauth2_refresh"`), or an OAuth
-  client-credentials profile (`"scheme": "oauth2_client_credentials"`). Signing
-  profiles and rotating refresh tokens are not offered by this provider. The
-  basic and both OAuth profiles have run only against the local fixture, not
-  a live provider, and the provider does not acquire the OAuth entry itself.
+  basic, an OAuth refresh profile (`"scheme": "oauth2_refresh"`), an OAuth
+  client-credentials profile (`"scheme": "oauth2_client_credentials"`), or a
+  GitHub App installation profile (`"scheme": "github_app"`). Profiles that sign
+  each request and rotating refresh tokens are not offered by this provider. The
+  basic, both OAuth and the GitHub App profiles have run only against the local
+  fixture, not a live provider, and the provider does not acquire the OAuth entry
+  itself.
 - Pagination and error envelopes are not declared; a paged read returns one page
   as the provider answers it.
 - A read answered `429` is sent once more, and never a third time, after the
@@ -1396,7 +1543,7 @@ appeared, which opened merge request 11 at the moved head and was classified
   wait, then as long again as the first request took, then 500 ms, must all end
   before the invocation deadline. The second request must finish 500 ms before
   the deadline; if it does not, the first answer's refusal and delay stand.
-  Otherwise, and after a second `429`, `operations invoke` fails with
+  Otherwise, and after a second `429`, `invoke` fails with
   `service_code: rate_limited` and `retry_after_seconds` set to the named delay,
   so the caller can wait; without `retry_after_seconds` the provider named no
   delay the engine could read. Two `Retry-After` lines on one answer that
