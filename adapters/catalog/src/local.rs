@@ -446,8 +446,12 @@ mod shipped {
 /// What an instance of a shipped connector states; its declaration fixes the rest.
 pub struct Instance<'a> {
     pub connector: &'a str,
-    /// The user's name for the instance; its id is `<connector>.<name>`.
+    /// The user's name for the instance; its id is `<connector>.<name>`
+    /// unless `instance_id` names another.
     pub name: &'a str,
+    /// The id a migrated instance keeps (`--instance-id`), in place of
+    /// `<connector>.<name>` (story:migrate-writes-the-short-instance-form).
+    pub instance_id: Option<&'a str>,
     pub endpoint: Option<&'a str>,
     /// Required when the connector declares more than one profile.
     pub profile: Option<&'a str>,
@@ -539,14 +543,18 @@ fn derived(instance: &Instance<'_>) -> Result<(Configuration, Sources)> {
     Ok((config, sources))
 }
 
-/// The native configuration `declaration` gives `instance`: its id
-/// `<connector>.<name>`, the endpoint and API path, and the one profile it
-/// uses. A shipped declaration and a lowered definition's are read alike.
+/// The native configuration `declaration` gives `instance`: its id (the one it
+/// states, else `<connector>.<name>`), the endpoint and API path, and the one
+/// profile it uses. A shipped declaration and a lowered definition's are read
+/// alike.
 fn instance_configuration(
     declaration: Declaration,
     instance: &Instance<'_>,
 ) -> Result<Configuration> {
-    let instance_id = format!("{}.{}", declaration.connector_id, instance.name);
+    let instance_id = match instance.instance_id {
+        Some(id) => id.to_owned(),
+        None => format!("{}.{}", declaration.connector_id, instance.name),
+    };
     if !connectors_core::valid_id(instance.name) || !connectors_core::valid_id(&instance_id) {
         return Err(Failure::InvalidInput);
     }
@@ -1467,6 +1475,9 @@ impl Credential for Fixed {
 pub struct Local {
     bootstrap: Bootstrap,
     bootstrap_v2: Bootstrap,
+    /// Per key of the configuration revision's digest input, the digest of
+    /// that key's value (`--print-revision-inputs`).
+    revision_inputs: BTreeMap<String, String>,
     http: Arc<ScopedHttp>,
     /// Each admitted origin's port, without a credential, and whether the
     /// connection's credential travels to it.
@@ -1545,6 +1556,7 @@ impl Local {
         let instance = Instance {
             connector: &connector,
             name,
+            instance_id: None,
             endpoint,
             profile,
         };
@@ -1986,6 +1998,12 @@ impl Local {
             });
         }
         let configuration_revision = connectors_core::digest(&effective);
+        let revision_inputs = effective
+            .as_object()
+            .ok_or(Failure::Protocol)?
+            .iter()
+            .map(|(key, value)| (key.clone(), connectors_core::digest(value)))
+            .collect();
         let http = Arc::new(
             ScopedHttp::new_with_ca_bytes(
                 &HttpConfig {
@@ -2217,6 +2235,7 @@ impl Local {
         Ok(Self {
             bootstrap,
             bootstrap_v2,
+            revision_inputs,
             http,
             hosts,
             engine,
@@ -2228,6 +2247,12 @@ impl Local {
     }
     pub fn description(&self) -> &Bootstrap {
         &self.bootstrap
+    }
+    /// Per key of the configuration revision's digest input, that value's
+    /// digest: where two configurations' revisions differ, the keys that
+    /// differ (`setup migrate` names the first).
+    pub fn revision_inputs(&self) -> &BTreeMap<String, String> {
+        &self.revision_inputs
     }
     /// Whether [`Self::upstream_token`] serves this profile: a `token`
     /// profile without a prefix, or a `github_app` profile.
@@ -3232,6 +3257,7 @@ mod tests {
             let (mut config, sources) = derived(&Instance {
                 connector: &connector,
                 name: "work",
+                instance_id: None,
                 endpoint: Some(&endpoint),
                 profile: Some(&auth.profile),
             })

@@ -450,10 +450,17 @@ views:
 # PrepareAttempt (`connection_ref` and the fingerprint's connection absent,
 # `approval_mode: not_required`, no `idempotency_key`, `publication_fence` the
 # instance's configuration revision), LinkAnchorAttempt, OpenDispatch, the one
-# provider dispatch, then RecordCompletion for a definitive success or
-# RecordUncertainty for anything else. A failed link or a refused OpenDispatch
+# provider dispatch, then RecordCompletion for a definitive success,
+# RecordRefusal for the provider's definitive refusal, or RecordUncertainty for
+# anything else. A failed link or a refused OpenDispatch
 # aborts the attempt (AbortPrepared, `not_attempted`) with zero adapter calls.
-# The legacy adapter port answers only a value or a generic error; a generic
+# The definitive refusal is the one the adapter's write port answers as
+# refused (`invoke_write_at`; the provider engine's refusal of a 4xx answer,
+# such as 405, 409 or 422 to a merge): Failed / `refused`, answered with the
+# refusal's base code and safe message, both kept in `terminal_result_json`
+# for a replay. A 5xx, a cut connection or a timeout is never a refusal.
+# An adapter that does not override that port answers only a value or a
+# generic error; a generic
 # error, a deadline or a result that breaks the declared output schema after
 # dispatch is not definitive no-effect evidence
 # (contracts/operations/v1alpha1/semantics.md § 4 rule 11), so it is
@@ -503,7 +510,8 @@ views:
 # Replay: the same key with the same fingerprint is answered from the attempt,
 # `replayed: true`, with no grant check, no count and no dispatch: Completed
 # with the retained result (or `capacity`, `applied`, when the result was not
-# retained), Aborted or Failed `not_attempted`, Indeterminate
+# retained), Aborted `not_attempted`, Failed `refused` with the original
+# refusal's code and message, Indeterminate
 # `outcome_unknown`. A Prepared or Dispatching original the same process runs
 # is awaited for at most 25 seconds by at most 4 replays, then answered
 # `outcome_unknown`; the host does not recover a pending attempt after a

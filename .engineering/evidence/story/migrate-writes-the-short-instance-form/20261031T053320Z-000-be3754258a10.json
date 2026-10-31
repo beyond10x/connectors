@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-31T05:33:20Z",
+  "actor": "human:timo",
+  "artifact": "story:migrate-writes-the-short-instance-form",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "drift.sh on wave/d298 at f737d9687: the gate's 14 generation, drift, fmt, connectors-build tests and plan validate steps, all exit 0 (D321)",
+    "reference": "drift log sha256 c87712c719152b9191ea78eac711b63181c497893d9cf3d02fc49009d41d4539"
+  }
+}

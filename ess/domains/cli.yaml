@@ -1059,13 +1059,23 @@ types:
       - {name: state_path, type: "String"}
       - {name: host_incarnation, type: "Optional<String>"}
   # `setup migrate` (contracts/cli/v1alpha1/semantics.md §3, "Migrating adapter
-  # entries"; migration-plan:connector-vocabulary step 4) rewrites each
+  # entries"; migration-plan:connector-vocabulary steps 2 and 4) rewrites each
   # `[adapters.<alias>]` entry whose implementation maps to a shipped connector
-  # declaration as the pinned instance `[connectors.<connector>.instances.<alias>]`,
-  # keeping every pin. Its instance_id, configuration_revision, executable
-  # selection digest and mounted custody item names stay byte for byte, so its
-  # connections (connectors.auth_bindings.Connection), approval policy and
-  # custody items stay valid and nothing is re-consented or revalidated.
+  # declaration as the instance `[connectors.<connector>.instances.<alias>]`.
+  # The short form (MigrateForm short) states only `alias`, the entry's own
+  # `instance_id`, and `endpoint` and `profile` where they differ from the
+  # declaration's defaults; the installed provider derives the rest. It
+  # is written when that derivation has the entry's instance_id,
+  # configuration_revision, credential_revision, permissions and startup, its
+  # executable has the entry's digest where the entry states a
+  # credential_revision, and no approval policy is published for the instance:
+  # the short form selects another executable argument vector, so an approval
+  # policy's executable_selection would no longer match. Otherwise the entry is
+  # the pinned instance, keeping every pin, its executable selection digest
+  # included. Either way its instance_id, configuration_revision and mounted
+  # custody item names stay byte for byte, so its connections
+  # (connectors.auth_bindings.Connection), approval policy and custody items
+  # stay valid and nothing is re-consented or revalidated.
   # ess-cli/1 has no valueless switch source, so the mode is a value
   # (`--mode dry-run`); the binary also reads `--dry-run` and `--apply` as
   # exactly those two values.
@@ -1122,9 +1132,26 @@ types:
   # description, endpoint and profile a differing instance key, of the new
   # table or of an existing instance of its connector; enabled the connector's
   # table; format the file's format, which keeps every entry.
+  # A migrated entry written in the pinned form names, as pinned_field, why its
+  # short form was not written: credential_revision, permissions, startup or
+  # executable for the derivation's differing value (executable also when an
+  # approval policy is published for the instance), and for a differing
+  # configuration revision the first differing key of the installed provider's
+  # revision digest input (provider, bundle_sha256, source_sha256, api_base,
+  # ca_digest, auth, operations, token_ca_digest, feed, request_prefix, hosts,
+  # bindings; its instance key is instance_id), or configuration_revision when
+  # no key accounts for it or the provider derives none. api_base and auth are
+  # also named before deriving, for a native configuration whose `api_base` no
+  # endpoint of the connector produces or whose `auth` names no profile the
+  # connector declares.
   - name: connectors.cli.MigrateField
     kind: enum
-    variants: [instance_id, configuration_revision, adapter_id, protocol, private_protocol, startup, restart, executable, permissions, instance, enabled, description, endpoint, profile, format]
+    variants: [instance_id, configuration_revision, adapter_id, protocol, private_protocol, startup, restart, executable, permissions, instance, enabled, description, endpoint, profile, format, credential_revision, provider, bundle_sha256, source_sha256, api_base, ca_digest, auth, operations, token_ca_digest, feed, request_prefix, hosts, bindings]
+  # The form a migrated entry is written in: short (alias, instance_id and
+  # endpoint and profile where needed; the rest derived) or pinned (every pin).
+  - name: connectors.cli.MigrateForm
+    kind: enum
+    variants: [short, pinned]
   # What an entry's records are keyed by. custody_items are the mounted-secret
   # item names `<alias>/<profile>` of its permitted profiles; platform custody
   # items are keyed by connection, not by configuration names.
@@ -1138,8 +1165,11 @@ types:
   # One `[adapters.<alias>]` entry of the file before the migration; entries
   # already under `[connectors]` are not listed. connector and instance select
   # it after the migration. reason is present exactly when kept, differing_field
-  # exactly when reason is selection_changes: runtime obligations, as for
-  # AcquisitionObservation.
+  # exactly when reason is selection_changes, form exactly when migrated and
+  # pinned_field exactly when form is pinned: runtime obligations, as for
+  # AcquisitionObservation. before and after carry the revision before and
+  # after; a short-form entry's after carries the derived executable's
+  # selection digest.
   - name: connectors.cli.MigrateEntry
     kind: struct
     fields:
@@ -1149,6 +1179,8 @@ types:
       - {name: disposition, type: "connectors.cli.MigrateEntryDisposition"}
       - {name: reason, type: "Optional<connectors.cli.MigrateKeptReason>"}
       - {name: differing_field, type: "Optional<connectors.cli.MigrateField>"}
+      - {name: form, type: "Optional<connectors.cli.MigrateForm>"}
+      - {name: pinned_field, type: "Optional<connectors.cli.MigrateField>"}
       - {name: before, type: "connectors.cli.MigrateSelection"}
       - {name: after, type: "connectors.cli.MigrateSelection"}
   # configuration is the file the migration writes, the unchanged file when
@@ -1741,7 +1773,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:1387, docs/local-connection-registry.md:222-223;
+    # contracts/cli/v1alpha1/semantics.md:1413, docs/local-connection-registry.md:222-223;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1901,7 +1933,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1391) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1417) and the host
     # removal path (er.rs:4538-4540) only expires Active cursors. The error name is
     # the decision; no source names one.
 

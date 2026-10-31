@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-31T02:50:06Z",
+  "actor": "human:timo",
+  "artifact": "story:slack-connector-declaration",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "v0.63.1 binaries: guide-shaped legacy user-token entry lists as slack/slack-user, invoke reaches connection_unresolved, migrate moves it (D314 repro); merged 5bc94d505, tag v0.63.1",
+    "reference": "https://github.com/beyond10x/connectors/releases/tag/v0.63.1"
+  }
+}
