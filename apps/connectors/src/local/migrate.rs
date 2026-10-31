@@ -10,10 +10,11 @@
 //! the field.
 use super::declarations::CATALOG;
 use super::*;
+use connectors_core::operation_metadata::{CURATION_LIMIT, Curation};
 use connectors_host::local::{
     approval_policy,
     config::{self, Adapter, CONFIG_LIMIT, ShortForm},
-    filesystem,
+    filesystem, operation_curation,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -511,8 +512,9 @@ fn entry(
 
 /// The short form of the legacy entry `entry`, moving to the instance `alias`
 /// of `connector`, or the field that keeps it pinned
-/// (`connectors.cli.MigrateField`): `executable` while an approval policy is
-/// published for it, `api_base` or `auth` for a native configuration no
+/// (`connectors.cli.MigrateField`): `executable` while an approval policy or
+/// an operation curation ([`curated`]) is bound to it, `api_base` or `auth`
+/// for a native configuration no
 /// instance of the connector states, and otherwise what the installed
 /// provider derives differently ([`short_differing`], [`revision_field`]).
 fn short_form(
@@ -526,7 +528,7 @@ fn short_form(
     let published =
         approval_policy::Store::new(&paths.state, &entry.instance_id, &entry.adapter_id)
             .and_then(|store| store.published());
-    if published != Ok(false) {
+    if published != Ok(false) || curated(paths, alias, entry) {
         return Err("executable");
     }
     let (endpoint, profile) = stated(connector, entry)?;
@@ -542,6 +544,33 @@ fn short_form(
         Some("configuration_revision") => Err(revision_field(entry, &derived)),
         Some(field) => Err(field),
     }
+}
+
+/// Whether the operation curation beside the configuration
+/// (`<config>.operation-curation.json`) may bind the entry `alias`: it names
+/// the alias or the entry's executable selection, or it exists and cannot be
+/// read or parsed. Its records are pinned to the executable selection digest,
+/// which the short form changes.
+fn curated(paths: &Paths, alias: &str, entry: &Adapter) -> bool {
+    let path = operation_curation::path(paths);
+    match std::fs::symlink_metadata(&path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return false,
+        Err(_) => return true,
+        Ok(_) => {}
+    }
+    let curation = filesystem::private_file(&path)
+        .and_then(|file| filesystem::read_bounded(file, CURATION_LIMIT))
+        .ok()
+        .and_then(|bytes| Curation::parse(&bytes).ok());
+    let Some(curation) = curation else {
+        return true;
+    };
+    let selection = entry.selection();
+    curation
+        .document()
+        .adapters
+        .iter()
+        .any(|adapter| adapter.adapter_alias == alias || adapter.executable_selection == selection)
 }
 
 /// The endpoint and profile a short-form instance of `connector` states for

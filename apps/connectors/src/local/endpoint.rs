@@ -20,9 +20,9 @@ use toml_edit::{DocumentMut, InlineTable, Item, Table};
 /// The keys of an instance table that pin it to an executable selection
 /// (`connectors.cli` configuration, `connectors-local/5`): such an instance
 /// takes its endpoint from its pinned arguments, never from this command.
-const PINS: [&str; 11] = [
-    "alias",
-    "instance_id",
+/// `alias` and `instance_id` are not among them: a derived short-form
+/// instance states both and still takes its endpoint here.
+const PINS: [&str; 9] = [
     "adapter_id",
     "configuration_revision",
     "credential_revision",

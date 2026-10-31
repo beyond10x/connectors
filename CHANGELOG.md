@@ -9,10 +9,14 @@
   catalog provider derives the instance under that id (`--instance-id`), so a migrated instance
   keeps its old id, and with it its connections, approval policy, audits and custody records. An
   instance id that two instances, or an instance and a legacy entry, resolve to refuses the file.
+  `connections connect --endpoint` writes into such an instance as into any derived one, and
+  refuses a host that would strand a connection admitted under its stated id.
 - `setup migrate` writes a legacy catalog entry in that short form (`alias`, `instance_id`, and
   `endpoint` and `profile` only where they differ from the declaration's defaults) when the
   installed provider derives it with the same instance id, configuration revision, credential
-  revision, permissions and startup, and no approval policy is published for the instance. Every
+  revision, permissions and startup, no approval policy is published for the instance, and the
+  operation curation (`<config>.operation-curation.json`) neither names the entry's alias or
+  executable selection nor is present but unreadable. Every
   other mapped entry is still written pinned, as before; each migrated entry's new `form` says
   which, and a pinned one's `pinned_field` names why, for a revision difference the first differing
   key of the provider's revision digest input (`auth` for other scopes).
@@ -22,7 +26,7 @@
 ### Known limits
 
 - The short form changes an instance's executable selection digest, to which a published approval
-  policy is bound, so an instance with a published policy stays pinned.
+  policy and an operation curation are bound, so an instance with either stays pinned.
 
 ## 0.63.1 — 2026-10-31
 

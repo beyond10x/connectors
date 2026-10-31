@@ -1157,8 +1157,10 @@ started with `--instance-id <instance_id>`, derives the entry's
 not), `permissions` and `startup`, with the entry's executable digest when
 the entry states a `credential_revision`. The short form selects another
 executable argument vector, so it is not written for an instance whose approval
-policy is published: that policy's `executable_selection` would no longer
-match. Otherwise the instance carries every pin of the entry, its alias
+policy is published, nor for an entry whose alias or executable selection the
+operation curation `<config>.operation-curation.json` names, nor for any entry
+while that file is present but unreadable: their `executable_selection` would
+no longer match. Otherwise the instance carries every pin of the entry, its alias
 included (`form` `pinned`), and its executable selection digest stays byte for
 byte too; `pinned_field` names why (`connectors.cli.MigrateField`). For a
 derived configuration revision other than the entry's it is the first key of
@@ -1166,7 +1168,7 @@ the provider's revision digest input in which the two differ (`auth` for other
 scopes, `api_base` for another API base), printed per key by the provider's
 `--print-revision-inputs`, or `configuration_revision` when no key accounts
 for it or the provider derives nothing; `executable` for a published approval
-policy; otherwise the differing `credential_revision`, `permissions`,
+policy or an operation curation; otherwise the differing `credential_revision`, `permissions`,
 `startup` or `executable`.
 
 Only a catalog entry maps to a connector today: the connector whose shipped
