@@ -1064,7 +1064,7 @@ types:
   # declaration as the instance `[connectors.<connector>.instances.<alias>]`.
   # The short form (MigrateForm short) states only `alias`, the entry's own
   # `instance_id`, and `endpoint` and `profile` where they differ from the
-  # declaration's defaults; the installed catalog provider derives the rest. It
+  # declaration's defaults; the installed provider derives the rest. It
   # is written when that derivation has the entry's instance_id,
   # configuration_revision, credential_revision, permissions and startup, its
   # executable has the entry's digest where the entry states a
@@ -1136,7 +1136,7 @@ types:
   # short form was not written: credential_revision, permissions, startup or
   # executable for the derivation's differing value (executable also when an
   # approval policy is published for the instance), and for a differing
-  # configuration revision the first differing key of the catalog provider's
+  # configuration revision the first differing key of the installed provider's
   # revision digest input (provider, bundle_sha256, source_sha256, api_base,
   # ca_digest, auth, operations, token_ca_digest, feed, request_prefix, hosts,
   # bindings; its instance key is instance_id), or configuration_revision when

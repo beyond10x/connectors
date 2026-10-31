@@ -455,7 +455,7 @@ views:
 # anything else. A failed link or a refused OpenDispatch
 # aborts the attempt (AbortPrepared, `not_attempted`) with zero adapter calls.
 # The definitive refusal is the one the adapter's write port answers as
-# refused (`invoke_write_at`; the catalog engine's refusal of a 4xx answer,
+# refused (`invoke_write_at`; the provider engine's refusal of a 4xx answer,
 # such as 405, 409 or 422 to a merge): Failed / `refused`, answered with the
 # refusal's base code and safe message, both kept in `terminal_result_json`
 # for a replay. A 5xx, a cut connection or a timeout is never a refusal.
