@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:slack-connector-declaration
 kind: story
-status: active
+status: implemented
 title: Slack's bot selection ships a connector declaration, so legacy Slack entries migrate
 summary: Declare connector slack (profile slack.bot, operations.json) from connectors-definitions slack.yaml; 0.63.1
 tags:
@@ -11,10 +11,11 @@ tags:
 relations:
 - decomposes: epic:connector-vocabulary
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-31T00:29:17Z", actor: "human:timo", revision: 2, executor: "agent:conn-d298-u1", correlation: "wave-d298-u1"}
 - {from: "proposed", to: "active", at: "2026-10-31T00:29:17Z", actor: "human:timo", revision: 3, executor: "agent:conn-d298-u1", correlation: "wave-d298-u1"}
+- {from: "active", to: "implemented", at: "2026-10-31T02:50:07Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1,"verification":1}}, executor: "agent:conn-d298", correlation: "wave-d298"}
 ---
 ## Problem
 

@@ -8,7 +8,7 @@ summary: U1 slack-connector-declaration as v0.63.1 (D169); U2, U3 and the releas
 relations:
 - decides: story:slack-connector-declaration
 - decides: story:migrate-writes-the-short-instance-form
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "approved", at: "2026-10-31T00:29:11Z", actor: "human:timo", revision: 2, executor: "agent:conn-d298-u1", correlation: "wave-d298-u1"}
 ---
@@ -42,3 +42,34 @@ connectors. U1 therefore declares the bot selection as `slack`, lowered from
 `connectors/slack.yaml`; the user selection stays pinned, and `slack-user` is
 `story:slack-user-connector-declaration`. Both legacy Slack entries migrate (to pinned instances
 of `slack`), which is what the blocked deployment needs.
+
+## D314: does 0.63.1 unblock a user-token entry addressed as `catalog/slack-user`
+
+The orchestrator session, 2026-10-31, item D314: "as built, PR 227 does not unblock the consumer.
+The blocked deployment invokes `catalog/slack-user`, not `catalog/slack`." It asked whether the
+ADR admits a separate `slack-user` declaration, to be added to 0.63.1, with the acceptance "that
+repro gets past legacy_entry_unmigrated", and held the merge of PR 227.
+
+- The ADR admits it: `decision-blocker:slack-openrouter-pinned-source`, option A, keeps Slack as
+  two connectors, `slack` and `slack-user`. No ADR change is needed.
+- The target `catalog/<alias>` names a legacy catalog entry no connector is derived for, and is
+  refused as `legacy_entry_unmigrated` whatever is declared
+  (`contracts/cli/v1alpha1/semantics.md`, "A catalog entry no connector is derived for is no
+  instance"; `apps/connectors/src/local/invoke.rs` `names_unmigrated`). Once a declaration names
+  the entry's provider, the entry is named `<connector>/<alias>`. A `slack-user` declaration
+  would name it `slack-user/slack-user`. Neither makes `catalog/slack-user` answer.
+- Observed with this branch's binaries (head f65712d69) on a scratch configuration holding one
+  guide-shaped legacy entry `[adapters.slack-user]` (provider `slack`, `user-operations.json`,
+  profile `slack.user`), `~/.cache/connectors-d240/u1/repro.out`:
+  `instances list` lists `slack/slack-user` and no unmigrated entry; `invoke catalog/slack-user
+  conversations.history` is `not_found` at admission; `invoke slack/slack-user
+  conversations.history` reaches `connection_unresolved` (no credential in the scratch state);
+  `setup migrate --mode dry-run` migrates it to `slack/slack-user`.
+- Decision of the implementing session: 0.63.1 stays as built. Its acceptance is met: the
+  user-token entry is past `legacy_entry_unmigrated` under the target `slack/slack-user`. The
+  deployment's target changes from `catalog/slack-user` to `slack/slack-user`. A `slack-user`
+  declaration needs a second declaration in one catalog provider directory, which the declaration
+  layout, the lowerer's output path and the declaration tests rule out; it stays
+  `story:slack-user-connector-declaration`, and would rename the instance a second time.
+
+D315, the orchestrator session, 2026-10-31: "go. PR 227 stays as built". The orchestrator tells the deployment to switch its target to `slack/slack-user`; `story:slack-user-connector-declaration` stays a follow-up story.

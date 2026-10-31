@@ -152,6 +152,9 @@ their own, so a new worktree does not recompile every dependency: `RUSTC_WRAPPER
 port 4226, never a wrapper set globally. Set them in the build's environment, not in a committed
 Cargo configuration, and keep the caller's `TMPDIR` short (the server binds its startup socket
 there).
+Never leave `RUSTC_WRAPPER` unset for `connectors-build gate`: a host-wide `rustc-wrapper` then
+applies, and on 2026-10-31 the gate's `oauth2_boundary` tests failed in a worktree with `sccache:
+error: path must be shorter than SUN_LEN`; set the variables above, or `RUSTC_WRAPPER=` (empty).
 
 For documentation-only changes, check links, factual support claims and AEP
 consistency; do not rerun unrelated live-provider tests. Report actual commands,

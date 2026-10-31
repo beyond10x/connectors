@@ -2,16 +2,17 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0621-rehearsal-findings
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.62.1: findings from the served forge access rehearsal'
 summary: 'D275: five rehearsal findings on 0.62.0'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T15:16:30Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "approved", at: "2026-10-30T15:16:31Z", actor: "human:timo", revision: 3}
 - {from: "approved", to: "active", at: "2026-10-30T15:16:32Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-31T02:50:19Z", actor: "human:timo", revision: 5, executor: "agent:conn-d298", correlation: "wave-d298"}
 ---
 ## Outcome
 
