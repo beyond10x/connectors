@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:migrate-writes-the-short-instance-form
 kind: story
-status: active
+status: implemented
 title: setup migrate moves every legacy entry to the short instance form, catalog named nowhere
 relations:
 - decomposes: epic:connector-vocabulary
 - serves: vision:independent-contract-adapters
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-31T02:53:19Z", actor: "human:timo", revision: 5, executor: "agent:conn-d298", correlation: "wave-d298"}
 - {from: "proposed", to: "active", at: "2026-10-31T02:53:20Z", actor: "human:timo", revision: 6, executor: "agent:conn-d298", correlation: "wave-d298"}
+- {from: "active", to: "implemented", at: "2026-10-31T05:33:21Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":2,"verification":1}}, executor: "agent:conn-d298", correlation: "wave-d298"}
 ---
 ## Problem
 

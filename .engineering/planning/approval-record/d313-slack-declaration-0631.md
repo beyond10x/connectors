@@ -8,7 +8,7 @@ summary: U1 slack-connector-declaration as v0.63.1 (D169); U2, U3 and the releas
 relations:
 - decides: story:slack-connector-declaration
 - decides: story:migrate-writes-the-short-instance-form
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "approved", at: "2026-10-31T00:29:11Z", actor: "human:timo", revision: 2, executor: "agent:conn-d298-u1", correlation: "wave-d298-u1"}
 ---
@@ -73,3 +73,26 @@ repro gets past legacy_entry_unmigrated", and held the merge of PR 227.
   `story:slack-user-connector-declaration`, and would rename the instance a second time.
 
 D315, the orchestrator session, 2026-10-31: "go. PR 227 stays as built". The orchestrator tells the deployment to switch its target to `slack/slack-user`; `story:slack-user-connector-declaration` stays a follow-up story.
+
+## D321: no fifth local full gate; CI's full gate decides 0.64.0
+
+Local full gates 1 to 4 of wave D298 each failed on a generation or drift step, and each wrote
+34 to 39 GB against the machine's write budget. The fixes after gate 4 (head `f737d9687`) were
+checked by the gate's generation and drift steps alone (`drift.sh`, 14 steps, all exit 0): build
+tool, `metadata-entities --check`, `ess-boundary`, `source-hashes`, `release-binaries`, `cli
+--check`, `mcp-bindings --check`, `service-metadata --check`, `ess specify validate`, `cargo fmt
+--check`, `tool-contracts generate --check`, `connectors-docs generate --check`, `cargo test -p
+connectors-build --tests` and `aep plan artifact validate`.
+
+Following the workspace rule for a full suite larger than the disk budget, the wave runs the full
+tests of every crate its units touched (`connectors-sdk`, `connectors-host`, `connectors-core`,
+`connectors-catalog-provider`, `connectors`) instead of a fifth local gate. The pull request's CI
+full gate is the full gate of record for 0.64.0. If it fails, the implementing session reports the
+failing test and does not start a local full gate.
+
+## Approval
+
+The orchestrator session, 2026-10-31 05:24Z, item D321: "no local gate 5. Record it in your store.
+The workspace rule (delivery in waves) applies: where the full suite does not fit the disk budget,
+run every touched crate's full tests plus the projection checks, and let CI's full gate run on the
+PR."

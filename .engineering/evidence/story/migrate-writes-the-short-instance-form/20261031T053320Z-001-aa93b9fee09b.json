@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-31T05:33:20Z",
+  "actor": "human:timo",
+  "artifact": "story:migrate-writes-the-short-instance-form",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test --locked --offline --no-fail-fast -p connectors-sdk -p connectors-host -p connectors-core on f737d9687: 899 passed, 0 failed, 44 ignored",
+    "reference": "test log sha256 a8c80397bfe31483eef8856fdcf52756361ca99d3449325e2f4f4dfd30e15358"
+  }
+}

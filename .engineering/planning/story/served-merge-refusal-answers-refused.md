@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:served-merge-refusal-answers-refused
 kind: story
-status: active
+status: implemented
 title: A served pull_request.merge that GitHub refuses answers refused, not outcome_unknown
 summary: 'D282: a merge GitHub refuses (branch behind a strict ruleset) answered HTTP 502 outcome_unknown in the G7 rehearsal; a definite refusal must answer refused with the provider''s message.'
 relations:
@@ -12,10 +12,11 @@ scope:
   path: adapters/catalog/src
 - confidence: inferred
   path: crates/connectors-host/src/server/v1alpha2.rs
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-31T02:50:24Z", actor: "human:timo", revision: 3, executor: "agent:conn-d298", correlation: "wave-d298"}
 - {from: "proposed", to: "active", at: "2026-10-31T02:50:24Z", actor: "human:timo", revision: 4, executor: "agent:conn-d298", correlation: "wave-d298"}
+- {from: "active", to: "implemented", at: "2026-10-31T05:33:21Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":2,"verification":1}}, executor: "agent:conn-d298", correlation: "wave-d298"}
 ---
 # Story: served-merge-refusal-answers-refused
 
