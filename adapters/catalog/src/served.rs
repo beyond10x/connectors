@@ -37,9 +37,14 @@
 //!
 //! A read is dispatched through `invoke_explained`, the read path. A write is
 //! dispatched through `runtime::Adapter::prepare_write` and executed once;
-//! only an applied write with a deliverable result is a success. Any other
-//! answer after dispatch is an error, which the host records as `unknown`
-//! and never dispatches again.
+//! only an applied write with a deliverable result is a success. The
+//! provider's definite refusal (a 4xx answer the engine classifies as a
+//! refusal, such as 405, 409 or 422 to a merge) reaches the host as refused
+//! ([`Bridge`]'s `invoke_write_at`), which answers its code with the
+//! provider's admitted reason and records the write `refused`. Any other
+//! answer after dispatch (a 5xx, a cut connection, an answer the engine
+//! cannot read) is an error the host records as `unknown` and never
+//! dispatches again.
 //!
 //! Start refuses a description that lists an operation of unknown effect, a
 //! read under the `mutation` profile, a write under any other profile, a
@@ -623,19 +628,12 @@ impl<A: runtime::Adapter> connectors_sdk::Adapter for Bridge<A> {
 
     async fn invoke(&self, operation: &str, input: Value) -> Result<Value> {
         let write = self.writes.contains(operation);
-        // Refusal: an operation this bridge did not describe.
-        if !write && !self.reads.contains(operation) {
-            return Err(Error::new(
-                ErrorCode::Unsupported,
-                "the served host dispatches only the operations it describes",
-            ));
-        }
-        // Refusal: with a repository list, an unlisted repository.
-        self.bounded(&input)?;
-        // Refusal: no mounted credential now, so nothing is sent.
-        let document = self.credential.read().await?;
+        let document = self.checked(operation, &input).await?;
         if write {
-            return self.write(operation, document, input).await;
+            return match self.write(operation, document, input).await {
+                WriteOutcome::Applied(result) => result,
+                WriteOutcome::Refused(error) | WriteOutcome::Unknown(error) => Err(error),
+            };
         }
         self.adapter
             .invoke_explained(
@@ -648,28 +646,88 @@ impl<A: runtime::Adapter> connectors_sdk::Adapter for Bridge<A> {
             .await
             .map_err(error)
     }
+
+    /// A described write, its effect as the private write path knows it: the
+    /// provider's definite refusal is [`WriteOutcome::Refused`], which the
+    /// host answers `refused`. A refusal before anything is sent stays an
+    /// error whose effect the host does not know, as it was.
+    async fn invoke_write_at(
+        &self,
+        revision: &str,
+        operation: &str,
+        input: Value,
+    ) -> WriteOutcome<Value> {
+        if self.descriptor.revision != revision || !self.writes.contains(operation) {
+            return match self.invoke_at(revision, operation, input).await {
+                Ok(value) => WriteOutcome::Applied(Ok(value)),
+                Err(error) => WriteOutcome::Unknown(error),
+            };
+        }
+        match self.checked(operation, &input).await {
+            Ok(document) => self.write(operation, document, input).await,
+            Err(error) => WriteOutcome::Unknown(error),
+        }
+    }
 }
 
 impl<A: runtime::Adapter> Bridge<A> {
+    /// The checks every call meets before the provider, in this order, and
+    /// the mounted credential it is sent with.
+    async fn checked(&self, operation: &str, input: &Value) -> Result<Secret> {
+        // Refusal: an operation this bridge did not describe.
+        if !self.writes.contains(operation) && !self.reads.contains(operation) {
+            return Err(Error::new(
+                ErrorCode::Unsupported,
+                "the served host dispatches only the operations it describes",
+            ));
+        }
+        // Refusal: with a repository list, an unlisted repository.
+        self.bounded(input)?;
+        // Refusal: no mounted credential now, so nothing is sent.
+        self.credential.read().await
+    }
+
     /// One write the host admitted under a standing grant, its attempt open:
-    /// prepared on the private write path and executed once. Only an applied
-    /// write with a deliverable result is `Ok`. A refused preparation, a
-    /// refused or unknown write, and an applied write whose result cannot be
-    /// delivered are each an error; after dispatch the host records any error
-    /// as `unknown` and never dispatches the attempt again.
-    async fn write(&self, operation: &str, document: Secret, input: Value) -> Result<Value> {
-        let prepared = self
+    /// prepared on the private write path and executed once. A refused
+    /// preparation is [`WriteOutcome::Unknown`] to the host, as before. The
+    /// provider's definite refusal is [`WriteOutcome::Refused`], its message
+    /// carrying the provider's admitted reason ([`refused_write`]). An unknown
+    /// write, and an applied write whose result cannot be delivered, the host
+    /// records as `unknown` and never dispatches again.
+    async fn write(&self, operation: &str, document: Secret, input: Value) -> WriteOutcome<Value> {
+        // The credential's bytes, so a reason that echoes them is withheld.
+        let credential = zeroize::Zeroizing::new(document.0.clone());
+        let prepared = match self
             .adapter
             .prepare_write(operation, &self.instance, document, input)
             .await
-            .map_err(|failure| error(Refusal::from(failure)))?;
+        {
+            Ok(prepared) => prepared,
+            Err(failure) => return WriteOutcome::Unknown(error(Refusal::from(failure))),
+        };
         match prepared.execute().await {
-            WriteOutcome::Applied(Ok(result)) => Ok(result),
-            WriteOutcome::Applied(Err(error))
-            | WriteOutcome::Refused(error)
-            | WriteOutcome::Unknown(error) => Err(error),
+            WriteOutcome::Refused(error) => {
+                WriteOutcome::Refused(refused_write(error, &credential))
+            }
+            outcome => outcome,
         }
     }
+}
+
+/// The host's error for a write the provider definitely refused: the code the
+/// engine gave it, and its message followed by the provider's own reason, as
+/// [`connectors_core::reason`] admitted it from the answer's body. A reason
+/// that holds any piece of the mounted credential, or that would take the
+/// message past [`MESSAGE_LIMIT`](connectors_core::v1alpha2::MESSAGE_LIMIT),
+/// is left out; the refusal itself still stands.
+fn refused_write(mut error: Error, credential: &[u8]) -> Error {
+    if let Some(reason) = error.upstream_reason.take().filter(|reason| {
+        !connectors_core::reason::carries_credential(reason, credential)
+            && error.message.len() + 2 + reason.len() <= connectors_core::v1alpha2::MESSAGE_LIMIT
+    }) {
+        error.message = format!("{}: {reason}", error.message);
+    }
+    error
 }
 
 /// The host's error for a refused read: the code the private failure stands
