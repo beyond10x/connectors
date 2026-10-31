@@ -17,9 +17,16 @@ Configuration, connection, approval and invocation work as described there;
 this page covers what differs for Slack. The terms connector, instance and connection are those
 of the [vocabulary](../README.md#vocabulary).
 
-Slack runs as two pinned instances of the connector `slack`, one per selection set: a bot
-instance and a user instance ([Configure the two instances](#configure-the-two-instances)). The
-catalog provider ships no connector declaration for Slack, so neither is derived.
+Slack runs as two instances of the connector `slack`, one per selection set: a bot instance and
+a user instance ([Configure the two instances](#configure-the-two-instances)). Since 0.63.1 the
+catalog provider ships a connector declaration for the bot selection,
+[`adapters/catalog/providers/slack/connector.json`](../adapters/catalog/providers/slack/connector.json):
+the connector `slack`, its default endpoint `https://slack.com/api`, the profile `slack.bot` and
+the selection `operations.json`, lowered from the definition `connectors/slack.yaml` of
+`beyond10x/connectors-definitions`. A bot instance can therefore be derived from the connector
+name alone (`--connector slack --instance <name>`). A provider directory holds one declaration,
+so the user selection has none: the user instance stays pinned, and a derived instance refuses
+the profile `slack.user`.
 
 ## Source and bundle
 
@@ -602,18 +609,21 @@ it.
 
 ### Move the entries to instances
 
-`setup migrate` keeps Slack entries where they are: the catalog provider ships no Slack
-connector declaration.
+Since 0.63.1, when the catalog provider ships Slack's declaration, `setup migrate` moves all
+three entries, the user-selection entry included, to pinned instances of the connector `slack`
+under their aliases. This dry run used the 0.63.1 binaries on a scratch configuration with the
+three entries:
 
 ```console
 $ connectors setup migrate --mode dry-run | jq -c '[.result.entries[]|{connector,instance,disposition,reason}]'
-[{"connector":"catalog","instance":"slack","disposition":"kept","reason":"connector_undeclared"},{"connector":"catalog","instance":"slack-bot","disposition":"kept","reason":"connector_undeclared"},{"connector":"catalog","instance":"slack-search","disposition":"kept","reason":"connector_undeclared"}]
+[{"connector":"slack","instance":"slack","disposition":"migrated","reason":null},{"connector":"slack","instance":"slack-bot","disposition":"migrated","reason":null},{"connector":"slack","instance":"slack-search","disposition":"migrated","reason":null}]
 ```
 
-Since 0.60.0 such an entry is no instance: `instances list` names it in `unmigrated`, and
-selecting it as `catalog/<alias>` or `--connector catalog --instance <alias>` is
-`invalid_configuration` with the rule `legacy_entry_unmigrated`. To name it as a Slack instance,
-rewrite it by hand: change
+Before 0.63.1 it kept each as `connector_undeclared`, and since 0.60.0 such an entry is no
+instance: `instances list` names it in `unmigrated`, and selecting it as `catalog/<alias>` or
+`--connector catalog --instance <alias>` is `invalid_configuration` with the rule
+`legacy_entry_unmigrated`. The run below predates 0.63.1, so it names the instances by hand
+instead of by alias: change
 `format` to `"connectors-local/5"`, add `[connectors.slack]` with `enabled = true`, and rename
 each legacy table `[adapters.<alias>]` to `[connectors.slack.instances.<instance>]` with `alias =
 "<alias>"` as its first key, the `.permissions` and `.executable` tables with it. Every pin stays

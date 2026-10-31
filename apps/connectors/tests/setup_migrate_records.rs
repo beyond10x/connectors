@@ -55,7 +55,7 @@ type Fixed = (
 const ENTRIES: &[Fixed] = &[
     ("mail", "catalog", Some("google-gmail"), None, Some("gmail")),
     ("tracker", "catalog", Some("jira"), None, Some("jira")),
-    ("chat", "catalog", Some("slack"), None, None),
+    ("chat", "catalog", Some("slack"), None, Some("slack")),
     (
         "tracker-gw",
         "catalog",
