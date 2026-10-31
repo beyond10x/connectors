@@ -56,3 +56,7 @@ harness = false
 [[test]]
 name = "setup_migrate_short"
 harness = false
+
+[[test]]
+name = "short_form_adversary"
+harness = false
