@@ -184,6 +184,16 @@ impl Store {
         self.load(&metadata.connection)
     }
 
+    /// Whether a policy is published for the instance, as passively as
+    /// [`Store::status`]: a state directory without a metadata database
+    /// holds none (`setup migrate`, story:migrate-writes-the-short-instance-form).
+    pub fn published(&self) -> Result<bool> {
+        match std::fs::symlink_metadata(self.path.join(super::metadata::NAME)) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            _ => Ok(self.status()?.is_some()),
+        }
+    }
+
     /// Publish an already admitted operation set. The coordinator, not this
     /// metadata port, checks that every operation is a supported approval-gated
     /// write under current native metadata and owner permissions.

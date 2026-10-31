@@ -691,6 +691,22 @@ impl ServiceState {
         settled
     }
 
+    /// `RecordRefusal`: the provider definitely refused the write, so nothing
+    /// was performed (`Failed`, classification `refused`). The refusal's
+    /// `code` and safe `message` are kept beside the classification, so a
+    /// replay of its key answers them again. `true` when the ledger
+    /// acknowledged the settlement.
+    pub fn settle_refused(&self, attempt: ledger::AttemptRef, code: &str, message: &str) -> bool {
+        let mut settled = settlement("refused", Some(code));
+        settled["message"] = json!(message);
+        let settled = self
+            .ledger
+            .settle(attempt, &ledger::Outcome::Refused(settled))
+            .is_ok();
+        self.land(attempt.attempt_id);
+        settled
+    }
+
     /// Internal owner read of one of this host's attempts by its public id.
     pub fn attempt(&self, attempt_id: &str) -> ledger::Result<ledger::Observation> {
         let attempt_id = Uuid::parse_str(attempt_id).map_err(|_| ledger::Failure::InvalidInput)?;

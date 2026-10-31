@@ -20795,7 +20795,20 @@
                         "description",
                         "endpoint",
                         "profile",
-                        "format"
+                        "format",
+                        "credential_revision",
+                        "provider",
+                        "bundle_sha256",
+                        "source_sha256",
+                        "api_base",
+                        "ca_digest",
+                        "auth",
+                        "operations",
+                        "token_ca_digest",
+                        "feed",
+                        "request_prefix",
+                        "hosts",
+                        "bindings"
                       ]
                     }
                   },
@@ -20806,8 +20819,54 @@
                       "kept"
                     ]
                   },
+                  "form": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "enum",
+                      "variants": [
+                        "short",
+                        "pinned"
+                      ]
+                    }
+                  },
                   "instance": {
                     "kind": "string"
+                  },
+                  "pinned_field": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "enum",
+                      "variants": [
+                        "instance_id",
+                        "configuration_revision",
+                        "adapter_id",
+                        "protocol",
+                        "private_protocol",
+                        "startup",
+                        "restart",
+                        "executable",
+                        "permissions",
+                        "instance",
+                        "enabled",
+                        "description",
+                        "endpoint",
+                        "profile",
+                        "format",
+                        "credential_revision",
+                        "provider",
+                        "bundle_sha256",
+                        "source_sha256",
+                        "api_base",
+                        "ca_digest",
+                        "auth",
+                        "operations",
+                        "token_ca_digest",
+                        "feed",
+                        "request_prefix",
+                        "hosts",
+                        "bindings"
+                      ]
+                    }
                   },
                   "reason": {
                     "kind": "optional",
@@ -23336,7 +23395,7 @@
       ],
       "aliases": [],
       "callable": "setup-migrate",
-      "about": "Rewrite each entry of the legacy configuration format that maps to a shipped connector as that connector's instance, keeping its instance id, revision and selection; --mode dry-run (or --dry-run) prints the new file, --mode apply (or --apply) writes it and keeps the old one as config.toml.before-migrate-TIMESTAMP (UTC)",
+      "about": "Rewrite each entry of the legacy configuration format that maps to a shipped connector as that connector's instance, keeping its instance id and revision, in the short form when the installed provider derives it unchanged; --mode dry-run (or --dry-run) prints the new file, --mode apply (or --apply) writes it and keeps the old one as config.toml.before-migrate-TIMESTAMP (UTC)",
       "arguments": [
         {
           "field": "mode",

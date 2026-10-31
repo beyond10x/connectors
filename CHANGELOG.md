@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.64.0 — 2026-10-31
+
+### Fixed
+
+- A served write the provider definitely refuses answers `refused`, not `outcome_unknown`
+  (story:served-merge-refusal-answers-refused). On `POST /v1alpha2/invoke`, a 4xx the catalog
+  engine classifies as a refusal, such as 405, 409 or 422 to a pull request merge, answers the
+  refusal's code (`forbidden` for 405, `invalid_input` for 409 and 422) with a message carrying
+  the provider's own `message`, `mutation.classification: refused` with its attempt, settled
+  `Failed`; a replay of its key answers the same refusal with no request. Before, every provider
+  error after dispatch answered HTTP 502 `outcome_unknown`, so an agent could not tell a refused
+  merge from a lost one. A 5xx, a cut connection and a timeout stay `outcome_unknown`.
+  `connectors_sdk::Adapter` gains `invoke_write_at`, whose default keeps the old answer for an
+  adapter that does not override it. The host bounds an adapter error's message to 512 bytes,
+  keeps a positive `retry_after_seconds` of a refused rate limit, and a replay of a refusal
+  answers its original code even when its message is empty.
+
+### Added
+
+- A derived instance table `[connectors.<connector>.instances.<name>]` may state `alias` and
+  `instance_id` (story:migrate-writes-the-short-instance-form, migration plan step 2). The installed
+  catalog provider derives the instance under that id (`--instance-id`), so a migrated instance
+  keeps its old id, and with it its connections, approval policy, audits and custody records. An
+  instance id that two instances, or an instance and a legacy entry, resolve to refuses the file.
+  `connections connect --endpoint` writes into such an instance as into any derived one, and
+  refuses a host that would strand a connection admitted under its stated id.
+- `setup migrate` writes a legacy catalog entry in that short form (`alias`, `instance_id`, and
+  `endpoint` and `profile` only where they differ from the declaration's defaults) when the
+  installed provider derives it with the same instance id, configuration revision, credential
+  revision, permissions and startup, no approval policy is published for the instance, and the
+  operation curation (`<config>.operation-curation.json`) neither names the entry's alias or
+  executable selection nor is present but unreadable. Every
+  other mapped entry is still written pinned, as before; each migrated entry's new `form` says
+  which, and a pinned one's `pinned_field` names why, for a revision difference the first differing
+  key of the provider's revision digest input (`auth` for other scopes).
+- `connectors-catalog-provider --print-revision-inputs` prints, per key of the configuration
+  revision's digest input, that value's digest.
+
+### Known limits
+
+- The short form changes an instance's executable selection digest, to which a published approval
+  policy and an operation curation are bound, so an instance with either stays pinned.
+- The response bodies the tests use are GitHub's documented shapes, not a recorded answer to a
+  merge of a branch behind a strict ruleset; recording that answer is
+  story:served-merge-refusal-live-record.
+
 ## 0.63.1 — 2026-10-31
 
 Slack's bot selection ships a connector declaration, so a legacy Slack entry migrates and a Slack
