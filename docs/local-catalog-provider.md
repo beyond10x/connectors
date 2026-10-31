@@ -1352,10 +1352,25 @@ sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
 args = ["--local-config", "/absolute/path/gitlab-catalog.json"]
 ```
 
-An instance table with any of these pins must carry all of them, `alias` included; one with
-none is derived. `alias` is the name the deprecated `--adapter` selector and mounted custody
-items use. The connector name of a pinned instance is a name only: it is not checked against a
-declaration.
+An instance table with any of these pins besides `alias` and `instance_id` must carry all of
+them, `alias` included; one with none is derived. `alias` is the name the deprecated `--adapter`
+selector and mounted custody items use. The connector name of a pinned instance is a name only:
+it is not checked against a declaration.
+
+A derived instance may state `alias` and `instance_id`, and nothing else besides `endpoint`,
+`profile` and `description`. This short form is what `setup migrate` writes for an entry the
+installed provider derives unchanged: the provider is started with `--instance-id`, so the
+instance keeps its old id, and its entry is held under the alias:
+
+```toml
+[connectors.gitlab.instances.forge]
+alias = "forge"
+instance_id = "gitlab-sandbox"
+endpoint = "https://gitlab.example.com"
+```
+
+No two instances, and no instance and legacy entry, may resolve to one instance id; such a file
+is refused.
 
 ### Existing installations
 
@@ -1365,8 +1380,8 @@ for it and its alias (here `gitlab/forge`, or `--connector gitlab --instance for
 deprecated `--adapter <alias>`. An entry no connector is derived for, such as an OpenRouter
 entry, is no instance: selecting it is `legacy_entry_unmigrated`.
 `setup migrate` moves every entry whose native configuration names a provider with a shipped
-declaration to `[connectors.<connector>.instances.<alias>]`, with every pin unchanged, so its
-connections and approval policy stay valid. The dry run writes nothing; this one ran on a file
+declaration to `[connectors.<connector>.instances.<alias>]`, in the short form or with every
+pin unchanged (below), so its connections and approval policy stay valid. The dry run writes nothing; this one ran on a file
 with a GitLab entry `forge`, a Kubernetes entry `cluster` and a Slack entry `slack-bot`, before
 0.63.1 shipped Slack's declaration; since then `slack-bot` migrates to the connector `slack` as
 `forge` does to `gitlab`:
@@ -1386,8 +1401,38 @@ rollback. The migrated `forge` is the pinned instance above. The entries it keep
 `reason` ([migrating legacy adapter entries](../contracts/cli/v1alpha1/semantics.md#migrating-adapter-entries)):
 Kubernetes and the other non-catalog implementations can be rewritten by hand as the
 [Kubernetes guide](local-kubernetes-cli.md) shows, and Slack as [the Slack guide](catalog-slack.md)
-shows. Moving a migrated instance to a derived one is a new instance: its instance id and
-configuration revision change, so it needs a new connection.
+shows.
+
+Since 0.64.0 a migrated entry is written in the short form above when the installed provider,
+started with `--instance-id` and the endpoint and profile read from the entry's native
+configuration, derives the same instance id, configuration revision, credential revision,
+permissions and startup, and no approval policy is published for the instance: the short form
+starts the provider with other arguments, and a policy is bound to those. Each migrated entry
+names its `form`; a `pinned` one names why in `pinned_field`. For another revision that is the
+first key of the revision's digest input the two configurations differ in, as
+`connectors-catalog-provider --print-revision-inputs` prints them: `auth` for other scopes,
+`api_base` for an API base no endpoint of the connector produces. `before` and `after` show
+that the instance id and revision stay; the executable selection is the derived one. This dry run
+read a file with two legacy GitLab entries at `https://gitlab.example.com`: `forge`, whose native
+configuration, credential revision and permissions are the ones the provider derives, and
+`forge-ro`, whose profile requires `read_api` instead of `api`:
+
+```console
+$ connectors --output json setup migrate --dry-run | jq -c '.result.entries[] | {adapter, form, pinned_field, before: .before | {instance_id, configuration_revision}, after: .after | {instance_id, configuration_revision}}'
+{"adapter":"forge","form":"short","pinned_field":null,"before":{"instance_id":"gitlab-forge","configuration_revision":"176f1ddf503bcb5ee3ed52b1862a4fc5116f3b86af83bdd63991296f0806b317"},"after":{"instance_id":"gitlab-forge","configuration_revision":"176f1ddf503bcb5ee3ed52b1862a4fc5116f3b86af83bdd63991296f0806b317"}}
+{"adapter":"forge-ro","form":"pinned","pinned_field":"auth","before":{"instance_id":"gitlab-forge-ro","configuration_revision":"9734736cade35e04da8dbe3bb5f43acc6d33906bd607d4ba660259ec9aee2fb3"},"after":{"instance_id":"gitlab-forge-ro","configuration_revision":"9734736cade35e04da8dbe3bb5f43acc6d33906bd607d4ba660259ec9aee2fb3"}}
+$ connectors --output json setup migrate --dry-run | jq -r .result.configuration | sed -n '/instances.forge\]/,/^$/p'
+[connectors.gitlab.instances.forge]
+endpoint = "https://gitlab.example.com"
+alias = "forge"
+instance_id = "gitlab-forge"
+```
+
+An entry whose permissions are narrower than every operation the connector ships stays pinned
+(`permissions`): the derived instance would permit them all.
+
+Moving a pinned instance to a derived one by hand without its `instance_id` is a new instance:
+its instance id and configuration revision change, so it needs a new connection.
 
 ### Connect and keep the connection ready
 

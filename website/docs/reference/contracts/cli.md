@@ -1154,16 +1154,35 @@ an entry.
 `[adapters.<alias>]` entries to connector instances without a new consent,
 revalidation or approval policy publication. `--dry-run` and `--apply` are the
 same two commands. Each entry whose implementation maps to a shipped connector
-declaration becomes `[connectors.<connector>.instances.<alias>]` carrying every
-pin of the entry, its alias included. The instance name is the alias, so the
-instance is selected as `--connector <connector> --instance <alias>`, and
-`--adapter <alias>` keeps selecting it for the deprecation window. Its
-`instance_id`, `configuration_revision`, executable selection digest (an approval
-policy's `executable_selection`) and mounted custody item names
-`<alias>/<profile>` stay byte for byte, so its connections, approval policy and
-custody items stay valid. Platform custody items are keyed by connection, not by
-configuration names. Read and write instance pairs are not merged: merging
-changes scopes and so the revision.
+declaration becomes `[connectors.<connector>.instances.<alias>]`. The instance
+name is the alias, so the instance is selected as `--connector <connector>
+--instance <alias>`, and `--adapter <alias>` keeps selecting it for the
+deprecation window. Its `instance_id`, `configuration_revision` and mounted
+custody item names `<alias>/<profile>` stay byte for byte, so its connections,
+approval policy and custody items stay valid. Platform custody items are keyed
+by connection, not by configuration names. Read and write instance pairs are
+not merged: merging changes scopes and so the revision.
+
+The instance is written in the short form (`form` `short`) when the installed
+catalog provider derives the entry from it unchanged: the table states `alias`,
+the entry's `instance_id`, and `endpoint` and `profile` only where they differ
+from the declaration's default endpoint and single profile, and the provider,
+started with `--instance-id <instance_id>`, derives the entry's
+`instance_id`, `configuration_revision`, `credential_revision` (stated or
+not), `permissions` and `startup`, with the entry's executable digest when
+the entry states a `credential_revision`. The short form selects another
+executable argument vector, so it is not written for an instance whose approval
+policy is published: that policy's `executable_selection` would no longer
+match. Otherwise the instance carries every pin of the entry, its alias
+included (`form` `pinned`), and its executable selection digest stays byte for
+byte too; `pinned_field` names why (`connectors.cli.MigrateField`). For a
+derived configuration revision other than the entry's it is the first key of
+the provider's revision digest input in which the two differ (`auth` for other
+scopes, `api_base` for another API base), printed per key by the provider's
+`--print-revision-inputs`, or `configuration_revision` when no key accounts
+for it or the provider derives nothing; `executable` for a published approval
+policy; otherwise the differing `credential_revision`, `permissions`,
+`startup` or `executable`.
 
 Only a catalog entry maps to a connector today: the connector whose shipped
 declaration names the `provider` of the entry's native configuration as its
@@ -1183,9 +1202,13 @@ other entry stays where it is, and the result names why in `reason`
 | `selection_changes` | would read back with another value of the field `differing_field` names |
 
 The new file is read back with the reading rules above before anything is
-written, its 1 MiB bound included: a rewritten file larger than that is
+written, its 1 MiB bound included, short-form instances derived by the
+installed provider: a rewritten file larger than that is
 refused in both modes as `invalid_configuration` naming `config_too_large`,
-and nothing is written. An entry that reads back with any other value of any
+and nothing is written. A short-form instance that reads back with another
+`instance_id`, `configuration_revision`, `credential_revision`, `permissions`
+or `startup` is written pinned instead, naming that field in `pinned_field`. A
+pinned entry that reads back with any other value of any
 of its fields is not migrated, naming the first such field. So is one whose
 new instance table reads back differently (`instance`, or the first of
 `description`, `endpoint` and `profile`) or whose connector's pre-existing
@@ -1199,8 +1222,9 @@ comments are not kept.
 
 The result lists every `[adapters.<alias>]` entry of the file it read with its
 `disposition` (`migrated` or `kept`), the `connector` and `instance` that select
-it afterwards and, `before` and `after`, its `instance_id`,
-`configuration_revision`, `executable_selection` and `custody_items`. It carries
+it afterwards, a migrated entry's `form` and, `before` and `after`, its `instance_id`,
+`configuration_revision`, `executable_selection` and `custody_items`; a
+short-form entry's `after` carries the derived executable's selection. It carries
 the file in `configuration` and its `format_before` and `format_after`. The
 format moves to `connectors-local/5` only when at least one entry is migrated.
 With nothing to migrate the result is `unchanged` and nothing is written in

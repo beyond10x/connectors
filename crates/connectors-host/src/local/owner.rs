@@ -1424,6 +1424,7 @@ mod reuse_tests {
             description: None,
             endpoint: None,
             alias: alias.into(),
+            instance_id: None,
             derived: false,
             profile: None,
             awaiting_profile: None,

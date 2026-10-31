@@ -12,18 +12,94 @@
 //! configuration revision digests the endpoint. As a child it serves the same
 //! bootstrap and validates nothing. An endpoint containing `refuse` is refused,
 //! as a provider refuses an endpoint it cannot use.
+//!
+//! For story:migrate-writes-the-short-instance-form it also stands in for a
+//! migrated GitLab instance, emulating the catalog provider's revision
+//! ([`inputs`]): a selection naming a native configuration
+//! (`--local-config <file>`) or an instance id (`--instance-id`) is described
+//! from its digest input, printed per key for `--print-revision-inputs`, and
+//! its child validates any credential and answers a read with its digest.
 #![allow(dead_code)]
 use connectors_host::local::{registry, runtime};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs,
     io::Write,
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::{Command, Output},
 };
+
+/// The shipped GitLab declaration, which a derived instance is lowered from.
+const GITLAB: &str = include_str!("../../../../adapters/catalog/providers/gitlab/connector.json");
+
+fn sha256(bytes: &[u8]) -> String {
+    hex::encode(Sha256::digest(bytes))
+}
+
+/// The configuration revision digest input of a selection naming a native
+/// configuration (its `instance`, `provider`, `api_base` and `auth`) or a
+/// derived GitLab instance with an instance id (the declaration's provider,
+/// the endpoint or default endpoint followed by `api_path`, and its single
+/// profile as `auth`); `None` for any other selection.
+pub fn inputs(args: &[String]) -> Option<BTreeMap<String, Value>> {
+    let mut inputs = BTreeMap::new();
+    if let Some(path) = option(args, "local-config") {
+        let native: Value = serde_json::from_slice(&fs::read(path).ok()?).ok()?;
+        for key in ["instance", "provider", "api_base", "auth"] {
+            inputs.insert(key.to_owned(), native.get(key)?.clone());
+        }
+    } else {
+        let id = option(args, "instance-id")?;
+        let declaration: Value = serde_json::from_str(GITLAB).unwrap();
+        if option(args, "connector")? != declaration["connector_id"] {
+            return None;
+        }
+        let endpoint = option(args, "endpoint")
+            .or(declaration["default_endpoint"].as_str())?
+            .trim_end_matches('/');
+        let api_base = format!("{endpoint}{}", declaration["api_path"].as_str()?);
+        inputs.insert("instance".into(), json!(id));
+        inputs.insert("provider".into(), declaration["catalog_provider"].clone());
+        inputs.insert("api_base".into(), json!(api_base));
+        inputs.insert("auth".into(), declaration["profiles"][0].clone());
+    }
+    inputs.insert("format".into(), json!("standin/1"));
+    Some(inputs)
+}
+
+/// The configuration revision of a digest input.
+pub fn revision(inputs: &BTreeMap<String, Value>) -> String {
+    format!(
+        "cfg-{}",
+        &sha256(serde_json::to_string(inputs).unwrap().as_bytes())[..16]
+    )
+}
+
+/// The native configuration of the GitLab instance `instance` at `api_base`
+/// whose profile requires `scopes`: with the declaration's scopes, the one a
+/// derived instance of that id at that API base has.
+pub fn native(instance: &str, api_base: &str, scopes: &[&str]) -> Value {
+    let declaration: Value = serde_json::from_str(GITLAB).unwrap();
+    let mut auth = declaration["profiles"][0].clone();
+    auth["minimum_scopes"] = json!(scopes);
+    json!({"instance": instance, "provider": declaration["catalog_provider"],
+        "api_base": api_base, "auth": auth})
+}
+
+/// The revision a native configuration has.
+pub fn native_revision(native: &Value) -> String {
+    let mut inputs: BTreeMap<String, Value> = native
+        .as_object()
+        .unwrap()
+        .iter()
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect();
+    inputs.insert("format".into(), json!("standin/1"));
+    revision(&inputs)
+}
 
 /// The value of `--<name>` in `args`.
 fn option<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
@@ -36,13 +112,28 @@ fn option<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
 
 /// The bootstrap the stand-in reports for the selection in `args`.
 fn bootstrap(args: &[String]) -> runtime::Bootstrap {
-    let connector = option(args, "connector").unwrap_or("none");
-    let instance = format!("{connector}.{}", option(args, "instance").unwrap_or("none"));
-    let endpoint = option(args, "endpoint").unwrap_or("https://default.standin.invalid");
-    let revision = format!(
-        "cfg-{}",
-        &hex::encode(Sha256::digest(endpoint.as_bytes()))[..16]
-    );
+    let (connector, instance, endpoint, revision) = match inputs(args) {
+        Some(inputs) => (
+            "gitlab".to_owned(),
+            inputs["instance"].as_str().unwrap().to_owned(),
+            inputs["api_base"].as_str().unwrap().to_owned(),
+            revision(&inputs),
+        ),
+        None => {
+            let connector = option(args, "connector").unwrap_or("none");
+            let endpoint = option(args, "endpoint").unwrap_or("https://default.standin.invalid");
+            (
+                connector.to_owned(),
+                format!("{connector}.{}", option(args, "instance").unwrap_or("none")),
+                endpoint.to_owned(),
+                format!(
+                    "cfg-{}",
+                    &hex::encode(Sha256::digest(endpoint.as_bytes()))[..16]
+                ),
+            )
+        }
+    };
+    let endpoint = endpoint.as_str();
     let profile = format!("{connector}.pat");
     let operation = format!("{connector}.whoami");
     let descriptor = connectors_core::Descriptor {
@@ -96,7 +187,9 @@ fn bootstrap(args: &[String]) -> runtime::Bootstrap {
     }
 }
 
-struct Child(runtime::Bootstrap);
+/// The child: its bootstrap, and whether it serves (a selection [`inputs`]
+/// describes) rather than refusing every validation and invocation.
+struct Child(runtime::Bootstrap, bool);
 
 #[async_trait::async_trait]
 impl runtime::Adapter for Child {
@@ -112,17 +205,45 @@ impl runtime::Adapter for Child {
         _: &str,
         _: connectors_sdk::Secret,
     ) -> runtime::Result<runtime::Baseline> {
-        Err(runtime::Failure::Unavailable)
+        if !self.1 {
+            return Err(runtime::Failure::Unavailable);
+        }
+        let now = connectors_sdk::now_ms();
+        Ok(runtime::Baseline {
+            binding: None,
+            identity: registry::ExternalIdentity {
+                kind: "gitlab.user".into(),
+                subject: "standin-subject-1".into(),
+            },
+            granted_scopes: None,
+            credential_expires_at_ms: None,
+            collected_at_ms: now,
+            valid_until_ms: now + 55_000,
+        })
     }
     async fn invoke(
         &self,
         _: &str,
         _: &str,
-        _: connectors_sdk::Secret,
+        document: connectors_sdk::Secret,
         _: Value,
     ) -> runtime::Result<Value> {
-        Err(runtime::Failure::Unsupported)
+        if !self.1 {
+            return Err(runtime::Failure::Unsupported);
+        }
+        Ok(json!({"credential": sha256(&document.0)}))
     }
+}
+
+/// The schema digest and descriptor revision `invoke` names for the read of
+/// the selection `args`.
+pub fn read_schema(args: &[String]) -> (String, String) {
+    let bootstrap = bootstrap(args);
+    let operation = bootstrap.requirements[0].operation.clone();
+    (
+        connectors_host::local::owner::schema(&bootstrap, &operation).unwrap(),
+        "desc-1".into(),
+    )
 }
 
 /// Act as the provider when the arguments are a provider's, else run `tests`
@@ -130,15 +251,33 @@ impl runtime::Adapter for Child {
 /// does: 0 when every selected test passed, 101 otherwise.
 pub fn main(tests: &[(&str, fn())]) {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.iter().any(|arg| arg == "--print-revision-inputs") {
+        let Some(inputs) = inputs(&args) else {
+            std::process::exit(1);
+        };
+        let digests: BTreeMap<&String, String> = inputs
+            .iter()
+            .map(|(key, value)| {
+                (
+                    key,
+                    sha256(serde_json::to_string(value).unwrap().as_bytes()),
+                )
+            })
+            .collect();
+        println!("{}", serde_json::to_string(&digests).unwrap());
+        return;
+    }
     if args.iter().any(|arg| arg == "--print-local-bootstrap") {
         let exe = std::env::current_exe().unwrap();
         let record = exe.parent().unwrap().parent().unwrap().join("args");
-        let mut log = fs::OpenOptions::new()
+        // A jailed provider may have no writable directory there.
+        if let Ok(mut log) = fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(record)
-            .unwrap();
-        writeln!(log, "{}", args.join("\n")).unwrap();
+        {
+            writeln!(log, "{}", args.join("\n")).unwrap();
+        }
         if option(&args, "endpoint").is_some_and(|endpoint| endpoint.contains("refuse")) {
             std::process::exit(1);
         }
@@ -149,7 +288,7 @@ pub fn main(tests: &[(&str, fn())]) {
         std::process::exit(1);
     }
     if args.iter().any(|arg| arg == "--connectors-private-fd") {
-        let _ = runtime::serve(3, Child(bootstrap(&args)));
+        let _ = runtime::serve(3, Child(bootstrap(&args), inputs(&args).is_some()));
         return;
     }
     let filter = args.iter().find(|arg| !arg.starts_with('-'));
