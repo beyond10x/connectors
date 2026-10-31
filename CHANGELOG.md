@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.63.1 — 2026-10-31
+
+Slack's bot selection ships a connector declaration, so a legacy Slack entry migrates and a Slack
+bot instance can be named by its connector alone.
+
+### Added
+
+- `adapters/catalog/providers/slack/connector.json` declares the connector `slack`: provider
+  `slack`, default endpoint `https://slack.com/api`, the bot selection `operations.json` and the
+  profile `slack.bot`, lowered from `connectors/slack.yaml` of `beyond10x/connectors-definitions`
+  (story:slack-connector-declaration). `--connector slack --instance <name>` derives the Slack
+  guide's bot configuration and its revision.
+- `setup migrate` moves a legacy Slack entry, on the bot or the user selection, to a pinned
+  instance `[connectors.slack.instances.<alias>]` with every pin unchanged; before, it kept it as
+  `connector_undeclared`, and such an entry was no instance (`legacy_entry_unmigrated`).
+
+### Known limits
+
+- The user selection (`user-operations.json`, profile `slack.user`, search) has no declaration: a
+  catalog directory holds one. A user-token instance stays pinned, and a derived `slack` instance
+  refuses the profile `slack.user`. Declaring it as the connector `slack-user` is
+  story:slack-user-connector-declaration.
+- The connectors index lists `slack` from its declaration: the bot selection's 12 reads and 5
+  writes, the profile `slack.bot`, derived.
+
 ## 0.63.0 — 2026-10-30
 
 `invoke` prints only what an agent asks for, and walks a declared page sequence itself, so one
