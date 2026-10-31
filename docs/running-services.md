@@ -310,7 +310,13 @@ per intended effect. The host answers, before anything is recorded or sent:
 | The grant file or the host's state cannot be read | `unavailable` (503) |
 | A write on `POST /v1/invoke`, which records no attempt and reads no grant | `unsupported` (501) |
 
-A write that passes is recorded as one attempt and sent at most once. Sending the same key
+A write that passes is recorded as one attempt and sent at most once. When the provider
+definitely refuses it, as GitHub answers a merge it cannot perform with 405, 409 or 422, the
+host answers the refusal's code (`forbidden` for 405, `invalid_input` for 409 and 422) with
+the provider's own message, and `mutation.classification: refused`: nothing was performed, so
+the caller can fix the cause (update the branch) and send a new write under a new key. A `5xx`,
+a cut connection or a timeout says nothing about the write: `outcome_unknown` (502), never
+sent again. Sending the same key
 and input again never sends again: it answers the original attempt's outcome, marked
 `replayed: true`, and checks no grant, so a revoked grant does not hide what already
 happened. If the original is still running, the repeat waits up to 25 seconds, without

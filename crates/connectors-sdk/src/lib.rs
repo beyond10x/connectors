@@ -28,6 +28,25 @@ pub trait Adapter: Send + Sync {
         }
         self.invoke(operation, input).await
     }
+    /// A write whose attempt the host has recorded, answered with what the
+    /// adapter knows of its effect. By default [`invoke_at`](Self::invoke_at):
+    /// a value is applied, and an error says nothing about the effect, so it
+    /// is unknown. An adapter that tells the provider's definite refusal of
+    /// the write from a lost or unclear answer overrides this and answers that
+    /// refusal [`WriteOutcome::Refused`]; the host then records the write as
+    /// refused, not performed (contracts/operations/v1alpha1/semantics.md
+    /// § 4, rule 11).
+    async fn invoke_write_at(
+        &self,
+        revision: &str,
+        operation: &str,
+        input: Value,
+    ) -> WriteOutcome<Value> {
+        match self.invoke_at(revision, operation, input).await {
+            Ok(value) => WriteOutcome::Applied(Ok(value)),
+            Err(error) => WriteOutcome::Unknown(error),
+        }
+    }
     /// A refusal the adapter answers from a described operation's validated
     /// input alone, which the host sends before it anchors the call: no
     /// record, no attempt and no adapter call. None by default.

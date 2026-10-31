@@ -66,7 +66,7 @@ use connectors_core::{
         MutationObservation, Refusal, ResponseStatus, Version,
     },
 };
-use connectors_sdk::validate;
+use connectors_sdk::{WriteOutcome, validate};
 use serde_json::Value;
 use std::{
     sync::Arc,
@@ -478,39 +478,45 @@ async fn execute(
     let _landing = attempt.map(|opened| Landing(state.clone(), opened.attempt_id));
 
     let started = Instant::now();
-    let answer = dispatch(&service, &request, &operation).await;
+    let answer = dispatch(&service, &request, &operation, write).await;
     tracing::info!(request_id = ?request.request_id, operation = ?request.operation, elapsed_ms = started.elapsed().as_millis(), success = answer.is_ok(), "operation completed");
 
     let Some(attempt) = attempt else {
         // A read: its known result or error, observed as it is.
         let (outcome, code) = match &answer {
             Ok(_) => (audit::Outcome::Success, None),
-            Err((error, _)) => (audit::Outcome::Error, Some(text(error.code))),
+            Err(failed) => (audit::Outcome::Error, Some(text(failed.error.code))),
         };
         let complete = finish(&state, &reference, outcome, code).await;
         return respond(
             request_id,
             &reference,
             complete,
-            answer.map_err(|(error, _)| error),
+            answer.map_err(|failed| failed.error),
             None,
         );
     };
 
-    // A write: only a deliverable value is definitive; anything else after
-    // dispatch is `unknown` and is never redispatched (mutations.yaml).
-    let cause = answer.as_ref().err().map(|(_, cause)| cause.clone());
+    // A write: a deliverable value is applied and the provider's definite
+    // refusal is refused; anything else after dispatch is `unknown` and is
+    // never redispatched (mutations.yaml).
+    let cause = answer.as_ref().err().map(|failed| failed.cause.clone());
     let cause_text = cause.as_ref().map(|cause| text(cause.code));
     let settled = {
         let state = state.clone();
         let result = answer.as_ref().ok().cloned();
+        let refusal = answer
+            .as_ref()
+            .err()
+            .filter(|failed| failed.refused)
+            .map(|failed| failed.error.clone());
         let cause_text = cause_text.clone();
-        tokio::task::spawn_blocking(move || {
-            if state.keyed() {
+        tokio::task::spawn_blocking(move || match &refusal {
+            Some(refusal) => state.settle_refused(attempt, &text(refusal.code), &refusal.message),
+            None if state.keyed() => {
                 state.settle_keyed(attempt, result.as_ref(), cause_text.as_deref())
-            } else {
-                state.settle_attempt(attempt, result.is_some(), cause_text.as_deref())
             }
+            None => state.settle_attempt(attempt, result.is_some(), cause_text.as_deref()),
         })
         .await
         .unwrap_or(false)
@@ -531,6 +537,34 @@ async fn execute(
                 secondary,
             );
             respond(request_id, &reference, complete, Ok(value), Some(mutation))
+        }
+        // The provider's definite refusal: nothing was performed, and its
+        // safe code and message are answered (operations § 4, rule 11). A
+        // refusal stays known when its settlement was not stored.
+        Err(Failed {
+            error,
+            refused: true,
+            ..
+        }) => {
+            let complete = finish(
+                &state,
+                &reference,
+                audit::Outcome::Refused,
+                Some(text(error.code)),
+            )
+            .await;
+            let secondary = (!settled).then_some(DiagnosticCause {
+                code: BaseErrorCode::Unavailable,
+                stage: CauseStage::AttemptStore,
+            });
+            let mutation = observation(
+                &state,
+                &request_id,
+                EffectKnowledge::Refused,
+                Some(attempt),
+                secondary,
+            );
+            respond(request_id, &reference, complete, Err(error), Some(mutation))
         }
         Err(_) => {
             let complete = finish(
@@ -752,13 +786,20 @@ async fn replay(
                 ),
             }
         }
-        mutations::State::Aborted | mutations::State::Failed => (
+        mutations::State::Aborted => (
             audit::Outcome::Refused,
             Err(Error::new(
                 ErrorCode::Unavailable,
                 "the original write was not attempted",
             )),
             replayed(EffectKnowledge::NotAttempted, None),
+        ),
+        // The provider definitely refused the original: its code and message
+        // again ([`ServiceState::settle_refused`]).
+        mutations::State::Failed => (
+            audit::Outcome::Refused,
+            Err(refusal(settled)),
+            replayed(EffectKnowledge::Refused, None),
         ),
         mutations::State::Indeterminate => (
             audit::Outcome::Unknown,
@@ -832,21 +873,47 @@ fn respond(
 
 /// The one adapter call. An error carries the safe error a read answers and
 /// the cause a write's `unknown` observation names.
+///
+/// A write is called through [`invoke_write_at`](connectors_sdk::Adapter::invoke_write_at),
+/// so the adapter's [`WriteOutcome::Refused`] (the provider's definite
+/// refusal) reaches the host as a [`Failed`] that is `refused`; every other
+/// error, an applied write whose result is an error included, stays one whose
+/// effect is not known.
 async fn dispatch(
     service: &Service,
     request: &KeyedInvokeRequest,
     operation: &connectors_core::Operation,
-) -> std::result::Result<Value, (Error, DiagnosticCause)> {
-    let failed = |code: ErrorCode, base: BaseErrorCode, stage, message: String| {
-        (
-            Error::new(code, message),
-            DiagnosticCause { code: base, stage },
-        )
+    write: bool,
+) -> std::result::Result<Value, Failed> {
+    let failed = |code: ErrorCode, base: BaseErrorCode, stage, message: String| Failed {
+        error: Error::new(code, message),
+        cause: DiagnosticCause { code: base, stage },
+        refused: false,
     };
-    let call =
-        service
-            .adapter
-            .invoke_at(&request.revision, &request.operation, request.input.clone());
+    let adapter = &service.adapter;
+    let (revision, name, input) = (
+        request.revision.as_str(),
+        request.operation.as_str(),
+        request.input.clone(),
+    );
+    let call: std::pin::Pin<Box<dyn std::future::Future<Output = Answer> + Send + '_>> = if write {
+        Box::pin(async move {
+            match adapter.invoke_write_at(revision, name, input).await {
+                WriteOutcome::Applied(Ok(value)) => Ok(value),
+                WriteOutcome::Refused(error) => Err((error, true)),
+                WriteOutcome::Applied(Err(error)) | WriteOutcome::Unknown(error) => {
+                    Err((error, false))
+                }
+            }
+        })
+    } else {
+        Box::pin(async move {
+            adapter
+                .invoke_at(revision, name, input)
+                .await
+                .map_err(|error| (error, false))
+        })
+    };
     let result = match tokio::time::timeout(DEADLINE, Unwind(call)).await {
         // The adapter panicked after dispatch: its answer is lost, which a
         // write observes as `unknown` (mutations.yaml) and a read as an
@@ -867,13 +934,16 @@ async fn dispatch(
                 "operation deadline exceeded".to_owned(),
             ));
         }
-        Ok(Ok(Err(error))) => {
-            return Err(failed(
-                code(error.code.clone()),
-                base(error.code),
-                CauseStage::Dispatch,
-                error.message,
-            ));
+        Ok(Ok(Err((error, refused)))) => {
+            return Err(Failed {
+                refused,
+                ..failed(
+                    code(error.code.clone()),
+                    base(error.code),
+                    CauseStage::Dispatch,
+                    error.message,
+                )
+            });
         }
         Ok(Ok(Ok(result))) => result,
     };
@@ -902,6 +972,40 @@ async fn dispatch(
         ));
     }
     Ok(result)
+}
+
+/// The adapter's answer to one call: a value, or its error and whether it is
+/// the provider's definite refusal of a write.
+type Answer = std::result::Result<Value, (connectors_core::Error, bool)>;
+
+/// A call that answered no deliverable value.
+struct Failed {
+    /// The safe error a read, or a refused write, answers.
+    error: Error,
+    /// The cause a write's `unknown` observation names.
+    cause: DiagnosticCause,
+    /// The provider definitely refused the write: nothing was performed.
+    refused: bool,
+}
+
+/// The error a replay of a refused write answers: the code and message its
+/// settlement kept ([`ServiceState::settle_refused`]), or, when they cannot
+/// be read back as a code this binding emits and a safe message, a fixed one.
+fn refusal(settlement: Option<&Value>) -> Error {
+    let kept = settlement.and_then(|settlement| {
+        let code: ErrorCode = serde_json::from_value(settlement.get("cause")?.clone()).ok()?;
+        let message = settlement.get("message")?.as_str()?;
+        (code.is_base()
+            && !message.is_empty()
+            && message.len() <= connectors_core::v1alpha2::MESSAGE_LIMIT)
+            .then(|| Error::new(code, message))
+    });
+    kept.unwrap_or_else(|| {
+        Error::new(
+            ErrorCode::InvalidInput,
+            "the provider refused the original write",
+        )
+    })
 }
 
 fn base(code: connectors_core::ErrorCode) -> BaseErrorCode {

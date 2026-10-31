@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.64.0 — unreleased
+
+### Fixed
+
+- A served write the provider definitely refuses answers `refused`, not `outcome_unknown`
+  (story:served-merge-refusal-answers-refused). On `POST /v1alpha2/invoke`, a 4xx the catalog
+  engine classifies as a refusal, such as 405, 409 or 422 to a pull request merge, answers the
+  refusal's code (`forbidden` for 405, `invalid_input` for 409 and 422) with a message carrying
+  the provider's own `message`, `mutation.classification: refused` with its attempt, settled
+  `Failed`; a replay of its key answers the same refusal with no request. Before, every provider
+  error after dispatch answered HTTP 502 `outcome_unknown`, so an agent could not tell a refused
+  merge from a lost one. A 5xx, a cut connection and a timeout stay `outcome_unknown`.
+  `connectors_sdk::Adapter` gains `invoke_write_at`, whose default keeps the old answer for an
+  adapter that does not override it.
+
+### Known limits
+
+- The response bodies the tests use are GitHub's documented shapes, not a recorded answer to a
+  merge of a branch behind a strict ruleset; recording that answer is
+  story:served-merge-refusal-live-record.
+
 ## 0.63.1 — 2026-10-31
 
 Slack's bot selection ships a connector declaration, so a legacy Slack entry migrates and a Slack
