@@ -40,6 +40,7 @@ mod tests {
 
     const API_BASE: &str = "https://gitlab.example.test/api/v4";
     const ENDPOINT: &str = "https://gitlab.example.test";
+    const DEFAULT_API_BASE: &str = "https://gitlab.com/api/v4";
     const PROFILE: &str = "gitlab.pat";
     const READ: &str = "gitlab.whoami";
 
@@ -259,6 +260,10 @@ mod tests {
     /// and configuration revision) under its old alias and under
     /// `--connector gitlab --instance work`, has the same approval policy
     /// status, and reads with the stored credential: nothing is entered again.
+    /// The entry uses the declaration's default endpoint, so the short form
+    /// states none; `connect --endpoint` naming another host then derives the
+    /// instance's stated id under its alias, finds the live connection
+    /// admitted under the default host and is refused without writing.
     /// The installed provider is named by `CONNECTORS_INSTALLATION`.
     pub fn a_live_connection_stays_live_after_its_entry_becomes_the_short_form() {
         let mut jail = Jail::new();
@@ -274,7 +279,7 @@ mod tests {
         );
         let provider = jail.install(&std::env::current_exe().unwrap(), PROVIDER);
         let sha256 = digest(&fs::read(provider).unwrap());
-        let native = standin::native("gitlab-work-local", API_BASE, &["api"]);
+        let native = standin::native("gitlab-work-local", DEFAULT_API_BASE, &["api"]);
         private(
             &jail.path("/srv/native/work.json"),
             native.to_string().as_bytes(),
@@ -400,8 +405,6 @@ mod tests {
             "work",
             "--instance-id",
             "gitlab-work-local",
-            "--endpoint",
-            ENDPOINT,
         ]
         .map(str::to_owned)
         .to_vec();
@@ -420,6 +423,31 @@ mod tests {
             "{}",
         ]);
         assert_eq!(read["result"]["credential"], digest(SECRET), "{read}");
+
+        // The short form states no endpoint, so another host reaches the
+        // check for a live connection, under the alias and stated id.
+        assert!(!written.contains("endpoint"), "{written}");
+        let (code, refused) = standin::refusal(&run(&[
+            "connections",
+            "connect",
+            "gitlab/work",
+            "--profile",
+            PROFILE,
+            "--endpoint",
+            ENDPOINT,
+        ]));
+        assert_eq!(code, Some(1), "{refused}");
+        assert_eq!(
+            (&refused["code"], &refused["stage"], &refused["field"]),
+            (
+                &json!("lifecycle_conflict"),
+                &json!("configuration"),
+                &json!("endpoint")
+            ),
+            "{refused}"
+        );
+        assert_eq!(fs::read_to_string(&config).unwrap(), written);
+        assert_eq!(records(&["--adapter", "work"]), before);
         let stopped = run(&["setup", "owner-stop"]);
         assert!(stopped.status.success(), "{stopped:?}");
     }

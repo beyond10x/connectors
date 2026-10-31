@@ -1406,8 +1406,11 @@ shows.
 Since 0.64.0 a migrated entry is written in the short form above when the installed provider,
 started with `--instance-id` and the endpoint and profile read from the entry's native
 configuration, derives the same instance id, configuration revision, credential revision,
-permissions and startup, and no approval policy is published for the instance: the short form
-starts the provider with other arguments, and a policy is bound to those. Each migrated entry
+permissions and startup, no approval policy is published for the instance, and the operation
+curation beside the configuration (`<config>.operation-curation.json`) does not name the entry's
+alias or executable selection: the short form starts the provider with other arguments, and a
+policy or curation is bound to those. A curation file that is present but unreadable keeps every
+entry pinned. Each migrated entry
 names its `form`; a `pinned` one names why in `pinned_field`. For another revision that is the
 first key of the revision's digest input the two configurations differ in, as
 `connectors-catalog-provider --print-revision-inputs` prints them: `auth` for other scopes,
