@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T12:14:14Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-shapes-its-result",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test --locked -p connectors --test invoke_shapes",
+    "reference": "base 3b9486a47: 10 of 12 failed, cli_parse on --fields (s1/red.log) vs 68c4f7bbf: 12 passed (s1/lanes-final.log); VERIFIED, new behaviour"
+  }
+}

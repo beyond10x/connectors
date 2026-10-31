@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T12:17:59Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-operation-declares-its-walk",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test --locked -p connectors-catalog-provider --test walk_declarations",
+    "reference": "base 3b9486a47: does not compile, no walk module or Selection.walk (s3/red.log) vs 6ffcc953d: 10 passed (s3/final.log); VERIFIED, new behaviour"
+  }
+}

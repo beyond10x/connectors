@@ -83,7 +83,7 @@ pub struct Condition {
 }
 
 impl Condition {
-    fn holds(&self, value: &Value) -> bool {
+    pub(crate) fn holds(&self, value: &Value) -> bool {
         value.pointer(&self.pointer) == Some(&self.equals)
     }
 }

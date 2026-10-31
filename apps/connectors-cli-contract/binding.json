@@ -17086,6 +17086,18 @@
                 "kind": "boolean"
               }
             },
+            "each": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "fields": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
             "idempotency_key": {
               "kind": "optional",
               "of": {
@@ -17095,8 +17107,20 @@
             "input": {
               "kind": "string"
             },
+            "max_pages": {
+              "kind": "optional",
+              "of": {
+                "kind": "integer"
+              }
+            },
             "operation": {
               "kind": "string"
+            },
+            "out": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "revision": {
               "kind": "string"
@@ -17106,6 +17130,12 @@
             },
             "target": {
               "kind": "string"
+            },
+            "walk": {
+              "kind": "optional",
+              "of": {
+                "kind": "boolean"
+              }
             }
           }
         }
@@ -23107,6 +23137,41 @@
           "source": {
             "kind": "option",
             "long": "describe"
+          }
+        },
+        {
+          "field": "fields",
+          "source": {
+            "kind": "option",
+            "long": "fields"
+          }
+        },
+        {
+          "field": "each",
+          "source": {
+            "kind": "option",
+            "long": "each"
+          }
+        },
+        {
+          "field": "walk",
+          "source": {
+            "kind": "option",
+            "long": "walk"
+          }
+        },
+        {
+          "field": "max_pages",
+          "source": {
+            "kind": "option",
+            "long": "max-pages"
+          }
+        },
+        {
+          "field": "out",
+          "source": {
+            "kind": "option",
+            "long": "out"
           }
         }
       ]

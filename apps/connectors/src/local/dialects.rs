@@ -14,24 +14,25 @@ use connectors_sdk::Secret;
 use std::{collections::BTreeMap, ffi::OsString};
 
 /// A bare `--device` is `--device true`, a bare `--reveal` is `--reveal true`
-/// and a bare `--describe` is `--describe true`: `ess-cli/1` has no valueless
-/// switch source. Only the arguments of `connections connect`, `reconnect` or
-/// its deprecated name `repair` (`--device`), of `connections token`
-/// (`--reveal`) and of `invoke` (`--describe`,
-/// story:connectors-do-short-invocation), before a first `--` are rewritten,
-/// and a switch already followed by `true` or `false` is left as it is.
+/// and a bare `--describe` or `--walk` is `--describe true` or `--walk true`:
+/// `ess-cli/1` has no valueless switch source. Only the arguments of
+/// `connections connect`, `reconnect` or its deprecated name `repair`
+/// (`--device`), of `connections token` (`--reveal`) and of `invoke`
+/// (`--describe`, story:connectors-do-short-invocation; `--walk`,
+/// story:invoke-walks-declared-pages), before a first `--` are rewritten, and a
+/// switch already followed by `true` or `false` is left as it is.
 pub(super) fn switch_shorthand(args: Vec<OsString>) -> Vec<OsString> {
-    let switch = match command(&args).as_slice() {
-        ["connections", "connect" | "reconnect" | "repair"] => "--device",
-        ["connections", "token"] => "--reveal",
-        ["invoke", ..] => "--describe",
+    let switches: &[&str] = match command(&args).as_slice() {
+        ["connections", "connect" | "reconnect" | "repair"] => &["--device"],
+        ["connections", "token"] => &["--reveal"],
+        ["invoke", ..] => &["--describe", "--walk"],
         _ => return args,
     };
     let mut rewritten = Vec::with_capacity(args.len() + 1);
     let mut trailing = false;
     let mut rest = args.into_iter().peekable();
     while let Some(arg) = rest.next() {
-        let bare = !trailing && arg.to_str() == Some(switch);
+        let bare = !trailing && arg.to_str().is_some_and(|arg| switches.contains(&arg));
         trailing |= arg.to_str() == Some("--");
         rewritten.push(arg);
         if bare
@@ -343,6 +344,36 @@ mod tests {
             &["c", "invoke", "fixture", "--", "--describe"],
             &["c", "operations", "describe", "--describe"],
             &["c", "connections", "token", "--describe"],
+        ] {
+            assert_eq!(switch_shorthand(args(unchanged)), args(unchanged));
+        }
+    }
+
+    /// story:invoke-walks-declared-pages: a bare `invoke --walk` reads
+    /// `--walk true`, beside `--describe`, and on no other command.
+    #[test]
+    fn a_bare_walk_switch_reads_true_on_invoke_only() {
+        assert_eq!(
+            switch_shorthand(args(&["c", "invoke", "f", "i.r", "--walk", "--out", "-"])),
+            args(&["c", "invoke", "f", "i.r", "--walk", "true", "--out", "-"])
+        );
+        assert_eq!(
+            switch_shorthand(args(&["c", "invoke", "f", "i.r", "--walk", "--describe"])),
+            args(&[
+                "c",
+                "invoke",
+                "f",
+                "i.r",
+                "--walk",
+                "true",
+                "--describe",
+                "true"
+            ])
+        );
+        for unchanged in [
+            &["c", "invoke", "f", "i.r", "--walk", "false"][..],
+            &["c", "invoke", "f", "--", "--walk"],
+            &["c", "connections", "token", "--walk"],
         ] {
             assert_eq!(switch_shorthand(args(unchanged)), args(unchanged));
         }

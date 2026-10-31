@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T12:53:08Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-walks-declared-pages",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test --locked -p connectors --test invoke_walks",
+    "reference": "base 091dc40d0: unresolved import connectors::walk, then 9 of 12 failed on cli_parse (s4/red2.log) vs 0286239f3: 12 passed (s4/green2.log); VERIFIED, new behaviour"
+  }
+}

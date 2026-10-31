@@ -598,8 +598,18 @@ fn admitted(served: &Served, peer: &mut Peer, id: i32) -> (Value, Value) {
     let tool = tools[0].clone();
     assert_eq!(tool["name"], name("read"), "{tool}");
     assert_eq!(tool["annotations"]["readOnlyHint"], true, "{tool}");
+    // story:mcp-tool-call-shapes-its-result (decision D240 c = A): the
+    // advertised `result` is any JSON, and the operation's own output schema
+    // is under the tool's operation `_meta`.
     assert_eq!(
-        tool["outputSchema"]["properties"]["result"]["properties"]["observed"]["type"], "number",
+        tool["outputSchema"]["properties"]["result"],
+        json!({}),
+        "{tool}"
+    );
+    assert_eq!(
+        tool["_meta"]["io.beyond10x.connectors/operation"]["output_schema"]["properties"]["observed"]
+            ["type"],
+        "number",
         "{tool}"
     );
     assert_eq!(served.provider.requests(), 0, "listing sent a request");
