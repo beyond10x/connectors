@@ -1,9 +1,9 @@
 ---
 title: Slack
 sidebar_position: 11
-description: Read Slack conversations, users and files with a bot token, post messages and delete files under approval, and search with a user token, as two pinned instances.
-lede: Slack runs as two pinned instances of the slack connector, a bot instance that reads and posts under approval and a user instance that reads and searches, because no Slack declaration ships yet.
-source: docs/catalog-slack.md, adapters/catalog/providers/slack/operations.json, adapters/catalog/providers/slack/user-operations.json, adapters/catalog/tests/slack.rs, docs/local-catalog-provider.md
+description: Read Slack conversations, users and files with a bot token, post messages and delete files under approval, and search with a user token, as a derived or pinned bot instance and a pinned user instance.
+lede: Slack runs as two instances of the slack connector, a bot instance that reads and posts under approval, derived from the shipped declaration or pinned, and a pinned user instance that reads and searches.
+source: docs/catalog-slack.md, adapters/catalog/providers/slack/connector.json, adapters/catalog/providers/slack/operations.json, adapters/catalog/providers/slack/user-operations.json, adapters/catalog/tests/slack.rs, docs/local-catalog-provider.md
 connectors: "slack"
 ---
 
@@ -15,8 +15,10 @@ Slack Web API document. The words connector, instance, connection and operation 
 [full Slack guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-slack.md) has
 every parameter, scope and refusal.
 
-The catalog provider ships no connector declaration for Slack yet, so neither instance is
-derived: each pins its executable, that executable's SHA-256 and its configuration revision. The
+Since 0.63.1 the catalog provider ships a connector declaration for the bot selection (profile
+`slack.bot`), so a bot instance can be derived from the connector name. A provider directory
+holds one declaration, so the user selection has none, and the user instance pins its
+executable, that executable's SHA-256 and its configuration revision. The
 outputs below come from the guide's run against a local HTTPS fixture standing in for Slack
 (synthetic token and ids); its commands are shown without `--config`, `--state-dir` and
 `--output json`.
@@ -43,7 +45,24 @@ granted scopes only in a header the provider does not read, so a missing scope s
 
 ## Enable the connector and add an instance
 
-Write each instance's native configuration file, print its bootstrap and hash the provider, as the
+A bot instance can be derived from the shipped declaration: its default endpoint is
+`https://slack.com/api` and its one profile `slack.bot`.
+
+```toml
+[connectors.slack]
+enabled = true
+
+[connectors.slack.instances.work]
+```
+
+```console
+$ connectors instances list | jq -c '[.. | objects | select(.instance_id) | {connector, instance, instance_id}]'
+[{"connector":"slack","instance":"work","instance_id":"slack.work"}]
+```
+
+The user instance has no declaration, so it is pinned. The guide's run, which the rest of this
+page shows, pins both instances, `bot` and `search`. Write each instance's native configuration
+file, print its bootstrap and hash the provider, as the
 [full guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-slack.md#configure-the-two-instances)
 shows, then pin both instances. The bot instance permits the writes, so it selects private
 protocol two:
@@ -167,8 +186,9 @@ $ printf '{"token":"xoxb-fixture-token"}' | connectors connections reconnect --c
 
 - Verified against a local fixture only (`adapters/catalog/tests/slack.rs`); no live workspace
   has been read or posted to.
-- Two pinned instances until a Slack connector declaration ships; `setup migrate` keeps legacy
-  Slack entries where they are.
+- The shipped declaration covers the bot selection only: a user-token instance stays pinned,
+  and a derived instance refuses the profile `slack.user`. `setup migrate` moves both legacy
+  Slack entries to pinned instances of `slack` under their aliases.
 - Each list returns one page per call; search pages by number (`page`, `count` 1 to 100).
 - `file.download` reads at most 2 MiB, and only on a connection whose hosts admit
   `https://files.slack.com`. File upload is not offered; `files.delete` is not read back after

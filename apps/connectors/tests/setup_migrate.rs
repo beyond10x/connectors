@@ -170,7 +170,7 @@ fn shipped() -> BTreeMap<String, Option<String>> {
 /// For a catalog entry, the connector whose shipped declaration names the
 /// native configuration's `provider`: every provider directory with a
 /// declaration migrates under that declaration's connector, and every one
-/// without (Slack) stays an adapter entry naming `connector_undeclared`.
+/// without (OpenRouter) stays an adapter entry naming `connector_undeclared`.
 #[test]
 fn every_shipped_declaration_maps_its_native_provider_and_no_other_does() {
     let shipped = shipped();
@@ -232,8 +232,52 @@ fn every_shipped_declaration_maps_its_native_provider_and_no_other_does() {
     );
 }
 
-/// The fixture's kinds: two catalog entries that migrate, Slack and an
-/// Atlassian gateway entry that stay, and one entry of each non-catalog
+/// Acceptance (story:slack-connector-declaration): an install's two Slack
+/// entries, one on the bot selection and one on the user selection, both move
+/// to pinned instances of the connector `slack` under their aliases, each
+/// keeping its instance id, revision, executable selection and custody items.
+#[test]
+fn both_slack_entries_migrate_to_pinned_instances_of_slack() {
+    let (root, _) = configured("connectors-local/4", "", |scratch| {
+        ["operations.json", "user-operations.json"]
+            .into_iter()
+            .zip(["slack-bot", "slack-search"])
+            .map(|(selection, alias)| {
+                Entry::catalog(
+                    scratch,
+                    alias,
+                    json!({
+                        "provider": "slack",
+                        "api_base": "https://slack.com/api",
+                        "operations_file": format!("/absolute/path/adapters/catalog/providers/slack/{selection}"),
+                    }),
+                )
+            })
+            .collect()
+    });
+    let result = success(&command(root.path(), &["setup", "migrate", "--dry-run"]));
+    assert_eq!(result["disposition"], "planned", "{result}");
+    let listed = entries(&result);
+    assert_eq!(listed.len(), 2, "{result}");
+    for alias in ["slack-bot", "slack-search"] {
+        let entry = &listed[alias];
+        assert_eq!(entry["disposition"], "migrated", "{entry}");
+        assert_eq!(
+            (&entry["connector"], &entry["instance"]),
+            (&json!("slack"), &json!(alias)),
+            "{entry}"
+        );
+        assert_eq!(entry["before"], entry["after"], "{entry}");
+        let table = format!("[connectors.slack.instances.{alias}]");
+        assert!(
+            result["configuration"].as_str().unwrap().contains(&table),
+            "{table}"
+        );
+    }
+}
+
+/// The fixture's kinds: three catalog entries that migrate, Slack among them,
+/// OpenRouter and an Atlassian gateway entry that stay, and one entry of each non-catalog
 /// implementation (credential binary, MCP, SQL, Kubernetes), which no
 /// connector maps.
 fn every_kind(scratch: &Path) -> Vec<Entry> {
@@ -252,6 +296,11 @@ fn every_kind(scratch: &Path) -> Vec<Entry> {
             scratch,
             "chat",
             json!({"provider":"slack","api_base":"https://slack.com/api"}),
+        ),
+        Entry::catalog(
+            scratch,
+            "router",
+            json!({"provider":"openrouter","api_base":"https://openrouter.ai/api/v1"}),
         ),
         Entry::catalog(
             scratch,
@@ -283,7 +332,8 @@ fn each_kind_is_migrated_or_kept_naming_why_and_keeps_its_records() {
     let expected = [
         ("mail", "migrated", None, "gmail"),
         ("tracker", "migrated", None, "jira"),
-        ("chat", "kept", Some("connector_undeclared"), "catalog"),
+        ("chat", "migrated", None, "slack"),
+        ("router", "kept", Some("connector_undeclared"), "catalog"),
         ("tracker-gw", "kept", Some("gateway_prefix"), "catalog"),
         ("search", "kept", Some("implementation_unmapped"), "tavily"),
         ("tools", "kept", Some("implementation_unmapped"), "mcp"),

@@ -5,7 +5,7 @@ members = ["crates/*", "adapters/catalog", "adapters/grafana", "adapters/kuberne
 exclude = ["apps/connectors-cli-contract", "adapters/mcp/generated/launch-cli", "adapters/mcp/generated/launch-types", "adapters/mcp/generated/configuration-types", "adapters/mcp/generated/supervision", "crates/connectors-core/generated/operation-types"]
 
 [workspace.package]
-version = "0.63.0"
+version = "0.63.1"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"

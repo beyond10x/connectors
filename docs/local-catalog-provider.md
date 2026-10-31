@@ -1301,8 +1301,8 @@ and `merge_requests.list` (`assignee_username`, `not[assignee_username]`,
 A derived instance ([Set up a GitLab instance](#set-up-a-gitlab-instance)) is the usual
 binding. This section is the reference for the other one, a pinned instance: it names a native
 configuration of its own, as above, and pins its executable, configuration revision and
-permissions. Existing installations use it, and so does a connector the catalog provider ships
-no declaration for, such as Slack ([the Slack guide](catalog-slack.md)), or an instance that
+permissions. Existing installations use it, and so does a selection the catalog provider ships
+no declaration for, such as Slack's user selection ([the Slack guide](catalog-slack.md)), or an instance that
 needs what an instance table cannot state, such as a `ca_file` or a narrower selection.
 
 The local CLI requires Linux x86_64 and the
@@ -1362,12 +1362,14 @@ declaration.
 A configuration written before `connectors-local/5` holds legacy `[adapters.<alias>]` entries
 in the same shape. They keep working: each is selected by the connector `setup migrate` derives
 for it and its alias (here `gitlab/forge`, or `--connector gitlab --instance forge`), or by the
-deprecated `--adapter <alias>`. An entry no connector is derived for, such as the Slack entry
-`slack-bot`, is no instance: selecting it is `legacy_entry_unmigrated`.
+deprecated `--adapter <alias>`. An entry no connector is derived for, such as an OpenRouter
+entry, is no instance: selecting it is `legacy_entry_unmigrated`.
 `setup migrate` moves every entry whose native configuration names a provider with a shipped
 declaration to `[connectors.<connector>.instances.<alias>]`, with every pin unchanged, so its
 connections and approval policy stay valid. The dry run writes nothing; this one ran on a file
-with a GitLab entry `forge`, a Kubernetes entry `cluster` and a Slack entry `slack-bot`:
+with a GitLab entry `forge`, a Kubernetes entry `cluster` and a Slack entry `slack-bot`, before
+0.63.1 shipped Slack's declaration; since then `slack-bot` migrates to the connector `slack` as
+`forge` does to `gitlab`:
 
 ```console
 $ connectors --output json setup migrate --mode dry-run | jq -c '.result | {disposition, format_before, format_after, entries: [.entries[] | {connector, instance, disposition, reason}]}'

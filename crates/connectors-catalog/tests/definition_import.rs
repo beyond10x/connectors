@@ -249,9 +249,9 @@ fn assert_lowers_to_the_shipped_files(temp: &Path, name: &str, file: &Path, root
     }
 }
 
-/// The selections with no committed connector declaration: Slack's two run as
-/// two instances of one catalog directory, which ships none.
-const UNDECLARED: [&str; 3] = ["openrouter", "slack", "slack-user"];
+/// The selections with no committed connector declaration: Slack's user
+/// selection shares the catalog directory whose one declaration is the bot's.
+const UNDECLARED: [&str; 2] = ["openrouter", "slack-user"];
 
 fn round_trip(name: &str) {
     let temp = tempfile::tempdir().unwrap();
