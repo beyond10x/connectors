@@ -274,7 +274,7 @@ Error `failure`: `connectors.cli.Failure`.
 
 ### `setup migrate`
 
-Rewrite each entry of the legacy configuration format that maps to a shipped connector as that connector's instance, keeping its instance id, revision and selection; --mode dry-run (or --dry-run) prints the new file, --mode apply (or --apply) writes it and keeps the old one as config.toml.before-migrate-TIMESTAMP (UTC)
+Rewrite each entry of the legacy configuration format that maps to a shipped connector as that connector's instance, keeping its instance id and revision, in the short form when the installed provider derives it unchanged; --mode dry-run (or --dry-run) prints the new file, --mode apply (or --apply) writes it and keeps the old one as config.toml.before-migrate-TIMESTAMP (UTC)
 
 Callable: `setup-migrate`. Input: `connectors.cli.SetupMigrateInput`. Result: `connectors.cli.SetupMigrateResult`.
 
