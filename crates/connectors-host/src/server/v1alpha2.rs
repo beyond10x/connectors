@@ -934,16 +934,20 @@ async fn dispatch(
                 "operation deadline exceeded".to_owned(),
             ));
         }
+        // The adapter's error is answered within the binding's bounds: its
+        // message at most MESSAGE_LIMIT bytes and its delay only when positive.
         Ok(Ok(Err((error, refused)))) => {
-            return Err(Failed {
+            let mut failed = Failed {
                 refused,
                 ..failed(
                     code(error.code.clone()),
                     base(error.code),
                     CauseStage::Dispatch,
-                    error.message,
+                    bounded(error.message),
                 )
-            });
+            };
+            failed.error.retry_after_seconds = error.retry_after_seconds.filter(|delay| *delay > 0);
+            return Err(failed);
         }
         Ok(Ok(Ok(result))) => result,
     };
@@ -988,17 +992,27 @@ struct Failed {
     refused: bool,
 }
 
+/// `message` cut to at most [`MESSAGE_LIMIT`](connectors_core::v1alpha2::MESSAGE_LIMIT)
+/// bytes on a character boundary.
+fn bounded(mut message: String) -> String {
+    let mut end = message.len().min(connectors_core::v1alpha2::MESSAGE_LIMIT);
+    while !message.is_char_boundary(end) {
+        end -= 1;
+    }
+    message.truncate(end);
+    message
+}
+
 /// The error a replay of a refused write answers: the code and message its
-/// settlement kept ([`ServiceState::settle_refused`]), or, when they cannot
-/// be read back as a code this binding emits and a safe message, a fixed one.
+/// settlement kept ([`ServiceState::settle_refused`]), the message bounded
+/// as the original's was, or, when the code cannot be read back as one this
+/// binding emits, a fixed one.
 fn refusal(settlement: Option<&Value>) -> Error {
     let kept = settlement.and_then(|settlement| {
         let code: ErrorCode = serde_json::from_value(settlement.get("cause")?.clone()).ok()?;
         let message = settlement.get("message")?.as_str()?;
-        (code.is_base()
-            && !message.is_empty()
-            && message.len() <= connectors_core::v1alpha2::MESSAGE_LIMIT)
-            .then(|| Error::new(code, message))
+        code.is_base()
+            .then(|| Error::new(code, bounded(message.to_owned())))
     });
     kept.unwrap_or_else(|| {
         Error::new(

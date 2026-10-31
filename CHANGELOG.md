@@ -13,7 +13,9 @@
   error after dispatch answered HTTP 502 `outcome_unknown`, so an agent could not tell a refused
   merge from a lost one. A 5xx, a cut connection and a timeout stay `outcome_unknown`.
   `connectors_sdk::Adapter` gains `invoke_write_at`, whose default keeps the old answer for an
-  adapter that does not override it.
+  adapter that does not override it. The host bounds an adapter error's message to 512 bytes,
+  keeps a positive `retry_after_seconds` of a refused rate limit, and a replay of a refusal
+  answers its original code even when its message is empty.
 
 ### Known limits
 

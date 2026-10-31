@@ -131,10 +131,7 @@ impl Adapter for Defaulted {
     }
     async fn invoke(&self, _operation: &str, _input: Value) -> Result<Value> {
         self.requests.fetch_add(1, Ordering::SeqCst);
-        Err(
-            connectors_core::Error::new(connectors_core::ErrorCode::Forbidden, REFUSAL)
-                .answered(),
-        )
+        Err(connectors_core::Error::new(connectors_core::ErrorCode::Forbidden, REFUSAL).answered())
     }
 }
 
