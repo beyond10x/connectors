@@ -8,7 +8,7 @@ use connectors_host::{
     server::ServiceConfig,
     server::router,
 };
-use connectors_sdk::{Adapter, Credential, Secret};
+use connectors_sdk::{Adapter, Credential, Secret, WriteOutcome};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
@@ -557,8 +557,10 @@ mod v1alpha2_ledger {
     };
 
     /// `write` applies and echoes; `lost-write` is dispatched and its answer is
-    /// lost (a generic adapter error); `read` echoes; `failing-read` errors.
-    /// `break_store` takes the state directory away during the next dispatch.
+    /// lost (a generic adapter error); `refused-write` is dispatched and the
+    /// provider definitely refuses it ([`REFUSAL`]); `read` echoes;
+    /// `failing-read` errors. `break_store` takes the state directory away
+    /// during the next dispatch.
     struct Ledger {
         calls: Arc<AtomicUsize>,
         state: PathBuf,
@@ -586,6 +588,7 @@ mod v1alpha2_ledger {
                 operations: vec![
                     operation("write", "mutation"),
                     operation("lost-write", "mutation"),
+                    operation("refused-write", "mutation"),
                     operation("read", "read"),
                     operation("failing-read", "read"),
                 ],
@@ -608,7 +611,28 @@ mod v1alpha2_ledger {
                 _ => Ok(input),
             }
         }
+        /// `refused-write` is the provider's definite refusal; every other
+        /// write is the default: a value applied, an error unknown.
+        async fn invoke_write_at(
+            &self,
+            revision: &str,
+            operation: &str,
+            input: Value,
+        ) -> WriteOutcome<Value> {
+            if operation == "refused-write" {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                return WriteOutcome::Refused(
+                    connectors_core::Error::new(ErrorCode::Forbidden, REFUSAL).answered(),
+                );
+            }
+            match self.invoke_at(revision, operation, input).await {
+                Ok(value) => WriteOutcome::Applied(Ok(value)),
+                Err(error) => WriteOutcome::Unknown(error),
+            }
+        }
     }
+    /// The message of `refused-write`'s refusal, the provider's reason in it.
+    const REFUSAL: &str = "provider refused the write: Pull Request is not mergeable";
     /// A group-readable state directory makes every metadata write fail.
     fn private(state: &Path, usable: bool) {
         let mode = if usable { 0o700 } else { 0o750 };
@@ -762,6 +786,42 @@ mod v1alpha2_ledger {
             .expect("the final observation");
         assert_eq!(observed.outcome, audit::Outcome::Unknown);
         // Settled once; the host did not dispatch again.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert_eq!(host.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(host.state.attempt_count().unwrap(), 1);
+        host.task.abort();
+    }
+
+    /// story:served-merge-refusal-answers-refused: a write the provider
+    /// definitely refuses answers the refusal's code and message, classified
+    /// `refused` with its attempt, settled `Failed` with that code and
+    /// message, its final observation `refused`, and is never dispatched again.
+    #[tokio::test]
+    async fn a_provider_refusal_is_refused_with_its_message_and_the_attempt_failed() {
+        let host = host().await;
+        let (status, response) = invoke(&host, request("refused-write", "refused-1")).await;
+        assert_eq!(status, 403);
+        assert_eq!(response.status, ResponseStatus::Error);
+        let error = response.error.expect("the refusal");
+        assert_eq!(error.code, WireCode::Forbidden);
+        assert_eq!(error.message, REFUSAL);
+        let mutation = response.mutation.expect("the recorded attempt");
+        assert_eq!(mutation.classification, EffectKnowledge::Refused);
+        assert_eq!(mutation.original_request_id.as_deref(), Some("refused-1"));
+        assert!(!mutation.replayed);
+        assert_eq!(mutation.cause, None);
+        let attempt = mutation.attempt.expect("the attempt id");
+        let record = host.state.attempt(attempt.id.as_str()).unwrap();
+        assert_eq!(record.state, mutations::State::Failed);
+        assert_eq!(
+            record.result,
+            Some(json!({"classification":"refused","cause":"forbidden","message":REFUSAL}))
+        );
+        assert!(record.settled_at_ms.is_some());
+        let observed = audit_record(&host.path, &response.audit_ref.unwrap())
+            .final_observation
+            .expect("the final observation");
+        assert_eq!(observed.outcome, audit::Outcome::Refused);
         tokio::time::sleep(Duration::from_millis(200)).await;
         assert_eq!(host.calls.load(Ordering::SeqCst), 1);
         assert_eq!(host.state.attempt_count().unwrap(), 1);
