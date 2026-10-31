@@ -22,7 +22,7 @@ const DECLARATION_FORMAT: &str = "connectors-catalog-connector/1";
 const GMAIL_READONLY: &str = "https://www.googleapis.com/auth/gmail.readonly";
 const GMAIL_COMPOSE: &str = "https://www.googleapis.com/auth/gmail.compose";
 /// The catalog providers that ship no declaration and stay pinned.
-const UNDECLARED: [&str; 2] = ["openrouter", "slack"];
+const UNDECLARED: [&str; 1] = ["openrouter"];
 
 fn root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -213,13 +213,15 @@ fn gmail_derived_from_its_declaration_has_the_reference_revision() {
     assert_eq!(actual["instance"], "gmail.private");
 }
 
-/// Slack holds two selections run as two instances, and OpenRouter one selection
-/// run as a management and an inference instance joined by custody, so neither
-/// ships a declaration and both stay pinned; every other catalog provider
-/// directory ships exactly one,
-/// naming its own directory, its own selection and a distinct connector.
+/// OpenRouter holds one selection run as a management and an inference instance
+/// joined by custody, so it ships no declaration and stays pinned; every other
+/// catalog provider directory ships exactly one, naming its own directory, its
+/// own selection and a distinct connector. Slack's declares the bot selection
+/// (`operations.json`) as the connector `slack`; its user selection
+/// (`user-operations.json`) stays a pinned instance, because a directory holds
+/// one declaration.
 #[test]
-fn every_catalog_provider_but_slack_and_openrouter_ships_one_declaration() {
+fn every_catalog_provider_but_openrouter_ships_one_declaration() {
     let declarations = declarations();
     let directories: BTreeSet<String> = fs::read_dir(root().join("providers"))
         .unwrap()
@@ -268,6 +270,7 @@ fn every_catalog_provider_but_slack_and_openrouter_ships_one_declaration() {
             "jira",
             "opsgenie",
             "runpod",
+            "slack",
             "slides",
             "zendesk",
         ]
@@ -302,6 +305,15 @@ fn declared_profiles_are_the_documented_ones_with_every_scope() {
             );
             continue;
         };
+        // A configuration of another selection of the provider (Slack's user
+        // selection) is a pinned instance its declaration does not cover.
+        let selection = format!("/{}", declaration["selection"].as_str().unwrap());
+        if config["operations_file"]
+            .as_str()
+            .is_some_and(|file| !file.ends_with(&selection))
+        {
+            continue;
+        }
         let id = config["auth"]["profile"].as_str().unwrap();
         let profile = declaration["profiles"]
             .as_array()
@@ -423,10 +435,10 @@ fn every_declared_profile_derives_what_its_hand_written_configuration_derives() 
             checked.push(format!("{connector} {id}"));
         }
     }
-    // Twelve connectors, Zendesk with two profiles: a lane that finds no
-    // declaration checks nothing and must not pass. ChatGPT's one profile and Claude's two
+    // Thirteen connectors, Slack's since 0.63.1, Zendesk with two profiles: a lane that finds
+    // no declaration checks nothing and must not pass. ChatGPT's one profile and Claude's two
     // are refused.
-    assert_eq!(checked.len(), 13, "{checked:?}");
+    assert_eq!(checked.len(), 14, "{checked:?}");
     assert_eq!(
         refused,
         [
@@ -653,7 +665,7 @@ fn a_stated_endpoint_replaces_the_default() {
 }
 
 /// What a derived configuration refuses: an unknown or undeclared connector
-/// (Slack), a connector without a default endpoint and no stated one, a
+/// (OpenRouter), a connector without a default endpoint and no stated one, a
 /// connector of several profiles without one named, a profile it does not
 /// declare, an instance name that is not an id, and both forms at once.
 #[test]
@@ -667,7 +679,21 @@ fn a_derived_configuration_refuses_what_it_cannot_derive() {
     // 1 is a refusal by the provider, 2 a usage error before it loads anything.
     for (code, args) in [
         (1, vec!["--connector", "outlook", "--instance", "private"]),
-        (1, vec!["--connector", "slack", "--instance", "private"]),
+        (
+            1,
+            vec!["--connector", "openrouter", "--instance", "private"],
+        ),
+        (
+            1,
+            vec![
+                "--connector",
+                "slack",
+                "--instance",
+                "private",
+                "--profile",
+                "slack.user",
+            ],
+        ),
         (
             1,
             vec!["--connector", "google-gmail", "--instance", "private"],
@@ -735,6 +761,42 @@ fn a_derived_configuration_refuses_what_it_cannot_derive() {
         "zendesk.basic",
     ]));
     assert_eq!(zendesk["profiles"][0]["id"], "zendesk.basic");
+}
+
+/// Acceptance (story:slack-connector-declaration): given only the connector
+/// name `slack` and an instance name, the provider derives the bot instance the
+/// Slack guide documents, with the guide's bot selection and profile, and so
+/// its revision; the user selection's profile is not the connector's.
+#[test]
+fn slack_derived_from_its_declaration_is_the_documented_bot_instance() {
+    let (_, mut reference) = documented()
+        .into_iter()
+        .find(|(page, config)| {
+            page == "catalog-slack.md" && config["auth"]["profile"] == "slack.bot"
+        })
+        .expect("the Slack guide documents the bot instance");
+    assert_eq!(
+        reference["operations_file"],
+        "providers/slack/operations.json"
+    );
+    reference["instance"] = json!("slack.work");
+    let expected = legacy(&reference);
+    let actual = bootstrap(derived(&["--connector", "slack", "--instance", "work"]));
+    assert_eq!(
+        actual["configuration_revision"],
+        expected["configuration_revision"]
+    );
+    assert_eq!(actual, expected);
+    assert_eq!(actual["instance"], "slack.work");
+    let user = derived(&[
+        "--connector",
+        "slack",
+        "--instance",
+        "work",
+        "--profile",
+        "slack.user",
+    ]);
+    assert_eq!(user.status.code(), Some(1));
 }
 
 /// Every configuration the guides document keeps the revision it computed

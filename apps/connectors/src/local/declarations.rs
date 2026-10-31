@@ -20,6 +20,7 @@ const DECLARATIONS: &[&str] = &[
     include_str!("../../../../adapters/catalog/providers/jira/connector.json"),
     include_str!("../../../../adapters/catalog/providers/opsgenie/connector.json"),
     include_str!("../../../../adapters/catalog/providers/runpod/connector.json"),
+    include_str!("../../../../adapters/catalog/providers/slack/connector.json"),
     include_str!("../../../../adapters/catalog/providers/zendesk/connector.json"),
 ];
 

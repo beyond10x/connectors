@@ -6,7 +6,7 @@ status: draft
 title: setup migrate moves every legacy entry to the short instance form, catalog named nowhere
 relations:
 - decomposes: epic:connector-vocabulary
-revision: 2
+revision: 3
 ---
 ## Problem
 
@@ -44,6 +44,8 @@ Operator, 2026-10-22, verbatim: "i dont want to keep anything old, just migrate"
 
 ## Cause of `connector_undeclared` for Slack
 
-`apps/connectors/src/local/migrate.rs:23-36` compiles 12 declarations; `adapters/catalog/providers/slack`
-has no `connector.json`, and `apps/connectors/tests/setup_migrate.rs:170-173` asserts that Slack stays
-an adapter entry. Slack gets a declaration under this story.
+`apps/connectors/src/local/migrate.rs:23-36` compiled 12 declarations; `adapters/catalog/providers/slack`
+had no `connector.json`, and `apps/connectors/tests/setup_migrate.rs:170-173` asserted that Slack stays
+an adapter entry. `story:slack-connector-declaration` (0.63.1, D313) ships Slack's bot declaration,
+so both Slack entries migrate to pinned instances of `slack`; writing them in the short form stays
+with this story.
