@@ -442,7 +442,10 @@ entities:
   # A new (not migrated) instance's instance_id is `<connector>.<instance>`
   # (`mail.personal`), which passes the selector check
   # (crates/connectors-host/src/local/config.rs selector, valid_id admits
-  # `.`); a migrated instance keeps its old instance_id (decision 10).
+  # `.`); a migrated instance keeps its old instance_id (decision 10), stated
+  # as the instance table's `instance_id`, which the installed catalog provider
+  # then derives the instance under (`--instance-id`). Two instances, or an
+  # instance and a legacy entry, with one instance_id refuse the configuration.
   # An instance holds at most one published non-revoked connection; revoked
   # connections and connections never published stay as history
   # (decision-blocker instance-connection-cardinality, option A; decision
