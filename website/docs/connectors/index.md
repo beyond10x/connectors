@@ -5,7 +5,7 @@ sidebar_label: "All connectors"
 sidebar_position: 1
 description: "Every connector, with its provider, reads, writes, auth profiles and how its instances are configured."
 lede: "Every connector has one onboarding page with the same eight steps, from what it reads and writes to its limits."
-source: "adapters/catalog/providers/*/connector.json and their selections; Slack, OpenRouter, the connectors served by their own executables and MCP by hand in crates/connectors-docs/src/onboarding.rs"
+source: "adapters/catalog/providers/*/connector.json and their selections; OpenRouter, the connectors served by their own executables and MCP by hand in crates/connectors-docs/src/onboarding.rs"
 custom_edit_url: null
 ---
 
@@ -28,8 +28,8 @@ Every connector you can configure, with its provider, how many reads and writes 
 | [Jira](./jira.md) `jira` | Atlassian | 11 | 6 | `atlassian.basic` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/jira/connector.json) |
 | [Opsgenie](./opsgenie.md) `opsgenie` | Opsgenie | 5 | 0 | `opsgenie.api-key` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/opsgenie/connector.json) |
 | [Runpod](./runpod.md) `runpod` | Runpod | 2 | 2 | `runpod.api-key` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/runpod/connector.json) |
+| [Slack](./slack.md) `slack` | Slack | 12 | 5 | `slack.bot` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/slack/connector.json) |
 | [Zendesk](./zendesk.md) `zendesk` | Zendesk | 8 | 3 | `zendesk.oauth`, `zendesk.basic` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/zendesk/connector.json) |
-| [Slack](./slack.md) `slack` | Slack | 13 | 5 | `slack.bot`, `slack.user` | pinned | hand-written |
 | [OpenRouter](./openrouter.md) `openrouter` | OpenRouter | 3 | 1 | `openrouter.api-key` | pinned | hand-written |
 | [Kubernetes](./kubernetes.md) `kubernetes` | Kubernetes | 14 | 1 | `kubernetes.token` | pinned | hand-written |
 | [PostgreSQL](./postgres.md) `postgres` | PostgreSQL | 7 | 0 | `postgres.password` | pinned | hand-written |

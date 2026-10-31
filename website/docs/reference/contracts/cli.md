@@ -1176,7 +1176,7 @@ other entry stays where it is, and the result names why in `reason`
 | `reason` | The entry |
 |---|---|
 | `implementation_unmapped` | is not a catalog entry: no declaration maps a credential binary, MCP, SQL or Kubernetes implementation to a connector yet |
-| `connector_undeclared` | names a native provider no shipped declaration carries (Slack ships none) |
+| `connector_undeclared` | names a native provider no shipped declaration carries (OpenRouter ships none) |
 | `gateway_prefix` | states a request prefix its connector's declaration does not produce: an API gateway in front of the provider's API, such as the Atlassian gateway |
 | `native_configuration_unreadable` | names no native configuration, or one that is not owner-only, not readable JSON or names no provider |
 | `instance_conflict` | maps to a connector configured disabled, or one that already has an instance named like the alias |
