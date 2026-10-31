@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.64.0 — unreleased
+
+### Added
+
+- A derived instance table `[connectors.<connector>.instances.<name>]` may state `alias` and
+  `instance_id` (story:migrate-writes-the-short-instance-form, migration plan step 2). The installed
+  catalog provider derives the instance under that id (`--instance-id`), so a migrated instance
+  keeps its old id, and with it its connections, approval policy, audits and custody records. An
+  instance id that two instances, or an instance and a legacy entry, resolve to refuses the file.
+- `setup migrate` writes a legacy catalog entry in that short form (`alias`, `instance_id`, and
+  `endpoint` and `profile` only where they differ from the declaration's defaults) when the
+  installed provider derives it with the same instance id, configuration revision, credential
+  revision, permissions and startup, and no approval policy is published for the instance. Every
+  other mapped entry is still written pinned, as before; each migrated entry's new `form` says
+  which, and a pinned one's `pinned_field` names why, for a revision difference the first differing
+  key of the provider's revision digest input (`auth` for other scopes).
+- `connectors-catalog-provider --print-revision-inputs` prints, per key of the configuration
+  revision's digest input, that value's digest.
+
+### Known limits
+
+- The short form changes an instance's executable selection digest, to which a published approval
+  policy is bound, so an instance with a published policy stays pinned.
+
 ## 0.63.1 — 2026-10-31
 
 Slack's bot selection ships a connector declaration, so a legacy Slack entry migrates and a Slack

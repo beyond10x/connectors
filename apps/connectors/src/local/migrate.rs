@@ -2,13 +2,17 @@
 //! `contracts/cli/v1alpha1/semantics.md` §3, "Migrating adapter entries"):
 //! each `[adapters.<alias>]` entry whose implementation maps to a shipped
 //! connector declaration becomes the pinned instance
-//! `[connectors.<connector>.instances.<alias>]`, carrying every pin. The new
-//! file is read back before anything is written, and an entry that reads back
-//! with any other value is not migrated, naming the field.
+//! `[connectors.<connector>.instances.<alias>]`: in the short form, which the
+//! installed catalog provider derives the entry from, when it derives the
+//! entry unchanged (story:migrate-writes-the-short-instance-form), otherwise
+//! carrying every pin. The new file is read back before anything is written,
+//! and an entry that reads back with any other value is not migrated, naming
+//! the field.
 use super::declarations::CATALOG;
 use super::*;
 use connectors_host::local::{
-    config::{Adapter, CONFIG_LIMIT},
+    approval_policy,
+    config::{self, Adapter, CONFIG_LIMIT, ShortForm},
     filesystem,
 };
 use std::{
@@ -29,6 +33,36 @@ const FIELDS: [&str; 9] = [
     "restart",
     "executable",
     "permissions",
+];
+
+/// The entry fields a short-form instance must derive unchanged, in the order
+/// a difference is named in `pinned_field`.
+const SHORT_FIELDS: [&str; 5] = [
+    "instance_id",
+    "configuration_revision",
+    "credential_revision",
+    "permissions",
+    "startup",
+];
+
+/// The keys of the catalog provider's configuration revision digest input
+/// (`--print-revision-inputs`), in the order the first differing one is named;
+/// `instance` is named `instance_id`. `format` is not named: a difference in
+/// it alone is `configuration_revision`.
+const REVISION_INPUTS: [&str; 13] = [
+    "instance",
+    "provider",
+    "bundle_sha256",
+    "source_sha256",
+    "api_base",
+    "ca_digest",
+    "auth",
+    "operations",
+    "token_ca_digest",
+    "feed",
+    "request_prefix",
+    "hosts",
+    "bindings",
 ];
 
 /// Why an entry stays `[adapters.<alias>]` (`connectors.cli.MigrateKeptReason`),
@@ -119,30 +153,82 @@ pub(super) fn execute(call: &Invocation<'_>, paths: &Paths) -> Result<Value, Han
             }
         }
     }
+    // Each moved entry's short form, or the field that keeps it pinned.
+    let mut short = BTreeMap::new();
+    let mut pinned = BTreeMap::new();
+    for (alias, connector) in &moved {
+        match short_form(paths, connector, alias, &config.adapters[alias]) {
+            Ok(form) => {
+                short.insert(alias.clone(), form);
+            }
+            Err(field) => {
+                pinned.insert(alias.clone(), field);
+            }
+        }
+    }
     let (written, after) = loop {
         if moved.is_empty() {
             break (text.clone(), config.clone());
         }
-        let candidate = config.with_instances(&moved).map_err(host_failure)?;
+        let candidate = config
+            .with_short_instances(&moved, &short)
+            .map_err(host_failure)?;
         let written = candidate.to_text().map_err(host_failure)?;
         // A file every later read refuses is never planned or written.
         if written.len() > CONFIG_LIMIT {
             return Err(too_large(written.len()));
         }
-        let after = Config::parse(&written).map_err(|_| {
-            failure(
-                "invalid_configuration",
-                "configuration",
-                "check_configuration",
-                true,
-            )
-        })?;
+        let after = match Config::parse(&written) {
+            Ok(after) => after,
+            // Only a short-form instance's derivation can account for a
+            // refusal the pinned file does not have.
+            Err(_) if !short.is_empty() => {
+                for (alias, _) in std::mem::take(&mut short) {
+                    pinned.insert(alias, "configuration_revision");
+                }
+                continue;
+            }
+            Err(_) => {
+                return Err(failure(
+                    "invalid_configuration",
+                    "configuration",
+                    "check_configuration",
+                    true,
+                ));
+            }
+        };
         // Nothing but the moved entries' tables may change.
         if shared(&config) != shared(&after) {
             return Err(host_failure(Failure::InvalidConfiguration));
         }
+        // A short-form instance that reads back with another entry is
+        // written pinned instead.
+        let demoted: Vec<(String, &'static str)> = short
+            .keys()
+            .filter_map(|alias| {
+                let entry = &config.adapters[alias];
+                short_differing(entry, after.adapters.get(alias))
+                    .map(|field| (alias.clone(), field))
+            })
+            .collect();
+        if !demoted.is_empty() {
+            for (alias, field) in demoted {
+                short.remove(&alias);
+                let field = match (field, after.adapters.get(&alias)) {
+                    ("configuration_revision", Some(derived)) => {
+                        revision_field(&config.adapters[&alias], derived)
+                    }
+                    (field, _) => field,
+                };
+                pinned.insert(alias, field);
+            }
+            continue;
+        }
         let mut differences = Vec::new();
         for (alias, entry) in &config.adapters {
+            if short.contains_key(alias) {
+                continue;
+            }
             if let Some(field) = differing(entry, after.adapters.get(alias)) {
                 if !moved.contains_key(alias) {
                     return Err(host_failure(Failure::InvalidConfiguration));
@@ -160,13 +246,22 @@ pub(super) fn execute(call: &Invocation<'_>, paths: &Paths) -> Result<Value, Han
         for (alias, field) in differences {
             // The first difference named for an entry is the one reported.
             if moved.remove(&alias).is_some() {
+                short.remove(&alias);
+                pinned.remove(&alias);
                 kept.insert(alias, Kept::Selection(field));
             }
         }
     };
     let entries: Vec<Value> = legacy
         .iter()
-        .map(|alias| entry(alias, &config, &after, kept.get(alias)))
+        .map(|alias| {
+            let form = match (kept.get(alias), short.contains_key(alias)) {
+                (Some(why), _) => Err(why),
+                (None, true) => Ok(None),
+                (None, false) => Ok(Some(pinned.get(alias).copied().unwrap_or("instance"))),
+            };
+            entry(alias, &config, &after, form)
+        })
         .collect();
     let mut result = json!({
         "mode": if apply { "apply" } else { "dry-run" },
@@ -381,27 +476,163 @@ fn differing(before: &Adapter, after: Option<&Adapter>) -> Option<&'static str> 
     (before != after).then_some(FIELDS[0])
 }
 
-/// One listed entry: its names after the migration, why it was kept, and the
-/// records' keys before and after.
-fn entry(alias: &str, before: &Config, after: &Config, kept: Option<&Kept>) -> Value {
+/// One listed entry: its names after the migration, why it was kept or, when
+/// migrated, its form (`Ok(None)` short, `Ok(Some(field))` pinned because of
+/// `field`), and the records' keys before and after.
+fn entry(
+    alias: &str,
+    before: &Config,
+    after: &Config,
+    form: Result<Option<&'static str>, &Kept>,
+) -> Value {
     let (connector, instance) = after.names(alias).unwrap_or((alias, alias));
     let mut entry = json!({
         "adapter": alias,
         "connector": connector,
         "instance": instance,
-        "disposition": if kept.is_some() { "kept" } else { "migrated" },
+        "disposition": if form.is_err() { "kept" } else { "migrated" },
         "before": keys(alias, &before.adapters[alias]),
         "after": after.adapters.get(alias).map_or(Value::Null, |a| keys(alias, a)),
     });
-    match kept {
-        Some(Kept::Reason(reason)) => entry["reason"] = json!(reason),
-        Some(Kept::Selection(field)) => {
+    match form {
+        Err(Kept::Reason(reason)) => entry["reason"] = json!(reason),
+        Err(Kept::Selection(field)) => {
             entry["reason"] = json!("selection_changes");
             entry["differing_field"] = json!(field);
         }
-        None => {}
+        Ok(None) => entry["form"] = json!("short"),
+        Ok(Some(field)) => {
+            entry["form"] = json!("pinned");
+            entry["pinned_field"] = json!(field);
+        }
     }
     entry
+}
+
+/// The short form of the legacy entry `entry`, moving to the instance `alias`
+/// of `connector`, or the field that keeps it pinned
+/// (`connectors.cli.MigrateField`): `executable` while an approval policy is
+/// published for it, `api_base` or `auth` for a native configuration no
+/// instance of the connector states, and otherwise what the installed
+/// provider derives differently ([`short_differing`], [`revision_field`]).
+fn short_form(
+    paths: &Paths,
+    connector: &str,
+    alias: &str,
+    entry: &Adapter,
+) -> Result<ShortForm, &'static str> {
+    // The policy is bound to the executable selection digest, which the
+    // short form's argument vector changes.
+    let published =
+        approval_policy::Store::new(&paths.state, &entry.instance_id, &entry.adapter_id)
+            .and_then(|store| store.published());
+    if published != Ok(false) {
+        return Err("executable");
+    }
+    let (endpoint, profile) = stated(connector, entry)?;
+    let form = ShortForm {
+        instance_id: entry.instance_id.clone(),
+        endpoint,
+        profile,
+    };
+    let derived =
+        config::short_entry(connector, alias, &form).map_err(|_| "configuration_revision")?;
+    match short_differing(entry, Some(&derived)) {
+        None => Ok(form),
+        Some("configuration_revision") => Err(revision_field(entry, &derived)),
+        Some(field) => Err(field),
+    }
+}
+
+/// The endpoint and profile a short-form instance of `connector` states for
+/// the legacy catalog entry `entry`, each only where it differs from the
+/// declaration's default endpoint and single profile: those of its
+/// `--connector` arguments, or those its native configuration's `api_base`
+/// (less the declaration's `api_path`) and `auth` profile name.
+fn stated(
+    connector: &str,
+    entry: &Adapter,
+) -> Result<(Option<String>, Option<String>), &'static str> {
+    let declaration = declarations::all()
+        .into_iter()
+        .find(|declaration| declaration["connector_id"] == connector)
+        .ok_or("configuration_revision")?;
+    let profiles: Vec<&str> = declaration["profiles"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|profile| profile["profile"].as_str())
+        .collect();
+    let args = &entry.executable.args;
+    let (endpoint, profile) = if option(args, "--connector").is_some() {
+        (
+            option(args, "--endpoint").map(str::to_owned),
+            option(args, "--profile").map(str::to_owned),
+        )
+    } else {
+        let native = option(args, "--local-config")
+            .and_then(native)
+            .ok_or("configuration_revision")?;
+        let api_base = native
+            .get("api_base")
+            .and_then(Value::as_str)
+            .ok_or("api_base")?;
+        let endpoint = match declaration.get("api_path").and_then(Value::as_str) {
+            Some(path) => api_base.strip_suffix(path).ok_or("api_base")?,
+            None => api_base,
+        };
+        let profile = native
+            .get("auth")
+            .and_then(|auth| auth.get("profile"))
+            .and_then(Value::as_str)
+            .filter(|profile| profiles.contains(profile))
+            .ok_or("auth")?;
+        (Some(endpoint.to_owned()), Some(profile.to_owned()))
+    };
+    let default = declaration["default_endpoint"].as_str();
+    Ok((
+        endpoint.filter(|endpoint| Some(endpoint.as_str()) != default),
+        profile.filter(|_| profiles.len() != 1),
+    ))
+}
+
+/// The first field of [`SHORT_FIELDS`] in which `derived`, a short-form
+/// instance's entry, differs from the legacy `entry`; `executable` when the
+/// entry states a credential revision, to which a connection binds the
+/// executable digest, and the derived digest is another.
+fn short_differing(entry: &Adapter, derived: Option<&Adapter>) -> Option<&'static str> {
+    let Some(derived) = derived else {
+        return Some(SHORT_FIELDS[0]);
+    };
+    let (before, after) = (json!(entry), json!(derived));
+    if let Some(field) = SHORT_FIELDS
+        .into_iter()
+        .find(|field| before.get(field) != after.get(field))
+    {
+        return Some(field);
+    }
+    (entry.credential_revision.is_some() && entry.executable.sha256 != derived.executable.sha256)
+        .then_some("executable")
+}
+
+/// Why `derived` has another configuration revision than `entry`: the first
+/// key of [`REVISION_INPUTS`] whose digest the installed provider prints
+/// differently for the two argument vectors, or `configuration_revision`
+/// when it prints none or no key accounts for it.
+fn revision_field(entry: &Adapter, derived: &Adapter) -> &'static str {
+    let (Ok(before), Ok(after)) = (
+        config::revision_inputs(&entry.executable.args),
+        config::revision_inputs(&derived.executable.args),
+    ) else {
+        return "configuration_revision";
+    };
+    REVISION_INPUTS
+        .into_iter()
+        .find(|key| before.get(*key) != after.get(*key))
+        .map_or("configuration_revision", |key| match key {
+            "instance" => "instance_id",
+            key => key,
+        })
 }
 
 /// What an entry's records are keyed by (`connectors.cli.MigrateSelection`):
@@ -541,6 +772,56 @@ mod tests {
         let mut other = entry.clone();
         other.permissions.profiles.insert("p".into());
         assert_eq!(differing(&entry, Some(&other)), Some("permissions"));
+    }
+
+    /// A short form is kept unless its derivation changes what a connection,
+    /// custody item or policy is keyed by; its argument vector and private
+    /// protocol are its own, and its executable digest matters only to a
+    /// connection bound to a credential revision.
+    #[test]
+    fn a_short_form_names_the_first_field_its_derivation_changes() {
+        let entry: Adapter = serde_json::from_value(json!({
+            "instance_id":"a","adapter_id":"catalog","configuration_revision":"r",
+            "protocol":"v1alpha1","private_protocol":"connectors-private/1",
+            "executable":{"path":"/x","sha256":"0".repeat(64),"args":["--local-config","/n"]},
+            "permissions":{"profiles":["p"],"operations":["o"]}}))
+        .unwrap();
+        assert_eq!(short_differing(&entry, None), Some("instance_id"));
+        let mut derived = entry.clone();
+        derived.executable.args = vec!["--connector".into(), "c".into()];
+        derived.executable.sha256 = "1".repeat(64);
+        derived.private_protocol = None;
+        assert_eq!(short_differing(&entry, Some(&derived)), None);
+        let changed = |change: &dyn Fn(&mut Adapter)| {
+            let mut other = derived.clone();
+            change(&mut other);
+            short_differing(&entry, Some(&other))
+        };
+        assert_eq!(
+            changed(&|a| a.instance_id = "c.a".into()),
+            Some("instance_id")
+        );
+        assert_eq!(
+            changed(&|a| a.configuration_revision = "s".into()),
+            Some("configuration_revision")
+        );
+        assert_eq!(
+            changed(&|a| a.credential_revision = Some("k".into())),
+            Some("credential_revision")
+        );
+        assert_eq!(
+            changed(&|a| {
+                a.permissions.operations.insert("w".into());
+            }),
+            Some("permissions")
+        );
+        let mut bound = entry.clone();
+        bound.credential_revision = Some("k".into());
+        let mut same = derived.clone();
+        same.credential_revision = Some("k".into());
+        assert_eq!(short_differing(&bound, Some(&same)), Some("executable"));
+        same.executable.sha256 = bound.executable.sha256.clone();
+        assert_eq!(short_differing(&bound, Some(&same)), None);
     }
 
     /// The `[connectors]` table read back is compared with the one written:

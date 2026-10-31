@@ -49,7 +49,7 @@ const AUDIT_MIGRATION: &str = include_str!("metadata/audit.sql");
 /// `MetadataUnavailable`, which callers read as "the store is gone". The bound
 /// only has to separate a live queue from a holder that never releases.
 pub const WAIT_BOUND: Duration = Duration::from_secs(30);
-const NAME: &str = "metadata.sqlite3";
+pub(crate) const NAME: &str = "metadata.sqlite3";
 const LOCK: &str = "metadata.lock";
 /// The registry's durable clock floor, beside the lock that guards it.
 const REGISTRY_FLOOR: &str = "registry-clock.floor";

@@ -401,22 +401,23 @@ fn moves_no_connection(
     instance: &str,
     endpoint: &str,
 ) -> Result<(), HandlerReply> {
-    let profile = config
+    let listed = config
         .connectors
         .as_ref()
         .and_then(|connectors| connectors.get(connector))
-        .and_then(|table| table.instances.get(instance))
-        .and_then(|listed| listed.profile.as_deref());
+        .and_then(|table| table.instances.get(instance));
+    let profile = listed.and_then(|listed| listed.profile.as_deref());
+    // A short-form instance keeps the alias and instance id it states.
+    let alias = listed.map_or_else(|| format!("{connector}.{instance}"), |l| l.alias.clone());
+    let stated = listed.and_then(|listed| listed.instance_id.as_deref());
     // An instance awaiting its profile has no entry: nothing derives yet.
-    if !config
-        .adapters
-        .contains_key(&format!("{connector}.{instance}"))
-    {
+    if !config.adapters.contains_key(&alias) {
         return Ok(());
     }
-    let (instance_id, authority) =
-        connectors_host::local::config::derived_authority(connector, instance, endpoint, profile)
-            .map_err(|_| argument("endpoint"))?;
+    let (instance_id, authority) = connectors_host::local::config::derived_authority(
+        connector, instance, endpoint, profile, stated,
+    )
+    .map_err(|_| argument("endpoint"))?;
     let moved = connectors_host::local::registry::Registry::with_system_clock(&paths.state)
         .authority_moves(&instance_id, &authority)
         .map_err(connections::registry_failure)?;

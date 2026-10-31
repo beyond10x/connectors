@@ -945,3 +945,135 @@ fn documented_native_configurations_keep_their_revisions() {
         .unwrap()
     );
 }
+
+/// story:migrate-writes-the-short-instance-form: `--instance-id` derives the
+/// instance under the id it names instead of `<connector>.<instance>`, so a
+/// migrated instance keeps its old id. The derivation is exactly the
+/// hand-written configuration with that `instance`: the same bootstrap and
+/// revision. An id that is not one is refused, and `--instance-id` without a
+/// connector is a usage error.
+#[test]
+fn an_instance_id_derives_the_instance_under_that_id() {
+    let mut reference = read_json(&root().join("tests/connector_declarations/gmail.json"));
+    reference["instance"] = json!("mail-local");
+    let expected = legacy(&reference);
+    let actual = bootstrap(derived(&[
+        "--connector",
+        "gmail",
+        "--instance",
+        "mail",
+        "--instance-id",
+        "mail-local",
+    ]));
+    assert_eq!(actual["instance"], "mail-local");
+    assert_eq!(
+        actual["configuration_revision"],
+        expected["configuration_revision"]
+    );
+    assert_eq!(actual, expected);
+    let unnamed = bootstrap(derived(&["--connector", "gmail", "--instance", "mail"]));
+    assert_eq!(unnamed["instance"], "gmail.mail");
+    assert_ne!(
+        unnamed["configuration_revision"],
+        actual["configuration_revision"]
+    );
+    for (code, args) in [
+        (
+            1,
+            vec![
+                "--connector",
+                "gmail",
+                "--instance",
+                "mail",
+                "--instance-id",
+                "a/b",
+            ],
+        ),
+        (
+            1,
+            vec![
+                "--connector",
+                "gmail",
+                "--instance",
+                "mail",
+                "--instance-id",
+                "",
+            ],
+        ),
+        (2, vec!["--instance-id", "mail-local"]),
+    ] {
+        let output = derived(&args);
+        assert_eq!(output.status.code(), Some(code), "{args:?}");
+        assert!(output.stdout.is_empty(), "{args:?} printed");
+    }
+}
+
+/// `--print-revision-inputs` prints, per key of the configuration revision's
+/// digest input, the digest of that key's value: a derived instance and the
+/// hand-written configuration it equals print the same, and one that requests
+/// other scopes differs in `auth` alone, which `setup migrate` names.
+#[test]
+fn revision_inputs_name_the_key_in_which_two_configurations_differ() {
+    let inputs = |output: Output| -> BTreeMap<String, String> {
+        serde_json::from_value(bootstrap(output)).unwrap()
+    };
+    let mut reference = read_json(&root().join("tests/connector_declarations/gmail.json"));
+    reference["instance"] = json!("mail-local");
+    let printed = |config: &Value| {
+        let file = written(config.clone());
+        inputs(run(&[
+            "--local-config",
+            file.path.to_str().unwrap(),
+            "--print-revision-inputs",
+        ]))
+    };
+    let derived = inputs(run(&[
+        "--connector",
+        "gmail",
+        "--instance",
+        "mail",
+        "--instance-id",
+        "mail-local",
+        "--print-revision-inputs",
+    ]));
+    let keys: BTreeSet<&str> = derived.keys().map(String::as_str).collect();
+    for key in [
+        "format",
+        "instance",
+        "provider",
+        "bundle_sha256",
+        "source_sha256",
+        "api_base",
+        "auth",
+        "operations",
+    ] {
+        assert!(keys.contains(key), "{key}: {derived:?}");
+    }
+    assert!(
+        derived
+            .values()
+            .all(|digest| digest.len() == 64 && digest.bytes().all(|b| b.is_ascii_hexdigit())),
+        "{derived:?}"
+    );
+    assert_eq!(printed(&reference), derived);
+    let mut narrower = reference.clone();
+    narrower["auth"]["requested_scopes"] = json!(["openid", GMAIL_READONLY]);
+    narrower["auth"]["minimum_scopes"] = json!([GMAIL_READONLY]);
+    let differing: Vec<String> = {
+        let narrower = printed(&narrower);
+        keys.iter()
+            .filter(|key| narrower.get(**key) != derived.get(**key))
+            .map(|key| (*key).to_owned())
+            .collect()
+    };
+    assert_eq!(differing, ["auth"]);
+    let mut elsewhere = reference.clone();
+    elsewhere["api_base"] = json!("https://mail.example.test");
+    let elsewhere = printed(&elsewhere);
+    let differing: Vec<&str> = keys
+        .iter()
+        .copied()
+        .filter(|key| elsewhere.get(*key) != derived.get(*key))
+        .collect();
+    assert_eq!(differing, ["api_base"]);
+}

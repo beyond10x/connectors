@@ -321,6 +321,7 @@ impl Catalog {
             } => Local::derive(&Instance {
                 connector,
                 name,
+                instance_id: None,
                 endpoint: endpoint.as_deref(),
                 profile: profile.as_deref(),
             })
