@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T15:04:48Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-reads-stay-inside-the-instance-repositories",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-catalog bin (15), served (8), git_relay (11); connectors-host lib (642), http_admit (2)",
+    "reference": "commit 04e7fe1c7"
+  }
+}

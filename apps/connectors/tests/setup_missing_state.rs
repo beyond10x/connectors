@@ -23,7 +23,7 @@ restart = "never"
 [adapters.forge.executable]
 path = "NOT_INSTALLED/connectors-catalog-provider"
 sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-args = []
+args = ["--connector", "jira"]
 "#;
 
 fn command(root: &tempfile::TempDir, args: &[&str]) -> Output {
@@ -120,7 +120,8 @@ fn initialises_state_for(root: &tempfile::TempDir, before: &[u8]) {
         .as_array()
         .unwrap()
         .iter()
-        .map(|a| a["adapter"].clone())
+        // An item names its instance (story:connectors-do-short-invocation).
+        .map(|a| a["instance"].clone())
         .collect();
     assert_eq!(listed, vec![Value::from("forge")], "{adapters}");
     let connections = success(&command(

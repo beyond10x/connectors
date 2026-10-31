@@ -158,7 +158,7 @@ fn refusal(config: &Value) -> String {
 /// boolean, and again when the guards of `issue.create` and
 /// `issue.comment.add` required the new `id` (and the issue's `key`) present
 /// after the write, and again when it gained `projects.list`, `project.get`
-/// and the issue `feed`.
+/// and the issue `feed`, and again when `issues.search` declared its `walk`.
 const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
@@ -169,16 +169,17 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "catalog-jira.md",
         "jira",
-        "e52d459b1888a782c6b3d9dd2e39e17f26e88ab0694964370368ba34031d9fff",
-        "dffb974880505f1da2a2a943b605841096792ee98be3b29b5846349b225a4a66",
+        "4957f983d76748a1effbf84b2945f22ac1b2375247a1163bbc04ce3699041f47",
+        "825e16fc6a087d3f237b49e2a29dbb1e1d44ede342bbf3b8fe4cfa80ac4db3a2",
     ),
     // The Confluence guide declares an `access` probe since #102, which is part of
-    // its configuration and so of its revision.
+    // its configuration and so of its revision. Its pair moved again when its
+    // selection declared walks (story:catalog-operation-declares-its-walk).
     (
         "catalog-confluence.md",
         "confluence",
-        "b6620549f33372b55a07ec1e1abc582583e2aff7f14a9434e73fcc4272a2cc0a",
-        "86a936572eaa670f31dfb80ea503d568c7e3732384bbe46207047796a5599e28",
+        "b28fc9739d6e43c7e50b6f060744f02caf12ea7a9e503414497922c6413c6db1",
+        "df461239a3e29d679d70ebd5388f42bbff7fcdd6469d5c6f431f01697e1e7b92",
     ),
 ];
 

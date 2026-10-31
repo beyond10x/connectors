@@ -1,0 +1,18 @@
+{
+  "format": "connectors-catalog-connector/1",
+  "connector_id": "slack",
+  "provider_id": "slack",
+  "adapter_id": "catalog",
+  "catalog_provider": "slack",
+  "default_endpoint": "https://slack.com/api",
+  "selection": "operations.json",
+  "profiles": [
+    {
+      "profile": "slack.bot",
+      "header": "Authorization",
+      "bearer": true,
+      "label": "Slack bot token",
+      "identity": {"path": "auth.test", "kind": "slack.user", "subject_pointer": "/user_id"}
+    }
+  ]
+}

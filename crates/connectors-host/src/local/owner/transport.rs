@@ -34,6 +34,9 @@ type Listener = UnixListener;
 pub struct Client {
     stream: channel::Stream,
     pub host_incarnation: String,
+    /// The store authority this client greeted the owner with, which the
+    /// owner confirmed as its own.
+    authority: String,
     /// The owner's executable digest; `None` for an owner that predates the
     /// build handshake, which is by definition another build.
     owner_build: Option<String>,
@@ -109,6 +112,10 @@ fn read_reply(
 /// How long past an invoke's deadline its client waits for the owner's answer,
 /// which the owner sends by that deadline.
 const ANSWER_GRACE: Duration = Duration::from_secs(2);
+/// How long [`Client::connect`] waits for the greeting of an owner it started.
+/// The owner verifies the whole metadata store before it answers; on a store of
+/// a few hundred megabytes on a loaded host that took longer than 10 seconds.
+const START_BOUND: Duration = Duration::from_secs(60);
 /// A read's answer: the provider result, which the adapter child held to
 /// [`channel::DEPTH`], one level under the answer's own scalar members. The
 /// answer is held to one level more and every member but `result` to a
@@ -170,25 +177,64 @@ impl Client {
     /// Connect and admit this exact build within the caller's original deadline.
     /// No request or connection retry starts a new interval.
     pub fn connect_until(paths: &Paths, start: bool, deadline: Instant) -> Result<Self> {
-        let client = Self::connect_version(paths, start, VERSION, deadline)?;
+        let client = Self::connect_version(paths, start, VERSION, deadline, None)?;
         approval_issuance::check(deadline)?;
         client.same_build()?;
         Ok(client)
     }
 
+    /// [`Client::connect_until`] to an owner that is already running, greeted by
+    /// `authority`, the one an earlier client of this process confirmed
+    /// ([`Client::authority`]). The store's own authority is read only when its
+    /// lifecycle lock is free: the owner holds that lock while it records the
+    /// work it serves, and a caller that must answer within a short lease (the
+    /// MCP server's data lease, 1.9 s) cannot wait on it. A store that is gone
+    /// or names another authority refuses; a held lock defers that comparison
+    /// to the next call. The owner still refuses an authority that is not its
+    /// own, and a reconnect starts no owner.
+    pub fn reconnect_until(paths: &Paths, authority: &str, deadline: Instant) -> Result<Self> {
+        approval_issuance::check(deadline)?;
+        match Metadata::authority_unless_locked_until(&paths.state, deadline) {
+            Ok(Some(current)) if current.to_string() != authority => {
+                return Err(Code::ReadinessMismatch.into());
+            }
+            Ok(_) => {}
+            Err(_) if Instant::now() >= deadline => return Err(Code::Timeout.into()),
+            Err(error) => return Err(error.into()),
+        }
+        let client = Self::connect_as(paths, false, VERSION, authority, deadline, None)?;
+        approval_issuance::check(deadline)?;
+        client.same_build()?;
+        Ok(client)
+    }
+
+    /// The store authority the owner confirmed in this client's greeting.
+    #[must_use]
+    pub fn authority(&self) -> &str {
+        &self.authority
+    }
+
+    /// Connect within 10 seconds to a running owner, or start one and wait for
+    /// its greeting up to [`START_BOUND`]: for a command with no deadline of
+    /// its own.
     pub fn connect(paths: &Paths, start: bool) -> Result<Self> {
         Self::connect_version(
             paths,
             start,
             VERSION,
             Instant::now() + Duration::from_secs(10),
+            Some(START_BOUND),
         )
     }
+    /// `start_bound`, when given, is how long the greeting of an owner this
+    /// call starts may take, counted from its start, where that ends later than
+    /// `deadline`. A caller's own deadline passes `None`: it is never extended.
     fn connect_version(
         paths: &Paths,
         start: bool,
         version: &str,
         deadline: Instant,
+        start_bound: Option<Duration>,
     ) -> Result<Self> {
         // The authority the greeting names, read without replaying the store: an
         // owner verified the whole store when it started, and one this call
@@ -204,6 +250,16 @@ impl Client {
                 }
             })?
             .to_string();
+        Self::connect_as(paths, start, version, &authority, deadline, start_bound)
+    }
+    fn connect_as(
+        paths: &Paths,
+        start: bool,
+        version: &str,
+        authority: &str,
+        deadline: Instant,
+        start_bound: Option<Duration>,
+    ) -> Result<Self> {
         let directory = fs::directory(&paths.state, false, true)?;
         // The pipe name's salt, published by the first caller and refused by
         // name when it is not owner-only.
@@ -212,12 +268,16 @@ impl Client {
         let socket = socket_path(&directory);
         #[cfg(target_os = "macos")]
         admit_socket(&socket)?;
+        // What this call waits to: the caller's deadline, which a command
+        // without a deadline of its own extends to the startup bound while an
+        // owner is starting (below).
+        let mut wait = deadline;
+        let mut starting: Option<Instant> = None;
         loop {
-            approval_issuance::check(deadline)?;
-            match connect_identified(&socket, deadline) {
+            approval_issuance::check(wait)?;
+            match connect_identified(&socket, wait) {
                 Ok((stream, identity)) => {
-                    match Self::greet_running(&socket, stream, paths, &authority, version, deadline)
-                    {
+                    match Self::greet_running(&socket, stream, paths, authority, version, wait) {
                         // The owner closed the stream and its socket is no longer
                         // at the path: it retired (owner.md). Start over as if
                         // none was running; a newer owner may already listen.
@@ -225,7 +285,7 @@ impl Client {
                             if start
                                 && error.code == Code::Unavailable
                                 && socket_identity(&socket) != Some(identity)
-                                && Instant::now() < deadline => {}
+                                && Instant::now() < wait => {}
                         result => return result,
                     }
                 }
@@ -239,10 +299,10 @@ impl Client {
             let lock = lock(&directory)?;
             match try_lock(&lock) {
                 Ok(()) => {
-                    match connect_socket(&socket, deadline) {
+                    match connect_socket(&socket, wait) {
                         Ok(stream) => {
                             return Self::greet_running(
-                                &socket, stream, paths, &authority, version, deadline,
+                                &socket, stream, paths, authority, version, wait,
                             );
                         }
                         // Only absence starts a replacement owner; a timeout
@@ -253,31 +313,66 @@ impl Client {
                     // Held to the end of this block: the owner measures its build
                     // before it answers the greeting (or never will), and only
                     // then may its launch copy go.
-                    let (stream, mut process, _launched) = spawn(paths, &lock, deadline)?;
+                    let (stream, mut process, launched) = spawn(paths, &lock, wait)?;
+                    // The owner verifies the whole store before it answers, so
+                    // its greeting takes longer as the store grows. A command
+                    // without a deadline of its own waits for it up to the
+                    // startup bound, not the 10 seconds it allows a running
+                    // owner (story:owner-start-outlasts-a-fixed-bound).
+                    let greeting =
+                        start_bound.map_or(wait, |bound| wait.max(Instant::now() + bound));
                     let result = Self::greet(
                         stream,
                         paths,
-                        &authority,
+                        authority,
                         version,
                         Some(own_build()?),
-                        deadline,
+                        greeting,
                     );
-                    if result.is_err() {
-                        let _ = process.kill();
-                        let _ = process.wait();
+                    match &result {
+                        Ok(_) => {}
+                        // A caller that stopped waiting leaves the owner it
+                        // started to finish its start: the next command reaches
+                        // it instead of starting and ending another, which on a
+                        // large store would never answer in time either. It is
+                        // reaped here when it exits, and its launch copy stays
+                        // until then. Every other failure ends it.
+                        Err(error) if error.code == Code::Timeout => {
+                            // One tuple: the launch is `()` on Windows.
+                            let held = (process, launched);
+                            let _ = std::thread::Builder::new()
+                                .name("connectors-owner-reaper".into())
+                                .spawn(move || {
+                                    let (mut process, _launch) = held;
+                                    let _ = process.wait();
+                                });
+                        }
+                        Err(_) => {
+                            let _ = process.kill();
+                            let _ = process.wait();
+                        }
                     }
                     return result;
                 }
                 Err(error) if error.kind() != std::io::ErrorKind::WouldBlock => {
                     return Err(Code::Unavailable.into());
                 }
-                Err(_) => {}
+                // Another process holds the lifetime lock and no owner listens
+                // yet: an owner is starting. A command without a deadline of its
+                // own waits for it up to the startup bound, as for one it
+                // started itself.
+                Err(_) => {
+                    if let Some(bound) = start_bound {
+                        let first = *starting.get_or_insert_with(Instant::now);
+                        wait = deadline.max(first + bound);
+                    }
+                }
             }
-            if Instant::now() >= deadline {
+            if Instant::now() >= wait {
                 return Err(Code::Timeout.into());
             }
             std::thread::sleep(
-                Duration::from_millis(20).min(deadline.saturating_duration_since(Instant::now())),
+                Duration::from_millis(20).min(wait.saturating_duration_since(Instant::now())),
             );
         }
     }
@@ -432,6 +527,7 @@ impl Client {
                 Ok(Self {
                     stream,
                     host_incarnation,
+                    authority: authority.to_owned(),
                     owner_build,
                 })
             }
@@ -985,6 +1081,7 @@ impl WriteClient {
             deadline
                 .until()?
                 .min(Instant::now() + Duration::from_secs(10)),
+            None,
         )
         .and_then(|client| {
             client.same_build()?;
@@ -1219,7 +1316,7 @@ pub fn stop_owner(paths: &Paths, bound: Duration) -> Result<OwnerStop> {
     // The lock is held: an owner runs or is starting. Greet it, retrying while
     // a starting owner is not listening yet.
     let client = loop {
-        match Client::connect_version(paths, false, VERSION, deadline) {
+        match Client::connect_version(paths, false, VERSION, deadline, None) {
             Ok(client) => break client,
             Err(error) if error.code == Code::Unavailable => {
                 // It retired or exited by itself meanwhile.
@@ -1276,6 +1373,11 @@ fn lock(directory: &File) -> Result<File> {
         std::ffi::OsStr::new("owner.lock"),
     )?)
 }
+/// The environment variable a test build's owner waits on, in milliseconds,
+/// before it answers its startup greeting: a stand-in for the verification of a
+/// large store (tests/owner_slow_start.rs).
+#[cfg(debug_assertions)]
+const START_DELAY: &str = "CONNECTORS_TEST_OWNER_START_DELAY_MS";
 /// What a started owner's caller holds until the owner has answered its
 /// greeting. On macOS that is the owner's launch copy: the owner measures its
 /// build from the file at its running executable's path
@@ -1344,10 +1446,15 @@ fn spawn(
     // A test build ties the owner to the process a harness names (owner.md),
     // and hands it the follow hook's trust root (`oauth::follow`), so the
     // owner's refresh trusts the fixture authorization server the CLI's grant
-    // trusted; with the installation directory above, they are all of the
-    // CLI's environment the owner receives. A release build compiles neither.
+    // trusted, and the startup delay that stands in for a large store
+    // ([`START_DELAY`]); with the installation directory above, they are all of
+    // the CLI's environment the owner receives. A release build compiles none.
     #[cfg(debug_assertions)]
-    for name in [super::tether::PARENT, "CONNECTORS_TEST_OAUTH_FOLLOW"] {
+    for name in [
+        super::tether::PARENT,
+        "CONNECTORS_TEST_OAUTH_FOLLOW",
+        START_DELAY,
+    ] {
         if let Some(value) = std::env::var_os(name) {
             command.env(name, value);
         }
@@ -1426,6 +1533,14 @@ pub fn serve_with_read_policy(paths: Paths, read_policy: Arc<dyn ReadPolicy>) ->
     let config = Config::load(&paths.config)?;
     let directory = fs::directory(&paths.state, false, true)?;
     let metadata = Metadata::start_owner(&paths.state)?;
+    // A test build waits here as long as a large store's verification takes.
+    #[cfg(debug_assertions)]
+    if let Some(delay) = std::env::var(START_DELAY)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+    {
+        std::thread::sleep(Duration::from_millis(delay));
+    }
     let authority = metadata.authority()?.to_string();
     drop(metadata);
     fs::check_private_file(&lifetime)?;
@@ -3094,6 +3209,7 @@ mod governed_client_tests {
         let result = Client {
             stream: client,
             host_incarnation: "host".into(),
+            authority: "authority".into(),
             owner_build: Some(own_build().unwrap().into()),
         }
         .bounded_projected_read("fixture", &request, "projection", budget)
@@ -3125,6 +3241,7 @@ mod governed_client_tests {
             let error = Client {
                 stream: client,
                 host_incarnation: "host".into(),
+                authority: "authority".into(),
                 owner_build: Some(
                     if mismatch {
                         "another-build"
@@ -3181,6 +3298,7 @@ mod governed_client_tests {
         let error = Client {
             stream: client,
             host_incarnation: "host".into(),
+            authority: "authority".into(),
             owner_build: Some(build),
         }
         .bounded_projected_read("fixture", &request, "projection", budget)
@@ -3223,6 +3341,7 @@ mod governed_client_tests {
                 Client {
                     stream: client,
                     host_incarnation: "host".into(),
+                    authority: "authority".into(),
                     owner_build: Some(own_build().unwrap().into()),
                 },
                 "fixture",
@@ -3236,6 +3355,7 @@ mod governed_client_tests {
                 Client {
                     stream: client,
                     host_incarnation: "host".into(),
+                    authority: "authority".into(),
                     owner_build: Some("another-build".into()),
                 },
                 "fixture",
@@ -3273,6 +3393,7 @@ mod governed_client_tests {
         let result = Client {
             stream: client,
             host_incarnation: "host".into(),
+            authority: "authority".into(),
             owner_build: Some(own_build().unwrap().into()),
         }
         .governed_read("fixture", &request, connectors_sdk::now_ms() + 5000)
@@ -3284,6 +3405,7 @@ mod governed_client_tests {
         let result = Client {
             stream: client,
             host_incarnation: "host".into(),
+            authority: "authority".into(),
             owner_build: Some("another-build".into()),
         }
         .governed_read("fixture", &request, connectors_sdk::now_ms() + 5000);
@@ -3305,6 +3427,7 @@ mod invoke_answer_tests {
             Client {
                 stream: client,
                 host_incarnation: "fixture-host".into(),
+                authority: "authority".into(),
                 owner_build: Some(own_build().unwrap().into()),
             },
             owner,
@@ -3375,6 +3498,7 @@ mod read_answer_depth_tests {
             Client {
                 stream: client,
                 host_incarnation: "fixture-host".into(),
+                authority: "authority".into(),
                 owner_build: None,
             }
         };
@@ -3574,6 +3698,7 @@ mod tests {
                     true,
                     VERSION,
                     Instant::now() + Duration::from_secs(10),
+                    None,
                 )
                 .map(|client| client.host_incarnation)
                 .map_err(|error| error.code)

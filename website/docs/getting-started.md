@@ -6,11 +6,13 @@ description: Build Connectors from source, start one connector as a standalone s
 
 # Getting started
 
-Build the workspace, start the Kubernetes connector as a standalone service and ask it what it
-offers. No Kubernetes cluster and no real credential are needed: the service answers its
+Build the workspace, start the Kubernetes connector as a standalone service and ask it over HTTP
+what it offers. No Kubernetes cluster and no real credential are needed: the service answers its
 descriptor without contacting its provider, and the invocation that would need the provider is
 refused by name. Every command below was run in a checkout of the repository, starting at its
-root, and the output under it is what that run printed.
+root, and the output under it is what that run printed. The `connectors` command itself runs
+configured instances on your machine and does not call a standalone service;
+[Set up the local CLI](./guides/set-up-the-local-cli.md) starts there.
 
 ## Build
 
@@ -23,7 +25,7 @@ target/debug/connectors --version
 ```
 
 ```text
-connectors 0.59.0
+connectors 0.64.0
 ```
 
 Ordinary builds read checked-in generated Rust and need no ESS. Cargo downloads dependencies on
@@ -125,9 +127,12 @@ Start the service in the background:
 
 ## Ask it what it offers
 
+A caller presents the service credential as a bearer token. `GET /v1/describe` answers the
+descriptor:
+
 ```sh
-../debug/connectors describe --endpoint http://127.0.0.1:17102/ \
-  --allow-plaintext --token-file service.secret \
+token="authorization: Bearer $(cat service.secret)"
+curl -s -H "$token" http://127.0.0.1:17102/v1/describe \
   | jq '{instance, revision, operations: [.operations[] | {id, contract, profile}]}'
 ```
 
@@ -166,55 +171,79 @@ Start the service in the background:
 ```
 
 The full descriptor also carries each operation's input and output schema. The revision changes
-when the descriptor does; an invocation names the revision it was built against.
-`--allow-plaintext` is an explicit choice for loopback development, not a TLS bypass.
+when the descriptor does; an invocation names the revision it was built against. The service
+listens on loopback HTTP here; anywhere else it belongs behind TLS.
 
 ## Invoke, and read the refusals
 
-Ask for five pods. The service admits the request and dispatches it, and Kubernetes is not there:
+`POST /v1/invoke` takes one request: the wire version, a request id the answer repeats, the
+operation, the descriptor revision and the input. Ask for five pods. The service admits the
+request and dispatches it, and Kubernetes is not there:
 
 ```sh
-printf '{"namespace":"engineering","kind":"pods","limit":5}\n' > pods.json
-../debug/connectors invoke --endpoint http://127.0.0.1:17102/ \
-  --allow-plaintext --token-file service.secret \
-  --operation resources.list --input pods.json
+revision=$(curl -s -H "$token" http://127.0.0.1:17102/v1/describe | jq -r .revision)
+jq -n --arg revision "$revision" '{version: "v1alpha1", request_id: "try-1",
+  operation: "resources.list", revision: $revision,
+  input: {namespace: "engineering", kind: "pods", limit: 5}}' > pods.json
+curl -s -w '\nHTTP %{http_code}\n' -H "$token" -H 'content-type: application/json' \
+  --data @pods.json http://127.0.0.1:17102/v1/invoke
 ```
 
-```json
-{"code":"unavailable","message":"dependency unavailable"}
+```text
+{"version":"v1alpha1","request_id":"try-1","status":"error","error":{"code":"unavailable","message":"dependency unavailable"}}
+HTTP 503
 ```
 
 A kind outside the operation's schema is refused before anything is dispatched:
 
 ```sh
-printf '{"namespace":"engineering","kind":"secrets","limit":5}\n' > secrets.json
-../debug/connectors invoke --endpoint http://127.0.0.1:17102/ \
-  --allow-plaintext --token-file service.secret \
-  --operation resources.list --input secrets.json
+jq -n --arg revision "$revision" '{version: "v1alpha1", request_id: "try-2",
+  operation: "resources.list", revision: $revision,
+  input: {namespace: "engineering", kind: "secrets", limit: 5}}' > secrets.json
+curl -s -w '\nHTTP %{http_code}\n' -H "$token" -H 'content-type: application/json' \
+  --data @secrets.json http://127.0.0.1:17102/v1/invoke
 ```
 
-```json
-{"code":"invalid_input","message":"value does not match its declared schema"}
+```text
+{"version":"v1alpha1","request_id":"try-2","status":"error","error":{"code":"invalid_input","message":"value does not match its declared schema"}}
+HTTP 400
+```
+
+A request built against another revision is refused as stale, never re-resolved:
+
+```sh
+jq -n '{version: "v1alpha1", request_id: "try-3",
+  operation: "resources.list", revision: "an-older-revision",
+  input: {namespace: "engineering", kind: "pods", limit: 5}}' > stale.json
+curl -s -w '\nHTTP %{http_code}\n' -H "$token" -H 'content-type: application/json' \
+  --data @stale.json http://127.0.0.1:17102/v1/invoke
+```
+
+```text
+{"version":"v1alpha1","request_id":"try-3","status":"error","error":{"code":"stale_description","message":"refresh the descriptor before resubmitting"}}
+HTTP 409
 ```
 
 A caller without the service credential is refused before it learns anything:
 
 ```sh
 head -c 32 /dev/urandom | base64 > other.secret && chmod 600 other.secret
-../debug/connectors describe --endpoint http://127.0.0.1:17102/ \
-  --allow-plaintext --token-file other.secret
+curl -s -w '\nHTTP %{http_code}\n' -H "authorization: Bearer $(cat other.secret)" \
+  http://127.0.0.1:17102/v1/describe
 ```
 
-```json
+```text
 {"code":"unauthorized","message":"service authentication failed"}
+HTTP 401
 ```
 
-Each refusal exits with status 1. Leave the service running for the next guide; it stops with
-your shell's job control.
+The [service contract](./reference/contracts/service.md) states every code and status. Stop the
+service with your shell's job control when you are done.
 
 ## Next
 
-- Put a federation host in front of this service, the internal process of the Kubernetes connector: [Federate services](./guides/federate-adapter-services.md).
+- From a Rust program, put one federation host in front of several services:
+  [Federate services](./guides/federate-adapter-services.md), for internal connector processes.
 - Use the local CLI with saved connections: [Set up the local CLI](./guides/set-up-the-local-cli.md).
 - See what each connector can do and which ones run: [connector reference](./reference/adapters/index.md) and the [status page](./status.md).
 - Follow an illustrated request from a laptop to GitLab: [Follow a request](/docs/examples/follow-a-request).

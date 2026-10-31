@@ -33,6 +33,7 @@ pub mod runtime;
 #[cfg(test)]
 mod security_replay_tests;
 pub mod service;
+pub mod standing;
 #[cfg(test)]
 pub(crate) mod test_executable;
 #[cfg(test)]

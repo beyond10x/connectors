@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T13:16:30Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-tool-call-shapes-its-result",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test --locked -p connectors --test mcp_tool_call_shapes",
+    "reference": "base a75706179: 6 of 7 failed, Expected arguments.input (s2/red2.log) vs e94c64399: 7 passed (s2/gate2.log); VERIFIED, new behaviour"
+  }
+}

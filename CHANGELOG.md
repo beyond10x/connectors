@@ -1,11 +1,490 @@
 # Changelog
 
-## Unreleased
+## 0.64.0 — 2026-10-31
+
+### Fixed
+
+- A served write the provider definitely refuses answers `refused`, not `outcome_unknown`
+  (story:served-merge-refusal-answers-refused). On `POST /v1alpha2/invoke`, a 4xx the catalog
+  engine classifies as a refusal, such as 405, 409 or 422 to a pull request merge, answers the
+  refusal's code (`forbidden` for 405, `invalid_input` for 409 and 422) with a message carrying
+  the provider's own `message`, `mutation.classification: refused` with its attempt, settled
+  `Failed`; a replay of its key answers the same refusal with no request. Before, every provider
+  error after dispatch answered HTTP 502 `outcome_unknown`, so an agent could not tell a refused
+  merge from a lost one. A 5xx, a cut connection and a timeout stay `outcome_unknown`.
+  `connectors_sdk::Adapter` gains `invoke_write_at`, whose default keeps the old answer for an
+  adapter that does not override it. The host bounds an adapter error's message to 512 bytes,
+  keeps a positive `retry_after_seconds` of a refused rate limit, and a replay of a refusal
+  answers its original code even when its message is empty.
+
+### Added
+
+- A derived instance table `[connectors.<connector>.instances.<name>]` may state `alias` and
+  `instance_id` (story:migrate-writes-the-short-instance-form, migration plan step 2). The installed
+  catalog provider derives the instance under that id (`--instance-id`), so a migrated instance
+  keeps its old id, and with it its connections, approval policy, audits and custody records. An
+  instance id that two instances, or an instance and a legacy entry, resolve to refuses the file.
+  `connections connect --endpoint` writes into such an instance as into any derived one, and
+  refuses a host that would strand a connection admitted under its stated id.
+- `setup migrate` writes a legacy catalog entry in that short form (`alias`, `instance_id`, and
+  `endpoint` and `profile` only where they differ from the declaration's defaults) when the
+  installed provider derives it with the same instance id, configuration revision, credential
+  revision, permissions and startup, no approval policy is published for the instance, and the
+  operation curation (`<config>.operation-curation.json`) neither names the entry's alias or
+  executable selection nor is present but unreadable. Every
+  other mapped entry is still written pinned, as before; each migrated entry's new `form` says
+  which, and a pinned one's `pinned_field` names why, for a revision difference the first differing
+  key of the provider's revision digest input (`auth` for other scopes).
+- `connectors-catalog-provider --print-revision-inputs` prints, per key of the configuration
+  revision's digest input, that value's digest.
+
+### Known limits
+
+- The short form changes an instance's executable selection digest, to which a published approval
+  policy and an operation curation are bound, so an instance with either stays pinned.
+- The response bodies the tests use are GitHub's documented shapes, not a recorded answer to a
+  merge of a branch behind a strict ruleset; recording that answer is
+  story:served-merge-refusal-live-record.
+
+## 0.63.1 — 2026-10-31
+
+Slack's bot selection ships a connector declaration, so a legacy Slack entry migrates and a Slack
+bot instance can be named by its connector alone.
+
+### Added
+
+- `adapters/catalog/providers/slack/connector.json` declares the connector `slack`: provider
+  `slack`, default endpoint `https://slack.com/api`, the bot selection `operations.json` and the
+  profile `slack.bot`, lowered from `connectors/slack.yaml` of `beyond10x/connectors-definitions`
+  (story:slack-connector-declaration). `--connector slack --instance <name>` derives the Slack
+  guide's bot configuration and its revision.
+- `setup migrate` moves a legacy Slack entry, on the bot or the user selection, to a pinned
+  instance `[connectors.slack.instances.<alias>]` with every pin unchanged; before, it kept it as
+  `connector_undeclared`, and such an entry was no instance (`legacy_entry_unmigrated`).
+
+### Known limits
+
+- The user selection (`user-operations.json`, profile `slack.user`, search) has no declaration: a
+  catalog directory holds one. A user-token instance stays pinned, and a derived `slack` instance
+  refuses the profile `slack.user`. Declaring it as the connector `slack-user` is
+  story:slack-user-connector-declaration.
+- The connectors index lists `slack` from its declaration: the bot selection's 12 reads and 5
+  writes, the profile `slack.bot`, derived.
+
+## 0.63.0 — 2026-10-30
+
+`invoke` prints only what an agent asks for, and walks a declared page sequence itself, so one
+page of 40 ticket audits no longer costs about 38 KB of context and no agent writes its own
+cursor loop. The local MCP server takes the same shaping and walk arguments.
+
+### Breaking
+
+- MCP `tools/list`: every tool's `outputSchema.properties.result` is now any JSON, and the
+  operation's own output schema moves to `_meta["io.beyond10x.connectors/operation"].output_schema`
+  (story:mcp-tool-call-shapes-its-result). A client that validated `structuredContent` against the
+  operation schema reads it from `_meta` instead.
+
+### Added
+
+- `invoke --fields <paths>` prints only the named members of the provider result, and
+  `invoke --each <path>` prints one NDJSON line per element of an array, the envelope last
+  (story:invoke-shapes-its-result). A path is dotted names, `[]` over an array, `alias:path`, or an
+  RFC 6901 pointer for a key holding `.`, `[`, `]`, `:`, `/` or `~`. A path that matches nothing is
+  listed in `result.missing`. `--fields status` is a status-only probe. A refusal and a catalog
+  result whose status is not 2xx are printed whole; on a write `request_id`, `mutation` and
+  `source_audit` are always printed. Shaping runs after the owner, the audit record and the
+  mutation ledger have the full answer, and is never sent to the provider.
+- A catalog read may declare a `walk` (position parameter, next-position pointer, records pointer,
+  fixed query, named end conditions) in its selection (story:catalog-operation-declares-its-walk).
+  It reaches callers in the operation's input schema as `x-connectors-walk`, so `invoke --describe`
+  shows it. Declared for Zendesk (ticket comments, ticket audits, the incremental exports), Gmail,
+  Google Calendar, Google Drive, Confluence, Jira `issues.search`, HubSpot `objects.list` and Slack.
+  The configuration revision of these providers' instances changes, because their selection files
+  change; their bundles do not.
+- `invoke --walk --out <file|-> [--max-pages n]` follows a declared walk (story:invoke-walks-declared-pages).
+  Each page is one admitted read. Records are written as NDJSON to a new owner-only file, or to
+  stdout with `--out -`, and a summary (`pages`, `records`, `complete`, `end`, `stopped`, `resume`)
+  is printed last. `--max-pages` is 1 to 10,000, default 20. A walk that stops early keeps the
+  records it wrote and gives the input for the next call as `resume`. `--walk` without `--out`,
+  on a write, or on an operation that declares no walk is refused before any call.
+- MCP `tools/call` takes `fields`, `each`, `walk` and `max_pages` beside `input`, with the CLI's
+  semantics; a walk returns its records as `items`, bounded by the response size, never a file.
+
+### Limitations
+
+- An operation lowered from a `connectors-definition/1` file declares no walk yet; `--walk` on it
+  is refused as `unsupported` (story:definition-lowerer-carries-walk). `connectors-build` import
+  of a selection with walks reports each dropped walk.
+- `--fields` cannot name a key holding `,` or with leading or trailing whitespace.
+- Shaping applies to `invoke` and MCP `tools/call` only, not to the list commands.
+
+
+## 0.62.1 — 2026-10-30
+
+Findings from a cluster rehearsal of 0.62.0's served forge access: one instance serves several
+agent service accounts, the review token and `state` work on an ordinary pod's volumes, and a
+served catalog instance's reads stay inside the repositories it is configured for.
+
+No breaking changes.
+
+### Added
+
+- A served host under `service-account-token` admits several service accounts: `principals`
+  (1 to 64 accounts) or `service_accounts: {namespace, name}`, where `*` is the only wildcard in
+  the name. A single `principal` works as before. The audit anchor records the username the
+  review named (story:served-admission-admits-a-set-of-service-accounts). A configuration key
+  such as `principals` written with no value is refused, not read as absent. A
+  `service_accounts` pattern that no account name can match is refused at start.
+- A served catalog instance takes an optional `catalog.repositories` (`<owner>/<repo>`; owners
+  and names compare without case and a trailing `.git` in any case is dropped, as in
+  `git.repositories`, which now drops it the same way). An empty, `null` or invalid list
+  refuses start. With it set, operations taking `owner` and `repo` reach only listed
+  repositories; any other answers `not_found` before anything is recorded or sent. Other
+  operations are not described (story:catalog-reads-stay-inside-the-instance-repositories).
+  `connectors_sdk::Adapter` gains a defaulted `admit`, which the host asks before it records a
+  `/v1alpha2/invoke` call.
+
+### Changed
+
+- A `service-account-token` host now reads its TokenReview `credential_file` at exactly `0640` or
+  `0440` when its group is one the process holds (a pod with `fsGroup`). Special bits and
+  owner-execute are still refused, and every other credential file still needs `0600`
+  (story:review-token-file-admits-fsgroup-read).
+- A host whose `state` cannot be admitted now names the refused directory and why: an ancestor
+  that is owned by neither the host user nor root, or is writable by group or others, or `state`
+  itself, which must be owned by the host user with mode 0700, no group or other bits. A
+  directory the host cannot open still refuses with the closed text. The admission is
+  unchanged; docs/running-services.md shows how to run on a `0777` volume root
+  (story:served-state-on-a-shared-volume-root).
+
+### Fixed
+
+- The documented TokenReview example now names
+  `/var/run/secrets/kubernetes.io/serviceaccount/..data/token`, because the conventional `token`
+  name is a symbolic link the host refuses (story:review-token-path-in-docs-opens).
+
+## 0.62.0 — 2026-10-30
+
+A served catalog instance takes a GitHub App credential, admits a Kubernetes service account,
+runs writes under a standing grant when asked to, and relays git smart-HTTP, so an agent pod
+clones and pushes with no forge credential of its own. The lowerer reads the four features
+connectors-definitions 0.5.2 publishes.
+
+No breaking changes.
+
+### Added
+
+- A published definition that uses `rate_limit_headers` (on `defaults` or an operation),
+  `query_fixed`, `query_folds` or `embedded_text` now lowers, so `invoke --definition`
+  and `connectors-build definition` accept connectors-definitions 0.5.2's `connectors/github.yaml`
+  (story:definition-lowerer-reads-published-features). Each member reaches the catalog provider's
+  selection as written; `rate_limit_headers` on `defaults` applies to every operation that sets
+  none, and a default `envelope` does not apply to an `embedded_text` read. `query_fixed` or
+  `query_folds` on a write, and `embedded_text` other than on a read answering JSON that sets no
+  `response`, `envelope`, `binary` or `download`, are refused when lowering, as the catalog
+  provider would refuse them. So are the members the catalog provider would refuse at load or
+  never read, each by name: `rate_limit_headers` that are not two distinct header names, or set on
+  a `download`; `query_fixed` or `query_folds` on a `download`; a `query_fixed` value that is
+  empty, on more than eight parameters, or on a parameter that is not a query parameter of the
+  operation or that it bounds, requires, withholds or passes as the credential; a `query_folds`
+  fold not named by an id, named after a parameter, into a value it does not fix or another fold
+  joins, or with an empty prefix or one holding whitespace; and `embedded_text` with a pointer not
+  starting with `/`, a `max_bytes` outside 1 to 2 MiB, or on an operation that answers only text.
+  A default `rate_limit_headers` does not apply to a `download`.
+- Catalog auth scheme `github_app`: an instance authenticates as a GitHub App installation. The
+  stored entry holds the App id, the installation id and the App's RSA private key (PEM, PKCS #1
+  or PKCS #8). The provider signs a nine-minute RS256 JWT, exchanges it at
+  `{api_base}/app/installations/{installation_id}/access_tokens` for an installation token, sends
+  that token as `Authorization: Bearer` and keeps it in memory only, reused until five minutes
+  before its `expires_at`. The token is never returned, logged, stored or written into an error.
+  An answer whose `expires_at` is not in the future, or that is not a JSON object, is `protocol`
+  and its token is never sent. The connection is the installation (`identity.source` `configuration`, subject the installation
+  id). A definition declares it as `scheme: github_app` with a label and no identity block.
+  Nothing in the entry rotates, so `mounted_secret` custody admits the profile. See
+  `docs/local-catalog-provider.md`. Run against a local fixture only, not against GitHub.
+- A served host can admit its caller by a Kubernetes service account token instead of a static
+  bearer. With `admission: service-account-token` in a `urn:connectors:config:v3:service`
+  configuration, the host sends each request's bearer to the configured TokenReview endpoint
+  and admits it only when the review authenticates it for the configured `audience` as the
+  configured `principal` (`system:serviceaccount:<namespace>:<name>`). Any other answer is
+  `unauthorized`; a review that fails, times out or cannot be reached is `unavailable`. In both
+  cases no operation runs. At most 8 reviews run at once; a request that arrives while 8 are
+  under way is `unavailable` at once, with no review sent. Reviews are not cached, and the
+  token is never logged. The audit
+  anchor names the service account. Under this profile `POST /v1/invoke` answers
+  `unsupported`. `static-bearer` stays the default, and v1 and v2 configurations read
+  unchanged.
+- `connectors-catalog-provider --config <file>` serves one catalog instance on the HTTP host:
+  a shipped connector's instance, a local catalog configuration, or a definition file under a
+  definitions checkout. The instance's credential document is a file the platform mounts. The
+  host reads it at every request under the `mounted_secret` checks, so a rotated Secret is used
+  from the next read on. A missing or refused item answers `unavailable` and sends nothing. The
+  served host lists and runs the instance's reads only; a catalog write is not offered. See
+  [Run connector services](docs/running-services.md#catalog-instances).
+- On Unix, a served catalog instance can relay git smart-HTTP
+  (story:git-smart-http-relay-with-quarantine).
+  With a `git` member in its configuration it serves `/git/<owner>/<repo>.git` for clone, fetch
+  and push to the repositories it lists, under the host's admission profile, and sends each
+  request to the forge with its own profile's token (a `token` profile's, or a `github_app`
+  installation token) in HTTP basic authentication; the caller holds no forge credential. A push
+  is read whole up to `push_limit_bytes` and is refused, with nothing sent to the forge's
+  receive-pack, when a command is not a branch under `ref_prefixes` (deletes, tags and push options
+  included),
+  when its pack does not index into a quarantine repository beside the instance's mirror or carries
+  an object no pushed branch reaches and the mirror lacks, when a
+  new commit's author or committer is not `commit_identity`, or when `pre_push_check`, a configured
+  command run in the quarantine with no credential in its environment, exits non-zero (it runs as
+  the instance's user, so it must not run pushed code). A passing push is sent once;
+  each command is logged `applied`, `refused` or `unknown`, and a push whose answer is lost is
+  reported `unknown` and never resent. See
+  [Run connector services](docs/running-services.md#git-relay).
+- Opt-in keyed writes under a standing grant on a served host
+  (story:served-keyed-writes-under-a-standing-approval). A host whose service configuration
+  has no `standing_grants` is unchanged: a write on `POST /v1alpha2/invoke` is dispatched
+  unkeyed and `idempotency_key` is still `unsupported`. Setting `standing_grants` (it requires
+  `state`) names a `connectors.standing-grants/1` file the operator mounts; each grant names the
+  instance, one operation, the input members a write must hold (a JSON pointer and its exact
+  value), an expiry and `max_per_hour`. On such a host every write on `POST /v1alpha2/invoke`
+  needs `idempotency_key` and a covering grant, and `POST /v1/invoke`, which records no attempt,
+  refuses writes as `unsupported`. The host reads the file on every write, so an edit or a
+  revocation applies from the next call on. The file may be a key of a Kubernetes Secret or
+  ConfigMap volume (on Linux its `..data` link is read as the `mounted_secret` custody binding
+  reads an item); the host refuses it as `unavailable` when it is reached through any other
+  symlink or a directory another user can write, is writable by group or others, owned by
+  another user than the host's or root, over 64 KiB or malformed. A write without
+  `idempotency_key` is `invalid_input`, a key used for another request `idempotency_conflict`,
+  a write no grant covers `approval_required`, a grant over its hour `rate_limited` with
+  `retry_after_seconds`; none of them records an attempt or reaches the provider. The same key
+  and input again replays the original outcome with `replayed: true` and never sends again;
+  the host admits requests with one key one at a time, so concurrent requests with one key
+  make one provider request and take one grant use. A replay of a write still running waits
+  up to 25 s without holding an in-flight slot, at most 4 per write; a further one, or one
+  whose write a restart interrupted, answers `outcome_unknown` at once. An applied keyed write
+  keeps its provider result, up to 64 KiB, for the replay; a replay of a larger result answers
+  `capacity`, with the write still reported as applied. Keys and hourly counts survive a
+  restart in `standing-grants.sqlite3` (mode 0600); keys do not expire. Limitation: the
+  `state` directory holds at most 100,000 recorded attempts per instance and the host removes
+  none, so once that many are recorded every further write answers `capacity` (a replay of a
+  recorded key still answers) until the operator moves the host to a fresh `state` directory,
+  which carries no earlier key over. With a grant file,
+  `connectors-catalog-provider --config` lists and runs the instance's writes too; without one
+  it serves reads only, as before. Rust callers send a key with the new
+  `Client::invoke_v1alpha2_keyed`; `Client::invoke_v1alpha2` is unchanged. Contract:
+  `contracts/service/compatibility.md` § 2.1, "Keyed writes under a standing grant"; model:
+  `ess/domains/standing_approvals.yaml`; operator guide:
+  [Standing write grants](docs/running-services.md#standing-write-grants). Scenarios added:
+  `v1alpha2-invoke-keyed-write-under-standing-grant`, `v1alpha2-invoke-keyed-replay`,
+  `v1alpha2-invoke-write-outside-grant-refused`.
+
+### Fixed
+
+- Every provider request now carries `User-Agent: connectors/<version>`, set on the HTTP client;
+  GitHub's REST API refuses a request without one. Neither an instance's credential header nor a
+  fixed header may take that name (`invalid_input` when the instance loads), so no configuration
+  or definition replaces it (`contracts/auth/capability/v1alpha1/http-headers.md`).
+- The catalog provider refuses an OAuth token answer, a `tokeninfo` answer or `id_token` claims
+  that are a JSON array as `protocol` (stored grant claims as an invalid credential). Before, the
+  array was read field by field in order, so its first string could be sent as the access token.
+- A served host whose standard error is a closed pipe, for example after its supervisor exited,
+  now answers requests normally. Before, the first log line it could not write ended the
+  request: a read the provider had answered came back `internal` (HTTP 500) with no final audit
+  observation, and an admission refusal closed the connection with no answer. Every binary that
+  uses the shared log setup now drops a log line it cannot write.
+
+### Limitations
+
+- Keyed writes under a standing grant stay opt-in (D269). A host without `standing_grants`
+  dispatches unkeyed writes as before; the default changes only after the consumers send
+  `Client::invoke_v1alpha2_keyed`, so no consumer breaks.
+- Keyed attempts on the HTTP host never expire, and a keyed write cut off by a restart is not
+  recovered: its replay answers `outcome_unknown`.
+- `connectors-oauth2` and the local host's OAuth handling still read a token answer that is a
+  JSON array field by field; only the catalog provider refuses it.
+- The lowerer and the catalog engine check a definition's members separately; one shared check
+  is still to come.
+- The git relay's `pre_push_check` runs as the instance's user, so it can read what the instance
+  reads; configure a check that inspects the pushed objects and never runs them
+  (story:git-relay-pre-push-check-sandbox).
+
+## 0.61.0 — 2026-10-30
+
+One command installs a connectors-definitions release, verified file by file, into a read-only
+cache and a lock.
+
+### Added
+
+- `connectors definitions install --source <source> --tag <tag>` installs a connectors-definitions
+  release (story:definitions-install). It reads `index.json` and the release asset from an `https`
+  repository (`<source>/releases/download/<tag>/`) or a local directory (`<source>/<tag>/`),
+  checks every file against the index, and only then writes a read-only cache entry,
+  `<state>/installed-definitions/<index sha256>/`, and `definitions.lock` beside the configuration
+  file, naming source, tag, commit and index SHA-256. A digest mismatch, an index format version
+  this build does not read and a feature it does not support are refused by name
+  (`digest_mismatch`, `unknown_format_version`, `unmet_feature`), as is an index or asset outside
+  the format (`release_invalid`); a refusal leaves the lock and the cache as they were. A release
+  this binary was never built with installs without a rebuild: install takes only the supported
+  format versions and features from the build. Installing grants nothing, starts no process, and
+  no instance resolves through the lock yet. The four features install admits
+  (`embedded_text`, `query_fixed`, `query_folds`, `rate_limit_headers`) are not yet read by the
+  definition lowerer, which refuses a published definition that uses them. The core is the new library
+  `connectors-definitions-install`, which depends on no connectors crate. Contract:
+  `contracts/cli/v1alpha1/semantics.md`, "Installing a definitions release"; model:
+  `ess/domains/definitions_install.yaml`.
+
+## 0.60.0 — 2026-10-30
+
+Breaking changes. One command invokes an operation, named by connector and instance, and the
+commands that called a standalone service are gone.
+
+### Breaking
+
+- `operations invoke` is removed. Use `invoke <connector>[/<instance>] <operation>`.
+- `operations invoke --definition <file> --operation <op>` is removed. Use
+  `invoke --definition <file> <op>`, with no target: the file names the connector and instance,
+  and the on-the-fly lowering and the digest cache are the same.
+- `connectors invoke --endpoint <url> --token-file <file> --operation <op> --input <json>` is
+  removed. Give an instance its `endpoint` (`connections connect <connector>/<instance> --endpoint
+  <url>`) and run `invoke` on it. A standalone service is called over HTTP
+  (`GET /v1/describe`, `POST /v1/invoke`), as `docs/running-services.md` shows.
+- `connectors describe --endpoint …` is removed. Use `invoke <connector>/<instance> <operation>
+  --describe` for one operation, or `operations describe`.
+- `connectors serve --config …` is removed, with no command in its place. The federation host
+  stays a library, `connectors_host::federation`, which a Rust program embeds
+  ([Federate services](website/docs/guides/federate-adapter-services.md)).
+- Each of those command lines is now a parse refusal, exit status 2, and contacts nothing.
+- `instances list` items no longer carry `adapter` or `adapter_id`: each is `connector`,
+  `instance`, `instance_id`, `startup` and `restart`. An invoke result carries no `adapter`
+  member; it names `connector` and `instance`.
+- A legacy catalog entry is named, in `instances list` and every selection, by the connector
+  `setup migrate` derives for it. `--connector catalog --instance <alias>` and the target
+  `catalog/<alias>` no longer select such an entry; they are `not_found`. Name it as
+  `<connector>/<alias>`, or keep the deprecated `--adapter <alias>`.
+
+### Added
+
+- `invoke <connector>[/<instance>] <operation>`. With the instance left out, the connector's only
+  instance is used; `default_instance` is not read. Without `--connection` the instance's one
+  ready connection is used, else its one usable one. `--schema` and `--revision` default to the
+  current description's; given, they are pins, and a differing description is
+  `stale_description`.
+- `invoke … --describe` prints the operation's description, effect (`read` or `write`), schema,
+  revision and input schema, and calls nothing. With `--definition` it answers from the file's
+  lowering and records, asks and connects nothing.
+- `invoke` reads its input from standard input when no input flag is given and standard input is
+  not a terminal; `--input-stdin` asks for it explicitly.
+- Refusal `instance_ambiguous` (usage, stage `arguments`, exit status 2): the connector has more
+  than one instance and none was named. `instances` lists each as `<connector>/<instance>`.
+- Refusal `connection_unresolved` (operational, stage `admission`, exit status 1): no usable
+  connection, or several. `connections` lists each held connection with its state, and the next
+  action is `create_connection`, `repair_connection` or `none`.
+- A write without `--approval-file` is refused `approval_required` before any provider call, and
+  `approval_steps` names the commands that issue the proof: `approvals prepare`,
+  `approvals clock-check`, `approvals issue`.
+- `connections connect` takes the target `<connector>/<instance>` and `--endpoint <url>`. The
+  endpoint is written into the configuration before a credential is asked for: the instance, and
+  its connector's table when absent, are created, every other byte of the file is kept, and a
+  different endpoint on an existing instance is refused `lifecycle_conflict` naming `endpoint`. A
+  connector without a default endpoint, on an instance without one, needs `--endpoint`.
+- `connections revalidate`, `revoke` and `reconnect` refused for a revision name it:
+  `revision_expected` and `revision_given` give the kind of revision each is, and `read_with`
+  the command that reads the right one.
+- `instances list` names a legacy catalog entry no connector is derived for in `unmigrated`,
+  sorted, instead of listing it as an instance.
+- Configuration rule `legacy_entry_unmigrated`: selecting such an entry as an instance
+  (`--connector catalog --instance <alias>`, or the `invoke` target `catalog/<alias>`) is
+  `invalid_configuration` at `configuration` with next action `check_configuration`. Its
+  replacement is a `[connectors.<connector>]` instance.
+- Zendesk read `ticket.audits` (`ListAuditsForTicket`) returns one ticket's audits by cursor
+  (`page[size]`, `page[after]`). Each audit carries its author, time, via channel and source, and
+  its events, field changes included. When `meta.has_more` is present it decides the walk: false
+  ends it, and true continues even past an empty page and is an error without
+  `meta.after_cursor`. Without `meta.has_more`, a page with no `meta.after_cursor` or no audits
+  ends the walk. A cursor seen before is an error. Sending `include_boundary_indicators: true` is
+  recommended so that pages carry `has_more`. The catalog inventory now expands a deepObject
+  `page` that is either an offset number or cursor pairs into its cursor pairs. The Zendesk
+  descriptor and the configuration revision of its guide change. An existing local entry keeps
+  working with the operations it names; add `ticket.audits` to its `operations` permission to use
+  it.
+
+### Changed
+
+- Zendesk `ticket.comments`: the walk follows the rule of `ticket.audits`. `meta.has_more`
+  decides when present; without it, a page with no `meta.after_cursor` or no comments ends the
+  walk; a cursor seen before is an error. Before, it ended only on `meta.has_more` false, which the
+  pinned API document never declares for comments.
+- `connections revalidate` and `revoke` given the instance's configuration revision in place of a
+  connection revision are `invalid_input` at `arguments`, exit status 2; any other stale revision
+  stays `lifecycle_conflict`.
+- `--adapter` on a command that takes none, such as `invoke`, is a parse refusal without a
+  deprecation notice.
+- `connectors-build live-read-loop` invokes each read as `invoke <connector>/<instance>`.
+- README, the guides, every connector page and the CLI contract show `invoke`. Getting started
+  calls the Kubernetes service over HTTP with `curl`; Federate services describes the library. The
+  landing page's terminal session is recorded again with 0.60.0. README states that
+  `connectors server --transport stdio` is a local MCP server on Linux.
+- Tests: the adversary test `root_help_after_a_global_output_carries_the_service_block` is
+  inverted to `root_help_after_a_global_output_carries_no_service_block`
+  (`apps/connectors/tests/adversary_legacy_edges.rs:42`), because the service commands are
+  removed (`contracts/cli/v1alpha1/semantics.md:282`). Root help lists `invoke`.
+- Tests: `describe_of_a_definition_needs_no_connection`
+  (`apps/connectors/tests/adversary_d218_u1.rs:687`) needs a built catalog provider. Like the
+  definition connect-question tests, it runs under `connectors-build ignored`, which supplies the
+  provider (`crates/connectors-build/src/ignored.rs:403`). No CI job runs it yet
+  (story:provider-ignored-tests-run-in-ci). It passed by hand against this release.
+
+## 0.59.3 — 2026-10-30
+
+No breaking changes.
+
+### Fixed
+
+- A read with no owner running no longer times out for ever on a large store. The owner it
+  starts verifies the whole store before it answers, and the CLI waited for that at most
+  10 seconds, then ended the owner and answered `timeout` at `admission`; every retry did the
+  same. A read on `operations invoke` now waits for the owner it starts within its own
+  30-second deadline. Other commands that start an owner, such as `connections revalidate`,
+  wait up to 60 seconds for it; a running owner is still reached within 10 seconds. A command
+  that finds an owner another process is starting waits for it up to 60 seconds, and a command
+  that times out leaves the owner it started to finish its start, so the next command reaches
+  it. Writes keep their 10-second wait.
+
+## 0.59.2 — 2026-10-29
+
+No breaking changes.
+
+### Changed
+
+- ESS 0.77.0 (from 0.75.0). No user-visible effect: the specifications stay at their current
+  formats, and the regenerated types differ only in the generator version they name.
+
+### Fixed
+
+- `connectors server --transport stdio` no longer exits with status 1 and `mcp_unavailable` while
+  it answers a long read on a loaded host. Renewing the session's data lease waited on the
+  store's lock, and an owner holding that lock past the lease's remaining 1.4 s ended the
+  session. A renewal now greets the owner by the authority the session was admitted under. It
+  still compares the store's authority whenever the lock is free, so a replaced store still
+  ends the session.
+- `connectors server --transport stdio` no longer sends a call to the owner after the client has
+  closed standard input. Admission now checks the input's hangup directly instead of waiting for
+  the serve loop to read the end of file, which a loaded host could delay. Such a call is
+  answered `unavailable`, as documented.
+
+## 0.59.1 — 2026-10-29
+
+No breaking changes. No change in the CLI's or the owner's behaviour.
 
 ### Changed
 
 - ESS 0.75.0 (from 0.69.2). No user-visible effect: the specifications stay at their current
   formats, and the regenerated types differ only in the generator version they name.
+
+### Fixed
+
+- Two owner-capacity tests of the local CLI (`apps/connectors/tests/local_cli.rs`) no longer fail
+  on a loaded or single-CPU host. The owner serves its startup channel in one of its 32 client
+  slots. The tests closed that channel before the owner read it, so the slot could free after
+  they had seen the owner full. They now hold it with the clients that fill the owner.
 
 ## 0.59.0 — 2026-10-26
 

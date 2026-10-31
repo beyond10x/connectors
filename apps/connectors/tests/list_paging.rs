@@ -62,7 +62,7 @@ fn refusal(output: &Output) -> Value {
 
 fn adapter_entry(alias: &str, revision: &str) -> String {
     format!(
-        "\n[adapters.{alias}]\ninstance_id='{alias}-local'\nadapter_id='catalog'\nconfiguration_revision='{revision}'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.{alias}.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[adapters.{alias}.permissions]\nprofiles=['token']\noperations=['{}','{}','{}']\n",
+        "\n[adapters.{alias}]\ninstance_id='{alias}-local'\nadapter_id='catalog'\nconfiguration_revision='{revision}'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.{alias}.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=['--connector','jira']\n[adapters.{alias}.permissions]\nprofiles=['token']\noperations=['{}','{}','{}']\n",
         "a".repeat(64),
         OPERATIONS[0],
         OPERATIONS[1],
@@ -170,7 +170,8 @@ fn aliases(page: &Value) -> Vec<String> {
         .as_array()
         .unwrap()
         .iter()
-        .map(|entry| entry["adapter"].as_str().unwrap().to_owned())
+        // An item names its instance (story:connectors-do-short-invocation).
+        .map(|entry| entry["instance"].as_str().unwrap().to_owned())
         .collect()
 }
 

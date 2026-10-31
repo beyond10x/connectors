@@ -400,6 +400,9 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "the_connect_question_of_an_oauth_profile_names_its_token_host_too"
             | "an_entry_another_run_recorded_while_the_question_waits_is_not_connected",
         ) => Some((Disposable, vec![PROVIDER])),
+        ("connectors", "adversary_d218_u1", "describe_of_a_definition_needs_no_connection") => {
+            Some((Disposable, vec![PROVIDER]))
+        }
         (
             "connectors",
             "setup_migrate_records",

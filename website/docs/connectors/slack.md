@@ -1,9 +1,9 @@
 ---
 title: Slack
 sidebar_position: 11
-description: Read Slack conversations, users and files with a bot token, post messages and delete files under approval, and search with a user token, as two pinned instances.
-lede: Slack runs as two pinned instances of the slack connector, a bot instance that reads and posts under approval and a user instance that reads and searches, because no Slack declaration ships yet.
-source: docs/catalog-slack.md, adapters/catalog/providers/slack/operations.json, adapters/catalog/providers/slack/user-operations.json, adapters/catalog/tests/slack.rs, docs/local-catalog-provider.md
+description: Read Slack conversations, users and files with a bot token, post messages and delete files under approval, and search with a user token, as a derived or pinned bot instance and a pinned user instance.
+lede: Slack runs as two instances of the slack connector, a bot instance that reads and posts under approval, derived from the shipped declaration or pinned, and a pinned user instance that reads and searches.
+source: docs/catalog-slack.md, adapters/catalog/providers/slack/connector.json, adapters/catalog/providers/slack/operations.json, adapters/catalog/providers/slack/user-operations.json, adapters/catalog/tests/slack.rs, docs/local-catalog-provider.md
 connectors: "slack"
 ---
 
@@ -15,8 +15,10 @@ Slack Web API document. The words connector, instance, connection and operation 
 [full Slack guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-slack.md) has
 every parameter, scope and refusal.
 
-The catalog provider ships no connector declaration for Slack yet, so neither instance is
-derived: each pins its executable, that executable's SHA-256 and its configuration revision. The
+Since 0.63.1 the catalog provider ships a connector declaration for the bot selection (profile
+`slack.bot`), so a bot instance can be derived from the connector name. A provider directory
+holds one declaration, so the user selection has none, and the user instance pins its
+executable, that executable's SHA-256 and its configuration revision. The
 outputs below come from the guide's run against a local HTTPS fixture standing in for Slack
 (synthetic token and ids); its commands are shown without `--config`, `--state-dir` and
 `--output json`.
@@ -43,7 +45,24 @@ granted scopes only in a header the provider does not read, so a missing scope s
 
 ## Enable the connector and add an instance
 
-Write each instance's native configuration file, print its bootstrap and hash the provider, as the
+A bot instance can be derived from the shipped declaration: its default endpoint is
+`https://slack.com/api` and its one profile `slack.bot`.
+
+```toml
+[connectors.slack]
+enabled = true
+
+[connectors.slack.instances.work]
+```
+
+```console
+$ connectors instances list | jq -c '[.. | objects | select(.instance_id) | {connector, instance, instance_id}]'
+[{"connector":"slack","instance":"work","instance_id":"slack.work"}]
+```
+
+The user instance has no declaration, so it is pinned. The guide's run, which the rest of this
+page shows, pins both instances, `bot` and `search`. Write each instance's native configuration
+file, print its bootstrap and hash the provider, as the
 [full guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-slack.md#configure-the-two-instances)
 shows, then pin both instances. The bot instance permits the writes, so it selects private
 protocol two:
@@ -95,15 +114,18 @@ Connecting runs `auth.test`; its `user_id` is the connection's identity.
 
 ## A first read
 
-Take `--schema` and `--revision` from `operations describe --connector slack --instance bot
---operation conversations.list`. In the guide's run:
+The instance's one connection and its current schema and revision are used when none is named,
+and the input is read from standard input. In the guide's run:
 
 ```console
-$ connectors operations invoke --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation conversations.list --schema 2771ae0cbcfa853c69da89e1603d017e397120ce4ffd0891c23ed0d0b5f3f365 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-json '{}' | jq -c '.result.result|{status,body}'
+$ printf '{}' | connectors invoke slack/bot conversations.list | jq -c '.result.result|{status,body}'
 {"status":200,"body":{"channels":[{"id":"C0000000001","name":"general"}],"ok":true,"response_metadata":{"next_cursor":""}}}
 ```
 
-An empty `response_metadata.next_cursor` ends a walk.
+An empty `response_metadata.next_cursor` ends a walk. With two Slack instances,
+`connectors invoke slack conversations.list` names none and is refused as `instance_ambiguous`,
+listing `slack/bot` and `slack/search`. `connectors invoke slack/bot conversations.list --describe`
+prints the operation's input schema, schema and revision without calling Slack.
 
 ## A first guarded write
 
@@ -121,7 +143,8 @@ $ connectors approvals policy-set --connector slack --instance bot --input-file 
 
 Prepare the approval for `~/private/post.json`, which holds
 `{"body":{"channel":"C0000000001","text":"migration check"}}`, check the clock, issue the proof
-for the subject's digest and invoke with it:
+for the subject's digest and invoke with it. The approval names the connection, and the schema
+and revision `connectors invoke slack/bot chat.postMessage --describe` prints:
 
 ```console
 $ connectors approvals prepare --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation chat.postMessage --schema fd40561da56fd3a5b2f1cd9fe47106914c45c80dc7cc27dc4bdca4f9a45efae2 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-file ~/private/post.json | jq -c '.result.preparation|{subject_sha256, presentation}'
@@ -130,7 +153,7 @@ $ connectors approvals clock-check --connector slack --instance bot | jq -c '.re
 [{"address":"51.81.57.55:2002","result":"agreed"},{"address":"148.113.255.71:2002","result":"agreed"}]
 $ connectors approvals issue --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation chat.postMessage --schema fd40561da56fd3a5b2f1cd9fe47106914c45c80dc7cc27dc4bdca4f9a45efae2 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-file ~/private/post.json --approve-subject 5da23cd1ba119d43b499bb9689ab76e210e6dfbeec7dbda0ac65e025d299bf5d --proof-output ~/private/proof-post-1.json | jq -c '.result|{connector,instance,disposition,subject_sha256}'
 {"connector":"slack","instance":"bot","disposition":"published","subject_sha256":"5da23cd1ba119d43b499bb9689ab76e210e6dfbeec7dbda0ac65e025d299bf5d"}
-$ connectors operations invoke --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation chat.postMessage --schema fd40561da56fd3a5b2f1cd9fe47106914c45c80dc7cc27dc4bdca4f9a45efae2 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-file ~/private/post.json --approval-file ~/private/proof-post-1.json --idempotency-key post-1 | jq -c '.result|{classification: .mutation.classification, status: .result.status, body: .result.body}'
+$ connectors invoke slack/bot chat.postMessage --approval-file ~/private/proof-post-1.json --idempotency-key post-1 < ~/private/post.json | jq -c '.result|{classification: .mutation.classification, status: .result.status, body: .result.body}'
 {"classification":"applied","status":200,"body":{"channel":"C0000000001","message":{"text":"migration check","ts":"1780000700.000700"},"ok":true,"ts":"1780000700.000700"}}
 ```
 
@@ -151,7 +174,7 @@ connection. In the guide's run the fixture stopped accepting the bot token, then
 again:
 
 ```console
-$ connectors operations invoke --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --operation conversations.list --schema 2771ae0cbcfa853c69da89e1603d017e397120ce4ffd0891c23ed0d0b5f3f365 --revision 87a55803d552e77cbfd7ed338bf86133549150a2f65b4d9812ca1328df1acce6 --input-json '{}'
+$ connectors invoke slack/bot conversations.list --input-json '{}'
 {"error":{"code":"failure","data":{"code":"service_failure","kind":"operational","next_action":"repair_connection","service_code":"unauthorized","service_reason":"invalid_auth","stage":"dispatch"}},"ok":false}
 $ connectors connections list --connector slack --instance bot | jq -c '[.result.connections[]|{connection,revision,state}]'
 [{"connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","revision":"691cd61d-0a34-4ba9-8ab2-f499f90c71f6","state":"stale"}]
@@ -163,8 +186,9 @@ $ printf '{"token":"xoxb-fixture-token"}' | connectors connections reconnect --c
 
 - Verified against a local fixture only (`adapters/catalog/tests/slack.rs`); no live workspace
   has been read or posted to.
-- Two pinned instances until a Slack connector declaration ships; `setup migrate` keeps legacy
-  Slack entries where they are.
+- The shipped declaration covers the bot selection only: a user-token instance stays pinned,
+  and a derived instance refuses the profile `slack.user`. `setup migrate` moves both legacy
+  Slack entries to pinned instances of `slack` under their aliases.
 - Each list returns one page per call; search pages by number (`page`, `count` 1 to 100).
 - `file.download` reads at most 2 MiB, and only on a connection whose hosts admit
   `https://files.slack.com`. File upload is not offered; `files.delete` is not read back after

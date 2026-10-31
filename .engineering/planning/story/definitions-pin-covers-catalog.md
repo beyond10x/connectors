@@ -8,7 +8,36 @@ relations:
 - decomposes: epic:catalog-connectors-only-in-definitions
 - serves: vision:independent-contract-adapters
 - depends_on: story:definitions-install
-revision: 3
+scope:
+- confidence: cited
+  path: .github/workflows/macos-host.yml
+- confidence: cited
+  path: .github/workflows/pages.yml
+- confidence: cited
+  path: .github/workflows/rust-gate.yml
+- confidence: cited
+  path: .github/workflows/windows-host.yml
+- confidence: cited
+  path: Cargo.lock
+- confidence: cited
+  path: adapters/catalog/Cargo.toml
+- confidence: cited
+  path: apps/connectors/Cargo.toml
+- confidence: cited
+  path: crates/connectors-build/Cargo.toml
+- confidence: cited
+  path: crates/connectors-build/src/gate.rs
+- confidence: cited
+  path: crates/connectors-catalog/Cargo.toml
+- confidence: cited
+  path: crates/connectors-catalog/src/import.rs
+- confidence: inferred
+  path: crates/connectors-catalog/tests
+- confidence: cited
+  path: crates/connectors-docs/Cargo.toml
+- confidence: inferred
+  path: docs/development.md
+revision: 6
 ---
 ## Outcome
 
@@ -67,15 +96,24 @@ revision: 3
 
 ## Scope
 
-- a committed lock at the repository root (inferred; path chosen at implementation)
-- the test-support crate (inferred)
-- `adapters/catalog/Cargo.toml`, `crates/connectors-catalog/Cargo.toml`,
-  `crates/connectors-build/Cargo.toml`, `crates/connectors-docs/Cargo.toml`,
-  `apps/connectors/Cargo.toml`, `Cargo.lock` (cited: the consuming crates)
-- `crates/connectors-build/src/gate.rs` (cited: the offline test step)
-- `.github/workflows/rust-gate.yml`, `pages.yml`, `macos-host.yml`, `windows-host.yml` (cited)
-- the check test (inferred: beside `crates/connectors-catalog/tests/definition_import.rs`)
-- `AGENTS.md` (inferred: how to fetch the pinned release before running cargo locally)
+Derived 2026-10-29 by `story-scoper` against origin/main 65c928d72. Every line is **cited** (read from the story or the tree) or **inferred** (a reading that could be wrong).
+
+- **Primary surface:** the test-support crate that opens the pinned release and lowers one connector, plus the check that calls it first — inferred, the story leaves the crate's choice to implementation
+- **Files:** `Cargo.lock` — cited, the story says it adds the matching entries
+- **Files:** `adapters/catalog/Cargo.toml`, `crates/connectors-catalog/Cargo.toml`, `apps/connectors/Cargo.toml` — cited, the story names each as getting a dev-dependency
+- **Files:** `crates/connectors-build/Cargo.toml`, `crates/connectors-docs/Cargo.toml` — cited, the story names them for gate code
+- **Files:** `crates/connectors-build/src/gate.rs:193-194` — cited, the offline `cargo build`/`cargo test` steps that the fetch has to run before (the story's `:149-150` has drifted)
+- **Files:** `.github/workflows/rust-gate.yml:56,62-63` — cited, a fetch step goes in before the gate
+- **Files:** `.github/workflows/pages.yml:48-52`, `.github/workflows/macos-host.yml:43`, `.github/workflows/windows-host.yml:51` — cited, the story says each fetches the release first
+- **Files:** a committed pin lock at the repository root — inferred, the story says the path is chosen at implementation
+- **Files:** the check test, beside `crates/connectors-catalog/tests/definition_import.rs` — inferred
+- **Symbols:** `definition_name` at `crates/connectors-catalog/src/import.rs:561-568`, `shipped_selections` at `:580` — cited (the story's `:542-549` and `:561-575` have drifted)
+- **Also likely:** a new crate under `crates/`, which the `crates/*` members glob in `Cargo.toml:4` picks up without a root manifest edit — inferred
+- **Documents:** `docs/development.md:49-55`, which describes the gate and `rust-gate.yml` (`AGENTS.md:134` points there for gate commands), gets the local fetch-before-cargo step — inferred
+- **Confidence:** medium — the story names every manifest and workflow, but the crate holding the support function, the lock path and where the fetch runs are left to implementation
+- **Would collide with:** any unit touching `Cargo.lock`, the five crate manifests above, `crates/connectors-build/src/gate.rs`, the four workflows above, or `docs/development.md`
+- **Stale in this body:** the tree has 16 provider directories and 17 selection files on 65c928d72 (`chatgpt` and `claude-subscription` arrived after 9201b1177), not 14 and 15; whether any connectors-definitions tag holds those two is not established
+- **Safety fact:** the pinned release enters only tests and the gate, never a shipped binary's build: the new edges are dev-dependencies on the catalog provider and `apps/connectors`, and only `connectors-build`/`connectors-docs` (repo tools) get normal ones — level 2 (`.github/workflows/release-binaries.yml:124-125` builds only `$BINARIES`), unproven; under option C this was false by design
 
 ## Acceptance
 

@@ -16,7 +16,7 @@ As of 2026-10-16: 67 capabilities are shipped, 3 are decided and 5 are planned. 
 | Capability | Status | What it means |
 |---|---|---|
 | [Describe and invoke](./getting-started.md) | ● shipped | A connector's standalone service answers a typed descriptor and invokes its operations over HTTP; admission and freshness are checked before dispatch. |
-| [One-hop federation](./guides/federate-adapter-services.md) | ● shipped | connectors serve puts one gateway in front of several standalone services, prefixes their operations and reports a downstream failure without retrying it. |
+| [One-hop federation](./guides/federate-adapter-services.md) | ● shipped | The connectors_host::federation library puts one gateway in front of several standalone services, prefixes their operations and reports a downstream failure without retrying it. |
 | [Audited v1alpha2 invoke](./concepts/governed-invocation.md) | ● shipped | A host whose service configuration names a state directory serves POST /v1alpha2/invoke: every admitted invocation is anchored in the execution audit before dispatch (since 0.35.0). |
 | [The attempt a write produced](./concepts/governed-invocation.md) | ● shipped | An admitted write records its attempt before its one dispatch and answers it as mutation; a lost answer is outcome_unknown and is never sent again (since 0.35.0). |
 | [Rust client for v1alpha2](./concepts/governed-invocation.md) | ● shipped | connectors_client::Client::invoke_v1alpha2 returns the attempt the host recorded and reports an older host as unsupported instead of falling back. |

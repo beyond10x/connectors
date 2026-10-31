@@ -3,8 +3,8 @@
 **Inbound read-only tools run on Linux.** Use the [production stdio guide](local-mcp-stdio.md)
 for supported declarations, configuration, calls and limitations. This document
 retains the broader selected intent; resources, prompts, mutations and outbound
-MCP remain unfinished, so [compatibility metadata](../apps/connectors/spec/compatibility.json)
-remains `mcp: deferred`. The [authored inventory](../adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.json)
+MCP remain unfinished, and MCP stays deferred.
+The [authored inventory](../adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.json)
 is static documentation, not CLI output or a runtime discovery endpoint.
 
 Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
@@ -24,9 +24,8 @@ connectors --config CONFIG --state-dir STATE_DIR server --transport stdio
 `CONFIG` and `STATE_DIR` stand for explicit absolute local paths, not literal
 arguments or credentials. `--transport` is required and this selected command
 accepts only `stdio`. There is no selected default transport. This launch has no
-`--output`, cloud, caller-assignment, outbound-child or credential flags. Do not
-substitute the existing `serve` command: it starts the compatibility federation
-service and is not an alias for an MCP server.
+`--output`, cloud, caller-assignment, outbound-child or credential flags. The
+`serve` command, removed in 0.60.0, was never an alias for an MCP server.
 
 A local MCP client launches Connectors and owns that child. Connectors reads MCP
 frames from stdin and reserves stdout exclusively for MCP frames; safe diagnostics
@@ -145,7 +144,7 @@ here belongs to ordinary grouped commands, never the selected stdio server.
 | `connections revoke` | `--connector CONNECTOR --instance INSTANCE --connection CONNECTION --expected-revision REVISION` | unresolved-binding |
 | `operations list` | `--connector CONNECTOR --instance INSTANCE`; optional `--limit LIMIT`, `--cursor CURSOR` | unresolved-binding |
 | `operations describe` | `--connector CONNECTOR --instance INSTANCE --operation OPERATION` | unresolved-binding |
-| `operations invoke` | `--connector CONNECTOR --instance INSTANCE --operation OPERATION --schema SCHEMA --revision REVISION`; `--connection CONNECTION` when required; exactly one of `--input-json JSON`, `--input-file FILE`, `--input-stdin`; `--approval-file FILE` and `--idempotency-key KEY` only under their selected mutation profile | unresolved-binding |
+| `invoke` | `CONNECTOR[/INSTANCE] OPERATION`; optional pins `--schema SCHEMA --revision REVISION` and `--connection CONNECTION`, each defaulting to the only one that fits; at most one of `--input-json JSON`, `--input-file FILE`, `--input-stdin`, standard input when none is given; `--approval-file FILE` and `--idempotency-key KEY` only under their selected mutation profile | unresolved-binding |
 
 **Unavailable step: acquire and persist an MCP server credential.** The static
 source flags above document existing generic grammar. They do not implement MCP

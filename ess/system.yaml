@@ -14,6 +14,7 @@ domains:
   - connectors.service_wire
   - connectors.delegation
   - connectors.approval_issuers
+  - connectors.standing_approvals
   - connectors.clock
   - connectors.local_approval_policy
   - connectors.connection_admission
@@ -25,6 +26,7 @@ domains:
   - connectors.artifact_provenance
   - connectors.auth_bindings
   - connectors.cli
+  - connectors.definitions_install
   - connectors.transport
   - connectors.oauth2
   - connectors.tool_contracts

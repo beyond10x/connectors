@@ -8,7 +8,7 @@ use connectors_host::{
     server::ServiceConfig,
     server::router,
 };
-use connectors_sdk::{Adapter, Credential, Secret};
+use connectors_sdk::{Adapter, Credential, Secret, WriteOutcome};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
@@ -241,6 +241,55 @@ async fn credential_stores_are_substitutable_and_file_permissions_are_enforced()
     let link = temp.path().join("symlink");
     std::os::unix::fs::symlink(path, &link).unwrap();
     assert!(CredentialRef::File { path: link }.resolve().await.is_err());
+}
+
+/// D275: the group read admitted for the TokenReview token is the review
+/// token's alone. A static-bearer `service_credential`, and every other
+/// credential file, keeps the private rule: at `0640` under a group the
+/// process holds it is refused, by itself and at host start.
+#[tokio::test]
+async fn a_group_readable_credential_file_is_still_refused_outside_the_review_token() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("credential");
+    std::fs::write(&path, b"service-token").unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    let credential = CredentialRef::File { path: path.clone() };
+    let directory = BoundCredential {
+        store: Arc::new(DirectorySecrets(temp.path().into())),
+        reference: "credential".into(),
+    };
+    assert!(credential.resolve().await.is_ok());
+    assert!(directory.resolve().await.is_ok());
+    for mode in [0o640, 0o440, 0o660, 0o644, 0o604] {
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).unwrap();
+        let Err(error) = credential.resolve().await else {
+            panic!("a {mode:o} credential file was read");
+        };
+        assert_eq!(error.code, ErrorCode::Forbidden, "{mode:o}");
+        assert_eq!(
+            error.message, "credential file must be private, owner-bound and bounded",
+            "{mode:o}"
+        );
+        assert!(directory.resolve().await.is_err(), "{mode:o}");
+    }
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
+    let started = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        connectors_host::server::serve(
+            ServiceConfig {
+                instance: "leaf".into(),
+                listen: "127.0.0.1:0".parse().unwrap(),
+                service_credential: credential,
+                state: None,
+            },
+            Arc::new(Echo(Arc::new(AtomicUsize::new(0)))),
+        ),
+    )
+    .await;
+    assert!(
+        matches!(started, Ok(Err(_))),
+        "a 0640 static-bearer credential was admitted at start"
+    );
 }
 
 struct ChangingLeaf {
@@ -508,8 +557,10 @@ mod v1alpha2_ledger {
     };
 
     /// `write` applies and echoes; `lost-write` is dispatched and its answer is
-    /// lost (a generic adapter error); `read` echoes; `failing-read` errors.
-    /// `break_store` takes the state directory away during the next dispatch.
+    /// lost (a generic adapter error); `refused-write` is dispatched and the
+    /// provider definitely refuses it ([`REFUSAL`]); `read` echoes;
+    /// `failing-read` errors. `break_store` takes the state directory away
+    /// during the next dispatch.
     struct Ledger {
         calls: Arc<AtomicUsize>,
         state: PathBuf,
@@ -537,6 +588,7 @@ mod v1alpha2_ledger {
                 operations: vec![
                     operation("write", "mutation"),
                     operation("lost-write", "mutation"),
+                    operation("refused-write", "mutation"),
                     operation("read", "read"),
                     operation("failing-read", "read"),
                 ],
@@ -559,7 +611,28 @@ mod v1alpha2_ledger {
                 _ => Ok(input),
             }
         }
+        /// `refused-write` is the provider's definite refusal; every other
+        /// write is the default: a value applied, an error unknown.
+        async fn invoke_write_at(
+            &self,
+            revision: &str,
+            operation: &str,
+            input: Value,
+        ) -> WriteOutcome<Value> {
+            if operation == "refused-write" {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                return WriteOutcome::Refused(
+                    connectors_core::Error::new(ErrorCode::Forbidden, REFUSAL).answered(),
+                );
+            }
+            match self.invoke_at(revision, operation, input).await {
+                Ok(value) => WriteOutcome::Applied(Ok(value)),
+                Err(error) => WriteOutcome::Unknown(error),
+            }
+        }
     }
+    /// The message of `refused-write`'s refusal, the provider's reason in it.
+    const REFUSAL: &str = "provider refused the write: Pull Request is not mergeable";
     /// A group-readable state directory makes every metadata write fail.
     fn private(state: &Path, usable: bool) {
         let mode = if usable { 0o700 } else { 0o750 };
@@ -713,6 +786,42 @@ mod v1alpha2_ledger {
             .expect("the final observation");
         assert_eq!(observed.outcome, audit::Outcome::Unknown);
         // Settled once; the host did not dispatch again.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert_eq!(host.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(host.state.attempt_count().unwrap(), 1);
+        host.task.abort();
+    }
+
+    /// story:served-merge-refusal-answers-refused: a write the provider
+    /// definitely refuses answers the refusal's code and message, classified
+    /// `refused` with its attempt, settled `Failed` with that code and
+    /// message, its final observation `refused`, and is never dispatched again.
+    #[tokio::test]
+    async fn a_provider_refusal_is_refused_with_its_message_and_the_attempt_failed() {
+        let host = host().await;
+        let (status, response) = invoke(&host, request("refused-write", "refused-1")).await;
+        assert_eq!(status, 403);
+        assert_eq!(response.status, ResponseStatus::Error);
+        let error = response.error.expect("the refusal");
+        assert_eq!(error.code, WireCode::Forbidden);
+        assert_eq!(error.message, REFUSAL);
+        let mutation = response.mutation.expect("the recorded attempt");
+        assert_eq!(mutation.classification, EffectKnowledge::Refused);
+        assert_eq!(mutation.original_request_id.as_deref(), Some("refused-1"));
+        assert!(!mutation.replayed);
+        assert_eq!(mutation.cause, None);
+        let attempt = mutation.attempt.expect("the attempt id");
+        let record = host.state.attempt(attempt.id.as_str()).unwrap();
+        assert_eq!(record.state, mutations::State::Failed);
+        assert_eq!(
+            record.result,
+            Some(json!({"classification":"refused","cause":"forbidden","message":REFUSAL}))
+        );
+        assert!(record.settled_at_ms.is_some());
+        let observed = audit_record(&host.path, &response.audit_ref.unwrap())
+            .final_observation
+            .expect("the final observation");
+        assert_eq!(observed.outcome, audit::Outcome::Refused);
         tokio::time::sleep(Duration::from_millis(200)).await;
         assert_eq!(host.calls.load(Ordering::SeqCst), 1);
         assert_eq!(host.state.attempt_count().unwrap(), 1);

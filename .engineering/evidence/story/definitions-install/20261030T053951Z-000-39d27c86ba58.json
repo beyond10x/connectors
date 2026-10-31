@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T05:39:51Z",
+  "actor": "human:timo",
+  "artifact": "story:definitions-install",
+  "kind": "story",
+  "revision": 12,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-definitions-install 24/24 (incl. the adversary cases), -p connectors 440/440 (definitions_install 6, definitions_install_adversary 4, vocabulary_text 4), -p connectors-docs -p connectors-cli-contract 56/56, clippy -D warnings, ess specify validate, connectors-build cli --check and connectors-docs generate --check current with ESS 0.77.0",
+    "reference": "655855edf"
+  }
+}

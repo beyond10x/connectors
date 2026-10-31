@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-31T05:33:21Z",
+  "actor": "human:timo",
+  "artifact": "story:migrate-writes-the-short-instance-form",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors --test setup_migrate --test setup_migrate_short --test short_form_adversary on f737d9687: 15 passed, 0 failed (D321 option b)",
+    "reference": "test log sha256 d86b41e71279d19132102de32a10e90b68e65800272e97f4b4cdc830808856e3"
+  }
+}

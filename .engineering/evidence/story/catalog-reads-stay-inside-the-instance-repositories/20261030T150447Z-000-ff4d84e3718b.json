@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-30T15:04:47Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-reads-stay-inside-the-instance-repositories",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-d275-ud-adversary",
+    "review": "review-result:wave-d275-ud-adversary",
+    "outcome": "fixed"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-30T05:24:39Z",
+  "actor": "human:timo",
+  "artifact": "story:owner-start-outlasts-a-fixed-bound",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "v0.59.3 released (merge 5843c939e, Release binaries run 40994148058 success); on the 0.60.0 integration head after the 0.59.3 merge: cargo test -p connectors --test owner_slow_start 3/3, --test owner_slow_start_adversary 4/4, --test mounted_custody 9/9, -p connectors-host --lib local::owner 129/129; PR 221 CI green (Linux gate, macOS, Windows)",
+    "reference": "a84301ac6"
+  }
+}

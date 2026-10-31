@@ -76,13 +76,14 @@ args = ["--local-config", "/absolute/path/loki.json"]
 
 ```sh
 target/release/connectors --output json connections connect --connector loki --instance logs --profile loki.bearer --credential-prompt
-target/release/connectors --output json operations describe --connector loki --instance logs --operation logs.query_range
-target/release/connectors --output json operations invoke --connector loki --instance logs --connection CONNECTION --operation logs.query_range --schema SCHEMA --revision REVISION --input-json '{"query":"{app=\"api\"} |= \"error\"","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000","limit":100}'
-target/release/connectors --output json operations invoke --connector loki --instance logs --connection CONNECTION --operation logs.query_metric --schema SCHEMA --revision REVISION --input-json '{"query":"sum by (app) (count_over_time({app=\"api\"}[1m]))","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000","step_seconds":60}'
-target/release/connectors --output json operations invoke --connector loki --instance logs --connection CONNECTION --operation logs.labels --schema SCHEMA --revision REVISION --input-json '{"label":"app"}'
+target/release/connectors --output json invoke loki/logs logs.query_range --describe
+target/release/connectors --output json invoke loki/logs logs.query_range --input-json '{"query":"{app=\"api\"} |= \"error\"","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000","limit":100}'
+target/release/connectors --output json invoke loki/logs logs.query_metric --input-json '{"query":"sum by (app) (count_over_time({app=\"api\"}[1m]))","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000","step_seconds":60}'
+target/release/connectors --output json invoke loki/logs logs.labels --input-json '{"label":"app"}'
 ```
 
-Each operation has its own schema and revision from `operations describe`. For automation,
+`--describe` prints an operation's input schema; the connection, schema and revision default to
+the instance's current ones. For automation,
 `--credential-stdin` or `--credential-file /absolute/private/file.json` carries the complete
 native `{"token":"..."}` document.
 
@@ -126,8 +127,8 @@ a call identifier carried in the line is
 are masked to their last four characters unless a field declares `"mask": "none"`.
 
 ```sh
-target/release/connectors --output json operations invoke --connector loki --instance logs --connection CONNECTION --operation logs.profile_lines --schema SCHEMA --revision REVISION --input-json '{"profile":"fixture-cdr","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000","match":{"caller":"+15550100001"}}'
-target/release/connectors --output json operations invoke --connector loki --instance logs --connection CONNECTION --operation logs.call_trace --schema SCHEMA --revision REVISION --input-json '{"profile":"fixture-by-label","call_id":"fx-leg-0001","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000"}'
+target/release/connectors --output json invoke loki/logs logs.profile_lines --input-json '{"profile":"fixture-cdr","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000","match":{"caller":"+15550100001"}}'
+target/release/connectors --output json invoke loki/logs logs.call_trace --input-json '{"profile":"fixture-by-label","call_id":"fx-leg-0001","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000"}'
 ```
 
 The first answers one record per CDR line whose caller is exactly that number, with the
