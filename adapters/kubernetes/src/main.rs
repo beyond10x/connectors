@@ -9,6 +9,7 @@ use std::{path::PathBuf, sync::Arc};
 mod local;
 
 #[derive(Parser)]
+#[command(version)]
 #[command(group(clap::ArgGroup::new("mode").args(["config","local_config"]).required(true)))]
 struct Args {
     #[arg(long)]
