@@ -10,8 +10,12 @@
 //! - it starts from an empty environment and receives only `HOME` (when
 //!   configured), `KUBERNETES_EXEC_INFO` and the allow-listed names, none of
 //!   which may be one of the listed loader or start-up variables;
-//! - it inherits no descriptor of the adapter beyond stdio (and, for a script,
-//!   the plugin descriptor its interpreter reads);
+//! - it inherits no descriptor of the adapter beyond stdio (and, for a script
+//!   on Linux, the plugin descriptor its interpreter reads);
+//! - on macOS, which has no `fexecve`, the plugin's path is executed instead:
+//!   every directory on it must be changeable by root or the adapter's user
+//!   only, and the path must still name the hashed file right before the
+//!   exec, so only those two can swap the plugin between check and exec;
 //! - one run is bounded in time and in output, and its process group and its
 //!   own process are killed when the run ends, while the plugin's own process
 //!   is still unreaped;
@@ -347,6 +351,7 @@ fn prepare(
 /// The plugin file, opened once, checked and hashed through this descriptor,
 /// and executed through it: the path is resolved exactly once, so the bytes
 /// that ran are the bytes of the inode that was hashed.
+#[cfg(not(target_os = "macos"))]
 struct Verified {
     file: std::fs::File,
     /// The file starts with `#!`. The kernel then hands the interpreter
@@ -354,35 +359,75 @@ struct Verified {
     /// executable keeps it close-on-exec and inherits nothing.
     script: bool,
 }
+/// On macOS, which has no `fexecve`: the plugin opened once at `path`,
+/// checked and hashed through this descriptor as on Linux. The run executes
+/// `path`, which must still name this file then; the open descriptor keeps
+/// the file's identity from being reused meanwhile.
+#[cfg(target_os = "macos")]
+struct Verified {
+    file: std::fs::File,
+    /// The pinned path with its directories resolved, each of them checked.
+    path: PathBuf,
+}
+
+/// Opens the plugin once and checks the file through that descriptor: a
+/// regular file, not writable by group or others, no set-ID bit, owned by
+/// root or the effective user.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn admitted(path: &Path) -> Result<std::fs::File, Refusal> {
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+    // O_NOFOLLOW: a symbolic link as the final component refuses (ELOOP);
+    // O_NONBLOCK: a FIFO at the path cannot stall the open; std adds
+    // O_CLOEXEC, so no concurrently spawned process inherits it.
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(path)
+        .map_err(unavailable)?;
+    // fstat on the open descriptor, never a second lookup of the path.
+    let metadata = file.metadata().map_err(unavailable)?;
+    // SAFETY: geteuid has no preconditions and cannot fail.
+    let uid = unsafe { libc::geteuid() };
+    // 0o6000 is S_ISUID | S_ISGID, which libc types as u16 on macOS.
+    if !metadata.is_file()
+        || metadata.mode() & 0o022 != 0
+        || metadata.mode() & 0o6000 != 0
+        || (metadata.uid() != 0 && metadata.uid() != uid)
+    {
+        return Err(Refusal::PluginUnavailable(None));
+    }
+    Ok(file)
+}
+
+/// The SHA-256 (lowercase hex) of what `file` holds from its offset to its
+/// end, and the first four bytes of it.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn hashed(file: &mut std::fs::File) -> Result<(String, Vec<u8>), Refusal> {
+    let mut hasher = Sha256::new();
+    let mut chunk = [0u8; 64 * 1024];
+    let mut head = Vec::with_capacity(4);
+    loop {
+        match file.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(n) => {
+                let take = (4 - head.len()).min(n);
+                head.extend_from_slice(&chunk[..take]);
+                hasher.update(&chunk[..n]);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(unavailable(error)),
+        }
+    }
+    Ok((hex::encode(hasher.finalize()), head))
+}
 
 /// The plugin's bytes must hash to the pin, and the file must not be
 /// replaceable by another user nor carry privileges of its own. Checked
 /// before every run, on the descriptor the run executes.
 #[cfg(target_os = "linux")]
 fn verify(binding: &Binding) -> Result<Verified, Refusal> {
-    use std::os::{
-        fd::AsRawFd,
-        unix::fs::{MetadataExt, OpenOptionsExt},
-    };
-    // O_NOFOLLOW: a symbolic link as the final component refuses (ELOOP);
-    // O_NONBLOCK: a FIFO at the path cannot stall the open; std adds
-    // O_CLOEXEC, so no concurrently spawned process inherits it.
-    let mut file = std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-        .open(&binding.path)
-        .map_err(unavailable)?;
-    // fstat on the open descriptor, never a second lookup of the path.
-    let metadata = file.metadata().map_err(unavailable)?;
-    // SAFETY: geteuid has no preconditions and cannot fail.
-    let uid = unsafe { libc::geteuid() };
-    if !metadata.is_file()
-        || metadata.mode() & 0o022 != 0
-        || metadata.mode() & (libc::S_ISUID | libc::S_ISGID) != 0
-        || (metadata.uid() != 0 && metadata.uid() != uid)
-    {
-        return Err(Refusal::PluginUnavailable(None));
-    }
+    use std::os::fd::AsRawFd;
+    let mut file = admitted(&binding.path)?;
     // File capabilities raise privileges on exec like a set-ID bit does. A
     // file system without extended attributes (ENOTSUP) carries none; any
     // other failure to find out refuses.
@@ -404,24 +449,8 @@ fn verify(binding: &Binding) -> Result<Verified, Refusal> {
         Some(libc::ENODATA) | Some(libc::ENOTSUP) => {}
         _ => return Err(unavailable(error)),
     }
-    let mut hasher = Sha256::new();
-    let mut chunk = [0u8; 64 * 1024];
-    let mut head = Vec::with_capacity(2);
-    loop {
-        match file.read(&mut chunk) {
-            Ok(0) => break,
-            Ok(n) => {
-                if head.len() < 2 {
-                    let take = (2 - head.len()).min(n);
-                    head.extend_from_slice(&chunk[..take]);
-                }
-                hasher.update(&chunk[..n]);
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
-            Err(error) => return Err(unavailable(error)),
-        }
-    }
-    if hex::encode(hasher.finalize()) != binding.sha256 {
+    let (digest, head) = hashed(&mut file)?;
+    if digest != binding.sha256 {
         return Err(Refusal::DigestMismatch);
     }
     // The child redirects descriptors 0 to 2 onto its stdio before it
@@ -432,11 +461,68 @@ fn verify(binding: &Binding) -> Result<Verified, Refusal> {
     }
     Ok(Verified {
         file,
-        script: head == b"#!",
+        script: head.starts_with(b"#!"),
     })
 }
-/// Executing a descriptor needs `fexecve`; elsewhere no plugin runs.
-#[cfg(not(target_os = "linux"))]
+
+/// macOS has no `fexecve`, so the run executes a path, and only root or the
+/// effective user may be able to change what it names. The directories of
+/// the pinned path are resolved once (`realpath` of its parent); each
+/// directory of the resolved path, from `/` down, must be a directory owned
+/// by root or the effective user and not writable by group or others (a
+/// sticky bit does not help). The plugin is then opened there, checked and
+/// hashed through one descriptor as on Linux. A pinned path through a
+/// symbolic link only selects which file is checked; the digest decides
+/// whether it runs.
+#[cfg(target_os = "macos")]
+fn verify(binding: &Binding) -> Result<Verified, Refusal> {
+    use std::os::unix::fs::MetadataExt;
+    let (Some(parent), Some(name)) = (binding.path.parent(), binding.path.file_name()) else {
+        return Err(Refusal::PluginUnavailable(None));
+    };
+    let path = std::fs::canonicalize(parent)
+        .map_err(unavailable)?
+        .join(name);
+    // SAFETY: geteuid has no preconditions and cannot fail.
+    let uid = unsafe { libc::geteuid() };
+    let mut directories: Vec<&Path> = path.ancestors().skip(1).collect();
+    directories.reverse();
+    for directory in directories {
+        // lstat: a symbolic link that replaced a resolved directory refuses.
+        let metadata = std::fs::symlink_metadata(directory).map_err(unavailable)?;
+        if !metadata.is_dir()
+            || metadata.mode() & 0o022 != 0
+            || (metadata.uid() != 0 && metadata.uid() != uid)
+        {
+            return Err(Refusal::PluginUnavailable(None));
+        }
+    }
+    let mut file = admitted(&path)?;
+    // No `security.capability` check: macOS has no file capabilities, and
+    // exec raises privileges only through the set-ID bits refused above.
+    if hashed(&mut file)?.0 != binding.sha256 {
+        return Err(Refusal::DigestMismatch);
+    }
+    Ok(Verified { file, path })
+}
+#[cfg(target_os = "macos")]
+impl Verified {
+    /// Checked right before the exec: the resolved path still names the file
+    /// that was hashed (same device and inode), not a symbolic link nor a
+    /// file swapped in since.
+    fn still_named(&self) -> Result<(), Refusal> {
+        use std::os::unix::fs::MetadataExt;
+        let open = self.file.metadata().map_err(unavailable)?;
+        let named = std::fs::symlink_metadata(&self.path).map_err(unavailable)?;
+        if (named.dev(), named.ino()) != (open.dev(), open.ino()) {
+            return Err(Refusal::PluginUnavailable(None));
+        }
+        Ok(())
+    }
+}
+/// Running a plugin needs `fexecve` (Linux) or a checked path (macOS);
+/// elsewhere no plugin runs.
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn verify(_binding: &Binding) -> Result<Verified, Refusal> {
     Err(Refusal::PluginUnavailable(Some(
         std::io::ErrorKind::Unsupported,
@@ -444,20 +530,25 @@ fn verify(_binding: &Binding) -> Result<Verified, Refusal> {
 }
 /// The operating system refused to open, read or execute the plugin; its
 /// error kind travels with the refusal.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn unavailable(error: std::io::Error) -> Refusal {
     Refusal::PluginUnavailable(Some(error.kind()))
 }
 
-/// The argument and environment vectors `fexecve` receives, built before the
-/// fork: the child between fork and exec may not allocate. Each string is
-/// NUL-terminated in a buffer sized exactly once, so building it never
-/// reallocates, and every buffer is zeroized on drop (the environment
-/// strings may hold secrets).
-#[cfg(target_os = "linux")]
+/// The argument and environment vectors `fexecve` receives (on macOS
+/// `execve` of the checked path), built before the fork: the child between
+/// fork and exec may not allocate. Each string is NUL-terminated in a buffer
+/// sized exactly once, so building it never reallocates, and every buffer is
+/// zeroized on drop (the environment strings may hold secrets).
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 struct Image {
+    #[cfg(target_os = "linux")]
     fd: std::os::fd::RawFd,
+    #[cfg(target_os = "linux")]
     script: bool,
+    /// The checked path, which macOS executes.
+    #[cfg(target_os = "macos")]
+    path: std::ffi::CString,
     argv: Vec<*const libc::c_char>,
     envp: Vec<*const libc::c_char>,
     /// Owns the bytes `argv` and `envp` point into.
@@ -466,14 +557,16 @@ struct Image {
 // SAFETY: the pointers point into the heap buffers of `_strings`, which the
 // struct owns and never mutates while it lives; they are only read, by the
 // forked child.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 unsafe impl Send for Image {}
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 unsafe impl Sync for Image {}
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 impl Image {
     fn new(prepared: &Prepared, verified: &Verified) -> Result<Self, Refusal> {
-        use std::{os::fd::AsRawFd, os::unix::ffi::OsStrExt};
+        #[cfg(target_os = "linux")]
+        use std::os::fd::AsRawFd;
+        use std::os::unix::ffi::OsStrExt;
         let c = |parts: &[&[u8]]| -> Result<Zeroizing<Vec<u8>>, Refusal> {
             let length = parts.iter().map(|p| p.len()).sum::<usize>() + 1;
             let mut bytes = Zeroizing::new(Vec::with_capacity(length));
@@ -502,8 +595,13 @@ impl Image {
                 .collect::<Vec<_>>()
         };
         Ok(Self {
+            #[cfg(target_os = "linux")]
             fd: verified.file.as_raw_fd(),
+            #[cfg(target_os = "linux")]
             script: verified.script,
+            #[cfg(target_os = "macos")]
+            path: std::ffi::CString::new(verified.path.as_os_str().as_bytes())
+                .map_err(|_| Refusal::PluginUnavailable(None))?,
             argv: pointers(&strings[..argc]),
             envp: pointers(&strings[argc..]),
             _strings: strings,
@@ -512,11 +610,12 @@ impl Image {
     /// Runs in the forked child, after std has redirected stdio, changed the
     /// directory and set the process group. Async-signal-safe calls only, and
     /// no allocation.
+    #[cfg(target_os = "linux")]
     fn exec(&self) -> std::io::Error {
-        // SAFETY: close_range, getrlimit and fcntl act on this child's own
-        // descriptor table; fd is the verified plugin descriptor, open in the
-        // parent and so in this child; argv and envp are NUL-terminated
-        // arrays of NUL-terminated strings that outlive this call.
+        // SAFETY: close_range and fcntl act on this child's own descriptor
+        // table; fd is the verified plugin descriptor, open in the parent and
+        // so in this child; argv and envp are NUL-terminated arrays of
+        // NUL-terminated strings that outlive this call.
         unsafe {
             // No descriptor of the adapter above stderr survives the exec,
             // whether or not the adapter opened it close-on-exec.
@@ -530,23 +629,8 @@ impl Image {
                 // Before Linux 5.11 (no close_range, or no CLOEXEC flag):
                 // mark each possible descriptor. The kernel never hands out
                 // one above the hard limit's ceiling, 1 << 20 by default.
-                let mut limit = libc::rlimit {
-                    rlim_cur: 0,
-                    rlim_max: 0,
-                };
-                let highest = if libc::getrlimit(libc::RLIMIT_NOFILE, &mut limit) == 0 {
-                    limit.rlim_cur.max(limit.rlim_max).min(1 << 20)
-                } else {
-                    1 << 20
-                };
-                for fd in 3..highest as libc::c_int {
-                    let flags = libc::fcntl(fd, libc::F_GETFD);
-                    if flags >= 0
-                        && flags & libc::FD_CLOEXEC == 0
-                        && libc::fcntl(fd, libc::F_SETFD, flags | libc::FD_CLOEXEC) < 0
-                    {
-                        return std::io::Error::last_os_error();
-                    }
+                if let Err(error) = cloexec_each_above_stderr() {
+                    return error;
                 }
             }
             if self.script {
@@ -560,12 +644,64 @@ impl Image {
         // fexecve returns only on failure.
         std::io::Error::last_os_error()
     }
+    /// Runs in the forked child, after std has redirected stdio, changed the
+    /// directory and set the process group. Async-signal-safe calls only, and
+    /// no allocation.
+    #[cfg(target_os = "macos")]
+    fn exec(&self) -> std::io::Error {
+        // No descriptor of the adapter above stderr survives the exec. macOS
+        // has no close_range, so each possible descriptor is marked; its
+        // per-process ceiling (kern.maxfilesperproc) is below 1 << 20 by
+        // default. A script is executed by its path too, so its interpreter
+        // needs no descriptor of the adapter.
+        if let Err(error) = cloexec_each_above_stderr() {
+            return error;
+        }
+        // SAFETY: path is a NUL-terminated string, and argv and envp are
+        // NUL-terminated arrays of NUL-terminated strings, that outlive this
+        // call.
+        unsafe {
+            libc::execve(self.path.as_ptr(), self.argv.as_ptr(), self.envp.as_ptr());
+        }
+        // execve returns only on failure.
+        std::io::Error::last_os_error()
+    }
+}
+
+/// Marks each possible descriptor above stderr close-on-exec, one by one, up
+/// to the larger of the soft and hard open-files limit, capped at 1 << 20.
+/// Runs in the forked child: async-signal-safe calls only, no allocation.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn cloexec_each_above_stderr() -> Result<(), std::io::Error> {
+    let mut limit = libc::rlimit {
+        rlim_cur: 0,
+        rlim_max: 0,
+    };
+    // SAFETY: getrlimit writes only into this rlimit; fcntl acts on this
+    // child's own descriptor table.
+    unsafe {
+        let highest = if libc::getrlimit(libc::RLIMIT_NOFILE, &mut limit) == 0 {
+            limit.rlim_cur.max(limit.rlim_max).min(1 << 20)
+        } else {
+            1 << 20
+        };
+        for fd in 3..highest as libc::c_int {
+            let flags = libc::fcntl(fd, libc::F_GETFD);
+            if flags >= 0
+                && flags & libc::FD_CLOEXEC == 0
+                && libc::fcntl(fd, libc::F_SETFD, flags | libc::FD_CLOEXEC) < 0
+            {
+                return Err(std::io::Error::last_os_error());
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Whether the plugin's process has exited, and with status 0, observed
 /// without reaping it (`WNOWAIT`): while it is unreaped its pid, and so its
 /// process group id, cannot name anything else.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn exited_unreaped(pid: libc::pid_t) -> std::io::Result<Option<bool>> {
     // SAFETY: an all-zero siginfo_t is a valid value to be overwritten.
     let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
@@ -601,7 +737,7 @@ fn exited_unreaped(pid: libc::pid_t) -> std::io::Result<Option<bool>> {
 /// group, so the wait below cannot outlast the deadline; a descendant that
 /// left the group is not followed. Called exactly once per spawned plugin,
 /// and nothing before it reaps the child.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn end(child: &mut std::process::Child, pid: libc::pid_t) {
     // SAFETY: the plugin is unreaped (only `exited_unreaped`, which does not
     // reap, has waited on it), so its pid cannot name another process, and
@@ -618,7 +754,7 @@ fn end(child: &mut std::process::Child, pid: libc::pid_t) {
 
 /// Reads what stdout holds now, without blocking. `Ok(true)` once it is
 /// closed. The buffer was sized to the bound, so it never reallocates.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn drain(
     stdout: &mut std::process::ChildStdout,
     output: &mut Vec<u8>,
@@ -636,13 +772,13 @@ fn drain(
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn run(_prepared: &Prepared, _verified: Verified) -> Result<Zeroizing<Vec<u8>>, Refusal> {
     Err(Refusal::PluginUnavailable(Some(
         std::io::ErrorKind::Unsupported,
     )))
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn run(prepared: &Prepared, verified: Verified) -> Result<Zeroizing<Vec<u8>>, Refusal> {
     use std::{
         os::{fd::AsRawFd, unix::process::CommandExt},
@@ -651,8 +787,9 @@ fn run(prepared: &Prepared, verified: Verified) -> Result<Zeroizing<Vec<u8>>, Re
     };
     let image = Image::new(prepared, &verified)?;
     // The program path is never executed: the pre_exec hook replaces the
-    // child with the verified descriptor, or fails the spawn. std applies the
-    // empty environment, the directory, stdio and the process group first.
+    // child with the verified descriptor (on macOS the checked path), or
+    // fails the spawn. std applies the empty environment, the directory,
+    // stdio and the process group first.
     let mut command = Command::new(&prepared.program);
     command
         .env_clear()
@@ -662,10 +799,12 @@ fn run(prepared: &Prepared, verified: Verified) -> Result<Zeroizing<Vec<u8>>, Re
         .stderr(Stdio::null())
         .process_group(0);
     // SAFETY: `Image::exec` calls only close_range, getrlimit, fcntl and
-    // fexecve, all async-signal-safe, and allocates nothing.
+    // fexecve (execve on macOS), all async-signal-safe, and allocates nothing.
     unsafe {
         command.pre_exec(move || Err(image.exec()));
     }
+    #[cfg(target_os = "macos")]
+    verified.still_named()?;
     let spawned = command.spawn();
     // The parent's copy closes now; the child has exec'd or failed.
     drop(verified);
@@ -961,7 +1100,8 @@ impl Credentials {
     }
 }
 
-#[cfg(all(test, target_os = "linux"))]
+// A plugin runs only on Linux and macOS; elsewhere every run is refused.
+#[cfg(all(test, any(target_os = "linux", target_os = "macos")))]
 mod tests {
     use super::*;
     use std::{fs, os::unix::fs::PermissionsExt};
@@ -982,8 +1122,10 @@ mod tests {
 
     /// The TOCTOU the descriptor closes: the file at `path` is replaced
     /// after it was verified and before the process starts. The verified
-    /// inode runs; the replacement, which was never hashed, does not.
+    /// inode runs; the replacement, which was never hashed, does not. Linux
+    /// only: macOS executes the path, and refuses the replacement instead.
     #[test]
+    #[cfg(target_os = "linux")]
     fn exec_plugin_runs_the_verified_inode_not_the_path() {
         let dir = tempfile::tempdir().unwrap();
         let path = answering(dir.path(), "fixture-plugin", "fixture-verified-token");
@@ -1013,8 +1155,10 @@ mod tests {
     }
 
     /// The descriptor the child executes is never one of its stdio
-    /// descriptors, which std replaces before the exec.
+    /// descriptors, which std replaces before the exec. Linux only: macOS
+    /// executes a path, not a descriptor.
     #[test]
+    #[cfg(target_os = "linux")]
     fn exec_plugin_descriptor_is_above_stdio() {
         let dir = tempfile::tempdir().unwrap();
         let path = answering(dir.path(), "fixture-plugin", "fixture-token");
@@ -1028,5 +1172,150 @@ mod tests {
         };
         let verified = verify(&binding).unwrap();
         assert!(std::os::fd::AsRawFd::as_raw_fd(&verified.file) > 2);
+    }
+
+    /// story:kubernetes-exec-plugin-on-macos. macOS only: it has no
+    /// `fexecve`, so the run executes the checked path, which Linux never
+    /// does.
+    #[cfg(target_os = "macos")]
+    mod macos {
+        use super::*;
+
+        fn pinned(path: &Path) -> Binding {
+            Binding {
+                sha256: hex::encode(Sha256::digest(fs::read(path).unwrap())),
+                path: path.to_path_buf(),
+                user: "fixture-user".into(),
+                env: Vec::new(),
+                home: None,
+                timeout_ms: Some(5_000),
+            }
+        }
+        fn kubeconfig(path: &Path, args: &[&str]) -> String {
+            format!(
+                "users:\n- name: fixture-user\n  user:\n    exec:\n      apiVersion: {V1}\n      \
+                 command: {}\n      args: {}\n",
+                path.display(),
+                serde_json::to_string(args).unwrap()
+            )
+        }
+        fn answer(token: &str) -> String {
+            format!(
+                r#"{{"apiVersion":"{V1}","kind":"ExecCredential","status":{{"token":"{token}"}}}}"#
+            )
+        }
+        /// One run of the pinned plugin with `args`: its token.
+        fn token(binding: &Binding, args: &[&str]) -> Result<Vec<u8>, Refusal> {
+            let verified = verify(binding)?;
+            let config = kubeconfig(&binding.path, args);
+            let prepared = prepare(binding, config.as_bytes(), &|_| None)?;
+            let output = run(&prepared, verified)?;
+            parse(&output, V1).map(|token| token.secret.to_vec())
+        }
+
+        /// A `#!` script plugin runs from its own path: it reads its answer
+        /// from a file beside itself, as a bundled command line loads its own
+        /// files. A pin through a linked directory runs the same file.
+        #[test]
+        fn a_script_plugin_runs_from_its_own_path() {
+            let dir = tempfile::tempdir().unwrap();
+            let real = dir.path().join("real");
+            fs::create_dir(&real).unwrap();
+            fs::set_permissions(&real, fs::Permissions::from_mode(0o700)).unwrap();
+            let path = real.join("fixture-plugin");
+            fs::write(
+                &path,
+                "#!/bin/sh\nread -r line < \"${0%/*}/answer\"\nprintf '%s\\n' \"$line\"\n",
+            )
+            .unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+            fs::write(real.join("answer"), answer("fixture-script-token")).unwrap();
+            assert_eq!(token(&pinned(&path), &[]).unwrap(), b"fixture-script-token");
+            let link = dir.path().join("link");
+            std::os::unix::fs::symlink(&real, &link).unwrap();
+            assert_eq!(
+                token(&pinned(&link.join("fixture-plugin")), &[]).unwrap(),
+                b"fixture-script-token"
+            );
+        }
+
+        /// A native Mach-O plugin, a copy of the system `echo` pinned in the
+        /// test's own directory, runs from its own path with the kubeconfig's
+        /// argument as its argument vector.
+        #[test]
+        fn a_native_plugin_runs_from_its_own_path() {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("echo");
+            fs::write(&path, fs::read("/bin/echo").unwrap()).unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+            assert_ne!(&fs::read(&path).unwrap()[..2], b"#!");
+            let answer = answer("fixture-native-token");
+            assert_eq!(
+                token(&pinned(&path), &[&answer]).unwrap(),
+                b"fixture-native-token"
+            );
+        }
+
+        /// The Linux refusals hold on macOS: a digest that is not the pin, a
+        /// group-writable file and a set-user-ID file.
+        #[test]
+        fn digest_mismatch_group_writable_and_set_id_plugins_are_refused() {
+            let dir = tempfile::tempdir().unwrap();
+            let path = answering(dir.path(), "fixture-plugin", "fixture-token");
+            let mut other = pinned(&path);
+            other.sha256 = hex::encode(Sha256::digest(b"another plugin"));
+            assert_eq!(verify(&other).err(), Some(Refusal::DigestMismatch));
+            let binding = pinned(&path);
+            for mode in [0o720, 0o4700] {
+                fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
+                assert_eq!(
+                    verify(&binding).err(),
+                    Some(Refusal::PluginUnavailable(None)),
+                    "{mode:o}"
+                );
+            }
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+            assert_eq!(token(&binding, &[]).unwrap(), b"fixture-token");
+        }
+
+        /// Every directory on the path must be changeable by root or this
+        /// user only: a group-writable one is refused, and so is a
+        /// world-writable one with the sticky bit.
+        #[test]
+        fn a_plugin_under_a_writable_directory_is_refused() {
+            let dir = tempfile::tempdir().unwrap();
+            let shared = dir.path().join("shared");
+            fs::create_dir(&shared).unwrap();
+            let path = answering(&shared, "fixture-plugin", "fixture-token");
+            let binding = pinned(&path);
+            for mode in [0o770, 0o1777] {
+                fs::set_permissions(&shared, fs::Permissions::from_mode(mode)).unwrap();
+                assert_eq!(
+                    verify(&binding).err(),
+                    Some(Refusal::PluginUnavailable(None)),
+                    "{mode:o}"
+                );
+            }
+            fs::set_permissions(&shared, fs::Permissions::from_mode(0o700)).unwrap();
+            assert_eq!(token(&binding, &[]).unwrap(), b"fixture-token");
+        }
+
+        /// A file swapped in at the path after the check is refused right
+        /// before the exec, so the replacement, never hashed, does not run.
+        #[test]
+        fn a_file_swapped_in_after_the_check_is_refused() {
+            let dir = tempfile::tempdir().unwrap();
+            let path = answering(dir.path(), "fixture-plugin", "fixture-verified-token");
+            let swapped = answering(dir.path(), "swapped", "fixture-swapped-token");
+            let binding = pinned(&path);
+            let verified = verify(&binding).unwrap();
+            fs::rename(&swapped, &path).unwrap();
+            let config = kubeconfig(&path, &[]);
+            let prepared = prepare(&binding, config.as_bytes(), &|_| None).unwrap();
+            assert_eq!(
+                run(&prepared, verified).err(),
+                Some(Refusal::PluginUnavailable(None))
+            );
+        }
     }
 }

@@ -160,9 +160,22 @@ are the [`exec_credentials` ESS domain](../../../spec/ess/domains/exec_credentia
   cannot mark a range close-on-exec in one call, the adapter marks descriptors
   one by one up to the open-files hard limit, capped at 1048576 (2^20, the
   default `fs.nr_open`); where `fs.nr_open` was raised and the adapter holds a
-  descriptor numbered above that cap, that descriptor is not marked. Running a
-  plugin needs Linux; elsewhere it
-  is `plugin_unavailable`. The kubeconfig's `command` must equal `path` byte for
+  descriptor numbered above that cap, that descriptor is not marked. On macOS,
+  which has no `fexecve` and no file capabilities, the guarantee is weaker: the
+  adapter runs the pinned path, not a verified image, so root or a process of
+  the adapter's own user can replace or rewrite the file between the check and
+  the exec. Other users cannot: the directories of `path` are resolved once
+  (`realpath` of its parent), and every directory of the resolved path, from
+  `/` down, must be owned by root or the adapter's user and not writable by
+  group or others (the sticky bit does not help), or the run is
+  `plugin_unavailable`. The same open, checks and hash then apply there,
+  without the capability check, and right before the exec the resolved path
+  must still name the file that was hashed (same device and inode). The adapter
+  executes that path with the same argument vector and environment; a script
+  keeps no descriptor across the exec, and descriptors are always marked one by
+  one, with the same cap. `path` must name the plugin's real file, not a
+  symbolic link to it such as the one a package manager puts on `PATH`.
+  Running a plugin needs Linux or macOS; elsewhere it is `plugin_unavailable`. The kubeconfig's `command` must equal `path` byte for
   byte (a trailing or repeated slash is another spelling and refuses) or be a
   bare file name equal byte for byte to the path's file name.
 - **Arguments and environment.** The kubeconfig is read when the plugin runs,

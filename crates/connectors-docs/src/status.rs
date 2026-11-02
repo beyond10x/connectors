@@ -459,7 +459,7 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Native adapters",
         "Kubernetes exec credential plugin",
-        "A kubeconfig user that authenticates through an exec plugin, such as aws eks get-token, is reached when the local configuration pins the plugin by absolute path and sha256: it runs on Linux from the descriptor it was hashed through, with the kubeconfig arguments, an empty environment plus an allow-list, a deadline and an output bound, and its token is held in memory until expiry; verified with fixture plugins against a recorded API session, not a live EKS cluster.",
+        "A kubeconfig user that authenticates through an exec plugin, such as aws eks get-token, is reached when the local configuration pins the plugin by absolute path and sha256: it runs on Linux from the descriptor it was hashed through and on macOS from its checked path, with the kubeconfig arguments, an empty environment plus an allow-list, a deadline and an output bound, and its token is held in memory until expiry; verified with fixture plugins against a recorded API session, not a live EKS cluster.",
         "adapters/kubernetes/tests/local_runtime.rs::exec_plugin_credential_authenticates_a_recorded_api_session",
         "/docs/reference/adapters/kubernetes",
     ),

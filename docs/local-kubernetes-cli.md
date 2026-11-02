@@ -256,7 +256,14 @@ configuration. The instance's process runs it only under these rules, from the
   itself, not a symbolic link: the process opens it once without following a
   link, hashes it through that open file and runs that same open file, so a file
   swapped in at `path` after the check never runs. The plugin inherits no open
-  file of the instance's process beyond its standard streams. Plugins run on Linux only.
+  file of the instance's process beyond its standard streams. Plugins run on Linux
+  and macOS. macOS cannot run an open file, so there the pinned path itself runs,
+  not the file that was checked: root or a process running as you can replace it
+  between the check and the run. Other users cannot, because every directory on
+  the path, from `/` down, must be owned by root or by you and not writable by
+  group or others (a sticky bit does not help), and right before the run the path
+  must still name the file that was hashed. The pin must name the plugin's real
+  file, not the symbolic link a package manager puts on `PATH`.
 - **Arguments from the kubeconfig, as data.** `exec_plugin.user` names the
   kubeconfig `users` entry; its `exec.args` become the argument vector, and no shell
   runs. The entry's `exec.command` must be the pinned path, written exactly as in
