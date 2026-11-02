@@ -10,7 +10,7 @@ relations:
 - decides: story:program-start-failure-reason
 - decides: story:provider-programs-run-on-macos
 - decides: story:kubernetes-exec-plugin-on-macos
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "approved", at: "2026-11-02T07:27:31Z", actor: "human:operator", revision: 2, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
 ---
@@ -78,3 +78,7 @@ document the xattr step in the README instead."
   `a_program_that_floods_standard_error_is_not_held_up_and_its_log_is_bounded`.
 - Release: 0.65.0, dated 2026-11-02 in the CHANGELOG; version in `Cargo.toml`, `Cargo.lock` and
   the getting-started page.
+- D391, 2026-11-02: no local full gate. The 0.64.0 gates wrote 34-39 GB each (D321); at / 78G that would
+  end under the 60G stop. The touched crates and the drift checks are green (u24.sh, u24b.sh), and
+  CI runs the full gate on the pull request (workspace rule: where the full suite does not fit the
+  disk budget). The orchestrator, 2026-11-02: "D391: skip the local full gate."
