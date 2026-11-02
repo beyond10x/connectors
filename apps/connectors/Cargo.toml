@@ -60,3 +60,7 @@ harness = false
 [[test]]
 name = "short_form_adversary"
 harness = false
+
+[[test]]
+name = "catalog_provider_failure"
+harness = false

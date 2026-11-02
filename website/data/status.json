@@ -375,7 +375,7 @@
     },
     {
       "area": "Native adapters",
-      "detail": "A kubeconfig user that authenticates through an exec plugin, such as aws eks get-token, is reached when the local configuration pins the plugin by absolute path and sha256: it runs on Linux from the descriptor it was hashed through, with the kubeconfig arguments, an empty environment plus an allow-list, a deadline and an output bound, and its token is held in memory until expiry; verified with fixture plugins against a recorded API session, not a live EKS cluster.",
+      "detail": "A kubeconfig user that authenticates through an exec plugin, such as aws eks get-token, is reached when the local configuration pins the plugin by absolute path and sha256: it runs on Linux from the descriptor it was hashed through and on macOS from its checked path, with the kubeconfig arguments, an empty environment plus an allow-list, a deadline and an output bound, and its token is held in memory until expiry; verified with fixture plugins against a recorded API session, not a live EKS cluster.",
       "href": "/docs/reference/adapters/kubernetes",
       "label": "Kubernetes exec credential plugin",
       "status": "shipped"
@@ -515,7 +515,7 @@
     },
     {
       "area": "Distribution",
-      "detail": "A release page carries an archive per Linux and macOS target (x86_64 and aarch64) holding connectors and connectors-catalog-provider, with SHA256SUMS; the other adapters are built from the checkout, and there is no Windows binary.",
+      "detail": "A release page carries an archive per Linux and macOS target (x86_64 and aarch64) holding connectors, connectors-catalog-provider and the Grafana, Prometheus, Loki and Kubernetes programs, with SHA256SUMS; the other adapters are built from the checkout, and there is no Windows binary.",
       "href": "/docs/getting-started",
       "label": "Release binaries",
       "status": "shipped"

@@ -364,12 +364,14 @@ open checkpoints enabled before `setup init` returns, so its opens start from a
 persisted checkpoint instead of verifying the whole history, and connectors
 0.32.0 and earlier cannot open it. `setup init` never enables a database that
 already exists; only `setup checkpoints-enable` does (below). The file uses
-the current `connectors-local/2` format, whose adapter entries each select a
-`private_protocol` ([private mutation extension](private-mutations.md)); an
-existing `connectors-local/1` file keeps loading unchanged. A
-`connectors-local/3` file is `/2` plus an optional `[consumers]` table of pinned
-[consumer launch](consumer-launch.md) executables; `[consumers]` in a `/1` or `/2`
-file refuses the configuration, and `setup init` keeps writing `/2`. A
+the current `connectors-local/5` format, the one instances and `connections
+connect --endpoint` need, with an empty legacy `[adapters]` table
+(story:catalog-provider-failure-is-named). A `connectors-local/2` file's adapter
+entries each select a `private_protocol` ([private mutation
+extension](private-mutations.md)); an existing `connectors-local/1` file keeps
+loading unchanged. A `connectors-local/3` file is `/2` plus an optional
+`[consumers]` table of pinned [consumer launch](consumer-launch.md) executables;
+`[consumers]` in a `/1` or `/2` file refuses the configuration. A
 `connectors-local/4` file is `/3` plus an optional `[custody]` table
 (`connectors.cli.LocalCustodyBinding`) that explicitly selects the custody binding:
 `binding` (closed: `secret_service`, `macos_keychain`, `windows_credential_manager`,
@@ -385,7 +387,14 @@ local owner policy and OS keyring requirement; it does not write credentials,
 authenticate, install artifacts or start processes. `setup check` checks syntax,
 permissions, configured artifacts and non-interactive keyring availability. A
 missing/locked keyring produces a failed prerequisite in its typed result; no
-unlock prompt, write or successful connection is implied.
+unlock prompt, write or successful connection is implied. Its `installed_provider`
+prerequisite starts the catalog provider installed beside the CLI with
+`--version` alone, as a derivation starts it: `ready` when it prints its
+version, otherwise `failed` with `next_action = check_configuration` and
+`installed_provider_failure` naming why (`connectors.cli.InstalledProviderFailure`:
+`missing`, `not_executable`, `killed`, `exited`, `deadline`,
+`unreadable_output`). No instance is derived while it is `failed`
+(story:catalog-provider-failure-is-named).
 
 [The valid example](fixtures/config-valid.toml) chooses per-entry
 `startup = "on-demand" | "automatic"`; omission means `on-demand`.
@@ -515,7 +524,13 @@ endpoint would strand that connection, and the command is the same
 provider refuses while deriving the instance (one that is not https, or
 carries userinfo, a query or a fragment) is `invalid_input` at `arguments`
 with `field = endpoint` (exit 2), nothing written; the refusal never echoes
-the endpoint.
+the endpoint. A provider refused the endpoint only when it runs: when the
+catalog provider installed beside the CLI does not print its version
+(`setup check`'s `installed_provider`), the command is `unavailable` at
+`installed_provider` with `next_action = check_configuration` (exit 1),
+naming the provider's absolute path in `installed_provider_path` and why it does
+not run in `installed_provider_failure`, nothing written
+(story:catalog-provider-failure-is-named).
 
 The endpoint must pass the configuration's own endpoint rule (non-empty, at
 most 2048 bytes, no whitespace or control character); otherwise the command is
@@ -1213,9 +1228,11 @@ it afterwards, a migrated entry's `form` and, `before` and `after`, its `instanc
 `configuration_revision`, `executable_selection` and `custody_items`; a
 short-form entry's `after` carries the derived executable's selection. It carries
 the file in `configuration` and its `format_before` and `format_after`. The
-format moves to `connectors-local/5` only when at least one entry is migrated.
-With nothing to migrate the result is `unchanged` and nothing is written in
-either mode. A dry run that would migrate is `planned` and writes nothing. An
+format moves to `connectors-local/5` only when at least one entry is migrated,
+or when the file holds no legacy entry at all: then only its `format` value
+changes and every other byte, comments included, is kept
+(story:catalog-provider-failure-is-named). With nothing to migrate the result
+is `unchanged` and nothing is written in either mode. A dry run that would migrate is `planned` and writes nothing. An
 applied one is `applied`: it publishes the file it read, byte for byte and
 owner-only, as `config.toml.before-migrate-<UTC timestamp>`
 (`YYYYMMDDTHHMMSSZ`) beside the configuration without replacing any existing
@@ -1418,6 +1435,23 @@ bound to the selection/revision and expire after 300 seconds; stale cursors refu
 No automatic paging or unbounded retry occurs. Entry capture expires after 300
 seconds. OAuth continuations/registration and browser callback ingress remain
 separately specified; they are not secretly implemented by this terminal profile.
+
+### Why a start failed
+
+A start that fails keeps its failure code and stage (`unavailable` or
+`readiness_mismatch` at `readiness`, `invalid_configuration`); `instances status` of
+the failed instance adds why (story:program-start-failure-reason). `start_failure`
+is one of `admission` (the executable's path was refused), `digest` (its content is
+not the pinned executable), `copy` (the owner's private copy of it could not be made
+or launched), `spawn` (the process, its channel or its standard-error pipe could not
+be created), `exited_before_handshake` (with `start_exit_code` or `start_signal`),
+`handshake_deadline` or `handshake_mismatch`. On Linux and macOS the program's
+standard error goes to a pipe the owner holds until the handshake has ended, and
+`start_log` names the owner-only (`0600`) file under the state directory,
+`start-logs/<instance id>.log`, that holds at most 64 KiB of it, replaced on each
+start. The owner then closes its end and the runtime points the program's standard
+error at `/dev/null`: nothing the program writes once it can hold a credential is
+kept. Windows starts a program with no standard handles and keeps no start log.
 
 ## 5. Protected entry and durable publication
 

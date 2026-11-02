@@ -68,6 +68,7 @@ the whole store, so an edit that bypasses SQLite is refused by the next command.
   "prerequisites": [
     "configuration: ready",
     "metadata: ready",
+    "installed_provider: ready",
     "keyring: ready",
     "persistent_custody_qualification: ready"
   ]
@@ -78,7 +79,10 @@ the whole store, so an edit that bypasses SQLite is refused by the next command.
 credentials; a machine without one cannot save a connection, and the check says so before any
 connect asks for a credential. `custody_backend` names the store custody uses, fixed when the
 binary is built: `secret_service` on Linux, `macos_keychain` on macOS and
-`windows_credential_manager` on Windows.
+`windows_credential_manager` on Windows. `installed_provider` is the `connectors-catalog-provider`
+in the directory of `connectors`, which derives every instance that pins nothing: it is `ready`
+when it prints its version, and otherwise `failed` with `installed_provider_failure` naming why
+(`missing`, `not_executable`, `killed`, `exited`, `deadline` or `unreadable_output`).
 
 A headless host or a container has no Secret Service. There, a `connectors-local/4` or
 `connectors-local/5` configuration can select the read-only `mounted_secret` binding with a
@@ -94,8 +98,8 @@ the setup, with a CronJob example.
 
 ## Configure instances
 
-`setup init` writes the older `connectors-local/2` format, with an empty legacy table for
-pinned entries. Replace its content with a `connectors-local/5` configuration that enables the
+`setup init` writes a `connectors-local/5` file with an empty legacy table for pinned entries.
+Replace its content with a configuration that enables the
 connectors you use and names an instance of each:
 
 ```sh

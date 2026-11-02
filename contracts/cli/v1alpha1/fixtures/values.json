@@ -1187,6 +1187,33 @@
       }
     },
     {
+      "id": "valid-AdapterObservation-start-failure",
+      "type": "connectors.cli.AdapterObservation",
+      "valid": true,
+      "value": {
+        "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
+        "configuration_revision": "cfg-1",
+        "state": "failed",
+        "host_incarnation": "host-1",
+        "observed_at_ms": 1788951600000,
+        "start_failure": "exited_before_handshake",
+        "start_exit_code": 3,
+        "start_log": "/srv/fixture/state/start-logs/forge-local.log"
+      }
+    },
+    {
+      "id": "invalid-AdapterObservation-start-failure-unbounded",
+      "type": "connectors.cli.AdapterObservation",
+      "valid": false,
+      "value": {
+        "adapter": "forge", "connector": "fixture-forge", "instance": "forge",
+        "configuration_revision": "cfg-1",
+        "state": "failed",
+        "observed_at_ms": 1788951600000,
+        "start_failure": "the program printed something"
+      }
+    },
+    {
       "id": "C03-no-secret-in-management-request",
       "type": "connectors.cli.ConnectionCreateRequest",
       "valid": false,

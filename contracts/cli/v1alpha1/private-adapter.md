@@ -65,7 +65,11 @@ The child receives no database handle, arbitrary credential resolver or publicat
 permit. Invocation receives the exact retained document for the captured use and
 an opaque cursor partition; that partition grants no credential lookup authority.
 Responses contain one safe result or closed failure; raw exceptions and child
-stdout/stderr are never forwarded.
+stdout/stderr are never forwarded. On Linux and macOS the host keeps at most 64 KiB
+of what the child writes to stderr before its handshake ends in the instance's
+owner-only start log, which `instances status` names after a failed start; it then
+closes its end, and `serve` points the child's stderr at `/dev/null` once `ready` is
+written ([semantics § Why a start failed](semantics.md#why-a-start-failed)).
 
 Native invocation distinguishes a missing provider resource from an absent local
 selection. Its closed failure includes `provider_not_found`,

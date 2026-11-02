@@ -59,6 +59,20 @@ connectors instances list | jq -c '.[] | arrays | .[]'
 {"connector":"gitlab","instance":"work","instance_id":"gitlab.work","restart":"never","startup":"on-demand"}
 ```
 
+`endpoint` is the host, `https://<host>`, a trailing `/` allowed, or `https://<host>/<path>` for
+a GitLab served under a relative root. The connector adds `/api/v4` itself, so an endpoint that
+already ends in `/api/v4` is refused as `invalid_input` naming `endpoint`.
+`connections connect gitlab/work --profile gitlab.pat --endpoint https://gitlab.example.com`
+writes the same instance before it asks for the token.
+
+The instance is derived by the `connectors-catalog-provider` in the directory of `connectors`;
+keep the two binaries together. `connectors setup check` lists it as the `installed_provider`
+prerequisite, `failed` with the reason when it does not run, and a connect is then refused as
+`unavailable` at `installed_provider`, naming the provider's path and the reason, instead of
+blaming the endpoint. The macOS binaries are not signed: on an archive downloaded through a
+browser, remove the quarantine attribute from the extracted directory first, with
+`xattr -dr com.apple.quarantine <dir>`.
+
 A second host or account is a second instance. A GitLab behind a private CA needs a `ca_file`,
 which a derived instance cannot state: use the pinned form of the full guide.
 

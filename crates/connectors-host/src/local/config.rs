@@ -1417,9 +1417,97 @@ enum Derived {
 enum Unprinted {
     /// It exited unsuccessfully: it refused the selection.
     Refused,
-    /// It did not start, printed more than the bound, or outlived the
-    /// deadline, it or a descendant holding its output.
-    Failed,
+    /// It did not start, ended on a signal, printed more than the bound, or
+    /// outlived the deadline, it or a descendant holding its output.
+    Failed(ProviderFailure),
+}
+
+/// Why the installed catalog provider cannot run
+/// (`connectors.cli.CatalogProviderFailure`). Fixed words, never OS text.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProviderFailure {
+    /// No file is at its path.
+    Missing,
+    /// A file is there that is not admitted or does not start: not a regular
+    /// file, owned by neither the host user nor root, group- or
+    /// other-writable, without an execute bit, or refused when started.
+    NotExecutable,
+    /// It ended on a signal, as a binary the system refuses to run is
+    /// killed.
+    Killed,
+    /// It exited unsuccessfully.
+    Exited,
+    /// It outlived the ten-second deadline, it or a descendant holding its
+    /// output.
+    Deadline,
+    /// It printed nothing, more than the bound, or text that is not UTF-8.
+    UnreadableOutput,
+}
+
+impl ProviderFailure {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Missing => "missing",
+            Self::NotExecutable => "not_executable",
+            Self::Killed => "killed",
+            Self::Exited => "exited",
+            Self::Deadline => "deadline",
+            Self::UnreadableOutput => "unreadable_output",
+        }
+    }
+}
+
+/// The installed catalog provider that cannot run, and why.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProviderUnavailable {
+    pub path: PathBuf,
+    pub failure: ProviderFailure,
+}
+
+/// Whether the catalog provider in [`installation_directory`] runs: admitted
+/// as a derived instance's provider is, and started as a derivation starts it
+/// (empty environment, own process group, bounded output and deadline) with
+/// `--version` alone, it exits successfully and prints a version. A provider
+/// that refuses a derivation while it runs refused the selection it was
+/// given; one that does not run refused nothing (story:catalog-provider-failure-is-named).
+pub fn installed_provider_runs() -> std::result::Result<(), ProviderUnavailable> {
+    let name = format!(
+        "connectors-catalog-provider{}",
+        std::env::consts::EXE_SUFFIX
+    );
+    let Some(path) = installed_provider() else {
+        return Err(ProviderUnavailable {
+            path: PathBuf::from(name),
+            failure: ProviderFailure::Missing,
+        });
+    };
+    let unavailable = |failure| ProviderUnavailable {
+        path: path.clone(),
+        failure,
+    };
+    match std::fs::symlink_metadata(&path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Err(unavailable(ProviderFailure::Missing));
+        }
+        Err(_) => return Err(unavailable(ProviderFailure::NotExecutable)),
+        Ok(_) => {}
+    }
+    let selection = Executable {
+        path: path.clone(),
+        sha256: String::new(),
+        args: Vec::new(),
+    };
+    if fs::validate_path(&path).is_err() || selection.source().is_err() {
+        return Err(unavailable(ProviderFailure::NotExecutable));
+    }
+    match selection.print("--version") {
+        Ok(printed) => match String::from_utf8(printed) {
+            Ok(version) if !version.trim().is_empty() => Ok(()),
+            _ => Err(unavailable(ProviderFailure::UnreadableOutput)),
+        },
+        Err(Unprinted::Refused) => Err(unavailable(ProviderFailure::Exited)),
+        Err(Unprinted::Failed(failure)) => Err(unavailable(failure)),
+    }
 }
 
 /// Kills a printing provider's process group (on Unix; on Windows the
@@ -1902,7 +1990,7 @@ impl Config {
         super::metadata::Metadata::initialize(&paths.state)?;
         fs::sync_directory(&state)?;
         let config = Self {
-            format: "connectors-local/2".into(),
+            format: "connectors-local/5".into(),
             owner_uid: fs::uid(),
             approval_clock: None,
             secret_service_socket: None,
@@ -2054,10 +2142,16 @@ impl Executable {
         if let Some(root) = std::env::var_os("SystemRoot") {
             command.env("SystemRoot", root);
         }
-        let mut child = command.spawn().map_err(|_| Unprinted::Failed)?;
+        let mut child = command.spawn().map_err(|error| {
+            Unprinted::Failed(if error.kind() == std::io::ErrorKind::NotFound {
+                ProviderFailure::Missing
+            } else {
+                ProviderFailure::NotExecutable
+            })
+        })?;
         let Some(stdout) = child.stdout.take() else {
             stop(&mut child);
-            return Err(Unprinted::Failed);
+            return Err(Unprinted::Failed(ProviderFailure::UnreadableOutput));
         };
         let (sender, received) = std::sync::mpsc::channel();
         // Detached: a descendant holding the output keeps only this thread,
@@ -2084,10 +2178,21 @@ impl Executable {
                 .recv_timeout(until.saturating_duration_since(Instant::now()))
                 .ok()
         });
+        #[cfg(unix)]
+        let signalled = |status: &std::process::ExitStatus| {
+            std::os::unix::process::ExitStatusExt::signal(status).is_some()
+        };
+        #[cfg(not(unix))]
+        let signalled = |_: &std::process::ExitStatus| false;
         match (status, printed) {
+            (None, _) => Err(Unprinted::Failed(ProviderFailure::Deadline)),
+            (Some(status), _) if signalled(&status) => {
+                Err(Unprinted::Failed(ProviderFailure::Killed))
+            }
             (Some(status), _) if !status.success() => Err(Unprinted::Refused),
             (Some(_), Some(Ok(printed))) if printed.len() as u64 <= LIMIT => Ok(printed),
-            _ => Err(Unprinted::Failed),
+            (Some(_), None) => Err(Unprinted::Failed(ProviderFailure::Deadline)),
+            _ => Err(Unprinted::Failed(ProviderFailure::UnreadableOutput)),
         }
     }
 
@@ -2098,10 +2203,33 @@ impl Executable {
         &self,
         until: std::time::Instant,
     ) -> super::runtime::Result<super::runtime::artifact::Image> {
+        self.capture_explained(until)
+            .map_err(|(failure, _)| failure)
+    }
+
+    /// [`Executable::capture`], naming the step a refusal is
+    /// (story:program-start-failure-reason): a refused path is `admission`;
+    /// content refused as not the pinned executable (its digest, its format,
+    /// its size) is `digest`; a private copy that could not be made is `copy`.
+    pub(crate) fn capture_explained(
+        &self,
+        until: std::time::Instant,
+    ) -> std::result::Result<
+        super::runtime::artifact::Image,
+        (super::runtime::Failure, super::runtime::StartFailure),
+    > {
+        use super::runtime::{Failure as F, StartFailure as S};
         let source = self
             .source()
-            .map_err(|_| super::runtime::Failure::InvalidConfiguration)?;
-        super::runtime::artifact::capture(source, &self.sha256, until)
+            .map_err(|_| (F::InvalidConfiguration, S::Admission))?;
+        super::runtime::artifact::capture(source, &self.sha256, until).map_err(|failure| {
+            let step = if failure == F::InvalidConfiguration {
+                S::Digest
+            } else {
+                S::Copy
+            };
+            (failure, step)
+        })
     }
 
     // Content is deliberately unverified here. Keep this private so callers

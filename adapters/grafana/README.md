@@ -6,9 +6,11 @@ can read, each as its uid, name, plugin type, access mode and default flag, from
 read only: alert groups and incidents over a since window, and one of each by id (see
 [IRM alert groups and incidents](#irm-alert-groups-and-incidents)). The records are modeled in
 [spec/ess](spec/ess/domains/records.yaml) and [the IRM domain](spec/ess/domains/irm.yaml), the
-connection in [the connection domain](spec/ess/domains/connection.yaml). It requires Linux
-x86_64 and the [qualified Secret Service binding](../../docs/local-secret-service.md), like
-every saved credential.
+connection in [the connection domain](spec/ess/domains/connection.yaml). It runs on Linux with
+the [qualified Secret Service binding](../../docs/local-secret-service.md) and on Apple-silicon
+macOS with the login keychain, like every saved credential; the macOS job of `macos-host.yml`
+runs its tests. The release archives hold `connectors-grafana` beside `connectors`; see
+[From the release archive](#from-the-release-archive).
 
 Connector, instance and connection are the terms of the [vocabulary](../../README.md#vocabulary).
 
@@ -21,6 +23,30 @@ CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-gr
 target/release/connectors --output json setup init
 target/release/connectors --output json setup check
 ```
+
+## From the release archive
+
+Each release archive `connectors-<version>-<target>.tar.gz` holds `connectors-grafana` beside `connectors`
+and `connectors-catalog-provider`; `SHA256SUMS` on the release page covers it. Keep the three in
+one directory, the real one and not a symbolic link to it, and pin the program by its path there:
+
+```sh
+cd connectors-0.65.0-aarch64-apple-darwin
+./connectors-grafana --version
+./connectors-grafana --local-config /absolute/path/grafana.json --print-local-bootstrap
+shasum -a 256 connectors-grafana
+```
+
+On Linux use `sha256sum` in place of `shasum -a 256`. The macOS binaries are not signed or
+notarized. An archive downloaded with a browser carries the quarantine attribute, and macOS then
+stops the programs from running; clear it for the whole directory once, before the first command:
+
+```sh
+xattr -dr com.apple.quarantine connectors-0.65.0-aarch64-apple-darwin
+```
+
+The pin's `executable.path` is then `/absolute/path/connectors-0.65.0-aarch64-apple-darwin/connectors-grafana`,
+in place of the `target/release` path below.
 
 ## Configure the native target
 

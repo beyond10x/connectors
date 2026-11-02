@@ -30,7 +30,7 @@ fn a_file_invalid_for_another_reason_names_no_mismatched_entry() {
     Config::initialize(&paths).unwrap();
     let setup = fs::read_to_string(&paths.config)
         .unwrap()
-        .replace("connectors-local/2", "connectors-local/1");
+        .replace("connectors-local/5", "connectors-local/1");
     let good = "a".repeat(64);
     let mismatched = entry(
         "alpha",

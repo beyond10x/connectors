@@ -459,7 +459,7 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Native adapters",
         "Kubernetes exec credential plugin",
-        "A kubeconfig user that authenticates through an exec plugin, such as aws eks get-token, is reached when the local configuration pins the plugin by absolute path and sha256: it runs on Linux from the descriptor it was hashed through, with the kubeconfig arguments, an empty environment plus an allow-list, a deadline and an output bound, and its token is held in memory until expiry; verified with fixture plugins against a recorded API session, not a live EKS cluster.",
+        "A kubeconfig user that authenticates through an exec plugin, such as aws eks get-token, is reached when the local configuration pins the plugin by absolute path and sha256: it runs on Linux from the descriptor it was hashed through and on macOS from its checked path, with the kubeconfig arguments, an empty environment plus an allow-list, a deadline and an output bound, and its token is held in memory until expiry; verified with fixture plugins against a recorded API session, not a live EKS cluster.",
         "adapters/kubernetes/tests/local_runtime.rs::exec_plugin_credential_authenticates_a_recorded_api_session",
         "/docs/reference/adapters/kubernetes",
     ),
@@ -594,8 +594,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Distribution",
         "Release binaries",
-        "A release page carries an archive per Linux and macOS target (x86_64 and aarch64) holding connectors and connectors-catalog-provider, with SHA256SUMS; the other adapters are built from the checkout, and there is no Windows binary.",
-        "crates/connectors-build/src/release_binaries.rs::the_release_workflow_packages_the_cli_and_the_catalog_provider",
+        "A release page carries an archive per Linux and macOS target (x86_64 and aarch64) holding connectors, connectors-catalog-provider and the Grafana, Prometheus, Loki and Kubernetes programs, with SHA256SUMS; the other adapters are built from the checkout, and there is no Windows binary.",
+        "crates/connectors-build/src/release_binaries.rs::the_release_workflow_packages_the_cli_the_catalog_provider_and_the_provider_programs",
         "/docs/getting-started",
     ),
     planned(

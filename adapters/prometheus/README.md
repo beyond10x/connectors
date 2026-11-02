@@ -4,9 +4,11 @@ The `prometheus` connector answers three PromQL reads, each one GET against Prom
 API: `series.query` (an instant query), `series.query_range` (a range query at an explicit
 step) and `rules.list` (the alerting and recording rules, with each alerting rule's state).
 The mapping, bounds and errors are in [the Prometheus profile](contracts/series/v1alpha1/semantics.md)
-§§3–5 and 11; the connection is §11.4 and the Grafana placement §11.5. It requires Linux
-x86_64 and the [qualified Secret Service binding](../../docs/local-secret-service.md), like
-every saved credential.
+§§3–5 and 11; the connection is §11.4 and the Grafana placement §11.5. It runs on Linux with
+the [qualified Secret Service binding](../../docs/local-secret-service.md) and on Apple-silicon
+macOS with the login keychain, like every saved credential; the macOS job of `macos-host.yml`
+runs its tests. The release archives hold `connectors-prometheus` beside `connectors`; see
+[From the release archive](#from-the-release-archive).
 
 Connector, instance and connection are the terms of the [vocabulary](../../README.md#vocabulary).
 
@@ -15,6 +17,30 @@ CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-pr
 target/release/connectors --output json setup init
 target/release/connectors --output json setup check
 ```
+
+## From the release archive
+
+Each release archive `connectors-<version>-<target>.tar.gz` holds `connectors-prometheus` beside `connectors`
+and `connectors-catalog-provider`; `SHA256SUMS` on the release page covers it. Keep the three in
+one directory, the real one and not a symbolic link to it, and pin the program by its path there:
+
+```sh
+cd connectors-0.65.0-aarch64-apple-darwin
+./connectors-prometheus --version
+./connectors-prometheus --local-config /absolute/path/prometheus.json --print-local-bootstrap
+shasum -a 256 connectors-prometheus
+```
+
+On Linux use `sha256sum` in place of `shasum -a 256`. The macOS binaries are not signed or
+notarized. An archive downloaded with a browser carries the quarantine attribute, and macOS then
+stops the programs from running; clear it for the whole directory once, before the first command:
+
+```sh
+xattr -dr com.apple.quarantine connectors-0.65.0-aarch64-apple-darwin
+```
+
+The pin's `executable.path` is then `/absolute/path/connectors-0.65.0-aarch64-apple-darwin/connectors-prometheus`,
+in place of the `target/release` path below.
 
 ## Configure the native target
 

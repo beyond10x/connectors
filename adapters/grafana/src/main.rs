@@ -4,6 +4,7 @@ mod local;
 
 /// The Grafana data-source read adapter, run by the local `connectors` host.
 #[derive(Parser)]
+#[command(version)]
 struct Args {
     /// Owner-only nonsecret configuration for the private host binding.
     #[arg(long)]

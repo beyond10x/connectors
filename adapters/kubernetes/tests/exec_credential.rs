@@ -6,11 +6,12 @@
 #![cfg(unix)]
 use connectors_kubernetes::exec_credential::{Binding, Credentials, Refusal, rfc3339_ms};
 use sha2::{Digest, Sha256};
+#[cfg(target_os = "linux")]
+use std::time::{Duration, Instant};
 use std::{
     fs,
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
-    time::{Duration, Instant},
 };
 
 /// Fictional fixture material only.
@@ -291,6 +292,8 @@ fn exec_plugin_cannot_be_selected_by_the_kubeconfig() {
     assert_eq!(plugin.runs(), 0);
 }
 
+/// Linux only: it reads `/proc`, as the process-group tests that use it do.
+#[cfg(target_os = "linux")]
 fn dead(pid: i32) -> bool {
     match fs::read_to_string(format!("/proc/{pid}/stat")) {
         Err(_) => true,
@@ -351,6 +354,7 @@ fn exec_plugin_deadline_overrun_is_refused_and_killed() {
 }
 
 /// The process id a fixture wrote to `path`, if it got as far as writing it.
+#[cfg(target_os = "linux")]
 fn pid_in(path: &Path) -> Option<i32> {
     fs::read_to_string(path).ok()?.trim().parse().ok()
 }
