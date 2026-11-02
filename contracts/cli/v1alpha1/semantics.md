@@ -1436,6 +1436,23 @@ No automatic paging or unbounded retry occurs. Entry capture expires after 300
 seconds. OAuth continuations/registration and browser callback ingress remain
 separately specified; they are not secretly implemented by this terminal profile.
 
+### Why a start failed
+
+A start that fails keeps its failure code and stage (`unavailable` or
+`readiness_mismatch` at `readiness`, `invalid_configuration`); `instances status` of
+the failed instance adds why (story:program-start-failure-reason). `start_failure`
+is one of `admission` (the executable's path was refused), `digest` (its content is
+not the pinned executable), `copy` (the owner's private copy of it could not be made
+or launched), `spawn` (the process, its channel or its standard-error pipe could not
+be created), `exited_before_handshake` (with `start_exit_code` or `start_signal`),
+`handshake_deadline` or `handshake_mismatch`. On Linux and macOS the program's
+standard error goes to a pipe the owner holds until the handshake has ended, and
+`start_log` names the owner-only (`0600`) file under the state directory,
+`start-logs/<instance id>.log`, that holds at most 64 KiB of it, replaced on each
+start. The owner then closes its end and the runtime points the program's standard
+error at `/dev/null`: nothing the program writes once it can hold a credential is
+kept. Windows starts a program with no standard handles and keeps no start log.
+
 ## 5. Protected entry and durable publication
 
 The Linux OS keyring binding selects the user's admitted Secret Service collection

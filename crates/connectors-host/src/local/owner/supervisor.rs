@@ -1195,6 +1195,7 @@ fn worker(
                 control: &control,
                 launches: &launches,
                 state: &state,
+                directory: &paths.state,
                 stopped: &stopped,
                 current: &current,
                 epoch: job.epoch,
@@ -1798,6 +1799,8 @@ struct Launch<'a> {
     control: &'a Mutex<lifecycle::Control>,
     launches: &'a Launches,
     state: &'a runtime::state::State,
+    /// The state directory, which holds the instance's start log.
+    directory: &'a std::path::Path,
     stopped: &'a AtomicBool,
     current: &'a Adapter,
     epoch: u64,
@@ -1806,16 +1809,30 @@ impl Launch<'_> {
     /// Launches the configured adapter process by `deadline` and records it
     /// as the instance's child, under this job's epoch. A bounded read
     /// launches by its budget's original cutoff instead (`bounded`), and
-    /// awaits the control lock no longer.
+    /// awaits the control lock no longer. A launch that fails records why,
+    /// and where the program's standard error up to its handshake was kept,
+    /// for `instances status` (story:program-start-failure-reason).
     fn run(&self, deadline: u64, bounded: Option<Instant>) -> Result<runtime::Child> {
         {
             let mut guard = lock_before(self.control, bounded)?;
             guard.check(self.epoch)?;
             guard.starting = true;
+            guard.start_failure = None;
         }
         let cutoff = bounded.map_or_else(|| until(deadline), Ok)?;
         let _permit = self.launches.acquire(cutoff)?;
-        let new = runtime::Child::spawn_until(self.current, cutoff)?;
+        let new = match runtime::Child::start(self.current, cutoff, Some(self.directory)) {
+            Ok(new) => new,
+            Err(error) => {
+                if let Ok(mut guard) = lock_before(self.control, bounded) {
+                    guard.start_failure = Some(lifecycle::Start {
+                        step: error.step,
+                        log: error.log,
+                    });
+                }
+                return Err(error.failure.into());
+            }
+        };
         let mut guard = lock_before(self.control, bounded)?;
         guard.check(self.epoch)?;
         if self.stopped.load(Ordering::SeqCst) {
@@ -2457,6 +2474,87 @@ mod idle_tests {
             assert!(Instant::now() < until, "the idle child outlived shutdown");
             std::thread::sleep(Duration::from_millis(20));
         }
+    }
+
+    /// story:program-start-failure-reason: the observation `instances status`
+    /// prints for an instance whose program printed a line and exited 3
+    /// before its handshake names `exited_before_handshake`, exit code 3,
+    /// and the start log holding that line; an instance whose executable is
+    /// not the pinned one names `digest`. Unix only: Windows keeps no start
+    /// log, and its fixture exit status reads differently.
+    #[cfg(unix)]
+    #[test]
+    fn a_failed_start_is_observed_with_its_step_and_start_log() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Paths {
+            config: root.path().join("config/config.toml"),
+            state: root.path().join("state"),
+        };
+        Config::initialize(&paths).unwrap();
+        let mut config = Config::load(&paths.config).unwrap();
+        let (path, sha256) = crate::local::test_executable::path_and_sha256();
+        let adapter = |instance: &str, sha256: &str| Adapter {
+            credential_revision: None,
+            instance_id: instance.into(),
+            adapter_id: "fixture".into(),
+            configuration_revision: "fixture-config".into(),
+            protocol: "v1alpha1".into(),
+            private_protocol: Some(crate::local::runtime::PrivateProtocol::V2),
+            startup: Startup::Automatic,
+            restart: Default::default(),
+            permissions: Default::default(),
+            executable: Executable {
+                path: path.clone(),
+                sha256: sha256.into(),
+                args: vec![
+                    "--exact".into(),
+                    "local::runtime::process::tests::protocol_fixture".into(),
+                    "--".into(),
+                    "fixture-mode-stderr-exit".into(),
+                ],
+            },
+        };
+        let exits = adapter("exits", &sha256);
+        let pinned = adapter("pinned", &"0".repeat(64));
+        config.adapters.insert("exits".into(), exits.clone());
+        config.adapters.insert("pinned".into(), pinned.clone());
+        std::fs::write(&paths.config, toml::to_string(&config).unwrap()).unwrap();
+        let state = paths.state.clone();
+        let pool = Pool::new(Arc::new(paths), uuid::Uuid::new_v4().to_string());
+        pool.automatic(&config);
+
+        let observed = |alias: &str, adapter: &Adapter| {
+            let until = Instant::now() + Duration::from_secs(20);
+            loop {
+                let status = pool.status(alias, adapter).unwrap();
+                if status["observation"]["state"] == "failed" {
+                    break status["observation"].clone();
+                }
+                assert!(Instant::now() < until, "{alias} never failed: {status}");
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        };
+        let exited = observed("exits", &exits);
+        assert_eq!(
+            exited["start_failure"], "exited_before_handshake",
+            "{exited}"
+        );
+        assert_eq!(exited["start_exit_code"], 3, "{exited}");
+        assert!(exited.get("start_signal").is_none(), "{exited}");
+        let log = state
+            .join(runtime::START_LOGS)
+            .join(runtime::start_log_name("exits"));
+        assert_eq!(exited["start_log"], log.to_str().unwrap(), "{exited}");
+        assert_eq!(
+            std::fs::read_to_string(&log).unwrap(),
+            "fixture: refused to start\n"
+        );
+
+        let refused = observed("pinned", &pinned);
+        assert_eq!(refused["start_failure"], "digest", "{refused}");
+        assert!(refused.get("start_exit_code").is_none(), "{refused}");
+        assert!(refused["start_log"].is_string(), "{refused}");
+        pool.shutdown().unwrap();
     }
 }
 

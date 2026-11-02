@@ -20,6 +20,12 @@ pub(super) struct Owned {
     pub incarnation: String,
     pub revision: String,
 }
+/// Why the instance's last start failed and where its start log is
+/// (story:program-start-failure-reason).
+pub(super) struct Start {
+    pub step: runtime::StartFailure,
+    pub log: Option<std::path::PathBuf>,
+}
 #[derive(Default)]
 pub(super) struct Control {
     pub epoch: u64,
@@ -27,6 +33,9 @@ pub(super) struct Control {
     pub stopping: bool,
     pub starting: bool,
     pub failed: bool,
+    /// Set by a start that failed launching the program; cleared when the
+    /// next start begins.
+    pub start_failure: Option<Start>,
 }
 impl Control {
     pub fn check(&self, epoch: u64) -> Result<()> {
@@ -69,6 +78,24 @@ impl Control {
         if running {
             observation["child_incarnation"] =
                 json!(self.child.as_ref().ok_or(Code::Unavailable)?.incarnation);
+        }
+        // A failed instance whose last start failed names the step, the exit
+        // of a program that ended before its handshake, and its start log.
+        if state == "failed"
+            && let Some(start) = &self.start_failure
+        {
+            observation["start_failure"] = json!(start.step.as_str());
+            if let runtime::StartFailure::ExitedBeforeHandshake { code, signal } = start.step {
+                if let Some(code) = code {
+                    observation["start_exit_code"] = json!(code);
+                }
+                if let Some(signal) = signal {
+                    observation["start_signal"] = json!(signal);
+                }
+            }
+            if let Some(log) = start.log.as_deref().and_then(std::path::Path::to_str) {
+                observation["start_log"] = json!(log);
+            }
         }
         Ok(json!({"observation":observation}))
     }

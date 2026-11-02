@@ -147,6 +147,28 @@ pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
     }
     run(channel, adapter)
 }
+/// Points standard error at /dev/null once the handshake is written. The
+/// owner keeps a program's standard error only until its handshake ends
+/// (story:program-start-failure-reason) and then closes its end of the pipe;
+/// from here on a write goes nowhere, as it did before, instead of failing on
+/// that closed pipe. Only a process serving descriptor three for its parent
+/// gets here, so no other process's standard error is touched.
+#[cfg(unix)]
+fn stderr_to_null() {
+    // SAFETY: a static NUL-terminated path and scalar flags.
+    let null = unsafe { libc::open(c"/dev/null".as_ptr(), libc::O_WRONLY | libc::O_CLOEXEC) };
+    // A failed open, or a standard descriptor that was closed and now holds
+    // /dev/null itself: nothing to duplicate, and nothing to close.
+    if null <= 2 {
+        return;
+    }
+    // SAFETY: `null` is a live descriptor this process owns, closed once it
+    // has been duplicated onto descriptor two; dup2 clears close-on-exec.
+    unsafe {
+        libc::dup2(null, 2);
+        libc::close(null);
+    }
+}
 fn run(mut channel: channel::Stream, adapter: impl Adapter) -> Result<()> {
     let until = Instant::now() + Duration::from_secs(10);
     let hello = channel::read::<Request>(&mut channel, until, false, 0)?;
@@ -189,6 +211,8 @@ fn run(mut channel: channel::Stream, adapter: impl Adapter) -> Result<()> {
         &[],
         until,
     )?;
+    #[cfg(unix)]
+    stderr_to_null();
     let executor = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

@@ -1895,6 +1895,39 @@
                 "observed_at_ms": {
                   "kind": "integer"
                 },
+                "start_exit_code": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "integer"
+                  }
+                },
+                "start_failure": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "enum",
+                    "variants": [
+                      "admission",
+                      "digest",
+                      "copy",
+                      "spawn",
+                      "exited_before_handshake",
+                      "handshake_deadline",
+                      "handshake_mismatch"
+                    ]
+                  }
+                },
+                "start_log": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "string"
+                  }
+                },
+                "start_signal": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "integer"
+                  }
+                },
                 "state": {
                   "kind": "enum",
                   "variants": [
@@ -3035,6 +3068,39 @@
                 },
                 "observed_at_ms": {
                   "kind": "integer"
+                },
+                "start_exit_code": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "integer"
+                  }
+                },
+                "start_failure": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "enum",
+                    "variants": [
+                      "admission",
+                      "digest",
+                      "copy",
+                      "spawn",
+                      "exited_before_handshake",
+                      "handshake_deadline",
+                      "handshake_mismatch"
+                    ]
+                  }
+                },
+                "start_log": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "string"
+                  }
+                },
+                "start_signal": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "integer"
+                  }
                 },
                 "state": {
                   "kind": "enum",
