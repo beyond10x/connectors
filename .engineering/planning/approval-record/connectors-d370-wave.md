@@ -10,7 +10,7 @@ relations:
 - decides: story:program-start-failure-reason
 - decides: story:provider-programs-run-on-macos
 - decides: story:kubernetes-exec-plugin-on-macos
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "approved", at: "2026-11-02T07:27:31Z", actor: "human:timo", revision: 2, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
 ---
@@ -70,3 +70,11 @@ document the xattr step in the README instead."
   decision is accepted with the documented residual; record it in the store."
 - No pre-release: the repository's release workflow admits only `vX.Y.Z` tags, so the adopter tests
   0.65.0. The orchestrator, 2026-11-02: "No pre-release: the adopter tests 0.65.0."
+- U2 (`story:program-start-failure-reason`), 2026-11-02: the owner reads a starting program's
+  standard-error pipe on a thread while the program starts, keeping the first 64 KiB and dropping
+  the rest, so a program that writes more than the pipe holds before its handshake is not held up
+  and misreported as `handshake_deadline`. The last read after the start ends is bounded, so a
+  writer that never stops cannot hold the start. Test:
+  `a_program_that_floods_standard_error_is_not_held_up_and_its_log_is_bounded`.
+- Release: 0.65.0, dated 2026-11-02 in the CHANGELOG; version in `Cargo.toml`, `Cargo.lock` and
+  the getting-started page.
