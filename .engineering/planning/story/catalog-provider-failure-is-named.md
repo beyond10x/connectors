@@ -7,7 +7,7 @@ title: A catalog provider that cannot run is named, not blamed on the endpoint
 summary: 'D370 item 2: provider failure refusal, setup check, init writes local/5'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-02T07:27:31Z", actor: "human:operator", revision: 2, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
 - {from: "proposed", to: "active", at: "2026-11-02T07:27:31Z", actor: "human:operator", revision: 3, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
@@ -35,12 +35,12 @@ Reproduced on Linux with the v0.64.0 archive: `connectors` alone in a directory 
 
 - With no provider beside `connectors`, or with a provider that exits non-zero, is killed or prints
   nothing, `connections connect <c>/<i> --endpoint https://<host>` is refused with a code other than
-  `invalid_input`. The refusal names the stage `catalog_provider`, the provider path, and one reason
+  `invalid_input`. The refusal is `unavailable` at stage `installed_provider`, with `installed_provider_path` (the provider path) and `installed_provider_failure`, one reason
   out of a bounded set (`missing`, `not_executable`, `killed`, `exited`, `deadline`, `unreadable_output`).
 - An endpoint the provider itself refuses (`https://<host>/api/v4` for GitLab) is still
   `invalid_input` naming `endpoint`.
-- `setup check` lists a `catalog_provider` prerequisite: `ready` when the provider beside
-  `connectors` prints its version, `failed` with the reason otherwise.
+- `setup check` lists an `installed_provider` prerequisite: `ready` when the provider beside
+  `connectors` prints its version, `failed` with `installed_provider_failure` otherwise. The names are `installed_provider`, not `catalog_provider`, so that the provider vocabulary stays out of the shared ESS domain (decided in the wave, 2026-11-02).
 - `setup init` creates a `connectors-local/5` configuration, and `connect --endpoint` on it writes
   the instance. `setup migrate --apply` moves a `/2` file with no legacy entries to `/5`.
 - The GitLab onboarding page and the README state the accepted endpoint form, and on macOS the
