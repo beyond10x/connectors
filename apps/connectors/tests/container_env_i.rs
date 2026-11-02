@@ -35,12 +35,24 @@ fn env_i_mounted_custody_round_trip() {
     assert_eq!(init["disposition"], "state_initialized", "{init}");
     let check = success(&container.run(&["setup", "check"]));
     assert_eq!(check["custody_backend"], "mounted_secret", "{check}");
+    // The container installs `connectors` alone and pins its entry, so the
+    // catalog provider, which derives unpinned instances only, is named
+    // missing (story:catalog-provider-failure-is-named); every other
+    // prerequisite is ready.
+    let prerequisites = check["prerequisites"].as_array().unwrap();
     assert!(
-        check["prerequisites"]
-            .as_array()
-            .unwrap()
+        prerequisites
             .iter()
+            .filter(|p| p["name"] != "installed_provider")
             .all(|p| p["state"] == "ready"),
+        "{check}"
+    );
+    assert!(
+        prerequisites
+            .iter()
+            .any(|p| p["name"] == "installed_provider"
+                && p["state"] == "failed"
+                && p["installed_provider_failure"] == "missing"),
         "{check}"
     );
     let connected = success(&container.connect(PROFILE));

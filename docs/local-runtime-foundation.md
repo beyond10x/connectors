@@ -24,7 +24,7 @@ Otherwise the binding uses the absolute XDG configuration/state directories, or
 the corresponding directories beneath the user's home. There is no current
 directory search or migration from an existing installed Connectors deployment.
 
-Initialization creates an empty `connectors-local/2` TOML configuration bound to
+Initialization creates an empty `connectors-local/5` TOML configuration bound to
 the effective Linux UID, owner-only directories and a private SQLite database.
 It never replaces an existing configuration. When that configuration loads and
 its state directory holds no metadata database, it initialises the state and
@@ -43,8 +43,8 @@ installs or starts an instance's process, and `setup check` reports unavailable 
 artifacts as failed prerequisites. Credentials never belong in configuration or
 executable arguments.
 
-Setup writes `connectors-local/2`, and the parser still accepts an existing
-`connectors-local/1` configuration. Every legacy `[adapters.<alias>]` entry in version two
+Setup writes `connectors-local/5`, and the parser still accepts an existing
+`connectors-local/1` configuration. Every legacy `[adapters.<alias>]` entry in version two and later
 requires `private_protocol`, exactly `connectors-private/1`, `connectors-private/2` or
 `connectors-private/3`.
 Version one refuses that field and keeps its implicit private version one;

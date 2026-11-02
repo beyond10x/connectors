@@ -495,6 +495,25 @@ pub(super) fn schema_newer(store: Option<String>) -> HandlerReply {
     }
 }
 
+/// `unavailable` at `installed_provider` (story:catalog-provider-failure-is-named):
+/// the catalog provider installed beside the CLI does not run, so nothing it
+/// would derive was refused. Named by its path and why, never by OS text.
+fn provider_unavailable(
+    unavailable: connectors_host::local::config::ProviderUnavailable,
+) -> HandlerReply {
+    let mut reply = failure(
+        "unavailable",
+        "installed_provider",
+        "check_configuration",
+        false,
+    );
+    if let HandlerReply::Error { data, .. } = &mut reply {
+        data["installed_provider_path"] = json!(unavailable.path.to_string_lossy());
+        data["installed_provider_failure"] = json!(unavailable.failure.as_str());
+    }
+    reply
+}
+
 fn host_failure(error: Failure) -> HandlerReply {
     match error {
         Failure::MetadataSchemaNewer(store) => {
@@ -656,6 +675,19 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
             opened => opened.is_ok(),
         };
         checks.push(json!({"name":"metadata", "state": if metadata {"ready"} else {"failed"}, "next_action":if metadata {"none"} else {"check_configuration"}}));
+        // Every derived instance is started from the catalog provider beside
+        // this CLI: one that does not print its version derives none
+        // (story:catalog-provider-failure-is-named).
+        checks.push(
+            match connectors_host::local::config::installed_provider_runs() {
+                Ok(()) => {
+                    json!({"name":"installed_provider", "state":"ready", "next_action":"none"})
+                }
+                Err(unavailable) => {
+                    json!({"name":"installed_provider", "state":"failed", "next_action":"check_configuration", "installed_provider_failure":unavailable.failure.as_str()})
+                }
+            },
+        );
         for (alias, adapter) in &config.adapters {
             let ready = adapter.executable.check().is_ok();
             checks.push(json!({"name":format!("artifact:{alias}"), "state":if ready {"ready"} else {"failed"}, "next_action":if ready {"none"} else {"check_configuration"}}));

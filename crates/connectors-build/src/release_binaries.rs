@@ -403,12 +403,19 @@ mod tests {
     }
 
     #[test]
-    fn the_release_workflow_packages_the_cli_and_the_catalog_provider() {
+    fn the_release_workflow_packages_the_cli_the_catalog_provider_and_the_provider_programs() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
         let workflow = std::fs::read_to_string(root.join(WORKFLOW)).unwrap();
         assert_eq!(
             packaged(&workflow).unwrap(),
-            strings(&["connectors", "connectors-catalog-provider"])
+            strings(&[
+                "connectors",
+                "connectors-catalog-provider",
+                "connectors-grafana",
+                "connectors-prometheus",
+                "connectors-loki",
+                "connectors-kubernetes",
+            ])
         );
     }
 }

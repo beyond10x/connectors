@@ -65,11 +65,11 @@ fn follow_documented_steps(doc: &str) {
     let root = tempfile::tempdir().unwrap();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
-    // The guides say to change the format line: instances are a `connectors-local/5` table.
+    // Setup writes `connectors-local/5`, the format instances need
+    // (story:catalog-provider-failure-is-named).
     let created = fs::read_to_string(&config_path).unwrap();
-    assert!(created.contains("format = \"connectors-local/2\""));
-    let config =
-        created.replace("connectors-local/2", "connectors-local/5") + "\n" + &documented_entry(doc);
+    assert!(created.contains("format = \"connectors-local/5\""));
+    let config = created + "\n" + &documented_entry(doc);
     fs::write(&config_path, config).unwrap();
     let output = command(&root, &["setup", "check"]);
     assert!(
@@ -100,7 +100,7 @@ fn legacy_root(with_entry: bool) -> (tempfile::TempDir, std::path::PathBuf, Vec<
     let config_path = root.path().join("config/config.toml");
     let mut text = fs::read_to_string(&config_path)
         .unwrap()
-        .replace("connectors-local/2", "connectors-local/1");
+        .replace("connectors-local/5", "connectors-local/1");
     assert!(text.contains("format = \"connectors-local/1\""));
     if with_entry {
         text += &format!(
@@ -175,6 +175,6 @@ fn initialized_empty_configuration_is_byte_stable_apart_from_owner() {
         .to_owned();
     assert_eq!(
         text.replace(&uid, "owner_uid = UID"),
-        "# Linux Secret Service custody is required; credentials never belong here.\nformat = \"connectors-local/2\"\nowner_uid = UID\n\n[adapters]\n"
+        "# Linux Secret Service custody is required; credentials never belong here.\nformat = \"connectors-local/5\"\nowner_uid = UID\n\n[adapters]\n"
     );
 }

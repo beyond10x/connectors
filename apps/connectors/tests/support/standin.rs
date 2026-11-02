@@ -10,8 +10,10 @@
 //! installation's `bin` directory, so a test reads which endpoint the provider
 //! was given, and prints a bootstrap for exactly that selection whose
 //! configuration revision digests the endpoint. As a child it serves the same
-//! bootstrap and validates nothing. An endpoint containing `refuse` is refused,
-//! as a provider refuses an endpoint it cannot use.
+//! bootstrap and validates nothing. An endpoint containing `refuse`, or one
+//! that already ends in GitLab's `/api/v4`, is refused, as a provider refuses
+//! an endpoint it cannot use. `--version` prints a version, as the catalog
+//! provider's does.
 //!
 //! For story:migrate-writes-the-short-instance-form it also stands in for a
 //! migrated GitLab instance, emulating the catalog provider's revision
@@ -251,6 +253,11 @@ pub fn read_schema(args: &[String]) -> (String, String) {
 /// does: 0 when every selected test passed, 101 otherwise.
 pub fn main(tests: &[(&str, fn())]) {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    misbehave();
+    if args.iter().any(|arg| arg == "--version") {
+        println!("connectors-catalog-provider standin");
+        return;
+    }
     if args.iter().any(|arg| arg == "--print-revision-inputs") {
         let Some(inputs) = inputs(&args) else {
             std::process::exit(1);
@@ -278,7 +285,9 @@ pub fn main(tests: &[(&str, fn())]) {
         {
             writeln!(log, "{}", args.join("\n")).unwrap();
         }
-        if option(&args, "endpoint").is_some_and(|endpoint| endpoint.contains("refuse")) {
+        if option(&args, "endpoint").is_some_and(|endpoint| {
+            endpoint.contains("refuse") || endpoint.trim_end_matches('/').ends_with("/api/v4")
+        }) {
             std::process::exit(1);
         }
         println!("{}", serde_json::to_string(&bootstrap(&args)).unwrap());
@@ -317,6 +326,45 @@ pub fn main(tests: &[(&str, fn())]) {
         println!("failures: {failed:?}");
         std::process::exit(101);
     }
+}
+
+/// How an installed stand-in misbehaves for every argument
+/// (story:catalog-provider-failure-is-named), read from `misbehave` beside its
+/// installation's `bin` directory: `exit` exits 3, `silent` prints nothing and
+/// exits 0, `kill` ends on SIGKILL, `hang` sleeps 30 seconds, past the host's ten-second
+/// deadline. Only a copy installed as
+/// `connectors-catalog-provider` reads it, never the test runner.
+fn misbehave() {
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    if exe.file_name() != Some(std::ffi::OsStr::new("connectors-catalog-provider")) {
+        return;
+    }
+    let Some(root) = exe.parent().and_then(Path::parent) else {
+        return;
+    };
+    match fs::read_to_string(root.join("misbehave")).as_deref() {
+        Ok("exit") => std::process::exit(3),
+        Ok("silent") => std::process::exit(0),
+        Ok("hang") => std::thread::sleep(std::time::Duration::from_secs(30)),
+        Ok("kill") => {
+            // SAFETY: raising a signal on this process takes no pointers.
+            unsafe {
+                libc::raise(libc::SIGKILL);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// The ways [`misbehave`] makes an installed stand-in fail.
+#[derive(Clone, Copy)]
+pub enum Misbehaviour {
+    Exit,
+    Silent,
+    Kill,
+    Hang,
 }
 
 fn private_file(path: &Path, bytes: &[u8], mode: u32) {
@@ -420,6 +468,22 @@ impl Installation {
     /// Forget the recorded provider starts.
     pub fn forget_calls(&self) {
         let _ = fs::remove_file(self.root.path().join("args"));
+    }
+
+    /// The path of the catalog provider beside the installed CLI.
+    pub fn provider(&self) -> PathBuf {
+        self.root.path().join("bin/connectors-catalog-provider")
+    }
+
+    /// Make the installed stand-in fail for every argument ([`misbehave`]).
+    pub fn misbehave(&self, how: Misbehaviour) {
+        let word = match how {
+            Misbehaviour::Exit => "exit",
+            Misbehaviour::Silent => "silent",
+            Misbehaviour::Kill => "kill",
+            Misbehaviour::Hang => "hang",
+        };
+        fs::write(self.root.path().join("misbehave"), word).unwrap();
     }
 }
 

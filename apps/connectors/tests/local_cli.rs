@@ -396,7 +396,7 @@ fn configured_entry(root: &tempfile::TempDir, format: &str, private_protocol: &s
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path)
         .unwrap()
-        .replace("connectors-local/2", format)
+        .replace("connectors-local/5", format)
         + &format!(
             "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\n{private_protocol}[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
             "a".repeat(64)
