@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.65.0 — 2026-11-02
+
+### Fixed
+
+- `connections connect --endpoint` no longer blames the endpoint when the catalog provider
+  installed beside the CLI cannot run (story:catalog-provider-failure-is-named). After a refused
+  derivation the host runs that provider with `--version`; a provider that is missing, not
+  executable, killed, exited, past its deadline or printing nothing usable answers `unavailable`
+  at stage `installed_provider`, with `installed_provider_path` and `installed_provider_failure`.
+  Before, every endpoint was refused as `invalid_input` on `endpoint`, which on macOS is what a
+  quarantined or unsigned download looks like. An endpoint a running provider refuses stays
+  `invalid_input` on `endpoint`. `setup check` lists the `installed_provider` prerequisite.
+- `setup init` writes `connectors-local/5`, and `setup migrate --apply` moves a
+  `connectors-local/2` file with no legacy entries to `/5`, with a backup, so instance tables
+  can be written into a freshly initialized file.
+
+### Added
+
+- A program that fails to start says why (story:program-start-failure-reason). `instances
+  status` names the step for a failed instance, `start_failure` (`admission`, `digest`, `copy`,
+  `spawn`, `exited_before_handshake`, `handshake_deadline`, `handshake_mismatch`), with
+  `start_exit_code` or `start_signal` when the program ended, and `start_log`: an owner-only
+  file under the state directory, `start-logs/<instance id>.log`, holding the first 64 KiB the
+  program wrote to standard error before its handshake ended, replaced on each start. The owner
+  reads that pipe while the program starts, so a program that writes more is not held up. After
+  the handshake the program's standard error goes to `/dev/null` as before: nothing it writes
+  once it can hold a credential is kept. The failure codes are unchanged. Windows keeps no start
+  log.
+- The release archives carry `connectors-grafana`, `connectors-prometheus`, `connectors-loki`
+  and `connectors-kubernetes` beside `connectors` and `connectors-catalog-provider`, for every
+  target, including Apple-silicon macOS (story:provider-programs-run-on-macos). Each program
+  answers `--version`. A new macOS CI job runs clippy and every test target of the four
+  programs. The Grafana, Loki and Prometheus READMEs state macOS support and show how to pin a
+  program from the release archive, including the quarantine step for the unsigned macOS
+  binaries.
+- A Kubernetes exec credential plugin, such as `aws eks get-token`, runs on macOS
+  (story:kubernetes-exec-plugin-on-macos). macOS cannot run an open file, so the pinned path
+  itself runs after the same checks as on Linux. Every directory on the path must be owned by
+  root or by the user and not writable by group or others, and right before the run the path
+  must still name the file that was hashed. Root or a process running as the same user can
+  still swap the file between the check and the run; Linux keeps running the file it hashed.
+  The pin must name the plugin's real file, not a symbolic link on `PATH`.
+
 ## 0.64.0 — 2026-10-31
 
 ### Fixed
