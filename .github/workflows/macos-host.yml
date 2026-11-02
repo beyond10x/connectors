@@ -58,6 +58,19 @@ jobs:
           rustup toolchain install 1.98.1 --profile minimal --component clippy
           rustup default 1.98.1
           rustc --version
+      - name: Install the pinned ess release
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          version="$(jq -r .ess "$GITHUB_WORKSPACE/crates/connectors-spec/toolchain.json")"
+          archive="ess-$version-aarch64-apple-darwin.tar.gz"
+          base="https://github.com/beyond10x/ess/releases/download/$version"
+          curl -fsSLO "$base/$archive"
+          curl -fsSL -o ess-SHA256SUMS "$base/SHA256SUMS"
+          grep " $archive\$" ess-SHA256SUMS | shasum -a 256 -c -
+          tar -xzf "$archive"
+          echo "$PWD/ess-$version-aarch64-apple-darwin" >> "$GITHUB_PATH"
       - name: Lint the programs
         shell: bash
         run: |
