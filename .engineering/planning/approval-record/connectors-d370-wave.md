@@ -10,7 +10,7 @@ relations:
 - decides: story:program-start-failure-reason
 - decides: story:provider-programs-run-on-macos
 - decides: story:kubernetes-exec-plugin-on-macos
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "approved", at: "2026-11-02T07:27:31Z", actor: "human:operator", revision: 2, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
 ---
@@ -55,3 +55,18 @@ document the xattr step in the README instead."
 - Item 1, inferred: the start of a pinned program on macOS fails before or during the handshake. Its
   stderr goes to `/dev/null` (`crates/connectors-host/src/local/runtime/process.rs:84`). The cause
   is still to be verified on the macOS runner.
+
+## Decided in the wave
+
+- D372, 2026-11-02, U4 (`story:kubernetes-exec-plugin-on-macos`): on macOS the pinned exec credential
+  plugin runs from its pinned path, not from a copy. A copy breaks a bundled CLI that loads files from
+  beside its executable, which is the story's own example. Before the run: the final component is
+  not a symbolic link (`O_NOFOLLOW`); the open descriptor passes the Linux file checks and the pinned
+  SHA-256; every directory of the resolved parent path, from `/`, is owned by root or the effective
+  uid and is not group- or world-writable; and right before spawn the path still names the
+  descriptor's (dev, ino). Residual, documented in the reads contract and in
+  `docs/local-kubernetes-cli.md`: root or the same user can replace the file between the check and
+  the exec. The orchestrator, 2026-11-02: "D372 (recorded in decisions.md): your U4 in-place exec
+  decision is accepted with the documented residual; record it in the store."
+- No pre-release: the repository's release workflow admits only `vX.Y.Z` tags, so the adopter tests
+  0.65.0. The orchestrator, 2026-11-02: "No pre-release: the adopter tests 0.65.0."
