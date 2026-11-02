@@ -41,3 +41,60 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
         run: cargo test --locked --no-fail-fast -p connectors-host -p connectors
+
+  programs:
+    name: provider programs on macos-latest
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      PROGRAMS: connectors-grafana connectors-prometheus connectors-loki connectors-kubernetes
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install Rust 1.98.1
+        shell: bash
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --component clippy
+          rustup default 1.98.1
+          rustc --version
+      - name: Install the pinned ess release
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          version="$(jq -r .ess "$GITHUB_WORKSPACE/crates/connectors-spec/toolchain.json")"
+          archive="ess-$version-aarch64-apple-darwin.tar.gz"
+          base="https://github.com/beyond10x/ess/releases/download/$version"
+          curl -fsSLO "$base/$archive"
+          curl -fsSL -o ess-SHA256SUMS "$base/SHA256SUMS"
+          grep " $archive\$" ess-SHA256SUMS | shasum -a 256 -c -
+          tar -xzf "$archive"
+          echo "$PWD/ess-$version-aarch64-apple-darwin" >> "$GITHUB_PATH"
+      - name: Lint the programs
+        shell: bash
+        run: |
+          set -euo pipefail
+          packages=()
+          for program in $PROGRAMS; do packages+=(-p "$program"); done
+          cargo clippy --locked "${packages[@]}" --all-targets -- -D warnings
+      - name: Build the CLI and the catalog provider
+        shell: bash
+        run: cargo build --locked -p connectors -p connectors-catalog-provider
+      - name: Each program names its version
+        shell: bash
+        run: |
+          set -euo pipefail
+          packages=()
+          for program in $PROGRAMS; do packages+=(-p "$program"); done
+          cargo build --locked "${packages[@]}"
+          for program in $PROGRAMS; do "target/debug/${program}" --version; done
+      - name: Test the programs
+        shell: bash
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          packages=()
+          for program in $PROGRAMS; do packages+=(-p "$program"); done
+          cargo test --locked --no-fail-fast "${packages[@]}"

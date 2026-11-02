@@ -47,7 +47,12 @@ extern "C" fn standin_provider() {
     // filtered harness run is never the provider.
     let provider = !args.iter().any(|arg| arg == "--exact")
         && args.iter().any(|arg| {
-            arg == "--print-local-bootstrap" || arg == "--print-profiles" || arg == "--connector"
+            arg == "--print-local-bootstrap"
+                || arg == "--print-profiles"
+                || arg == "--connector"
+                // story:catalog-provider-failure-is-named: the CLI asks a
+                // provider whose derivation refused whether it runs at all.
+                || arg == "--version"
         });
     if provider {
         standin::main(&[]);

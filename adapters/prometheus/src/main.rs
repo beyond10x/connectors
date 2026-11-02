@@ -4,6 +4,7 @@ mod local;
 
 /// The Prometheus PromQL read adapter, run by the local `connectors` host.
 #[derive(Parser)]
+#[command(version)]
 struct Args {
     /// Owner-only nonsecret configuration for the private host binding.
     #[arg(long)]

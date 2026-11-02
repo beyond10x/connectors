@@ -339,13 +339,14 @@ fn write(
     }
     // A file every later read refuses is never written. When the file read
     // before the edit and only the edit is refused, the provider refused the
-    // endpoint while deriving the instance: the argument's refusal.
+    // endpoint while deriving the instance: the argument's refusal, if the
+    // provider runs at all ([`refused_endpoint`]).
     let config = match Config::parse(&written) {
         Ok(config) => config,
         Err(refusal @ Refusal::Rule(_)) => return Err(configuration_refusal(refusal)),
         Err(refusal) => {
             return Err(if Config::parse(&text).is_ok() {
-                argument("endpoint")
+                refused_endpoint()
             } else {
                 configuration_refusal(refusal)
             });
@@ -371,6 +372,18 @@ fn write(
             publish(paths, &written, &text, mode)?;
             Err(invalid_configuration())
         }
+    }
+}
+
+/// A derivation at the given endpoint was refused: `invalid_input` naming
+/// `endpoint` when the installed catalog provider runs, so the provider
+/// refused that endpoint; otherwise `unavailable` at `installed_provider` naming
+/// the provider and why it does not run, since it refused nothing
+/// (story:catalog-provider-failure-is-named).
+fn refused_endpoint() -> HandlerReply {
+    match connectors_host::local::config::installed_provider_runs() {
+        Ok(()) => argument("endpoint"),
+        Err(unavailable) => provider_unavailable(unavailable),
     }
 }
 
@@ -417,7 +430,7 @@ fn moves_no_connection(
     let (instance_id, authority) = connectors_host::local::config::derived_authority(
         connector, instance, endpoint, profile, stated,
     )
-    .map_err(|_| argument("endpoint"))?;
+    .map_err(|_| refused_endpoint())?;
     let moved = connectors_host::local::registry::Registry::with_system_clock(&paths.state)
         .authority_moves(&instance_id, &authority)
         .map_err(connections::registry_failure)?;

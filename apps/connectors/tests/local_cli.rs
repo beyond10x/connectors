@@ -396,7 +396,7 @@ fn configured_entry(root: &tempfile::TempDir, format: &str, private_protocol: &s
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path)
         .unwrap()
-        .replace("connectors-local/2", format)
+        .replace("connectors-local/5", format)
         + &format!(
             "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\n{private_protocol}[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
             "a".repeat(64)
@@ -1731,4 +1731,94 @@ fn adversary_a_permitted_profile_with_no_protected_source_is_refused_before_the_
         "{error}"
     );
     assert_eq!(output.status.code(), Some(2), "{output:?}");
+}
+
+/// The program [`instances_status_names_why_a_program_did_not_start`]
+/// configures: this test binary, re-entered through libtest's filter with the
+/// private channel's arguments. Like a provider program that refuses to start,
+/// it prints its own error line and exits 3 before its handshake. Written to
+/// the descriptor itself: libtest captures `eprintln!`. An ordinary run does
+/// nothing.
+#[test]
+fn start_failure_fixture() {
+    if !std::env::args().any(|argument| argument == "--connectors-private-fd") {
+        return;
+    }
+    let _ = std::io::Write::write_all(&mut std::io::stderr(), b"fixture: refused to start\n");
+    std::process::exit(3);
+}
+
+/// story:program-start-failure-reason: `instances status --output json` of an
+/// instance whose program printed a line and exited 3 before its handshake
+/// names `exited_before_handshake`, exit code 3, and the owner-only start log
+/// under the state directory holding that line; of one whose executable is
+/// not the pinned one, `digest`. Unix only: the owner is started the way the
+/// CLI starts it, with descriptors a Unix shell hands over, and Windows keeps
+/// no start log.
+#[cfg(unix)]
+#[test]
+fn instances_status_names_why_a_program_did_not_start() {
+    let root = tempfile::tempdir().unwrap();
+    success(&command(&root, &["setup", "init"]));
+    let config_path = root.path().join("config/config.toml");
+    let program = std::env::current_exe().unwrap().canonicalize().unwrap();
+    let digest: String = ring::digest::digest(&ring::digest::SHA256, &fs::read(&program).unwrap())
+        .as_ref()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let path = serde_json::to_string(program.to_str().unwrap()).unwrap();
+    let entry = |alias: &str, sha256: &str| {
+        format!(
+            "\n[adapters.{alias}]\ninstance_id='{alias}-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\nstartup='automatic'\nrestart='never'\n[adapters.{alias}.executable]\npath={path}\nsha256='{sha256}'\nargs=['--exact','start_failure_fixture','--']\n"
+        )
+    };
+    let config = fs::read_to_string(&config_path).unwrap()
+        + &entry("forge", &digest)
+        + &entry("pinned", &"0".repeat(64));
+    fs::write(&config_path, config).unwrap();
+    let _owner = start_owner(
+        std::path::Path::new(env!("CARGO_BIN_EXE_connectors")),
+        &root,
+    );
+
+    let failed = |alias: &str| {
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        loop {
+            let status = success(&command(
+                &root,
+                &["instances", "status", "--adapter", alias],
+            ));
+            if status["observation"]["state"] == "failed" {
+                return status["observation"].clone();
+            }
+            assert!(
+                std::time::Instant::now() < until,
+                "{alias} never failed: {status}"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    };
+    let exited = failed("forge");
+    assert_eq!(
+        exited["start_failure"], "exited_before_handshake",
+        "{exited}"
+    );
+    assert_eq!(exited["start_exit_code"], 3, "{exited}");
+    assert!(exited.get("start_signal").is_none(), "{exited}");
+    let log = root.path().join("state/start-logs/forge-local.log");
+    assert_eq!(exited["start_log"], log.to_str().unwrap(), "{exited}");
+    assert_eq!(
+        fs::read_to_string(&log).unwrap(),
+        "fixture: refused to start\n"
+    );
+    let metadata = fs::symlink_metadata(&log).unwrap();
+    assert!(metadata.is_file());
+    assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
+
+    let pinned = failed("pinned");
+    assert_eq!(pinned["start_failure"], "digest", "{pinned}");
+    assert!(pinned.get("start_exit_code").is_none(), "{pinned}");
+    let stopped = success(&command(&root, &["setup", "owner-stop"]));
+    assert_eq!(stopped["disposition"], "stopped", "{stopped}");
 }

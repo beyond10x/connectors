@@ -6,6 +6,7 @@ use std::fs::File;
 use std::os::fd::FromRawFd;
 use std::{
     marker::PhantomData,
+    path::{Path, PathBuf},
     rc::Rc,
     time::{Duration, Instant},
 };
@@ -20,6 +21,239 @@ use std::{
 
 /// How a read decodes the result a child wrote.
 type Decode = fn(&[u8]) -> Result<serde_json::Value>;
+
+/// The step at which a start of an instance's program failed
+/// (`connectors.cli.StartFailure`, ess/domains/cli.yaml;
+/// story:program-start-failure-reason). It is data beside the start's
+/// failure code, which it never changes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StartFailure {
+    /// The configured executable's path was not admitted.
+    Admission,
+    /// The executable's content is not the pinned one: its digest or its
+    /// executable format differs.
+    Digest,
+    /// The owner's private copy of the executable could not be made or
+    /// launched: the sealed snapshot on Linux, the owner-private copy on
+    /// macOS (`artifact::launch_path`), the deny-write copy on Windows.
+    Copy,
+    /// The process, or the channel or standard-error pipe it starts with,
+    /// could not be created.
+    Spawn,
+    /// The program exited before its handshake finished, with its exit code
+    /// or ended by a signal.
+    ExitedBeforeHandshake {
+        code: Option<i64>,
+        signal: Option<i32>,
+    },
+    /// The handshake did not finish by its deadline.
+    HandshakeDeadline,
+    /// The program answered the handshake with anything but the readiness
+    /// its configuration expects (`readiness_mismatch`), or broke its channel
+    /// while still running.
+    HandshakeMismatch,
+}
+impl StartFailure {
+    /// The value `instances status` prints as `start_failure`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Admission => "admission",
+            Self::Digest => "digest",
+            Self::Copy => "copy",
+            Self::Spawn => "spawn",
+            Self::ExitedBeforeHandshake { .. } => "exited_before_handshake",
+            Self::HandshakeDeadline => "handshake_deadline",
+            Self::HandshakeMismatch => "handshake_mismatch",
+        }
+    }
+}
+
+/// A failed [`Child::start`]: the failure code the caller answers, as
+/// before, the step that failed and the start log the attempt kept.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StartError {
+    pub failure: Failure,
+    pub step: StartFailure,
+    pub log: Option<PathBuf>,
+}
+
+/// The directory under the state directory holding one start log per instance.
+pub const START_LOGS: &str = "start-logs";
+/// The most bytes of a program's standard error a start log keeps.
+pub const START_LOG_LIMIT: usize = 64 * 1024;
+
+/// The file name of `instance`'s start log: the id with every byte other than
+/// an ASCII letter, digit, `-` or `_` written as `%XX`, so distinct ids never
+/// share a name and no name is `.`, `..` or holds a separator; an id whose
+/// name would be empty or longer than 200 bytes is named by its SHA-256.
+pub fn start_log_name(instance: &str) -> String {
+    use sha2::Digest as _;
+    use std::fmt::Write as _;
+    let mut name = String::new();
+    for byte in instance.bytes() {
+        if byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_' {
+            name.push(char::from(byte));
+        } else {
+            let _ = write!(name, "%{byte:02X}");
+        }
+    }
+    if name.is_empty() || name.len() > 200 {
+        name = format!(
+            "sha256-{}",
+            hex::encode(sha2::Sha256::digest(instance.as_bytes()))
+        );
+    }
+    name + ".log"
+}
+
+/// The owner's end of the pipe a starting program writes its standard error
+/// to: a thread that reads it while the program starts, keeping the first
+/// [`START_LOG_LIMIT`] bytes and dropping the rest, so a program that writes
+/// more than the pipe holds before its handshake is never held up by it.
+/// Windows starts a program with no standard handles and keeps none.
+#[cfg(unix)]
+struct Stderr {
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    reader: Option<std::thread::JoinHandle<Vec<u8>>>,
+}
+#[cfg(windows)]
+type Stderr = std::convert::Infallible;
+
+#[cfg(unix)]
+impl Stderr {
+    /// Ends the reading: what was written before this call is taken, the
+    /// owner's end is closed, and the kept bytes are returned.
+    fn finish(mut self) -> Vec<u8> {
+        self.stop.store(true, std::sync::atomic::Ordering::Release);
+        self.reader
+            .take()
+            .and_then(|reader| reader.join().ok())
+            .unwrap_or_default()
+    }
+}
+#[cfg(unix)]
+impl Drop for Stderr {
+    fn drop(&mut self) {
+        self.stop.store(true, std::sync::atomic::Ordering::Release);
+    }
+}
+
+/// Reads the owner's non-blocking end of a start's standard-error pipe until
+/// the program closes its end or `stop` is set, keeping the first
+/// [`START_LOG_LIMIT`] bytes. Once `stop` is set one last pass takes what is
+/// already in the pipe, bounded so that a writer which never stops cannot hold
+/// the start.
+#[cfg(unix)]
+fn drain(mut reader: std::io::PipeReader, stop: &std::sync::atomic::AtomicBool) -> Vec<u8> {
+    let mut kept = Vec::new();
+    let mut buffer = [0u8; 8192];
+    loop {
+        let stopping = stop.load(std::sync::atomic::Ordering::Acquire);
+        let mut taken = 0usize;
+        loop {
+            if stopping && taken >= 4 * START_LOG_LIMIT {
+                return kept;
+            }
+            match std::io::Read::read(&mut reader, &mut buffer) {
+                Ok(0) => return kept,
+                Ok(count) => {
+                    taken += count;
+                    let take = count.min(START_LOG_LIMIT - kept.len());
+                    kept.extend_from_slice(&buffer[..take]);
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+                // Nothing more is buffered, or the pipe failed.
+                Err(_) => break,
+            }
+        }
+        if stopping {
+            return kept;
+        }
+        let mut ready = libc::pollfd {
+            fd: reader.as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        // SAFETY: one live pollfd on a descriptor this function owns; a
+        // timeout so `stop` is seen while the program writes nothing.
+        unsafe { libc::poll(&mut ready, 1, 20) };
+    }
+}
+
+/// Ends the reading of `stderr`, closing the owner's end, and, given the
+/// state directory, publishes the first [`START_LOG_LIMIT`] bytes the program
+/// wrote as `instance`'s start log: an owner-only file, replacing the one
+/// before, never written through a link
+/// ([`crate::local::filesystem::publish_replace`]). A log that cannot be
+/// kept leaves the start's outcome as it is.
+#[cfg(unix)]
+fn keep_start_log(stderr: Option<Stderr>, state: Option<&Path>, instance: &str) -> Option<PathBuf> {
+    use crate::local::filesystem;
+    let kept = stderr.map(Stderr::finish).unwrap_or_default();
+    let state = state?;
+    filesystem::directory(state, false, true).ok()?;
+    let directory = state.join(START_LOGS);
+    let held = filesystem::directory(&directory, true, true).ok()?;
+    let name = start_log_name(instance);
+    filesystem::publish_replace(&held, std::ffi::OsStr::new(&name), &kept).ok()?;
+    Some(directory.join(name))
+}
+#[cfg(windows)]
+fn keep_start_log(
+    _stderr: Option<Stderr>,
+    _state: Option<&Path>,
+    _instance: &str,
+) -> Option<PathBuf> {
+    None
+}
+
+/// The pipe a starting program's standard error goes to, with the thread
+/// that reads the owner's end ([`Stderr`]). That end does not block, so the
+/// thread sees a stop while the program writes nothing.
+#[cfg(unix)]
+fn stderr_pipe() -> Result<(Stderr, std::io::PipeWriter)> {
+    let (reader, writer) = std::io::pipe().map_err(|_| Failure::Unavailable)?;
+    let fd = reader.as_raw_fd();
+    // SAFETY: fcntl on a live descriptor this function owns, with scalar arguments.
+    let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+    if flags < 0 {
+        return Err(Failure::Unavailable);
+    }
+    // SAFETY: as above; only the status flags of the owner's end change.
+    if unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
+        return Err(Failure::Unavailable);
+    }
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let seen = std::sync::Arc::clone(&stop);
+    let reader = std::thread::Builder::new()
+        .name("connectors-start-log".into())
+        .spawn(move || drain(reader, &seen))
+        .map_err(|_| Failure::Unavailable)?;
+    Ok((
+        Stderr {
+            stop,
+            reader: Some(reader),
+        },
+        writer,
+    ))
+}
+
+/// A program that exited before its handshake finished, with its status.
+#[cfg(unix)]
+fn ended(status: std::process::ExitStatus) -> StartFailure {
+    use std::os::unix::process::ExitStatusExt;
+    StartFailure::ExitedBeforeHandshake {
+        code: status.code().map(i64::from),
+        signal: status.signal(),
+    }
+}
+#[cfg(windows)]
+fn ended(code: u32) -> StartFailure {
+    StartFailure::ExitedBeforeHandshake {
+        code: Some(i64::from(code)),
+        signal: None,
+    }
+}
 
 /// Owned process, never reconstructed from a PID or readiness file. It is not
 /// Send: its spawning thread must remain alive for the Linux parent-death lease.
@@ -54,16 +288,53 @@ impl Child {
         config: &super::super::config::Adapter,
         deadline: Instant,
     ) -> Result<Self> {
+        Self::start(config, deadline, None).map_err(|error| error.failure)
+    }
+    /// [`Child::spawn_until`], naming the step a failed start failed at
+    /// ([`StartFailure`]). Given the state directory, the program's standard
+    /// error up to the end of its handshake is kept, at most
+    /// [`START_LOG_LIMIT`] bytes, as the instance's start log under
+    /// [`START_LOGS`], replaced on each start; the error names its path. The
+    /// owner closes its end of that pipe before this returns, so nothing the
+    /// program writes once it can hold a credential is kept. Without a state
+    /// directory standard error goes nowhere, as it always did.
+    pub(crate) fn start(
+        config: &super::super::config::Adapter,
+        deadline: Instant,
+        state: Option<&Path>,
+    ) -> std::result::Result<Self, StartError> {
+        let mut stderr = None;
+        let started = Self::launch(config, deadline, &mut stderr);
+        // A failed start's process has been ended and reaped by now: the log
+        // holds what it wrote, and nothing more can arrive.
+        let log = keep_start_log(stderr, state, &config.instance_id);
+        started.map_err(|(failure, step)| StartError { failure, step, log })
+    }
+    fn launch(
+        config: &super::super::config::Adapter,
+        deadline: Instant,
+        stderr: &mut Option<Stderr>,
+    ) -> std::result::Result<Self, (Failure, StartFailure)> {
+        let spawn = |failure| (failure, StartFailure::Spawn);
         let until = deadline.min(Instant::now() + Duration::from_secs(10));
-        let executable = config.executable.capture(until)?;
+        let executable = config.executable.capture_explained(until)?;
         #[cfg(windows)]
-        let (process, image, channel) = spawn_windows(config, executable)?;
+        let _ = stderr;
+        #[cfg(windows)]
+        let (process, image, channel) = spawn_windows(config, executable).map_err(spawn)?;
         #[cfg(unix)]
-        let (channel, child_channel) = UnixStream::pair().map_err(|_| Failure::Unavailable)?;
+        let (channel, child_channel) =
+            UnixStream::pair().map_err(|_| spawn(Failure::Unavailable))?;
         #[cfg(unix)]
-        channel::peer(&channel)?;
+        channel::peer(&channel).map_err(spawn)?;
         #[cfg(unix)]
         let child_fd = child_channel.as_raw_fd();
+        #[cfg(unix)]
+        let (reader, writer) = stderr_pipe().map_err(spawn)?;
+        #[cfg(unix)]
+        {
+            *stderr = Some(reader);
+        }
         // SAFETY: getpid has no preconditions.
         #[cfg(unix)]
         let parent = unsafe { libc::getpid() };
@@ -71,9 +342,12 @@ impl Child {
         let mut command = Command::new(format!("/proc/self/fd/{}", executable.as_raw_fd()));
         // macOS executes the owner-private copy by its path (`owner_private_copy`).
         #[cfg(target_os = "macos")]
-        let launch = artifact::launch_path(&executable)?;
+        let launch =
+            artifact::launch_path(&executable).map_err(|failure| (failure, StartFailure::Copy))?;
         #[cfg(target_os = "macos")]
         let mut command = Command::new(launch.path());
+        // Standard error goes to the owner's pipe until the handshake ends
+        // (`Child::start`); the SDK's `serve` then points it at /dev/null.
         #[cfg(unix)]
         command
             .args(&config.executable.args)
@@ -81,7 +355,7 @@ impl Child {
             .env_clear()
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null());
+            .stderr(writer);
         // SAFETY: the hook uses only async-signal-safe syscalls, captured scalar
         // values and fixed errors. Both source descriptors remain held by spawn.
         #[cfg(unix)]
@@ -106,10 +380,13 @@ impl Child {
             });
         }
         #[cfg(target_os = "linux")]
-        let mut process = command.spawn().map_err(|_| Failure::Unavailable)?;
+        let mut process = command.spawn().map_err(|_| spawn(Failure::Unavailable))?;
         #[cfg(target_os = "macos")]
         let process =
-            artifact::ExactChild::spawn(&mut command).map_err(|_| Failure::Unavailable)?;
+            artifact::ExactChild::spawn(&mut command).map_err(|_| spawn(Failure::Unavailable))?;
+        // The command holds the pipe's write end: only the child keeps one.
+        #[cfg(unix)]
+        drop(command);
         #[cfg(unix)]
         drop(child_channel);
         #[cfg(unix)]
@@ -123,7 +400,7 @@ impl Child {
         if raw < 0 {
             let _ = process.kill();
             let _ = process.wait();
-            return Err(Failure::Unavailable);
+            return Err(spawn(Failure::Unavailable));
         }
         // SAFETY: the successful syscall returned a new owned descriptor.
         #[cfg(target_os = "linux")]
@@ -156,7 +433,7 @@ impl Child {
             live: true,
             _parent_thread: PhantomData,
         };
-        channel::write(
+        let response = channel::write(
             &mut child.channel,
             &Request::Hello {
                 version: config.private_protocol().as_str().into(),
@@ -166,8 +443,13 @@ impl Child {
             None,
             &[],
             until,
-        )?;
-        let response = channel::read::<Reply>(&mut child.channel, until, false, 0)?;
+        )
+        .and_then(|_| channel::read::<Reply>(&mut child.channel, until, false, 0));
+        let response = match response {
+            Ok(response) => response,
+            Err(failure) => return Err((failure, child.interrupted(failure))),
+        };
+        let mismatch = (Failure::ReadinessMismatch, StartFailure::HandshakeMismatch);
         let Reply::Ready {
             version,
             nonce: returned,
@@ -175,11 +457,11 @@ impl Child {
             bootstrap,
         } = response.control
         else {
-            return Err(Failure::ReadinessMismatch);
+            return Err(mismatch);
         };
         bootstrap
             .validate_for(config.private_protocol())
-            .map_err(|_| Failure::ReadinessMismatch)?;
+            .map_err(|_| mismatch)?;
         if version != config.private_protocol().as_str()
             || returned != nonce
             || child_incarnation != incarnation
@@ -194,20 +476,34 @@ impl Child {
                 .as_ref()
                 .is_some_and(|stated| bootstrap.credential_revision.as_ref() != Some(stated))
         {
-            return Err(Failure::ReadinessMismatch);
+            return Err(mismatch);
         }
         let mut bootstrap = bootstrap;
         bootstrap.configure(config);
-        if child
-            .process
-            .try_wait()
-            .map_err(|_| Failure::Unavailable)?
-            .is_some()
-        {
-            return Err(Failure::Unavailable);
+        match child.process.try_wait() {
+            Ok(None) => {}
+            Ok(Some(status)) => return Err((Failure::Unavailable, ended(status))),
+            Err(_) => return Err(spawn(Failure::Unavailable)),
         }
         child.bootstrap = bootstrap;
         Ok(child)
+    }
+    /// The step a handshake that failed with `failure` failed at: its
+    /// deadline, the program's exit or a broken handshake. A program that
+    /// exits closes its channel a moment before its exit can be reaped, so
+    /// the exit is awaited briefly.
+    fn interrupted(&mut self, failure: Failure) -> StartFailure {
+        if failure == Failure::Timeout {
+            return StartFailure::HandshakeDeadline;
+        }
+        let until = Instant::now() + Duration::from_millis(500);
+        loop {
+            match self.process.try_wait() {
+                Ok(Some(status)) => return ended(status),
+                Ok(None) if Instant::now() < until => std::thread::sleep(Duration::from_millis(10)),
+                _ => return StartFailure::HandshakeMismatch,
+            }
+        }
     }
     pub fn bootstrap(&self) -> &Bootstrap {
         &self.bootstrap
@@ -1033,6 +1329,23 @@ executable: None,
             .iter()
             .find(|a| a.starts_with("fixture-mode-"))
             .unwrap();
+        // Written to the descriptor itself: libtest captures `eprintln!`.
+        let stderr = |line: &[u8]| {
+            let _ = std::io::Write::write_all(&mut std::io::stderr(), line);
+        };
+        // A program that refuses to start: its own error line, exit 3.
+        if mode == "fixture-mode-stderr-exit" {
+            stderr(b"fixture: refused to start\n");
+            std::process::exit(3);
+        }
+        // Four times the start log, more than a pipe holds, before anything
+        // else: exits 3, or with `-start` goes on to its handshake.
+        if mode.starts_with("fixture-mode-stderr-flood") {
+            stderr(&vec![b'x'; 4 * START_LOG_LIMIT]);
+            if mode == "fixture-mode-stderr-flood-exit" {
+                std::process::exit(3);
+            }
+        }
         #[cfg(unix)]
         // SAFETY: only the spawned fixture path owns inherited descriptor three.
         let mut stream = unsafe { UnixStream::from_raw_fd(3) };
@@ -1058,6 +1371,9 @@ executable: None,
             descriptor.operations[0].output_schema = serde_json::json!({"type":"object"});
             selected.descriptor = serde_json::to_string(&descriptor).unwrap();
         }
+        if mode == "fixture-mode-stderr-after-ready" {
+            stderr(b"fixture: before ready\n");
+        }
         channel::write(
             &mut stream,
             &Reply::Ready {
@@ -1072,6 +1388,29 @@ executable: None,
         )
         .unwrap();
         let request = channel::read::<Request>(&mut stream, until, true, INPUT_LIMIT).unwrap();
+        // A line written once the program holds a credential; it must never
+        // reach the start log.
+        if mode == "fixture-mode-stderr-after-ready" {
+            stderr(b"fixture: after ready\n");
+            let Request::Validate { request_id, .. } = request.control else {
+                panic!("expected validation")
+            };
+            channel::write(
+                &mut stream,
+                &Reply::Failed {
+                    request_id,
+                    code: Failure::InvalidCredential,
+                    reason: None,
+                    retry_after_seconds: None,
+                },
+                None,
+                &[],
+                until,
+            )
+            .unwrap();
+            std::thread::sleep(Duration::from_secs(30));
+            return;
+        }
         if mode == "fixture-mode-validate-retry-after" {
             let Request::Validate { request_id, .. } = request.control else {
                 panic!("expected validation")
@@ -1445,9 +1784,9 @@ executable: None,
         }
     }
 
-    fn fixture_child(mode: &str) -> Child {
+    fn fixture_config(mode: &str) -> Adapter {
         let (path, sha256) = crate::local::test_executable::path_and_sha256();
-        Child::spawn(&Adapter {
+        Adapter {
             credential_revision: None,
             private_protocol: None,
             permissions: Default::default(),
@@ -1467,8 +1806,182 @@ executable: None,
                     mode.into(),
                 ],
             },
-        })
-        .unwrap()
+        }
+    }
+
+    fn fixture_child(mode: &str) -> Child {
+        Child::spawn(&fixture_config(mode)).unwrap()
+    }
+
+    /// A state directory as the host keeps one: owner-only, which the start
+    /// log's directory walk requires (`filesystem::directory`).
+    fn private_state() -> tempfile::TempDir {
+        let state = tempfile::tempdir().unwrap();
+        #[cfg(unix)]
+        std::fs::set_permissions(
+            state.path(),
+            std::os::unix::fs::PermissionsExt::from_mode(0o700),
+        )
+        .unwrap();
+        state
+    }
+
+    /// A start of `config` with the state directory `state`, which fails.
+    fn failed_start(config: &Adapter, state: &Path) -> StartError {
+        let Err(error) = Child::start(
+            config,
+            Instant::now() + Duration::from_secs(10),
+            Some(state),
+        ) else {
+            panic!("the start succeeded")
+        };
+        error
+    }
+
+    /// story:program-start-failure-reason: a program that prints a line to
+    /// standard error and exits 3 before its handshake fails its start as
+    /// `exited_before_handshake` with exit code 3, under the unchanged
+    /// `unavailable`, and its line is in the instance's owner-only start log
+    /// under the state directory. Unix only: on Windows the program starts
+    /// with no standard handles and no start log is kept.
+    #[cfg(unix)]
+    #[test]
+    fn a_program_that_exits_before_its_handshake_names_its_exit_and_keeps_its_line() {
+        use std::os::unix::fs::PermissionsExt;
+        let state = private_state();
+        let error = failed_start(&fixture_config("fixture-mode-stderr-exit"), state.path());
+        assert_eq!(
+            error.step,
+            StartFailure::ExitedBeforeHandshake {
+                code: Some(3),
+                signal: None
+            }
+        );
+        assert_eq!(error.step.as_str(), "exited_before_handshake");
+        assert_eq!(error.failure, Failure::Unavailable);
+        let log = error.log.expect("a start log");
+        assert_eq!(log, state.path().join(START_LOGS).join("fixture.log"));
+        let kept = std::fs::read_to_string(&log).unwrap();
+        assert_eq!(kept, "fixture: refused to start\n");
+        let metadata = std::fs::symlink_metadata(&log).unwrap();
+        assert!(metadata.is_file());
+        assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
+        // The next start replaces the log.
+        let again = failed_start(&fixture_config("fixture-mode-stderr-exit"), state.path());
+        assert_eq!(again.log.as_ref(), Some(&log));
+        assert_eq!(std::fs::read_to_string(&log).unwrap(), kept);
+    }
+
+    /// story:program-start-failure-reason: an executable whose content is
+    /// not the pinned one fails as `digest`, and one whose path is not
+    /// admitted as `admission`, each under its unchanged code and with no
+    /// program started: the start log they replace is empty.
+    #[test]
+    fn a_digest_mismatch_names_digest_and_a_refused_path_names_admission() {
+        let state = private_state();
+        let mut config = fixture_config("fixture-mode-json");
+        config.executable.sha256 = "0".repeat(64);
+        let error = failed_start(&config, state.path());
+        assert_eq!(error.step, StartFailure::Digest);
+        assert_eq!(error.step.as_str(), "digest");
+        assert_eq!(error.failure, Failure::InvalidConfiguration);
+        #[cfg(unix)]
+        assert_eq!(std::fs::read(error.log.expect("a start log")).unwrap(), b"");
+
+        let mut config = fixture_config("fixture-mode-json");
+        config.executable.path = state.path().join("not-installed");
+        let error = failed_start(&config, state.path());
+        assert_eq!(error.step, StartFailure::Admission);
+        assert_eq!(error.failure, Failure::InvalidConfiguration);
+    }
+
+    /// story:program-start-failure-reason: after a successful start the start
+    /// log holds what the program wrote before its handshake ended and
+    /// nothing it wrote once it could hold a credential: the owner's end of
+    /// the pipe is closed when the start returns.
+    #[cfg(unix)]
+    #[test]
+    fn a_started_program_keeps_nothing_it_wrote_after_its_handshake() {
+        let state = private_state();
+        let Ok(mut child) = Child::start(
+            &fixture_config("fixture-mode-stderr-after-ready"),
+            Instant::now() + Duration::from_secs(10),
+            Some(state.path()),
+        ) else {
+            panic!("the program did not start")
+        };
+        let log = state.path().join(START_LOGS).join("fixture.log");
+        assert_eq!(
+            std::fs::read_to_string(&log).unwrap(),
+            "fixture: before ready\n"
+        );
+        // The fixture writes its line on receiving the validation, then answers.
+        assert_eq!(
+            child
+                .validate(
+                    "fixture",
+                    &Secret(b"fictional".to_vec()),
+                    connectors_sdk::now_ms() + 2000
+                )
+                .err(),
+            Some(Failure::InvalidCredential)
+        );
+        assert!(child.running().unwrap());
+        assert_eq!(
+            std::fs::read_to_string(&log).unwrap(),
+            "fixture: before ready\n"
+        );
+    }
+
+    /// story:program-start-failure-reason: a program that writes more than a
+    /// pipe holds before its handshake is not held up by it. Exiting, it
+    /// fails as `exited_before_handshake`, not `handshake_deadline`; going on,
+    /// it starts. Either way its start log keeps the first
+    /// [`START_LOG_LIMIT`] bytes.
+    #[cfg(unix)]
+    #[test]
+    fn a_program_that_floods_standard_error_is_not_held_up_and_its_log_is_bounded() {
+        let state = private_state();
+        let begun = Instant::now();
+        let error = failed_start(
+            &fixture_config("fixture-mode-stderr-flood-exit"),
+            state.path(),
+        );
+        assert_eq!(
+            error.step,
+            StartFailure::ExitedBeforeHandshake {
+                code: Some(3),
+                signal: None
+            }
+        );
+        assert!(begun.elapsed() < Duration::from_secs(8));
+        let log = error.log.expect("a start log");
+        assert_eq!(std::fs::read(&log).unwrap(), vec![b'x'; START_LOG_LIMIT]);
+
+        let Ok(child) = Child::start(
+            &fixture_config("fixture-mode-stderr-flood-start"),
+            Instant::now() + Duration::from_secs(10),
+            Some(state.path()),
+        ) else {
+            panic!("the program did not start")
+        };
+        drop(child);
+        assert_eq!(std::fs::read(&log).unwrap(), vec![b'x'; START_LOG_LIMIT]);
+    }
+
+    /// Start log names are distinct for distinct ids and never a path.
+    #[test]
+    fn start_log_names_are_escaped_and_bounded() {
+        assert_eq!(start_log_name("forge-local_1"), "forge-local_1.log");
+        assert_eq!(start_log_name("a.b"), "a%2Eb.log");
+        assert_eq!(start_log_name("a/.."), "a%2F%2E%2E.log");
+        assert_ne!(start_log_name("a.b"), start_log_name("a_b"));
+        let long = start_log_name(&"x".repeat(201));
+        assert!(
+            long.starts_with("sha256-") && long.len() == 7 + 64 + 4,
+            "{long}"
+        );
+        assert!(start_log_name("").starts_with("sha256-"));
     }
 
     /// story:catalog-honours-retry-after: a failed `invoke` answered as the

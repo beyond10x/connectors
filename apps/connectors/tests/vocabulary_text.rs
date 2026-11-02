@@ -275,8 +275,10 @@ fn a_failure_rendered_for_a_person_never_says_adapter() {
             rendered += 1;
         }
     }
-    // 39 codes, 11 stages and 15 next actions; `instance_ambiguous` and
-    // `connection_unresolved` (story:connectors-do-short-invocation) and the four
-    // refusals of `definitions install` (story:definitions-install) are the newest.
-    assert_eq!(rendered, 65);
+    // 39 codes, 12 stages and 15 next actions; `instance_ambiguous` and
+    // `connection_unresolved` (story:connectors-do-short-invocation), the four
+    // refusals of `definitions install` (story:definitions-install) and the
+    // `installed_provider` stage (story:catalog-provider-failure-is-named) are
+    // the newest.
+    assert_eq!(rendered, 66);
 }

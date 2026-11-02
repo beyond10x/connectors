@@ -39,9 +39,9 @@ fn private_protocol_requires_explicit_v2_configuration_without_rewriting_v1() {
     Config::initialize(&paths).unwrap();
     let setup = fs::read_to_string(&paths.config).unwrap();
     // Setup writes the current format; an explicit selection needs no edit of it.
-    assert!(setup.contains("format = \"connectors-local/2\""));
+    assert!(setup.contains("format = \"connectors-local/5\""));
     assert!(Config::load(&paths.config).unwrap().adapters.is_empty());
-    let legacy_setup = setup.replace("connectors-local/2", "connectors-local/1");
+    let legacy_setup = setup.replace("connectors-local/5", "connectors-local/1");
     let text = format!(
         "{legacy_setup}\n[adapters.fixture]\ninstance_id='fixture'\nadapter_id='fixture'\nconfiguration_revision='one'\nprotocol='v1alpha1'\n[adapters.fixture.executable]\npath='/fixture'\nsha256='{}'\n",
         "a".repeat(64)
@@ -136,7 +136,7 @@ fn a_format_and_private_protocol_mismatch_names_the_format_and_entry() {
         ),
         ("connectors-local/2", ""),
     ] {
-        let text = setup.replace("connectors-local/2", format) + &entry(private);
+        let text = setup.replace("connectors-local/5", format) + &entry(private);
         fs::write(&paths.config, &text).unwrap();
         assert_eq!(
             Config::read(&paths.config).unwrap_err(),
@@ -152,7 +152,7 @@ fn a_format_and_private_protocol_mismatch_names_the_format_and_entry() {
         );
     }
     // A mismatched entry whose instance id is itself invalid names nothing.
-    let text = setup.replace("connectors-local/2", "connectors-local/1")
+    let text = setup.replace("connectors-local/5", "connectors-local/1")
         + &entry("private_protocol='connectors-private/2'\n")
             .replace("fixture-one", "not a selector");
     fs::write(&paths.config, &text).unwrap();
