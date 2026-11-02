@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-02T15:48:03Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-provider-failure-is-named",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "Targeted crate tests and drift checks of wave D370 (u24.sh, u24b.sh): connectors-host --lib 658 passed, local_cli, kubernetes --lib, connectors-build --tests, cli/service-metadata/metadata-entities/ess-boundary/docs --check, fmt, clippy; local full gate skipped under D391",
+    "reference": "https://github.com/beyond10x/connectors/pull/235"
+  }
+}

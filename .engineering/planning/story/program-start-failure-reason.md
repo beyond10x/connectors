@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:program-start-failure-reason
 kind: story
-status: active
+status: implemented
 title: instances status names why a program did not start and keeps its stderr
 summary: 'D370 item 3: start failure reason and log file'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-02T07:27:31Z", actor: "human:timo", revision: 2, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
 - {from: "proposed", to: "active", at: "2026-11-02T07:27:32Z", actor: "human:timo", revision: 3, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
+- {from: "active", to: "implemented", at: "2026-11-02T15:48:05Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1,"verification":1}}}
 ---
 # Story: program-start-failure-reason
 

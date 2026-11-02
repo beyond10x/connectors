@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:catalog-provider-failure-is-named
 kind: story
-status: active
+status: implemented
 title: A catalog provider that cannot run is named, not blamed on the endpoint
 summary: 'D370 item 2: provider failure refusal, setup check, init writes local/5'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-02T07:27:31Z", actor: "human:timo", revision: 2, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
 - {from: "proposed", to: "active", at: "2026-11-02T07:27:31Z", actor: "human:timo", revision: 3, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
+- {from: "active", to: "implemented", at: "2026-11-02T15:48:04Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1,"verification":1}}}
 ---
 # Story: catalog-provider-failure-is-named
 

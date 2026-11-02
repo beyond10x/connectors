@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:provider-programs-run-on-macos
 kind: story
-status: active
+status: implemented
 title: Grafana, Prometheus, Loki and Kubernetes programs run and ship on Apple-silicon macOS
 summary: 'D370 items 1 and 3: macOS CI job, Grafana start fix, release binaries, READMEs'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-02T07:27:32Z", actor: "human:timo", revision: 2, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
 - {from: "proposed", to: "active", at: "2026-11-02T07:27:32Z", actor: "human:timo", revision: 3, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
+- {from: "active", to: "implemented", at: "2026-11-02T15:48:07Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1,"verification":1}}}
 ---
 # Story: provider-programs-run-on-macos
 

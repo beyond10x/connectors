@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-02T15:48:04Z",
+  "actor": "human:timo",
+  "artifact": "story:program-start-failure-reason",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "CI on pull request 235 at faff36bf1: Rust gate, macOS host, macOS provider programs, Windows host, Custody platforms, Release binaries, Planning store, Documentation validation and Shared source gates all success",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/41463902959"
+  }
+}
