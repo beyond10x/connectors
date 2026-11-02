@@ -943,6 +943,27 @@ types:
       - {name: child_incarnation, type: "Optional<String>"}
       - {name: observed_at_ms, type: "Integer"}
       - {name: failure, type: "Optional<connectors.cli.Failure>"}
+      # Present on a failed instance whose last start failed launching its program
+      # (story:program-start-failure-reason): the step, the exit code or signal of a
+      # program that exited before its handshake, and the owner-only file holding at
+      # most 64 KiB of what the program wrote to standard error before its handshake
+      # ended. Nothing it writes after that is kept.
+      - {name: start_failure, type: "Optional<connectors.cli.StartFailure>"}
+      - {name: start_exit_code, type: "Optional<Integer>"}
+      - {name: start_signal, type: "Optional<Integer>"}
+      - {name: start_log, type: "Optional<String>"}
+  # The step at which the owner's start of an instance's program failed
+  # (story:program-start-failure-reason). It is data beside the start's failure
+  # code, which it does not change. admission: the executable's path was refused;
+  # digest: its content is not the pinned executable; copy: the owner's private
+  # copy of it could not be made or launched; spawn: the process, its channel or
+  # its standard-error pipe could not be created; exited_before_handshake: the
+  # program exited before its handshake finished; handshake_deadline: the handshake
+  # did not finish in time; handshake_mismatch: the program's readiness did not
+  # match its configuration, or it broke its channel while running.
+  - name: connectors.cli.StartFailure
+    kind: enum
+    variants: [admission, digest, copy, spawn, exited_before_handshake, handshake_deadline, handshake_mismatch]
   # References existing qualified Connection and AuthProfile coordinates. revision is public semantic revision, never private generation/publication fence. State is an observation, not a second lifecycle.
   - name: connectors.cli.ConnectionSummary
     kind: struct

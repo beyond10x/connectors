@@ -9,7 +9,10 @@ mod server;
 pub mod state;
 mod writes;
 pub use bounded::ReadBudget;
-pub use process::{Child, PreparedInvocation};
+pub use process::{
+    Child, PreparedInvocation, START_LOG_LIMIT, START_LOGS, StartError, StartFailure,
+    start_log_name,
+};
 pub use server::{Adapter, serve};
 pub use writes::{Created, PreparedWrite, WriteEffect, WriteResult};
 

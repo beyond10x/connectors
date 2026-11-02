@@ -2203,10 +2203,33 @@ impl Executable {
         &self,
         until: std::time::Instant,
     ) -> super::runtime::Result<super::runtime::artifact::Image> {
+        self.capture_explained(until)
+            .map_err(|(failure, _)| failure)
+    }
+
+    /// [`Executable::capture`], naming the step a refusal is
+    /// (story:program-start-failure-reason): a refused path is `admission`;
+    /// content refused as not the pinned executable (its digest, its format,
+    /// its size) is `digest`; a private copy that could not be made is `copy`.
+    pub(crate) fn capture_explained(
+        &self,
+        until: std::time::Instant,
+    ) -> std::result::Result<
+        super::runtime::artifact::Image,
+        (super::runtime::Failure, super::runtime::StartFailure),
+    > {
+        use super::runtime::{Failure as F, StartFailure as S};
         let source = self
             .source()
-            .map_err(|_| super::runtime::Failure::InvalidConfiguration)?;
-        super::runtime::artifact::capture(source, &self.sha256, until)
+            .map_err(|_| (F::InvalidConfiguration, S::Admission))?;
+        super::runtime::artifact::capture(source, &self.sha256, until).map_err(|failure| {
+            let step = if failure == F::InvalidConfiguration {
+                S::Digest
+            } else {
+                S::Copy
+            };
+            (failure, step)
+        })
     }
 
     // Content is deliberately unverified here. Keep this private so callers
