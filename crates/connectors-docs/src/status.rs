@@ -594,8 +594,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Distribution",
         "Release binaries",
-        "A release page carries an archive per Linux and macOS target (x86_64 and aarch64) holding connectors and connectors-catalog-provider, with SHA256SUMS; the other adapters are built from the checkout, and there is no Windows binary.",
-        "crates/connectors-build/src/release_binaries.rs::the_release_workflow_packages_the_cli_and_the_catalog_provider",
+        "A release page carries an archive per Linux and macOS target (x86_64 and aarch64) holding connectors, connectors-catalog-provider and the Grafana, Prometheus, Loki and Kubernetes programs, with SHA256SUMS; the other adapters are built from the checkout, and there is no Windows binary.",
+        "crates/connectors-build/src/release_binaries.rs::the_release_workflow_packages_the_cli_the_catalog_provider_and_the_provider_programs",
         "/docs/getting-started",
     ),
     planned(

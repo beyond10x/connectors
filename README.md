@@ -62,9 +62,10 @@ connections and their states are in the
 ### Configure instances
 
 A `connectors-local/5` configuration enables connectors by name and names their instances.
-`setup init` creates the file and the metadata store; it still writes the older
-`connectors-local/2` format with an empty legacy `[adapters]` table, so replace that file's
-content with yours, keeping `owner_uid` (your user id):
+`setup init` creates the file, in that format with an empty legacy `[adapters]` table, and the
+metadata store; `setup migrate --apply` moves an older file without legacy entries to it. Add
+your instances to that file, or replace its content with yours, keeping `owner_uid` (your user
+id):
 
 ```toml
 format = "connectors-local/5"
@@ -85,7 +86,8 @@ endpoint = "https://gitlab.example.com"
 ```
 
 An instance without `endpoint` uses its connector's default (`https://gmail.googleapis.com` for
-Gmail); a GitLab endpoint is the host. An instance names only what is yours: its endpoint, an
+Gmail); a GitLab endpoint is the host, `https://<host>` (a trailing `/` allowed), or
+`https://<host>/<path>` for a relative root, never a URL that already ends in `/api/v4`. An instance names only what is yours: its endpoint, an
 optional description and, where its connector declares more than one auth profile (Zendesk),
 `profile`. Everything else comes from the connector shipped with the `connectors-catalog-provider`
 installed beside `connectors`: the executable and its SHA-256, the configuration revision and
@@ -295,6 +297,18 @@ cargo build --workspace --locked
 
 Ordinary builds use checked-in generated Rust. They do not require ESS or refresh
 vendor specifications; Cargo may need to download dependencies on the first build.
+
+Or install a release binary: each release page carries `connectors-<version>-<target>.tar.gz`
+for Linux and macOS, whose directory holds `connectors` and `connectors-catalog-provider`
+([Getting started](https://beyond10x.github.io/connectors/docs/getting-started#or-install-a-release-binary)).
+Keep the two binaries in one directory: an instance that pins nothing is derived by the provider
+beside `connectors`, which `setup check` lists as the `installed_provider` prerequisite. The macOS
+binaries are not signed. An archive downloaded through a browser carries Gatekeeper's quarantine
+attribute, and its binaries are refused until you remove it from the extracted directory:
+
+```sh
+xattr -dr com.apple.quarantine "connectors-$version-$target"
+```
 
 To use the local CLI, configure an instance as [Vocabulary](#vocabulary) shows and follow the
 [Getting started](https://beyond10x.github.io/connectors/docs/getting-started) page and the

@@ -169,6 +169,18 @@ pub(super) fn execute(call: &Invocation<'_>, paths: &Paths) -> Result<Value, Han
     }
     let (written, after) = loop {
         if moved.is_empty() {
+            // A file without any legacy entry takes the current format and
+            // nothing else, its comments kept: every instance and
+            // `connections connect --endpoint` need `connectors-local/5`
+            // (story:catalog-provider-failure-is-named).
+            if legacy.is_empty() && config.format != CURRENT_FORMAT {
+                let written = current_format(&text)?;
+                let after = Config::parse(&written).map_err(configuration_refusal)?;
+                if shared(&config) != shared(&after) || !after.adapters.is_empty() {
+                    return Err(host_failure(Failure::InvalidConfiguration));
+                }
+                break (written, after);
+            }
             break (text.clone(), config.clone());
         }
         let candidate = config
@@ -264,12 +276,13 @@ pub(super) fn execute(call: &Invocation<'_>, paths: &Paths) -> Result<Value, Han
             entry(alias, &config, &after, form)
         })
         .collect();
+    let changed = !moved.is_empty() || after.format != config.format;
     let mut result = json!({
         "mode": if apply { "apply" } else { "dry-run" },
-        "disposition": match (moved.is_empty(), apply) {
-            (true, _) => "unchanged",
-            (false, false) => "planned",
-            (false, true) => "applied",
+        "disposition": match (changed, apply) {
+            (false, _) => "unchanged",
+            (true, false) => "planned",
+            (true, true) => "applied",
         },
         "config_path": paths.config,
         "format_before": config.format,
@@ -277,10 +290,30 @@ pub(super) fn execute(call: &Invocation<'_>, paths: &Paths) -> Result<Value, Han
         "configuration": written,
         "entries": entries,
     });
-    if apply && !moved.is_empty() {
+    if apply && changed {
         result["backup_path"] = json!(publish(&paths.config, &text, &written)?);
     }
     Ok(result)
+}
+
+/// The format `setup init` writes and every migration moves a file to.
+const CURRENT_FORMAT: &str = "connectors-local/5";
+
+/// `text` with its `format` value set to [`CURRENT_FORMAT`] and every other
+/// byte, the value's own spacing and comment included, kept.
+fn current_format(text: &str) -> Result<String, HandlerReply> {
+    let mut document = text
+        .parse::<toml_edit::DocumentMut>()
+        .map_err(|_| host_failure(Failure::InvalidConfiguration))?;
+    let value = document
+        .get_mut("format")
+        .and_then(toml_edit::Item::as_value_mut)
+        .filter(|value| value.is_str())
+        .ok_or_else(|| host_failure(Failure::InvalidConfiguration))?;
+    let decor = value.decor().clone();
+    *value = CURRENT_FORMAT.into();
+    *value.decor_mut() = decor;
+    Ok(document.to_string())
 }
 
 /// The connector a legacy entry maps to. For a catalog entry, the connector

@@ -108,5 +108,5 @@ As of 2026-10-16: 67 capabilities are shipped, 3 are decided and 5 are planned. 
 
 | Capability | Status | What it means |
 |---|---|---|
-| [Release binaries](./getting-started.md) | ● shipped | A release page carries an archive per Linux and macOS target (x86_64 and aarch64) holding connectors and connectors-catalog-provider, with SHA256SUMS; the other adapters are built from the checkout, and there is no Windows binary. |
+| [Release binaries](./getting-started.md) | ● shipped | A release page carries an archive per Linux and macOS target (x86_64 and aarch64) holding connectors, connectors-catalog-provider and the Grafana, Prometheus, Loki and Kubernetes programs, with SHA256SUMS; the other adapters are built from the checkout, and there is no Windows binary. |
 | [Package distribution](./getting-started.md) | ○ planned | No package manager, container registry or Windows binary carries a release. |
