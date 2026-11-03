@@ -1329,27 +1329,7 @@ impl Installation {
         printed: &[u8],
     ) -> Result<(Adapter, super::runtime::Bootstrap)> {
         use super::runtime::PrivateProtocol;
-        let printed: super::runtime::Bootstrap =
-            serde_json::from_slice(printed).map_err(|_| Failure::InvalidConfiguration)?;
-        if printed.validate().is_err()
-            || printed.instance != instance
-            || printed.adapter != "catalog"
-            || printed.protocol != connectors_core::WIRE_VERSION
-        {
-            return Err(Failure::InvalidConfiguration);
-        }
-        let mut adapter = Adapter {
-            credential_revision: printed.credential_revision,
-            instance_id: printed.instance,
-            adapter_id: printed.adapter,
-            configuration_revision: printed.configuration_revision,
-            protocol: printed.protocol,
-            private_protocol: Some(PrivateProtocol::V2),
-            startup: Startup::default(),
-            restart: Restart::default(),
-            executable,
-            permissions: Permissions::default(),
-        };
+        let mut adapter = printed_adapter(instance, executable, printed)?;
         // The printed bootstrap is the `connectors-private/1` one, reads only.
         let reported = (self.handshake)(&adapter)?;
         if reported.validate_for(PrivateProtocol::V2).is_err()
@@ -1400,6 +1380,91 @@ impl Installation {
             .map_err(|_| Failure::InvalidConfiguration)?;
         self.entry(alias, executable, &printed)
     }
+}
+
+/// The entry, before any child of it started, of `executable` from the
+/// bootstrap it `printed` for `instance`: refused unless that bootstrap is a
+/// valid catalog one of `instance` at this wire version.
+fn printed_adapter(instance: &str, executable: Executable, printed: &[u8]) -> Result<Adapter> {
+    let printed: super::runtime::Bootstrap =
+        serde_json::from_slice(printed).map_err(|_| Failure::InvalidConfiguration)?;
+    if printed.validate().is_err()
+        || printed.instance != instance
+        || printed.adapter != "catalog"
+        || printed.protocol != connectors_core::WIRE_VERSION
+    {
+        return Err(Failure::InvalidConfiguration);
+    }
+    Ok(Adapter {
+        credential_revision: printed.credential_revision,
+        instance_id: printed.instance,
+        adapter_id: printed.adapter,
+        configuration_revision: printed.configuration_revision,
+        protocol: printed.protocol,
+        private_protocol: Some(super::runtime::PrivateProtocol::V2),
+        startup: Startup::default(),
+        restart: Restart::default(),
+        executable,
+        permissions: Permissions::default(),
+    })
+}
+
+/// Why the installed catalog provider, which prints a valid bootstrap for the
+/// instance `name` of `connector` at `endpoint` (with `profile` and
+/// `instance_id` as the instance states them), still derives nothing: its
+/// `connectors-private/2` child, started as a derivation starts it, did not
+/// finish its handshake. `None` when the provider refuses the selection or
+/// prints no valid bootstrap, which the selection is answerable for, and when
+/// the child starts (story:connect-names-a-failed-provider-start).
+pub fn derivation_start_failure(
+    connector: &str,
+    name: &str,
+    endpoint: &str,
+    profile: Option<&str>,
+    instance_id: Option<&str>,
+) -> Option<ProviderUnavailable> {
+    use super::runtime::StartFailure;
+    let table = InstanceTable {
+        endpoint: Some(endpoint.to_owned()),
+        profile: profile.map(str::to_owned),
+        instance_id: instance_id.map(str::to_owned),
+        ..InstanceTable::default()
+    };
+    let (_, args, id) = table.underived(connector, name).ok()?;
+    let provider = installed_provider()?;
+    fs::validate_path(&provider).ok()?;
+    let selection = Executable {
+        path: provider.clone(),
+        sha256: String::new(),
+        args,
+    };
+    let mut source = selection.source().ok()?;
+    let executable = Executable {
+        sha256: digest(&mut source).ok()?,
+        ..selection
+    };
+    executable.validate().ok()?;
+    let printed = executable.print("--print-local-bootstrap").ok()?;
+    let adapter = printed_adapter(&id, executable, &printed).ok()?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let step = super::runtime::Child::start(&adapter, deadline, None)
+        .err()?
+        .step;
+    let failure = match step {
+        StartFailure::ExitedBeforeHandshake {
+            signal: Some(_), ..
+        } => ProviderFailure::Killed,
+        StartFailure::ExitedBeforeHandshake { .. } => ProviderFailure::Exited,
+        StartFailure::HandshakeDeadline => ProviderFailure::Deadline,
+        StartFailure::HandshakeMismatch => ProviderFailure::UnreadableOutput,
+        StartFailure::Admission | StartFailure::Digest | StartFailure::Copy | StartFailure::Spawn => {
+            ProviderFailure::NotExecutable
+        }
+    };
+    Some(ProviderUnavailable {
+        path: provider,
+        failure,
+    })
 }
 
 /// What the installed provider derives for an unpinned instance.

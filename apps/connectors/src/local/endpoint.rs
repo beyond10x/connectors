@@ -338,17 +338,29 @@ fn write(
         return Err(configuration_refusal(Refusal::Rule(Rule::ConfigTooLarge)));
     }
     // A file every later read refuses is never written. When the file read
-    // before the edit and only the edit is refused, the provider refused the
-    // endpoint while deriving the instance: the argument's refusal, if the
-    // provider runs at all ([`refused_endpoint`]).
+    // before the edit and only the edit is refused, deriving the instance at
+    // the endpoint failed: the argument's refusal, if the provider runs and
+    // its child starts ([`refused_endpoint`]).
     let config = match Config::parse(&written) {
         Ok(config) => config,
         Err(refusal @ Refusal::Rule(_)) => return Err(configuration_refusal(refusal)),
         Err(refusal) => {
-            return Err(if Config::parse(&text).is_ok() {
-                refused_endpoint()
-            } else {
-                configuration_refusal(refusal)
+            return Err(match Config::parse(&text) {
+                Ok(before) => {
+                    let listed = before
+                        .connectors
+                        .as_ref()
+                        .and_then(|connectors| connectors.get(connector))
+                        .and_then(|table| table.instances.get(instance));
+                    refused_endpoint(&Selection {
+                        connector,
+                        instance,
+                        endpoint,
+                        profile: listed.and_then(|listed| listed.profile.as_deref()),
+                        stated: listed.and_then(|listed| listed.instance_id.as_deref()),
+                    })
+                }
+                Err(_) => configuration_refusal(refusal),
             });
         }
     };
@@ -375,15 +387,37 @@ fn write(
     }
 }
 
-/// A derivation at the given endpoint was refused: `invalid_input` naming
-/// `endpoint` when the installed catalog provider runs, so the provider
-/// refused that endpoint; otherwise `unavailable` at `installed_provider` naming
-/// the provider and why it does not run, since it refused nothing
-/// (story:catalog-provider-failure-is-named).
-fn refused_endpoint() -> HandlerReply {
-    match connectors_host::local::config::installed_provider_runs() {
-        Ok(()) => argument("endpoint"),
-        Err(unavailable) => provider_unavailable(unavailable),
+/// The instance a derivation was asked for: `<connector>/<instance>` at
+/// `endpoint`, with the profile and instance id the instance states.
+struct Selection<'a> {
+    connector: &'a str,
+    instance: &'a str,
+    endpoint: &'a str,
+    profile: Option<&'a str>,
+    stated: Option<&'a str>,
+}
+
+/// A derivation of `selection` was refused: `unavailable` at
+/// `installed_provider` naming the provider and why, when it does not run
+/// (story:catalog-provider-failure-is-named) or prints its bootstrap but its
+/// private child does not start, as a system that kills the copy it starts
+/// from makes it (story:connect-names-a-failed-provider-start), since it
+/// refused nothing; otherwise the provider refused that endpoint:
+/// `invalid_input` naming `endpoint`.
+fn refused_endpoint(selection: &Selection<'_>) -> HandlerReply {
+    use connectors_host::local::config;
+    if let Err(unavailable) = config::installed_provider_runs() {
+        return provider_unavailable(unavailable);
+    }
+    match config::derivation_start_failure(
+        selection.connector,
+        selection.instance,
+        selection.endpoint,
+        selection.profile,
+        selection.stated,
+    ) {
+        Some(unavailable) => provider_unavailable(unavailable),
+        None => argument("endpoint"),
     }
 }
 
@@ -430,7 +464,15 @@ fn moves_no_connection(
     let (instance_id, authority) = connectors_host::local::config::derived_authority(
         connector, instance, endpoint, profile, stated,
     )
-    .map_err(|_| refused_endpoint())?;
+    .map_err(|_| {
+        refused_endpoint(&Selection {
+            connector,
+            instance,
+            endpoint,
+            profile,
+            stated,
+        })
+    })?;
     let moved = connectors_host::local::registry::Registry::with_system_clock(&paths.state)
         .authority_moves(&instance_id, &authority)
         .map_err(connections::registry_failure)?;
