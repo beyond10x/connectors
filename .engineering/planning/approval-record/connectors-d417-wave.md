@@ -6,7 +6,7 @@ status: approved
 title: 'Wave D417: cold owner start, and the store close of merged stories'
 relations:
 - decides: story:cold-owner-start-verifies-once
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "approved", at: "2026-11-03T13:09:52Z", actor: "human:timo", revision: 2}
 ---
@@ -64,12 +64,20 @@ Stay active, with the gap named:
 ## Release scope
 
 0.65.1: U1 (`story:cold-owner-start-verifies-once`, merged at `e60844a1d`; its D422 review round 2 at
-`d62f07e40`) and U2 (ESS 0.84.0, merged at `011ec3139`). The reviews are
-`review-result:wave-d417-u1-adversary` and `review-result:wave-d417-u1-security`; the decision on
-them is `approval-record:connectors-d417-d422-u1-reviews`. After `d62f07e40` the six drift checks
-and `cargo test -p connectors-build --tests` exit 0 on this tree
-(`~/.cache/connectors-wave-20261103/int-checks-1748.log`). The full gate runs staged, S1 to S5 of
-`~/.cache/connectors-wave-20261103/stages.tsv`, under host-monitor's 16:53Z go.
+`d62f07e40`, round 3 at `7ef244880`) and U2 (ESS 0.84.0, merged at `011ec3139`). The reviews are
+`review-result:wave-d417-u1-adversary`, `-adversary-2`, `-adversary-3` and
+`review-result:wave-d417-u1-security`; the decision on them is
+`approval-record:connectors-d417-d422-u1-reviews`, and round 3 (a locked open waits for an
+inspection's handle) was the lead's call on the leftover inside the acceptance.
+
+The full gate ran staged on `7ef244880` under host-monitor's go, with `worktree discard-cache` between stages
+(`~/.cache/connectors-wave-20261103/gate/`): S1 drift and boundaries exit 0 (305 passed, peak 5G);
+S2 thirteen library packages exit 0 (1525 passed, 8G); S3 `apps/connectors` failed on its first run
+only because `-p connectors` does not build the `connectors-catalog-provider` binary two tests
+look up beside it, and passed on its approved rerun after building it (532 passed, 10G); S4 adapters
+exit 0 (1447 passed, 16G against a 10G row, revised to 18G during the run); S5a to S5c clippy
+`-D warnings` on all 23 packages exit 0. CI's repository gate on the pull request runs what the
+staged gate leaves out: the authored scenarios, metadata conformance and the OAuth2 boundary.
 
 ## Commits this wave makes
 
