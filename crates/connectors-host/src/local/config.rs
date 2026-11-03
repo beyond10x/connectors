@@ -1457,9 +1457,10 @@ pub fn derivation_start_failure(
         StartFailure::ExitedBeforeHandshake { .. } => ProviderFailure::Exited,
         StartFailure::HandshakeDeadline => ProviderFailure::Deadline,
         StartFailure::HandshakeMismatch => ProviderFailure::UnreadableOutput,
-        StartFailure::Admission | StartFailure::Digest | StartFailure::Copy | StartFailure::Spawn => {
-            ProviderFailure::NotExecutable
-        }
+        StartFailure::Admission
+        | StartFailure::Digest
+        | StartFailure::Copy
+        | StartFailure::Spawn => ProviderFailure::NotExecutable,
     };
     Some(ProviderUnavailable {
         path: provider,
