@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:definition-reader-feed-extensions
 kind: story
-status: active
+status: implemented
 title: The definition reader lowers the Jira and Confluence feeds of connectors-definitions 536945d
 summary: definition.rs and import.rs accept offset, url_parameter, a query position, utc_offsets, url and url_base; both feeds move into the shipped selections
 relations:
@@ -68,10 +68,11 @@ scope:
   path: website/docs/connectors/jira.md
 - confidence: cited
   path: website/docs/status.md
-revision: 12
+revision: 13
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-22T09:48:11Z", actor: "human:operator", revision: 8, decided_on: {"recorded":{"review_outcome":6}}, executor: "agent:connectors-session", correlation: "wave-20261022"}
 - {from: "proposed", to: "active", at: "2026-10-22T09:48:11Z", actor: "human:operator", revision: 9, decided_on: {"recorded":{"review_outcome":6}}, executor: "agent:connectors-session", correlation: "wave-20261022"}
+- {from: "active", to: "implemented", at: "2026-11-03T13:11:09Z", actor: "human:operator", revision: 13, decided_on: {"recorded":{"test_result":1,"review_outcome":7}}}
 ---
 ## Outcome
 

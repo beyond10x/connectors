@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-03T13:11:11Z",
+  "actor": "human:operator",
+  "artifact": "story:cli-lists-available-connectors",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "merge d1309030d on main; holders apps/connectors/tests/list_connectors.rs:153-212, Taskfile.yml:4-8 install; PR #201 (merge abc7aadda, wave 20261022) checks green: repository gate run 39943283073, host and CLI 39943283679 and 39943283791, docs 39943283250",
+    "reference": "approval-record:connectors-d417-wave"
+  }
+}

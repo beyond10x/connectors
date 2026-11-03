@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-03T13:11:10Z",
+  "actor": "human:operator",
+  "artifact": "story:docs-first-run-path",
+  "kind": "story",
+  "revision": 37,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "merge 5c2fb81e9 on main (README 25,705 bytes at merge); holder crates/connectors-docs/src/vocabulary.rs:383; PR #201 (merge abc7aadda, wave 20261022) checks green: repository gate run 39943283073, host and CLI 39943283679 and 39943283791, docs 39943283250",
+    "reference": "approval-record:connectors-d417-wave"
+  }
+}

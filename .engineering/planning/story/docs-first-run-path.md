@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:docs-first-run-path
 kind: story
-status: active
+status: implemented
 title: The first-run path from README to a first read has no wrong command or maintainer history
 summary: 'docs review run 3: seven wrong facts on the first-run and concept pages; README 38.8 KB'
 relations:
@@ -45,10 +45,11 @@ scope:
   path: website/docs/guides/upgrade-the-cli.md
 - confidence: cited
   path: website/docs/index.md
-revision: 37
+revision: 38
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-22T09:48:11Z", actor: "human:operator", revision: 34, decided_on: {"recorded":{"review_outcome":5}}, executor: "agent:connectors-session", correlation: "wave-20261022"}
 - {from: "proposed", to: "active", at: "2026-10-22T09:48:11Z", actor: "human:operator", revision: 35, decided_on: {"recorded":{"review_outcome":5}}, executor: "agent:connectors-session", correlation: "wave-20261022"}
+- {from: "active", to: "implemented", at: "2026-11-03T13:11:10Z", actor: "human:operator", revision: 38, decided_on: {"recorded":{"test_result":1,"review_outcome":7}}}
 ---
 ## Outcome
 
