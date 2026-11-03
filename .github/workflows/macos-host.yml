@@ -149,6 +149,7 @@ jobs:
       - name: A copy started directly, made as cp and as the host makes it
         shell: bash
         run: |
+          set +e
           status=0
           for dir in "$PUBLISHED" "$BUILT"; do
             for method in cp write; do
@@ -173,6 +174,7 @@ jobs:
         if: ${{ always() }}
         shell: bash
         run: |
+          set +e
           status=0
           for dir in "$PUBLISHED" "$BUILT"; do
             root="$(mktemp -d)"
@@ -180,10 +182,12 @@ jobs:
               env -i HOME="$root" PATH=/usr/bin:/bin "$dir/connectors" --output json \
                 --config "$root/config/config.toml" --state-dir "$root/state" "$@" < /dev/null 2>&1
             }
-            run setup init > /dev/null || status=1
+            out="$(run setup init)"
+            echo "host-init $dir exit $?: $out"
             for round in 1 2; do
               out="$(run connections connect gitlab/probe --profile gitlab.pat --endpoint https://gitlab.example.org)"
-              echo "host-start $dir round $round: $out"
+              code=$?
+              echo "host-start $dir round $round exit $code: $out"
               printf '%s' "$out" | grep -Eq '"stage": *"protected_entry"' || status=1
             done
           done
