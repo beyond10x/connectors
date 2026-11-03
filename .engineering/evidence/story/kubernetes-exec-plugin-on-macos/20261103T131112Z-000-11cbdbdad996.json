@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-03T13:11:12Z",
+  "actor": "human:timo",
+  "artifact": "story:kubernetes-exec-plugin-on-macos",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "merge 8150245c2 on main; holders adapters/kubernetes/src/exec_credential.rs:1220,:1246,:1262,:1285,:1306 ran on the macOS job; acceptance line 1 as amended by D372 (approval-record:connectors-d370-wave); PR #235 (merge 8150245c2, release 0.65.0) checks green: repository gate run 41463902959, macOS host and CLI 41463903366, Windows 41463902901; main after merge: Rust gate 41471564824, macOS host 41471564879, release binaries 41471796270",
+    "reference": "approval-record:connectors-d417-wave"
+  }
+}

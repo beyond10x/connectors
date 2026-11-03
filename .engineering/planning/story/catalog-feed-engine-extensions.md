@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-feed-engine-extensions
 kind: story
-status: active
+status: implemented
 title: The catalog feed engine reads the list shapes real providers use
 relations:
 - decomposes: epic:generic-datasource-feeds
@@ -28,10 +28,11 @@ scope:
   path: crates/connectors-build/src/catalog_feed_conformance.rs
 - confidence: inferred
   path: crates/connectors-docs/
-revision: 9
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-21T21:05:12Z", actor: "human:timo", revision: 8}
 - {from: "proposed", to: "active", at: "2026-10-21T21:05:13Z", actor: "human:timo", revision: 9}
+- {from: "active", to: "implemented", at: "2026-11-03T13:11:08Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":1,"review_outcome":3}}}
 ---
 ## Outcome
 
