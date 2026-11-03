@@ -973,6 +973,22 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
                 None if request.describe => decide(&held(&paths, &config, adapter)?).ok(),
                 None => Some(decide(&held(&paths, &config, adapter)?)?),
             };
+            // A read names neither an approval file nor an idempotency key, so
+            // an invoke naming neither is a read or is refused: it starts the
+            // owner before it reads the description, within the read's 30
+            // seconds, and the description, the admission and the read are then
+            // answered from that owner's held handle; a cold read verifies the
+            // store once, in the owner (story:cold-owner-start-verifies-once).
+            if !request.describe
+                && request.idempotency_key.is_none()
+                && request.approval_file.is_none()
+            {
+                owner::start_for_read(
+                    &paths,
+                    std::time::Instant::now() + std::time::Duration::from_secs(30),
+                )
+                .map_err(owner_failure)?;
+            }
             let (adapter, bootstrap) = bound(&paths, &alias, connection.as_deref())?;
             (connector, instance, adapter, bootstrap, connection)
         }
