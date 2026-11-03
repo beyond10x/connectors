@@ -294,6 +294,32 @@ types:
     kind: struct
     fields:
       - {name: bootstrap, type: connectors.cli.PrivateAdapterBootstrap}
+  # Request::Connections (story:cold-owner-start-verifies-once): a CLI's listing of
+  # the connections an adapter's instance holds, revoked ones excepted, answered from
+  # the running owner's held metadata handle instead of a direct open of the store
+  # (contracts/cli/v1alpha1/owner.md). An `invoke` without `--connection` chooses its
+  # connection from it. Sent only to an owner of the CLI's own build; without one, or
+  # after an exchange that failed past the greeting, the CLI lists directly.
+  - name: connectors.cli.LocalOwnerConnectionsKind
+    kind: enum
+    variants: [connections]
+  - name: connectors.cli.LocalOwnerConnectionsRequest
+    kind: struct
+    fields:
+      - {name: kind, type: connectors.cli.LocalOwnerConnectionsKind}
+      - {name: adapter, type: String}
+  # One listed connection; current is false when the connection is not admitted
+  # under the instance's current configuration.
+  - name: connectors.cli.LocalOwnerListedConnection
+    kind: struct
+    fields:
+      - {name: connection, type: String}
+      - {name: state, type: "connectors.connection_admission.ConnectionState"}
+      - {name: current, type: Boolean}
+  - name: connectors.cli.LocalOwnerConnections
+    kind: struct
+    fields:
+      - {name: connections, type: "List<connectors.cli.LocalOwnerListedConnection>"}
   # Request::Reuse (story:invoke-definition-reuse-credential): the reuse answer of
   # `invoke --definition` (contracts/cli/v1alpha1/semantics.md, "Invoking a
   # definition file"; owner.md). adapter is the definition's instance to connect, source
