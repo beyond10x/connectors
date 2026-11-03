@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-03T13:11:11Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-provider-failure-is-named",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "merge 8150245c2 on main; holder apps/connectors/tests/catalog_provider_failure.rs (missing, exit, kill, silent provider answer unavailable at installed_provider; a refused endpoint stays invalid_input; setup check, init /5, migrate /2 to /5); PR #235 (merge 8150245c2, release 0.65.0) checks green: repository gate run 41463902959, macOS host and CLI 41463903366, Windows 41463902901; main after merge: Rust gate 41471564824, macOS host 41471564879, release binaries 41471796270",
+    "reference": "approval-record:connectors-d417-wave"
+  }
+}

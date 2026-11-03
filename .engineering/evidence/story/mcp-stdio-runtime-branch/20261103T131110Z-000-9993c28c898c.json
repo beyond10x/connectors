@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-03T13:11:10Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-stdio-runtime-branch",
+  "kind": "story",
+  "revision": 40,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "merge 7b38a2984 on main; the 10 named scenarios in apps/connectors/tests/local_mcp_server.rs:661-865, none ignored; finding J3 of review-result:w1022-u3-adversary-r2 deferred to story:owner-cancels-a-bounded-read (draft), held as a deferred case at apps/connectors/tests/adversary_local_mcp_server.rs:1069; PR #201 (merge abc7aadda, wave 20261022) checks green: repository gate run 39943283073, host and CLI 39943283679 and 39943283791, docs 39943283250",
+    "reference": "approval-record:connectors-d417-wave"
+  }
+}

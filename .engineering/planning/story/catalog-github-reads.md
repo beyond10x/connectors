@@ -39,7 +39,7 @@ scope:
   path: docs/catalog-github.md
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 27
+revision: 28
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-23T12:24:51Z", actor: "human:timo", revision: 24}
 - {from: "proposed", to: "active", at: "2026-10-23T12:24:51Z", actor: "human:timo", revision: 25}
@@ -111,3 +111,22 @@ Decided 2026-10-23 (approval-record:github-reads-option-a-20261023):
 - Branch `unit/github-reads` (396a146f8) is superseded. It is kept unmerged and will not merge. Its fix pass 1 edits live in the managed tree `conn-github-reads`.
 - Engine part, F1: a 403 or 429 with `Retry-After` is `rate_limited`, in connectors branch `unit/catalog-retry-after`, tested in `adapters/catalog/tests/engine.rs::a_secondary_rate_limit_with_requests_left_is_rate_limited`.
 - Provider part, the 10 reads with F2 and F5: one `connectors/github.yaml` in connectors-definitions, https://github.com/beyond10x/connectors-definitions/pull/9. Writes join the same file later; there is no separate read provider.
+
+## Checked 2026-11-03 (wave D417)
+
+Read against `origin/main` `8150245c2` by wave D417.
+
+- Held: the engine part (`d93457b06`, `adapters/catalog/tests/engine.rs:2646`
+  `a_secondary_rate_limit_with_requests_left_is_rate_limited`); the provider part merged in
+  https://github.com/beyond10x/connectors-definitions/pull/9 (2026-10-23); on main the 0.5.2
+  definitions fixture carries the ten reads, held by
+  `adapters/catalog/tests/definition_published_features_adversary.rs:101` (ids, all read), `:152`
+  (fixed `q` with `since`), `:183` (caller `state` refused), `:200` (rate-limit headers), `:215`
+  (README as text) and `crates/connectors-catalog/tests/definition_published_features.rs:272`.
+- Not held as the acceptance is written: no two-page paging test per list and no 1,000-result cap test;
+  exact-request fixture tests cover 3 of the 10 reads; `docs/catalog-github.md` does not exist and
+  `website/docs/connectors/` has no GitHub page; the acceptance names
+  `adapters/catalog/providers/github/operations.json` and a bundle drift line, surfaces that moved to
+  connectors-definitions.
+
+The acceptance needs restating against the definitions-only layout before a wave takes the remainder.

@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-03T13:11:09Z",
+  "actor": "human:timo",
+  "artifact": "story:definition-reader-feed-extensions",
+  "kind": "story",
+  "revision": 12,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "merge f1089f007 on main; holders crates/connectors-catalog/tests/definition_feed.rs:391-633, definition_import.rs:365-373, adapters/catalog/tests/jira_feed.rs:489, confluence_v1_feed.rs:536, crates/connectors-build/src/jira_feed_conformance.rs:616,:665, confluence_feed_conformance.rs:696,:735; PR #201 (merge abc7aadda, wave 20261022) checks green: repository gate run 39943283073, host and CLI 39943283679 and 39943283791, docs 39943283250",
+    "reference": "approval-record:connectors-d417-wave"
+  }
+}

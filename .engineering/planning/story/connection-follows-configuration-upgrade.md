@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:connection-follows-configuration-upgrade
 kind: story
-status: active
+status: implemented
 title: A connection follows a configuration upgrade without credential re-entry
 relations:
 - serves: vision:independent-contract-adapters
@@ -17,12 +17,13 @@ scope:
   path: crates/connectors-host/src/local/registry/upgrade_tests.rs
 - confidence: inferred
   path: docs/local-catalog-provider.md
-revision: 12
+revision: 13
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-06T02:14:55Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "draft", at: "2026-10-19T18:41:43Z", actor: "human:timo", revision: 6}
 - {from: "draft", to: "proposed", at: "2026-10-21T21:05:13Z", actor: "human:timo", revision: 11}
 - {from: "proposed", to: "active", at: "2026-10-21T21:05:13Z", actor: "human:timo", revision: 12}
+- {from: "active", to: "implemented", at: "2026-11-03T13:11:09Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Problem
 
