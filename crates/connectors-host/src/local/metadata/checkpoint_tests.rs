@@ -270,3 +270,62 @@ fn the_greeting_authority_is_read_without_a_replay() {
         Err(Failure::MetadataUnavailable)
     );
 }
+
+/// Integrity conformance for the wait an open makes for a handle another
+/// thread of its process uses (security review of
+/// story:cold-owner-start-verifies-once): however long the store's last fresh
+/// open took, the wait ends at the caller's own metadata deadline, and an open
+/// of a different store never waits for that handle.
+#[test]
+fn a_wait_for_a_used_handle_ends_at_the_callers_deadline_and_never_spans_stores() {
+    let (_root, path) = store();
+    let (_other_root, other) = store();
+    simulate_process(91_701);
+    drop(Metadata::initialize(&path).unwrap());
+    drop(Metadata::initialize(&other).unwrap());
+    exit_process();
+    write_in(&path, 91_702, 0);
+    write_in(&other, 91_703, 0);
+    simulate_process(91_704);
+    drop(Metadata::start_owner(&path).unwrap());
+    let bound = Duration::from_secs(20);
+    er::assume_open_took(&path.join(NAME), bound);
+    er::assume_open_took(&other.join(NAME), bound);
+    let held = Metadata::inspect(&path).unwrap();
+
+    let deadline = Duration::from_millis(500);
+    let waiter = {
+        let path = path.clone();
+        std::thread::spawn(move || {
+            simulate_process(91_704);
+            let started = Instant::now();
+            let opened = super::deadline::within(Instant::now() + deadline, || {
+                Metadata::inspect(&path).map(drop)
+            });
+            (opened, started.elapsed())
+        })
+    };
+    let across = {
+        let other = other.clone();
+        std::thread::spawn(move || {
+            simulate_process(91_704);
+            let started = Instant::now();
+            let opened = Metadata::inspect(&other).map(drop);
+            (opened, er::fresh_opens(), started.elapsed())
+        })
+    };
+    let (across_opened, across_opens, across_waited) = across.join().unwrap();
+    let (opened, waited) = waiter.join().unwrap();
+    drop(held);
+    exit_process();
+    assert!(
+        waited < deadline + Duration::from_secs(2),
+        "an open waited {waited:?} for a used handle past its {deadline:?} deadline ({opened:?})"
+    );
+    assert_eq!(across_opened, Ok(()));
+    assert_eq!(across_opens, 1, "the other store was not opened afresh");
+    assert!(
+        across_waited < Duration::from_secs(10),
+        "an open of another store waited {across_waited:?} for this store's handle"
+    );
+}
