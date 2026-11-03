@@ -250,6 +250,47 @@ fn an_open_waits_for_the_handle_another_thread_uses_instead_of_verifying_again()
     exit_process();
 }
 
+/// An inspection never takes the lifecycle lock again once it released it, so
+/// a locked open that meets the handle an inspection uses waits for it instead
+/// of verifying the store again: the owner's maintenance inspects the store
+/// every few seconds (`mutations.rs`), and a read's locked opens in the owner
+/// (its read-use grant, its audit write) met that hold and verified a 200 MB
+/// store a second time (story:cold-owner-start-verifies-once).
+#[test]
+fn a_locked_open_waits_for_the_handle_an_inspection_uses_instead_of_verifying_again() {
+    let (_root, path) = store();
+    simulate_process(90);
+    drop(Metadata::initialize(&path).unwrap());
+    exit_process();
+    write_in(&path, 91, 0);
+    simulate_process(92);
+    drop(Metadata::start_owner(&path).unwrap());
+    // As long as a large store's verification: the bound of the wait.
+    let bound = Duration::from_secs(20);
+    er::assume_open_took(&path.join(NAME), bound);
+    let held = Metadata::inspect(&path).unwrap();
+    let locked = {
+        let path = path.clone();
+        std::thread::spawn(move || {
+            simulate_process(92);
+            let started = Instant::now();
+            let opened = Metadata::update(&path, false).map(drop);
+            (opened, er::fresh_opens(), started.elapsed())
+        })
+    };
+    let used = Duration::from_millis(300);
+    std::thread::sleep(used);
+    drop(held);
+    let (opened, opens, waited) = locked.join().unwrap();
+    exit_process();
+    assert_eq!(opened, Ok(()), "the locked open");
+    assert_eq!(opens, 0, "the locked open verified the store again");
+    assert!(
+        waited >= used && waited < bound,
+        "the locked open waited {waited:?}"
+    );
+}
+
 /// Adversary, D417 U1 (story:cold-owner-start-verifies-once). An unlocked
 /// observation (`Registry::transaction_observation`, a read on one owner
 /// request thread) replays with the process's verified handle after releasing
