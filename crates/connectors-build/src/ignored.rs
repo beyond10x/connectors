@@ -142,7 +142,8 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "local::registry::store_cost_tests::batch_cost_by_subject"
             | "local::registry::store_cost_tests::first_owner_open_of_a_grown_store"
             | "local::registry::store_cost_tests::owner_start_of_a_grown_store"
-            | "local::registry::store_cost_tests::two_revalidations_of_a_grown_store" => {
+            | "local::registry::store_cost_tests::two_revalidations_of_a_grown_store"
+            | "local::registry::store_cost_tests::fresh_open_passes_of_a_blob_heavy_store" => {
                 Some((Timing, vec![]))
             }
             "local::oauth_adversary_tests::chrome_following_the_redirect_is_accepted"
@@ -408,6 +409,11 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "setup_migrate_records",
             "migrated_entries_keep_their_connections_and_approval_policies",
         ) => Some((Disposable, vec![CUSTODY])),
+        (
+            "connectors",
+            "cold_owner_start",
+            "a_cold_describe_and_read_of_a_large_store_answer_within_60_seconds",
+        ) => Some((Timing, vec![])),
         (
             "connectors",
             "local_cli",

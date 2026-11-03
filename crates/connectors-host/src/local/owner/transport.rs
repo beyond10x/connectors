@@ -1447,13 +1447,16 @@ fn spawn(
     // and hands it the follow hook's trust root (`oauth::follow`), so the
     // owner's refresh trusts the fixture authorization server the CLI's grant
     // trusted, and the startup delay that stands in for a large store
-    // ([`START_DELAY`]); with the installation directory above, they are all of
-    // the CLI's environment the owner receives. A release build compiles none.
+    // ([`START_DELAY`]), and the file its verifications of the store are counted
+    // in (`metadata::VERIFICATION_LOG`); with the installation directory above,
+    // they are all of the CLI's environment the owner receives. A release build
+    // compiles none.
     #[cfg(debug_assertions)]
     for name in [
         super::tether::PARENT,
         "CONNECTORS_TEST_OAUTH_FOLLOW",
         START_DELAY,
+        crate::local::metadata::VERIFICATION_LOG,
     ] {
         if let Some(value) = std::env::var_os(name) {
             command.env(name, value);
