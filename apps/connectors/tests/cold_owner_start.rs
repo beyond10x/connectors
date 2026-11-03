@@ -125,6 +125,34 @@ fn passes(container: &Container) -> Passes {
     }
 }
 
+/// One cold read, CLI and the owner it starts together, verifies the store
+/// once; the next read, answered by that owner, verifies nothing again.
+#[test]
+fn a_cold_read_verifies_the_store_once() {
+    let (container, connection) = connected();
+    let schema = container.schema();
+    let target = format!("{CONNECTOR}/{ALIAS}");
+    let args = read_args(&connection, &schema, &target);
+    let read = success(&logged(&container, &args));
+    assert_eq!(read["result"]["credential"], digest(SECRET), "{read}");
+    let cold = passes(&container);
+    assert_eq!(
+        (cold.opens, cold.snapshots, cold.processes),
+        (1, 1, 1),
+        "fresh opens, complete reads and processes that verified: {:?}",
+        cold.lines
+    );
+    let read = success(&logged(&container, &args));
+    assert_eq!(read["result"]["credential"], digest(SECRET), "{read}");
+    let warm = passes(&container);
+    assert_eq!(
+        (warm.opens, warm.snapshots),
+        (0, 0),
+        "the next read verified the store again: {:?}",
+        warm.lines
+    );
+}
+
 /// A cold `operations describe` of a cached description reads the store
 /// directly and starts no owner: one verification.
 #[test]
@@ -211,7 +239,7 @@ fn timed(container: &Container, args: &[&str]) -> (Duration, Output) {
 
 /// The 60-second line on a store of about 200 MB (the reported one held
 /// 172 MB in 21,830 blobs): a cold `operations describe` and a cold read each
-/// answer within 60 s, the describe verifies the store once, and the next read
+/// answer within 60 s, each verifies the store once, and the next read
 /// verifies nothing and takes no longer than a warm one. A measurement against a deadline, run
 /// explicitly, on a release build for the record (which logs no verification,
 /// so the counts are checked on a test build only):
@@ -280,6 +308,7 @@ fn a_cold_describe_and_read_of_a_large_store_answer_within_60_seconds() {
     // A release build logs no verification; the counts hold in a test build.
     if cfg!(debug_assertions) {
         assert_eq!(describe_passes.opens, 1, "{:?}", describe_passes.lines);
+        assert_eq!(cold_passes.opens, 1, "{:?}", cold_passes.lines);
         assert_eq!(next_passes.opens, 0, "{:?}", next_passes.lines);
         assert_eq!(warm_passes.opens, 0, "{:?}", warm_passes.lines);
     }

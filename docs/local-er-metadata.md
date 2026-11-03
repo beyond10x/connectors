@@ -268,9 +268,11 @@ took, instead of verifying the store again: an owner's periodic mutation
 recovery and a request's admission met that way, and the request then verified
 a 200 MB store a second time. A command run while an
 owner of its own build runs reads through it ([owner transport](../contracts/cli/v1alpha1/owner.md))
-and does not open the store; without one it opens the store directly. A cold
-`operations describe` of a cached description starts no owner and verifies the
-store once, in the command (story:cold-owner-start-verifies-once;
+and does not open the store; without one it opens the store directly. A read
+on `invoke` with none running starts one before it reads the store, so a cold
+read verifies the store once, in the owner, and a cold `operations describe` of
+a cached description starts no owner and verifies the store once, in the
+command (story:cold-owner-start-verifies-once;
 `apps/connectors/tests/cold_owner_start.rs` counts the fresh opens and complete
 reads of the command and of an owner it starts).
 Page damage written to the file by something other than SQLite while a process
