@@ -1010,6 +1010,12 @@ impl Client {
                         .and_then(super::listed_state)
                         .ok_or(Code::Unavailable)?,
                     current: listed["current"].as_bool().ok_or(Code::Unavailable)?,
+                    binding: match listed.get("binding") {
+                        None => None,
+                        Some(binding) => {
+                            Some(binding.as_str().ok_or(Code::Unavailable)?.to_owned())
+                        }
+                    },
                 })
             })
             .collect()
@@ -2740,7 +2746,14 @@ fn action(
                         .into_iter()
                         .filter(|c| c.state != registry::State::Revoked)
                         .map(|c| {
-                            json!({"connection":c.reference,"state":c.state,"current":!c.stale})
+                            let mut listed = json!({"connection":c.reference,"state":c.state,"current":!c.stale});
+                            // Named only for an instance that declares
+                            // alternative bindings, as `connections describe`
+                            // names it.
+                            if let Some(binding) = c.binding {
+                                listed["binding"] = json!(binding);
+                            }
+                            listed
                         }),
                 );
                 match page.next_cursor {

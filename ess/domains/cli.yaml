@@ -309,13 +309,17 @@ types:
       - {name: kind, type: connectors.cli.LocalOwnerConnectionsKind}
       - {name: adapter, type: String}
   # One listed connection; current is false when the connection is not admitted
-  # under the instance's current configuration.
+  # under the instance's current configuration. binding is the binding the
+  # connection's current evidence selected, present only for an instance that
+  # declares alternative bindings, as connectors.cli.ConnectionDescription names
+  # it; a bound read naming its connection takes it from here.
   - name: connectors.cli.LocalOwnerListedConnection
     kind: struct
     fields:
       - {name: connection, type: String}
       - {name: state, type: "connectors.connection_admission.ConnectionState"}
       - {name: current, type: Boolean}
+      - {name: binding, type: "Optional<String>"}
   - name: connectors.cli.LocalOwnerConnections
     kind: struct
     fields:
@@ -2005,7 +2009,7 @@ commands:
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
     # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1437) and the host
-    # removal path (er.rs:4715-4717) only expires Active cursors. The error name is
+    # removal path (er.rs:4728-4730) only expires Active cursors. The error name is
     # the decision; no source names one.
 
 events:

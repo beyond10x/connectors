@@ -503,9 +503,15 @@ pub fn reusable(paths: &Paths, alias: &str, target: &registry::Binding) -> Resul
 /// this build answers it from its held metadata handle; without one the store
 /// is read directly, which verifies it completely (`docs/local-er-metadata.md`).
 pub fn cached(paths: &Paths, alias: &str) -> Result<runtime::Bootstrap> {
-    let mut bootstrap = cached_unbound(paths, alias)?;
-    // Bound to the configured entry it was cached under (the executable is
-    // never carried by a cached record).
+    configured(paths, alias, cached_unbound(paths, alias)?)
+}
+/// `bootstrap` bound to the configured entry it was cached under (the
+/// executable is never carried by a cached record).
+fn configured(
+    paths: &Paths,
+    alias: &str,
+    mut bootstrap: runtime::Bootstrap,
+) -> Result<runtime::Bootstrap> {
     let (_, adapter) = selected(paths, alias)?;
     bootstrap.configure(&adapter);
     Ok(bootstrap)
@@ -524,7 +530,20 @@ pub fn described(
     alias: &str,
     connection: Option<&str>,
 ) -> Result<runtime::Bootstrap> {
-    match cached(paths, alias) {
+    // A running owner of this build that has nothing cached is asked to launch
+    // (`"launch": true`): it checks the launch condition itself, from its held
+    // handle, so a cold read of an uncached description verifies the store
+    // once, in the owner (story:cold-owner-start-verifies-once). Any other
+    // failed exchange is answered by the direct read, as `cached` answers it.
+    let unbound = match cached_through_owner(paths, alias) {
+        Some(Err(error)) if error.code == Code::DescriptionUnavailable => {
+            let launched = Client::connect(paths, true)?.launched(alias, connection)?;
+            return configured(paths, alias, launched);
+        }
+        Some(Ok(bootstrap)) => Ok(bootstrap),
+        Some(Err(_)) | None => cached_direct(paths, alias),
+    };
+    match unbound.and_then(|bootstrap| configured(paths, alias, bootstrap)) {
         Err(error) if error.code == Code::DescriptionUnavailable => {
             let (_, adapter) = selected(paths, alias)?;
             if transport::in_owner()
@@ -562,19 +581,31 @@ pub fn bound_described(
     }
     let binding = match connection {
         None => None,
-        Some(connection) => {
-            let (_, adapter) = selected(paths, alias)?;
-            registry::Registry::with_system_clock(&paths.state)
-                .describe(
-                    &adapter.instance_id,
-                    &adapter.adapter_id,
-                    adapter.configured(),
-                    connection,
-                    connectors_sdk::now_ms(),
-                    false,
-                )?
-                .binding
-        }
+        // A running owner of this build names the connection's binding from its
+        // held handle, so a cold bound read verifies the store once, in the owner
+        // (story:cold-owner-start-verifies-once). A connection its listing does
+        // not hold, or a failed listing, is described directly, which gives a
+        // refusal its own code.
+        Some(connection) => match listed_through_owner(paths, alias).and_then(|listed| {
+            listed
+                .into_iter()
+                .find(|held| held.connection == connection)
+        }) {
+            Some(held) => held.binding,
+            None => {
+                let (_, adapter) = selected(paths, alias)?;
+                registry::Registry::with_system_clock(&paths.state)
+                    .describe(
+                        &adapter.instance_id,
+                        &adapter.adapter_id,
+                        adapter.configured(),
+                        connection,
+                        connectors_sdk::now_ms(),
+                        false,
+                    )?
+                    .binding
+            }
+        },
     };
     Ok(bootstrap.bound(binding.as_deref())?)
 }
@@ -604,13 +635,15 @@ pub fn start_for_read(paths: &Paths, until: Instant) -> Result<()> {
     }
 }
 /// A connection an instance holds, as a listing through its owner answers it:
-/// its reference, its state, and whether it is admitted under the instance's
-/// current configuration.
+/// its reference, its state, whether it is admitted under the instance's
+/// current configuration, and, for an instance that declares alternative
+/// bindings, the binding its current evidence selected.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Listed {
     pub connection: String,
     pub state: registry::State,
     pub current: bool,
+    pub binding: Option<String>,
 }
 /// The connections the instance of `alias` holds, revoked ones excepted,
 /// listed by a running owner of this build from its held metadata handle, so
@@ -644,15 +677,18 @@ fn listed_state(name: &str) -> Option<registry::State> {
     .find(|state| serde_json::to_value(state).is_ok_and(|value| value == name))
 }
 fn cached_unbound(paths: &Paths, alias: &str) -> Result<runtime::Bootstrap> {
-    cached_through(paths, alias, |paths, alias| {
-        if transport::in_owner() {
-            return None;
-        }
-        let client = Client::connect(paths, false)
-            .ok()
-            .filter(Client::is_same_build)?;
-        Some(client.cached(alias))
-    })
+    cached_through(paths, alias, cached_through_owner)
+}
+/// A running owner of this build's answer to a `cached` request; `None` in the
+/// owner itself or when no such owner runs.
+fn cached_through_owner(paths: &Paths, alias: &str) -> Option<Result<runtime::Bootstrap>> {
+    if transport::in_owner() {
+        return None;
+    }
+    let client = Client::connect(paths, false)
+        .ok()
+        .filter(Client::is_same_build)?;
+    Some(client.cached(alias))
 }
 /// `through_owner` asks a running owner, or answers `None` when there is none
 /// to ask. Only its answer is taken; a failed or broken exchange after the

@@ -546,8 +546,16 @@ fn check_out_opened(er: &mut ErAuthority, took: std::time::Duration) {
 /// caller's metadata deadline: the wait never costs more than the complete
 /// verification a fresh open repeats, which is all a concurrent use of the
 /// store cost before (story:cold-owner-start-verifies-once). The calling
-/// thread never waits for a handle it uses itself.
-fn take_or_wait(path: &Path, authority: &Authority, source_level: i64) -> Option<ErAuthority> {
+/// thread never waits for a handle it uses itself, and a caller that holds the
+/// store's lifecycle lock (`locked`) never waits at all: the thread using the
+/// handle may need that lock before it returns the handle, as an unlocked
+/// observation relocks before it ends.
+fn take_or_wait(
+    path: &Path,
+    authority: &Authority,
+    source_level: i64,
+    locked: bool,
+) -> Option<ErAuthority> {
     let Ok(mut checkouts) = CHECKOUTS.lock() else {
         return take(path, authority, source_level);
     };
@@ -573,7 +581,7 @@ fn take_or_wait(path: &Path, authority: &Authority, source_level: i64) -> Option
         let left = cutoff.map_or(std::time::Duration::ZERO, |cutoff| {
             cutoff.saturating_duration_since(std::time::Instant::now())
         });
-        if !elsewhere || left.is_zero() {
+        if locked || !elsewhere || left.is_zero() {
             return None;
         }
         checkouts = RETURNED.wait_timeout(checkouts, left).ok()?.0;
@@ -2359,14 +2367,19 @@ impl ErAuthority {
     }
 }
 
+/// Opens the store at `path`: a verified handle this process holds, or a fresh
+/// open that verifies the whole store. `locked` says the caller holds the
+/// store's lifecycle lock, so the open does not wait for a handle in use
+/// ([`take_or_wait`]).
 pub(super) fn open(
     path: &Path,
     authority: Authority,
     source_level: i64,
     projection_level: i64,
+    locked: bool,
 ) -> Result<(ErAuthority, String)> {
     super::deadline::check()?;
-    if let Some(mut held) = take_or_wait(path, &authority, source_level) {
+    if let Some(mut held) = take_or_wait(path, &authority, source_level, locked) {
         held.projection_level = projection_level;
         // A held handle whose read refuses is not evidence either way; the
         // fresh open below verifies the whole store and reports the refusal.
@@ -5899,7 +5912,7 @@ mod tests {
         assert_eq!(projected["attempt_id"], prepared.fields["attempt_id"]);
         drop(authority);
 
-        let (reopened, _) = open(&path, coordinates, 4, 4).unwrap();
+        let (reopened, _) = open(&path, coordinates, 4, 4, false).unwrap();
         let replayed = reopened.facade.complete_snapshot(call_wait()).unwrap();
         let terminal = replayed
             .histories

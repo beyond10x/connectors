@@ -262,11 +262,11 @@ no handle is open is refused by the first open after it, a command run directly
 or the owner when it starts. The owner holds its handles for its whole run, so
 it verifies the whole store once per start; no open, the owner's included,
 answers from a checkpoint without that complete read. A process keeps one
-verified handle per store, and an open while another thread of the process uses
-it waits for it to return, at most as long as that store's last fresh open there
-took, instead of verifying the store again: an owner's periodic mutation
-recovery and a request's admission met that way, and the request then verified
-a 200 MB store a second time. A command run while an
+verified handle per store, and an unlocked open while another thread uses it
+waits for it to return, at most as long as that store's last fresh open there
+took, instead of verifying the store again (an owner's mutation recovery and a
+request met that way); an open holding the store's lifecycle lock never waits,
+as the handle's user may need that lock to return it. A command run while an
 owner of its own build runs reads through it ([owner transport](../contracts/cli/v1alpha1/owner.md))
 and does not open the store; without one it opens the store directly. A read
 on `invoke` with none running starts one before it reads the store, so a cold
