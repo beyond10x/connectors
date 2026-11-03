@@ -44,6 +44,12 @@ const APPROVAL_STEPS: [&str; 3] = [
 ];
 /// The connections one page of an instance's listing reads.
 const LISTED: u16 = 500;
+/// A read's own deadline, the 30 seconds its input phase sets
+/// (`session.rs`): a cold read waits for the greeting of the owner it starts
+/// within it, never within a shorter fixed bound, and a start that outlasts it
+/// answers `timeout`, as before the read started the owner first
+/// (owner.md; story:owner-start-outlasts-a-fixed-bound).
+const READ_DEADLINE: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// `<connector>` or `<connector>/<instance>`, each part an admitted id.
 pub(super) fn target(text: &str) -> Option<(&str, Option<&str>)> {
@@ -312,7 +318,26 @@ pub(super) fn decide(held: &[Held]) -> Result<String, HandlerReply> {
 /// The connections the instance of `adapter` holds, revoked ones excepted:
 /// every page of the listing is read, so no number of revoked connections
 /// hides a usable one.
-fn held(paths: &Paths, config: &Config, adapter: &Adapter) -> Result<Vec<Held>, HandlerReply> {
+fn held(
+    paths: &Paths,
+    config: &Config,
+    alias: &str,
+    adapter: &Adapter,
+) -> Result<Vec<Held>, HandlerReply> {
+    // A running owner of this build lists them from its held metadata handle,
+    // so the listing verifies nothing here (story:cold-owner-start-verifies-once);
+    // without one, or when that exchange fails, they are listed directly, which
+    // verifies the store and gives a refusal its own code.
+    if let Some(listed) = owner::listed_through_owner(paths, alias) {
+        return Ok(listed
+            .into_iter()
+            .map(|listed| Held {
+                connection: listed.connection,
+                state: listed.state,
+                current: listed.current,
+            })
+            .collect());
+    }
     let registry = Registry::with_system_clock(&paths.state);
     let custody = keyring::custody::available_for(&config.selection());
     every_page(|cursor| {
@@ -966,29 +991,27 @@ fn prepare_with(request: &Request, signals: &protected::Signals) -> Result<Prepa
                 .adapters
                 .get(&alias)
                 .ok_or_else(|| unselected(Unselected::NotFound))?;
-            let connection = match &request.connection {
-                Some(connection) => Some(connection.clone()),
-                // `--describe` uses the one usable connection's binding when
-                // there is one, and the instance's description otherwise.
-                None if request.describe => decide(&held(&paths, &config, adapter)?).ok(),
-                None => Some(decide(&held(&paths, &config, adapter)?)?),
-            };
             // A read names neither an approval file nor an idempotency key, so
             // an invoke naming neither is a read or is refused: it starts the
-            // owner before it reads the description, within the read's 30
-            // seconds, and the description, the admission and the read are then
-            // answered from that owner's held handle; a cold read verifies the
-            // store once, in the owner (story:cold-owner-start-verifies-once).
+            // owner first, within the read's own deadline, and the listing of
+            // its connections without `--connection`, the description, the
+            // admission and the read are then answered from that owner's held
+            // handle; a cold read verifies the store once, in the owner
+            // (story:cold-owner-start-verifies-once).
             if !request.describe
                 && request.idempotency_key.is_none()
                 && request.approval_file.is_none()
             {
-                owner::start_for_read(
-                    &paths,
-                    std::time::Instant::now() + std::time::Duration::from_secs(30),
-                )
-                .map_err(owner_failure)?;
+                owner::start_for_read(&paths, std::time::Instant::now() + READ_DEADLINE)
+                    .map_err(owner_failure)?;
             }
+            let connection = match &request.connection {
+                Some(connection) => Some(connection.clone()),
+                // `--describe` uses the one usable connection's binding when
+                // there is one, and the instance's description otherwise.
+                None if request.describe => decide(&held(&paths, &config, &alias, adapter)?).ok(),
+                None => Some(decide(&held(&paths, &config, &alias, adapter)?)?),
+            };
             let (adapter, bootstrap) = bound(&paths, &alias, connection.as_deref())?;
             (connector, instance, adapter, bootstrap, connection)
         }
@@ -1166,7 +1189,7 @@ pub(super) fn dispatch(
             let Some(adapter) = config.adapters.get(&alias) else {
                 return unselected(Unselected::NotFound);
             };
-            match held(&paths, &config, adapter).and_then(|held| decide(&held)) {
+            match held(&paths, &config, &alias, adapter).and_then(|held| decide(&held)) {
                 Ok(connection) => connection,
                 Err(reply) => return reply,
             }

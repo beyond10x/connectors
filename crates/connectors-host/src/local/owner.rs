@@ -603,6 +603,46 @@ pub fn start_for_read(paths: &Paths, until: Instant) -> Result<()> {
         Ok(_) | Err(_) => Ok(()),
     }
 }
+/// A connection an instance holds, as a listing through its owner answers it:
+/// its reference, its state, and whether it is admitted under the instance's
+/// current configuration.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Listed {
+    pub connection: String,
+    pub state: registry::State,
+    pub current: bool,
+}
+/// The connections the instance of `alias` holds, revoked ones excepted,
+/// listed by a running owner of this build from its held metadata handle, so
+/// that the listing verifies nothing in the caller
+/// (story:cold-owner-start-verifies-once). `None` when no such owner runs, or
+/// when the exchange fails after the greeting, a refusal included: the caller
+/// then lists the store directly, which gives a refusal its own code.
+pub fn listed_through_owner(paths: &Paths, alias: &str) -> Option<Vec<Listed>> {
+    if transport::in_owner() {
+        return None;
+    }
+    Client::connect(paths, false)
+        .ok()
+        .filter(Client::is_same_build)?
+        .connections(alias)
+        .ok()
+}
+/// The connection state a listing names by its serialized name; `None` for a
+/// name this build does not know, which fails the listing.
+fn listed_state(name: &str) -> Option<registry::State> {
+    use registry::State::*;
+    [
+        Ready,
+        Pending,
+        ReauthorizationRequired,
+        Stale,
+        CustodyUnavailable,
+        Revoked,
+    ]
+    .into_iter()
+    .find(|state| serde_json::to_value(state).is_ok_and(|value| value == name))
+}
 fn cached_unbound(paths: &Paths, alias: &str) -> Result<runtime::Bootstrap> {
     cached_through(paths, alias, |paths, alias| {
         if transport::in_owner() {
@@ -1254,6 +1294,13 @@ enum Request {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         connection: Option<String>,
     },
+    /// A CLI's listing of the connections the adapter's instance holds,
+    /// revoked ones excepted, answered from the owner's held metadata handle
+    /// (`connectors.cli.LocalOwnerConnectionsRequest`;
+    /// story:cold-owner-start-verifies-once).
+    Connections {
+        adapter: String,
+    },
     /// A consumer launch. Answered by `Reply::Launch`, then the consumer image
     /// and the sealed credential as descriptors, then the final answer.
     Launch {
@@ -1372,6 +1419,25 @@ mod cached_tests {
         );
         std::fs::write(&paths.config, toml::to_string(&config).unwrap()).unwrap();
         (root, paths)
+    }
+
+    /// Every state a listing through the owner carries reads back as itself;
+    /// a name this build does not know reads as none.
+    #[test]
+    fn a_listed_state_reads_back_as_itself() {
+        use registry::State::*;
+        for state in [
+            Ready,
+            Pending,
+            ReauthorizationRequired,
+            Stale,
+            CustodyUnavailable,
+            Revoked,
+        ] {
+            let name = serde_json::to_value(state).unwrap();
+            assert_eq!(listed_state(name.as_str().unwrap()), Some(state));
+        }
+        assert_eq!(listed_state("parent_degraded"), None);
     }
 
     #[test]

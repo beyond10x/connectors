@@ -169,28 +169,35 @@ the owner's held metadata handle, and refuses with the codes a direct read gives
 (`not_found`, `description_unavailable`, `metadata_unavailable`). With
 `"launch": true` (and the named `connection`, when there is one) the owner, finding
 no description cached, checks the [launch condition](semantics.md#launching-for-a-description)
-again and starts the configured adapter, which caches it. `invoke`
+again and starts the configured adapter, which caches it. It answers a
+`connections` request (`connectors.cli.LocalOwnerConnectionsRequest`,
+`{"kind":"connections","adapter":…}`) with `connectors.cli.LocalOwnerConnections`:
+every connection the adapter's instance holds, revoked ones excepted, each with
+its state and whether it is admitted under the instance's current
+configuration, listed from the same held handle as a direct listing lists them;
+an `invoke` without `--connection` chooses its connection from that listing
+(story:cold-owner-start-verifies-once). `invoke`
 with such an owner running sends no admission of its own: the owner's
 admission of the `invoke` request decides it, before dispatch, from the same held
 handle. The authority a greeting names is read from the database's authority row
 without replaying the store. Without a reachable owner of the same build a
 command reads the store directly, which verifies it completely. A target
-`invoke` with `--connection` that names neither `--approval-file` nor
-`--idempotency-key`, the only form a read is admitted in, starts an owner
-first, before it reads the description, and reads the description and its
-admission through that owner, so a cold read verifies the store once, in the
-owner before its greeting (story:cold-owner-start-verifies-once). That owner
+`invoke` that names neither `--approval-file` nor `--idempotency-key`, the
+only form a read is admitted in, starts an owner first, before it lists the
+connections (without `--connection`) or reads the description, and reads them
+and its admission through that owner, so a cold read verifies the store once,
+in the owner before its greeting (story:cold-owner-start-verifies-once). That owner
 starts its `automatic` adapters as any start does, so such an `invoke` refused
 afterwards, a write refused `approval_required` included, leaves it running.
 Only a start that outlasts the read's 30 seconds answers the `invoke`
 (`timeout`); a start that fails otherwise leaves the `invoke` to the direct
 read, which refuses by its own code before any provider call
 (`metadata_unavailable` for a store that fails verification). An `invoke`
-that names either flag, an `invoke` of a definition file and one without
-`--connection` each read the store directly first, which verifies it, and a
-write is admitted directly before it starts an owner. A `cached` exchange that fails
-after the greeting, an owner's refusal included, is answered by that direct
-read, so a refusal carries the direct read's own code. The owner itself never routes
+that names either flag and an `invoke` of a definition file read the store
+directly first, which verifies it, and a write is admitted directly before it
+starts an owner. A `cached` or `connections` exchange that fails after the
+greeting, an owner's refusal included, is answered by that direct read, so a
+refusal carries the direct read's own code. The owner itself never routes
 its reads through an owner.
 
 The generated parser's protected Sources hook retains one clearing buffer and
