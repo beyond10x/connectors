@@ -1063,6 +1063,9 @@ impl Metadata {
             },
             source_level,
             projection_level,
+            // A replay that keeps the lifecycle lock never waits for a handle
+            // whose user may need that lock to return it.
+            !release_physical,
         )?;
         if imported_digest != digest {
             return Err(Failure::MetadataUnavailable);
