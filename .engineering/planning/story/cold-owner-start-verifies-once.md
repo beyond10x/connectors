@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:cold-owner-start-verifies-once
 kind: story
-status: active
+status: implemented
 title: A cold owner start verifies the store once and answers describe within the caller's deadline
 relations:
 - informed_by: story:owner-start-outlasts-a-fixed-bound
@@ -34,10 +34,11 @@ scope:
   path: crates/connectors-host/src/local/runtime/state.rs
 - confidence: cited
   path: docs/local-er-metadata.md
-revision: 18
+revision: 19
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T05:28:52Z", actor: "human:operator", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-30T05:28:52Z", actor: "human:operator", revision: 4}
+- {from: "active", to: "implemented", at: "2026-11-03T19:23:10Z", actor: "human:operator", revision: 19, decided_on: {"recorded":{"test_result":1,"review_outcome":4}}}
 ---
 ## Problem
 
