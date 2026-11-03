@@ -309,13 +309,17 @@ types:
       - {name: kind, type: connectors.cli.LocalOwnerConnectionsKind}
       - {name: adapter, type: String}
   # One listed connection; current is false when the connection is not admitted
-  # under the instance's current configuration.
+  # under the instance's current configuration. binding is the binding the
+  # connection's current evidence selected, present only for an instance that
+  # declares alternative bindings, as connectors.cli.ConnectionDescription names
+  # it; a bound read naming its connection takes it from here.
   - name: connectors.cli.LocalOwnerListedConnection
     kind: struct
     fields:
       - {name: connection, type: String}
       - {name: state, type: "connectors.connection_admission.ConnectionState"}
       - {name: current, type: Boolean}
+      - {name: binding, type: "Optional<String>"}
   - name: connectors.cli.LocalOwnerConnections
     kind: struct
     fields:

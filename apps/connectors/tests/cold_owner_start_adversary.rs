@@ -82,7 +82,9 @@ fn passes(container: &Container) -> ((usize, usize, usize), Vec<String>) {
 /// configured selection then finds none.
 fn uncache(container: &Container) {
     let state = runtime::state::State::new(&container.path(STATE));
-    state.remember("superseded-selection", &bootstrap()).unwrap();
+    state
+        .remember("superseded-selection", &bootstrap())
+        .unwrap();
     assert!(
         state
             .cached("forge-local", "superseded-selection")
