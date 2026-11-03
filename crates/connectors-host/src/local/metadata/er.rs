@@ -474,6 +474,110 @@ pub(super) struct ErAuthority {
     /// How the provider's open verified the store. Whatever it says, the host
     /// read the store completely before this handle answered anything.
     opened: OpenVerification,
+    /// Present while a thread uses this handle, absent while it waits in
+    /// [`IDLE`]: an open of the same store by another thread of this process
+    /// waits for it to return there ([`take_or_wait`]).
+    checkout: Option<Checkout>,
+}
+
+/// One verified handle in use, by the thread of the process that took it.
+/// Dropping it, as the handle returns to [`IDLE`] or is retired, wakes the
+/// opens waiting for a handle of the same store.
+struct Checkout(u64);
+
+/// The verified handles in use, as (checkout, store, process, thread), and how
+/// long the last fresh open of each store took in each process.
+struct Checkouts {
+    held: Vec<(u64, std::path::PathBuf, u64, std::thread::ThreadId)>,
+    opened: Vec<(std::path::PathBuf, u64, std::time::Duration)>,
+    next: u64,
+}
+
+static CHECKOUTS: std::sync::Mutex<Checkouts> = std::sync::Mutex::new(Checkouts {
+    held: Vec::new(),
+    opened: Vec::new(),
+    next: 0,
+});
+
+/// Signalled whenever a [`Checkout`] ends.
+static RETURNED: std::sync::Condvar = std::sync::Condvar::new();
+
+impl Checkouts {
+    /// Records that the calling thread uses `er`.
+    fn start(&mut self, er: &mut ErAuthority) {
+        self.next += 1;
+        self.held.push((
+            self.next,
+            er.durable_path.clone(),
+            er.process,
+            std::thread::current().id(),
+        ));
+        er.checkout = Some(Checkout(self.next));
+    }
+}
+
+impl Drop for Checkout {
+    fn drop(&mut self) {
+        if let Ok(mut checkouts) = CHECKOUTS.lock() {
+            checkouts.held.retain(|(id, ..)| *id != self.0);
+        }
+        RETURNED.notify_all();
+    }
+}
+
+/// Records that the calling thread uses `er`, which a fresh open that took
+/// `took` verified: the longest an open of the same store in this process
+/// waits for a handle in use.
+fn check_out_opened(er: &mut ErAuthority, took: std::time::Duration) {
+    if let Ok(mut checkouts) = CHECKOUTS.lock() {
+        let process = er.process;
+        let path = er.durable_path.clone();
+        checkouts
+            .opened
+            .retain(|(store, owner, _)| !(*store == path && *owner == process));
+        checkouts.opened.push((path, process, took));
+        checkouts.start(er);
+    }
+}
+
+/// A verified idle handle of the store at `path` ([`take`]). With none idle
+/// while another thread of this process uses one, waits for it to return, at
+/// most as long as the last fresh open of that store here took and within the
+/// caller's metadata deadline: the wait never costs more than the complete
+/// verification a fresh open repeats, which is all a concurrent use of the
+/// store cost before (story:cold-owner-start-verifies-once). The calling
+/// thread never waits for a handle it uses itself.
+fn take_or_wait(path: &Path, authority: &Authority, source_level: i64) -> Option<ErAuthority> {
+    let Ok(mut checkouts) = CHECKOUTS.lock() else {
+        return take(path, authority, source_level);
+    };
+    let process = process();
+    let thread = std::thread::current().id();
+    let cutoff = checkouts
+        .opened
+        .iter()
+        .find(|(store, owner, _)| store == path && *owner == process)
+        .map(|(_, _, took)| super::deadline::cutoff(*took));
+    loop {
+        // A handle returns to the pool before its checkout ends, and the
+        // checkout ends under this lock: a handle returned since the last look
+        // is taken here, never missed.
+        if let Some(mut held) = take(path, authority, source_level) {
+            checkouts.start(&mut held);
+            return Some(held);
+        }
+        let elsewhere = checkouts
+            .held
+            .iter()
+            .any(|(_, store, owner, user)| store == path && *owner == process && *user != thread);
+        let left = cutoff.map_or(std::time::Duration::ZERO, |cutoff| {
+            cutoff.saturating_duration_since(std::time::Instant::now())
+        });
+        if !elsewhere || left.is_zero() {
+            return None;
+        }
+        checkouts = RETURNED.wait_timeout(checkouts, left).ok()?.0;
+    }
 }
 
 /// Highest global position and number of the tenant's events. Eventlog
@@ -528,7 +632,11 @@ impl ErAuthority {
 /// A verified handle returns to the pool; `checkpoint` says whether its use may
 /// persist the open checkpoint. A passive inspection may not: it only reads the
 /// store (`contracts/cli/v1alpha1/owner.md`), and the checkpoint is a commit.
-pub(super) fn release_handle(er: ErAuthority, lock: &mut Option<std::fs::File>, checkpoint: bool) {
+pub(super) fn release_handle(
+    mut er: ErAuthority,
+    lock: &mut Option<std::fs::File>,
+    checkpoint: bool,
+) {
     if er.reusable {
         if checkpoint {
             release(er);
@@ -537,6 +645,8 @@ pub(super) fn release_handle(er: ErAuthority, lock: &mut Option<std::fs::File>, 
         }
         return;
     }
+    // A retired handle never returns to the pool: no open waits for it.
+    drop(er.checkout.take());
     // The authority is destroyed before the lock. ManuallyDrop is deliberate:
     // failure to start the reaper, or a panic inside it, must retain ownership
     // until process exit rather than release a worker still able to commit.
@@ -577,10 +687,13 @@ pub(super) fn release(er: ErAuthority) {
 
 /// Keeps a verified handle for the next open of the same store in this process
 /// without persisting its observation.
-fn pool(er: ErAuthority) {
+fn pool(mut er: ErAuthority) {
     if !er.reusable {
         return;
     }
+    // Ended once the handle is in the pool, outside its lock: an open that
+    // waits for this handle then finds it ([`take_or_wait`]).
+    let checkout = er.checkout.take();
     let evicted = {
         let Ok(mut idle) = super::deadline::lock(&IDLE) else {
             return;
@@ -608,6 +721,7 @@ fn pool(er: ErAuthority) {
         }
         evicted
     };
+    drop(checkout);
     // Dropping a verified idle bridge closes admission and detaches its worker;
     // no unacknowledged write remains on this path. Keep it outside the pool.
     drop(evicted);
@@ -2240,6 +2354,7 @@ impl ErAuthority {
             file: file_identity(path),
             opened: facade.open_verification(),
             facade,
+            checkout: None,
         }
     }
 }
@@ -2251,7 +2366,7 @@ pub(super) fn open(
     projection_level: i64,
 ) -> Result<(ErAuthority, String)> {
     super::deadline::check()?;
-    if let Some(mut held) = take(path, &authority, source_level) {
+    if let Some(mut held) = take_or_wait(path, &authority, source_level) {
         held.projection_level = projection_level;
         // A held handle whose read refuses is not evidence either way; the
         // fresh open below verifies the whole store and reports the refusal.
@@ -2263,6 +2378,8 @@ pub(super) fn open(
     super::deadline::check()?;
     let definitions = registry()?;
     let path_text = utf8_path(path)?;
+    note_fresh_open();
+    let started = std::time::Instant::now();
     // The open verifies the whole store; later reads and batches reuse that verified
     // observation while SQLite attests it unchanged, or verify only the appended suffix
     // (Entity Runtime 0.26.0, beyond10x/entity-runtime#51).
@@ -2282,6 +2399,7 @@ pub(super) fn open(
     .map_err(|_| Failure::MetadataUnavailable)?;
     let mut er = ErAuthority::new(facade, path, source_level, projection_level);
     resynchronize(&mut er)?;
+    check_out_opened(&mut er, started.elapsed());
     let source_digest = er.source_digest.clone();
     Ok((er, source_digest))
 }
@@ -2717,6 +2835,7 @@ fn imported_digest(snapshot: &CompleteStoreSnapshot) -> Result<String> {
 #[cfg(test)]
 thread_local! {
     static FULL_REPLAYS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    static FRESH_OPENS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
     static PROCESS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
 
@@ -2724,6 +2843,47 @@ thread_local! {
 #[cfg(test)]
 pub(super) fn full_replays() -> u64 {
     FULL_REPLAYS.with(std::cell::Cell::get)
+}
+
+/// Fresh opens this thread has made: each verifies the whole store once, the
+/// provider's open and the complete read after it together.
+#[cfg(test)]
+pub(super) fn fresh_opens() -> u64 {
+    FRESH_OPENS.with(std::cell::Cell::get)
+}
+
+/// The environment variable naming the file a debug build appends one line to
+/// for each fresh open (`<process id> open`) and each complete read
+/// (`<process id> snapshot`) it makes, so that a test counts the verification
+/// passes the CLI and the owner it starts make together
+/// (story:cold-owner-start-verifies-once). A release build compiles none of it.
+#[cfg(debug_assertions)]
+pub(in crate::local) const VERIFICATION_LOG: &str = "CONNECTORS_TEST_VERIFICATION_LOG";
+
+#[cfg(debug_assertions)]
+fn log_verification(kind: &str) {
+    use std::io::Write;
+    let Some(path) = std::env::var_os(VERIFICATION_LOG) else {
+        return;
+    };
+    // One write per line: the CLI and its owner append to the same file.
+    let line = format!("{} {kind}\n", std::process::id());
+    if let Ok(mut log) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
+        let _ = log.write_all(line.as_bytes());
+    }
+}
+
+/// A fresh open is about to verify the whole store: no handle this process
+/// verified before was reused.
+fn note_fresh_open() {
+    #[cfg(test)]
+    FRESH_OPENS.with(|count| count.set(count.get() + 1));
+    #[cfg(debug_assertions)]
+    log_verification("open");
 }
 
 /// Makes this thread act as process `id`: an authority one process opened is
@@ -2749,6 +2909,21 @@ pub(super) fn exit_process() {
         },
     );
     drop(exited);
+    if let Ok(mut checkouts) = CHECKOUTS.lock() {
+        checkouts.opened.retain(|(_, owner, _)| *owner != process);
+    }
+}
+
+/// Makes this process's last fresh open of the store at `path` as long as
+/// `took`: how long an open of that store here waits for a handle in use.
+#[cfg(test)]
+pub(super) fn assume_open_took(path: &Path, took: Duration) {
+    let process = process();
+    let mut checkouts = CHECKOUTS.lock().unwrap();
+    checkouts
+        .opened
+        .retain(|(store, owner, _)| !(store == path && *owner == process));
+    checkouts.opened.push((path.to_owned(), process, took));
 }
 
 #[cfg(test)]
@@ -2787,6 +2962,8 @@ pub(super) fn take_costs() -> BTreeMap<&'static str, (u64, Duration)> {
 fn complete_snapshot(facade: &RecordedProviderFacade) -> Result<CompleteStoreSnapshot> {
     #[cfg(test)]
     FULL_REPLAYS.with(|count| count.set(count.get() + 1));
+    #[cfg(debug_assertions)]
+    log_verification("snapshot");
     timed("er.complete_snapshot", || {
         facade.complete_snapshot(call_wait())
     })

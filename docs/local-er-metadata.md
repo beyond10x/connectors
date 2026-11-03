@@ -261,9 +261,20 @@ verifies completely: a raw edit of `metadata.sqlite3` that bypasses SQLite while
 no handle is open is refused by the first open after it, a command run directly
 or the owner when it starts. The owner holds its handles for its whole run, so
 it verifies the whole store once per start; no open, the owner's included,
-answers from a checkpoint without that complete read. A command run while an
+answers from a checkpoint without that complete read. A process keeps one
+verified handle per store, and an open while another thread of the process uses
+it waits for it to return, at most as long as that store's last fresh open there
+took, instead of verifying the store again: an owner's periodic mutation
+recovery and a request's admission met that way, and the request then verified
+a 200 MB store a second time. A command run while an
 owner of its own build runs reads through it ([owner transport](../contracts/cli/v1alpha1/owner.md))
-and does not open the store; without one it opens the store directly.
+and does not open the store; without one it opens the store directly. A read
+on `invoke` with none running starts one before it reads the store, so a cold
+read verifies the store once, in the owner, and a cold `operations describe` of
+a cached description starts no owner and verifies the store once, in the
+command (story:cold-owner-start-verifies-once;
+`apps/connectors/tests/cold_owner_start.rs` counts the fresh opens and complete
+reads of the command and of an owner it starts).
 Page damage written to the file by something other than SQLite while a process
 holds a verified handle for it is accepted by that process's later opens, which
 do not repeat the page scan, until its next fresh open, which refuses it.
