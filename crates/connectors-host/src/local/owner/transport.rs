@@ -984,6 +984,36 @@ impl Client {
             serde_json::from_value(answer["bootstrap"].take()).map_err(|_| Code::Unavailable)?;
         Ok(bootstrap)
     }
+    /// The connections the adapter's instance holds, revoked ones excepted,
+    /// listed from the owner's held metadata handle
+    /// ([`super::listed_through_owner`]).
+    pub(super) fn connections(mut self, adapter: &str) -> Result<Vec<super::Listed>> {
+        self.same_build()?;
+        let answer = self.simple(
+            Request::Connections {
+                adapter: adapter.into(),
+            },
+            Duration::from_secs(30),
+        )?;
+        answer["connections"]
+            .as_array()
+            .ok_or(Code::Unavailable)?
+            .iter()
+            .map(|listed| {
+                Ok(super::Listed {
+                    connection: listed["connection"]
+                        .as_str()
+                        .ok_or(Code::Unavailable)?
+                        .to_owned(),
+                    state: listed["state"]
+                        .as_str()
+                        .and_then(super::listed_state)
+                        .ok_or(Code::Unavailable)?,
+                    current: listed["current"].as_bool().ok_or(Code::Unavailable)?,
+                })
+            })
+            .collect()
+    }
     pub fn status(mut self, adapter: &str) -> Result<Value> {
         self.same_build()?;
         self.simple(
@@ -2324,6 +2354,7 @@ fn action(
         | Request::Invoke { adapter, .. }
         | Request::Status { adapter }
         | Request::Cached { adapter, .. }
+        | Request::Connections { adapter }
         | Request::Launch { adapter, .. }
         | Request::Stop { adapter, .. } => adapter.clone(),
         _ => return Err(Code::InvalidInput.into()),
@@ -2683,6 +2714,41 @@ fn action(
             )
         }
         Request::Status { .. } if document.is_empty() => owner.pool.status(&alias, &adapter),
+        // An `invoke` without `--connection` lists the instance's connections
+        // from the held handle, as the CLI lists them directly without an
+        // owner: every page, revoked ones excepted
+        // (story:cold-owner-start-verifies-once).
+        Request::Connections { .. } if document.is_empty() => {
+            let registry = registry::Registry::with_system_clock(&owner.paths.state);
+            let custody = custody::available_for(&config.selection());
+            let mut listed = Vec::new();
+            let mut cursor: Option<String> = None;
+            loop {
+                let page = registry.list(
+                    &adapter.instance_id,
+                    &adapter.adapter_id,
+                    adapter.configured(),
+                    registry::PageOptions {
+                        limit: 500,
+                        cursor: cursor.as_deref(),
+                    },
+                    connectors_sdk::now_ms(),
+                    custody,
+                )?;
+                listed.extend(
+                    page.connections
+                        .into_iter()
+                        .filter(|c| c.state != registry::State::Revoked)
+                        .map(|c| {
+                            json!({"connection":c.reference,"state":c.state,"current":!c.stale})
+                        }),
+                );
+                match page.next_cursor {
+                    Some(next) => cursor = Some(next),
+                    None => return Ok(json!({ "connections": listed })),
+                }
+            }
+        }
         Request::Cached {
             launch, connection, ..
         } if document.is_empty() => match super::cached_direct(&owner.paths, &alias) {

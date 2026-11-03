@@ -125,6 +125,21 @@ fn passes(container: &Container) -> Passes {
     }
 }
 
+/// The read without `--connection`: the instance's one ready connection.
+fn unnamed_read_args<'a>(schema: &'a str, target: &'a str) -> [&'a str; 9] {
+    [
+        "invoke",
+        target,
+        READ,
+        "--schema",
+        schema,
+        "--revision",
+        REVISION,
+        "--input-json",
+        "{}",
+    ]
+}
+
 /// One cold read, CLI and the owner it starts together, verifies the store
 /// once; the next read, answered by that owner, verifies nothing again.
 #[test]
@@ -132,8 +147,46 @@ fn a_cold_read_verifies_the_store_once() {
     let (container, connection) = connected();
     let schema = container.schema();
     let target = format!("{CONNECTOR}/{ALIAS}");
-    let args = read_args(&connection, &schema, &target);
-    let read = success(&logged(&container, &args));
+    verifies_once(&container, &read_args(&connection, &schema, &target));
+}
+
+/// The same for a read that names no connection: the connection it uses is
+/// chosen from the listing the owner it starts answers, not from a direct
+/// read of the store.
+#[test]
+fn a_cold_read_without_a_connection_verifies_the_store_once() {
+    let (container, _) = connected();
+    let schema = container.schema();
+    let target = format!("{CONNECTOR}/{ALIAS}");
+    verifies_once(&container, &unnamed_read_args(&schema, &target));
+}
+
+/// A read without `--connection` whose owner takes longer than the CLI's
+/// 10-second wait for a running owner to start still waits for it within its
+/// own 30 seconds and verifies the store once, in that owner
+/// (story:owner-start-outlasts-a-fixed-bound).
+#[test]
+fn a_cold_read_without_a_connection_waits_for_a_slow_owner_start() {
+    let slow_start = Duration::from_secs(12);
+    let (container, _) = connected();
+    let schema = container.schema();
+    let target = format!("{CONNECTOR}/{ALIAS}");
+    let started = Instant::now();
+    let read = success(&Jail::output(
+        container
+            .jail
+            .command("/bin-test/connectors", Map::Own)
+            .args(["--output", "json", "--config", CONFIG, "--state-dir", STATE])
+            .args(unnamed_read_args(&schema, &target))
+            .env_clear()
+            .env("CONNECTORS_TEST_VERIFICATION_LOG", LOG)
+            .env(
+                "CONNECTORS_TEST_OWNER_START_DELAY_MS",
+                slow_start.as_millis().to_string(),
+            )
+            .stdin(Stdio::null()),
+    ));
+    assert!(started.elapsed() >= slow_start, "{:?}", started.elapsed());
     assert_eq!(read["result"]["credential"], digest(SECRET), "{read}");
     let cold = passes(&container);
     assert_eq!(
@@ -142,9 +195,23 @@ fn a_cold_read_verifies_the_store_once() {
         "fresh opens, complete reads and processes that verified: {:?}",
         cold.lines
     );
-    let read = success(&logged(&container, &args));
+}
+
+/// `args`, a read with no owner running, verifies the store once, in one
+/// process; the same read next verifies nothing.
+fn verifies_once(container: &Container, args: &[&str]) {
+    let read = success(&logged(container, args));
     assert_eq!(read["result"]["credential"], digest(SECRET), "{read}");
-    let warm = passes(&container);
+    let cold = passes(container);
+    assert_eq!(
+        (cold.opens, cold.snapshots, cold.processes),
+        (1, 1, 1),
+        "fresh opens, complete reads and processes that verified: {:?}",
+        cold.lines
+    );
+    let read = success(&logged(container, args));
+    assert_eq!(read["result"]["credential"], digest(SECRET), "{read}");
+    let warm = passes(container);
     assert_eq!(
         (warm.opens, warm.snapshots),
         (0, 0),
