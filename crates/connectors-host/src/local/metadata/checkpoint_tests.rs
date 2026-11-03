@@ -250,6 +250,58 @@ fn an_open_waits_for_the_handle_another_thread_uses_instead_of_verifying_again()
     exit_process();
 }
 
+/// Adversary, D417 U1 (story:cold-owner-start-verifies-once). An unlocked
+/// observation (`Registry::transaction_observation`, a read on one owner
+/// request thread) replays with the process's verified handle after releasing
+/// the lifecycle lock, then relocks. A locked open on another request thread of
+/// the same process takes the free lock and, in `take_or_wait`, waits for the
+/// handle the observation holds; the observation cannot return it before it
+/// relocks, and it cannot relock while the locked open holds the lock. Before
+/// the wait the locked open verified afresh at once and the observation
+/// relocked after it; now one of the two waits out its bound.
+#[test]
+fn a_locked_open_never_waits_for_a_handle_whose_user_waits_for_its_lock() {
+    let (_root, path) = store();
+    simulate_process(80);
+    drop(Metadata::initialize(&path).unwrap());
+    exit_process();
+    write_in(&path, 81, 0);
+    simulate_process(82);
+    drop(Metadata::start_owner(&path).unwrap());
+    // A large store's last fresh open: the bound of the locked open's wait.
+    er::assume_open_took(&path.join(NAME), Duration::from_secs(10));
+    let lock_wait = Duration::from_secs(3);
+    super::set_lifecycle_lock_wait(lock_wait);
+    // The observation replayed with the verified handle and released the lock.
+    let mut observation = Metadata::update_observation(&path).unwrap();
+    let locked = {
+        let path = path.clone();
+        std::thread::spawn(move || {
+            simulate_process(82);
+            super::set_lifecycle_lock_wait(lock_wait);
+            let started = Instant::now();
+            let opened = Metadata::update(&path, false).map(drop);
+            (opened, started.elapsed())
+        })
+    };
+    // The locked open has taken the lock and is in its open.
+    std::thread::sleep(Duration::from_secs(1));
+    let relocked = observation.relock_observation();
+    drop(observation);
+    let (opened, took) = locked.join().unwrap();
+    exit_process();
+    assert_eq!(opened, Ok(()), "the locked open");
+    assert_eq!(
+        relocked,
+        Ok(()),
+        "the observation could not relock: the locked open held the lock while it waited for the observation's handle"
+    );
+    assert!(
+        took < lock_wait,
+        "the locked open took {took:?}, waiting for a handle that could not return"
+    );
+}
+
 /// The authority a CLI names in its owner greeting is read without replaying
 /// the store, and is the store's authority; a missing store has none.
 #[test]
