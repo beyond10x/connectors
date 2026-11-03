@@ -177,7 +177,7 @@ jobs:
           set +e
           status=0
           for dir in "$PUBLISHED" "$BUILT"; do
-            root="$(mktemp -d)"
+            root="$(mktemp -d "$RUNNER_TEMP/host-start.XXXXXXXX")"
             run() {
               env -i HOME="$root" PATH=/usr/bin:/bin "$dir/connectors" --output json \
                 --config "$root/config/config.toml" --state-dir "$root/state" "$@" < /dev/null 2>&1
