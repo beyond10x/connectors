@@ -6,7 +6,7 @@ status: approved
 title: 'Wave D417: cold owner start, and the store close of merged stories'
 relations:
 - decides: story:cold-owner-start-verifies-once
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "approved", at: "2026-11-03T13:09:52Z", actor: "human:timo", revision: 2}
 ---
@@ -60,6 +60,16 @@ Stay active, with the gap named:
   depends on drafts `story:upgrade-moves-catalog-adapters` and `story:refusals-name-the-field`.
 - `story:claude-connects-to-the-mcp-server`: its session fixture is recorded from a real Claude Code
   client, which needs a client login in an isolated home (a credential).
+
+## Release scope
+
+0.65.1: U1 (`story:cold-owner-start-verifies-once`, merged at `e60844a1d`; its D422 review round 2 at
+`d62f07e40`) and U2 (ESS 0.84.0, merged at `011ec3139`). The reviews are
+`review-result:wave-d417-u1-adversary` and `review-result:wave-d417-u1-security`; the decision on
+them is `approval-record:connectors-d417-d422-u1-reviews`. After `d62f07e40` the six drift checks
+and `cargo test -p connectors-build --tests` exit 0 on this tree
+(`~/.cache/connectors-wave-20261103/int-checks-1748.log`). The full gate runs staged, S1 to S5 of
+`~/.cache/connectors-wave-20261103/stages.tsv`, under host-monitor's 16:53Z go.
 
 ## Commits this wave makes
 
