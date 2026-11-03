@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-03T13:11:09Z",
+  "actor": "human:operator",
+  "artifact": "story:connection-follows-configuration-upgrade",
+  "kind": "story",
+  "revision": 12,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "merge 25ca4eb3d on main; holders crates/connectors-host/src/local/registry/upgrade_tests.rs:378,:498,:562, adapters/catalog/tests/local_runtime/revision_recovery.rs:533-548, all 11 ignored revision_recovery tests classified in crates/connectors-build/src/ignored.rs, docs/local-catalog-provider.md:1275-1291; PR #197 (merge be11ae1de, release 0.56.0) checks green: repository gate run 39733507867, host and CLI 39733507912 and 39733507901, docs 39733507833",
+    "reference": "approval-record:connectors-d417-wave"
+  }
+}

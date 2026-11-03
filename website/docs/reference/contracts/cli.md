@@ -1318,7 +1318,10 @@ later opens in that process reads just what was appended since; the owner keeps
 its handles for its whole run. A command run while an owner of its own build
 runs reads the store through that owner (its `cached` request and the owner's
 admission of `invoke`, local owner transport) and does not open it;
-without such an owner it opens the store directly and verifies it completely.
+without such an owner it opens the store directly and verifies it completely,
+except a read on `invoke`, which starts the owner first and reads through it,
+its connection listing included, so a cold read verifies the store once, in the
+owner (local owner transport).
 A write through any SQLite connection is proven or makes the next read verify
 completely, as before. Due expiries of transient subjects are recorded in
 batches of at most 128 before the batch carrying the command's own change; a

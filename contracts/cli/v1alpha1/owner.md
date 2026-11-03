@@ -19,8 +19,9 @@ descriptor on the state directory (`/proc/self/fd/<n>/`), so a long state
 directory path does not push the socket address past `sun_path`.
 
 Passive commands contact only an existing socket or read recognized metadata.
-Admitted connect, repair, revalidate and invoke may start the owner, and so may
-`operations describe` and `operations list`, only to
+Admitted connect, repair, revalidate and invoke may start the owner, and a read
+on `invoke` starts it before its admission (below); `operations describe` and
+`operations list` may start it only to
 [launch for a description](semantics.md#launching-for-a-description). Competing startups acquire
 the same lifetime lock before spawning; failure to acquire it never authorizes a
 replacement process. A startup socket carries a fresh challenge, owner incarnation
@@ -126,7 +127,7 @@ admitted client.
 
 An owner verifies the whole store before it answers its startup greeting, so its
 start takes longer as the store grows. A read on `invoke` that starts
-the owner waits for its greeting within the read's own deadline. A command without a
+the owner waits for its greeting up to the read's own 30 seconds. A command without a
 deadline of its own reaches a running owner within 10 seconds and waits for the
 greeting of an owner it started up to 60 seconds from that start, and for an
 owner another process is starting up to 60 seconds from when it found it
@@ -168,15 +169,35 @@ the owner's held metadata handle, and refuses with the codes a direct read gives
 (`not_found`, `description_unavailable`, `metadata_unavailable`). With
 `"launch": true` (and the named `connection`, when there is one) the owner, finding
 no description cached, checks the [launch condition](semantics.md#launching-for-a-description)
-again and starts the configured adapter, which caches it. `invoke`
+again and starts the configured adapter, which caches it; a command its `cached`
+request answered `description_unavailable` asks this next instead of a direct read.
+It answers `connections` (`connectors.cli.LocalOwnerConnectionsRequest`,
+`{"kind":"connections","adapter":…}`) with `connectors.cli.LocalOwnerConnections`:
+every connection the adapter's instance holds, revoked ones excepted, each with its
+state, whether it is admitted under the current configuration and, for an instance
+declaring bindings, its `binding`, from the same held handle as a direct listing;
+`invoke` takes its connection or binding from it (story:cold-owner-start-verifies-once). `invoke`
 with such an owner running sends no admission of its own: the owner's
 admission of the `invoke` request decides it, before dispatch, from the same held
 handle. The authority a greeting names is read from the database's authority row
 without replaying the store. Without a reachable owner of the same build a
-command reads the store directly, which verifies it completely, and `invoke`
-admits directly before it starts an owner. A `cached` exchange that fails
-after the greeting, an owner's refusal included, is answered by that direct
-read, so a refusal carries the direct read's own code. The owner itself never routes
+command reads the store directly, which verifies it completely. A target
+`invoke` that names neither `--approval-file` nor `--idempotency-key`, the
+only form a read is admitted in, nor `--describe`, starts an owner first, before
+it lists the connections (without `--connection`) or reads the description, and reads them
+and its admission through that owner, so a cold read verifies the store once,
+in the owner before its greeting (story:cold-owner-start-verifies-once). That owner
+starts its `automatic` adapters as any start does, so such an `invoke` refused
+afterwards, a write refused `approval_required` included, leaves it running.
+Only a start that outlasts the read's 30 seconds answers the `invoke`
+(`timeout`); a start that fails otherwise leaves the `invoke` to the direct
+read, which refuses by its own code before any provider call
+(`metadata_unavailable` for a store that fails verification). An `invoke`
+that names either flag or `--describe` and an `invoke` of a definition file read
+the store directly first, which verifies it, and a write is admitted directly before it
+starts an owner. A `cached` or `connections` exchange that fails after the
+greeting, an owner's refusal but `description_unavailable` included, is answered by
+that direct read, so a refusal carries the direct read's own code. The owner itself never routes
 its reads through an owner.
 
 The generated parser's protected Sources hook retains one clearing buffer and
@@ -247,7 +268,7 @@ upgrade: those stay with explicit `connections revalidate`.
 
 A running owner of the CLI's own build admits `connections revalidate` from its
 held metadata handle; only without one does the CLI admit it directly, which
-verifies the whole store, before it starts an owner, as for `invoke`.
+verifies the whole store, before it starts an owner, as a write on `invoke` does.
 The command's 30-second deadline is set by the CLI as it sends the request to the
 owner: after its own direct admission when it admitted the revalidation itself,
 and before the owner's admission from its held handle otherwise, so that

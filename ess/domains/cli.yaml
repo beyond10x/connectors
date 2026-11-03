@@ -294,6 +294,36 @@ types:
     kind: struct
     fields:
       - {name: bootstrap, type: connectors.cli.PrivateAdapterBootstrap}
+  # Request::Connections (story:cold-owner-start-verifies-once): a CLI's listing of
+  # the connections an adapter's instance holds, revoked ones excepted, answered from
+  # the running owner's held metadata handle instead of a direct open of the store
+  # (contracts/cli/v1alpha1/owner.md). An `invoke` without `--connection` chooses its
+  # connection from it. Sent only to an owner of the CLI's own build; without one, or
+  # after an exchange that failed past the greeting, the CLI lists directly.
+  - name: connectors.cli.LocalOwnerConnectionsKind
+    kind: enum
+    variants: [connections]
+  - name: connectors.cli.LocalOwnerConnectionsRequest
+    kind: struct
+    fields:
+      - {name: kind, type: connectors.cli.LocalOwnerConnectionsKind}
+      - {name: adapter, type: String}
+  # One listed connection; current is false when the connection is not admitted
+  # under the instance's current configuration. binding is the binding the
+  # connection's current evidence selected, present only for an instance that
+  # declares alternative bindings, as connectors.cli.ConnectionDescription names
+  # it; a bound read naming its connection takes it from here.
+  - name: connectors.cli.LocalOwnerListedConnection
+    kind: struct
+    fields:
+      - {name: connection, type: String}
+      - {name: state, type: "connectors.connection_admission.ConnectionState"}
+      - {name: current, type: Boolean}
+      - {name: binding, type: "Optional<String>"}
+  - name: connectors.cli.LocalOwnerConnections
+    kind: struct
+    fields:
+      - {name: connections, type: "List<connectors.cli.LocalOwnerListedConnection>"}
   # Request::Reuse (story:invoke-definition-reuse-credential): the reuse answer of
   # `invoke --definition` (contracts/cli/v1alpha1/semantics.md, "Invoking a
   # definition file"; owner.md). adapter is the definition's instance to connect, source
@@ -1818,7 +1848,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:1430, docs/local-connection-registry.md:222-223;
+    # contracts/cli/v1alpha1/semantics.md:1433, docs/local-connection-registry.md:222-223;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1978,8 +2008,8 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1434) and the host
-    # removal path (er.rs:4538-4540) only expires Active cursors. The error name is
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1437) and the host
+    # removal path (er.rs:4747-4749) only expires Active cursors. The error name is
     # the decision; no source names one.
 
 events:

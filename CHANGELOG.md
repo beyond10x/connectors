@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.65.1 — 2026-11-03
+
+### Fixed
+
+- A cold start verifies the local store once (story:cold-owner-start-verifies-once). A read,
+  `operations describe` or `invoke` that finds no running owner now starts the owner first and
+  takes its connection listing, description and binding from it, instead of verifying the whole
+  store in the CLI and again in the owner. On a store of about 200 MB a cold read went from two
+  verification passes in about 17 s to one in about 10.5 s (local debug build). An open inside the
+  owner that is already running waits for the handle another request is using instead of
+  verifying the store again, except while it holds the store's lifecycle lock. A store that fails
+  verification still refuses `metadata_unavailable` before any provider call. `invoke
+  --describe` starts no owner.
+
+### Changed
+
+- ESS 0.84.0 (from 0.77.0). No user-visible effect: the specifications stay at their current
+  formats, and the regenerated types differ only in the generator version they name.
+
 ## 0.65.0 — 2026-11-02
 
 ### Fixed

@@ -168,6 +168,181 @@ fn an_offline_raw_edit_is_refused_when_the_owner_starts() {
     exit_process();
 }
 
+/// A fresh open verifies the store once: one provider open and one complete
+/// read. A reopen in the process that verified it, the owner's included,
+/// verifies nothing again (story:cold-owner-start-verifies-once).
+#[test]
+fn a_fresh_open_verifies_once_and_a_reopen_in_its_process_not_again() {
+    let (_root, path) = store();
+    simulate_process(50);
+    drop(Metadata::initialize(&path).unwrap());
+    exit_process();
+    write_in(&path, 51, 0);
+    let counts = || (super::fresh_opens(), super::full_replays());
+    for process in [52, 53] {
+        simulate_process(process);
+        let before = counts();
+        drop(Metadata::start_owner(&path).unwrap());
+        let started = counts();
+        assert_eq!(
+            (started.0 - before.0, started.1 - before.1),
+            (1, 1),
+            "an owner start in process {process}"
+        );
+        drop(Metadata::inspect(&path).unwrap());
+        drop(Metadata::update(&path, false).unwrap());
+        assert_eq!(counts(), started, "a reopen in process {process}");
+        exit_process();
+    }
+}
+
+/// An open while another thread of the same process uses its verified handle
+/// waits for that handle instead of verifying the store again, as the owner's
+/// background recovery and a request's admission did when they met
+/// (story:cold-owner-start-verifies-once); the thread using a handle opens
+/// another afresh at once, never waiting for itself.
+#[test]
+fn an_open_waits_for_the_handle_another_thread_uses_instead_of_verifying_again() {
+    let (_root, path) = store();
+    simulate_process(60);
+    drop(Metadata::initialize(&path).unwrap());
+    exit_process();
+    write_in(&path, 61, 0);
+    simulate_process(62);
+    drop(Metadata::start_owner(&path).unwrap());
+    // As long as a large store's verification: the bound of the wait.
+    let bound = Duration::from_secs(20);
+    er::assume_open_took(&path.join(NAME), bound);
+    let held = Metadata::inspect(&path).unwrap();
+    let other = {
+        let path = path.clone();
+        std::thread::spawn(move || {
+            simulate_process(62);
+            let started = Instant::now();
+            drop(Metadata::inspect(&path).unwrap());
+            (er::fresh_opens(), started.elapsed())
+        })
+    };
+    let used = Duration::from_millis(300);
+    std::thread::sleep(used);
+    drop(held);
+    let (opens, waited) = other.join().unwrap();
+    assert_eq!(opens, 0, "the other thread verified the store again");
+    assert!(
+        waited >= used && waited < bound,
+        "the other thread waited {waited:?}"
+    );
+
+    let held = Metadata::inspect(&path).unwrap();
+    let before = er::fresh_opens();
+    let started = Instant::now();
+    drop(Metadata::inspect(&path).unwrap());
+    assert_eq!(
+        er::fresh_opens() - before,
+        1,
+        "a nested open of the same thread"
+    );
+    assert!(
+        started.elapsed() < bound,
+        "the thread waited for its own handle"
+    );
+    drop(held);
+    exit_process();
+}
+
+/// An inspection never takes the lifecycle lock again once it released it, so
+/// a locked open that meets the handle an inspection uses waits for it instead
+/// of verifying the store again: the owner's maintenance inspects the store
+/// every few seconds (`mutations.rs`), and a read's locked opens in the owner
+/// (its read-use grant, its audit write) met that hold and verified a 200 MB
+/// store a second time (story:cold-owner-start-verifies-once).
+#[test]
+fn a_locked_open_waits_for_the_handle_an_inspection_uses_instead_of_verifying_again() {
+    let (_root, path) = store();
+    simulate_process(90);
+    drop(Metadata::initialize(&path).unwrap());
+    exit_process();
+    write_in(&path, 91, 0);
+    simulate_process(92);
+    drop(Metadata::start_owner(&path).unwrap());
+    // As long as a large store's verification: the bound of the wait.
+    let bound = Duration::from_secs(20);
+    er::assume_open_took(&path.join(NAME), bound);
+    let held = Metadata::inspect(&path).unwrap();
+    let locked = {
+        let path = path.clone();
+        std::thread::spawn(move || {
+            simulate_process(92);
+            let started = Instant::now();
+            let opened = Metadata::update(&path, false).map(drop);
+            (opened, er::fresh_opens(), started.elapsed())
+        })
+    };
+    let used = Duration::from_millis(300);
+    std::thread::sleep(used);
+    drop(held);
+    let (opened, opens, waited) = locked.join().unwrap();
+    exit_process();
+    assert_eq!(opened, Ok(()), "the locked open");
+    assert_eq!(opens, 0, "the locked open verified the store again");
+    assert!(
+        waited >= used && waited < bound,
+        "the locked open waited {waited:?}"
+    );
+}
+
+/// Adversary, D417 U1 (story:cold-owner-start-verifies-once). An unlocked
+/// observation (`Registry::transaction_observation`, a read on one owner
+/// request thread) replays with the process's verified handle after releasing
+/// the lifecycle lock, then relocks. A locked open on another request thread of
+/// the same process takes the free lock and, in `take_or_wait`, waits for the
+/// handle the observation holds; the observation cannot return it before it
+/// relocks, and it cannot relock while the locked open holds the lock. Before
+/// the wait the locked open verified afresh at once and the observation
+/// relocked after it; now one of the two waits out its bound.
+#[test]
+fn a_locked_open_never_waits_for_a_handle_whose_user_waits_for_its_lock() {
+    let (_root, path) = store();
+    simulate_process(80);
+    drop(Metadata::initialize(&path).unwrap());
+    exit_process();
+    write_in(&path, 81, 0);
+    simulate_process(82);
+    drop(Metadata::start_owner(&path).unwrap());
+    // A large store's last fresh open: the bound of the locked open's wait.
+    er::assume_open_took(&path.join(NAME), Duration::from_secs(10));
+    let lock_wait = Duration::from_secs(3);
+    super::set_lifecycle_lock_wait(lock_wait);
+    // The observation replayed with the verified handle and released the lock.
+    let mut observation = Metadata::update_observation(&path).unwrap();
+    let locked = {
+        let path = path.clone();
+        std::thread::spawn(move || {
+            simulate_process(82);
+            super::set_lifecycle_lock_wait(lock_wait);
+            let started = Instant::now();
+            let opened = Metadata::update(&path, false).map(drop);
+            (opened, started.elapsed())
+        })
+    };
+    // The locked open has taken the lock and is in its open.
+    std::thread::sleep(Duration::from_secs(1));
+    let relocked = observation.relock_observation();
+    drop(observation);
+    let (opened, took) = locked.join().unwrap();
+    exit_process();
+    assert_eq!(opened, Ok(()), "the locked open");
+    assert_eq!(
+        relocked,
+        Ok(()),
+        "the observation could not relock: the locked open held the lock while it waited for the observation's handle"
+    );
+    assert!(
+        took < lock_wait,
+        "the locked open took {took:?}, waiting for a handle that could not return"
+    );
+}
+
 /// The authority a CLI names in its owner greeting is read without replaying
 /// the store, and is the store's authority; a missing store has none.
 #[test]
@@ -186,5 +361,64 @@ fn the_greeting_authority_is_read_without_a_replay() {
     assert_eq!(
         Metadata::authority_at(&missing),
         Err(Failure::MetadataUnavailable)
+    );
+}
+
+/// Integrity conformance for the wait an open makes for a handle another
+/// thread of its process uses (security review of
+/// story:cold-owner-start-verifies-once): however long the store's last fresh
+/// open took, the wait ends at the caller's own metadata deadline, and an open
+/// of a different store never waits for that handle.
+#[test]
+fn a_wait_for_a_used_handle_ends_at_the_callers_deadline_and_never_spans_stores() {
+    let (_root, path) = store();
+    let (_other_root, other) = store();
+    simulate_process(91_701);
+    drop(Metadata::initialize(&path).unwrap());
+    drop(Metadata::initialize(&other).unwrap());
+    exit_process();
+    write_in(&path, 91_702, 0);
+    write_in(&other, 91_703, 0);
+    simulate_process(91_704);
+    drop(Metadata::start_owner(&path).unwrap());
+    let bound = Duration::from_secs(20);
+    er::assume_open_took(&path.join(NAME), bound);
+    er::assume_open_took(&other.join(NAME), bound);
+    let held = Metadata::inspect(&path).unwrap();
+
+    let deadline = Duration::from_millis(500);
+    let waiter = {
+        let path = path.clone();
+        std::thread::spawn(move || {
+            simulate_process(91_704);
+            let started = Instant::now();
+            let opened = super::deadline::within(Instant::now() + deadline, || {
+                Metadata::inspect(&path).map(drop)
+            });
+            (opened, started.elapsed())
+        })
+    };
+    let across = {
+        let other = other.clone();
+        std::thread::spawn(move || {
+            simulate_process(91_704);
+            let started = Instant::now();
+            let opened = Metadata::inspect(&other).map(drop);
+            (opened, er::fresh_opens(), started.elapsed())
+        })
+    };
+    let (across_opened, across_opens, across_waited) = across.join().unwrap();
+    let (opened, waited) = waiter.join().unwrap();
+    drop(held);
+    exit_process();
+    assert!(
+        waited < deadline + Duration::from_secs(2),
+        "an open waited {waited:?} for a used handle past its {deadline:?} deadline ({opened:?})"
+    );
+    assert_eq!(across_opened, Ok(()));
+    assert_eq!(across_opens, 1, "the other store was not opened afresh");
+    assert!(
+        across_waited < Duration::from_secs(10),
+        "an open of another store waited {across_waited:?} for this store's handle"
     );
 }

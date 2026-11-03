@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:cli-lists-available-connectors
 kind: story
-status: active
+status: implemented
 title: connectors list prints every available connector, and task install installs the CLI
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-22T20:48:16Z", actor: "human:operator", revision: 2, executor: "agent:connectors-session", correlation: "wave-20261022"}
 - {from: "proposed", to: "active", at: "2026-10-22T20:48:17Z", actor: "human:operator", revision: 3, executor: "agent:connectors-session", correlation: "wave-20261022"}
+- {from: "active", to: "implemented", at: "2026-11-03T13:11:11Z", actor: "human:operator", revision: 4, decided_on: {"recorded":{"test_result":1,"review_outcome":2}}}
 ---
 ## Request
 

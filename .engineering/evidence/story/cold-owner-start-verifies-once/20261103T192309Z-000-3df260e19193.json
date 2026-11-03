@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-03T19:23:09Z",
+  "actor": "human:operator",
+  "artifact": "story:cold-owner-start-verifies-once",
+  "kind": "story",
+  "revision": 18,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "local staged gate on wave/20261103 head 7ef244880 (stages.tsv, stage-v3.sh): S1 drift, boundaries and connectors-build 305 passed; S2 13 library packages 1525 passed 0 failed; S3 rerun apps/connectors 532 passed 0 failed; S4 adapters 1447 passed 0 failed; S5a-c clippy -D warnings on all 23 packages exit 0. Holders: apps/connectors/tests/cold_owner_start.rs (one verification per cold start), cold_owner_start_adversary.rs, cold_owner_start_security.rs, crates/connectors-host/src/local/metadata/checkpoint_tests.rs (9). Authored scenarios and metadata conformance run in CI's repository gate on the PR.",
+    "reference": "approval-record:connectors-d417-wave"
+  }
+}

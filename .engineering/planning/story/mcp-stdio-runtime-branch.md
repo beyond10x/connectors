@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:mcp-stdio-runtime-branch
 kind: story
-status: active
+status: implemented
 title: Re-land the read-only MCP stdio server kept on branch unit/mcp-local-runtime-20261003-rebased
 relations:
 - decomposes: epic:mcp-contracts
@@ -68,10 +68,11 @@ scope:
   path: website/docs/reference/cli.md
 - confidence: cited
   path: website/docs/reference/crates.md
-revision: 40
+revision: 41
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-22T09:48:11Z", actor: "human:operator", revision: 39, decided_on: {"recorded":{"review_outcome":5}}, executor: "agent:connectors-session", correlation: "wave-20261022"}
 - {from: "proposed", to: "active", at: "2026-10-22T09:48:11Z", actor: "human:operator", revision: 40, decided_on: {"recorded":{"review_outcome":5}}, executor: "agent:connectors-session", correlation: "wave-20261022"}
+- {from: "active", to: "implemented", at: "2026-11-03T13:11:11Z", actor: "human:operator", revision: 41, decided_on: {"recorded":{"test_result":1,"review_outcome":7}}}
 ---
 ## Outcome
 

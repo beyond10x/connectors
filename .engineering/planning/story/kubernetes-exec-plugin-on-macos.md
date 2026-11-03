@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:kubernetes-exec-plugin-on-macos
 kind: story
-status: active
+status: implemented
 title: Kubernetes exec credential plugins run on macOS
 summary: 'D370 item 3: exec plugin from a verified owner-private copy'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-02T07:27:32Z", actor: "human:operator", revision: 2, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
 - {from: "proposed", to: "active", at: "2026-11-02T07:27:32Z", actor: "human:operator", revision: 3, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
+- {from: "active", to: "implemented", at: "2026-11-03T13:11:13Z", actor: "human:operator", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 # Story: kubernetes-exec-plugin-on-macos
 
@@ -41,3 +42,23 @@ no `fexecve`; the host already launches programs on macOS from a verified owner-
 ## Out of Scope
 
 - Plugins that need an interactive terminal.
+
+## Acceptance as decided in wave D370 (D372)
+
+Acceptance line 1 asks for execution from an owner-private copy. Wave D370 decided otherwise (D372,
+2026-11-02, `approval-record:connectors-d370-wave` § Decided in the wave): on macOS the pinned plugin
+runs from its pinned path, because a copy breaks a bundled CLI that loads files from beside its
+executable. Before the run the final component is not a symbolic link, the open descriptor passes the
+Linux file checks and the pinned SHA-256, every directory of the resolved parent path is owned by
+root or the effective uid and is not group- or world-writable, and right before spawn the path still
+names the descriptor's (dev, ino). The orchestrator, 2026-11-02: "your U4 in-place exec decision is
+accepted with the documented residual; record it in the store." Residual, documented in CHANGELOG
+0.65.0, the reads contract and `docs/local-kubernetes-cli.md`: root or the same user can replace the
+file between the check and the run.
+
+Read as amended, line 1 is held by `adapters/kubernetes/src/exec_credential.rs` tests
+`a_script_plugin_runs_from_its_own_path` (:1220), `a_native_plugin_runs_from_its_own_path` (:1246),
+`digest_mismatch_group_writable_and_set_id_plugins_are_refused` (:1262),
+`a_plugin_under_a_writable_directory_is_refused` (:1285) and `a_file_swapped_in_after_the_check_is_refused`
+(:1306), which ran on the macOS job of pull request #235 (run 41463903366). Recorded 2026-11-03 by wave
+D417.

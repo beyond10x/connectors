@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-03T13:11:08Z",
+  "actor": "human:operator",
+  "artifact": "story:catalog-feed-engine-extensions",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "merge c83272c5b on main; holders crates/connectors-build/src/catalog_feed_conformance.rs:1422,:1601,:1658 and adapters/catalog/tests/feed_extensions_security_review.rs:254,:294; PR #197 (merge be11ae1de, release 0.56.0) checks green: repository gate run 39733507867, host and CLI 39733507912 and 39733507901, docs 39733507833",
+    "reference": "approval-record:connectors-d417-wave"
+  }
+}
