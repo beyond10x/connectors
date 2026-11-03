@@ -578,6 +578,31 @@ pub fn bound_described(
     };
     Ok(bootstrap.bound(binding.as_deref())?)
 }
+/// Starts the owner a read on `invoke` is answered by, when none of this
+/// build runs for the state directory, waiting for its greeting until `until`,
+/// before the read opens the store. The owner verifies the whole store before
+/// it answers its greeting; the read's description and admission are then
+/// read from the owner's held handle, so a cold read verifies the store once
+/// (contracts/cli/v1alpha1/owner.md; story:cold-owner-start-verifies-once).
+///
+/// Only a start that outlasts `until` is the read's answer (`timeout`), and
+/// the owner it started is left to finish its start. Any other failure, an
+/// owner of another build or a store the owner refuses included, leaves the
+/// read to the direct way, which verifies the store itself and refuses by its
+/// own code before any provider call (`metadata_unavailable` for a store that
+/// fails verification).
+pub fn start_for_read(paths: &Paths, until: Instant) -> Result<()> {
+    if transport::in_owner() {
+        return Ok(());
+    }
+    if Client::connect(paths, false).is_ok_and(|client| client.is_same_build()) {
+        return Ok(());
+    }
+    match Client::connect_until(paths, true, until) {
+        Err(error) if error.code == Code::Timeout => Err(error),
+        Ok(_) | Err(_) => Ok(()),
+    }
+}
 fn cached_unbound(paths: &Paths, alias: &str) -> Result<runtime::Bootstrap> {
     cached_through(paths, alias, |paths, alias| {
         if transport::in_owner() {
