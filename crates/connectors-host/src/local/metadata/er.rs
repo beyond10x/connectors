@@ -485,10 +485,26 @@ pub(super) struct ErAuthority {
 /// opens waiting for a handle of the same store.
 struct Checkout(u64);
 
-/// The verified handles in use, as (checkout, store, process, thread), and how
-/// long the last fresh open of each store took in each process.
+/// What an open's caller does with the store's lifecycle lock while it uses
+/// the handle, which decides which handles in use it waits for
+/// ([`take_or_wait`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Hold {
+    /// The caller holds the lock (`Metadata::update`, `Metadata::initialize`).
+    Locked,
+    /// The caller released the lock and may take it again before it returns
+    /// the handle (an unlocked observation, `Metadata::relock_observation`).
+    Relocks,
+    /// The caller released the lock and never takes it again
+    /// (`Metadata::inspect`).
+    Released,
+}
+
+/// The verified handles in use, as (checkout, store, process, thread, whether
+/// its user may relock), and how long the last fresh open of each store took
+/// in each process.
 struct Checkouts {
-    held: Vec<(u64, std::path::PathBuf, u64, std::thread::ThreadId)>,
+    held: Vec<(u64, std::path::PathBuf, u64, std::thread::ThreadId, bool)>,
     opened: Vec<(std::path::PathBuf, u64, std::time::Duration)>,
     next: u64,
 }
@@ -503,14 +519,16 @@ static CHECKOUTS: std::sync::Mutex<Checkouts> = std::sync::Mutex::new(Checkouts 
 static RETURNED: std::sync::Condvar = std::sync::Condvar::new();
 
 impl Checkouts {
-    /// Records that the calling thread uses `er`.
-    fn start(&mut self, er: &mut ErAuthority) {
+    /// Records that the calling thread uses `er`, holding the lifecycle lock as
+    /// `hold` says.
+    fn start(&mut self, er: &mut ErAuthority, hold: Hold) {
         self.next += 1;
         self.held.push((
             self.next,
             er.durable_path.clone(),
             er.process,
             std::thread::current().id(),
+            hold == Hold::Relocks,
         ));
         er.checkout = Some(Checkout(self.next));
     }
@@ -528,7 +546,7 @@ impl Drop for Checkout {
 /// Records that the calling thread uses `er`, which a fresh open that took
 /// `took` verified: the longest an open of the same store in this process
 /// waits for a handle in use.
-fn check_out_opened(er: &mut ErAuthority, took: std::time::Duration) {
+fn check_out_opened(er: &mut ErAuthority, took: std::time::Duration, hold: Hold) {
     if let Ok(mut checkouts) = CHECKOUTS.lock() {
         let process = er.process;
         let path = er.durable_path.clone();
@@ -536,7 +554,7 @@ fn check_out_opened(er: &mut ErAuthority, took: std::time::Duration) {
             .opened
             .retain(|(store, owner, _)| !(*store == path && *owner == process));
         checkouts.opened.push((path, process, took));
-        checkouts.start(er);
+        checkouts.start(er, hold);
     }
 }
 
@@ -547,14 +565,14 @@ fn check_out_opened(er: &mut ErAuthority, took: std::time::Duration) {
 /// verification a fresh open repeats, which is all a concurrent use of the
 /// store cost before (story:cold-owner-start-verifies-once). The calling
 /// thread never waits for a handle it uses itself, and a caller that holds the
-/// store's lifecycle lock (`locked`) never waits at all: the thread using the
-/// handle may need that lock before it returns the handle, as an unlocked
-/// observation relocks before it ends.
+/// store's lifecycle lock ([`Hold::Locked`]) never waits for a handle whose user
+/// may relock ([`Hold::Relocks`]): that user needs the lock before it returns
+/// the handle. It does wait for an inspection's, which never relocks.
 fn take_or_wait(
     path: &Path,
     authority: &Authority,
     source_level: i64,
-    locked: bool,
+    hold: Hold,
 ) -> Option<ErAuthority> {
     let Ok(mut checkouts) = CHECKOUTS.lock() else {
         return take(path, authority, source_level);
@@ -571,17 +589,18 @@ fn take_or_wait(
         // checkout ends under this lock: a handle returned since the last look
         // is taken here, never missed.
         if let Some(mut held) = take(path, authority, source_level) {
-            checkouts.start(&mut held);
+            checkouts.start(&mut held, hold);
             return Some(held);
         }
-        let elsewhere = checkouts
-            .held
-            .iter()
-            .any(|(_, store, owner, user)| store == path && *owner == process && *user != thread);
+        let mut users = checkouts.held.iter().filter(|(_, store, owner, user, _)| {
+            store == path && *owner == process && *user != thread
+        });
+        let elsewhere = users.clone().next().is_some();
+        let relocking = users.any(|(.., relocks)| *relocks);
         let left = cutoff.map_or(std::time::Duration::ZERO, |cutoff| {
             cutoff.saturating_duration_since(std::time::Instant::now())
         });
-        if locked || !elsewhere || left.is_zero() {
+        if !elsewhere || (hold == Hold::Locked && relocking) || left.is_zero() {
             return None;
         }
         checkouts = RETURNED.wait_timeout(checkouts, left).ok()?.0;
@@ -2368,18 +2387,18 @@ impl ErAuthority {
 }
 
 /// Opens the store at `path`: a verified handle this process holds, or a fresh
-/// open that verifies the whole store. `locked` says the caller holds the
-/// store's lifecycle lock, so the open does not wait for a handle in use
-/// ([`take_or_wait`]).
+/// open that verifies the whole store. `hold` says what the caller does with
+/// the store's lifecycle lock while it uses the handle, which decides the
+/// handles in use the open waits for ([`take_or_wait`]).
 pub(super) fn open(
     path: &Path,
     authority: Authority,
     source_level: i64,
     projection_level: i64,
-    locked: bool,
+    hold: Hold,
 ) -> Result<(ErAuthority, String)> {
     super::deadline::check()?;
-    if let Some(mut held) = take_or_wait(path, &authority, source_level, locked) {
+    if let Some(mut held) = take_or_wait(path, &authority, source_level, hold) {
         held.projection_level = projection_level;
         // A held handle whose read refuses is not evidence either way; the
         // fresh open below verifies the whole store and reports the refusal.
@@ -2412,7 +2431,7 @@ pub(super) fn open(
     .map_err(|_| Failure::MetadataUnavailable)?;
     let mut er = ErAuthority::new(facade, path, source_level, projection_level);
     resynchronize(&mut er)?;
-    check_out_opened(&mut er, started.elapsed());
+    check_out_opened(&mut er, started.elapsed(), hold);
     let source_digest = er.source_digest.clone();
     Ok((er, source_digest))
 }
@@ -5912,7 +5931,7 @@ mod tests {
         assert_eq!(projected["attempt_id"], prepared.fields["attempt_id"]);
         drop(authority);
 
-        let (reopened, _) = open(&path, coordinates, 4, 4, false).unwrap();
+        let (reopened, _) = open(&path, coordinates, 4, 4, Hold::Released).unwrap();
         let replayed = reopened.facade.complete_snapshot(call_wait()).unwrap();
         let terminal = replayed
             .histories

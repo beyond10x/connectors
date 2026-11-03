@@ -1064,8 +1064,15 @@ impl Metadata {
             source_level,
             projection_level,
             // A replay that keeps the lifecycle lock never waits for a handle
-            // whose user may need that lock to return it.
-            !release_physical,
+            // whose user may need that lock to return it; an observation
+            // relocks, an inspection never does.
+            if !release_physical {
+                er::Hold::Locked
+            } else if self.inspection {
+                er::Hold::Released
+            } else {
+                er::Hold::Relocks
+            },
         )?;
         if imported_digest != digest {
             return Err(Failure::MetadataUnavailable);
