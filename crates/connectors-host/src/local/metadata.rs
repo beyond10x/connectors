@@ -117,7 +117,7 @@ pub(super) fn fresh_opens() -> u64 {
     er::fresh_opens()
 }
 
-#[cfg(debug_assertions)]
+#[cfg(all(debug_assertions, unix))]
 pub(in crate::local) use er::VERIFICATION_LOG;
 
 #[cfg(test)]
