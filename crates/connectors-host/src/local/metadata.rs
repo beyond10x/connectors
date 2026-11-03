@@ -113,6 +113,14 @@ pub(super) fn full_replays() -> u64 {
 }
 
 #[cfg(test)]
+pub(super) fn fresh_opens() -> u64 {
+    er::fresh_opens()
+}
+
+#[cfg(debug_assertions)]
+pub(in crate::local) use er::VERIFICATION_LOG;
+
+#[cfg(test)]
 pub(super) fn simulate_process(id: u64) {
     er::simulate_process(id);
 }

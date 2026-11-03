@@ -671,6 +671,88 @@ fn owner_start_of_a_grown_store() {
     }
 }
 
+/// story:cold-owner-start-verifies-once, the diagnosis: which half of one
+/// fresh open verifies the whole store, the provider's open (`er.start`) or
+/// the complete read after it (`er.complete_snapshot`), on a store with
+/// durable open checkpoints (as `setup init` creates) and on an adopted one
+/// without, each grown by remembered descriptions of about
+/// `CONNECTORS_STORE_COST_RECORD_BYTES` (8,000) to `CONNECTORS_STORE_COST_MB`
+/// (50): `cargo test --release -p connectors-host --lib fresh_open_passes_of_a_blob_heavy_store -- --ignored --nocapture`.
+#[test]
+#[ignore = "timing measurement; run explicitly"]
+fn fresh_open_passes_of_a_blob_heavy_store() {
+    use super::super::metadata::{exit_process, simulate_process, take_costs};
+    let number = |name: &str, default: u64| {
+        std::env::var(name).map_or(default, |value| value.trim().parse().unwrap())
+    };
+    let target = number("CONNECTORS_STORE_COST_MB", 50) * 1024 * 1024;
+    let padding =
+        "p".repeat(usize::try_from(number("CONNECTORS_STORE_COST_RECORD_BYTES", 8_000)).unwrap());
+    for checkpoints in [true, false] {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("state");
+        simulate_process(60_000);
+        if checkpoints {
+            crate::local::filesystem::directory(&path, true, true).unwrap();
+            drop(Metadata::initialize(&path).unwrap());
+        } else {
+            Metadata::unmarked_store_for_tests(&path).unwrap();
+        }
+        let enabled: bool = rusqlite::Connection::open_with_flags(
+            path.join("metadata.sqlite3"),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .unwrap()
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='connectors_er_capture_continuity')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+        assert_eq!(enabled, checkpoints);
+        let size = || {
+            ["metadata.sqlite3", "metadata.sqlite3-wal"]
+                .iter()
+                .map(|name| std::fs::metadata(path.join(name)).map_or(0, |m| m.len()))
+                .sum::<u64>()
+        };
+        let state = crate::local::runtime::state::State::new(&path);
+        let mut written = 0u64;
+        while size() < target {
+            let mut filler = crate::local::runtime::state::tests::fixture_bootstrap();
+            filler.instance = format!("filler-{}", written % 900);
+            let mut descriptor = filler.descriptor().unwrap();
+            descriptor.instance = filler.instance.clone();
+            descriptor.configuration_schema =
+                serde_json::json!({"type":"object","description":format!("{written} {padding}")});
+            filler.descriptor = serde_json::to_string(&descriptor).unwrap();
+            state.remember("filler", &filler).unwrap();
+            written += 1;
+        }
+        exit_process();
+        for (round, process) in [(1, 60_001), (2, 60_002)] {
+            simulate_process(process);
+            take_costs();
+            let started = std::time::Instant::now();
+            let opened = Metadata::start_owner(&path).map(|owner| owner.opened_from_checkpoint());
+            let costs = take_costs();
+            let spent = |kind| {
+                costs
+                    .get(kind)
+                    .map_or(0.0, |cost: &(u64, Duration)| ms(cost.1))
+            };
+            println!(
+                "checkpoints={checkpoints} bytes={} records={written} round={round} open_ms={:.0} from_checkpoint={opened:?} er.start_ms={:.0} er.complete_snapshot_ms={:.0}",
+                size(),
+                ms(started.elapsed()),
+                spent("er.start"),
+                spent("er.complete_snapshot"),
+            );
+            exit_process();
+        }
+    }
+}
+
 /// story:connection-lease-holds-unattended, the diagnosis: the stages of two
 /// `connections revalidate` of one connection started together, on a store
 /// grown by read invokes, as the CLI and the owner run them today. Each CLI is

@@ -168,6 +168,88 @@ fn an_offline_raw_edit_is_refused_when_the_owner_starts() {
     exit_process();
 }
 
+/// A fresh open verifies the store once: one provider open and one complete
+/// read. A reopen in the process that verified it, the owner's included,
+/// verifies nothing again (story:cold-owner-start-verifies-once).
+#[test]
+fn a_fresh_open_verifies_once_and_a_reopen_in_its_process_not_again() {
+    let (_root, path) = store();
+    simulate_process(50);
+    drop(Metadata::initialize(&path).unwrap());
+    exit_process();
+    write_in(&path, 51, 0);
+    let counts = || (super::fresh_opens(), super::full_replays());
+    for process in [52, 53] {
+        simulate_process(process);
+        let before = counts();
+        drop(Metadata::start_owner(&path).unwrap());
+        let started = counts();
+        assert_eq!(
+            (started.0 - before.0, started.1 - before.1),
+            (1, 1),
+            "an owner start in process {process}"
+        );
+        drop(Metadata::inspect(&path).unwrap());
+        drop(Metadata::update(&path, false).unwrap());
+        assert_eq!(counts(), started, "a reopen in process {process}");
+        exit_process();
+    }
+}
+
+/// An open while another thread of the same process uses its verified handle
+/// waits for that handle instead of verifying the store again, as the owner's
+/// background recovery and a request's admission did when they met
+/// (story:cold-owner-start-verifies-once); the thread using a handle opens
+/// another afresh at once, never waiting for itself.
+#[test]
+fn an_open_waits_for_the_handle_another_thread_uses_instead_of_verifying_again() {
+    let (_root, path) = store();
+    simulate_process(60);
+    drop(Metadata::initialize(&path).unwrap());
+    exit_process();
+    write_in(&path, 61, 0);
+    simulate_process(62);
+    drop(Metadata::start_owner(&path).unwrap());
+    // As long as a large store's verification: the bound of the wait.
+    let bound = Duration::from_secs(20);
+    er::assume_open_took(&path.join(NAME), bound);
+    let held = Metadata::inspect(&path).unwrap();
+    let other = {
+        let path = path.clone();
+        std::thread::spawn(move || {
+            simulate_process(62);
+            let started = Instant::now();
+            drop(Metadata::inspect(&path).unwrap());
+            (er::fresh_opens(), started.elapsed())
+        })
+    };
+    let used = Duration::from_millis(300);
+    std::thread::sleep(used);
+    drop(held);
+    let (opens, waited) = other.join().unwrap();
+    assert_eq!(opens, 0, "the other thread verified the store again");
+    assert!(
+        waited >= used && waited < bound,
+        "the other thread waited {waited:?}"
+    );
+
+    let held = Metadata::inspect(&path).unwrap();
+    let before = er::fresh_opens();
+    let started = Instant::now();
+    drop(Metadata::inspect(&path).unwrap());
+    assert_eq!(
+        er::fresh_opens() - before,
+        1,
+        "a nested open of the same thread"
+    );
+    assert!(
+        started.elapsed() < bound,
+        "the thread waited for its own handle"
+    );
+    drop(held);
+    exit_process();
+}
+
 /// The authority a CLI names in its owner greeting is read without replaying
 /// the store, and is the store's authority; a missing store has none.
 #[test]
