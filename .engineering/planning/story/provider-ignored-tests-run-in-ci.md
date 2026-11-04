@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: story:provider-ignored-tests-run-in-ci
 kind: story
-status: proposed
+status: active
 title: Tests that need a built catalog provider run on every pull request
 relations:
 - informed_by: story:connectors-do-short-invocation
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T05:34:02Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-11-04T08:46:47Z", actor: "human:timo", revision: 4}
 ---
 ## Problem
 
