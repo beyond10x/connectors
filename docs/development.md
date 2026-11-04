@@ -187,8 +187,24 @@ cargo run --locked -p connectors-build -- release-binaries
 
 `connectors-build ignored` inventories every compiled default-feature workspace
 test executable with Rust's `--ignored --list`, then runs each selected test by
-its exact name. Unknown classifications refuse all execution. The existing
-`gate` command is unchanged; this lane is not automatically enrolled in CI.
+its exact name. Unknown classifications refuse all execution. The `gate`
+command does not run it.
+
+`--only-prerequisite` narrows the selected families to tests whose every
+prerequisite is one it names: `provider` (`CONNECTORS_TEST_CATALOG_PROVIDER`) or
+`cli` (`CONNECTORS_TEST_CLI`), both supplied by workspace compilation. A test with
+no prerequisite also qualifies. With `--required` an empty selection still refuses.
+The `repository gate` job of [`rust-gate.yml`](../.github/workflows/rust-gate.yml)
+runs, after the gate, on every pull request and push to `main`:
+
+```sh
+cargo run --locked -p connectors-build -- ignored --required --only-prerequisite provider
+```
+
+Its report names each selected test and its outcome; today these are the three
+tests of `apps/connectors/tests/definition_connect_question.rs` and
+`describe_of_a_definition_needs_no_connection` in
+`apps/connectors/tests/adversary_d218_u1.rs`.
 
 A test that a `cfg` keeps off a platform (`#[cfg(unix)]`, `#![cfg(unix)]`,
 `#[cfg(target_os = "linux")]` and the like) does not compile there, so no binary
