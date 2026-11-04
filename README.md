@@ -310,6 +310,10 @@ attribute, and its binaries are refused until you remove it from the extracted d
 xattr -dr com.apple.quarantine "connectors-$version-$target"
 ```
 
+Or run the container image: releases after 0.65.1 publish `ghcr.io/beyond10x/connectors:<version>`
+for `linux/amd64` and `linux/arm64`, with the Linux archive's binaries, running as a non-root user
+and starting `connectors-catalog-provider` ([In a container](docs/running-services.md#in-a-container)).
+
 To use the local CLI, configure an instance as [Vocabulary](#vocabulary) shows and follow the
 [Getting started](https://beyond10x.github.io/connectors/docs/getting-started) page and the
 guide of its connector. To run a connector as a standalone service instead, choose a service
