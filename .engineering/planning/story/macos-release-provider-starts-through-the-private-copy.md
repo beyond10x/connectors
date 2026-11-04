@@ -8,7 +8,7 @@ summary: A downstream adopter on a macOS Apple-silicon laptop sees every provide
 relations:
 - informed_by: story:host-runs-on-macos
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-03T22:00:13Z", actor: "human:operator", revision: 2}
 - {from: "proposed", to: "active", at: "2026-11-03T22:00:13Z", actor: "human:operator", revision: 3}
@@ -60,3 +60,26 @@ spawn) is not known yet; the CI case in Acceptance settles it from a log, so it 
 ## Open Questions
 
 None.
+
+## Status after the D430 CI case (D440)
+
+Not fixed in 0.65.2 (D440): the kill does not reproduce on CI, so this story stays open, and the release-start job in
+`.github/workflows/macos-host.yml` stays as a standing guard.
+
+Verified on `macos-latest`, macOS 26.6.2 (25G83), PR 237 run 41742146148, job 126286036812:
+
+- Both catalog providers are ad-hoc and linker-signed, `codesign -v` passes, and they carry no extended attributes. That
+  holds for the published 0.65.0 one and the one built from the branch.
+- A copy started directly exits 0 in all eight starts: published and built, `cp` and host-style write, twice each, from
+  `/private/tmp/connectors-image.*`.
+- Through the host, `setup init` succeeds, and every `connections connect gitlab/probe --endpoint
+  https://gitlab.example.org` (twice, published and built) reaches `protected_entry`. The derivation's private start
+  finished its handshake.
+- The kernel logs each private copy exec'd from `/private/var/folders/…/T/connectors-image.*/image`, with an empty
+  environment. It logs only the non-fatal ad-hoc line "has no CMS blob?". Each copy then logs "bundle … missing from
+  disk and dyld shared cache", because the copy was removed after spawn. No signal and no denial appear.
+
+Inferred: the cause lies in the adopter's environment. Candidates are the macOS version, the launch context (launchd),
+or an endpoint-security or MDM agent that kills unsigned executables started from temporary directories. Asked of the
+adopter: `sw_vers`; the exit code of a plain copy-and-run from the shell and from launchd; whether the laptop is
+managed; and `log show --last 5m --predicate 'eventMessage CONTAINS "connectors-image"'` right after a failed start.

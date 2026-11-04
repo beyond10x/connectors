@@ -8,7 +8,7 @@ summary: 'Fix release 0.65.2 for a downstream adopter: provider start through th
 relations:
 - decides: story:macos-release-provider-starts-through-the-private-copy
 - decides: story:connect-names-a-failed-provider-start
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "approved", at: "2026-11-03T22:00:26Z", actor: "human:operator", revision: 3}
 ---
@@ -32,3 +32,16 @@ Units:
 Terms: targeted tests through `build-slot.sh`; the gate plan is asked of the orchestrator before the full gate; one
 bot pull request merged through `PUT /pulls/<n>/merge`; tag `v0.65.2`, release, verify, announce. No customer, person,
 host or channel name enters the repository, the store, a commit or a pull request.
+
+## Scope of 0.65.2 (D440, 2026-11-04)
+
+The orchestrator, after the CI case did not reproduce the kill, set the scope of 0.65.2:
+
+- in: the fix for unit 1 (a killed or exited provider start answers `unavailable` at `installed_provider`, not
+  `invalid_input` on `endpoint`), the error that names the failed provider start, and the macOS `release-start`
+  job in `.github/workflows/macos-host.yml` as a standing guard;
+- out: unit 2's fix. Its story stays active, citing the CI evidence and the questions put to the adopter. The
+  CHANGELOG says the kill is under investigation and not reproduced on CI macOS 26.6.2. No change to the copy.
+
+Also filed by this wave: `story:clock-quorum-test-tolerates-a-slow-loopback-source` (D433) and
+`story:endpoint-publish-holds-one-writer` (D440), both drafts from findings.
