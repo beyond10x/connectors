@@ -530,7 +530,13 @@ catalog provider installed beside the CLI does not print its version
 `installed_provider` with `next_action = check_configuration` (exit 1),
 naming the provider's absolute path in `installed_provider_path` and why it does
 not run in `installed_provider_failure`, nothing written
-(story:catalog-provider-failure-is-named).
+(story:catalog-provider-failure-is-named). The same holds when the provider
+prints its bootstrap for the endpoint but its `connectors-private/2` child,
+started as the derivation starts it, does not finish its handshake: ended on a
+signal (`killed`, as a system that refuses the copy it starts from kills it),
+exited (`exited`), past its deadline (`deadline`), answering anything but its
+bootstrap (`unreadable_output`), or not started at all (`not_executable`)
+(story:connect-names-a-failed-provider-start).
 
 The endpoint must pass the configuration's own endpoint rule (non-empty, at
 most 2048 bytes, no whitespace or control character); otherwise the command is

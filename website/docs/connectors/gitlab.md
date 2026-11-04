@@ -67,10 +67,11 @@ writes the same instance before it asks for the token.
 
 The instance is derived by the `connectors-catalog-provider` in the directory of `connectors`;
 keep the two binaries together. `connectors setup check` lists it as the `installed_provider`
-prerequisite, `failed` with the reason when it does not run, and a connect is then refused as
+prerequisite, `failed` with the reason when it does not run. A connect is then refused as
 `unavailable` at `installed_provider`, naming the provider's path and the reason, instead of
-blaming the endpoint. The macOS binaries are not signed: on an archive downloaded through a
-browser, remove the quarantine attribute from the extracted directory first, with
+blaming the endpoint, and so is a connect whose provider prints its bootstrap but is killed or
+exits when the host starts it for the instance. The macOS binaries are not signed: on an archive
+downloaded through a browser, remove the quarantine attribute from the extracted directory first, with
 `xattr -dr com.apple.quarantine <dir>`.
 
 A second host or account is a second instance. A GitLab behind a private CA needs a `ca_file`,
