@@ -1688,4 +1688,250 @@ fn selected_fixture() {{
         assert_eq!(error.raw_os_error(), Some(libc::ECHILD));
         assert!(other_still_running, "another fixture group was affected");
     }
+
+    /// The provider-only lane read from the documents that declare it: the
+    /// workflow step, the development guide and the classification.
+    mod adversary {
+        use super::*;
+
+        const WORKFLOW: &str = include_str!("../../../.github/workflows/rust-gate.yml");
+        const GUIDE: &str = include_str!("../../../docs/development.md");
+        /// The four tests `docs/development.md` names for the CI step.
+        const FOUR: [(&str, &str, &str); 4] = [
+            (
+                "connectors",
+                "definition_connect_question",
+                "the_connect_question_names_the_host_the_token_is_sent_to",
+            ),
+            (
+                "connectors",
+                "definition_connect_question",
+                "the_connect_question_of_an_oauth_profile_names_its_token_host_too",
+            ),
+            (
+                "connectors",
+                "definition_connect_question",
+                "an_entry_another_run_recorded_while_the_question_waits_is_not_connected",
+            ),
+            (
+                "connectors",
+                "adversary_d218_u1",
+                "describe_of_a_definition_needs_no_connection",
+            ),
+        ];
+        /// Neighbours in the same packages that the lane must leave alone.
+        const OTHERS: [(&str, &str, &str); 4] = [
+            PROVIDER_AND_CUSTODY,
+            CHROME_ONLY,
+            (
+                "connectors",
+                "failed_connect",
+                "an_adapter_identity_mismatch_during_an_upgrade_names_a_new_connection",
+            ),
+            (
+                "connectors-host",
+                "connectors_host",
+                "local::clock::tests::independent_live_quorum",
+            ),
+        ];
+        fn id((package, target, name): (&str, &str, &str)) -> String {
+            format!("{package}::{target}::{name}")
+        }
+        /// The arguments of the workflow's `ignored` step, parsed as the binary parses them.
+        fn ci_options() -> Options {
+            let line = WORKFLOW
+                .lines()
+                .find(|line| line.contains("connectors-build -- ignored"))
+                .expect("rust-gate.yml runs connectors-build ignored");
+            let (_, args) = line.split_once("connectors-build -- ").unwrap();
+            let argv: Vec<&str> = std::iter::once("connectors-build")
+                .chain(args.split_whitespace())
+                .collect();
+            let crate::Action::Ignored(options) =
+                crate::Args::try_parse_from(argv).unwrap().command
+            else {
+                panic!("ignored action required");
+            };
+            options
+        }
+        fn entry(family: Option<Family>, prerequisites: Vec<&'static str>) -> Entry {
+            let mut entry = classified(&[("connectors", "probe", "a_reviewed_probe")])
+                .pop()
+                .unwrap();
+            entry.family = family;
+            entry.prerequisites = prerequisites;
+            entry
+        }
+
+        #[test]
+        fn the_ci_step_runs_the_four_documented_tests_and_nothing_else() {
+            let options = ci_options();
+            assert!(options.required, "the CI step must refuse an empty lane");
+            assert_eq!(options.family, [Family::Disposable]);
+            assert_eq!(options.only_prerequisite, [Supplied::Provider]);
+            let step = WORKFLOW
+                .lines()
+                .find(|line| line.contains("connectors-build -- ignored"))
+                .unwrap();
+            let (_, command) = step.split_once("run: ").unwrap();
+            assert!(
+                GUIDE.lines().any(|line| line == command),
+                "docs/development.md shows another command than the workflow runs: {command}"
+            );
+            let mut entries = classified(&OTHERS);
+            entries.extend(classified(&FOUR));
+            let mut ran = vec![];
+            let report = evaluate(
+                entries,
+                &options,
+                |_| vec![],
+                |entry| {
+                    ran.push(entry.id());
+                    Ok(true)
+                },
+            );
+            assert_eq!(ran, FOUR.map(id));
+            assert_eq!(
+                (
+                    report.selected,
+                    report.executed,
+                    report.missing,
+                    report.unknown
+                ),
+                (4, 4, 0, 0)
+            );
+            let prose = GUIDE.split_whitespace().collect::<Vec<_>>().join(" ");
+            let in_file = FOUR
+                .iter()
+                .filter(|test| test.1 == "definition_connect_question")
+                .count();
+            assert_eq!(in_file, 3);
+            assert!(prose.contains(
+                "the three tests of `apps/connectors/tests/definition_connect_question.rs`"
+            ));
+            assert!(prose.contains(
+                "`describe_of_a_definition_needs_no_connection` in `apps/connectors/tests/adversary_d218_u1.rs`"
+            ));
+            for test in FOUR {
+                let outcome = report.outcomes.iter().find(|o| o.name == id(test)).unwrap();
+                assert_eq!(
+                    (outcome.selected, outcome.status.as_str()),
+                    (true, "passed")
+                );
+            }
+            assert!(report.accepted(options.required));
+        }
+
+        #[test]
+        fn an_unreviewed_test_refuses_the_ci_step_before_any_execution() {
+            let options = ci_options();
+            let mut entries = classified(&FOUR);
+            entries.push(entry(None, vec![]));
+            let report = evaluate(
+                entries,
+                &options,
+                |_| vec![],
+                |entry| panic!("{} executed beside unknown inventory", entry.id()),
+            );
+            assert_eq!(
+                (
+                    report.unknown,
+                    report.selected,
+                    report.executed,
+                    report.skipped
+                ),
+                (1, 4, 0, 5)
+            );
+            assert!(
+                report
+                    .outcomes
+                    .iter()
+                    .filter(|o| o.selected)
+                    .all(|o| o.status == "blocked")
+            );
+            assert!(!report.accepted(options.required));
+        }
+
+        #[test]
+        fn a_provider_the_build_did_not_supply_refuses_the_ci_step_instead_of_skipping() {
+            let options = ci_options();
+            let report = evaluate(
+                classified(&FOUR),
+                &options,
+                |entry| {
+                    entry
+                        .prerequisites
+                        .iter()
+                        .filter(|key| **key == PROVIDER)
+                        .map(|key| format!("{key} must name an executable file"))
+                        .collect()
+                },
+                |entry| panic!("{} executed without its provider", entry.id()),
+            );
+            assert_eq!(
+                (report.selected, report.missing, report.executed),
+                (4, 4, 0)
+            );
+            assert!(
+                report
+                    .outcomes
+                    .iter()
+                    .all(|o| o.status == "missing-prerequisite")
+            );
+            assert!(!report.accepted(options.required));
+        }
+
+        #[test]
+        fn a_disposable_test_with_no_prerequisite_qualifies_as_the_guide_says() {
+            let prose = GUIDE.split_whitespace().collect::<Vec<_>>().join(" ");
+            assert!(prose.contains("A test with no prerequisite also qualifies."));
+            let report = evaluate(
+                vec![entry(Some(Family::Disposable), vec![])],
+                &ci_options(),
+                |_| vec![],
+                |_| Ok(true),
+            );
+            assert_eq!((report.selected, report.executed), (1, 1));
+        }
+
+        #[test]
+        fn narrowing_never_widens_the_family() {
+            let report = evaluate(
+                vec![
+                    entry(Some(Family::Live), vec![]),
+                    entry(Some(Family::Timing), vec![]),
+                ],
+                &ci_options(),
+                |_| vec![],
+                |entry| panic!("{} executed outside its family", entry.id()),
+            );
+            assert_eq!(report.selected, 0);
+            assert!(report.outcomes.iter().all(|o| o.status == "not-selected"
+                && o.reasons == ["family requires explicit selection"]));
+        }
+
+        #[test]
+        fn cli_names_the_cli_prerequisite_and_provider_does_not() {
+            let select = |supplied: Vec<Supplied>, prerequisites: Vec<&'static str>| {
+                let mut options = options();
+                options.only_prerequisite = supplied;
+                evaluate(
+                    vec![entry(Some(Family::Disposable), prerequisites)],
+                    &options,
+                    |_| vec![],
+                    |_| Ok(true),
+                )
+                .selected
+            };
+            assert_eq!(select(vec![Supplied::Cli], vec![CLI]), 1);
+            assert_eq!(select(vec![Supplied::Provider], vec![CLI]), 0);
+            assert_eq!(select(vec![Supplied::Cli], vec![PROVIDER]), 0);
+            assert_eq!(select(vec![Supplied::Provider], vec![CLI, PROVIDER]), 0);
+            assert_eq!(
+                select(vec![Supplied::Provider, Supplied::Cli], vec![CLI, PROVIDER]),
+                1
+            );
+            assert_eq!(select(vec![Supplied::Cli], vec![CLI, CUSTODY]), 0);
+        }
+    }
 }
