@@ -209,6 +209,36 @@ async fn the_released_rate_limit_headers_answer_a_spent_limit_as_rate_limited() 
         .await
         .expect_err("a spent limit is refused");
     assert_eq!(error.code, ErrorCode::RateLimited, "{}", error.message);
+
+    // A reset in the future is the wait: `retry_after_seconds` is the seconds
+    // until it, and the read is sent once, never retried.
+    let reset = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        + 120;
+    let http = answering(
+        403,
+        &[
+            ("x-ratelimit-remaining", "0"),
+            ("x-ratelimit-reset", &reset.to_string()),
+        ],
+        json!({"message": "API rate limit exceeded"}),
+    );
+    let error = engine
+        .read(&http, "github", "user.me", json!({}))
+        .await
+        .expect_err("a spent limit is refused");
+    assert_eq!(error.code, ErrorCode::RateLimited, "{}", error.message);
+    let wait = error
+        .retry_after_seconds
+        .expect("a future reset sets retry_after_seconds");
+    assert!((1..=120).contains(&wait), "waits until the reset: {wait}");
+    assert_eq!(
+        http.sent.lock().unwrap().len(),
+        1,
+        "sent once, never retried"
+    );
 }
 
 #[tokio::test]
