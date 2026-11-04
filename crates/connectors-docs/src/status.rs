@@ -429,6 +429,13 @@ pub const CAPABILITIES: &[Capability] = &[
         "adapters/catalog/tests/opsgenie.rs::shipped_opsgenie_selections_are_exactly_the_five_reads",
         "/docs/reference/adapters/catalog",
     ),
+    shipped(
+        "Catalog provider",
+        "GitHub reads from a definition file",
+        "The ten reads of connectors-definitions 0.5.2 connectors/github.yaml (review_requests.list, issues.assigned, notifications.list, user.me, repos.list, repo.get, releases.list, release.latest, readme.raw and file.raw) send their path and query with the definition's fixed values and the since fold, pass page and per_page through, refuse a per_page above its bound and a search page above 1,000 before any request and GitHub's answer for a page past the first 1,000 search results as invalid_input, and return GitHub's answer unchanged, a README or file as its decoded text; verified against a scripted provider only.",
+        "adapters/catalog/tests/github_definition_reads.rs::each_list_passes_page_and_per_page_through_unchanged",
+        "/docs/connectors/github",
+    ),
     decided(
         "Catalog provider",
         "Catalog index service",
