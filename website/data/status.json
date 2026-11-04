@@ -347,6 +347,13 @@
     },
     {
       "area": "Catalog provider",
+      "detail": "The ten reads of connectors-definitions 0.5.2 connectors/github.yaml (review_requests.list, issues.assigned, notifications.list, user.me, repos.list, repo.get, releases.list, release.latest, readme.raw and file.raw) send their path and query with the definition's fixed values and the since fold, pass page and per_page through, refuse a per_page above its bound and a search page above 1,000 before any request and GitHub's answer for a page past the first 1,000 search results as invalid_input, and return GitHub's answer unchanged, a README or file as its decoded text; verified against a scripted provider only.",
+      "href": "/docs/connectors/github",
+      "label": "GitHub reads from a definition file",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
       "detail": "Listing and locating precompiled bundles with provenance is specified; directly configured adapters need no index.",
       "href": "/docs/reference/contracts/catalog",
       "label": "Catalog index service",

@@ -5,7 +5,7 @@ sidebar_label: "All connectors"
 sidebar_position: 1
 description: "Every connector, with its provider, reads, writes, auth profiles and how its instances are configured."
 lede: "Every connector has one onboarding page with the same eight steps, from what it reads and writes to its limits."
-source: "adapters/catalog/providers/*/connector.json and their selections; OpenRouter, the connectors served by their own executables and MCP by hand in crates/connectors-docs/src/onboarding.rs"
+source: "adapters/catalog/providers/*/connector.json and their selections; OpenRouter, GitHub, the connectors served by their own executables and MCP by hand in crates/connectors-docs/src/onboarding.rs"
 custom_edit_url: null
 ---
 
@@ -31,6 +31,7 @@ Every connector you can configure, with its provider, how many reads and writes 
 | [Slack](./slack.md) `slack` | Slack | 12 | 5 | `slack.bot` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/slack/connector.json) |
 | [Zendesk](./zendesk.md) `zendesk` | Zendesk | 8 | 3 | `zendesk.oauth`, `zendesk.basic` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/zendesk/connector.json) |
 | [OpenRouter](./openrouter.md) `openrouter` | OpenRouter | 3 | 1 | `openrouter.api-key` | pinned | hand-written |
+| [GitHub](./github.md) `github` | GitHub | 10 | 0 | `github.token` | definition file | hand-written |
 | [Kubernetes](./kubernetes.md) `kubernetes` | Kubernetes | 14 | 1 | `kubernetes.token` | pinned | hand-written |
 | [PostgreSQL](./postgres.md) `postgres` | PostgreSQL | 7 | 0 | `postgres.password` | pinned | hand-written |
 | [MySQL](./mysql.md) `mysql` | MySQL | 7 | 0 | `mysql.password` | pinned | hand-written |
@@ -40,6 +41,6 @@ Every connector you can configure, with its provider, how many reads and writes 
 | [Prometheus](./prometheus.md) `prometheus` | Prometheus | 3 | 0 | `prometheus.bearer` | pinned | hand-written |
 | [MCP](./mcp.md) `mcp` | any MCP server | 0 | 0 | none | not yet: planned | hand-written |
 
-A **derived** instance names only what is yours (its endpoint, an optional description and, where the connector declares more than one auth profile, `profile`); everything else comes from the declaration shipped with the `connectors-catalog-provider` installed beside `connectors`. A **pinned** instance names its executable, that executable's SHA-256 and its configuration revision, because no declaration exists to derive them from; its page says why. Every write is a required-approval mutation: it runs only with a proof issued for its exact input.
+A **derived** instance names only what is yours (its endpoint, an optional description and, where the connector declares more than one auth profile, `profile`); everything else comes from the declaration shipped with the `connectors-catalog-provider` installed beside `connectors`. A **pinned** instance names its executable, that executable's SHA-256 and its configuration revision, because no declaration exists to derive them from; its page says why. A **definition file** instance is the instance `definition` that `connectors invoke --definition <file>` makes from a released connector definition, served by the same catalog provider; the configuration file names nothing. Every write is a required-approval mutation: it runs only with a proof issued for its exact input.
 
 The rows of the catalog connectors are generated from their declarations under [`adapters/catalog/providers/`](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers); the others are written by hand in the generator. Start with [Set up the local CLI](../guides/set-up-the-local-cli.md) if no configuration exists yet.
