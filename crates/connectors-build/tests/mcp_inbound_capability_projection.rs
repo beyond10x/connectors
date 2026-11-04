@@ -46,7 +46,11 @@ struct VisibilityCase {
     metadata_admitted: bool,
     policy: String,
     observation_admitted: bool,
-    revision_current: bool,
+    /// `null` for a tool call that names no revision. The member is still
+    /// required: `deserialize_with` keeps serde from reading an omitted one
+    /// as `None`.
+    #[serde(deserialize_with = "Option::deserialize")]
+    revision_current: Option<bool>,
     input_valid: bool,
     dependency_ready: bool,
     approval_ready: bool,
@@ -145,7 +149,8 @@ fn visibility(case: &VisibilityCase) -> Result<(bool, &str), String> {
         "deny" => "not_granted",
         "unavailable" => "unavailable",
         "admit" if !case.observation_admitted => "forbidden",
-        "admit" if !case.revision_current => "stale_description",
+        // A tool call that names no revision binds to the advertised one.
+        "admit" if case.revision_current == Some(false) => "stale_description",
         "admit" if !case.implemented || !case.bound => "not_found",
         "admit" if !case.enabled => "forbidden",
         "admit" if !case.input_valid => "invalid_input",
@@ -420,6 +425,7 @@ fn checker_rejects_visibility_and_precedence_contradictions() {
         "policy-beats-stale",
         "revision-beats-hidden",
         "scope-beats-stale",
+        "no-revision-binds-current",
     ] {
         let mut changed = cases.clone();
         let row = changed
@@ -438,6 +444,35 @@ fn checker_rejects_visibility_and_precedence_contradictions() {
         );
     }
 }
+/// projection.md § Qualified names and inverse selection: a tool call that
+/// names no revision binds to the advertised one, so no such case is refused
+/// `stale_description`. Its `revision_current` is `null`, and the member stays
+/// required on every case: an omitted one is not read as an absent revision.
+#[test]
+fn checker_holds_a_call_without_a_revision_to_the_advertised_one() {
+    let (document, cases, codes) = inputs();
+    let mut stale = cases.clone();
+    stale
+        .visibility
+        .iter_mut()
+        .find(|case| case.id == "no-revision-binds-current")
+        .unwrap()
+        .outcome = "stale_description".into();
+    assert_eq!(
+        check(&document, &stale, &codes).unwrap_err(),
+        "contradicted visibility or refusal precedence"
+    );
+    let authored: serde_json::Value = serde_json::from_str(&read(CASES)).unwrap();
+    for case in authored["visibility"].as_array().unwrap() {
+        let mut case = case.clone();
+        case.as_object_mut().unwrap().remove("revision_current");
+        assert!(
+            serde_json::from_value::<VisibilityCase>(case.clone()).is_err(),
+            "an omitted revision_current was accepted: {case}"
+        );
+    }
+}
+
 #[test]
 fn checker_rejects_weak_family_projection() {
     let (document, mut cases, codes) = inputs();

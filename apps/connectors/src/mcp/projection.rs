@@ -343,13 +343,7 @@ impl Snapshot {
         if !self.adapter.permissions.operations.contains(&name[2]) {
             return Err(refusal("not_granted"));
         }
-        let revision = params["_meta"][protocol::REVISION]
-            .as_str()
-            .filter(|r| connectors_core::valid_id(r))
-            .ok_or_else(|| protocol::error(-32602, "Missing projection revision"))?;
-        if revision != self.revision {
-            return Err(refusal("stale_description"));
-        }
+        bind_revision(params, &self.revision)?;
         let descriptor = self
             .bootstrap
             .descriptor()
@@ -722,6 +716,30 @@ pub(super) fn execute(
     }
 }
 
+/// projection.md § Qualified names and inverse selection: a tool call whose
+/// `_meta` names no projection revision, or that has no `_meta`, binds to
+/// `current`, the revision this snapshot advertises, which the owner fences
+/// again at dispatch. A revision that is present must be a valid identifier,
+/// and a valid one other than `current` is stale.
+fn bind_revision(params: &Value, current: &str) -> Result<(), Value> {
+    let revision = match params.get("_meta") {
+        None => return Ok(()),
+        Some(Value::Object(meta)) => match meta.get(protocol::REVISION) {
+            None => return Ok(()),
+            Some(revision) => revision,
+        },
+        Some(_) => return Err(protocol::error(-32602, "Invalid _meta")),
+    };
+    let revision = revision
+        .as_str()
+        .filter(|r| connectors_core::valid_id(r))
+        .ok_or_else(|| protocol::error(-32602, "Invalid projection revision"))?;
+    if revision != current {
+        return Err(refusal("stale_description"));
+    }
+    Ok(())
+}
+
 // Native projection of the already-selected service envelope: the provider's
 // schema is nested under result, never asserted to describe the outer response.
 fn response_schema(result: Value) -> Value {
@@ -837,6 +855,42 @@ mod tests {
             "story:mcp-tool-call-shapes-its-result: the first page past the bound"
         );
         assert_eq!(walk_bound(65_536, 4_194_304), 4_194_304 - 65_536 - 8192);
+    }
+
+    /// projection.md § Qualified names and inverse selection: a tool call
+    /// with no revision in `_meta`, or no `_meta`, binds to the advertised
+    /// revision; a present revision must be a valid identifier, and a valid
+    /// one that is not the advertised one is stale.
+    #[test]
+    fn a_call_without_a_revision_binds_to_the_advertised_one() {
+        let current = "rev-1";
+        for params in [
+            json!(null),
+            json!({}),
+            json!({"_meta":{}}),
+            json!({"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28",
+                "io.modelcontextprotocol/clientCapabilities":{},"progressToken":1}}),
+            json!({"_meta":{protocol::REVISION:current}}),
+        ] {
+            assert_eq!(bind_revision(&params, current), Ok(()), "{params}");
+        }
+        assert_eq!(
+            bind_revision(&json!({"_meta":{protocol::REVISION:"rev-0"}}), current),
+            Err(refusal("stale_description"))
+        );
+        for meta in [
+            json!({protocol::REVISION:null}),
+            json!({protocol::REVISION:7}),
+            json!({protocol::REVISION:["rev-1"]}),
+            json!({protocol::REVISION:""}),
+            json!({protocol::REVISION:"rev 1"}),
+            json!({protocol::REVISION:"r".repeat(129)}),
+            json!(null),
+            json!("rev-1"),
+        ] {
+            let refused = bind_revision(&json!({ "_meta": meta }), current).unwrap_err();
+            assert_eq!(refused["code"], -32602, "{meta}: {refused}");
+        }
     }
 
     #[test]
