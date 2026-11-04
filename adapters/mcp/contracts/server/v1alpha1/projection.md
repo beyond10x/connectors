@@ -128,7 +128,8 @@ revision string in request `_meta["io.beyond10x.connectors/revision"]`. A tool
 call whose `_meta` has no such member, or that has no `_meta`, binds to the
 revision the server currently advertises for that tool and is then checked as a
 call naming it; such a client cannot detect a descriptor change between listing
-and calling. A prompt request without a revision is malformed input, and so is a
+and calling. A `_meta` that is present but not an object is malformed input. A
+prompt request without a revision is malformed input, and so is a
 revision present as anything but a syntactically valid identifier; a
 syntactically valid old revision is checked at the position defined above. List
 results and each advertised definition carry the same revision in safe `_meta`;
