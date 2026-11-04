@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Each release tag publishes the container image `ghcr.io/beyond10x/connectors:<version>` for
+  `linux/amd64` and `linux/arm64`, beside the archives. `release-binaries.yml` builds it from the
+  two Linux archives' binaries on `gcr.io/distroless/cc-debian13`
+  (`deploy/images/connectors/Dockerfile`), checks that every binary in it answers `--version`
+  with the release version as user `65532`, pushes it with the workflow's own token and refuses
+  a version the registry already holds. The image starts `connectors-catalog-provider` and
+  carries no configuration or credential (`docs/running-services.md` § In a container). A pull
+  request that changes the workflow or the image builds both architectures and pushes nothing.
+
 ## 0.65.1 — 2026-11-03
 
 ### Fixed

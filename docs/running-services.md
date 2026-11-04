@@ -417,6 +417,35 @@ is lost, the outcome is `unknown`: the caller is told so, and the push is not se
 shows whether it was applied. A push whose caller hangs up after sending it still runs to its end
 and is logged. At most 4 pushes are worked on at once; another one is `503`.
 
+## In a container
+
+Releases after 0.65.1 publish the image `ghcr.io/beyond10x/connectors:<version>` for
+`linux/amd64` and `linux/arm64`. It holds the binaries of that release's Linux archives in
+`/usr/local/bin`, on `gcr.io/distroless/cc-debian13`, runs as user and group `65532`, and starts
+`connectors-catalog-provider`; pass `--config <file>` to serve a catalog instance. Each binary
+answers `--version` with the release version:
+
+```sh
+docker run --rm "ghcr.io/beyond10x/connectors:$version" --version
+docker run --rm --entrypoint /usr/local/bin/connectors-kubernetes "ghcr.io/beyond10x/connectors:$version" --version
+```
+
+```text
+connectors-catalog-provider 0.65.1
+connectors-kubernetes 0.65.1
+```
+
+The image carries no configuration and no credential. Mount the configuration file, give the
+service credential as a file or an environment reference, mount the instance credential as a
+read-only Secret volume, and give `state` a directory owned by `65532` with mode `0700`
+([The state directory](#the-state-directory)). With `securityContext.fsGroup: 65532` and
+`defaultMode: 0400`, the kubelet presents the Secret item as `0440 root:65532`, which the
+[mounted-secret checks](local-mounted-secret-custody.md#checks) admit. `GET /healthz` answers
+`204` without admission and serves as the liveness and readiness probe.
+
+The release workflow builds the image from the archives it uploads, so the image and the archives
+of one version hold the same binaries, and it refuses a version the registry already holds.
+
 ## Supported surfaces
 
 | Service | Operations | External binding |
