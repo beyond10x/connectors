@@ -49,6 +49,10 @@ mod tests {
                 setup_check_lists_the_installed_provider,
             ),
             (
+                "a_provider_that_prints_but_does_not_start_is_named_not_the_endpoint",
+                a_provider_that_prints_but_does_not_start_is_named_not_the_endpoint,
+            ),
+            (
                 "a_provider_past_its_deadline_is_named_by_setup_check",
                 a_provider_past_its_deadline_is_named_by_setup_check,
             ),
@@ -152,6 +156,21 @@ mod tests {
         );
         assert_eq!(code, Some(2));
         assert_eq!(installation.text(), before);
+    }
+
+    /// story:connect-names-a-failed-provider-start: a provider that prints its
+    /// version and its bootstrap, but is killed, or exits, when started as the
+    /// derived instance's private child, refused nothing. The start that
+    /// failed is named, as on a macOS host that kills the private copy.
+    pub fn a_provider_that_prints_but_does_not_start_is_named_not_the_endpoint() {
+        for (endpoint, reason) in [
+            ("https://killed-at-start.example.org", "killed"),
+            ("https://exits-at-start.example.org", "exited"),
+        ] {
+            let installation = Installation::new();
+            let before = installation.configure("");
+            assert_named(&installation, &before, endpoint, reason);
+        }
     }
 
     /// `installed_provider` is `ready` while the provider prints its version,
