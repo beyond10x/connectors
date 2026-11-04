@@ -61,6 +61,8 @@ jobs:
           fi
       - name: Run the repository gate
         run: cargo run --locked -p connectors-build -- gate
+      - name: Run the ignored tests a built catalog provider suffices for
+        run: cargo run --locked -p connectors-build -- ignored --required --only-prerequisite provider
       - name: Report disk use
         if: always()
         run: |

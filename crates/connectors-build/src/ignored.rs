@@ -28,6 +28,10 @@ pub struct Options {
     /// Missing prerequisites in any selected family make the command fail.
     #[arg(long, conflicts_with = "inventory")]
     required: bool,
+    /// Narrow the selected families to tests whose every prerequisite is one of
+    /// these. Workspace compilation supplies both, so CI can require them.
+    #[arg(long, value_enum, value_delimiter = ',')]
+    only_prerequisite: Vec<Supplied>,
     #[arg(long, default_value = ".local/ignored-suites.json")]
     report: PathBuf,
     /// A short, physical, owner-private fixture directory for long checkouts.
@@ -41,6 +45,23 @@ pub enum Family {
     Live,
     Timing,
     Deferred,
+}
+/// A prerequisite the workspace build supplies, as `--only-prerequisite` names it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+pub enum Supplied {
+    /// `CONNECTORS_TEST_CATALOG_PROVIDER`, the built catalog provider.
+    Provider,
+    /// `CONNECTORS_TEST_CLI`, the built production CLI.
+    Cli,
+}
+impl Supplied {
+    fn key(self) -> &'static str {
+        match self {
+            Supplied::Provider => PROVIDER,
+            Supplied::Cli => CLI,
+        }
+    }
 }
 #[derive(Clone, Debug)]
 struct Suite {
@@ -481,9 +502,17 @@ fn evaluate(
         ..Report::default()
     };
     for entry in entries {
-        let selected = entry
+        let family = entry
             .family
             .is_some_and(|family| options.family.contains(&family));
+        let within = options.only_prerequisite.is_empty()
+            || entry.prerequisites.iter().all(|key| {
+                options
+                    .only_prerequisite
+                    .iter()
+                    .any(|supplied| supplied.key() == *key)
+            });
+        let selected = family && within;
         let mut outcome = Outcome {
             name: entry.id(),
             family: entry.family,
@@ -501,11 +530,16 @@ fn evaluate(
             outcome
                 .reasons
                 .push("inventory classification required".into());
-        } else if !selected {
+        } else if !family {
             outcome.status = "not-selected".into();
             outcome
                 .reasons
                 .push("family requires explicit selection".into());
+        } else if !within {
+            outcome.status = "not-selected".into();
+            outcome
+                .reasons
+                .push("a prerequisite outside --only-prerequisite".into());
         } else {
             report.selected += 1;
             outcome.reasons = missing(&entry);
@@ -1145,7 +1179,7 @@ pub fn run(root: &Path, options: Options) -> Result<()> {
             execute_test(&entry.suite, &entry.name, temp.path(), &logs, &environment)
         },
     );
-    let value = serde_json::json!({"format":"connectors.ignored-suites/1", "mode":if options.inventory { "inventory" } else { "execute" }, "scope":"workspace default features", "families":options.family, "required":options.required, "test_binaries":suites.len(), "logs":logs, "result":report, "platform_gated":gated});
+    let value = serde_json::json!({"format":"connectors.ignored-suites/1", "mode":if options.inventory { "inventory" } else { "execute" }, "scope":"workspace default features", "families":options.family, "only_prerequisite":options.only_prerequisite, "required":options.required, "test_binaries":suites.len(), "logs":logs, "result":report, "platform_gated":gated});
     crate::save_json(&report_path, &value)?;
     println!("{}", serde_json::to_string_pretty(&value)?);
     if !report.accepted(options.required) {
@@ -1166,9 +1200,117 @@ mod tests {
             family: vec![Family::Disposable],
             inventory: false,
             required: true,
+            only_prerequisite: vec![],
             report: PathBuf::new(),
             tmpdir: None,
         }
+    }
+    /// Entries as `classify` holds them; the stubbed runner never starts their executable.
+    fn classified(tests: &[(&str, &str, &str)]) -> Vec<Entry> {
+        tests
+            .iter()
+            .map(|(package, target, name)| {
+                let suite = Suite {
+                    package: (*package).into(),
+                    target: (*target).into(),
+                    executable: PathBuf::new(),
+                };
+                classify(&suite, name)
+            })
+            .collect()
+    }
+    const PROVIDER_ONLY: (&str, &str, &str) = (
+        "connectors",
+        "adversary_d218_u1",
+        "describe_of_a_definition_needs_no_connection",
+    );
+    const PROVIDER_AND_CUSTODY: (&str, &str, &str) = (
+        "connectors",
+        "failed_connect",
+        "a_connect_to_an_unreachable_provider_reports_the_owners_cause_at_dispatch",
+    );
+    const CHROME_ONLY: (&str, &str, &str) = (
+        "connectors-host",
+        "connectors_host",
+        "local::oauth_adversary_tests::chrome_following_the_redirect_is_accepted",
+    );
+    #[test]
+    fn only_prerequisite_parses_and_defaults_to_no_narrowing() {
+        let parse = |args: &[&str]| {
+            let args = crate::Args::try_parse_from(args).unwrap();
+            let crate::Action::Ignored(options) = args.command else {
+                panic!("ignored action required");
+            };
+            options.only_prerequisite
+        };
+        assert_eq!(parse(&["connectors-build", "ignored"]), []);
+        assert_eq!(
+            parse(&[
+                "connectors-build",
+                "ignored",
+                "--required",
+                "--only-prerequisite",
+                "provider",
+            ]),
+            [Supplied::Provider]
+        );
+        assert_eq!(
+            parse(&[
+                "connectors-build",
+                "ignored",
+                "--only-prerequisite",
+                "provider,cli"
+            ]),
+            [Supplied::Provider, Supplied::Cli]
+        );
+    }
+    #[test]
+    fn only_prerequisite_provider_selects_the_tests_a_built_provider_suffices_for() {
+        let mut opts = options();
+        opts.only_prerequisite = vec![Supplied::Provider];
+        let mut ran = vec![];
+        let report = evaluate(
+            classified(&[PROVIDER_ONLY, PROVIDER_AND_CUSTODY, CHROME_ONLY]),
+            &opts,
+            |_| vec![],
+            |entry| {
+                ran.push(entry.id());
+                Ok(true)
+            },
+        );
+        let id =
+            |(package, target, name): (&str, &str, &str)| format!("{package}::{target}::{name}");
+        assert_eq!(ran, [id(PROVIDER_ONLY)]);
+        assert_eq!(
+            (report.selected, report.executed, report.missing),
+            (1, 1, 0)
+        );
+        let status = |test| {
+            report
+                .outcomes
+                .iter()
+                .find(|o| o.name == id(test))
+                .map(|o| (o.selected, o.status.as_str()))
+                .unwrap()
+        };
+        assert_eq!(status(PROVIDER_ONLY), (true, "passed"));
+        assert_eq!(status(PROVIDER_AND_CUSTODY), (false, "not-selected"));
+        assert_eq!(status(CHROME_ONLY), (false, "not-selected"));
+        assert!(report.accepted(true));
+    }
+    #[test]
+    fn only_prerequisite_with_an_empty_selection_refuses_when_required() {
+        let mut opts = options();
+        opts.only_prerequisite = vec![Supplied::Provider, Supplied::Cli];
+        let report = evaluate(
+            classified(&[PROVIDER_AND_CUSTODY, CHROME_ONLY]),
+            &opts,
+            |_| vec![],
+            |_| Ok(true),
+        );
+        assert_eq!((report.selected, report.executed), (0, 0));
+        assert!(!report.accepted(true));
+        assert!(report.accepted(false));
     }
     /// A bounded real Rust libtest executable. No provider, shell script or ambient service.
     fn fixture(fail: bool, unknown: bool) -> (tempfile::TempDir, Suite) {
