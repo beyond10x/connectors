@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.65.2 — 2026-11-04
+
+### Fixed
+
+- `connections connect --endpoint` names a catalog provider that prints its bootstrap and then
+  fails to start, instead of refusing the endpoint (story:connect-names-a-failed-provider-start).
+  A provider that is killed, exits, misses its handshake deadline or prints an unreadable
+  handshake during the derivation answers `unavailable` at stage `installed_provider`, with
+  `installed_provider_path` and `installed_provider_failure`. In 0.65.1 such a start was
+  `invalid_input` on `endpoint`. An endpoint that a running provider refuses still answers
+  `invalid_input` on `endpoint`.
+
+### Known issue
+
+- On one macOS Apple-silicon laptop the catalog provider is killed during its start, before the
+  handshake (story:macos-release-provider-starts-through-the-private-copy). This is under
+  investigation and does not reproduce on CI macOS 26.6.2: the published 0.65.0 provider and
+  a fresh build both start through the host there. Such a start now reports the kill as above.
+
+### Added
+
+- CI: a macOS job builds the release CLI and catalog provider, checks the published archive,
+  and starts both providers through the host twice, as a standing guard.
+
 ## 0.65.1 — 2026-11-03
 
 ### Fixed
