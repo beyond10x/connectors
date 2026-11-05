@@ -8,7 +8,7 @@ relations:
 - decides: story:owner-bounded-read-rechecks-semantic-effects
 - decides: story:mcp-mutating-tool-call-revision-rule
 - decides: story:claude-mcp-add-registration-is-recorded
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "approved", at: "2026-11-05T17:30:48Z", actor: "human:timo", revision: 2}
 ---
@@ -25,3 +25,11 @@ The directing session `b10x-chef-orchestrator` gave the go for connectors wave 2
 - The staged gate runs S1 to S5c with the proposal's terms. Each stage starts with its estimated peak +40G free, never under 45G, and trees-budget passing. A stage stops at its estimated peak +2G, at twice its estimated cargo minutes, or under 40G free, and the cache is discarded between stages.
 - On green: one bot PR; PUT merge after its checks; tag v0.68.0 once main is green. Then the release page, the archive sums, verify-release, and the announcement.
 - The three other active stories stay as they are: the two macOS stories and the sustained live read loop.
+
+## ESS pin to 0.87.0 (orchestrator, 2026-11-05)
+
+ESS 0.87.0 was released and verified after the go. The workspace rule moves a repository's ESS pin to the newest release when a wave touches that repository anyway, and the directing session `b10x-chef-orchestrator` applied it to this wave:
+
+- One ride-along commit on the wave branch, after U3 and before the gate, moves the seven ESS git dependencies in `Cargo.toml` and the lockfile from tag 0.86.0 to tag 0.87.0.
+- The staged gate uses the `ess` binary at 0.87.0.
+- S1 may rebuild in full. If its peak passes the estimate (5G) by more than 2G, S1 stops with its stop line, and the directing session decides whether to raise the term.
