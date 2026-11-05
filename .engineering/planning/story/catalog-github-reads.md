@@ -2,47 +2,36 @@
 format: aep.planning-md/3
 id: story:catalog-github-reads
 kind: story
-status: active
+status: implemented
 title: 'GitHub reads through the catalog provider: what waits on the user, and public repository metadata'
 relations:
 - serves: vision:independent-contract-adapters
 scope:
-- confidence: cited
-  path: adapters/README.md
-- confidence: cited
-  path: adapters/catalog/generated/bundles/github.bundle.json
-- confidence: cited
-  path: adapters/catalog/generated/bundles/index.json
-- confidence: cited
-  path: adapters/catalog/providers/github/operations.json
-- confidence: cited
-  path: adapters/catalog/spec/ess/domains/selection.yaml
-- confidence: cited
-  path: adapters/catalog/src/lib.rs
-- confidence: cited
-  path: adapters/catalog/tests/bundle_drift.rs
-- confidence: cited
-  path: adapters/catalog/tests/github.rs
-- confidence: cited
-  path: adapters/github/upstream/README.md
-- confidence: cited
-  path: adapters/github/upstream/github-source-hashes.json
-- confidence: cited
-  path: contracts/catalog/v1alpha1/semantics.md
-- confidence: cited
-  path: crates/connectors-build/src/gate.rs
 - confidence: inferred
-  path: crates/connectors-catalog/src/inventory.rs
+  path: CHANGELOG.md
+- confidence: cited
+  path: README.md
+- confidence: cited
+  path: adapters/catalog/tests/definition_published_features_adversary.rs
+- confidence: inferred
+  path: adapters/catalog/tests/github_definition_reads.rs
+- confidence: cited
+  path: crates/connectors-docs/src/onboarding.rs
 - confidence: cited
   path: crates/connectors-docs/src/status.rs
 - confidence: cited
-  path: docs/catalog-github.md
+  path: website/data/status.json
 - confidence: cited
-  path: docs/local-catalog-provider.md
-revision: 28
+  path: website/docs/connectors/github.md
+- confidence: cited
+  path: website/docs/connectors/index.md
+- confidence: cited
+  path: website/docs/status.md
+revision: 56
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-23T12:24:51Z", actor: "human:timo", revision: 24}
 - {from: "proposed", to: "active", at: "2026-10-23T12:24:51Z", actor: "human:timo", revision: 25}
+- {from: "active", to: "implemented", at: "2026-11-05T01:33:53Z", actor: "human:timo", revision: 56, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Outcome
 
@@ -130,3 +119,87 @@ Read against `origin/main` `8150245c2` by wave D417.
   connectors-definitions.
 
 The acceptance needs restating against the definitions-only layout before a wave takes the remainder.
+
+## Scope (wave 2026-11-04)
+
+Derived by `story-scoper` against `a99bab09c` (v0.65.2). Each line is cited (read in the tree) or
+inferred.
+
+- Tests: `adapters/catalog/tests/github_definition_reads.rs` (new, inferred), on the in-process
+  harness of `adapters/catalog/tests/definition_published_features_adversary.rs:25-90` (cited);
+  the rate-limit test at `:200` gains a future `x-ratelimit-reset` (cited).
+- Documents: `website/docs/connectors/github.md` (new, cited); one row in the `README.md` support
+  table (cited); a `HAND` row in `crates/connectors-docs/src/onboarding.rs:359` and the index text
+  at `:733-735`, `:745` (cited); a shipped item in `crates/connectors-docs/src/status.rs` after
+  `:431` (inferred placement).
+- Generated: `website/docs/connectors/index.md`, `website/docs/status.md`,
+  `website/data/status.json` (cited, `onboarding.rs:645`, `status.rs:726`).
+- Moved away, removed from the typed scope: `adapters/catalog/providers/github/operations.json`,
+  the GitHub bundle and bundle index, `adapters/catalog/tests/github.rs`, `adapters/github/upstream/`,
+  `docs/catalog-github.md`; the engine prerequisites in `adapters/catalog/src/lib.rs` shipped in
+  `d93457b06`.
+- Paging today is caller-driven (`page`, `per_page`). A declared walk is `x-connectors-walk`
+  (`adapters/catalog/src/walk.rs:20`), which the definition importer drops
+  (`crates/connectors-catalog/src/import.rs:244-248`); `story:definition-lowerer-carries-walk` is a
+  draft. A two-page walk and a walk that stops at the 1,000-result cap therefore need a change in
+  connectors-definitions and that story first (cited).
+- Exact-request coverage on `a99bab09c`: only `review_requests.list` asserts its path and `q`
+  (`definition_published_features_adversary.rs:152`); the other nine have none (cited).
+- Shared with `story:claude-connects-to-the-mcp-server`: `onboarding.rs` (different `HAND` rows; the
+  index sentence at `:745` may clash), `status.rs` (different items; `AS_OF`), the README support
+  table (different rows), the generated `index.md` and `status.md` count line, `CHANGELOG.md`.
+- Confidence: high for tests and the onboarding rule; medium for row placement and the collisions.
+
+## Acceptance as restated (wave 2026-11-04)
+
+The acceptance above names surfaces that moved to connectors-definitions. The directing session
+`b10x-chef-orchestrator` accepted this restatement on 2026-11-04: "your restatement is accepted as
+written, with the two walks deferred and the moved-file lines dropped." It replaces the
+Acceptance section for the remainder; what main already holds is listed in "Checked 2026-11-03".
+
+- Held already: the ten ids, all reads, lower from the pinned definitions fixture
+  (`crates/connectors-catalog/tests/definition_published_features.rs:272`,
+  `adapters/catalog/tests/definition_published_features_adversary.rs:101`).
+- Each of the ten reads sends its exact path and query (fixed values, the `since` fold, `page` and
+  `per_page`) and returns the provider's answer as `body` unchanged, on synthetic `example-org`
+  fixtures: `adapters/catalog/tests/github_definition_reads.rs`.
+- Each of the five lists passes `page=2&per_page=N` through unchanged, and a `per_page` above its
+  bound (100; 50 for `notifications.list`) is refused `invalid_input` before any request: same file.
+- Search cap: `review_requests.list` with `page` 1001 is refused before any request, and a 422
+  "Only the first 1000 search results are available" is refused `invalid_input`: same file.
+- A 403 with `x-ratelimit-remaining: 0` and a future `x-ratelimit-reset` is `rate_limited` with
+  `retry_after_seconds` set, never retried: the test at
+  `definition_published_features_adversary.rs:200`, extended.
+- `website/docs/connectors/github.md` with the eight onboarding sections (token scopes, the setup
+  commands, the release link), a README support-table row, its onboarding row and a shipped status
+  item naming a test of the file above, held by `cargo test -p connectors-docs` and
+  `connectors-docs generate --check`.
+
+Deferred: a two-page walk and a walk that stops at the 1,000-result cap. Both need a declared walk
+in connectors-definitions and `story:definition-lowerer-carries-walk` (draft) first.
+
+Dropped: the `adapters/catalog/providers/github/operations.json`, bundle-drift and
+`docs/catalog-github.md` lines; the fixture's SHA-256 check
+(`definition_published_features.rs:274-279`) and the site page replace them.
+
+## Delivered (wave 2026-11-04, v0.66.0)
+
+Unit commit 995ec56d2 and adversary cases e34fd8032, merged in e7f4606ab on `wave/2026-11-04-connectors`;
+local staged gate green at ca1ef2f4d. The engine answered every restated acceptance line as written, so no
+engine file changed.
+
+Scope as landed (confirms the inferred lines of "Scope (wave 2026-11-04)"):
+
+| path | result |
+|---|---|
+| `adapters/catalog/tests/github_definition_reads.rs` (new, package `connectors-catalog-provider`) | held |
+| `adapters/catalog/tests/github_definition_reads_adversary.rs` (new) | added by the adversary pass |
+| `adapters/catalog/tests/definition_published_features_adversary.rs` | held (rate-limit assertions) |
+| `crates/connectors-docs/src/status.rs` item after Opsgenie (ended at `:431`) | held |
+| `crates/connectors-docs/src/onboarding.rs` HAND row after openrouter, instance kind `definition file` | held |
+| `README.md` support-table row, `website/docs/connectors/github.md` (new) | held |
+| `website/docs/connectors/index.md`, `website/docs/status.md`, `website/data/status.json` | regenerated |
+
+Not done, as the restatement defers: the two declared walks. The page's token-scope advice comes from
+GitHub's documentation and is not checked live; `connect`, the first read and `reconnect` need a live
+token and are shown without output.

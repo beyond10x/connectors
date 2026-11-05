@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-05T01:33:27Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-github-reads",
+  "kind": "story",
+  "revision": 54,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "local staged gate at ca1ef2f4d on wave/2026-11-04-connectors (S1-S5c, 2026-11-05 01:33Z): connectors-catalog-provider tests in S4a 1200 passed 0 failed; holders adapters/catalog/tests/github_definition_reads.rs (15 cases: the ten reads' exact paths and queries, caller-driven page and per_page, the 1,000-result cap and 422, raw reads decoded) and github_definition_reads_adversary.rs (19 cases: page and per_page bounds, withheld query fields, raw-read limits, past or missing rate-limit reset); definition_published_features_adversary.rs rate_limited with retry_after_seconds; connectors-docs generate --check 139 current in S1; clippy -D warnings green in S5b",
+    "reference": "git:ca1ef2f4d"
+  }
+}

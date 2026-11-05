@@ -2,14 +2,16 @@
 format: aep.planning-md/3
 id: story:provider-ignored-tests-run-in-ci
 kind: story
-status: proposed
+status: implemented
 title: Tests that need a built catalog provider run on every pull request
 relations:
 - informed_by: story:connectors-do-short-invocation
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T05:34:02Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-11-04T08:46:47Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-11-05T01:33:53Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Problem
 
@@ -36,3 +38,19 @@ Every test the `ignored` command needs only a built provider for runs on each pu
   `connectors-build ignored --required` on the tests that need `CONNECTORS_TEST_CATALOG_PROVIDER`.
   Each one is reported as executed, by name.
 - Reverting the D6 behaviour, so that a definition's describe asks to connect, fails that job.
+
+## Delivered (wave 2026-11-04, v0.66.0)
+
+Unit commit ae459799e and adversary cases ec568274b, merged in 5adf08852 on `wave/2026-11-04-connectors`;
+local staged gate green at ca1ef2f4d.
+
+- `crates/connectors-build/src/ignored.rs`: `--only-prerequisite <set>` (`provider`, `cli`) keeps only
+  the ignored tests whose every prerequisite is in the set; with `--required` an empty selection refuses.
+- `.github/workflows/rust-gate.yml`: a step in the `gate` job after the repository gate runs
+  `connectors-build ignored --required --only-prerequisite provider`.
+- `docs/development.md` § Ignored tests describes the option and the CI step.
+
+Shown: the four provider tests run by name with `CONNECTORS_TEST_CATALOG_PROVIDER` set, and with the
+describe short-circuit in `apps/connectors/src/local/invoke.rs` reverted,
+`describe_of_a_definition_needs_no_connection` fails. Not shown locally: the full CI step, which compiles
+every workspace test; its first run is the pull request's.
