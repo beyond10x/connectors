@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:claude-connects-to-the-mcp-server
 kind: story
-status: active
+status: implemented
 title: Claude Code connects to connectors as a local stdio MCP server
 summary: claude mcp add registers connectors server --transport stdio; tools/list holds the admitted reads, tools/call reads through the owner
 relations:
@@ -42,10 +42,11 @@ scope:
   path: website/docs/connectors/mcp.md
 - confidence: cited
   path: website/docs/status.md
-revision: 24
+revision: 26
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-23T17:49:18Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":7}}}
 - {from: "proposed", to: "active", at: "2026-10-23T17:49:18Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":7}}}
+- {from: "active", to: "implemented", at: "2026-11-05T14:19:42Z", actor: "human:timo", revision: 26, decided_on: {"recorded":{"test_result":2,"review_outcome":10}}}
 ---
 ## Outcome
 
@@ -229,3 +230,19 @@ This replaces the scenario list under "Acceptance (named conformance scenarios)"
 `crates/connectors-docs`: the status item and the onboarding row are as built in this unit, and `connectors-docs generate --check` is current.
 
 The run was made once, by the coordinator, on the existing login, under approval-record:connectors-claude-recording-on-the-existing-login. `claude mcp add` is not exercised; see story:claude-mcp-add-registration-is-recorded.
+
+## Delivered (wave 2026-11-05, v0.67.0)
+
+Unit commits fa3ca765e, 5cd05a187 and 5bf918996 were merged in 1894e5ab5 on `wave/2026-11-05-connectors`. The local staged gate is green at 925927b8f; the journey target (`apps/connectors/tests/claude_mcp_journey.rs`) has 8 passed.
+
+The scenarios are those of "Acceptance as delivered (wave 2026-11-05)" above. The no-write scenario of the earlier list was dropped by the orchestrator, because it could not fail for this setup. The recording is one headless Claude Code 2.1.318 session, run once by the coordinator. Its sanitized frames and transcript are fixtures; no raw capture is committed.
+
+Scope as landed:
+
+| path | result |
+|---|---|
+| `apps/connectors/tests/claude_mcp_journey.rs` (new) | added |
+| `apps/connectors/tests/fixtures/claude-code/{session.jsonl,session.expected.jsonl,transcript.jsonl,jira-search.json}` (new) | added |
+| `website/docs/connectors/mcp.md`, `README.md` | the entry that ran and the user form; the handshake as recorded |
+| `crates/connectors-docs/src/status.rs`, `crates/connectors-docs/src/onboarding.rs`, `website/docs/status.md`, `website/data/status.json` | held |
+| `projection-cases.json`, `local_mcp_server.rs` | not touched |

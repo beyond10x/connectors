@@ -7,7 +7,7 @@ title: 'Wave 2026-11-05: the recorded Claude Code session and a Write-by-name re
 relations:
 - decides: story:claude-connects-to-the-mcp-server
 - decides: story:mcp-write-operation-call-by-name-is-refused
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "approved", at: "2026-11-05T09:34:06Z", actor: "human:timo", revision: 2}
 ---
@@ -41,3 +41,27 @@ and stays draft.
 ## Release
 
 v0.67.0: the Claude Code support claim moves from planned to shipped.
+
+## Delivered (2026-11-05)
+
+Both units are merged into `wave/2026-11-05-connectors`. The release commit is 925927b8f (`release: 0.67.0`).
+
+| unit | merge | adversary | result |
+|---|---|---|---|
+| u1 Claude Code recording | 1894e5ab5 | red, 5 findings, all fixed in the unit; 8 cases | story:claude-connects-to-the-mcp-server implemented |
+| u2 Write by name refused | 71bb4ef0b | holds, 1 should-fix fixed in the unit; 6 cases | story:mcp-write-operation-call-by-name-is-refused implemented |
+
+The one `claude -p` run was made by the coordinator on the existing login, under approval-record:connectors-claude-recording-on-the-existing-login.
+
+The local staged gate ran at 925927b8f, serially, with a cache discard between stages; each stage was pre-checked against disk and trees-budget. Results:
+- S1: 317 passed.
+- S2: 1525 passed, 47 ignored.
+- S3: 559 passed, 13 ignored.
+- S4a: 1200 passed, 108 ignored.
+- S4b: 281 passed, 13 ignored.
+- S5a-c: clippy `-D warnings` green.
+- 0 failed; peak 12G.
+
+Findings filed as drafts:
+- story:owner-bounded-read-rechecks-semantic-effects (from the U2 adversary, tagged from-finding);
+- story:claude-mcp-add-registration-is-recorded (needs the orchestrator's go and one recorded run).
