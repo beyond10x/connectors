@@ -192,6 +192,13 @@
       "status": "shipped"
     },
     {
+      "area": "Local runtime",
+      "detail": "On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools and lists no write; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*).",
+      "href": "/docs/connectors/mcp",
+      "label": "Local MCP server for Claude Code",
+      "status": "shipped"
+    },
+    {
       "area": "Catalog provider",
       "detail": "connectors-build catalog compiles a pinned OpenAPI document into a digest-verified bundle; every committed bundle matches a fresh run byte for byte.",
       "href": "/docs/guides/build-a-catalog-bundle",
@@ -515,9 +522,9 @@
     },
     {
       "area": "Native adapters",
-      "detail": "MCP invocation, projection, auth lifecycle, mutation replay and composition contracts are specified; there is no MCP runtime.",
+      "detail": "Reading from an MCP server is specified (invocation, auth lifecycle, mutation replay and composition contracts) and has no runtime; the local MCP server is listed under Local runtime.",
       "href": "/docs/reference/adapters",
-      "label": "MCP",
+      "label": "MCP as a connector",
       "status": "planned"
     },
     {
