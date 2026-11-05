@@ -278,7 +278,7 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Local runtime",
         "Local MCP server for Claude Code",
-        "On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools and lists no write; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*).",
+        "On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*).",
         "apps/connectors/tests/claude_mcp_journey.rs::claude_code_session_is_answered",
         "/docs/connectors/mcp",
     ),

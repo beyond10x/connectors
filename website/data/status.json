@@ -193,7 +193,7 @@
     },
     {
       "area": "Local runtime",
-      "detail": "On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools and lists no write; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*).",
+      "detail": "On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*).",
       "href": "/docs/connectors/mcp",
       "label": "Local MCP server for Claude Code",
       "status": "shipped"

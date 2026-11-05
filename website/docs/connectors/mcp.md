@@ -31,7 +31,7 @@ are to be projected as operations; mutation advertisement stays withheld until t
 replay binding, with its approval source and business key, exists.
 
 As a local MCP server, connectors offers the admitted reads of one configured instance as
-read-only tools and lists no write. In the recorded session below a Jira instance listed its
+read-only tools. In the recorded session below a Jira instance listed its
 eleven reads: `attachment.content`, `issue.changelog`, `issue.comments`, `issue.create_meta`,
 `issue.create_meta.fields`, `issue.get`, `issue.transitions`, `issues.search`, `project.get`,
 `projects.list` and `users.search`.
@@ -69,8 +69,27 @@ tools it exposes (`CONFIG.mcp-stdio.json`) and the declarations of their operati
 [stdio guide](https://github.com/beyond10x/connectors/blob/main/docs/local-mcp-stdio.md) shows.
 
 A headless Claude Code session was run once, by Claude Code 2.1.318, against a Jira instance
-whose site was a local fixture. It named the server in an `--mcp-config` file; `CONFIG` and
-`STATE_DIR` stand for the absolute paths of the configuration and the state directory:
+whose site was a local fixture. The `--mcp-config` entry that ran named a capturing wrapper as
+its command. The wrapper tees the client's bytes and the server's answers to capture files, then
+runs `connectors` with the same arguments inside a bubblewrap sandbox, where `/srv/connectors`
+holds the configuration and state. What ran, with `CAPTURE_WRAPPER` and `CAPTURE_DIR` for the
+wrapper's path and the capture directory:
+
+```json
+{
+  "mcpServers": {
+    "connectors": {
+      "type": "stdio",
+      "command": "CAPTURE_WRAPPER",
+      "args": ["--config", "/srv/connectors/config.toml", "--state-dir", "/srv/connectors/state", "server", "--transport", "stdio"],
+      "env": {"RIG_CAPTURE": "CAPTURE_DIR"}
+    }
+  }
+}
+```
+
+The user form, the entry a user writes, names `connectors` itself; `CONFIG` and `STATE_DIR`
+stand for the absolute paths of the configuration and the state directory:
 
 ```json
 {
@@ -84,8 +103,7 @@ whose site was a local fixture. It named the server in an `--mcp-config` file; `
 }
 ```
 
-For the recording the server ran behind a wrapper that captured its frames. The command that ran,
-with `FILE` for the path of that file:
+The command that ran, with `FILE` for the path of the file that held the entry that ran:
 
 ```sh
 claude -p "List my open Jira issues. Use the connectors tool to search Jira, then reply with each issue's key, summary and status." --mcp-config FILE --strict-mcp-config --tools "" --allowedTools "mcp__connectors__c1_6a6972612e776f726b_636174616c6f67_6973737565732e736561726368" --setting-sources project --no-session-persistence --max-budget-usd 1 --output-format stream-json --verbose
@@ -97,7 +115,7 @@ standard input and output. Its answer listed DEMO-1, DEMO-2 and DEMO-3, each wit
 
 The session's frames are replayed against the server by
 [`claude_mcp_journey.rs`](https://github.com/beyond10x/connectors/blob/main/apps/connectors/tests/claude_mcp_journey.rs)
-in every `cargo test`. The client opened with `server/discover` on `2026-07-28`, answered:
+in every `cargo test` on Linux. The client opened with `server/discover` on `2026-07-28`, answered:
 
 ```json
 {"id":"server-discover-probe-1","jsonrpc":"2.0","result":{"_meta":{"io.modelcontextprotocol/serverInfo":{"name":"connectors","version":"0.66.0"}},"cacheScope":"private","capabilities":{"tools":{}},"resultType":"complete","supportedVersions":["2026-07-28","2025-11-25"],"ttlMs":0}}
@@ -126,8 +144,7 @@ tools.
 
 ## A first guarded write
 
-Not available: no MCP operation, read or write, is bound, and the local MCP server lists no
-write.
+Not available: no MCP operation, read or write, is bound.
 
 ## Reconnect when the connection is Stale
 

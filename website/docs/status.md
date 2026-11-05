@@ -47,7 +47,7 @@ As of 2026-10-16: 69 capabilities are shipped, 3 are decided and 5 are planned. 
 | [Consumer launch](./concepts/local-runtime.md) | ● shipped | connections launch hands one connection's protected document to a pinned consumer and refuses a launch its configuration does not admit (since 0.31.0). |
 | [Operations by family](./reference/cli.md) | ● shipped | operations list --family names the operations of one contract family, such as datasource.feed/v1alpha1, with their contract and profile. |
 | [JSON values in JSON answers](./reference/cli.md) | ● shipped | With --output json, invoke results and operation schemas are JSON values, not JSON text (breaking since 0.32.0). |
-| [Local MCP server for Claude Code](./connectors/mcp.md) | ● shipped | On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools and lists no write; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*). |
+| [Local MCP server for Claude Code](./connectors/mcp.md) | ● shipped | On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*). |
 
 ## Catalog provider
 
