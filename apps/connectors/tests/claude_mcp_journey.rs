@@ -776,9 +776,9 @@ fn name(operation: &str) -> String {
     connectors_mcp::names::encode_name([INSTANCE, ADAPTER, operation]).unwrap()
 }
 
-/// `tools/list` holds exactly the generic reads, each read-only, and no
-/// operation the selection declares as a write.
-fn lists_the_reads_and_no_write(list: &Value) {
+/// `tools/list` holds exactly the eleven generic reads, each by its encoded
+/// name and marked read-only.
+fn lists_the_eleven_reads(list: &Value) {
     let tools = list["result"]["tools"]
         .as_array()
         .unwrap_or_else(|| panic!("{list}"));
@@ -798,11 +798,6 @@ fn lists_the_reads_and_no_write(list: &Value) {
         let operation = tool["_meta"][OPERATION_META]["operation"].as_str().unwrap();
         assert_eq!(tool["name"], name(operation), "{tool}");
         assert_eq!(tool["annotations"]["readOnlyHint"], true, "{tool}");
-    }
-    let writes = selected("write");
-    assert!(!writes.is_empty());
-    for write in writes {
-        assert!(!listed.contains(&write), "{write} is listed: {list}");
     }
 }
 
@@ -870,7 +865,7 @@ fn claude_code_session_is_answered() {
     }
     let lists = by_method("tools/list");
     assert_eq!(lists.len(), 1);
-    lists_the_reads_and_no_write(lists[0]);
+    lists_the_eleven_reads(lists[0]);
     let revision = &lists[0]["result"]["_meta"][REVISION_META];
     for tool in lists[0]["result"]["tools"].as_array().unwrap() {
         assert_eq!(&tool["_meta"][REVISION_META], revision, "{tool}");
@@ -906,42 +901,93 @@ fn claude_code_session_is_answered() {
         assert!(line.contains("currentUser"), "{line}");
     }
 
-    // The transcript's tool uses are the session's calls, by the client's
-    // name for the server's tool.
-    let called: Vec<String> = frames
+    // The transcript holds the session's calls. Each tool use, in order, is a
+    // recorded `tools/call`: the client's name for the server's tool, the
+    // call's arguments as its input (also as the wire input), and its id as
+    // the call's `claudecode/toolUseId`. Each tool result answers that use
+    // with the recorded answer's text content and structured content.
+    let requests: Vec<Value> = frames
         .iter()
         .map(|line| serde_json::from_str::<Value>(line).unwrap())
         .filter(|request| request["method"] == "tools/call")
-        .map(|request| {
-            format!(
-                "mcp__connectors__{}",
-                request["params"]["name"].as_str().unwrap()
-            )
-        })
         .collect();
-    let used: Vec<String> = TRANSCRIPT
+    let recorded_calls = answered(&frames, &expected, "tools/call");
+    let records: Vec<Value> = TRANSCRIPT
         .lines()
-        .map(|line| serde_json::from_str::<Value>(line).unwrap())
-        .filter(|record| record["type"] == "assistant")
-        .flat_map(|record| {
-            record["message"]["content"]
-                .as_array()
-                .cloned()
-                .unwrap_or_default()
-        })
-        .filter(|content| content["type"] == "tool_use")
-        .map(|content| content["name"].as_str().unwrap().to_owned())
+        .map(|line| serde_json::from_str(line).unwrap())
         .collect();
-    assert_eq!(used, called);
-    assert_eq!(
-        called[0],
-        format!("mcp__connectors__{}", name("issues.search"))
-    );
+    let parts = |record_type: &str, part_type: &str| -> Vec<(Value, Value)> {
+        records
+            .iter()
+            .filter(|record| record["type"] == record_type)
+            .flat_map(|record| {
+                record["message"]["content"]
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|part| part["type"] == part_type)
+                    .map(|part| (record.clone(), part))
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    };
+    let uses = parts("assistant", "tool_use");
+    let results = parts("user", "tool_result");
+    assert_eq!(uses.len(), requests.len(), "one tool use per call");
+    assert_eq!(results.len(), requests.len(), "one tool result per call");
+    for (((record, used), (outcome, result)), (request, answer)) in uses
+        .iter()
+        .zip(&results)
+        .zip(requests.iter().zip(&recorded_calls))
+    {
+        let params = &request["params"];
+        let id = used["id"].as_str().unwrap();
+        assert_eq!(
+            used["name"],
+            format!("mcp__connectors__{}", params["name"].as_str().unwrap())
+        );
+        assert_eq!(used["input"], params["arguments"], "{used}");
+        assert_eq!(record["wire_tool_inputs"][id], params["arguments"]);
+        assert_eq!(params["_meta"]["claudecode/toolUseId"], id, "{request}");
+        assert_eq!(result["tool_use_id"], id, "{result}");
+        assert_eq!(
+            result["content"], answer["result"]["content"][0]["text"],
+            "{result}"
+        );
+        assert_eq!(outcome["tool_use_result"]["content"], result["content"]);
+        assert_eq!(
+            outcome["tool_use_result"]["structuredContent"],
+            answer["result"]["structuredContent"]
+        );
+    }
+    assert_eq!(requests[0]["params"]["name"], name("issues.search"));
+    // The session's answer names every issue of the last call by key,
+    // summary and status.
+    let reply = records
+        .iter()
+        .find(|record| record["type"] == "result")
+        .and_then(|record| record["result"].as_str())
+        .unwrap();
+    let items = recorded_calls[1]["result"]["structuredContent"]["result"]["items"]
+        .as_array()
+        .unwrap();
+    assert_eq!(items.len(), 3);
+    for item in items {
+        for field in [
+            &item["key"],
+            &item["fields"]["summary"],
+            &item["fields"]["status"]["name"],
+        ] {
+            assert!(reply.contains(field.as_str().unwrap()), "{field}: {reply}");
+        }
+    }
 }
 
-/// The `--mcp-config` document `website/docs/connectors/mcp.md` shows: its
-/// one JSON block with `mcpServers`.
-fn mcp_config() -> Value {
+/// The `connectors` entry of each `--mcp-config` document
+/// `website/docs/connectors/mcp.md` shows (each JSON block with `mcpServers`),
+/// in page order; each document names that one server.
+fn mcp_config_entries() -> Vec<Value> {
     let mut blocks = Vec::new();
     let mut block: Option<String> = None;
     for line in MCP_PAGE.lines() {
@@ -957,53 +1003,91 @@ fn mcp_config() -> Value {
             }
         }
     }
-    let configs: Vec<Value> = blocks
+    blocks
         .iter()
         .filter_map(|text| serde_json::from_str::<Value>(text).ok())
         .filter(|value| value.get("mcpServers").is_some())
-        .collect();
-    assert_eq!(configs.len(), 1, "mcp.md shows the --mcp-config document");
-    configs.into_iter().next().unwrap()
+        .map(|config| {
+            let servers = config["mcpServers"].as_object().unwrap();
+            assert_eq!(
+                servers.keys().collect::<Vec<_>>(),
+                ["connectors"],
+                "{config}"
+            );
+            servers["connectors"].clone()
+        })
+        .collect()
 }
 
-/// The `--mcp-config` entry mcp.md shows names one stdio server,
-/// `connectors`, whose command and arguments, with `CONFIG` and `STATE_DIR`
-/// naming the jail's files, are the launch the replay starts; the `claude -p`
-/// command the page shows reads it from `FILE` and allows only the search
-/// tool the recorded session called.
-#[test]
-fn mcp_config_entry_is_the_replayed_launch() {
-    let config = mcp_config();
-    let servers = config["mcpServers"].as_object().unwrap();
-    assert_eq!(
-        servers.keys().collect::<Vec<_>>(),
-        ["connectors"],
-        "{config}"
-    );
-    let entry = &servers["connectors"];
-    assert_eq!(
-        entry
-            .as_object()
-            .unwrap()
-            .keys()
-            .map(String::as_str)
-            .collect::<BTreeSet<_>>(),
-        BTreeSet::from(["args", "command", "type"]),
-        "{entry}"
-    );
-    assert_eq!(entry["type"], "stdio", "{entry}");
-    assert_eq!(entry["command"], "connectors", "{entry}");
-    let arguments: Vec<&str> = entry["args"]
+/// The members of an `--mcp-config` entry.
+fn members(entry: &Value) -> BTreeSet<&str> {
+    entry
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect()
+}
+
+/// The arguments of an `--mcp-config` entry, `CONFIG` and `STATE_DIR`
+/// replaced by `config` and `state`.
+fn arguments<'a>(entry: &'a Value, config: &'a str, state: &'a str) -> Vec<&'a str> {
+    entry["args"]
         .as_array()
         .unwrap()
         .iter()
         .map(|word| match word.as_str().unwrap() {
-            "CONFIG" => CONFIG,
-            "STATE_DIR" => STATE,
+            "CONFIG" => config,
+            "STATE_DIR" => state,
             word => word,
         })
-        .collect();
-    assert_eq!(arguments, LAUNCH, "the replayed launch");
+        .collect()
+}
+
+/// mcp.md shows two `--mcp-config` entries for the stdio server
+/// `connectors`. The first is the one the recorded session ran: its command
+/// is the capturing wrapper and its environment names the capture directory
+/// (placeholders `CAPTURE_WRAPPER` and `CAPTURE_DIR`), and its arguments are
+/// the user form's with the sandbox's `/srv/connectors` files in place of
+/// `CONFIG` and `STATE_DIR`. The second is the user form: command
+/// `connectors`, and with the jail's files in place of the placeholders, the
+/// launch the replay starts. The `claude -p` command the page shows reads
+/// the entry from `FILE` and allows only the search tool the recorded
+/// session called.
+#[test]
+fn mcp_config_entry_is_the_replayed_launch() {
+    let entries = mcp_config_entries();
+    assert_eq!(
+        entries.len(),
+        2,
+        "mcp.md shows the entry that ran and the user form"
+    );
+    let (ran, user) = (&entries[0], &entries[1]);
+    assert_eq!(
+        members(ran),
+        BTreeSet::from(["args", "command", "env", "type"]),
+        "{ran}"
+    );
+    assert_eq!(ran["type"], "stdio", "{ran}");
+    assert_eq!(ran["command"], "CAPTURE_WRAPPER", "{ran}");
+    assert_eq!(ran["env"], json!({"RIG_CAPTURE":"CAPTURE_DIR"}), "{ran}");
+    assert_eq!(
+        members(user),
+        BTreeSet::from(["args", "command", "type"]),
+        "{user}"
+    );
+    assert_eq!(user["type"], "stdio", "{user}");
+    assert_eq!(user["command"], "connectors", "{user}");
+    assert_eq!(
+        arguments(ran, "CONFIG", "STATE_DIR"),
+        arguments(user, "/srv/connectors/config.toml", "/srv/connectors/state"),
+        "the run's arguments are the user form's on the sandbox's files"
+    );
+    assert_eq!(
+        arguments(user, CONFIG, STATE),
+        LAUNCH,
+        "the replayed launch"
+    );
     let command = MCP_PAGE
         .lines()
         .map(str::trim)
@@ -1051,7 +1135,7 @@ fn constructed_initialize_first_session_lists_the_recorded_tools() {
     client.send(recorded("tools/list", 0));
     let list = client.answer();
     client.finish();
-    lists_the_reads_and_no_write(&list);
+    lists_the_eleven_reads(&list);
     let recorded_list = EXPECTED
         .lines()
         .map(|line| serde_json::from_str::<Value>(line).unwrap())
@@ -1064,14 +1148,19 @@ fn constructed_initialize_first_session_lists_the_recorded_tools() {
     assert!(served.searches().is_empty(), "listing sent a search");
 }
 
-/// With every write the Jira selection declares exposed and enabled beside
-/// its reads, the recorded `tools/list` still lists the eleven reads and no
-/// write: under `connectors-private/3` the instance describes no write.
+/// The operations [`lists_exactly_the_recorded_read_tools`] exposes: the
+/// eleven generic reads the stand-in describes, nothing else.
+fn listed_exposures() -> Vec<String> {
+    generic_reads()
+}
+
+/// The recorded `server/discover` and `tools/list` alone: the server lists
+/// exactly the eleven read tools the recorded `tools/list` answer holds, by
+/// name and in its order, and each tool equals the recorded one once
+/// [`normalized`]. Listing sends no search.
 #[test]
-fn no_write_tool_is_listed() {
-    let writes = selected("write");
-    let exposed: Vec<String> = generic_reads().into_iter().chain(writes).collect();
-    let served = Served::new(&exposed);
+fn lists_exactly_the_recorded_read_tools() {
+    let served = Served::new(&listed_exposures());
     let mut client = Client::start(served.server(&LAUNCH));
     client.send(recorded("server/discover", 0));
     let discovered = client.answer();
@@ -1082,6 +1171,131 @@ fn no_write_tool_is_listed() {
     client.send(recorded("tools/list", 0));
     let list = client.answer();
     client.finish();
-    lists_the_reads_and_no_write(&list);
+    let recorded_list = EXPECTED
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .find(|answer| answer["result"]["tools"].is_array())
+        .unwrap();
+    let names = |list: &Value| -> Vec<String> {
+        list["result"]["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|tool| tool["name"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    assert_eq!(names(&list), names(&recorded_list));
+    assert_eq!(names(&list).len(), 11, "{list}");
+    lists_the_eleven_reads(&list);
+    assert_eq!(
+        normalized(list)["result"]["tools"],
+        normalized(recorded_list)["result"]["tools"]
+    );
     assert!(served.searches().is_empty(), "listing sent a search");
+}
+
+/// Adversary probe (expected green): a server that changed what a client
+/// depends on would answer differently from `session.expected.jsonl`, and
+/// [`normalized`] keeps each such difference visible. Each mutation is made
+/// on an in-memory copy of the expected answers, never on the fixture.
+#[test]
+fn adversary_normalization_keeps_what_a_client_depends_on() {
+    let expected: Vec<Value> = EXPECTED
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let search = expected[3]["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|tool| tool["_meta"][OPERATION_META]["operation"] == "issues.search")
+        .unwrap();
+    type Mutation = (&'static str, usize, fn(&mut Value, usize));
+    let mutations: [Mutation; 8] = [
+        ("tool name", 3, |v, i| {
+            v["result"]["tools"][i]["name"] = json!("issues_search")
+        }),
+        ("input schema", 3, |v, i| {
+            v["result"]["tools"][i]["inputSchema"]["required"] = json!([])
+        }),
+        ("readOnlyHint", 3, |v, i| {
+            v["result"]["tools"][i]["annotations"]["readOnlyHint"] = json!(false)
+        }),
+        ("structuredContent", 5, |v, _| {
+            v["result"]["structuredContent"]["result"]["items"][0]["key"] = json!("DEMO-9")
+        }),
+        ("text content", 5, |v, _| {
+            let text = v["result"]["content"][0]["text"].as_str().unwrap();
+            v["result"]["content"][0]["text"] = json!(text.replace("DEMO-1", "DEMO-9"))
+        }),
+        ("isError", 5, |v, _| v["result"]["isError"] = json!(true)),
+        ("supportedVersions", 0, |v, _| {
+            v["result"]["supportedVersions"] = json!(["2026-07-28"])
+        }),
+        ("late initialize -32600", 1, |v, _| {
+            v["error"]["code"] = json!(-32601)
+        }),
+    ];
+    for (label, line, mutate) in mutations {
+        let mut mutated = expected[line].clone();
+        mutate(&mut mutated, search);
+        assert_ne!(
+            normalized(mutated),
+            normalized(expected[line].clone()),
+            "normalization hides a change of the {label}"
+        );
+    }
+}
+
+/// Adversary case: the transcript's ids are placeholders, and so is every
+/// thinking `signature`; no API-issued blob is kept. The replay reads the
+/// transcript's tool uses and results, never a signature.
+#[test]
+fn adversary_transcript_keeps_no_api_issued_signature() {
+    for line in TRANSCRIPT.lines() {
+        let record: Value = serde_json::from_str(line).unwrap();
+        for content in record["message"]["content"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+        {
+            if let Some(signature) = content.get("signature") {
+                let text = signature.as_str().unwrap_or_default();
+                assert!(
+                    text.contains("fixture"),
+                    "a raw API-issued thinking signature of {} characters is kept",
+                    text.len()
+                );
+            }
+        }
+    }
+}
+
+/// Adversary case, restated from a probe of the write case it replaced:
+/// [`lists_exactly_the_recorded_read_tools`] exposes only operations the
+/// stand-in describes, each a read, and no write of the Jira selection, so
+/// it holds the listed reads and claims nothing about writes. The write
+/// guard is held elsewhere.
+#[test]
+fn adversary_list_case_exposes_no_write() {
+    let Ok(descriptor) = bootstrap().descriptor() else {
+        panic!("the stand-in's descriptor")
+    };
+    let described: BTreeSet<String> = descriptor
+        .operations
+        .iter()
+        .map(|operation| operation.id.clone())
+        .collect();
+    let reads: BTreeSet<String> = engine()
+        .declarations(&[Effect::Read])
+        .into_iter()
+        .map(|operation| operation.id)
+        .collect();
+    assert_eq!(described, reads, "the stand-in describes reads only");
+    let writes = selected("write");
+    assert!(!writes.is_empty(), "the Jira selection declares writes");
+    for exposed in listed_exposures() {
+        assert!(described.contains(&exposed), "{exposed} is not described");
+        assert!(!writes.contains(&exposed), "{exposed} is a write");
+    }
 }
