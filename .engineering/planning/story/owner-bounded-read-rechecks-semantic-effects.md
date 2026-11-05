@@ -14,7 +14,7 @@ scope:
   path: crates/connectors-host/src/local/owner/governed/bounded.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/owner/governed/tests/bounded_reads.rs
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-05T17:29:38Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-11-05T17:29:38Z", actor: "human:timo", revision: 6}
@@ -74,3 +74,9 @@ The owner refuses a bounded read whose operation carries semantic effects, or ef
 
 - A runtime case drives the owner's bounded read directly with an operation that has non-empty `semantic_effects` and approval not required. The case is refused and records 0 provider requests. The same case on an admitted read makes 1 request.
 - The case is shown red with the owner recheck disabled.
+
+## Outcome, amended (orchestrator decision, 2026-11-05)
+
+The Outcome above says the owner refuses with "the same `not_found`-class answer the projection gives". As built, the owner answers `unsupported`. The directing session decided that the class stays `unsupported`, for this reason: in the owner, `not_found` means the operation is not in the projected metadata (`crates/connectors-host/src/local/owner/governed/bounded.rs:27`, `:41`), and every other bounded-read refusal there (approval, idempotency, limits, realization) is already `unsupported`.
+
+The Outcome now reads: the owner refuses a bounded read whose operation carries semantic effects, or an effect other than `network`, as `unsupported`, before any provider request. The MCP projection and the owner then hold the rule independently. The projection's own answer (`not_found`) is unchanged.
