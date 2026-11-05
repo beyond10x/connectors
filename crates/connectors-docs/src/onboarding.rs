@@ -358,7 +358,8 @@ const DEFINITION_FILE: &str = "definition file";
 /// The connectors with no catalog declaration. OpenRouter is served by the catalog provider from
 /// one selection through pinned instances; GitHub by the catalog provider from a released
 /// definition file, through its instance `definition`; the others by an executable
-/// of their own, each pinned by its instance; MCP has no runtime.
+/// of their own, each pinned by its instance; MCP as a connector has no runtime, so its row stays
+/// planned (the local MCP server, `server --transport stdio`, is no connector and has no row).
 pub const HAND: &[Hand] = &[
     Hand {
         connector: "openrouter",
