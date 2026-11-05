@@ -25,6 +25,12 @@
   (story:provider-ignored-tests-run-in-ci): `connectors-build ignored --required
   --only-prerequisite provider`.
 
+### Fixed
+
+- `connectors-build ignored` no longer inventories `harness = false` test targets. The CLI's stand-in
+  targets run their own `main` and answered the terse listing with a summary line, which the
+  inventory refused, so the full lane could not run since the first stand-in target.
+
 ## 0.65.2 — 2026-11-04
 
 ### Fixed

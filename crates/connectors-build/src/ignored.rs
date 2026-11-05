@@ -930,6 +930,7 @@ fn workspace(root: &Path) -> Result<(Vec<Suite>, BTreeMap<&'static str, OsString
             ))
         })
         .collect::<Result<_>>()?;
+    let custom = custom_harness_targets(&metadata)?;
     let output = crate::run(
         Command::new("cargo")
             .current_dir(root)
@@ -963,7 +964,10 @@ fn workspace(root: &Path) -> Result<(Vec<Suite>, BTreeMap<&'static str, OsString
         let target = artifact["target"]["name"]
             .as_str()
             .ok_or("Cargo target name missing")?;
-        if artifact["profile"]["test"] == true && seen.insert(executable.to_owned()) {
+        if artifact["profile"]["test"] == true
+            && inventoried(&custom, package, target)
+            && seen.insert(executable.to_owned())
+        {
             suites.push(Suite {
                 package: package.clone(),
                 target: target.into(),
@@ -985,6 +989,62 @@ fn workspace(root: &Path) -> Result<(Vec<Suite>, BTreeMap<&'static str, OsString
     }
     suites.sort_by(|a, b| (&a.package, &a.target).cmp(&(&b.package, &b.target)));
     Ok((suites, environment))
+}
+
+/// The `[[test]]` targets each workspace member declares with `harness = false`, as
+/// `(package, target)`. Such a target runs its own `main` rather than libtest, so it answers
+/// `--ignored --list --format terse` with no test list and is not inventoried. Cargo metadata
+/// does not carry the harness setting, so it is read from each member's manifest.
+fn custom_harness_targets(metadata: &Value) -> Result<BTreeSet<(String, String)>> {
+    let members = metadata["workspace_members"]
+        .as_array()
+        .ok_or("Cargo workspace members missing")?;
+    let mut targets = BTreeSet::new();
+    for package in metadata["packages"]
+        .as_array()
+        .ok_or("Cargo packages missing")?
+        .iter()
+        .filter(|package| members.contains(&package["id"]))
+    {
+        let name = package["name"]
+            .as_str()
+            .ok_or("Cargo package name missing")?;
+        let manifest = package["manifest_path"]
+            .as_str()
+            .ok_or("Cargo manifest path missing")?;
+        let text =
+            std::fs::read_to_string(manifest).map_err(|e| format!("read {manifest}: {e}"))?;
+        for target in harness_false_tests(&text).map_err(|e| format!("{manifest}: {e}"))? {
+            targets.insert((name.to_owned(), target));
+        }
+    }
+    Ok(targets)
+}
+
+/// The names of the `[[test]]` entries of one manifest that set `harness = false`.
+fn harness_false_tests(manifest: &str) -> Result<Vec<String>> {
+    let manifest: toml::Table = toml::from_str(manifest)?;
+    let Some(tests) = manifest.get("test") else {
+        return Ok(Vec::new());
+    };
+    let tests = tests
+        .as_array()
+        .ok_or("[[test]] is not an array of tables")?;
+    tests
+        .iter()
+        .filter(|test| test.get("harness").and_then(toml::Value::as_bool) == Some(false))
+        .map(|test| {
+            test.get("name")
+                .and_then(toml::Value::as_str)
+                .map(str::to_owned)
+                .ok_or_else(|| "a [[test]] with harness = false names no target".into())
+        })
+        .collect()
+}
+
+/// Whether a built test target is a libtest suite the inventory lists.
+fn inventoried(custom: &BTreeSet<(String, String)>, package: &str, target: &str) -> bool {
+    !custom.contains(&(package.to_owned(), target.to_owned()))
 }
 
 fn cargo_metadata(root: &Path) -> Result<Value> {
@@ -1194,6 +1254,57 @@ pub fn run(root: &Path, options: Options) -> Result<()> {
 mod tests {
     use super::*;
     use clap::Parser;
+
+    /// The CLI's stand-in targets run their own `main` and answer a terse listing with a
+    /// summary line, which the inventory refused; they are not inventoried, and a libtest
+    /// target of the same package still is.
+    #[test]
+    fn a_harness_false_target_is_not_inventoried_and_a_libtest_target_is() {
+        let manifest = include_str!("../../../apps/connectors/Cargo.toml");
+        let custom: BTreeSet<_> = harness_false_tests(manifest)
+            .unwrap()
+            .into_iter()
+            .map(|target| ("connectors".to_owned(), target))
+            .collect();
+        for target in [
+            "connect_endpoint",
+            "connect_endpoint_adversary",
+            "setup_migrate_short",
+            "short_form_adversary",
+            "catalog_provider_failure",
+        ] {
+            assert!(!inventoried(&custom, "connectors", target), "{target}");
+        }
+        assert!(inventoried(&custom, "connectors", "local_mcp_server"));
+        assert!(inventoried(
+            &custom,
+            "connectors-build",
+            "catalog_provider_failure"
+        ));
+    }
+
+    #[test]
+    fn harness_false_tests_reads_only_entries_that_set_harness_false() {
+        let manifest = r#"
+            [package]
+            name = "example"
+            [[test]]
+            name = "standin"
+            harness = false
+            [[test]]
+            name = "libtest_explicit"
+            harness = true
+            [[test]]
+            name = "libtest_default"
+        "#;
+        assert_eq!(harness_false_tests(manifest).unwrap(), vec!["standin"]);
+        assert!(
+            harness_false_tests("[package]\nname = \"none\"\n")
+                .unwrap()
+                .is_empty()
+        );
+        assert!(harness_false_tests("[[test]]\nharness = false\n").is_err());
+    }
 
     fn options() -> Options {
         Options {
