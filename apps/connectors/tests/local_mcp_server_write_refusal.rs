@@ -663,3 +663,140 @@ fn a_semantic_effect_called_by_name_is_not_found_with_no_request() {
     assert_eq!(served.provider.requests(), 1, "the read sent one request");
     peer.finish();
 }
+
+/// Adversary: one raw frame, its reply parsed, no protocol fields added.
+fn raw(peer: &mut Peer, frame: Value) -> Value {
+    let stdin = peer.child.stdin.as_mut().unwrap();
+    stdin.write_all(format!("{frame}\n").as_bytes()).unwrap();
+    peer.recv()
+}
+
+/// Adversary: the `connectors-private/2` binding projects no tool at all,
+/// so even its plain `read` is unlisted and refused `not_found` by name.
+/// Goes red when the binding check (`projection.rs:197`) admits V2: the
+/// write case above stays green then, held by the profile match.
+#[test]
+fn adv_a_v2_binding_lists_nothing_and_refuses_its_read_by_name() {
+    let served = Served::new(Binding::V2);
+    let mut peer = Peer::start(&served);
+    let (tools, revision) = listed(&mut peer, 1);
+    assert_eq!(tools, Vec::<String>::new(), "a V2 binding listed a tool");
+    for (id, revision) in [(2, Some(&revision)), (3, None)] {
+        let reply = peer.call(id, READ.id, revision);
+        assert_eq!(
+            reply["error"]["data"]["error"]["code"], "not_found",
+            "read on V2 at revision {revision:?}: {reply}"
+        );
+    }
+    assert_eq!(served.provider.requests(), 0);
+    peer.finish();
+}
+
+/// Adversary: under the 2025-11-25 lifecycle (initialize, then calls with no
+/// per-request protocol fields and no revision) `notify` is refused
+/// `not_found` with no provider request, and the admitted `read` then
+/// reaches the provider on the same server.
+#[test]
+fn adv_legacy_lifecycle_call_by_name_is_not_found_with_no_request() {
+    let served = Served::new(Binding::V3);
+    let mut peer = Peer::start(&served);
+    let init = raw(
+        &mut peer,
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25",
+            "capabilities":{},"clientInfo":{"name":"adv","version":"0"}}}),
+    );
+    assert_eq!(init["result"]["protocolVersion"], "2025-11-25", "{init}");
+    let stdin = peer.child.stdin.as_mut().unwrap();
+    stdin
+        .write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n")
+        .unwrap();
+    let reply = raw(
+        &mut peer,
+        json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":name(NOTIFY.id),
+            "arguments":{"input":{"n":17}}}}),
+    );
+    assert_eq!(
+        reply["error"]["data"]["error"]["code"], "not_found",
+        "{reply}"
+    );
+    assert_eq!(
+        served.provider.requests(),
+        0,
+        "legacy notify sent a request"
+    );
+    let reply = raw(
+        &mut peer,
+        json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":name(READ.id),
+            "arguments":{"input":{"n":17}}}}),
+    );
+    assert_eq!(
+        reply["result"]["structuredContent"]["status"], "success",
+        "{reply}"
+    );
+    assert_eq!(
+        served.provider.requests(),
+        1,
+        "the legacy read sent one request"
+    );
+    peer.finish();
+}
+
+/// Adversary: variant names and frames for `notify` reach no provider: the
+/// name upper-cased, the name for another instance, a stale valid revision,
+/// a batch holding the call, a call without an id, a revision of the wrong
+/// type. The admitted `read` then reaches the provider.
+#[test]
+fn adv_variant_names_and_frames_for_notify_reach_no_provider() {
+    let served = Served::new(Binding::V3);
+    let mut peer = Peer::start(&served);
+    let (_, revision) = listed(&mut peer, 1);
+    let meta = json!({"io.modelcontextprotocol/protocolVersion":"2026-07-28",
+        "io.modelcontextprotocol/clientCapabilities":{}});
+    let call = |id: i32, tool: String, extra: Value| {
+        let mut meta = meta.clone();
+        if let Value::Object(extra) = extra {
+            meta.as_object_mut().unwrap().extend(extra);
+        }
+        json!({"jsonrpc":"2.0","id":id,"method":"tools/call","params":{"name":tool,
+            "arguments":{"input":{"n":17}},"_meta":meta}})
+    };
+    let other = connectors_mcp::names::encode_name(["other-local", ADAPTER, NOTIFY.id]).unwrap();
+    let cases = [
+        call(2, name(NOTIFY.id).to_uppercase(), json!({})),
+        call(3, name(NOTIFY.id).replacen("c1_", "C1_", 1), json!({})),
+        call(4, other, json!({})),
+        call(
+            5,
+            name(NOTIFY.id),
+            json!({REVISION_META:"stale-revision-1"}),
+        ),
+        call(6, name(NOTIFY.id), json!({REVISION_META:7})),
+        call(7, name(NOTIFY.id), json!({REVISION_META:revision.clone()})),
+        json!([call(8, name(NOTIFY.id), json!({}))]),
+    ];
+    for frame in cases {
+        let reply = raw(&mut peer, frame.clone());
+        assert!(reply.get("result").is_none(), "{frame} answered {reply}");
+        assert_eq!(served.provider.requests(), 0, "{frame} sent a request");
+    }
+    // A notification-shaped call has no reply; the next request's reply
+    // follows it.
+    let stdin = peer.child.stdin.as_mut().unwrap();
+    let mut silent = call(0, name(NOTIFY.id), json!({}));
+    silent.as_object_mut().unwrap().remove("id");
+    stdin.write_all(format!("{silent}\n").as_bytes()).unwrap();
+    let (tools, revision) = listed(&mut peer, 9);
+    assert_eq!(tools, [name(READ.id)]);
+    assert_eq!(
+        served.provider.requests(),
+        0,
+        "an id-less notify sent a request"
+    );
+    let reply = peer.call(10, READ.id, Some(&revision));
+    assert_eq!(
+        reply["result"]["structuredContent"]["status"], "success",
+        "{reply}"
+    );
+    assert_eq!(served.provider.requests(), 1);
+    peer.finish();
+}
