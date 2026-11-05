@@ -35,6 +35,18 @@ pub(in crate::local::owner) fn resolve(
     {
         return Err(Code::Unsupported.into());
     }
+    // The owner holds the read rule itself rather than trusting a projection
+    // to have hidden the operation: a declared semantic effect, or an effect
+    // other than `network`, is never run as a bounded read.
+    if value["semantic_effects"]
+        .as_array()
+        .is_none_or(|effects| !effects.is_empty())
+        || value["effects"]
+            .as_array()
+            .is_none_or(|effects| effects.iter().any(|effect| effect != "network"))
+    {
+        return Err(Code::Unsupported.into());
+    }
     let descriptor = plan.bootstrap.descriptor()?;
     let profile = &descriptor
         .operation(request.operation)
