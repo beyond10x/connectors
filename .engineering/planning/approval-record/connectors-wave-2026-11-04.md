@@ -8,7 +8,7 @@ relations:
 - decides: story:claude-connects-to-the-mcp-server
 - decides: story:catalog-github-reads
 - decides: story:provider-ignored-tests-run-in-ci
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "approved", at: "2026-11-04T08:46:50Z", actor: "human:operator", revision: 2}
 ---
@@ -81,3 +81,22 @@ The opening store commits (the close above, the scopes and this page), one or mo
 branch, their merges into `wave/2026-11-04-connectors`, fix commits from reviews, the store-close
 commit, the release-prepare commit, the push through `b10x-gates bot`, one pull request and its merge
 through the App, then the v0.66.0 tag and release page.
+
+## Delivered (2026-11-05)
+
+All four units merged into `wave/2026-11-04-connectors`, release commit ca1ef2f4d (`release: 0.66.0`):
+
+| unit | merge | adversary | result |
+|---|---|---|---|
+| u1 MCP revision rule | d80e1e861 | holds, 6 cases; security review holds | story stays active (recorded run open) |
+| u2 GitHub reads | e7f4606ab | holds, 19 cases | story:catalog-github-reads implemented |
+| u3 ESS 0.86.0 | 1d02a6ae5 | none (pin move) | pin moved from 0.84.0; 0.86.0 replaced 0.85.0 as the newest release |
+| u4 provider tests in CI | 5adf08852 | holds, 6 cases | story:provider-ignored-tests-run-in-ci implemented |
+
+Local staged gate at ca1ef2f4d, serial with a cache discard between stages: S1 315 passed; S2 1524
+passed and 1 failed (`connectors-host` `http_standing_grant::replays_waiting_on_an_original_hold_no_slot_and_at_most_four_wait_per_key`,
+a 20 s join deadline; rerun alone 24 passed, no wave change in `connectors-host`); S3 545 passed; S4a 1200
+passed; S4b 281 passed; S5a-c clippy `-D warnings` green; peak 12G.
+
+Findings filed as drafts tagged from-finding: story:mcp-mutating-tool-call-revision-rule,
+story:mcp-write-operation-call-by-name-is-refused.

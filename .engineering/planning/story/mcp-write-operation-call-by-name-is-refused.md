@@ -1,0 +1,25 @@
+---
+format: aep.planning-md/3
+id: story:mcp-write-operation-call-by-name-is-refused
+kind: story
+status: draft
+title: A Write operation called by name over MCP is refused, held by a runtime case
+tags:
+- from-finding
+relations:
+- derived_from: review-result:connectors-wave-2026-11-04-u1-security
+revision: 1
+---
+## Why
+
+The security review of the MCP revision rule (review-result:connectors-wave-2026-11-04-u1-security) found
+that the read-only guard keeping a `Write`-requirement or semantic-effect operation out of `tools/call`
+(`apps/connectors/src/mcp/projection.rs:214-229`, `crates/connectors-host/src/local/owner/governed.rs:140`)
+holds by reading only. No MCP-level case calls such an operation by name while its approval is not
+required; the existing guarded case covers only approval required.
+
+## Acceptance
+
+- A runtime case in `apps/connectors/tests/` calls by name, over the stdio MCP server, an operation with
+  a `Write` requirement and approval not required, and one with non-empty `semantic_effects`; each is
+  refused `not_found` with zero provider requests, with and without a revision.

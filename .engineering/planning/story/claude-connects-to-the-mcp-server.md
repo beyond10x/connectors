@@ -42,7 +42,7 @@ scope:
   path: website/docs/connectors/mcp.md
 - confidence: cited
   path: website/docs/status.md
-revision: 22
+revision: 23
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-23T17:49:18Z", actor: "human:operator", revision: 9, decided_on: {"recorded":{"review_outcome":7}}}
 - {from: "proposed", to: "active", at: "2026-10-23T17:49:18Z", actor: "human:operator", revision: 10, decided_on: {"recorded":{"review_outcome":7}}}
@@ -185,3 +185,19 @@ tests; the story stays active." This wave implements decision-blocker:mcp-tool-c
 option A (a `tools/call` with no revision binds to the advertised one; a stale revision is still
 refused) with its contract cases and runtime cases. The recorded session, the journey and the
 claims wait for the recorded run, and the story stays active until then.
+
+## Wave 2026-11-04 result: the revision rule is delivered
+
+Unit commits b3adde687, adversary cases a3f00d6ff and docs 10ce2d4ca, merged in d80e1e861 on
+`wave/2026-11-04-connectors`; local staged gate green at ca1ef2f4d; ships in release v0.66.0.
+
+- A `tools/call` without `_meta["io.beyond10x.connectors/revision"]` binds to the advertised revision; a
+  stale one is `stale_description`; a malformed one or a non-object `_meta` is `-32602`.
+- `projection.md`, `projection-cases.json` (`revision_current` widened to bool or null) and the checker
+  `crates/connectors-build/tests/mcp_inbound_capability_projection.rs` state and hold it.
+- Scope correction: no raw frame was needed; `Peer::request` in `apps/connectors/tests/local_mcp_server.rs`
+  already sends a call without `_meta`.
+
+Still open, so the story stays active: the recorded Claude Code run (a Claude Code login in an isolated
+HOME is a credential, the operator's alone) and the claims part. Findings filed as drafts:
+story:mcp-mutating-tool-call-revision-rule, story:mcp-write-operation-call-by-name-is-refused.
