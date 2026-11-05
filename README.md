@@ -284,10 +284,11 @@ writes; writes run only through the local CLI under approval. On Linux,
 `connectors server --transport stdio` is a local MCP server that offers admitted read-only
 operations as tools through the same owner and custody ([guide](docs/local-mcp-stdio.md)); it
 offers no resources, prompts, writes or outbound MCP, and on macOS and Windows it exits with
-`mcp_unavailable`. Claude Code registers it with
-`claude mcp add connectors -- connectors --config CONFIG --state-dir STATE_DIR server --transport stdio`,
-and a recorded Claude Code session that lists a Jira instance's reads and calls its search tool
-is replayed against it in `cargo test` (`apps/connectors/tests/claude_mcp_journey.rs`). Reading
+`mcp_unavailable`. A headless Claude Code session named it in an `--mcp-config` file (a stdio
+server `connectors`, command `connectors`, arguments
+`--config CONFIG --state-dir STATE_DIR server --transport stdio`), listed a Jira instance's reads
+and called its search tool; the recorded session is replayed against the server in `cargo test`
+(`apps/connectors/tests/claude_mcp_journey.rs`). Reading
 from an MCP server as a connector is not implemented; the two decision blockers on its
 contracts are cleared ([MCP](https://beyond10x.github.io/connectors/docs/connectors/mcp/)).
 

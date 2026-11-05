@@ -22,8 +22,9 @@
 //! `2026-07-28`, sends an `initialize` on `2025-11-25`, which a session already
 //! on `2026-07-28` refuses as an invalid request, discovers again, lists the
 //! tools and calls the Jira search tool twice, with `walk` and two different
-//! `fields`. `claude_mcp_add_arguments_start_the_server` holds the `2025-11-25`
-//! handshake on its own: the recorded `initialize` as a session's first frame.
+//! `fields`. `constructed_initialize_first_session_lists_the_recorded_tools`
+//! holds the `2025-11-25` handshake on its own, in a sequence constructed from
+//! the recorded `initialize` frame that is not the recorded session.
 //! Linux only: the binding is.
 #![cfg(target_os = "linux")]
 #[path = "support/mounted.rs"]
@@ -638,6 +639,12 @@ impl Drop for Client {
 }
 
 /// The session's header and its frames, as recorded.
+///
+/// Line 1 of `session.jsonl` is no frame: it is a header added in this
+/// repository when the recording was copied in. It holds the recording format
+/// `claude-code-session/1`, the client's name and version, the recording date,
+/// the number of frames after it and a note on how they were captured; no
+/// path, email or id. Every later line is a frame the client sent.
 fn session() -> (Value, Vec<&'static str>) {
     let mut lines = SESSION.lines();
     let header: Value = serde_json::from_str(lines.next().unwrap()).unwrap();
@@ -932,41 +939,98 @@ fn claude_code_session_is_answered() {
     );
 }
 
-/// The registration line of `website/docs/connectors/mcp.md`, `claude mcp add
-/// connectors -- connectors ...`: the arguments after the command name.
-fn registered() -> Vec<String> {
-    let line = MCP_PAGE
-        .lines()
-        .map(str::trim)
-        .find(|line| line.starts_with("claude mcp add connectors -- "))
-        .expect("mcp.md shows the claude mcp add registration line");
-    let mut words = line
-        .strip_prefix("claude mcp add connectors -- ")
-        .unwrap()
-        .split_whitespace();
-    assert_eq!(words.next(), Some("connectors"), "{line}");
-    words.map(str::to_owned).collect()
+/// The `--mcp-config` document `website/docs/connectors/mcp.md` shows: its
+/// one JSON block with `mcpServers`.
+fn mcp_config() -> Value {
+    let mut blocks = Vec::new();
+    let mut block: Option<String> = None;
+    for line in MCP_PAGE.lines() {
+        let fence = line.trim();
+        match block.take() {
+            None if fence == "```json" => block = Some(String::new()),
+            None => {}
+            Some(text) if fence == "```" => blocks.push(text),
+            Some(mut text) => {
+                text.push_str(line);
+                text.push('\n');
+                block = Some(text);
+            }
+        }
+    }
+    let configs: Vec<Value> = blocks
+        .iter()
+        .filter_map(|text| serde_json::from_str::<Value>(text).ok())
+        .filter(|value| value.get("mcpServers").is_some())
+        .collect();
+    assert_eq!(configs.len(), 1, "mcp.md shows the --mcp-config document");
+    configs.into_iter().next().unwrap()
 }
 
-/// The page's registration arguments, with `CONFIG` and `STATE_DIR` naming
-/// the jail's files, start the server; the recorded `initialize` as the
-/// session's first frame is answered on 2025-11-25 with the tools capability,
-/// and after `notifications/initialized` the recorded `tools/list` lists the
-/// same tools the recorded session did.
+/// The `--mcp-config` entry mcp.md shows names one stdio server,
+/// `connectors`, whose command and arguments, with `CONFIG` and `STATE_DIR`
+/// naming the jail's files, are the launch the replay starts; the `claude -p`
+/// command the page shows reads it from `FILE` and allows only the search
+/// tool the recorded session called.
 #[test]
-fn claude_mcp_add_arguments_start_the_server() {
-    let arguments: Vec<String> = registered()
-        .into_iter()
-        .map(|word| match word.as_str() {
-            "CONFIG" => CONFIG.to_owned(),
-            "STATE_DIR" => STATE.to_owned(),
-            _ => word,
+fn mcp_config_entry_is_the_replayed_launch() {
+    let config = mcp_config();
+    let servers = config["mcpServers"].as_object().unwrap();
+    assert_eq!(
+        servers.keys().collect::<Vec<_>>(),
+        ["connectors"],
+        "{config}"
+    );
+    let entry = &servers["connectors"];
+    assert_eq!(
+        entry
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from(["args", "command", "type"]),
+        "{entry}"
+    );
+    assert_eq!(entry["type"], "stdio", "{entry}");
+    assert_eq!(entry["command"], "connectors", "{entry}");
+    let arguments: Vec<&str> = entry["args"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|word| match word.as_str().unwrap() {
+            "CONFIG" => CONFIG,
+            "STATE_DIR" => STATE,
+            word => word,
         })
         .collect();
-    assert_eq!(arguments, LAUNCH, "the documented launch");
+    assert_eq!(arguments, LAUNCH, "the replayed launch");
+    let command = MCP_PAGE
+        .lines()
+        .map(str::trim)
+        .find(|line| line.starts_with("claude -p "))
+        .expect("mcp.md shows the claude -p command that ran");
+    for option in [
+        "--mcp-config FILE".to_owned(),
+        "--strict-mcp-config".to_owned(),
+        r#"--tools """#.to_owned(),
+        format!(
+            r#"--allowedTools "mcp__connectors__{}""#,
+            name("issues.search")
+        ),
+    ] {
+        assert!(command.contains(&option), "{option}: {command}");
+    }
+}
+
+/// Not the recorded session: a sequence constructed from its recorded
+/// `initialize` frame, sent first, as a client on `2025-11-25` would. It is
+/// answered on 2025-11-25 with the tools capability, and after a
+/// `notifications/initialized` the recorded `tools/list` lists the same tools
+/// the recorded session did.
+#[test]
+fn constructed_initialize_first_session_lists_the_recorded_tools() {
     let served = Served::new(&generic_reads());
-    let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
-    let mut client = Client::start(served.server(&arguments));
+    let mut client = Client::start(served.server(&LAUNCH));
     client.send(recorded("initialize", 0));
     let initialized = client.answer();
     assert_eq!(

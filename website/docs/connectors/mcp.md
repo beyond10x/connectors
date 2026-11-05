@@ -2,7 +2,7 @@
 title: MCP
 sidebar_position: 21
 description: Claude Code and other local MCP clients reach connectors through its stdio MCP server on Linux; MCP as a connector has specified contracts and no runtime yet.
-lede: connectors runs as a local MCP server that Claude Code registers with one command. Reading from an MCP server as a connector is planned; each step below says which direction exists.
+lede: connectors runs as a local MCP server, recorded with a headless Claude Code session. Reading from an MCP server as a connector is planned; each step below says which direction exists.
 source: docs/local-mcp-cli.md, docs/local-mcp-stdio.md, apps/connectors/tests/claude_mcp_journey.rs, adapters/mcp/contracts/server/v1alpha1/semantics.md, adapters/mcp/contracts/client/v1alpha1/auth.md
 connectors: "mcp"
 ---
@@ -67,17 +67,35 @@ exits with `mcp_unavailable`. The instance needs a connection, and beside the co
 tools it exposes (`CONFIG.mcp-stdio.json`) and the declarations of their operations
 (`CONFIG.operation-curation.json`), as the
 [stdio guide](https://github.com/beyond10x/connectors/blob/main/docs/local-mcp-stdio.md) shows.
-Claude Code registers the server with:
 
-```sh
-claude mcp add connectors -- connectors --config CONFIG --state-dir STATE_DIR server --transport stdio
+A headless Claude Code session was run once, by Claude Code 2.1.318, against a Jira instance
+whose site was a local fixture. It named the server in an `--mcp-config` file; `CONFIG` and
+`STATE_DIR` stand for the absolute paths of the configuration and the state directory:
+
+```json
+{
+  "mcpServers": {
+    "connectors": {
+      "type": "stdio",
+      "command": "connectors",
+      "args": ["--config", "CONFIG", "--state-dir", "STATE_DIR", "server", "--transport", "stdio"]
+    }
+  }
+}
 ```
 
-`CONFIG` and `STATE_DIR` are the absolute paths of your configuration and state directory. Claude
-Code then starts the server as its child and speaks MCP over its standard input and output.
+For the recording the server ran behind a wrapper that captured its frames. The command that ran,
+with `FILE` for the path of that file:
 
-A headless Claude Code 2.1.318 session that listed the open Jira issues assigned to its user was
-recorded against a Jira instance whose site was a local fixture. Its frames are replayed against the server by
+```sh
+claude -p "List my open Jira issues. Use the connectors tool to search Jira, then reply with each issue's key, summary and status." --mcp-config FILE --strict-mcp-config --tools "" --allowedTools "mcp__connectors__c1_6a6972612e776f726b_636174616c6f67_6973737565732e736561726368" --setting-sources project --no-session-persistence --max-budget-usd 1 --output-format stream-json --verbose
+```
+
+Claude Code started the wrapper as its child and spoke MCP with the server through it, over
+standard input and output. Its answer listed DEMO-1, DEMO-2 and DEMO-3, each with its key, summary and status.
+`claude mcp add` is the interactive equivalent and is not exercised here.
+
+The session's frames are replayed against the server by
 [`claude_mcp_journey.rs`](https://github.com/beyond10x/connectors/blob/main/apps/connectors/tests/claude_mcp_journey.rs)
 in every `cargo test`. The client opened with `server/discover` on `2026-07-28`, answered:
 
@@ -101,8 +119,10 @@ recording):
 {"id":4,"jsonrpc":"2.0","result":{"isError":false,"resultType":"complete","structuredContent":{"audit_ref":"00000000-0000-4000-8000-000000000003","audit_status":"complete","request_id":"00000000-0000-4000-8000-000000000004","result":{"complete":true,"end":"no_next_page_token","items":[{"fields":{"status":{"name":"To Do"},"summary":"Login form rejects passwords with a trailing space"},"key":"DEMO-1"},{"fields":{"status":{"name":"In Progress"},"summary":"Add a CSV export to the monthly report"},"key":"DEMO-2"},{"fields":{"status":{"name":"To Do"},"summary":"Document the backup restore procedure"},"key":"DEMO-3"}],"pages":1,"records":3},"status":"success","version":"v1alpha2"}}}
 ```
 
-A client that starts with `initialize` on `2025-11-25` gets that revision with the tools
-capability and, after `notifications/initialized`, the same tools.
+A session that starts with `initialize` on `2025-11-25` is not in the recording. The test
+constructs one from the recorded `initialize` frame and sends it first: the server answers on
+`2025-11-25` with the tools capability and, after `notifications/initialized`, lists the same
+tools.
 
 ## A first guarded write
 
