@@ -154,6 +154,53 @@ fn bounded_owner_refuses_caller_limits_and_unimplemented_requirements() {
 }
 
 #[test]
+fn bounded_owner_refuses_semantic_and_non_network_effects_before_any_request() {
+    let mut target = Target::new();
+    prepare(&mut target, false);
+    let read = |declaration: Value| {
+        let calls = Cell::new(0);
+        let value = bounded::read(
+            &target.paths,
+            "owner-authority",
+            "fixture",
+            &target.request(),
+            (&Policy(declaration), "projection"),
+            budget(false),
+            |_| {
+                calls.set(calls.get() + 1);
+                Ok(br#"{"observed":true}"#.to_vec())
+            },
+        )
+        .unwrap();
+        (value, calls.get())
+    };
+    let (admitted, requests) = read(declaration(false));
+    assert_eq!(admitted["status"], "success");
+    assert_eq!(requests, 1);
+    for (field, effects) in [
+        ("semantic_effects", json!(["human_visible"])),
+        ("effects", json!(["network", "process"])),
+    ] {
+        let mut value = declaration(false);
+        value[field] = effects;
+        assert!(
+            matches!(
+                resolve(&target, &Policy(value.clone()), budget(false)),
+                Err(Error {
+                    code: Code::Unsupported,
+                    ..
+                })
+            ),
+            "{field}"
+        );
+        let (refused, requests) = read(value);
+        assert_eq!(refused["error"]["code"], "unsupported", "{field}");
+        assert_eq!(refused["audit_status"], "complete", "{field}");
+        assert_eq!(requests, 0, "{field}");
+    }
+}
+
+#[test]
 fn bounded_owner_counts_the_whole_request_and_never_dispatches_oversize() {
     let mut target = Target::new();
     prepare(&mut target, false);
