@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.67.0 — 2026-11-05
+
+### Added
+
+- A headless Claude Code session (2.1.318) was run once against `connectors server --transport stdio`
+  through an `--mcp-config` entry whose command was a capturing wrapper. It listed a Jira
+  instance's eleven reads and called its search tool (story:claude-connects-to-the-mcp-server).
+  `apps/connectors/tests/claude_mcp_journey.rs` replays its sanitized frames and holds its
+  transcript in every `cargo test` on Linux. The MCP page shows the entry that ran and the user
+  form. The client opened with `server/discover` on `2026-07-28`; its parallel `initialize` on
+  `2025-11-25` is refused as an invalid request, and the session goes on with `2026-07-28`.
+  `claude mcp add` is not exercised.
+- Tests: the stdio MCP server refuses by name, `not_found` and with no provider request, an
+  operation with a Write requirement or semantic effects whose approval is not required, with or
+  without a revision (story:mcp-write-operation-call-by-name-is-refused). Further cases hold a
+  binding check that admits `connectors-private/2`, variant names and frames, and the `2025-11-25`
+  lifecycle.
+
 ## 0.66.0 — 2026-11-05
 
 ### Changed
