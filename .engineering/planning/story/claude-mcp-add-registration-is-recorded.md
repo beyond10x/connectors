@@ -2,11 +2,24 @@
 format: aep.planning-md/3
 id: story:claude-mcp-add-registration-is-recorded
 kind: story
-status: draft
+status: active
 title: A recorded claude mcp add registers the local stdio MCP server
 relations:
 - derived_from: story:claude-connects-to-the-mcp-server
-revision: 2
+- serves: vision:independent-contract-adapters
+scope:
+- confidence: inferred
+  path: README.md
+- confidence: inferred
+  path: apps/connectors/tests/claude_mcp_journey.rs
+- confidence: inferred
+  path: apps/connectors/tests/fixtures/claude-code/mcp-add.json
+- confidence: inferred
+  path: website/docs/connectors/mcp.md
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-05T17:29:39Z", actor: "human:timo", revision: 4}
+- {from: "proposed", to: "active", at: "2026-11-05T17:29:39Z", actor: "human:timo", revision: 5}
 ---
 <!-- Starting point for a `story` artifact, seeded by `aep artifact new story <name>`.
      No frontmatter here on purpose: the `---` block is written by the CLI from the id, kind, status
