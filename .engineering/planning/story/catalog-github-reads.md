@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-github-reads
 kind: story
-status: active
+status: implemented
 title: 'GitHub reads through the catalog provider: what waits on the user, and public repository metadata'
 relations:
 - serves: vision:independent-contract-adapters
@@ -27,10 +27,11 @@ scope:
   path: website/docs/connectors/index.md
 - confidence: cited
   path: website/docs/status.md
-revision: 54
+revision: 56
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-23T12:24:51Z", actor: "human:timo", revision: 24}
 - {from: "proposed", to: "active", at: "2026-10-23T12:24:51Z", actor: "human:timo", revision: 25}
+- {from: "active", to: "implemented", at: "2026-11-05T01:33:53Z", actor: "human:timo", revision: 56, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Outcome
 
@@ -180,3 +181,25 @@ in connectors-definitions and `story:definition-lowerer-carries-walk` (draft) fi
 Dropped: the `adapters/catalog/providers/github/operations.json`, bundle-drift and
 `docs/catalog-github.md` lines; the fixture's SHA-256 check
 (`definition_published_features.rs:274-279`) and the site page replace them.
+
+## Delivered (wave 2026-11-04, v0.66.0)
+
+Unit commit 995ec56d2 and adversary cases e34fd8032, merged in e7f4606ab on `wave/2026-11-04-connectors`;
+local staged gate green at ca1ef2f4d. The engine answered every restated acceptance line as written, so no
+engine file changed.
+
+Scope as landed (confirms the inferred lines of "Scope (wave 2026-11-04)"):
+
+| path | result |
+|---|---|
+| `adapters/catalog/tests/github_definition_reads.rs` (new, package `connectors-catalog-provider`) | held |
+| `adapters/catalog/tests/github_definition_reads_adversary.rs` (new) | added by the adversary pass |
+| `adapters/catalog/tests/definition_published_features_adversary.rs` | held (rate-limit assertions) |
+| `crates/connectors-docs/src/status.rs` item after Opsgenie (ended at `:431`) | held |
+| `crates/connectors-docs/src/onboarding.rs` HAND row after openrouter, instance kind `definition file` | held |
+| `README.md` support-table row, `website/docs/connectors/github.md` (new) | held |
+| `website/docs/connectors/index.md`, `website/docs/status.md`, `website/data/status.json` | regenerated |
+
+Not done, as the restatement defers: the two declared walks. The page's token-scope advice comes from
+GitHub's documentation and is not checked live; `connect`, the first read and `reconnect` need a live
+token and are shown without output.
