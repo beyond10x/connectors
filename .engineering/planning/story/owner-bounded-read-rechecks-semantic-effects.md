@@ -4,9 +4,11 @@ id: story:owner-bounded-read-rechecks-semantic-effects
 kind: story
 status: draft
 title: The owner's bounded read refuses an operation with semantic effects
+tags:
+- from-finding
 relations:
 - derived_from: review-result:wave-20261105-u2-adversary-findings
-revision: 2
+revision: 3
 ---
 <!-- Starting point for a `story` artifact, seeded by `aep artifact new story <name>`.
      No frontmatter here on purpose: the `---` block is written by the CLI from the id, kind, status
