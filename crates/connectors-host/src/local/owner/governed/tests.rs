@@ -4,6 +4,7 @@ use std::{cell::Cell, collections::BTreeSet, sync::atomic::Ordering, time::Durat
 
 #[cfg(unix)]
 mod bounded_reads;
+mod bounded_reads_security;
 #[cfg(target_os = "linux")]
 mod final_fence;
 mod metadata_projection;
@@ -19,6 +20,32 @@ impl ReadPolicy for WithdrawAfter {
         } else {
             Err(Code::Forbidden.into())
         }
+    }
+    // A selecting policy declares its projection: the owner reads it for the
+    // effects rule on every projected read. This one is a plain network read.
+    fn metadata(
+        &self,
+        _: &Paths,
+        _: &str,
+        _: &Adapter,
+        _: &runtime::Bootstrap,
+    ) -> Result<ProjectionMetadata> {
+        let declaration = json!({"effects":["network"],"semantic_effects":[],"risk":"low",
+            "idempotency":{"kind":"none"},"approval":"not_required",
+            "limits":{"request_bytes":65536,"result_bytes":4194304,
+                "execution_ms":20000,"provider_ms":15000,"connect_ms":5000}});
+        Ok(ProjectionMetadata {
+            revision: "projection".into(),
+            operations: std::collections::BTreeMap::from([(
+                "item.read".into(),
+                connectors_core::operation_metadata::Metadata::parse(
+                    &serde_json::to_vec(&declaration).unwrap(),
+                    "resource",
+                    65536,
+                )
+                .unwrap(),
+            )]),
+        })
     }
 }
 
