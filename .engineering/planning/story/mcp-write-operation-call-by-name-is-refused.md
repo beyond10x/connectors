@@ -2,13 +2,20 @@
 format: aep.planning-md/3
 id: story:mcp-write-operation-call-by-name-is-refused
 kind: story
-status: draft
+status: active
 title: A Write operation called by name over MCP is refused, held by a runtime case
 tags:
 - from-finding
 relations:
 - derived_from: review-result:connectors-wave-2026-11-04-u1-security
-revision: 1
+- serves: vision:independent-contract-adapters
+scope:
+- confidence: inferred
+  path: apps/connectors/tests/local_mcp_server_write_refusal.rs
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-05T09:33:50Z", actor: "human:operator", revision: 3}
+- {from: "proposed", to: "active", at: "2026-11-05T09:33:50Z", actor: "human:operator", revision: 4}
 ---
 ## Why
 
