@@ -18,7 +18,7 @@ scope:
   path: adapters/mcp/contracts/server/v1alpha1/projection.md
 - confidence: inferred
   path: crates/connectors-build/tests/mcp_inbound_mutation_replay.rs
-revision: 8
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-05T09:37:30Z", actor: "human:timo", revision: 6}
 - {from: "proposed", to: "active", at: "2026-11-05T17:29:39Z", actor: "human:timo", revision: 8}
@@ -60,3 +60,7 @@ Decided by the directing session `b10x-chef-orchestrator` under its grant:
 
 Accepted by the directing session for the next connectors wave (its acceptance); it does not join the
 2026-11-05 wave.
+
+## Coordinator decision during implementation (2026-11-05)
+
+The implementor found at runtime that `bind_revision` (`apps/connectors/src/mcp/projection.rs:724`) binds an absent revision for every projected tool, without telling a read from a mutating tool. Today only the projection filter (`projection.rs:214-231`), which projects reads only, keeps a mutating call from binding without its revision. The directing session left the choice between fixing it in this unit and filing a draft to the coordinator. The coordinator fixes it in this unit, because it is this story's rule: `bind_revision` itself refuses an absent revision for a tool that is not a read, with -32602, so the rule no longer depends on what the projection filter lets through.
