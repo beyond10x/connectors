@@ -2,13 +2,22 @@
 format: aep.planning-md/3
 id: story:owner-bounded-read-rechecks-semantic-effects
 kind: story
-status: draft
+status: active
 title: The owner's bounded read refuses an operation with semantic effects
 tags:
 - from-finding
 relations:
 - derived_from: review-result:wave-20261105-u2-adversary-findings
-revision: 3
+- serves: vision:independent-contract-adapters
+scope:
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner/governed/bounded.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner/governed/tests/bounded_reads.rs
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-05T17:29:38Z", actor: "human:operator", revision: 5}
+- {from: "proposed", to: "active", at: "2026-11-05T17:29:38Z", actor: "human:operator", revision: 6}
 ---
 <!-- Starting point for a `story` artifact, seeded by `aep artifact new story <name>`.
      No frontmatter here on purpose: the `---` block is written by the CLI from the id, kind, status

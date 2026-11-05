@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:mcp-mutating-tool-call-revision-rule
 kind: story
-status: proposed
+status: active
 title: A mutating MCP tool call has one stated rule for an absent revision
 tags:
 - from-finding
@@ -13,12 +13,15 @@ scope:
 - confidence: inferred
   path: adapters/mcp/contracts/server/v1alpha1/mutation-cases.json
 - confidence: inferred
+  path: adapters/mcp/contracts/server/v1alpha1/mutations.md
+- confidence: inferred
   path: adapters/mcp/contracts/server/v1alpha1/projection.md
 - confidence: inferred
   path: crates/connectors-build/tests/mcp_inbound_mutation_replay.rs
-revision: 6
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-05T09:37:30Z", actor: "human:operator", revision: 6}
+- {from: "proposed", to: "active", at: "2026-11-05T17:29:39Z", actor: "human:operator", revision: 8}
 ---
 ## Why
 
