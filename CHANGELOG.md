@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.66.0 — 2026-11-05
+
+### Changed
+
+- MCP stdio server: a `tools/call` without `_meta["io.beyond10x.connectors/revision"]` now runs
+  against the revision the server currently advertises for that tool, instead of being refused as
+  invalid params (story:claude-connects-to-the-mcp-server). A present but stale revision is still
+  refused `stale_description` before any provider request, and a revision that is null, not a
+  string or not a valid id, or a `_meta` that is not an object, is still invalid params (`-32602`).
+  Such a client cannot tell that a tool's description changed since it listed it. The contract
+  (`adapters/mcp/contracts/server/v1alpha1/projection.md`) and its case file state the rule.
+- ESS 0.86.0: the pin and the `ess-*` crates move from 0.84.0. Generated MCP launch, configuration
+  and operation types change in their version stamp only.
+
+### Added
+
+- GitHub: the ten reads of connectors-definitions 0.5.2 `connectors/github.yaml` are tested against
+  a scripted provider (story:catalog-github-reads): exact paths and queries, caller-driven paging,
+  the `per_page` and page bounds, the 1,000-result search cap, fields a caller may not set, the
+  raw-read limits, and `rate_limited` with its wait. A new page, `website/docs/connectors/github.md`,
+  shows running GitHub as a definition file.
+- CI runs the ignored tests that a built catalog provider suffices for on every pull request
+  (story:provider-ignored-tests-run-in-ci): `connectors-build ignored --required
+  --only-prerequisite provider`.
+
+### Fixed
+
+- `connectors-build ignored` no longer inventories `harness = false` test targets. The CLI's stand-in
+  targets run their own `main` and answered the terse listing with a summary line, which the
+  inventory refused, so the full lane could not run since the first stand-in target.
+
 ## 0.65.2 — 2026-11-04
 
 ### Fixed

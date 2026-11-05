@@ -79,7 +79,8 @@ cannot assert that an earlier invocation was not attempted.
 
 The following table checks document decisions, not a policy engine. `policy`
 in the case file is current invocation lookup policy; `metadata_admitted` is its
-separate metadata decision. `candidate_or_retained_key` only passes lookup/input
+separate metadata decision; `revision_current` is `null` for a tool call that
+names no revision. `candidate_or_retained_key` only passes lookup/input
 checks: it is neither a dispatch instruction nor a claim of a successful result.
 | Case | Discovery | First lookup/input outcome |
 |---|---|---|
@@ -96,6 +97,7 @@ checks: it is neither a dispatch instruction nor a claim of a successful result.
 | revision-beats-hidden | omitted | stale_description |
 | revision-beats-absent | omitted | stale_description |
 | revision-beats-input | visible | stale_description |
+| no-revision-binds-current | visible | candidate_or_retained_key |
 | bad-input | visible | invalid_input |
 
 ## Qualified names and inverse selection
@@ -122,11 +124,17 @@ revision. No authority/host, fragment, extra or repeated query member, or URI
 normalization fallback is accepted. The resource name field remains `<name>`.
 The URI addresses that operation's configured read with `{}` input; it is not a
 provider URL or a credential reference. Tools and prompts carry the exact
-revision string in request `_meta["io.beyond10x.connectors/revision"]`. Missing
-revision is malformed input; a syntactically valid old revision is checked at the
-position defined above. List results and each advertised definition carry the
-same revision in safe `_meta`; it is never an authorization token. Operation
-names, resource URIs and projection revisions cannot switch owner or Connection.
+revision string in request `_meta["io.beyond10x.connectors/revision"]`. A tool
+call whose `_meta` has no such member, or that has no `_meta`, binds to the
+revision the server currently advertises for that tool and is then checked as a
+call naming it; such a client cannot detect a descriptor change between listing
+and calling. A `_meta` that is present but not an object is malformed input. A
+prompt request without a revision is malformed input, and so is a
+revision present as anything but a syntactically valid identifier; a
+syntactically valid old revision is checked at the position defined above. List
+results and each advertised definition carry the same revision in safe `_meta`;
+it is never an authorization token. Operation names, resource URIs and
+projection revisions cannot switch owner or Connection.
 
 | Case | Advertised name |
 |---|---|

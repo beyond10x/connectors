@@ -206,9 +206,9 @@ fn emit(root: &Path) -> (bool, String) {
 
 /// The acceptance names `metadata_conformance::emit` as the emission `mutate --collect` scores
 /// for `connectors.refresh` and `connectors.oauth2`. `emit` writes `ess-mutation-manifest/2`
-/// (`metadata_conformance.rs:918`), and the pinned ESS 0.84.0 reader refuses a `/2` manifest
+/// (`metadata_conformance.rs:918`), and the pinned ESS 0.86.0 reader refuses a `/2` manifest
 /// holding a `sets-drop`, `precedence-swap` or `emit-swap` mutant (`ess-conformance`
-/// `mutate.rs:161-167`). `IssueAccessToken`'s four precedence swaps are such mutants.
+/// `mutate.rs:185-193`). `IssueAccessToken`'s four precedence swaps are such mutants.
 #[test]
 fn emit_writes_a_manifest_for_the_oauth2_domain_that_the_pinned_ess_admits() {
     let scoped = scoped_root("connectors.oauth2");

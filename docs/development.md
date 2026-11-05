@@ -65,12 +65,12 @@ release profile and the bridge deadline are unchanged.
 
 ## Pinned tools
 
-The repository pins released tool versions, not source builds: ESS 0.84.0 in
+The repository pins released tool versions, not source builds: ESS 0.86.0 in
 [`crates/connectors-spec/toolchain.json`](../crates/connectors-spec/toolchain.json)
 and AEP 0.71.3 in [`crates/connectors-build/aep-toolchain.json`](../crates/connectors-build/aep-toolchain.json).
 Use the `ess` and `aep` executables the Beyond10x plugins install (`b10x upgrade`
 keeps them current). The Cargo dependencies select Entity Runtime 0.30.3 and the
-Eventlog release it builds on (0.8.3); ESS 0.84.0, like 0.56.0 through 0.83.0, additionally brings
+Eventlog release it builds on (0.8.3); ESS 0.86.0, like 0.56.0 through 0.85.0, additionally brings
 Entity Runtime Core 0.28.0 through `ess-entity-runtime`. The CLI binding stays
 `ess-cli/1` with all three globals, so the committed `ess-cli-plan/1` plan keeps its
 bytes; ESS 0.57.0 and later generate a CLI runtime that reads an `ess-cli-plan/2` plan's optional
@@ -187,8 +187,24 @@ cargo run --locked -p connectors-build -- release-binaries
 
 `connectors-build ignored` inventories every compiled default-feature workspace
 test executable with Rust's `--ignored --list`, then runs each selected test by
-its exact name. Unknown classifications refuse all execution. The existing
-`gate` command is unchanged; this lane is not automatically enrolled in CI.
+its exact name. Unknown classifications refuse all execution. The `gate`
+command does not run it.
+
+`--only-prerequisite` narrows the selected families to tests whose every
+prerequisite is one it names: `provider` (`CONNECTORS_TEST_CATALOG_PROVIDER`) or
+`cli` (`CONNECTORS_TEST_CLI`), both supplied by workspace compilation. A test with
+no prerequisite also qualifies. With `--required` an empty selection still refuses.
+The `repository gate` job of [`rust-gate.yml`](../.github/workflows/rust-gate.yml)
+runs, after the gate, on every pull request and push to `main`:
+
+```sh
+cargo run --locked -p connectors-build -- ignored --required --only-prerequisite provider
+```
+
+Its report names each selected test and its outcome; today these are the three
+tests of `apps/connectors/tests/definition_connect_question.rs` and
+`describe_of_a_definition_needs_no_connection` in
+`apps/connectors/tests/adversary_d218_u1.rs`.
 
 A test that a `cfg` keeps off a platform (`#[cfg(unix)]`, `#![cfg(unix)]`,
 `#[cfg(target_os = "linux")]` and the like) does not compile there, so no binary

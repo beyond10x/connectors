@@ -2,17 +2,18 @@
 format: aep.planning-md/3
 id: story:connect-names-a-failed-provider-start
 kind: story
-status: active
+status: implemented
 title: connections connect --endpoint names a provider start that failed instead of refusing the endpoint
 summary: When the catalog provider prints its bootstrap but its private child does not start, connect reports the failed start, not invalid_input on endpoint
 relations:
 - informed_by: story:catalog-provider-failure-is-named
 - informed_by: story:macos-release-provider-starts-through-the-private-copy
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-03T22:00:13Z", actor: "human:operator", revision: 2}
 - {from: "proposed", to: "active", at: "2026-11-03T22:00:13Z", actor: "human:operator", revision: 3}
+- {from: "active", to: "implemented", at: "2026-11-04T08:45:49Z", actor: "human:operator", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 # Story: connections connect --endpoint names a provider start that failed instead of refusing the endpoint
 
