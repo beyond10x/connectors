@@ -12,7 +12,7 @@ relations:
 scope:
 - confidence: inferred
   path: apps/connectors/tests/local_mcp_server_write_refusal.rs
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-05T09:33:50Z", actor: "human:operator", revision: 3}
 - {from: "proposed", to: "active", at: "2026-11-05T09:33:50Z", actor: "human:operator", revision: 4}
@@ -30,3 +30,10 @@ required; the existing guarded case covers only approval required.
 - A runtime case in `apps/connectors/tests/` calls by name, over the stdio MCP server, an operation with
   a `Write` requirement and approval not required, and one with non-empty `semantic_effects`; each is
   refused `not_found` with zero provider requests, with and without a revision.
+
+## Acceptance (2026-11-05)
+
+Accepted by the directing session `b10x-chef-orchestrator`, whose grant makes the acceptance of this
+story its own: the wave 2026-11-05 plan "is approved as sent: U1 and U2", with U2 this story, taken from
+draft to active as a test-only story derived from
+review-result:connectors-wave-2026-11-04-u1-security.
