@@ -276,6 +276,13 @@ pub const CAPABILITIES: &[Capability] = &[
         "/docs/reference/cli",
     ),
     shipped(
+        "Local runtime",
+        "Local MCP server for Claude Code",
+        "On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools and lists no write; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*).",
+        "apps/connectors/tests/claude_mcp_journey.rs::claude_code_session_is_answered",
+        "/docs/connectors/mcp",
+    ),
+    shipped(
         "Catalog provider",
         "Bundles from pinned sources",
         "connectors-build catalog compiles a pinned OpenAPI document into a digest-verified bundle; every committed bundle matches a fresh run byte for byte.",
@@ -594,8 +601,8 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     planned(
         "Native adapters",
-        "MCP",
-        "MCP invocation, projection, auth lifecycle, mutation replay and composition contracts are specified; there is no MCP runtime.",
+        "MCP as a connector",
+        "Reading from an MCP server is specified (invocation, auth lifecycle, mutation replay and composition contracts) and has no runtime; the local MCP server is listed under Local runtime.",
         "/docs/reference/adapters",
     ),
     shipped(

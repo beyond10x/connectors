@@ -9,7 +9,7 @@ custom_edit_url: null
 
 # Status
 
-As of 2026-10-16: 68 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. A release page carries the source archives and Linux and macOS binaries of `connectors` and `connectors-catalog-provider`; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
+As of 2026-10-16: 69 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. A release page carries the source archives and Linux and macOS binaries of `connectors` and `connectors-catalog-provider`; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
 
 ## Service boundary
 
@@ -47,6 +47,7 @@ As of 2026-10-16: 68 capabilities are shipped, 3 are decided and 5 are planned. 
 | [Consumer launch](./concepts/local-runtime.md) | ● shipped | connections launch hands one connection's protected document to a pinned consumer and refuses a launch its configuration does not admit (since 0.31.0). |
 | [Operations by family](./reference/cli.md) | ● shipped | operations list --family names the operations of one contract family, such as datasource.feed/v1alpha1, with their contract and profile. |
 | [JSON values in JSON answers](./reference/cli.md) | ● shipped | With --output json, invoke results and operation schemas are JSON values, not JSON text (breaking since 0.32.0). |
+| [Local MCP server for Claude Code](./connectors/mcp.md) | ● shipped | On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools and lists no write; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*). |
 
 ## Catalog provider
 
@@ -103,7 +104,7 @@ As of 2026-10-16: 68 capabilities are shipped, 3 are decided and 5 are planned. 
 | [Loki tenants and other authentication](./reference/adapters/loki/index.md) | ○ planned | An X-Scope-OrgID tenant header and profiles other than a bearer token; today a Loki without authentication cannot be connected. |
 | [Prometheus tenants, timeouts and other authentication](./reference/adapters/prometheus/index.md) | ○ planned | An X-Scope-OrgID tenant header, an adapter-set query timeout, a Capacity error for too many samples apart from other execution errors, and profiles other than a bearer token. |
 | [Specification-only adapters](./reference/adapters/index.md) | ◐ decided | Alertmanager has a design or typed model and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built. |
-| [MCP](./reference/adapters/index.md) | ○ planned | MCP invocation, projection, auth lifecycle, mutation replay and composition contracts are specified; there is no MCP runtime. |
+| [MCP as a connector](./reference/adapters/index.md) | ○ planned | Reading from an MCP server is specified (invocation, auth lifecycle, mutation replay and composition contracts) and has no runtime; the local MCP server is listed under Local runtime. |
 
 ## Distribution
 
