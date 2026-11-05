@@ -42,7 +42,7 @@ scope:
   path: website/docs/connectors/mcp.md
 - confidence: cited
   path: website/docs/status.md
-revision: 23
+revision: 24
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-23T17:49:18Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":7}}}
 - {from: "proposed", to: "active", at: "2026-10-23T17:49:18Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":7}}}
@@ -201,3 +201,31 @@ Unit commits b3adde687, adversary cases a3f00d6ff and docs 10ce2d4ca, merged in 
 Still open, so the story stays active: the recorded Claude Code run (a Claude Code login in an isolated
 HOME is a credential, the operator's alone) and the claims part. Findings filed as drafts:
 story:mcp-mutating-tool-call-revision-rule, story:mcp-write-operation-call-by-name-is-refused.
+
+## Acceptance as delivered (wave 2026-11-05)
+
+This replaces the scenario list under "Acceptance (named conformance scenarios)" above. The orchestrator restated it after the adversary pass:
+- The no-write claim is dropped. U2's cases in story:mcp-write-operation-call-by-name-is-refused carry the proof of the write guard.
+- The registration shown is the one that ran.
+- The 2025-11-25 handshake is a constructed sequence, not the recording.
+
+`apps/connectors/tests/claude_mcp_journey.rs` (Linux only):
+
+- `claude_code_session_is_answered`: replaying the recorded client frames (`fixtures/claude-code/session.jsonl`) against `connectors server --transport stdio` gives one answer per request. Each answer equals its recorded answer (`session.expected.jsonl`) after per-run ids and digests are normalized. The recorded session is:
+  1. `server/discover` on 2026-07-28;
+  2. a parallel `initialize` on 2025-11-25, refused -32600;
+  3. `tools/list` with the eleven Jira reads;
+  4. two `tools/call` to the search tool, `isError:false` with DEMO-1 to DEMO-3.
+
+  The transcript's tool uses equal the recorded calls' arguments and ids, its tool results equal the recorded answers, and its final reply names each issue's key, summary and status.
+- `lists_exactly_the_recorded_read_tools`: the server lists exactly the 11 recorded read tools, in order, equal to the recorded `tools/list`.
+- `mcp_config_entry_is_the_replayed_launch`: `website/docs/connectors/mcp.md` shows the `--mcp-config` entry that ran (the capturing wrapper as command) and the user form (command `connectors`). Their arguments equal the launch the replay uses.
+- `constructed_initialize_first_session_lists_the_recorded_tools`: a sequence constructed from the recorded `initialize` frame gets revision 2025-11-25 with the tools capability and the same tools. It is labelled as not the recorded session.
+- Adversary cases:
+  - `adversary_normalization_keeps_what_a_client_depends_on`;
+  - `adversary_transcript_keeps_no_api_issued_signature`;
+  - `adversary_list_case_exposes_no_write`, which checks that the list case exposes only described reads, not a write claim about the server.
+
+`crates/connectors-docs`: the status item and the onboarding row are as built in this unit, and `connectors-docs generate --check` is current.
+
+The run was made once, by the coordinator, on the existing login, under approval-record:connectors-claude-recording-on-the-existing-login. `claude mcp add` is not exercised; see story:claude-mcp-add-registration-is-recorded.
