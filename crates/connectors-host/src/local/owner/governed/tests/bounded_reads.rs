@@ -11,6 +11,15 @@ pub(super) fn declaration(generic: bool) -> Value {
             "request_bytes":if generic {262144} else {65536},"result_bytes":4194304}})
 }
 pub(super) fn prepare(target: &mut Target, generic: bool) {
+    prepare_operation(target, |operation| {
+        if generic {
+            operation.profile = "generic-http".into();
+        }
+    });
+}
+/// `prepare` for an implemented read, with `edit` applied to the selected
+/// operation's descriptor entry before the owner caches it.
+fn prepare_operation(target: &mut Target, edit: impl FnOnce(&mut connectors_core::Operation)) {
     let mut config = Config::load(&target.paths.config).unwrap();
     let old = config.adapters["fixture"].clone();
     let mut bootstrap = runtime::state::State::new(&target.paths.state)
@@ -21,9 +30,7 @@ pub(super) fn prepare(target: &mut Target, generic: bool) {
         Some(runtime::PrivateProtocol::V3);
     let mut descriptor = bootstrap.descriptor().unwrap();
     descriptor.operations[0].input_schema = json!({"type":"object"});
-    if generic {
-        descriptor.operations[0].profile = "generic-http".into();
-    }
+    edit(&mut descriptor.operations[0]);
     bootstrap.descriptor = serde_json::to_string(&descriptor).unwrap();
     target.schema = crate::local::owner::schema(&bootstrap, "item.read").unwrap();
     std::fs::write(&target.paths.config, toml::to_string(&config).unwrap()).unwrap();
@@ -198,6 +205,84 @@ fn bounded_owner_refuses_semantic_and_non_network_effects_before_any_request() {
         assert_eq!(refused["audit_status"], "complete", "{field}");
         assert_eq!(requests, 0, "{field}");
     }
+}
+
+/// A bounded read of `target` under the implemented declaration: the
+/// resolution's refusal code, the served value and the provider request count.
+fn implemented_read(target: &Target) -> (Option<Code>, Value, usize) {
+    let policy = Policy(declaration(false));
+    let refusal = resolve(target, &policy, budget(false))
+        .err()
+        .map(|error| error.code);
+    let calls = Cell::new(0);
+    let value = bounded::read(
+        &target.paths,
+        "owner-authority",
+        "fixture",
+        &target.request(),
+        (&policy, "projection"),
+        budget(false),
+        |_| {
+            calls.set(calls.get() + 1);
+            Ok(br#"{"observed":true}"#.to_vec())
+        },
+    )
+    .unwrap();
+    (refusal, value, calls.get())
+}
+
+/// The MCP projection advertises an implemented read only for the `resource`
+/// profile. Driven directly, past the projection, the owner holds the same
+/// rule: an implemented realization on any other read profile is
+/// `unsupported` before any provider request.
+#[test]
+fn bounded_owner_refuses_an_implemented_realization_outside_the_resource_profile() {
+    for profile in [
+        "generic-http",
+        "generic-http-page",
+        "rows-by-number",
+        "postgresql-native-text",
+    ] {
+        let mut target = Target::new();
+        prepare_operation(&mut target, |operation| operation.profile = profile.into());
+        let (refusal, value, requests) = implemented_read(&target);
+        assert_eq!(requests, 0, "{profile}: dispatched {value}");
+        assert_eq!(refusal, Some(Code::Unsupported), "{profile}");
+        assert_eq!(value["error"]["code"], "unsupported", "{profile}");
+        assert_eq!(value["audit_status"], "complete", "{profile}");
+    }
+}
+
+/// The projection advertises an implemented `resource` read only when its
+/// input and output schemas are self-contained. The owner refuses a schema the
+/// projection would not advertise, before any provider request.
+#[test]
+fn bounded_owner_refuses_an_implemented_resource_read_without_inline_schemas() {
+    let relocated = [
+        json!({"$ref":"#/$defs/value","$defs":{"value":{"type":"object"}}}),
+        json!({"$dynamicAnchor":"node","type":"object",
+            "properties":{"nested":{"$dynamicRef":"#node"}}}),
+        json!({"type":"object","$anchor":"root"}),
+    ];
+    for (side, schema) in relocated
+        .iter()
+        .flat_map(|schema| [("input", schema), ("output", schema)])
+    {
+        let mut target = Target::new();
+        prepare_operation(&mut target, |operation| match side {
+            "input" => operation.input_schema = schema.clone(),
+            _ => operation.output_schema = schema.clone(),
+        });
+        let (refusal, value, requests) = implemented_read(&target);
+        assert_eq!(requests, 0, "{side} {schema}: dispatched {value}");
+        assert_eq!(refusal, Some(Code::Unsupported), "{side} {schema}");
+        assert_eq!(value["error"]["code"], "unsupported", "{side} {schema}");
+    }
+    let mut target = Target::new();
+    prepare_operation(&mut target, |_| {});
+    let (refusal, value, requests) = implemented_read(&target);
+    assert_eq!((refusal, requests), (None, 1), "inline control: {value}");
+    assert_eq!(value["status"], "success");
 }
 
 #[test]
