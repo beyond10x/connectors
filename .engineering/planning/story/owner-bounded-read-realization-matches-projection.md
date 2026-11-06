@@ -2,11 +2,20 @@
 format: aep.planning-md/3
 id: story:owner-bounded-read-realization-matches-projection
 kind: story
-status: draft
+status: active
 title: The owner's bounded read accepts an implemented realization only where the projection does
 relations:
 - derived_from: review-result:wave-20261105b-u2-security
-revision: 1
+- serves: vision:independent-contract-adapters
+scope:
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/governed/bounded.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner/governed/tests/bounded_reads.rs
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-06T08:31:13Z", actor: "human:operator", revision: 2}
+- {from: "proposed", to: "active", at: "2026-11-06T08:31:14Z", actor: "human:operator", revision: 3}
 ---
 
 ## Why
