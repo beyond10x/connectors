@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.68.0 — 2026-11-06
+
+### Changed
+
+- MCP stdio server: a listed mutating `tools/call` that names no descriptor revision is refused as
+  invalid params (`-32602`) before any provider request. Read tools, and names the server does not
+  list, still bind an absent revision to the one the server advertises, so an unlisted operation
+  called by name stays `not_found` (story:mcp-mutating-tool-call-revision-rule). The contracts
+  (`projection.md`, `mutations.md`) and `docs/local-mcp-stdio.md` say so. No mutating tool is
+  projected today, so the refusal is held by a unit test of the binding.
+- The owner refuses, as `unsupported` and before any provider request, a projected read of an
+  operation that declares semantic effects or an effect other than `network`, with or without a
+  budget. The rule no longer depends on the MCP projection hiding the operation, or on which frame
+  the caller chooses (story:owner-bounded-read-rechecks-semantic-effects).
+- Dependencies: ESS moves from 0.86.0 to 0.87.0. The generated MCP and operation types change their
+  version stamp only, and the same 34 authored scenarios stay known failing.
+
+### Added
+
+- `claude mcp add --scope project` was recorded once with Claude Code 2.1.318, in an empty project
+  directory with an empty HOME and no network (story:claude-mcp-add-registration-is-recorded). The
+  MCP page and README show the command, its output and the `.mcp.json` it wrote.
+  `apps/connectors/tests/claude_mcp_journey.rs` checks that entry against the replayed launch and
+  the documented user form. The recording shows the registration only, not a session that uses it.
+
 ## 0.67.0 — 2026-11-05
 
 ### Added
