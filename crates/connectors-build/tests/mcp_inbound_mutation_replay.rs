@@ -63,7 +63,11 @@ struct Decision {
     id: String,
     policy: String,
     observation_admitted: bool,
-    revision_current: bool,
+    /// `null` for a mutating tool call that names no descriptor revision. The
+    /// member is still required: `deserialize_with` keeps serde from reading an
+    /// omitted one as `None`.
+    #[serde(deserialize_with = "Option::deserialize")]
+    revision_current: Option<bool>,
     lookup: String,
     input_valid: bool,
     kind: String,
@@ -144,8 +148,13 @@ fn decision(case: &Decision) -> Result<&str, String> {
     if !case.observation_admitted {
         return Ok("forbidden");
     }
-    if !case.revision_current {
-        return Ok("stale_description");
+    // mutations.md § Request identity: a mutating call carries its exact current
+    // descriptor revision. Without one it is invalid params at the revision
+    // position; projection's absent-revision binding covers read tools only.
+    match case.revision_current {
+        None => return Ok("-32602"),
+        Some(false) => return Ok("stale_description"),
+        Some(true) => {}
     }
     match case.lookup.as_str() {
         "absent" => return Ok("not_found"),
@@ -206,7 +215,7 @@ fn decision(case: &Decision) -> Result<&str, String> {
 // These predicates constrain premises, not opaque fixture values or outcomes.
 fn decision_premises(case: &Decision) -> bool {
     let admitted = case.policy == "admit" && case.observation_admitted;
-    let current = admitted && case.revision_current;
+    let current = admitted && case.revision_current == Some(true);
     let enabled = current && case.lookup == "enabled";
     let valid_input = enabled && case.input_valid;
     let valid_key = case.kind == "keyed" && case.key.as_deref().is_some_and(|key| !key.is_empty());
@@ -219,13 +228,22 @@ fn decision_premises(case: &Decision) -> bool {
     let approval_failure = ["missing", "refused", "spent"].contains(&case.approval.as_str());
     let preflight_failure = approval_failure || case.approval == "preflight_unavailable";
     match case.id.as_str() {
-        "policy-before-stale" => case.policy == "deny" && !case.revision_current,
+        "policy-before-stale" => case.policy == "deny" && case.revision_current == Some(false),
         "scope-before-stale" => {
-            case.policy == "admit" && !case.observation_admitted && !case.revision_current
+            case.policy == "admit"
+                && !case.observation_admitted
+                && case.revision_current == Some(false)
         }
         "revision-before-key" => {
             admitted
-                && !case.revision_current
+                && case.revision_current == Some(false)
+                && case.lookup == "enabled"
+                && case.input_valid
+                && retained
+        }
+        "absent-revision-before-key" => {
+            admitted
+                && case.revision_current.is_none()
                 && case.lookup == "enabled"
                 && case.input_valid
                 && retained
@@ -510,6 +528,7 @@ fn check(document: &str, cases: &Cases) -> Result<(), String> {
         "policy-before-stale",
         "scope-before-stale",
         "revision-before-key",
+        "absent-revision-before-key",
         "disabled-before-key",
         "input-before-key",
         "key-required",
@@ -733,6 +752,7 @@ fn copied_cases_cannot_grant_replay_dispatch_or_bypass_admission() {
     for id in [
         "policy-before-stale",
         "revision-before-key",
+        "absent-revision-before-key",
         "revoked-before-delivery",
         "winner-after-miss",
         "quarantine-never-resends",
@@ -759,7 +779,7 @@ fn copied_cases_cannot_grant_replay_dispatch_or_bypass_admission() {
         let case = &mut changed.decisions[index];
         let previous = case.expected.clone();
         if case.id == "policy-before-stale" {
-            case.revision_current = true;
+            case.revision_current = Some(true);
         } else {
             case.policy = "deny".into();
             case.expected = "not_granted".into();
@@ -978,6 +998,7 @@ fn adversary_named_replay_cases_cannot_be_replaced_by_policy_denials() {
     for id in [
         "exact-replay",
         "revision-before-key",
+        "absent-revision-before-key",
         "winner-after-miss",
         "preflight-winner",
     ] {
@@ -1039,12 +1060,12 @@ fn adversary_retained_admission_revision_and_winner_precedence() {
         let mut case = original.clone();
         case.reservation = reservation.into();
         assert_eq!(decision(&case).unwrap(), expected);
-        case.revision_current = false;
+        case.revision_current = Some(false);
         assert_eq!(decision(&case).unwrap(), "stale_description");
         case.policy = "deny".into();
         assert_eq!(decision(&case).unwrap(), "not_granted");
         case.policy = "admit".into();
-        case.revision_current = true;
+        case.revision_current = Some(true);
         case.final_disclosure_admitted = false;
         assert_eq!(decision(&case).unwrap(), "forbidden");
     }
@@ -1126,5 +1147,74 @@ fn adversary_second_observer_knowledge_cannot_be_self_consistently_rewritten() {
                 "must reject erased semantics rather than incidental row mismatch"
             );
         }
+    }
+}
+
+/// mutations.md § Request identity: a mutating `tools/call` carries its exact
+/// current descriptor revision. One that names none is invalid params
+/// (`-32602`) at the revision position, before lookup, input or key work, and
+/// reaches no provider. projection.md binds an absent revision to the advertised
+/// one for read tools only.
+#[test]
+fn a_mutating_call_without_its_revision_is_invalid_params() {
+    let (document, cases) = inputs();
+    let authored = cases
+        .decisions
+        .iter()
+        .find(|case| case.id == "absent-revision-before-key")
+        .expect("authored absent-revision case");
+    assert_eq!(authored.revision_current, None);
+    assert_eq!(authored.expected, "-32602");
+    assert_eq!((authored.extra_dispatches, authored.extra_spends), (0, 0));
+    assert!(
+        document
+            .lines()
+            .any(|line| line == "| absent-revision-before-key | -32602 | 0 | 0 |")
+    );
+
+    // Binding like a read, or treating absence as stale, is refused.
+    for bound in ["retained_result", "candidate_new", "stale_description"] {
+        let mut changed = cases.clone();
+        changed
+            .decisions
+            .iter_mut()
+            .find(|case| case.id == "absent-revision-before-key")
+            .unwrap()
+            .expected = bound.into();
+        let altered = document.replace(
+            "| absent-revision-before-key | -32602 | 0 | 0 |",
+            &format!("| absent-revision-before-key | {bound} | 0 | 0 |"),
+        );
+        assert_eq!(
+            check(&altered, &changed).unwrap_err(),
+            "unsafe replay decision",
+            "absent revision accepted as {bound}"
+        );
+    }
+
+    // Every admitted decision becomes invalid params once its revision is
+    // absent; current denial and unadmitted observation still come first.
+    for case in &cases.decisions {
+        let mut absent = case.clone();
+        absent.revision_current = None;
+        let expected = match (absent.policy.as_str(), absent.observation_admitted) {
+            ("deny", _) => "not_granted",
+            ("unavailable", _) => "unavailable",
+            (_, false) => "forbidden",
+            _ => "-32602",
+        };
+        assert_eq!(decision(&absent).unwrap(), expected, "{}", case.id);
+    }
+
+    // The member is required on every decision: an omitted one is not read
+    // as an absent revision.
+    let raw: Value = serde_json::from_str(&read(CASES)).unwrap();
+    for case in raw["decisions"].as_array().unwrap() {
+        let mut case = case.clone();
+        case.as_object_mut().unwrap().remove("revision_current");
+        assert!(
+            serde_json::from_value::<Decision>(case.clone()).is_err(),
+            "an omitted revision_current was accepted: {case}"
+        );
     }
 }
