@@ -471,7 +471,7 @@
       "input_valid": true,
       "dependency_ready": true,
       "approval_ready": true,
-      "id": "no-revision-binds-current",
+      "id": "read-without-revision-binds-current",
       "visible": true,
       "outcome": "candidate_or_retained_key"
     },
