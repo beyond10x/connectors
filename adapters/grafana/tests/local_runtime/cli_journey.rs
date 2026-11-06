@@ -1,16 +1,35 @@
-//! Production CLI, real private owner/adapter processes and disposable custody.
+//! Production CLI, real private owner/adapter processes and the platform's custody.
 //! The Grafana counterpart of the Loki journey: a saved `grafana.service_account`
 //! connection answers `datasources.list` through `invoke` against the
 //! recorded fixture, and `connections revalidate` repeats the identity probe.
+//!
+//! One journey body ([`journey`]) runs on each platform's custody binding: on
+//! Linux a disposable Secret Service the test starts, on macOS the user's login
+//! keychain, the binding the macOS build fixes.
 use super::*;
-use connectors_host::local::{config::Paths, keyring, owner};
+#[cfg(target_os = "linux")]
+use connectors_host::local::keyring;
+use connectors_host::local::{config::Paths, owner};
+#[cfg(target_os = "linux")]
+use std::io::Write;
 use std::{
-    io::Write,
     process::{Child as Process, Output, Stdio},
     time::{Duration, Instant},
 };
 
+/// The custody the journey's owner stores the saved credential in.
+trait JourneyCustody {
+    /// The `custody_backend` `setup check` reports for it.
+    fn backend(&self) -> &'static str;
+    /// The configuration lines that select it.
+    fn configuration(&self) -> String;
+    /// Restarts custody while no owner runs.
+    fn restart(&mut self);
+}
+
+#[cfg(target_os = "linux")]
 struct OwnedProcess(Process);
+#[cfg(target_os = "linux")]
 impl Drop for OwnedProcess {
     fn drop(&mut self) {
         let _ = self.0.kill();
@@ -96,6 +115,8 @@ impl Drop for BoundedChild {
         }
     }
 }
+/// A disposable GNOME Secret Service on a private bus: the Linux binding.
+#[cfg(target_os = "linux")]
 struct Custody {
     daemon: Option<OwnedProcess>,
     _bus: OwnedProcess,
@@ -103,6 +124,7 @@ struct Custody {
     socket: PathBuf,
     epoch: u32,
 }
+#[cfg(target_os = "linux")]
 impl Custody {
     fn new(parent: &std::path::Path) -> Self {
         let directory = parent.join("custody");
@@ -192,11 +214,124 @@ impl Custody {
             std::thread::sleep(Duration::from_millis(30));
         }
     }
+}
+#[cfg(target_os = "linux")]
+impl JourneyCustody for Custody {
+    fn backend(&self) -> &'static str {
+        "secret_service"
+    }
+    fn configuration(&self) -> String {
+        format!(
+            "secret_service_socket={}\n",
+            serde_json::to_string(self.socket.to_str().unwrap()).unwrap()
+        )
+    }
     fn restart(&mut self) {
         drop(self.daemon.take());
         self.start();
     }
 }
+
+/// The user's login keychain, the macOS binding
+/// (`connectors_custody::keychain`, service `connectors`). This journey touches
+/// it: the owner writes real items into it. They are named by the purpose, the
+/// test store's authority and version ids, so no item of another store is ever
+/// selected, and [`LoginKeychain::remove_written`] deletes them through the
+/// custody binding's own deletion (also when the test fails, on drop). A locked
+/// keychain answers `unavailable` without a prompt (user interaction is
+/// disallowed for every custody call), and `setup check` names it before any
+/// credential is read.
+#[cfg(target_os = "macos")]
+struct LoginKeychain {
+    /// The CLI's state directory, whose metadata store names the authority.
+    state: PathBuf,
+}
+#[cfg(target_os = "macos")]
+impl LoginKeychain {
+    /// The accounts of the `connectors` items in the login keychain that this
+    /// test's store wrote.
+    fn written(&self) -> Result<Vec<String>, String> {
+        use security_framework::item::{ItemClass, ItemSearchOptions, Limit};
+        // No store, nothing written: the journey failed before `setup init`.
+        let Ok(authority) = connectors_host::local::metadata::Metadata::authority_at(&self.state)
+        else {
+            return Ok(Vec::new());
+        };
+        let marker = format!("/{authority}/");
+        // The user's keychain search list, the login keychain among them;
+        // attributes only, never an item's data.
+        let found = ItemSearchOptions::new()
+            .class(ItemClass::generic_password())
+            .service(connectors_custody::keychain::SERVICE)
+            .load_attributes(true)
+            .limit(Limit::All)
+            .search();
+        let found = match found {
+            Ok(found) => found,
+            // errSecItemNotFound: no item carries the service.
+            Err(error) if error.code() == -25300 => Vec::new(),
+            Err(error) => return Err(format!("keychain search: {error}")),
+        };
+        Ok(found
+            .iter()
+            .filter_map(|item| item.simplify_dict()?.remove("acct"))
+            .filter(|account| account.contains(&marker))
+            .collect())
+    }
+
+    /// Deletes every item this test's store wrote and answers how many.
+    fn remove_written(&self) -> Result<usize, String> {
+        use connectors_custody::{Backend, Scope, Version, keychain::Keychain};
+        let accounts = self.written()?;
+        for account in &accounts {
+            let parts: Vec<&str> = account.split('/').collect();
+            let [purpose, authority, allocation, id] = parts[..] else {
+                return Err(format!("unexpected custody item {account}"));
+            };
+            let uuid =
+                |text: &str| uuid::Uuid::parse_str(text).map_err(|e| format!("{account}: {e}"));
+            let (authority, allocation) = (uuid(authority)?, uuid(allocation)?);
+            let scope = match purpose {
+                "credential" => Scope::new(authority, allocation),
+                "approval-signing" => Scope::approval_signing(authority, allocation),
+                other => return Err(format!("unexpected custody purpose {other}")),
+            }
+            .map_err(|e| format!("{account}: {e}"))?;
+            let version = Version::new(scope, uuid(id)?).map_err(|e| format!("{account}: {e}"))?;
+            Keychain::open(scope)
+                .and_then(|keychain| {
+                    keychain.delete(version, Instant::now() + Duration::from_secs(10), || Ok(()))
+                })
+                .map_err(|e| format!("deleting {account}: {e}"))?;
+        }
+        Ok(accounts.len())
+    }
+}
+#[cfg(target_os = "macos")]
+impl JourneyCustody for LoginKeychain {
+    fn backend(&self) -> &'static str {
+        "macos_keychain"
+    }
+    /// Nothing: absent `secret_service_socket` and `[custody]`, the platform
+    /// binding the macOS build fixes is the login keychain.
+    fn configuration(&self) -> String {
+        String::new()
+    }
+    /// The login keychain is the user's, not a process this test owns, so
+    /// there is nothing of custody to restart: the journey restarts the owner
+    /// only, which still reads the saved credential back from the keychain.
+    fn restart(&mut self) {}
+}
+#[cfg(target_os = "macos")]
+impl Drop for LoginKeychain {
+    fn drop(&mut self) {
+        match self.remove_written() {
+            Ok(removed) => eprintln!("removed {removed} login keychain item(s) of this test"),
+            Err(error) => eprintln!("login keychain cleanup failed: {error}"),
+        }
+    }
+}
+
 struct Cli {
     binary: PathBuf,
     paths: Paths,
@@ -204,7 +339,9 @@ struct Cli {
 impl Cli {
     fn new(root: &std::path::Path) -> Self {
         let binary = std::env::var_os("CONNECTORS_TEST_CLI")
-            .expect("built production CLI required")
+            .expect(
+                "built production CLI required: set CONNECTORS_TEST_CLI to target/debug/connectors",
+            )
             .into();
         Self {
             binary,
@@ -274,7 +411,7 @@ fn refusal(output: Output) -> Value {
     value["error"]["data"].clone()
 }
 
-fn configure(cli: &Cli, provider: &Provider, custody: &Custody) {
+fn configure(cli: &Cli, provider: &Provider, custody: &dyn JourneyCustody) {
     success(cli.run(&["setup", "init"]));
     success(cli.run(&["setup", "check"]));
     let adapter = provider.selection();
@@ -282,9 +419,9 @@ fn configure(cli: &Cli, provider: &Provider, custody: &Custody) {
     // paths. No credential is a configuration input.
     let q = |value: &str| serde_json::to_string(value).unwrap();
     let configuration = format!(
-        "format='connectors-local/1'\nowner_uid={}\nsecret_service_socket={}\n[adapters.grafana]\ninstance_id={}\nadapter_id='grafana'\nconfiguration_revision={}\nprotocol='v1alpha1'\nstartup='on-demand'\nrestart='never'\n[adapters.grafana.permissions]\nprofiles=['grafana.service_account']\noperations=['datasources.list']\n[adapters.grafana.executable]\npath={}\nsha256={}\nargs={}\n",
+        "format='connectors-local/1'\nowner_uid={}\n{}[adapters.grafana]\ninstance_id={}\nadapter_id='grafana'\nconfiguration_revision={}\nprotocol='v1alpha1'\nstartup='on-demand'\nrestart='never'\n[adapters.grafana.permissions]\nprofiles=['grafana.service_account']\noperations=['datasources.list']\n[adapters.grafana.executable]\npath={}\nsha256={}\nargs={}\n",
         filesystem::uid(),
-        q(custody.socket.to_str().unwrap()),
+        custody.configuration(),
         q(&adapter.instance_id),
         q(&adapter.configuration_revision),
         q(adapter.executable.path.to_str().unwrap()),
@@ -293,6 +430,19 @@ fn configure(cli: &Cli, provider: &Provider, custody: &Custody) {
     );
     private(&cli.paths.config, configuration.as_bytes());
     connectors_host::local::config::Config::load(&cli.paths.config).unwrap();
+    // The configured binding is the expected one and qualified before any
+    // credential is read: a locked or absent store is named here.
+    let check = success(cli.run(&["setup", "check"]));
+    assert_eq!(check["custody_backend"], custody.backend(), "{check}");
+    assert_eq!(check["keyring"], "available", "{check}");
+    assert!(
+        check["prerequisites"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|p| p["name"] == "persistent_custody_qualification" && p["state"] == "ready"),
+        "{check}"
+    );
 }
 
 /// `operations describe`, then `invoke` with the described schema
@@ -325,6 +475,10 @@ fn invoke_saved(cli: &Cli, connection: &str, operation: &str, input: Value) -> V
         .clone()
 }
 
+/// Linux only: its custody is a GNOME Secret Service on a private D-Bus, which
+/// macOS does not have; the macOS test below runs the same journey on the
+/// login keychain.
+#[cfg(target_os = "linux")]
 #[test]
 #[ignore = "requires built production CLI and qualified disposable Secret Service"]
 fn grafana_cli_connects_with_a_service_account_token_and_lists_datasources_on_the_saved_connection()
@@ -332,7 +486,41 @@ fn grafana_cli_connects_with_a_service_account_token_and_lists_datasources_on_th
     let provider = Provider::new();
     let mut custody = Custody::new(provider.root.path());
     let cli = Cli::new(provider.root.path());
-    configure(&cli, &provider, &custody);
+    journey(&provider, &mut custody, &cli);
+}
+
+/// The same journey on macOS through the production CLI, with the platform
+/// binding the macOS build fixes: the user's login keychain. It touches the
+/// login keychain (service `connectors`) and removes every item it wrote at the
+/// end. It needs `CONNECTORS_TEST_CLI` (the built `target/debug/connectors`) and
+/// fails without it rather than passing without having run.
+#[cfg(target_os = "macos")]
+#[test]
+fn grafana_cli_connects_with_a_service_account_token_and_lists_datasources_with_the_login_keychain()
+{
+    let provider = Provider::new();
+    // Declared before the CLI so that on a failure the owner is shut down
+    // (the CLI's drop) before the keychain items are removed (this drop).
+    let mut keychain = LoginKeychain {
+        state: provider.root.path().join("cli/state"),
+    };
+    let cli = Cli::new(provider.root.path());
+    assert_eq!(cli.paths.state, keychain.state);
+    journey(&provider, &mut keychain, &cli);
+    cli.shutdown();
+    let removed = keychain.remove_written().unwrap();
+    assert!(
+        removed >= 1,
+        "the saved credential was not in the login keychain"
+    );
+    assert_eq!(keychain.written().unwrap(), Vec::<String>::new());
+}
+
+/// Connect refuses an unaccepted token, connects with the accepted one,
+/// lists the data sources on the saved connection, and revalidates it after
+/// the owner and custody restart, from the saved credential alone.
+fn journey(provider: &Provider, custody: &mut dyn JourneyCustody, cli: &Cli) {
+    configure(cli, provider, custody);
     assert_eq!(cli.status()["state"], "owner_unavailable");
 
     // An unaccepted token saves nothing and performs only the identity probe.
@@ -378,7 +566,7 @@ fn grafana_cli_connects_with_a_service_account_token_and_lists_datasources_on_th
     assert_eq!(provider.routes(), ["/api/datasources"; 2]);
 
     // grafana.datasource.list
-    let listed = invoke_saved(&cli, &reference, "datasources.list", json!({}));
+    let listed = invoke_saved(cli, &reference, "datasources.list", json!({}));
     assert_eq!(listed["provenance"]["instance"], INSTANCE);
     assert_eq!(listed["complete"], true);
     let uids: Vec<&str> = listed["items"]
@@ -394,8 +582,9 @@ fn grafana_cli_connects_with_a_service_account_token_and_lists_datasources_on_th
     assert!(!listed.to_string().contains("monitoring.svc"));
     assert_eq!(provider.routes(), ["/api/datasources"; 3]);
 
-    // grafana.test again, after an owner and keyring restart: revalidation repeats the
-    // probe with the saved credential, which is now the only copy.
+    // grafana.test again, after an owner and custody restart (the owner only on macOS,
+    // see `LoginKeychain::restart`): revalidation repeats the probe with the saved
+    // credential, which is now the only copy.
     cli.shutdown();
     custody.restart();
     fs::remove_file(&credential).unwrap();
