@@ -14,11 +14,17 @@ scope:
   path: adapters/mcp/contracts/server/v1alpha1/mutation-cases.json
 - confidence: inferred
   path: adapters/mcp/contracts/server/v1alpha1/mutations.md
+- confidence: cited
+  path: adapters/mcp/contracts/server/v1alpha1/projection-cases.json
 - confidence: inferred
   path: adapters/mcp/contracts/server/v1alpha1/projection.md
+- confidence: cited
+  path: apps/connectors/src/mcp/projection.rs
+- confidence: cited
+  path: crates/connectors-build/tests/mcp_inbound_capability_projection.rs
 - confidence: inferred
   path: crates/connectors-build/tests/mcp_inbound_mutation_replay.rs
-revision: 9
+revision: 12
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-05T09:37:30Z", actor: "human:timo", revision: 6}
 - {from: "proposed", to: "active", at: "2026-11-05T17:29:39Z", actor: "human:timo", revision: 8}
