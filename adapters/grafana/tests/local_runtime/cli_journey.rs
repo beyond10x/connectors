@@ -251,13 +251,27 @@ impl LoginKeychain {
     /// The accounts of the `connectors` items in the login keychain that this
     /// test's store wrote.
     fn written(&self) -> Result<Vec<String>, String> {
-        use security_framework::item::{ItemClass, ItemSearchOptions, Limit};
-        // No store, nothing written: the journey failed before `setup init`.
-        let Ok(authority) = connectors_host::local::metadata::Metadata::authority_at(&self.state)
-        else {
-            return Ok(Vec::new());
+        use security_framework::{
+            item::{ItemClass, ItemSearchOptions, Limit},
+            os::macos::keychain::SecKeychain,
         };
+        // No state directory or no metadata store (`metadata.sqlite3`, the
+        // file `Metadata::authority_at` opens), nothing written: the owner
+        // writes custody items only under the store's authority. Any other
+        // failure to read the authority fails the cleanup.
+        let store = self.state.join("metadata.sqlite3");
+        match std::fs::symlink_metadata(&store) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => return Err(format!("{}: {error}", store.display())),
+            Ok(_) => {}
+        }
+        let authority = connectors_host::local::metadata::Metadata::authority_at(&self.state)
+            .map_err(|e| format!("the store's authority: {e:?}"))?;
         let marker = format!("/{authority}/");
+        // As every custody call: user interaction disallowed, so a locked
+        // keychain answers an error and never shows an unlock prompt.
+        let _quiet = SecKeychain::disable_user_interaction()
+            .map_err(|e| format!("disallowing keychain user interaction: {e}"))?;
         // The user's keychain search list, the login keychain among them;
         // attributes only, never an item's data.
         let found = ItemSearchOptions::new()
@@ -279,32 +293,47 @@ impl LoginKeychain {
             .collect())
     }
 
-    /// Deletes every item this test's store wrote and answers how many.
+    /// Deletes every item this test's store wrote and answers how many. Every
+    /// item is tried; a refusal names how many items it left behind.
     fn remove_written(&self) -> Result<usize, String> {
-        use connectors_custody::{Backend, Scope, Version, keychain::Keychain};
         let accounts = self.written()?;
-        for account in &accounts {
-            let parts: Vec<&str> = account.split('/').collect();
-            let [purpose, authority, allocation, id] = parts[..] else {
-                return Err(format!("unexpected custody item {account}"));
-            };
-            let uuid =
-                |text: &str| uuid::Uuid::parse_str(text).map_err(|e| format!("{account}: {e}"));
-            let (authority, allocation) = (uuid(authority)?, uuid(allocation)?);
-            let scope = match purpose {
-                "credential" => Scope::new(authority, allocation),
-                "approval-signing" => Scope::approval_signing(authority, allocation),
-                other => return Err(format!("unexpected custody purpose {other}")),
-            }
-            .map_err(|e| format!("{account}: {e}"))?;
-            let version = Version::new(scope, uuid(id)?).map_err(|e| format!("{account}: {e}"))?;
-            Keychain::open(scope)
-                .and_then(|keychain| {
-                    keychain.delete(version, Instant::now() + Duration::from_secs(10), || Ok(()))
-                })
-                .map_err(|e| format!("deleting {account}: {e}"))?;
+        let failures: Vec<String> = accounts
+            .iter()
+            .filter_map(|account| Self::remove(account).err())
+            .collect();
+        if failures.is_empty() {
+            Ok(accounts.len())
+        } else {
+            Err(format!(
+                "{} of {} login keychain item(s) of this test left behind: {}",
+                failures.len(),
+                accounts.len(),
+                failures.join("; ")
+            ))
         }
-        Ok(accounts.len())
+    }
+
+    /// Deletes one item through the custody binding's own deletion.
+    fn remove(account: &str) -> Result<(), String> {
+        use connectors_custody::{Backend, Scope, Version, keychain::Keychain};
+        let parts: Vec<&str> = account.split('/').collect();
+        let [purpose, authority, allocation, id] = parts[..] else {
+            return Err(format!("unexpected custody item {account}"));
+        };
+        let uuid = |text: &str| uuid::Uuid::parse_str(text).map_err(|e| format!("{account}: {e}"));
+        let (authority, allocation) = (uuid(authority)?, uuid(allocation)?);
+        let scope = match purpose {
+            "credential" => Scope::new(authority, allocation),
+            "approval-signing" => Scope::approval_signing(authority, allocation),
+            other => return Err(format!("unexpected custody purpose {other}")),
+        }
+        .map_err(|e| format!("{account}: {e}"))?;
+        let version = Version::new(scope, uuid(id)?).map_err(|e| format!("{account}: {e}"))?;
+        Keychain::open(scope)
+            .and_then(|keychain| {
+                keychain.delete(version, Instant::now() + Duration::from_secs(10), || Ok(()))
+            })
+            .map_err(|e| format!("deleting {account}: {e}"))
     }
 }
 #[cfg(target_os = "macos")]
@@ -372,21 +401,39 @@ impl Cli {
         success(self.run(&["adapters", "status", "--adapter", "grafana"]))["observation"].clone()
     }
     fn shutdown(&self) {
+        self.try_shutdown().unwrap();
+    }
+    /// Stops a running owner and waits for it to remove its socket.
+    fn try_shutdown(&self) -> Result<(), String> {
         if let Ok(client) = owner::Client::connect(&self.paths, false) {
             let host = client.host_incarnation.clone();
-            client.shutdown(&host).unwrap();
+            client
+                .shutdown(&host)
+                .map_err(|e| format!("owner shutdown: {e:?}"))?;
             let until = Instant::now() + Duration::from_secs(5);
             while self.paths.state.join("owner.sock").exists() {
-                assert!(Instant::now() < until, "owner did not finish cleanup");
+                if Instant::now() >= until {
+                    return Err("owner did not finish cleanup".into());
+                }
                 std::thread::sleep(Duration::from_millis(10));
             }
             eprintln!("owner {host} acknowledged shutdown and removed its socket");
         }
+        Ok(())
     }
 }
 impl Drop for Cli {
+    /// A failed shutdown while the test is already failing is reported, not
+    /// raised: a second panic would abort the process before the custody
+    /// cleanup declared before the CLI (the login keychain's drop) runs.
     fn drop(&mut self) {
-        self.shutdown();
+        if std::thread::panicking() {
+            if let Err(error) = self.try_shutdown() {
+                eprintln!("owner shutdown during the failure failed: {error}");
+            }
+        } else {
+            self.shutdown();
+        }
     }
 }
 #[track_caller]
