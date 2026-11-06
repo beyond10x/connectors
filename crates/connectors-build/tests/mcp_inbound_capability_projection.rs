@@ -46,7 +46,7 @@ struct VisibilityCase {
     metadata_admitted: bool,
     policy: String,
     observation_admitted: bool,
-    /// `null` for a tool call that names no revision. The member is still
+    /// `null` for a read tool call that names no revision. The member is still
     /// required: `deserialize_with` keeps serde from reading an omitted one
     /// as `None`.
     #[serde(deserialize_with = "Option::deserialize")]
@@ -149,7 +149,8 @@ fn visibility(case: &VisibilityCase) -> Result<(bool, &str), String> {
         "deny" => "not_granted",
         "unavailable" => "unavailable",
         "admit" if !case.observation_admitted => "forbidden",
-        // A tool call that names no revision binds to the advertised one.
+        // A read tool call that names no revision binds to the advertised one;
+        // a mutating one is invalid params under mutations.md (mutation-cases.json).
         "admit" if case.revision_current == Some(false) => "stale_description",
         "admit" if !case.implemented || !case.bound => "not_found",
         "admit" if !case.enabled => "forbidden",
@@ -425,7 +426,7 @@ fn checker_rejects_visibility_and_precedence_contradictions() {
         "policy-beats-stale",
         "revision-beats-hidden",
         "scope-beats-stale",
-        "no-revision-binds-current",
+        "read-without-revision-binds-current",
     ] {
         let mut changed = cases.clone();
         let row = changed
@@ -444,9 +445,10 @@ fn checker_rejects_visibility_and_precedence_contradictions() {
         );
     }
 }
-/// projection.md § Qualified names and inverse selection: a tool call that
-/// names no revision binds to the advertised one, so no such case is refused
-/// `stale_description`. Its `revision_current` is `null`, and the member stays
+/// projection.md § Qualified names and inverse selection: a read tool call
+/// that names no revision binds to the advertised one, so no such case is
+/// refused `stale_description`. A mutating call without one is invalid params
+/// under mutations.md, held by `mcp_inbound_mutation_replay.rs`. Its `revision_current` is `null`, and the member stays
 /// required on every case: an omitted one is not read as an absent revision.
 #[test]
 fn checker_holds_a_call_without_a_revision_to_the_advertised_one() {
@@ -455,7 +457,7 @@ fn checker_holds_a_call_without_a_revision_to_the_advertised_one() {
     stale
         .visibility
         .iter_mut()
-        .find(|case| case.id == "no-revision-binds-current")
+        .find(|case| case.id == "read-without-revision-binds-current")
         .unwrap()
         .outcome = "stale_description".into();
     assert_eq!(

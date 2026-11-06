@@ -154,6 +154,53 @@ fn bounded_owner_refuses_caller_limits_and_unimplemented_requirements() {
 }
 
 #[test]
+fn bounded_owner_refuses_semantic_and_non_network_effects_before_any_request() {
+    let mut target = Target::new();
+    prepare(&mut target, false);
+    let read = |declaration: Value| {
+        let calls = Cell::new(0);
+        let value = bounded::read(
+            &target.paths,
+            "owner-authority",
+            "fixture",
+            &target.request(),
+            (&Policy(declaration), "projection"),
+            budget(false),
+            |_| {
+                calls.set(calls.get() + 1);
+                Ok(br#"{"observed":true}"#.to_vec())
+            },
+        )
+        .unwrap();
+        (value, calls.get())
+    };
+    let (admitted, requests) = read(declaration(false));
+    assert_eq!(admitted["status"], "success");
+    assert_eq!(requests, 1);
+    for (field, effects) in [
+        ("semantic_effects", json!(["human_visible"])),
+        ("effects", json!(["network", "process"])),
+    ] {
+        let mut value = declaration(false);
+        value[field] = effects;
+        assert!(
+            matches!(
+                resolve(&target, &Policy(value.clone()), budget(false)),
+                Err(Error {
+                    code: Code::Unsupported,
+                    ..
+                })
+            ),
+            "{field}"
+        );
+        let (refused, requests) = read(value);
+        assert_eq!(refused["error"]["code"], "unsupported", "{field}");
+        assert_eq!(refused["audit_status"], "complete", "{field}");
+        assert_eq!(requests, 0, "{field}");
+    }
+}
+
+#[test]
 fn bounded_owner_counts_the_whole_request_and_never_dispatches_oversize() {
     let mut target = Target::new();
     prepare(&mut target, false);
@@ -198,4 +245,115 @@ fn bounded_owner_counts_the_whole_result_and_returns_capacity_without_truncation
     assert_eq!(value["error"]["code"], "capacity");
     assert!(value.get("result").is_none());
     assert_eq!(value["audit_status"], "complete");
+}
+
+// Adversary: the GovernedRead frame (transport.rs governed_action, budget None)
+// reaches governed::read with the composition's projection selected. The owner
+// must hold the read rule there too, or a same-uid caller swaps frame kinds.
+#[test]
+fn adversary_projected_governed_read_refuses_semantic_and_non_network_effects() {
+    let mut target = Target::new();
+    prepare(&mut target, false);
+    for (field, effects) in [
+        ("semantic_effects", json!(["human_visible"])),
+        ("effects", json!(["network", "process"])),
+    ] {
+        let mut value = declaration(false);
+        value[field] = effects;
+        let policy = Policy(value);
+        let calls = Cell::new(0);
+        let refused = super::super::read(
+            (
+                &target.paths,
+                "owner-authority",
+                Instant::now() + Duration::from_secs(20),
+            ),
+            "fixture",
+            &target.request(),
+            Some((&policy, "projection")),
+            |_| {
+                calls.set(calls.get() + 1);
+                Ok(br#"{"observed":true}"#.to_vec())
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            calls.get(),
+            0,
+            "{field}: projected GovernedRead dispatched {refused}"
+        );
+        assert_eq!(refused["error"]["code"], "unsupported", "{field}");
+    }
+}
+
+// Adversary: every semantic effect and every non-network effect that parses
+// for a read profile, not only the two the unit's case names.
+#[test]
+fn adversary_bounded_owner_refuses_every_parseable_semantic_and_non_network_effect() {
+    let mut target = Target::new();
+    prepare(&mut target, false);
+    for (field, effects) in [
+        ("semantic_effects", json!(["billable"])),
+        ("semantic_effects", json!(["irreversible"])),
+        ("semantic_effects", json!(["human_visible"])),
+        ("semantic_effects", json!(["irreversible", "billable"])),
+        ("effects", json!(["process"])),
+        ("effects", json!(["local_system"])),
+        ("effects", json!(["network", "local_system"])),
+        ("effects", json!(["local_system", "network"])),
+    ] {
+        let mut value = declaration(false);
+        value[field] = effects.clone();
+        assert!(
+            matches!(
+                resolve(&target, &Policy(value), budget(false)),
+                Err(Error {
+                    code: Code::Unsupported,
+                    ..
+                })
+            ),
+            "{field} {effects}"
+        );
+    }
+}
+
+// Adversary: field shapes the owner's check would read differently from the
+// projection never reach either check: both parse the typed metadata first.
+#[test]
+fn adversary_effect_shapes_outside_the_typed_metadata_never_parse() {
+    let mut cases: Vec<(&str, Option<Value>)> = vec![];
+    for shape in [
+        json!(null),
+        json!("x"),
+        json!({}),
+        json!([""]),
+        json!(["HUMAN_VISIBLE"]),
+    ] {
+        cases.push(("semantic_effects", Some(shape)));
+    }
+    for shape in [
+        json!(null),
+        json!("network"),
+        json!(["NETWORK"]),
+        json!(["network", "network"]),
+        json!(["telepathy"]),
+        json!([""]),
+    ] {
+        cases.push(("effects", Some(shape)));
+    }
+    cases.push(("semantic_effects", None));
+    cases.push(("effects", None));
+    for (field, shape) in cases {
+        let mut value = declaration(false);
+        match &shape {
+            Some(shape) => value[field] = shape.clone(),
+            None => {
+                value.as_object_mut().unwrap().remove(field);
+            }
+        }
+        assert!(
+            Metadata::parse(&serde_json::to_vec(&value).unwrap(), "resource", 65536).is_err(),
+            "{field} {shape:?}"
+        );
+    }
 }
