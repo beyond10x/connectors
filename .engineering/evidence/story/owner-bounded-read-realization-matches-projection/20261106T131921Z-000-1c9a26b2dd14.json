@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-06T13:19:21Z",
+  "actor": "human:timo",
+  "artifact": "story:owner-bounded-read-realization-matches-projection",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "local staged gate S1-S5c on wave/2026-11-06-connectors at 9413efbdd (S3 store-only head e94165df8): S1 318, S2 1540, S4a 1200, S4b 281 passed, S5a-c clippy green; S3 563 passed, 2 failed in connection_lease_adversary (load-sensitive, routed to story:lease-early-recollection-relaunch-margin); bounded lane 16 passed",
+    "reference": "sha256:8c986c74c8bd42e5ba26a38b1a54f69c43384981af89405caa13c18752a2e690"
+  }
+}
