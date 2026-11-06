@@ -800,3 +800,100 @@ fn adv_variant_names_and_frames_for_notify_reach_no_provider() {
     assert_eq!(served.provider.requests(), 1);
     peer.finish();
 }
+
+/// What a refused call answered: `-32602` for invalid params, else the
+/// refusal code in its error data.
+fn refused_as(reply: &Value) -> String {
+    if reply["error"]["code"] == -32602 {
+        return "-32602".into();
+    }
+    reply["error"]["data"]["error"]["code"]
+        .as_str()
+        .unwrap_or_else(|| panic!("not a refusal: {reply}"))
+        .to_owned()
+}
+
+/// Adversary (story:mcp-mutating-tool-call-revision-rule): the revision
+/// shapes of mutations.md and projection.md, driven through `tools/call` on
+/// the V2 binding, where both `read` and the mutating `write` are unlisted.
+/// The absent-revision `-32602` covers projected mutating tools only, so
+/// without a revision both bind to the advertised revision and then meet the
+/// unbound lookup (`not_found`), as story:mcp-write-operation-call-by-name-is-refused
+/// promises. A present revision that is not a valid identifier is `-32602`,
+/// and a valid old one `stale_description`, for both.
+#[test]
+fn adv_u1_revision_shapes_on_an_unlisted_read_and_write() {
+    let served = Served::new(Binding::V2);
+    let mut peer = Peer::start(&served);
+    let (tools, revision) = listed(&mut peer, 1);
+    assert_eq!(tools, Vec::<String>::new(), "a V2 binding listed a tool");
+    let shapes: [(&str, Option<Value>, &str, &str); 6] = [
+        ("absent", None, "not_found", "not_found"),
+        ("null", Some(Value::Null), "-32602", "-32602"),
+        ("empty", Some(json!("")), "-32602", "-32602"),
+        ("number", Some(json!(7)), "-32602", "-32602"),
+        (
+            "stale",
+            Some(json!("stale-revision-1")),
+            "stale_description",
+            "stale_description",
+        ),
+        ("current", Some(revision.clone()), "not_found", "not_found"),
+    ];
+    let mut id = 2;
+    for (shape, value, read, write) in shapes {
+        for (operation, expected) in [(READ.id, read), (WRITE.id, write)] {
+            let mut params = json!({"name":name(operation),"arguments":{"input":{"n":17}}});
+            if let Some(value) = &value {
+                params["_meta"] = json!({ REVISION_META: value });
+            }
+            let reply = peer.request(id, "tools/call", params);
+            id += 1;
+            assert_eq!(
+                refused_as(&reply),
+                expected,
+                "{operation} with a {shape} revision: {reply}"
+            );
+        }
+    }
+    assert_eq!(
+        served.provider.requests(),
+        0,
+        "a refused call sent a request"
+    );
+    peer.finish();
+}
+
+/// Adversary (story:mcp-mutating-tool-call-revision-rule): under the
+/// 2025-11-25 lifecycle a call has no `_meta` at all. The unlisted mutating
+/// `write` and the unlisted `read` both bind and are `not_found`; neither
+/// reaches the provider.
+#[test]
+fn adv_u1_legacy_call_without_meta_on_an_unlisted_write_is_not_found() {
+    let served = Served::new(Binding::V2);
+    let mut peer = Peer::start(&served);
+    let init = raw(
+        &mut peer,
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25",
+            "capabilities":{},"clientInfo":{"name":"adv","version":"0"}}}),
+    );
+    assert_eq!(init["result"]["protocolVersion"], "2025-11-25", "{init}");
+    let stdin = peer.child.stdin.as_mut().unwrap();
+    stdin
+        .write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n")
+        .unwrap();
+    for (id, operation, expected) in [(2, WRITE.id, "not_found"), (3, READ.id, "not_found")] {
+        let reply = raw(
+            &mut peer,
+            json!({"jsonrpc":"2.0","id":id,"method":"tools/call","params":{"name":name(operation),
+                "arguments":{"input":{"n":17}}}}),
+        );
+        assert_eq!(refused_as(&reply), expected, "legacy {operation}: {reply}");
+    }
+    assert_eq!(
+        served.provider.requests(),
+        0,
+        "a refused call sent a request"
+    );
+    peer.finish();
+}

@@ -84,9 +84,11 @@ at most 32 tools; cursors are bound to the current owner, selection and revision
 
 Call the returned name with `params.arguments.input` and copy its
 `_meta["io.beyond10x.connectors/revision"]` into the call's `params._meta`.
-A call without it runs against the revision the server advertises at that
-moment, so the client cannot tell that the tool's description changed since it
-listed it; a call with an old revision is refused `stale_description`.
+A read tool called without it runs against the revision the server advertises
+at that moment, so the client cannot tell that the tool's description changed
+since it listed it; a call with an old revision is refused `stale_description`.
+A listed mutating tool called without it is refused as invalid params
+(`-32602`); the server lists read tools only today.
 The configured exposure selects the Connection; MCP input cannot select another.
 The result's `structuredContent` is the complete owner service response, including
 request identity, audit reference/status, business result or error. The text
