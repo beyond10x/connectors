@@ -92,30 +92,15 @@ unsafe extern "C" {
 /// authorizes decrypt gets a NULL application list, which means any
 /// application. An empty list would mean none. The other ACLs, the owner's
 /// change-ACL authorization among them, keep what `SecAccessCreate` gave them.
-///
-/// The access is created with an empty trusted-application array, not NULL.
-/// NULL asks the Security framework to trust "the calling application", which
-/// it derives from the calling executable on disk; the owner runs from a
-/// private copy the CLI removes once the owner has answered, so that lookup
-/// can fail and the write would answer `Unavailable` (inferred from the first
-/// macOS CI run, where the owner's first saving connect answered
-/// `custody_unavailable` while the custody contract test passed from a binary
-/// that stays on disk). The trusted list only fills the decrypt ACL's
-/// application list (`Access::makeStandard` in Apple's Security sources),
-/// which the loop below replaces with NULL either way, so
-/// the item's ACLs end as before: change-ACL as `SecAccessCreate` makes it,
-/// decrypt for any application.
 fn any_application_access() -> Result<SecAccess> {
     let descriptor = CFString::new(SERVICE);
-    let trusted = CFArray::<CFType>::from_CFTypes(&[]);
     let mut access: SecAccessRef = std::ptr::null_mut();
-    // SAFETY: descriptor and the empty trusted list are live for the call (an
-    // array with no elements is documented: no trusted application), and
-    // access is a valid output.
+    // SAFETY: descriptor is live for the call, a NULL trusted list is
+    // documented (the calling application), and access is a valid output.
     let status = unsafe {
         SecAccessCreate(
             descriptor.as_concrete_TypeRef(),
-            trusted.as_concrete_TypeRef(),
+            std::ptr::null(),
             &mut access,
         )
     };

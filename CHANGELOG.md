@@ -10,21 +10,6 @@
   (story:owner-bounded-read-realization-matches-projection). The projection and the owner share
   one inline-schema check in `connectors-core`. Generic reads keep their current rule.
 
-### Fixed
-
-- macOS: saving a credential through the owner (`connections connect`) no longer answers
-  `custody_unavailable`. Keychain items keep the same access: any application can read them, and a
-  change to their access still asks for confirmation (story:provider-programs-run-on-macos).
-
-### Added
-
-- The macOS CI job runs the Grafana CLI journey through the built `connectors` with the login
-  keychain: it connects with a service account token and answers `datasources.list` against the
-  recorded fixture (story:provider-programs-run-on-macos,
-  https://github.com/beyond10x/connectors/issues/229). The journey removes the keychain items it
-  wrote. On a Mac, `cargo test -p connectors-grafana` now needs `CONNECTORS_TEST_CLI` set to a
-  built `connectors`.
-
 ## 0.68.0 — 2026-11-06
 
 ### Changed
