@@ -1,0 +1,52 @@
+{
+  "recording": "claude-code-mcp-add/1",
+  "client": {
+    "name": "claude-code",
+    "version": "2.1.318"
+  },
+  "recorded_on": "2026-11-05",
+  "note": "One claude mcp add --scope project run in an empty project directory with an empty HOME, no network and the filesystem read-only outside the run directory; the project directory is PROJECT_DIR.",
+  "argv": [
+    "claude",
+    "mcp",
+    "add",
+    "--scope",
+    "project",
+    "connectors",
+    "--",
+    "connectors",
+    "--config",
+    "/srv/connectors/config.toml",
+    "--state-dir",
+    "/srv/connectors/state",
+    "server",
+    "--transport",
+    "stdio"
+  ],
+  "exit": 0,
+  "stdout": [
+    "Added stdio MCP server connectors with command: connectors --config /srv/connectors/config.toml --state-dir /srv/connectors/state server --transport stdio to project config",
+    "File modified: PROJECT_DIR/.mcp.json"
+  ],
+  "stderr": [],
+  "written": {
+    ".mcp.json": {
+      "mcpServers": {
+        "connectors": {
+          "type": "stdio",
+          "command": "connectors",
+          "args": [
+            "--config",
+            "/srv/connectors/config.toml",
+            "--state-dir",
+            "/srv/connectors/state",
+            "server",
+            "--transport",
+            "stdio"
+          ],
+          "env": {}
+        }
+      }
+    }
+  }
+}
