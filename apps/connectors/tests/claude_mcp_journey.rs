@@ -77,6 +77,9 @@ const BUNDLE: &[u8] =
     include_bytes!("../../../adapters/catalog/generated/bundles/jira.bundle.json");
 const SELECTION: &str = include_str!("../../../adapters/catalog/providers/jira/operations.json");
 const MCP_PAGE: &str = include_str!("../../../website/docs/connectors/mcp.md");
+/// One recorded `claude mcp add --scope project` run: its argv, exit status,
+/// output (the project directory as `PROJECT_DIR`) and the `.mcp.json` it wrote.
+const MCP_ADD: &str = include_str!("fixtures/claude-code/mcp-add.json");
 
 /// The catalog engine over the shipped Jira bundle and selection, its feed
 /// included, as the catalog provider builds it for an instance whose API base
@@ -1104,6 +1107,133 @@ fn mcp_config_entry_is_the_replayed_launch() {
     ] {
         assert!(command.contains(&option), "{option}: {command}");
     }
+}
+
+/// The recorded `claude mcp add` run (`fixtures/claude-code/mcp-add.json`).
+fn mcp_add() -> Value {
+    serde_json::from_str(MCP_ADD).unwrap()
+}
+
+/// The `connectors` entry of the `.mcp.json` the recorded `claude mcp add`
+/// wrote, the only server in it.
+fn mcp_add_entry() -> Value {
+    let recording = mcp_add();
+    let servers = recording["written"][".mcp.json"]["mcpServers"]
+        .as_object()
+        .unwrap();
+    assert_eq!(
+        servers.keys().collect::<Vec<_>>(),
+        ["connectors"],
+        "{recording}"
+    );
+    servers["connectors"].clone()
+}
+
+/// The lines of each fenced block of mcp.md whose opening fence is `fence`,
+/// in page order.
+fn page_blocks(fence: &str) -> Vec<Vec<&'static str>> {
+    let mut blocks = Vec::new();
+    let mut block: Option<Vec<&'static str>> = None;
+    for line in MCP_PAGE.lines() {
+        match block.take() {
+            None if line.trim() == fence => block = Some(Vec::new()),
+            None => {}
+            Some(lines) if line.trim() == "```" => blocks.push(lines),
+            Some(mut lines) => {
+                lines.push(line);
+                block = Some(lines);
+            }
+        }
+    }
+    blocks
+}
+
+/// The recorded `claude mcp add --scope project` exited 0 with nothing on
+/// stderr and wrote one server, `connectors`, to `.mcp.json`: type `stdio`,
+/// command `connectors`, no environment, and as arguments the launch the
+/// replay starts, on the `/srv/connectors` files. Its argv after `--` is that
+/// command and those arguments.
+#[test]
+fn recorded_mcp_add_entry_is_the_replayed_launch() {
+    let recording = mcp_add();
+    assert_eq!(recording["exit"], 0, "{recording}");
+    assert_eq!(recording["stderr"], json!([]), "{recording}");
+    let entry = mcp_add_entry();
+    assert_eq!(
+        members(&entry),
+        BTreeSet::from(["args", "command", "env", "type"]),
+        "{entry}"
+    );
+    assert_eq!(entry["type"], "stdio", "{entry}");
+    assert_eq!(entry["command"], "connectors", "{entry}");
+    assert_eq!(entry["env"], json!({}), "{entry}");
+    assert_eq!(
+        arguments(&entry, "CONFIG", "STATE_DIR"),
+        LAUNCH,
+        "the replayed launch"
+    );
+    let argv: Vec<&str> = recording["argv"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|word| word.as_str().unwrap())
+        .collect();
+    let separator = argv.iter().position(|word| *word == "--").unwrap();
+    assert_eq!(argv[separator + 1], "connectors", "{argv:?}");
+    assert_eq!(argv[separator + 2..], LAUNCH, "{argv:?}");
+}
+
+/// The entry the recorded `claude mcp add` wrote is the user form mcp.md
+/// shows, its `CONFIG` and `STATE_DIR` filled with the `/srv/connectors` files
+/// as `mcp_config_entry_is_the_replayed_launch` fills them, plus an empty
+/// `env`.
+#[test]
+fn recorded_mcp_add_entry_is_the_documented_user_form() {
+    let entries = mcp_config_entries();
+    let user = entries.last().expect("mcp.md shows the user form");
+    assert_eq!(user["command"], "connectors", "{user}");
+    let mut filled = user.clone();
+    filled["args"] = json!(arguments(
+        user,
+        "/srv/connectors/config.toml",
+        "/srv/connectors/state"
+    ));
+    filled["env"] = json!({});
+    assert_eq!(mcp_add_entry(), filled);
+}
+
+/// mcp.md shows the `claude mcp add` command that was recorded, word for word
+/// with `CONFIG` and `STATE_DIR` for the `/srv/connectors` files, the two lines
+/// it printed, and the `.mcp.json` it wrote.
+#[test]
+fn mcp_page_shows_the_recorded_mcp_add() {
+    let recording = mcp_add();
+    let command = MCP_PAGE
+        .lines()
+        .map(str::trim)
+        .find(|line| line.starts_with("claude mcp add "))
+        .expect("mcp.md shows the claude mcp add command");
+    let words: Vec<&str> = command
+        .split_whitespace()
+        .map(|word| match word {
+            "CONFIG" => CONFIG,
+            "STATE_DIR" => STATE,
+            word => word,
+        })
+        .collect();
+    assert_eq!(json!(words), recording["argv"], "{command}");
+    let output = page_blocks("```text");
+    assert!(
+        output
+            .iter()
+            .any(|lines| json!(lines) == recording["stdout"]),
+        "mcp.md shows the two lines claude mcp add printed: {}",
+        recording["stdout"]
+    );
+    let written = page_blocks(r#"```json title=".mcp.json""#);
+    assert_eq!(written.len(), 1, "mcp.md shows the .mcp.json it wrote");
+    let shown: Value = serde_json::from_str(&written[0].join("\n")).unwrap();
+    assert_eq!(shown, recording["written"][".mcp.json"]);
 }
 
 /// Not the recorded session: a sequence constructed from its recorded
