@@ -256,6 +256,16 @@ impl Snapshot {
             .find(|e| e.operation_ref == id)
             .map(Box::as_ref)
     }
+    /// Whether `tools/list` lists `operation`.
+    fn lists(&self, operation: &str) -> bool {
+        self.bootstrap.descriptor().ok().is_some_and(|descriptor| {
+            descriptor
+                .operation(operation)
+                .ok()
+                .and_then(|operation| self.tool(operation))
+                .is_some()
+        })
+    }
     fn tool(&self, operation: &connectors_core::Operation) -> Option<Value> {
         self.limits(operation)?;
         let exposure = self.exposure(&operation.id)?;
@@ -343,10 +353,12 @@ impl Snapshot {
         if !self.adapter.permissions.operations.contains(&name[2]) {
             return Err(refusal("not_granted"));
         }
+        // Projection visibility comes first: a name this snapshot does not
+        // list binds an absent revision as a read does and meets lookup.
         bind_revision(
             params,
             &self.revision,
-            reads_only(&self.bootstrap.requirements, &name[2]),
+            reads_only(&self.bootstrap.requirements, &name[2]) || !self.lists(&name[2]),
         )?;
         let descriptor = self
             .bootstrap
@@ -732,7 +744,7 @@ fn reads_only(requirements: &[runtime::Requirement], operation: &str) -> bool {
 /// whose `_meta` names no projection revision, or that has no `_meta`, binds
 /// to `current`, the revision this snapshot advertises, which the owner fences
 /// again at dispatch. A revision that is present must be a valid identifier,
-/// and a valid one other than `current` is stale. A mutating call (`read`
+/// and a valid one other than `current` is stale. A listed mutating call (`read`
 /// false) that names no revision is invalid params under mutations.md.
 fn bind_revision(params: &Value, current: &str, read: bool) -> Result<(), Value> {
     let absent = || {

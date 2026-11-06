@@ -148,19 +148,20 @@ fn decision(case: &Decision) -> Result<&str, String> {
     if !case.observation_admitted {
         return Ok("forbidden");
     }
-    // mutations.md § Request identity: a mutating call carries its exact current
-    // descriptor revision. Without one it is invalid params at the revision
-    // position; projection's absent-revision binding covers read tools only.
-    match case.revision_current {
-        None => return Ok("-32602"),
-        Some(false) => return Ok("stale_description"),
-        Some(true) => {}
+    if case.revision_current == Some(false) {
+        return Ok("stale_description");
     }
     match case.lookup.as_str() {
         "absent" => return Ok("not_found"),
         "disabled" => return Ok("forbidden"),
         "enabled" => {}
         _ => return Err("unknown lookup decision".into()),
+    }
+    // mutations.md § Admission: a listed mutating tool called with no
+    // descriptor revision is invalid params after projection visibility; an
+    // unlisted name binds as a read does and met lookup above.
+    if case.revision_current.is_none() {
+        return Ok("-32602");
     }
     if !case.input_valid {
         return Ok("invalid_input");
@@ -1151,10 +1152,10 @@ fn adversary_second_observer_knowledge_cannot_be_self_consistently_rewritten() {
 }
 
 /// mutations.md § Request identity: a mutating `tools/call` carries its exact
-/// current descriptor revision. One that names none is invalid params
-/// (`-32602`) at the revision position, before lookup, input or key work, and
+/// current descriptor revision. A listed one that names none is invalid params
+/// (`-32602`) after projection visibility, before input or key work, and
 /// reaches no provider. projection.md binds an absent revision to the advertised
-/// one for read tools only.
+/// one for read tools, and for a name it does not list.
 #[test]
 fn a_mutating_call_without_its_revision_is_invalid_params() {
     let (document, cases) = inputs();
@@ -1192,19 +1193,31 @@ fn a_mutating_call_without_its_revision_is_invalid_params() {
         );
     }
 
-    // Every admitted decision becomes invalid params once its revision is
-    // absent; current denial and unadmitted observation still come first.
+    // Every admitted decision on a listed tool becomes invalid params once its
+    // revision is absent. Current denial, unadmitted observation and
+    // projection visibility come first: an unlisted name binds as a read does
+    // and meets lookup, so the refusal discloses nothing about it.
     for case in &cases.decisions {
         let mut absent = case.clone();
         absent.revision_current = None;
-        let expected = match (absent.policy.as_str(), absent.observation_admitted) {
-            ("deny", _) => "not_granted",
-            ("unavailable", _) => "unavailable",
-            (_, false) => "forbidden",
+        let expected = match (
+            absent.policy.as_str(),
+            absent.observation_admitted,
+            absent.lookup.as_str(),
+        ) {
+            ("deny", _, _) => "not_granted",
+            ("unavailable", _, _) => "unavailable",
+            (_, false, _) => "forbidden",
+            (_, _, "absent") => "not_found",
+            (_, _, "disabled") => "forbidden",
             _ => "-32602",
         };
         assert_eq!(decision(&absent).unwrap(), expected, "{}", case.id);
     }
+    // The authored case, its tool unlisted, is not_found with no provider work.
+    let mut unlisted = authored.clone();
+    unlisted.lookup = "absent".into();
+    assert_eq!(decision(&unlisted).unwrap(), "not_found");
 
     // The member is required on every decision: an omitted one is not read
     // as an absent revision.
