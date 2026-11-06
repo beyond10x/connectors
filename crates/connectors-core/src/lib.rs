@@ -98,6 +98,30 @@ pub struct Operation {
     pub output_schema: Value,
 }
 
+/// Whether `value` is a self-contained schema: no reference, identifier or
+/// anchor keyword at any depth. Nesting a schema in another document changes
+/// root-relative reference resolution, so the MCP projection advertises a
+/// bounded read only over inline schemas, and the owner serves an implemented
+/// realization only over inline schemas.
+pub fn inline_schema(value: &Value) -> bool {
+    match value {
+        Value::Object(fields) => fields.iter().all(|(key, value)| {
+            !matches!(
+                key.as_str(),
+                "$ref"
+                    | "$dynamicRef"
+                    | "$recursiveRef"
+                    | "$id"
+                    | "$anchor"
+                    | "$dynamicAnchor"
+                    | "$recursiveAnchor"
+            ) && inline_schema(value)
+        }),
+        Value::Array(values) => values.iter().all(inline_schema),
+        _ => true,
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Descriptor {

@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-06T14:22:45Z",
+  "actor": "human:operator",
+  "artifact": "story:provider-programs-run-on-macos",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-20261106-u1-ci1-security",
+    "review": "review-result:wave-20261106-u1-ci1-security",
+    "outcome": "fixed"
+  }
+}
