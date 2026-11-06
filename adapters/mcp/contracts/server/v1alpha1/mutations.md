@@ -138,10 +138,13 @@ then permitted private bound lookup/enablement, operation input validity and
 containment, then key inspection. Current denial wins over stale/existence/key
 or outcome disclosure. Current policy unavailable is `unavailable`, never cached
 success. Admitted stale revision yields `stale_description` before private lookup
-or key decisions. A mutating tool call that names no descriptor revision is
-refused at that same position as invalid params (`-32602`, a JSON-RPC error) and
-reaches no provider; it never binds to the advertised revision, which the
-[projection](projection.md) allows for read tools only. Refusals before admitted key/result observation omit mutation
+or key decisions. A mutating tool the projection lists, called with no
+descriptor revision, is refused as invalid params (`-32602`, a JSON-RPC error)
+after policy, scope and projection visibility, and reaches no provider; it never
+binds to the advertised revision, which the [projection](projection.md) allows
+for read tools only. A name the projection does not list binds an absent
+revision as a read does and meets lookup (`not_found`, or `forbidden` when
+disabled), so the refusal discloses nothing about an unlisted operation. Refusals before admitted key/result observation omit mutation
 metadata and cannot claim a possibly existing original was not attempted.
 
 An exact live fingerprint match selects the existing reservation and immutable
