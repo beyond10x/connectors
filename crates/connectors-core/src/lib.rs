@@ -101,7 +101,8 @@ pub struct Operation {
 /// Whether `value` is a self-contained schema: no reference, identifier or
 /// anchor keyword at any depth. Nesting a schema in another document changes
 /// root-relative reference resolution, so the MCP projection advertises a
-/// bounded read, and the owner serves one, only over inline schemas.
+/// bounded read only over inline schemas, and the owner serves an implemented
+/// realization only over inline schemas.
 pub fn inline_schema(value: &Value) -> bool {
     match value {
         Value::Object(fields) => fields.iter().all(|(key, value)| {
