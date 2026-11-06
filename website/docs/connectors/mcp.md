@@ -3,7 +3,7 @@ title: MCP
 sidebar_position: 21
 description: Claude Code and other local MCP clients reach connectors through its stdio MCP server on Linux; MCP as a connector has specified contracts and no runtime yet.
 lede: connectors runs as a local MCP server, recorded with a headless Claude Code session. Reading from an MCP server as a connector is planned; each step below says which direction exists.
-source: docs/local-mcp-cli.md, docs/local-mcp-stdio.md, apps/connectors/tests/claude_mcp_journey.rs, adapters/mcp/contracts/server/v1alpha1/semantics.md, adapters/mcp/contracts/client/v1alpha1/auth.md
+source: docs/local-mcp-cli.md, docs/local-mcp-stdio.md, apps/connectors/tests/claude_mcp_journey.rs, apps/connectors/tests/fixtures/claude-code/mcp-add.json, adapters/mcp/contracts/server/v1alpha1/semantics.md, adapters/mcp/contracts/client/v1alpha1/auth.md
 connectors: "mcp"
 ---
 
@@ -111,7 +111,7 @@ claude -p "List my open Jira issues. Use the connectors tool to search Jira, the
 
 Claude Code started the wrapper as its child and spoke MCP with the server through it, over
 standard input and output. Its answer listed DEMO-1, DEMO-2 and DEMO-3, each with its key, summary and status.
-`claude mcp add` is the interactive equivalent and is not exercised here.
+`claude mcp add` was recorded separately; see [Register with `claude mcp add`](#register-with-claude-mcp-add).
 
 The session's frames are replayed against the server by
 [`claude_mcp_journey.rs`](https://github.com/beyond10x/connectors/blob/main/apps/connectors/tests/claude_mcp_journey.rs)
@@ -141,6 +141,44 @@ A session that starts with `initialize` on `2025-11-25` is not in the recording.
 constructs one from the recorded `initialize` frame and sends it first: the server answers on
 `2025-11-25` with the tools capability and, after `notifications/initialized`, lists the same
 tools.
+
+### Register with `claude mcp add`
+
+`claude mcp add` writes the entry for you. It was recorded once, with Claude Code 2.1.318, in an
+empty project directory, with `/srv/connectors/config.toml` for `CONFIG` and
+`/srv/connectors/state` for `STATE_DIR`:
+
+```sh
+claude mcp add --scope project connectors -- connectors --config CONFIG --state-dir STATE_DIR server --transport stdio
+```
+
+It exited 0, printed nothing on standard error and printed, with `PROJECT_DIR` for the project
+directory:
+
+```text
+Added stdio MCP server connectors with command: connectors --config /srv/connectors/config.toml --state-dir /srv/connectors/state server --transport stdio to project config
+File modified: PROJECT_DIR/.mcp.json
+```
+
+It wrote `.mcp.json`, the project-scope file Claude Code reads, in the project directory: the
+user form above on those paths, with an empty `env`.
+
+```json title=".mcp.json"
+{
+  "mcpServers": {
+    "connectors": {
+      "type": "stdio",
+      "command": "connectors",
+      "args": ["--config", "/srv/connectors/config.toml", "--state-dir", "/srv/connectors/state", "server", "--transport", "stdio"],
+      "env": {}
+    }
+  }
+}
+```
+
+[`claude_mcp_journey.rs`](https://github.com/beyond10x/connectors/blob/main/apps/connectors/tests/claude_mcp_journey.rs)
+checks the recorded entry against the launch the replay starts and against the user form. The
+recording shows the registration only, not a session that uses it.
 
 ## A first guarded write
 

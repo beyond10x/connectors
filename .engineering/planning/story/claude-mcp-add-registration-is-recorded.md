@@ -2,11 +2,25 @@
 format: aep.planning-md/3
 id: story:claude-mcp-add-registration-is-recorded
 kind: story
-status: draft
+status: implemented
 title: A recorded claude mcp add registers the local stdio MCP server
 relations:
 - derived_from: story:claude-connects-to-the-mcp-server
-revision: 2
+- serves: vision:independent-contract-adapters
+scope:
+- confidence: inferred
+  path: README.md
+- confidence: inferred
+  path: apps/connectors/tests/claude_mcp_journey.rs
+- confidence: inferred
+  path: apps/connectors/tests/fixtures/claude-code/mcp-add.json
+- confidence: inferred
+  path: website/docs/connectors/mcp.md
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-05T17:29:39Z", actor: "human:operator", revision: 4}
+- {from: "proposed", to: "active", at: "2026-11-05T17:29:39Z", actor: "human:operator", revision: 5}
+- {from: "active", to: "implemented", at: "2026-11-06T05:34:10Z", actor: "human:operator", revision: 7, decided_on: {"recorded":{"test_result":1}}}
 ---
 <!-- Starting point for a `story` artifact, seeded by `aep artifact new story <name>`.
      No frontmatter here on purpose: the `---` block is written by the CLI from the id, kind, status
@@ -62,3 +76,22 @@ One recorded `claude mcp add --scope project connectors -- connectors --config C
 - A test checks that the server entry in the captured `.mcp.json` equals the server launch the journey replay uses: command and args.
 - The run is made by the coordinator only, with the orchestrator's go, once, on the existing login. Nothing in the user's own Claude configuration is changed.
 - The fixture passes `b10x-gates scan-text` and the grep for tokens, emails, hostnames and home paths with 0 hits before it is committed.
+
+## Delivered (wave 2026-11-05b, v0.68.0)
+
+The unit commit cc3260477 was merged in 798b960b7 on `wave/2026-11-05b-connectors`. The local staged gate is green at cd51cd062.
+
+The coordinator made the one recorded `claude mcp add --scope project` run with Claude Code 2.1.318. It ran in a rig with an empty HOME, no network and the filesystem read-only outside the run directory. Nothing asked for a login, and nothing was written outside the rig. The sanitized recording passed scan-text with 0 hits and was copied byte for byte to `apps/connectors/tests/fixtures/claude-code/mcp-add.json`.
+
+`claude_mcp_journey.rs` checks three things: the recorded `.mcp.json` entry against the replayed launch, the same entry against the documented user form, and the page's command and output against the recording. The MCP page and README show the command, its output and the `.mcp.json` it wrote. They say that the recording shows the registration only.
+
+Targeted tests: `claude_mcp_journey` 11 passed, `connectors-docs` 52 passed, and `generate --check` is current.
+
+Scope as landed:
+
+| path | result |
+|---|---|
+| `apps/connectors/tests/claude_mcp_journey.rs` | held |
+| `apps/connectors/tests/fixtures/claude-code/mcp-add.json` (new) | held |
+| `website/docs/connectors/mcp.md` | held |
+| `README.md` | held |

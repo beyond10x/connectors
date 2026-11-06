@@ -290,6 +290,15 @@ called its search tool. The `--mcp-config` entry that ran named a capturing wrap
 (`{"type":"stdio","command":"CAPTURE_WRAPPER","args":["--config","/srv/connectors/config.toml","--state-dir","/srv/connectors/state","server","--transport","stdio"],"env":{"RIG_CAPTURE":"CAPTURE_DIR"}}`);
 the user form names `connectors` itself
 (`{"type":"stdio","command":"connectors","args":["--config","CONFIG","--state-dir","STATE_DIR","server","--transport","stdio"]}`).
+`claude mcp add --scope project connectors -- connectors --config CONFIG --state-dir STATE_DIR server --transport stdio`
+was recorded once, with Claude Code 2.1.318 in an empty project directory, `CONFIG` being
+`/srv/connectors/config.toml` and `STATE_DIR` `/srv/connectors/state`. It printed
+`Added stdio MCP server connectors with command: connectors --config /srv/connectors/config.toml --state-dir /srv/connectors/state server --transport stdio to project config`
+and `File modified: PROJECT_DIR/.mcp.json`, `PROJECT_DIR` standing for the project directory,
+and wrote `.mcp.json`, the project-scope file Claude Code reads:
+`{"mcpServers":{"connectors":{"type":"stdio","command":"connectors","args":["--config","/srv/connectors/config.toml","--state-dir","/srv/connectors/state","server","--transport","stdio"],"env":{}}}}`,
+the user form on those paths with an empty `env`
+(`apps/connectors/tests/fixtures/claude-code/mcp-add.json`).
 The recorded session is replayed against the server in every `cargo test` on Linux
 (`apps/connectors/tests/claude_mcp_journey.rs`). Reading
 from an MCP server as a connector is not implemented; the two decision blockers on its
