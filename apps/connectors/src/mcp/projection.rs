@@ -4,6 +4,7 @@ use connectors::{
     shape,
     walk::{Page, Walk},
 };
+use connectors_core::inline_schema;
 use connectors_mcp::{names, protocol, results::Envelope};
 use serde_json::Value;
 use std::{
@@ -782,25 +783,6 @@ fn response_schema(result: Value) -> Value {
             "source_audit":{"type":"object"},"mutation":{"type":"object"}},
         "oneOf":[{"properties":{"status":{"const":"success"}},"required":["result"],"not":{"required":["error"]}},
             {"properties":{"status":{"const":"error"}},"required":["error"],"not":{"required":["result"]}}],"additionalProperties":false})
-}
-
-fn inline_schema(value: &Value) -> bool {
-    match value {
-        Value::Object(fields) => fields.iter().all(|(key, value)| {
-            !matches!(
-                key.as_str(),
-                "$ref"
-                    | "$dynamicRef"
-                    | "$recursiveRef"
-                    | "$id"
-                    | "$anchor"
-                    | "$dynamicAnchor"
-                    | "$recursiveAnchor"
-            ) && inline_schema(value)
-        }),
-        Value::Array(values) => values.iter().all(inline_schema),
-        _ => true,
-    }
 }
 
 #[cfg(test)]
