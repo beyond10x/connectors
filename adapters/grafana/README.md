@@ -8,8 +8,10 @@ read only: alert groups and incidents over a since window, and one of each by id
 [spec/ess](spec/ess/domains/records.yaml) and [the IRM domain](spec/ess/domains/irm.yaml), the
 connection in [the connection domain](spec/ess/domains/connection.yaml). It runs on Linux with
 the [qualified Secret Service binding](../../docs/local-secret-service.md) and on Apple-silicon
-macOS with the login keychain, like every saved credential; the macOS job of `macos-host.yml`
-runs its tests. The release archives hold `connectors-grafana` beside `connectors`; see
+macOS with the login keychain, like every saved credential. The macOS job of `macos-host.yml`
+runs its tests, among them the CLI journey that connects with a service account token through the
+built `connectors` and lists the data sources of the recorded fixture, with the credential saved
+in the login keychain. The release archives hold `connectors-grafana` beside `connectors`; see
 [From the release archive](#from-the-release-archive).
 
 Connector, instance and connection are the terms of the [vocabulary](../../README.md#vocabulary).
