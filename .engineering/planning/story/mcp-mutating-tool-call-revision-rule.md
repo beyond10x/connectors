@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:mcp-mutating-tool-call-revision-rule
 kind: story
-status: active
+status: implemented
 title: A mutating MCP tool call has one stated rule for an absent revision
 tags:
 - from-finding
@@ -24,10 +24,11 @@ scope:
   path: crates/connectors-build/tests/mcp_inbound_capability_projection.rs
 - confidence: inferred
   path: crates/connectors-build/tests/mcp_inbound_mutation_replay.rs
-revision: 13
+revision: 15
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-05T09:37:30Z", actor: "human:timo", revision: 6}
 - {from: "proposed", to: "active", at: "2026-11-05T17:29:39Z", actor: "human:timo", revision: 8}
+- {from: "active", to: "implemented", at: "2026-11-06T05:34:08Z", actor: "human:timo", revision: 15, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Why
 
@@ -86,3 +87,41 @@ One correction in this unit:
 - The adversary's two cases stay, with `not_found` expected for the unlisted write. One case pins the mutating refusal for a projected mutating tool, or the report notes why the test rig cannot project one.
 - `docs/local-mcp-stdio.md:87` says the absent-revision binding covers reads only. If a mutating field in `projection-cases.json` is small it is added; otherwise it is filed as a draft.
 - The coordinator keeps the `Unknown` arm of the classification, which no V2 or V3 bootstrap reaches today: it refuses rather than binds if a later bootstrap admits an unknown effect.
+
+## Delivered (wave 2026-11-05b, v0.68.0)
+
+The unit commit be6f693e4 and the correction 7ee45f9e6 were merged in 513325bf8 on `wave/2026-11-05b-connectors`. The local staged gate is green at cd51cd062.
+
+As built:
+- A listed mutating `tools/call` without a revision is refused `-32602` at the revision position, after policy, scope and projection visibility.
+- A read, or a name the server does not list, binds an absent revision to the advertised one, so an unlisted write called by name stays `not_found`.
+- A malformed revision stays `-32602`, and a stale one stays `stale_description`.
+- `bind_revision` (`apps/connectors/src/mcp/projection.rs`) takes its read flag from `reads_only` or from the name being unlisted.
+- No mutating tool can be projected today (`crates/connectors-host/src/local/runtime.rs:718-719`), so the refusal is held by the unit test `a_mutating_call_without_a_revision_is_invalid_params`.
+- The read or mutating field for the projection case rows is filed as story:mcp-projection-cases-carry-read-or-mutating.
+
+Targeted tests:
+
+| Test | Passed |
+|---|---|
+| `local_mcp_server_write_refusal` | 8 |
+| `--bin connectors` | 55 |
+| `local_mcp_server_revision_adversary` | 7 |
+| `mcp_inbound_mutation_replay` | 11 |
+| `mcp_inbound_capability_projection` | 11 |
+
+`mcp-bindings --check` is current.
+
+Scope as landed:
+
+| path | result |
+|---|---|
+| `adapters/mcp/contracts/server/v1alpha1/mutation-cases.json` | held |
+| `adapters/mcp/contracts/server/v1alpha1/projection.md` | held |
+| `adapters/mcp/contracts/server/v1alpha1/mutations.md` | held |
+| `crates/connectors-build/tests/mcp_inbound_mutation_replay.rs` | held |
+| `adapters/mcp/contracts/server/v1alpha1/projection-cases.json` | added (a renamed row) |
+| `crates/connectors-build/tests/mcp_inbound_capability_projection.rs` | added |
+| `apps/connectors/src/mcp/projection.rs` | added (`bind_revision`, `reads_only`, `lists`) |
+| `apps/connectors/tests/local_mcp_server_write_refusal.rs` | added (the adversary's two cases) |
+| `docs/local-mcp-stdio.md` | added |

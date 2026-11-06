@@ -8,7 +8,7 @@ relations:
 - decides: story:owner-bounded-read-rechecks-semantic-effects
 - decides: story:mcp-mutating-tool-call-revision-rule
 - decides: story:claude-mcp-add-registration-is-recorded
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "approved", at: "2026-11-05T17:30:48Z", actor: "human:timo", revision: 2}
 ---
@@ -33,3 +33,30 @@ ESS 0.87.0 was released and verified after the go. The workspace rule moves a re
 - One ride-along commit on the wave branch, after U3 and before the gate, moves the seven ESS git dependencies in `Cargo.toml` and the lockfile from tag 0.86.0 to tag 0.87.0.
 - The staged gate uses the `ess` binary at 0.87.0.
 - S1 may rebuild in full. If its peak passes the estimate (5G) by more than 2G, S1 stops with its stop line, and the directing session decides whether to raise the term.
+
+## Delivered (2026-11-06)
+
+All three units and the ESS ride-along are merged into `wave/2026-11-05b-connectors`. The release commit is cd51cd062 (`release: 0.68.0`).
+
+| unit | merge | review | result |
+|---|---|---|---|
+| U2 owner effects recheck | 56ef0b052, follow-up 9b2c4d29f | adversary red, 1 warning fixed in the unit; security green, 3 cases | story:owner-bounded-read-rechecks-semantic-effects implemented |
+| U1 mutating call revision rule | 513325bf8 | adversary red, 1 blocker fixed in the unit after the directing session's decision | story:mcp-mutating-tool-call-revision-rule implemented |
+| U3 recorded `claude mcp add` | 798b960b7 | coordinator review of the page against the fixture | story:claude-mcp-add-registration-is-recorded implemented |
+| ESS 0.87.0 | 445dc4e15 | same 34 known-failing scenarios; version stamps only | ride-along |
+
+The coordinator made U3's one recorded run in a rig with an empty HOME. Nothing asked for a login, and nothing was written outside the rig.
+
+The local staged gate ran at cd51cd062 with the ESS 0.87.0 release binary. The stages ran serially, with a cache discard between them, and each stage was pre-checked against disk and trees-budget. Results:
+- S1: 318 passed.
+- S2: 1532 passed, 47 ignored.
+- S3: 565 passed, 13 ignored.
+- S4a: 1200 passed, 108 ignored.
+- S4b: 281 passed, 13 ignored.
+- S5a-c: clippy `-D warnings` green.
+- 0 failed; peak 13G (S4a).
+
+Findings filed as drafts:
+- story:owner-invoke-frame-effects-boundary;
+- story:owner-bounded-read-realization-matches-projection;
+- story:mcp-projection-cases-carry-read-or-mutating.
