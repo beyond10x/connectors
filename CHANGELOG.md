@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.69.0 — 2026-11-06
+
+### Changed
+
+- The owner's bounded read serves an implemented realization only for a `resource` operation with
+  self-contained (inline) input and output schemas, as the MCP projection does. A bounded-read
+  frame sent to the owner directly is otherwise refused `unsupported` before any provider request
+  (story:owner-bounded-read-realization-matches-projection). The projection and the owner share
+  one inline-schema check in `connectors-core`. Generic reads keep their current rule.
+
+### Added
+
+- The macOS CI job runs the Grafana CLI journey through the built `connectors` with the login
+  keychain: it connects with a service account token and answers `datasources.list` against the
+  recorded fixture (story:provider-programs-run-on-macos,
+  https://github.com/beyond10x/connectors/issues/229). The journey removes the keychain items it
+  wrote. On a Mac, `cargo test -p connectors-grafana` now needs `CONNECTORS_TEST_CLI` set to a
+  built `connectors`.
+
 ## 0.68.0 — 2026-11-06
 
 ### Changed
