@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-06T02:14:22Z",
+  "actor": "human:operator",
+  "artifact": "story:mcp-mutating-tool-call-revision-rule",
+  "kind": "story",
+  "revision": 13,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-20261105b-u1-adversary",
+    "review": "review-result:wave-20261105b-u1-adversary",
+    "outcome": "fixed"
+  }
+}
