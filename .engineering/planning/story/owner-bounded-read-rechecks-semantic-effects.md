@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:owner-bounded-read-rechecks-semantic-effects
 kind: story
-status: active
+status: implemented
 title: The owner's bounded read refuses an operation with semantic effects
 tags:
 - from-finding
@@ -14,10 +14,11 @@ scope:
   path: crates/connectors-host/src/local/owner/governed/bounded.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/owner/governed/tests/bounded_reads.rs
-revision: 7
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-05T17:29:38Z", actor: "human:operator", revision: 5}
 - {from: "proposed", to: "active", at: "2026-11-05T17:29:38Z", actor: "human:operator", revision: 6}
+- {from: "active", to: "implemented", at: "2026-11-06T05:34:08Z", actor: "human:operator", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":2}}}
 ---
 <!-- Starting point for a `story` artifact, seeded by `aep artifact new story <name>`.
      No frontmatter here on purpose: the `---` block is written by the CLI from the id, kind, status
@@ -80,3 +81,24 @@ The owner refuses a bounded read whose operation carries semantic effects, or ef
 The Outcome above says the owner refuses with "the same `not_found`-class answer the projection gives". As built, the owner answers `unsupported`. The directing session decided that the class stays `unsupported`, for this reason: in the owner, `not_found` means the operation is not in the projected metadata (`crates/connectors-host/src/local/owner/governed/bounded.rs:27`, `:41`), and every other bounded-read refusal there (approval, idempotency, limits, realization) is already `unsupported`.
 
 The Outcome now reads: the owner refuses a bounded read whose operation carries semantic effects, or an effect other than `network`, as `unsupported`, before any provider request. The MCP projection and the owner then hold the rule independently. The projection's own answer (`not_found`) is unchanged.
+
+## Delivered (wave 2026-11-05b, v0.68.0)
+
+The unit commit 7ba0e97cc was merged in 56ef0b052. After the reviews, the follow-up 2d8b5464c was merged in 9b2c4d29f, carrying the fix and both reviewers' cases. All of this is on `wave/2026-11-05b-connectors`. The local staged gate is green at cd51cd062.
+
+As built:
+- `bounded::read_effects` (`crates/connectors-host/src/local/owner/governed/bounded.rs`) refuses, as `unsupported` and before any provider request, an operation that declares semantic effects or an effect other than `network`.
+- `resolve` applies it on the budget path, and on the no-budget path whenever a projection is selected, so the projected `GovernedRead` frame holds the rule too.
+- The supervisor's admission and final fence call the same `resolve`.
+- A plain `Invoke` with no projection is unchanged. It is filed as story:owner-invoke-frame-effects-boundary.
+
+Targeted tests: `governed::tests::bounded_reads` 11 passed (the reviewers' modules included), `governed::tests` 31 passed, `transport::governed_client_tests` 5 passed.
+
+Scope as landed:
+
+| path | result |
+|---|---|
+| `crates/connectors-host/src/local/owner/governed/bounded.rs` | held |
+| `crates/connectors-host/src/local/owner/governed/tests/bounded_reads.rs` | held |
+| `crates/connectors-host/src/local/owner/governed/tests/bounded_reads_security.rs` (new) | added by the security reviewer |
+| `crates/connectors-host/src/local/owner/governed/tests.rs` | added: the module line and the `WithdrawAfter` network-only `metadata()` |
