@@ -10,13 +10,15 @@ relations:
 scope:
 - confidence: cited
   path: .github/workflows/macos-host.yml
-- confidence: inferred
+- confidence: cited
+  path: adapters/grafana/Cargo.toml
+- confidence: cited
   path: adapters/grafana/README.md
 - confidence: cited
   path: adapters/grafana/tests/local_runtime/cli_journey.rs
 - confidence: inferred
   path: crates/connectors-custody/src/keychain.rs
-revision: 8
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-02T07:27:32Z", actor: "human:operator", revision: 2, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
 - {from: "proposed", to: "active", at: "2026-11-02T07:27:32Z", actor: "human:operator", revision: 3, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
