@@ -7,7 +7,16 @@ title: Grafana, Prometheus, Loki and Kubernetes programs run and ship on Apple-s
 summary: 'D370 items 1 and 3: macOS CI job, Grafana start fix, release binaries, READMEs'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 4
+scope:
+- confidence: cited
+  path: .github/workflows/macos-host.yml
+- confidence: inferred
+  path: adapters/grafana/README.md
+- confidence: cited
+  path: adapters/grafana/tests/local_runtime/cli_journey.rs
+- confidence: inferred
+  path: crates/connectors-custody/src/keychain.rs
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-02T07:27:32Z", actor: "human:operator", revision: 2, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
 - {from: "proposed", to: "active", at: "2026-11-02T07:27:32Z", actor: "human:operator", revision: 3, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
