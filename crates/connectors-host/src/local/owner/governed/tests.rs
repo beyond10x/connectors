@@ -5,6 +5,7 @@ use std::{cell::Cell, collections::BTreeSet, sync::atomic::Ordering, time::Durat
 #[cfg(unix)]
 mod bounded_reads;
 mod bounded_reads_security;
+mod bounded_realization_security;
 #[cfg(target_os = "linux")]
 mod final_fence;
 mod metadata_projection;

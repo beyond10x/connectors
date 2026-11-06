@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.69.0 — 2026-11-06
+
+### Changed
+
+- The owner's bounded read serves an implemented realization only for a `resource` operation with
+  self-contained (inline) input and output schemas, as the MCP projection does. A bounded-read
+  frame sent to the owner directly is otherwise refused `unsupported` before any provider request
+  (story:owner-bounded-read-realization-matches-projection). The projection and the owner share
+  one inline-schema check in `connectors-core`. Generic reads keep their current rule.
+
 ## 0.68.0 — 2026-11-06
 
 ### Changed

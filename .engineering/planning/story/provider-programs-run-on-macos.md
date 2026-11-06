@@ -7,7 +7,18 @@ title: Grafana, Prometheus, Loki and Kubernetes programs run and ship on Apple-s
 summary: 'D370 items 1 and 3: macOS CI job, Grafana start fix, release binaries, READMEs'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 4
+scope:
+- confidence: cited
+  path: .github/workflows/macos-host.yml
+- confidence: cited
+  path: adapters/grafana/Cargo.toml
+- confidence: cited
+  path: adapters/grafana/README.md
+- confidence: cited
+  path: adapters/grafana/tests/local_runtime/cli_journey.rs
+- confidence: inferred
+  path: crates/connectors-custody/src/keychain.rs
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-02T07:27:32Z", actor: "human:timo", revision: 2, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
 - {from: "proposed", to: "active", at: "2026-11-02T07:27:32Z", actor: "human:timo", revision: 3, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
@@ -64,3 +75,32 @@ Read against `origin/main` `8150245c2` (v0.65.0) by wave D417; the code shipped 
   unproven.
 
 The story stays active until both gaps are closed.
+
+## Wave 2026-11-06: tried on macOS CI, taken out of 0.69.0
+
+The wave ran the Grafana CLI journey on `macos-latest` against the login keychain (a macOS-only test sharing the
+Linux journey body, run by name in `macos-host.yml`'s `programs` job). Two pull-request runs failed, at different
+stages, and the unit was reverted from the release branch with its code kept on the unit commits (e77320412,
+f0cec3305, 700c77675; merge 4e3f7da01).
+
+- Run 1 (PR 242, run 42224840135): `setup check` and the wrong-token refusal passed; the first saving `connections
+  connect` answered `custody_unavailable`, stage `custody`, `next_action` `unlock_keyring`. The custody job of the
+  same run passed `macos_login_keychain_answers_the_custody_contract` from the test binary.
+- Inferred cause of run 1, consistent with Apple's Security sources (review-result:wave-20261106-u1-ci1-security):
+  `SecAccessCreate` with a NULL trusted list derives "the calling application" from the caller's executable on
+  disk, and the owner runs from a private copy the CLI removes once the owner has answered. 700c77675 passed an
+  empty trusted list instead (the item's ACLs end the same).
+- Run 2 (run 42233699721, with 700c77675): the same connect got past custody and answered `outcome_unknown` at stage
+  `publication`; the test's own search then found 0 items of its store. So the access was created, and either
+  `SecItemAdd` returned a status other than success, duplicate or interaction-not-allowed (mapped to
+  `OutcomeUnknown` in `keychain.rs` `write_new`), or the read-back after the add failed. Which one is not known.
+- The failure-only diagnostics step showed the login keychain in the search list and `no-timeout` (unlocked,
+  `show-keychain-info` exit 0). Its `log show` was cut by `tail -n 200` to lines after 14:35:51, after the failure
+  at 14:35:46, and filled with AMFI lines for the host's `connectors-image.*/image` copies ("has no CMS blob?",
+  "Unrecoverable CT signature issue, bailing out", then "bundle ... missing from disk"). The owner logs under the
+  process name `image`, not `connectors`.
+
+Next step for this story: log the `OSStatus` of the add and of the read-back in the owner (or in a macOS-only
+custody test that runs the write from a binary deleted after start), and filter `log show` on the owner's process
+and the failure minute, before another macOS run. Whether the owner's private copy being removed also breaks the
+add or the read-back (code-signature or partition checks against a missing executable) is open.
