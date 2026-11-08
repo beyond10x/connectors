@@ -10,10 +10,15 @@
 # publish job waits for the page of the tag to exist, then uploads the archives and SHA256SUMS,
 # and refuses rather than replace an asset already on the page.
 #
-# A pull request that changes this file runs provenance and the four builds against the
-# workspace version and publishes nothing. A manual dispatch backfills an existing annotated tag.
+# The image job puts the two Linux archives' binaries into the multi-arch OCI image
+# `ghcr.io/beyond10x/connectors:<version>` (deploy/images/connectors/Dockerfile), and refuses a
+# version the registry already holds.
 #
-# Every third-party action is pinned by commit; the publish job holds write authority.
+# A pull request that changes this file or the image runs provenance, the four builds and the
+# image build against the workspace version and publishes nothing. A manual dispatch backfills an
+# existing annotated tag.
+#
+# Every third-party action is pinned by commit; the publish and image jobs hold write authority.
 name: Release binaries
 
 on:
@@ -29,6 +34,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/release-binaries.yml
+      - deploy/images/**
 
 permissions:
   contents: read
@@ -280,3 +286,118 @@ jobs:
           test "$conflict" -eq 0
           gh release upload "$TAG" *.tar.gz SHA256SUMS
           gh release view "$TAG" --json assets --jq '.assets[].name' | tee -a "$GITHUB_STEP_SUMMARY"
+
+  image:
+    name: Build the container image, and push it on a release
+    needs: [provenance, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/beyond10x/connectors
+      PUSH: ${{ github.event_name != 'pull_request' }}
+      TAG: ${{ needs.provenance.outputs.tag }}
+      VERSION: ${{ needs.provenance.outputs.version }}
+      COMMIT: ${{ needs.provenance.outputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ needs.provenance.outputs.commit }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: "*-unknown-linux-gnu"
+          path: dist
+          merge-multiple: true
+      - name: Stage the Linux binaries by architecture
+        run: |
+          set -euo pipefail
+          context="$RUNNER_TEMP/image"
+          for pair in amd64:x86_64-unknown-linux-gnu arm64:aarch64-unknown-linux-gnu; do
+            arch="${pair%%:*}"
+            name="connectors-${VERSION}-${pair#*:}"
+            tar -C "$RUNNER_TEMP" -xzf "dist/${name}.tar.gz"
+            mkdir -p "$context/linux-$arch"
+            find "$RUNNER_TEMP/$name" -maxdepth 1 -type f -perm -u+x -exec cp {} "$context/linux-$arch/" \;
+            test -x "$context/linux-$arch/connectors"
+            test -x "$context/linux-$arch/connectors-catalog-provider"
+          done
+          diff <(ls "$context/linux-amd64") <(ls "$context/linux-arm64")
+          ls -l "$context"/linux-*
+          echo "CONTEXT=$context" >> "$GITHUB_ENV"
+      - name: Refuse a version the registry already holds
+        if: ${{ env.PUSH == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          answer=$(gh api --paginate /orgs/beyond10x/packages/container/connectors/versions \
+            --jq '.[].metadata.container.tags[]' 2>&1) && status=0 || status=$?
+          if [ "$status" -ne 0 ]; then
+            case "$answer" in
+              *"HTTP 404"*) echo "$IMAGE has no version yet"; exit 0 ;;
+            esac
+            echo "$answer"
+            echo "::error::the registry did not say whether $IMAGE:$VERSION exists"
+            exit 1
+          fi
+          if printf '%s\n' "$answer" | grep -Fqx "$VERSION"; then
+            echo "::error::$IMAGE:$VERSION exists; a release never replaces a published image"
+            exit 1
+          fi
+          echo "$IMAGE:$VERSION is not in the registry yet"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the linux/amd64 image for the start check
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ env.CONTEXT }}
+          file: deploy/images/connectors/Dockerfile
+          platforms: linux/amd64
+          build-args: |
+            VERSION=${{ env.VERSION }}
+            SOURCE_SHA=${{ env.COMMIT }}
+          tags: connectors:candidate
+          load: true
+          push: false
+      - name: Each binary in the image names the version, as the image user
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect connectors:candidate --format '{{.Config.User}}')" = 65532:65532
+          test "$(docker run --rm connectors:candidate --version)" = "connectors-catalog-provider ${VERSION}"
+          for path in "$CONTEXT"/linux-amd64/*; do
+            binary="$(basename "$path")"
+            test "$(docker run --rm --entrypoint "/usr/local/bin/${binary}" connectors:candidate --version)" = "${binary} ${VERSION}"
+          done
+      - name: Log in to ghcr.io
+        if: ${{ env.PUSH == 'true' }}
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Build linux/amd64 and linux/arm64, and push on a release
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ env.CONTEXT }}
+          file: deploy/images/connectors/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ env.VERSION }}
+            SOURCE_SHA=${{ env.COMMIT }}
+          tags: ${{ env.PUSH == 'true' && format('{0}:{1}', env.IMAGE, env.VERSION) || 'connectors:candidate' }}
+          push: ${{ env.PUSH == 'true' }}
+      - name: The pushed image and its digest
+        if: ${{ env.PUSH == 'true' }}
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          test -n "$DIGEST"
+          docker buildx imagetools inspect "$IMAGE:$VERSION" | tee "$RUNNER_TEMP/inspect" | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$(awk '/^Digest:/ {print $2; exit}' "$RUNNER_TEMP/inspect")" = "$DIGEST"
+          grep -Fq 'Platform:  linux/amd64' "$RUNNER_TEMP/inspect"
+          grep -Fq 'Platform:  linux/arm64' "$RUNNER_TEMP/inspect"
+          echo "$IMAGE:$VERSION@$DIGEST" | tee -a "$GITHUB_STEP_SUMMARY"

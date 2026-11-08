@@ -183,6 +183,20 @@ it to `BINARIES`, then document it.
 cargo run --locked -p connectors-build -- release-binaries
 ```
 
+The workflow's image job copies every executable of the two Linux archives into
+`linux-amd64/` and `linux-arm64/` of a build context and builds
+[`deploy/images/connectors/Dockerfile`](../deploy/images/connectors/Dockerfile) for both
+platforms; a binary added to `BINARIES` is in the image with no further change. The Dockerfile
+compiles nothing, so the same context builds it locally from a source build:
+
+```sh
+mkdir -p .local/image/linux-amd64
+cp target/release/connectors target/release/connectors-catalog-provider .local/image/linux-amd64/
+docker buildx build --platform linux/amd64 --load -t connectors:candidate \
+  -f deploy/images/connectors/Dockerfile .local/image
+docker run --rm connectors:candidate --version
+```
+
 ## Ignored tests
 
 `connectors-build ignored` inventories every compiled default-feature workspace
