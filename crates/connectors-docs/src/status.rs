@@ -276,6 +276,13 @@ pub const CAPABILITIES: &[Capability] = &[
         "/docs/reference/cli",
     ),
     shipped(
+        "Local runtime",
+        "Local MCP server for Claude Code",
+        "On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*).",
+        "apps/connectors/tests/claude_mcp_journey.rs::claude_code_session_is_answered",
+        "/docs/connectors/mcp",
+    ),
+    shipped(
         "Catalog provider",
         "Bundles from pinned sources",
         "connectors-build catalog compiles a pinned OpenAPI document into a digest-verified bundle; every committed bundle matches a fresh run byte for byte.",
@@ -428,6 +435,13 @@ pub const CAPABILITIES: &[Capability] = &[
         "alerts.list and incidents.list over a creation window the caller advances, alert.get, incident.get and incident.alert_ids, read only, with the key sent as GenieKey <key>; verified against a local fixture only.",
         "adapters/catalog/tests/opsgenie.rs::shipped_opsgenie_selections_are_exactly_the_five_reads",
         "/docs/reference/adapters/catalog",
+    ),
+    shipped(
+        "Catalog provider",
+        "GitHub reads from a definition file",
+        "The ten reads of connectors-definitions 0.5.2 connectors/github.yaml (review_requests.list, issues.assigned, notifications.list, user.me, repos.list, repo.get, releases.list, release.latest, readme.raw and file.raw) send their path and query with the definition's fixed values and the since fold, pass page and per_page through, refuse a per_page above its bound and a search page above 1,000 before any request and GitHub's answer for a page past the first 1,000 search results as invalid_input, and return GitHub's answer unchanged, a README or file as its decoded text; verified against a scripted provider only.",
+        "adapters/catalog/tests/github_definition_reads.rs::each_list_passes_page_and_per_page_through_unchanged",
+        "/docs/connectors/github",
     ),
     decided(
         "Catalog provider",
@@ -587,8 +601,8 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     planned(
         "Native adapters",
-        "MCP",
-        "MCP invocation, projection, auth lifecycle, mutation replay and composition contracts are specified; there is no MCP runtime.",
+        "MCP as a connector",
+        "Reading from an MCP server is specified (invocation, auth lifecycle, mutation replay and composition contracts) and has no runtime; the local MCP server is listed under Local runtime.",
         "/docs/reference/adapters",
     ),
     shipped(

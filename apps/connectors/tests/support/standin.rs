@@ -297,6 +297,19 @@ pub fn main(tests: &[(&str, fn())]) {
         std::process::exit(1);
     }
     if args.iter().any(|arg| arg == "--connectors-private-fd") {
+        // A provider that prints its bootstrap but does not start as a private
+        // child (story:connect-names-a-failed-provider-start): the system kills
+        // it, or it exits, before its handshake.
+        match option(&args, "endpoint") {
+            Some(endpoint) if endpoint.contains("killed-at-start") => {
+                // SAFETY: raising a signal on this process takes no pointers.
+                unsafe {
+                    libc::raise(libc::SIGKILL);
+                }
+            }
+            Some(endpoint) if endpoint.contains("exits-at-start") => std::process::exit(3),
+            _ => {}
+        }
         let _ = runtime::serve(3, Child(bootstrap(&args), inputs(&args).is_some()));
         return;
     }

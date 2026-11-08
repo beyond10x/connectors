@@ -703,6 +703,95 @@ fn an_ungranted_operation_is_refused_with_no_request() {
     refused("ungranted", "not_granted");
 }
 
+/// projection.md § Qualified names and inverse selection: a `tools/call`
+/// that names no projection revision binds to the one the server advertises
+/// when it is called. [`Peer::request`] sends only the protocol metadata on
+/// `2026-07-28` and no `_meta` at all on `2025-11-25`, as a client that does
+/// not echo the revision does. The admitted read runs with exactly one
+/// provider request; once its exposure is withdrawn, the same call binds to
+/// an advertisement without the tool and is refused with none.
+fn binds_without_revision(primary: bool) {
+    let served = Served::new();
+    let mut peer = Peer::start(&served, primary);
+    let (tool, _) = admitted(&served, &mut peer, 1);
+    let call = json!({"name":tool["name"],"arguments":{"input":{"n":5}}});
+    let reply = peer.request(2, "tools/call", call.clone());
+    assert_eq!(reply["result"]["isError"], false, "{reply}");
+    let envelope = &reply["result"]["structuredContent"];
+    assert_eq!(envelope["status"], "success", "{reply}");
+    assert_eq!(envelope["result"]["observed"], 5, "{reply}");
+    assert_eq!(served.provider.requests(), 1, "one call, one request");
+    served.exposures(false);
+    let reply = peer.request(3, "tools/call", call);
+    assert_eq!(
+        reply["error"]["data"]["error"]["code"], "forbidden",
+        "{reply}"
+    );
+    assert_eq!(
+        served.provider.requests(),
+        1,
+        "the withdrawn tool's call sent a request"
+    );
+    peer.finish();
+}
+
+#[test]
+fn a_call_without_a_revision_binds_to_the_advertised_one() {
+    binds_without_revision(true);
+}
+
+#[test]
+fn a_call_without_meta_binds_to_the_advertised_revision_on_2025_11_25() {
+    binds_without_revision(false);
+}
+
+/// A syntactically valid revision that is not the advertised one is still
+/// refused `stale_description`, before any provider request.
+#[test]
+fn a_call_with_a_stale_revision_is_refused_with_no_request() {
+    let served = Served::new();
+    let mut peer = Peer::start(&served, true);
+    let (tool, revision) = admitted(&served, &mut peer, 1);
+    let stale = json!("stale-0");
+    assert_ne!(stale, revision);
+    let reply = peer.call(2, tool["name"].as_str().unwrap(), "17", &stale);
+    assert_eq!(
+        reply["error"]["data"]["error"]["code"], "stale_description",
+        "{reply}"
+    );
+    assert_eq!(
+        served.provider.requests(),
+        0,
+        "the stale call sent a request"
+    );
+    peer.finish();
+}
+
+/// A revision that is present but null, not a string or not a valid
+/// identifier is malformed input, invalid params with no provider request.
+#[test]
+fn a_call_with_a_malformed_revision_is_still_malformed() {
+    let served = Served::new();
+    let mut peer = Peer::start(&served, true);
+    let (tool, _) = admitted(&served, &mut peer, 1);
+    let name = tool["name"].as_str().unwrap().to_owned();
+    for (id, revision) in [
+        (2, json!(null)),
+        (3, json!(7)),
+        (4, json!("")),
+        (5, json!("not an id")),
+    ] {
+        let reply = peer.call(id, &name, "17", &revision);
+        assert_eq!(reply["error"]["code"], -32602, "{revision}: {reply}");
+    }
+    assert_eq!(
+        served.provider.requests(),
+        0,
+        "a malformed call sent a request"
+    );
+    peer.finish();
+}
+
 /// Every exchange of the scenarios above, on both revisions, leaves only
 /// JSON-RPC frames on stdout, one per line; a server that cannot start
 /// writes its diagnostic to stderr and nothing to stdout.

@@ -98,3 +98,102 @@ jobs:
           packages=()
           for program in $PROGRAMS; do packages+=(-p "$program"); done
           cargo test --locked --no-fail-fast "${packages[@]}"
+
+  release-start:
+    name: release-built providers start through the host on macos-latest
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      PUBLISHED_VERSION: 0.65.0
+      TARGET: aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install Rust 1.98.1
+        shell: bash
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --target "$TARGET"
+          rustup default 1.98.1
+          rustc --version
+          sw_vers
+      - name: Build the release CLI and catalog provider
+        shell: bash
+        run: |
+          cargo build --locked --release --target "$TARGET" -p connectors -p connectors-catalog-provider
+          echo "BUILT=$GITHUB_WORKSPACE/target/$TARGET/release" >> "$GITHUB_ENV"
+      - name: Fetch the published release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/published"
+          mkdir -p "$work"
+          archive="connectors-$PUBLISHED_VERSION-$TARGET.tar.gz"
+          base="https://github.com/beyond10x/connectors/releases/download/v$PUBLISHED_VERSION"
+          curl -fsSL -o "$work/$archive" "$base/$archive"
+          curl -fsSL -o "$work/SHA256SUMS" "$base/SHA256SUMS"
+          (cd "$work" && grep " $archive\$" SHA256SUMS | shasum -a 256 -c -)
+          tar -xzf "$work/$archive" -C "$work"
+          cli="$(find "$work" -type f -name connectors -perm -u+x | head -n 1)"
+          test -n "$cli"
+          echo "PUBLISHED=$(dirname "$cli")" >> "$GITHUB_ENV"
+      - name: Signatures and attributes
+        shell: bash
+        run: |
+          for dir in "$PUBLISHED" "$BUILT"; do
+            program="$dir/connectors-catalog-provider"
+            codesign -dv "$program" 2>&1 | grep -E 'Identifier|Format|flags|Signature'
+            codesign -v "$program" && echo "codesign -v ok: $program"
+            xattr -l "$program"
+          done
+      - name: A copy started directly, made as cp and as the host makes it
+        shell: bash
+        run: |
+          set +e
+          status=0
+          for dir in "$PUBLISHED" "$BUILT"; do
+            for method in cp write; do
+              for round in 1 2; do
+                directory="$(mktemp -d /tmp/connectors-image.XXXXXXXX)"
+                if [ "$method" = cp ]; then
+                  cp "$dir/connectors-catalog-provider" "$directory/image"
+                else
+                  cat "$dir/connectors-catalog-provider" > "$directory/image"
+                fi
+                chmod 500 "$directory/image"
+                "$directory/image" --version
+                code=$?
+                echo "copy-start $dir $method round $round exit $code"
+                [ "$code" -eq 0 ] || status=1
+                rm -rf "$directory"
+              done
+            done
+          done
+          exit "$status"
+      - name: The host starts the catalog provider twice
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set +e
+          status=0
+          for dir in "$PUBLISHED" "$BUILT"; do
+            root="$(mktemp -d "$RUNNER_TEMP/host-start.XXXXXXXX")"
+            run() {
+              env -i HOME="$root" PATH=/usr/bin:/bin "$dir/connectors" --output json \
+                --config "$root/config/config.toml" --state-dir "$root/state" "$@" < /dev/null 2>&1
+            }
+            out="$(run setup init)"
+            echo "host-init $dir exit $?: $out"
+            for round in 1 2; do
+              out="$(run connections connect gitlab/probe --profile gitlab.pat --endpoint https://gitlab.example.org)"
+              code=$?
+              echo "host-start $dir round $round exit $code: $out"
+              printf '%s' "$out" | grep -Eq '"stage": *"protected_entry"' || status=1
+            done
+          done
+          exit "$status"
+      - name: Kernel and policy log of the starts
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          log show --last 30m --style compact --predicate 'sender == "AppleMobileFileIntegrity" OR process == "amfid" OR process == "syspolicyd" OR eventMessage CONTAINS[c] "code signing" OR eventMessage CONTAINS[c] "connectors-image" OR eventMessage CONTAINS[c] "connectors-catalog-provider"' | tail -n 200

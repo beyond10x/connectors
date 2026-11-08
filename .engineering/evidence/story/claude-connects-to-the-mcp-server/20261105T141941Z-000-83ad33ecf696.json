@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-05T14:19:41Z",
+  "actor": "human:operator",
+  "artifact": "story:claude-connects-to-the-mcp-server",
+  "kind": "story",
+  "revision": 24,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Local staged gate at 925927b8f: S1 317 passed, S2 1525 passed, S3 559 passed, S4a 1200 passed, S4b 281 passed, 0 failed; S5a-c clippy -D warnings green; peak 12G; journey target claude_mcp_journey 8 passed",
+    "reference": "sha256:07a7b76ba15e8dbf67624ae814fddfe9bb2dc9117375e44579dc8c4aeab7210f"
+  }
+}

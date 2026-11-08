@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-05T01:33:27Z",
+  "actor": "human:operator",
+  "artifact": "story:provider-ignored-tests-run-in-ci",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "local staged gate at ca1ef2f4d on wave/2026-11-04-connectors (S1-S5c, 2026-11-05 01:33Z): connectors-build tests in S1 315 passed 0 failed, including the ignored.rs selection tests and its adversary module (the rust-gate.yml step parsed with the real CLI selects exactly the four provider tests and runs each by name; an unreviewed test or a missing provider refuses); the four provider tests ran by name with CONNECTORS_TEST_CATALOG_PROVIDER set, and with the describe short-circuit reverted describe_of_a_definition_needs_no_connection failed (unit run); the CI step's first full run is the pull request's",
+    "reference": "git:ca1ef2f4d"
+  }
+}

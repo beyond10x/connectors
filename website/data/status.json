@@ -192,6 +192,13 @@
       "status": "shipped"
     },
     {
+      "area": "Local runtime",
+      "detail": "On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*).",
+      "href": "/docs/connectors/mcp",
+      "label": "Local MCP server for Claude Code",
+      "status": "shipped"
+    },
+    {
       "area": "Catalog provider",
       "detail": "connectors-build catalog compiles a pinned OpenAPI document into a digest-verified bundle; every committed bundle matches a fresh run byte for byte.",
       "href": "/docs/guides/build-a-catalog-bundle",
@@ -343,6 +350,13 @@
       "detail": "alerts.list and incidents.list over a creation window the caller advances, alert.get, incident.get and incident.alert_ids, read only, with the key sent as GenieKey <key>; verified against a local fixture only.",
       "href": "/docs/reference/adapters/catalog",
       "label": "Opsgenie alerts and incidents",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "The ten reads of connectors-definitions 0.5.2 connectors/github.yaml (review_requests.list, issues.assigned, notifications.list, user.me, repos.list, repo.get, releases.list, release.latest, readme.raw and file.raw) send their path and query with the definition's fixed values and the since fold, pass page and per_page through, refuse a per_page above its bound and a search page above 1,000 before any request and GitHub's answer for a page past the first 1,000 search results as invalid_input, and return GitHub's answer unchanged, a README or file as its decoded text; verified against a scripted provider only.",
+      "href": "/docs/connectors/github",
+      "label": "GitHub reads from a definition file",
       "status": "shipped"
     },
     {
@@ -508,9 +522,9 @@
     },
     {
       "area": "Native adapters",
-      "detail": "MCP invocation, projection, auth lifecycle, mutation replay and composition contracts are specified; there is no MCP runtime.",
+      "detail": "Reading from an MCP server is specified (invocation, auth lifecycle, mutation replay and composition contracts) and has no runtime; the local MCP server is listed under Local runtime.",
       "href": "/docs/reference/adapters",
-      "label": "MCP",
+      "label": "MCP as a connector",
       "status": "planned"
     },
     {
