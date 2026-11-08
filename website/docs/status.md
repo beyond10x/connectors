@@ -9,7 +9,7 @@ custom_edit_url: null
 
 # Status
 
-As of 2026-10-16: 67 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. A release page carries the source archives and Linux and macOS binaries of `connectors` and `connectors-catalog-provider`; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
+As of 2026-10-16: 69 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. A release page carries the source archives and Linux and macOS binaries of `connectors` and `connectors-catalog-provider`; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
 
 ## Service boundary
 
@@ -47,6 +47,7 @@ As of 2026-10-16: 67 capabilities are shipped, 3 are decided and 5 are planned. 
 | [Consumer launch](./concepts/local-runtime.md) | ● shipped | connections launch hands one connection's protected document to a pinned consumer and refuses a launch its configuration does not admit (since 0.31.0). |
 | [Operations by family](./reference/cli.md) | ● shipped | operations list --family names the operations of one contract family, such as datasource.feed/v1alpha1, with their contract and profile. |
 | [JSON values in JSON answers](./reference/cli.md) | ● shipped | With --output json, invoke results and operation schemas are JSON values, not JSON text (breaking since 0.32.0). |
+| [Local MCP server for Claude Code](./connectors/mcp.md) | ● shipped | On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*). |
 
 ## Catalog provider
 
@@ -74,6 +75,7 @@ As of 2026-10-16: 67 capabilities are shipped, 3 are decided and 5 are planned. 
 | [Slack files](./reference/adapters/catalog/index.md) | ● shipped | files.list, files.info and file.download, which reads a file's url_private on files.slack.com as a binary body with the bot token, only where the connection admits that host with the credential, and files.delete under approval after the token's auth.test read and a files.info read of the file, with file_not_found and file_deleted refused as not_found and cant_delete_file as forbidden; verified against a local fixture only. |
 | [Slack read refusals](./reference/adapters/catalog/index.md) | ● shipped | A Slack read answered 200 with ok false is refused, never returned as an empty read: Slack's error is the reason, and missing_scope, not_in_channel and user_not_visible are forbidden, invalid_auth and its kin unauthorized, an unknown channel, thread, file or user not_found, an e-mail address no user has (users_not_found) not_found, ratelimited rate_limited with its Retry-After, a bad cursor or argument invalid_input, and any other name internal, on every JSON read of both Slack sets; verified against a local fixture only. |
 | [Opsgenie alerts and incidents](./reference/adapters/catalog/index.md) | ● shipped | alerts.list and incidents.list over a creation window the caller advances, alert.get, incident.get and incident.alert_ids, read only, with the key sent as GenieKey <key>; verified against a local fixture only. |
+| [GitHub reads from a definition file](./connectors/github.md) | ● shipped | The ten reads of connectors-definitions 0.5.2 connectors/github.yaml (review_requests.list, issues.assigned, notifications.list, user.me, repos.list, repo.get, releases.list, release.latest, readme.raw and file.raw) send their path and query with the definition's fixed values and the since fold, pass page and per_page through, refuse a per_page above its bound and a search page above 1,000 before any request and GitHub's answer for a page past the first 1,000 search results as invalid_input, and return GitHub's answer unchanged, a README or file as its decoded text; verified against a scripted provider only. |
 | [Catalog index service](./reference/contracts/catalog.md) | ◐ decided | Listing and locating precompiled bundles with provenance is specified; directly configured adapters need no index. |
 
 ## Native adapters
@@ -102,7 +104,7 @@ As of 2026-10-16: 67 capabilities are shipped, 3 are decided and 5 are planned. 
 | [Loki tenants and other authentication](./reference/adapters/loki/index.md) | ○ planned | An X-Scope-OrgID tenant header and profiles other than a bearer token; today a Loki without authentication cannot be connected. |
 | [Prometheus tenants, timeouts and other authentication](./reference/adapters/prometheus/index.md) | ○ planned | An X-Scope-OrgID tenant header, an adapter-set query timeout, a Capacity error for too many samples apart from other execution errors, and profiles other than a bearer token. |
 | [Specification-only adapters](./reference/adapters/index.md) | ◐ decided | Alertmanager has a design or typed model and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built. |
-| [MCP](./reference/adapters/index.md) | ○ planned | MCP invocation, projection, auth lifecycle, mutation replay and composition contracts are specified; there is no MCP runtime. |
+| [MCP as a connector](./reference/adapters/index.md) | ○ planned | Reading from an MCP server is specified (invocation, auth lifecycle, mutation replay and composition contracts) and has no runtime; the local MCP server is listed under Local runtime. |
 
 ## Distribution
 

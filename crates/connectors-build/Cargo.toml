@@ -28,6 +28,7 @@ ess-primitives.workspace = true
 entity-core.workspace = true
 libc = "0.2"
 syn = { version = "2.0.119", features = ["full"] }
+toml = "1.1"
 
 [dev-dependencies]
 async-trait.workspace = true

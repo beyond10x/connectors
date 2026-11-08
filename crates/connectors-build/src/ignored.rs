@@ -28,6 +28,10 @@ pub struct Options {
     /// Missing prerequisites in any selected family make the command fail.
     #[arg(long, conflicts_with = "inventory")]
     required: bool,
+    /// Narrow the selected families to tests whose every prerequisite is one of
+    /// these. Workspace compilation supplies both, so CI can require them.
+    #[arg(long, value_enum, value_delimiter = ',')]
+    only_prerequisite: Vec<Supplied>,
     #[arg(long, default_value = ".local/ignored-suites.json")]
     report: PathBuf,
     /// A short, physical, owner-private fixture directory for long checkouts.
@@ -41,6 +45,23 @@ pub enum Family {
     Live,
     Timing,
     Deferred,
+}
+/// A prerequisite the workspace build supplies, as `--only-prerequisite` names it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+pub enum Supplied {
+    /// `CONNECTORS_TEST_CATALOG_PROVIDER`, the built catalog provider.
+    Provider,
+    /// `CONNECTORS_TEST_CLI`, the built production CLI.
+    Cli,
+}
+impl Supplied {
+    fn key(self) -> &'static str {
+        match self {
+            Supplied::Provider => PROVIDER,
+            Supplied::Cli => CLI,
+        }
+    }
 }
 #[derive(Clone, Debug)]
 struct Suite {
@@ -481,9 +502,17 @@ fn evaluate(
         ..Report::default()
     };
     for entry in entries {
-        let selected = entry
+        let family = entry
             .family
             .is_some_and(|family| options.family.contains(&family));
+        let within = options.only_prerequisite.is_empty()
+            || entry.prerequisites.iter().all(|key| {
+                options
+                    .only_prerequisite
+                    .iter()
+                    .any(|supplied| supplied.key() == *key)
+            });
+        let selected = family && within;
         let mut outcome = Outcome {
             name: entry.id(),
             family: entry.family,
@@ -501,11 +530,16 @@ fn evaluate(
             outcome
                 .reasons
                 .push("inventory classification required".into());
-        } else if !selected {
+        } else if !family {
             outcome.status = "not-selected".into();
             outcome
                 .reasons
                 .push("family requires explicit selection".into());
+        } else if !within {
+            outcome.status = "not-selected".into();
+            outcome
+                .reasons
+                .push("a prerequisite outside --only-prerequisite".into());
         } else {
             report.selected += 1;
             outcome.reasons = missing(&entry);
@@ -896,6 +930,7 @@ fn workspace(root: &Path) -> Result<(Vec<Suite>, BTreeMap<&'static str, OsString
             ))
         })
         .collect::<Result<_>>()?;
+    let custom = custom_harness_targets(&metadata)?;
     let output = crate::run(
         Command::new("cargo")
             .current_dir(root)
@@ -929,7 +964,10 @@ fn workspace(root: &Path) -> Result<(Vec<Suite>, BTreeMap<&'static str, OsString
         let target = artifact["target"]["name"]
             .as_str()
             .ok_or("Cargo target name missing")?;
-        if artifact["profile"]["test"] == true && seen.insert(executable.to_owned()) {
+        if artifact["profile"]["test"] == true
+            && inventoried(&custom, package, target)
+            && seen.insert(executable.to_owned())
+        {
             suites.push(Suite {
                 package: package.clone(),
                 target: target.into(),
@@ -951,6 +989,62 @@ fn workspace(root: &Path) -> Result<(Vec<Suite>, BTreeMap<&'static str, OsString
     }
     suites.sort_by(|a, b| (&a.package, &a.target).cmp(&(&b.package, &b.target)));
     Ok((suites, environment))
+}
+
+/// The `[[test]]` targets each workspace member declares with `harness = false`, as
+/// `(package, target)`. Such a target runs its own `main` rather than libtest, so it answers
+/// `--ignored --list --format terse` with no test list and is not inventoried. Cargo metadata
+/// does not carry the harness setting, so it is read from each member's manifest.
+fn custom_harness_targets(metadata: &Value) -> Result<BTreeSet<(String, String)>> {
+    let members = metadata["workspace_members"]
+        .as_array()
+        .ok_or("Cargo workspace members missing")?;
+    let mut targets = BTreeSet::new();
+    for package in metadata["packages"]
+        .as_array()
+        .ok_or("Cargo packages missing")?
+        .iter()
+        .filter(|package| members.contains(&package["id"]))
+    {
+        let name = package["name"]
+            .as_str()
+            .ok_or("Cargo package name missing")?;
+        let manifest = package["manifest_path"]
+            .as_str()
+            .ok_or("Cargo manifest path missing")?;
+        let text =
+            std::fs::read_to_string(manifest).map_err(|e| format!("read {manifest}: {e}"))?;
+        for target in harness_false_tests(&text).map_err(|e| format!("{manifest}: {e}"))? {
+            targets.insert((name.to_owned(), target));
+        }
+    }
+    Ok(targets)
+}
+
+/// The names of the `[[test]]` entries of one manifest that set `harness = false`.
+fn harness_false_tests(manifest: &str) -> Result<Vec<String>> {
+    let manifest: toml::Table = toml::from_str(manifest)?;
+    let Some(tests) = manifest.get("test") else {
+        return Ok(Vec::new());
+    };
+    let tests = tests
+        .as_array()
+        .ok_or("[[test]] is not an array of tables")?;
+    tests
+        .iter()
+        .filter(|test| test.get("harness").and_then(toml::Value::as_bool) == Some(false))
+        .map(|test| {
+            test.get("name")
+                .and_then(toml::Value::as_str)
+                .map(str::to_owned)
+                .ok_or_else(|| "a [[test]] with harness = false names no target".into())
+        })
+        .collect()
+}
+
+/// Whether a built test target is a libtest suite the inventory lists.
+fn inventoried(custom: &BTreeSet<(String, String)>, package: &str, target: &str) -> bool {
+    !custom.contains(&(package.to_owned(), target.to_owned()))
 }
 
 fn cargo_metadata(root: &Path) -> Result<Value> {
@@ -1145,7 +1239,7 @@ pub fn run(root: &Path, options: Options) -> Result<()> {
             execute_test(&entry.suite, &entry.name, temp.path(), &logs, &environment)
         },
     );
-    let value = serde_json::json!({"format":"connectors.ignored-suites/1", "mode":if options.inventory { "inventory" } else { "execute" }, "scope":"workspace default features", "families":options.family, "required":options.required, "test_binaries":suites.len(), "logs":logs, "result":report, "platform_gated":gated});
+    let value = serde_json::json!({"format":"connectors.ignored-suites/1", "mode":if options.inventory { "inventory" } else { "execute" }, "scope":"workspace default features", "families":options.family, "only_prerequisite":options.only_prerequisite, "required":options.required, "test_binaries":suites.len(), "logs":logs, "result":report, "platform_gated":gated});
     crate::save_json(&report_path, &value)?;
     println!("{}", serde_json::to_string_pretty(&value)?);
     if !report.accepted(options.required) {
@@ -1161,14 +1255,173 @@ mod tests {
     use super::*;
     use clap::Parser;
 
+    /// The CLI's stand-in targets run their own `main` and answer a terse listing with a
+    /// summary line, which the inventory refused; they are not inventoried, and a libtest
+    /// target of the same package still is.
+    #[test]
+    fn a_harness_false_target_is_not_inventoried_and_a_libtest_target_is() {
+        let manifest = include_str!("../../../apps/connectors/Cargo.toml");
+        let custom: BTreeSet<_> = harness_false_tests(manifest)
+            .unwrap()
+            .into_iter()
+            .map(|target| ("connectors".to_owned(), target))
+            .collect();
+        for target in [
+            "connect_endpoint",
+            "connect_endpoint_adversary",
+            "setup_migrate_short",
+            "short_form_adversary",
+            "catalog_provider_failure",
+        ] {
+            assert!(!inventoried(&custom, "connectors", target), "{target}");
+        }
+        assert!(inventoried(&custom, "connectors", "local_mcp_server"));
+        assert!(inventoried(
+            &custom,
+            "connectors-build",
+            "catalog_provider_failure"
+        ));
+    }
+
+    #[test]
+    fn harness_false_tests_reads_only_entries_that_set_harness_false() {
+        let manifest = r#"
+            [package]
+            name = "example"
+            [[test]]
+            name = "standin"
+            harness = false
+            [[test]]
+            name = "libtest_explicit"
+            harness = true
+            [[test]]
+            name = "libtest_default"
+        "#;
+        assert_eq!(harness_false_tests(manifest).unwrap(), vec!["standin"]);
+        assert!(
+            harness_false_tests("[package]\nname = \"none\"\n")
+                .unwrap()
+                .is_empty()
+        );
+        assert!(harness_false_tests("[[test]]\nharness = false\n").is_err());
+    }
+
     fn options() -> Options {
         Options {
             family: vec![Family::Disposable],
             inventory: false,
             required: true,
+            only_prerequisite: vec![],
             report: PathBuf::new(),
             tmpdir: None,
         }
+    }
+    /// Entries as `classify` holds them; the stubbed runner never starts their executable.
+    fn classified(tests: &[(&str, &str, &str)]) -> Vec<Entry> {
+        tests
+            .iter()
+            .map(|(package, target, name)| {
+                let suite = Suite {
+                    package: (*package).into(),
+                    target: (*target).into(),
+                    executable: PathBuf::new(),
+                };
+                classify(&suite, name)
+            })
+            .collect()
+    }
+    const PROVIDER_ONLY: (&str, &str, &str) = (
+        "connectors",
+        "adversary_d218_u1",
+        "describe_of_a_definition_needs_no_connection",
+    );
+    const PROVIDER_AND_CUSTODY: (&str, &str, &str) = (
+        "connectors",
+        "failed_connect",
+        "a_connect_to_an_unreachable_provider_reports_the_owners_cause_at_dispatch",
+    );
+    const CHROME_ONLY: (&str, &str, &str) = (
+        "connectors-host",
+        "connectors_host",
+        "local::oauth_adversary_tests::chrome_following_the_redirect_is_accepted",
+    );
+    #[test]
+    fn only_prerequisite_parses_and_defaults_to_no_narrowing() {
+        let parse = |args: &[&str]| {
+            let args = crate::Args::try_parse_from(args).unwrap();
+            let crate::Action::Ignored(options) = args.command else {
+                panic!("ignored action required");
+            };
+            options.only_prerequisite
+        };
+        assert_eq!(parse(&["connectors-build", "ignored"]), []);
+        assert_eq!(
+            parse(&[
+                "connectors-build",
+                "ignored",
+                "--required",
+                "--only-prerequisite",
+                "provider",
+            ]),
+            [Supplied::Provider]
+        );
+        assert_eq!(
+            parse(&[
+                "connectors-build",
+                "ignored",
+                "--only-prerequisite",
+                "provider,cli"
+            ]),
+            [Supplied::Provider, Supplied::Cli]
+        );
+    }
+    #[test]
+    fn only_prerequisite_provider_selects_the_tests_a_built_provider_suffices_for() {
+        let mut opts = options();
+        opts.only_prerequisite = vec![Supplied::Provider];
+        let mut ran = vec![];
+        let report = evaluate(
+            classified(&[PROVIDER_ONLY, PROVIDER_AND_CUSTODY, CHROME_ONLY]),
+            &opts,
+            |_| vec![],
+            |entry| {
+                ran.push(entry.id());
+                Ok(true)
+            },
+        );
+        let id =
+            |(package, target, name): (&str, &str, &str)| format!("{package}::{target}::{name}");
+        assert_eq!(ran, [id(PROVIDER_ONLY)]);
+        assert_eq!(
+            (report.selected, report.executed, report.missing),
+            (1, 1, 0)
+        );
+        let status = |test| {
+            report
+                .outcomes
+                .iter()
+                .find(|o| o.name == id(test))
+                .map(|o| (o.selected, o.status.as_str()))
+                .unwrap()
+        };
+        assert_eq!(status(PROVIDER_ONLY), (true, "passed"));
+        assert_eq!(status(PROVIDER_AND_CUSTODY), (false, "not-selected"));
+        assert_eq!(status(CHROME_ONLY), (false, "not-selected"));
+        assert!(report.accepted(true));
+    }
+    #[test]
+    fn only_prerequisite_with_an_empty_selection_refuses_when_required() {
+        let mut opts = options();
+        opts.only_prerequisite = vec![Supplied::Provider, Supplied::Cli];
+        let report = evaluate(
+            classified(&[PROVIDER_AND_CUSTODY, CHROME_ONLY]),
+            &opts,
+            |_| vec![],
+            |_| Ok(true),
+        );
+        assert_eq!((report.selected, report.executed), (0, 0));
+        assert!(!report.accepted(true));
+        assert!(report.accepted(false));
     }
     /// A bounded real Rust libtest executable. No provider, shell script or ambient service.
     fn fixture(fail: bool, unknown: bool) -> (tempfile::TempDir, Suite) {
@@ -1545,5 +1798,251 @@ fn selected_fixture() {{
         assert_eq!(waited, -1, "owned live leader must already be reaped");
         assert_eq!(error.raw_os_error(), Some(libc::ECHILD));
         assert!(other_still_running, "another fixture group was affected");
+    }
+
+    /// The provider-only lane read from the documents that declare it: the
+    /// workflow step, the development guide and the classification.
+    mod adversary {
+        use super::*;
+
+        const WORKFLOW: &str = include_str!("../../../.github/workflows/rust-gate.yml");
+        const GUIDE: &str = include_str!("../../../docs/development.md");
+        /// The four tests `docs/development.md` names for the CI step.
+        const FOUR: [(&str, &str, &str); 4] = [
+            (
+                "connectors",
+                "definition_connect_question",
+                "the_connect_question_names_the_host_the_token_is_sent_to",
+            ),
+            (
+                "connectors",
+                "definition_connect_question",
+                "the_connect_question_of_an_oauth_profile_names_its_token_host_too",
+            ),
+            (
+                "connectors",
+                "definition_connect_question",
+                "an_entry_another_run_recorded_while_the_question_waits_is_not_connected",
+            ),
+            (
+                "connectors",
+                "adversary_d218_u1",
+                "describe_of_a_definition_needs_no_connection",
+            ),
+        ];
+        /// Neighbours in the same packages that the lane must leave alone.
+        const OTHERS: [(&str, &str, &str); 4] = [
+            PROVIDER_AND_CUSTODY,
+            CHROME_ONLY,
+            (
+                "connectors",
+                "failed_connect",
+                "an_adapter_identity_mismatch_during_an_upgrade_names_a_new_connection",
+            ),
+            (
+                "connectors-host",
+                "connectors_host",
+                "local::clock::tests::independent_live_quorum",
+            ),
+        ];
+        fn id((package, target, name): (&str, &str, &str)) -> String {
+            format!("{package}::{target}::{name}")
+        }
+        /// The arguments of the workflow's `ignored` step, parsed as the binary parses them.
+        fn ci_options() -> Options {
+            let line = WORKFLOW
+                .lines()
+                .find(|line| line.contains("connectors-build -- ignored"))
+                .expect("rust-gate.yml runs connectors-build ignored");
+            let (_, args) = line.split_once("connectors-build -- ").unwrap();
+            let argv: Vec<&str> = std::iter::once("connectors-build")
+                .chain(args.split_whitespace())
+                .collect();
+            let crate::Action::Ignored(options) =
+                crate::Args::try_parse_from(argv).unwrap().command
+            else {
+                panic!("ignored action required");
+            };
+            options
+        }
+        fn entry(family: Option<Family>, prerequisites: Vec<&'static str>) -> Entry {
+            let mut entry = classified(&[("connectors", "probe", "a_reviewed_probe")])
+                .pop()
+                .unwrap();
+            entry.family = family;
+            entry.prerequisites = prerequisites;
+            entry
+        }
+
+        #[test]
+        fn the_ci_step_runs_the_four_documented_tests_and_nothing_else() {
+            let options = ci_options();
+            assert!(options.required, "the CI step must refuse an empty lane");
+            assert_eq!(options.family, [Family::Disposable]);
+            assert_eq!(options.only_prerequisite, [Supplied::Provider]);
+            let step = WORKFLOW
+                .lines()
+                .find(|line| line.contains("connectors-build -- ignored"))
+                .unwrap();
+            let (_, command) = step.split_once("run: ").unwrap();
+            assert!(
+                GUIDE.lines().any(|line| line == command),
+                "docs/development.md shows another command than the workflow runs: {command}"
+            );
+            let mut entries = classified(&OTHERS);
+            entries.extend(classified(&FOUR));
+            let mut ran = vec![];
+            let report = evaluate(
+                entries,
+                &options,
+                |_| vec![],
+                |entry| {
+                    ran.push(entry.id());
+                    Ok(true)
+                },
+            );
+            assert_eq!(ran, FOUR.map(id));
+            assert_eq!(
+                (
+                    report.selected,
+                    report.executed,
+                    report.missing,
+                    report.unknown
+                ),
+                (4, 4, 0, 0)
+            );
+            let prose = GUIDE.split_whitespace().collect::<Vec<_>>().join(" ");
+            let in_file = FOUR
+                .iter()
+                .filter(|test| test.1 == "definition_connect_question")
+                .count();
+            assert_eq!(in_file, 3);
+            assert!(prose.contains(
+                "the three tests of `apps/connectors/tests/definition_connect_question.rs`"
+            ));
+            assert!(prose.contains(
+                "`describe_of_a_definition_needs_no_connection` in `apps/connectors/tests/adversary_d218_u1.rs`"
+            ));
+            for test in FOUR {
+                let outcome = report.outcomes.iter().find(|o| o.name == id(test)).unwrap();
+                assert_eq!(
+                    (outcome.selected, outcome.status.as_str()),
+                    (true, "passed")
+                );
+            }
+            assert!(report.accepted(options.required));
+        }
+
+        #[test]
+        fn an_unreviewed_test_refuses_the_ci_step_before_any_execution() {
+            let options = ci_options();
+            let mut entries = classified(&FOUR);
+            entries.push(entry(None, vec![]));
+            let report = evaluate(
+                entries,
+                &options,
+                |_| vec![],
+                |entry| panic!("{} executed beside unknown inventory", entry.id()),
+            );
+            assert_eq!(
+                (
+                    report.unknown,
+                    report.selected,
+                    report.executed,
+                    report.skipped
+                ),
+                (1, 4, 0, 5)
+            );
+            assert!(
+                report
+                    .outcomes
+                    .iter()
+                    .filter(|o| o.selected)
+                    .all(|o| o.status == "blocked")
+            );
+            assert!(!report.accepted(options.required));
+        }
+
+        #[test]
+        fn a_provider_the_build_did_not_supply_refuses_the_ci_step_instead_of_skipping() {
+            let options = ci_options();
+            let report = evaluate(
+                classified(&FOUR),
+                &options,
+                |entry| {
+                    entry
+                        .prerequisites
+                        .iter()
+                        .filter(|key| **key == PROVIDER)
+                        .map(|key| format!("{key} must name an executable file"))
+                        .collect()
+                },
+                |entry| panic!("{} executed without its provider", entry.id()),
+            );
+            assert_eq!(
+                (report.selected, report.missing, report.executed),
+                (4, 4, 0)
+            );
+            assert!(
+                report
+                    .outcomes
+                    .iter()
+                    .all(|o| o.status == "missing-prerequisite")
+            );
+            assert!(!report.accepted(options.required));
+        }
+
+        #[test]
+        fn a_disposable_test_with_no_prerequisite_qualifies_as_the_guide_says() {
+            let prose = GUIDE.split_whitespace().collect::<Vec<_>>().join(" ");
+            assert!(prose.contains("A test with no prerequisite also qualifies."));
+            let report = evaluate(
+                vec![entry(Some(Family::Disposable), vec![])],
+                &ci_options(),
+                |_| vec![],
+                |_| Ok(true),
+            );
+            assert_eq!((report.selected, report.executed), (1, 1));
+        }
+
+        #[test]
+        fn narrowing_never_widens_the_family() {
+            let report = evaluate(
+                vec![
+                    entry(Some(Family::Live), vec![]),
+                    entry(Some(Family::Timing), vec![]),
+                ],
+                &ci_options(),
+                |_| vec![],
+                |entry| panic!("{} executed outside its family", entry.id()),
+            );
+            assert_eq!(report.selected, 0);
+            assert!(report.outcomes.iter().all(|o| o.status == "not-selected"
+                && o.reasons == ["family requires explicit selection"]));
+        }
+
+        #[test]
+        fn cli_names_the_cli_prerequisite_and_provider_does_not() {
+            let select = |supplied: Vec<Supplied>, prerequisites: Vec<&'static str>| {
+                let mut options = options();
+                options.only_prerequisite = supplied;
+                evaluate(
+                    vec![entry(Some(Family::Disposable), prerequisites)],
+                    &options,
+                    |_| vec![],
+                    |_| Ok(true),
+                )
+                .selected
+            };
+            assert_eq!(select(vec![Supplied::Cli], vec![CLI]), 1);
+            assert_eq!(select(vec![Supplied::Provider], vec![CLI]), 0);
+            assert_eq!(select(vec![Supplied::Cli], vec![PROVIDER]), 0);
+            assert_eq!(select(vec![Supplied::Provider], vec![CLI, PROVIDER]), 0);
+            assert_eq!(
+                select(vec![Supplied::Provider, Supplied::Cli], vec![CLI, PROVIDER]),
+                1
+            );
+            assert_eq!(select(vec![Supplied::Cli], vec![CLI, CUSTODY]), 0);
+        }
     }
 }

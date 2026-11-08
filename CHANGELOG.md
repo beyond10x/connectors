@@ -13,6 +13,114 @@
   carries no configuration or credential (`docs/running-services.md` § In a container). A pull
   request that changes the workflow or the image builds both architectures and pushes nothing.
 
+## 0.69.0 — 2026-11-06
+
+### Changed
+
+- The owner's bounded read serves an implemented realization only for a `resource` operation with
+  self-contained (inline) input and output schemas, as the MCP projection does. A bounded-read
+  frame sent to the owner directly is otherwise refused `unsupported` before any provider request
+  (story:owner-bounded-read-realization-matches-projection). The projection and the owner share
+  one inline-schema check in `connectors-core`. Generic reads keep their current rule.
+
+## 0.68.0 — 2026-11-06
+
+### Changed
+
+- MCP stdio server: a listed mutating `tools/call` that names no descriptor revision is refused as
+  invalid params (`-32602`) before any provider request. Read tools, and names the server does not
+  list, still bind an absent revision to the one the server advertises, so an unlisted operation
+  called by name stays `not_found` (story:mcp-mutating-tool-call-revision-rule). The contracts
+  (`projection.md`, `mutations.md`) and `docs/local-mcp-stdio.md` say so. No mutating tool is
+  projected today, so the refusal is held by a unit test of the binding.
+- The owner refuses, as `unsupported` and before any provider request, a projected read of an
+  operation that declares semantic effects or an effect other than `network`, with or without a
+  budget. The rule no longer depends on the MCP projection hiding the operation, or on which frame
+  the caller chooses (story:owner-bounded-read-rechecks-semantic-effects).
+- Dependencies: ESS moves from 0.86.0 to 0.87.0. The generated MCP and operation types change their
+  version stamp only, and the same 34 authored scenarios stay known failing.
+
+### Added
+
+- `claude mcp add --scope project` was recorded once with Claude Code 2.1.318, in an empty project
+  directory with an empty HOME and no network (story:claude-mcp-add-registration-is-recorded). The
+  MCP page and README show the command, its output and the `.mcp.json` it wrote.
+  `apps/connectors/tests/claude_mcp_journey.rs` checks that entry against the replayed launch and
+  the documented user form. The recording shows the registration only, not a session that uses it.
+
+## 0.67.0 — 2026-11-05
+
+### Added
+
+- A headless Claude Code session (2.1.318) was run once against `connectors server --transport stdio`
+  through an `--mcp-config` entry whose command was a capturing wrapper. It listed a Jira
+  instance's eleven reads and called its search tool (story:claude-connects-to-the-mcp-server).
+  `apps/connectors/tests/claude_mcp_journey.rs` replays its sanitized frames and holds its
+  transcript in every `cargo test` on Linux. The MCP page shows the entry that ran and the user
+  form. The client opened with `server/discover` on `2026-07-28`; its parallel `initialize` on
+  `2025-11-25` is refused as an invalid request, and the session goes on with `2026-07-28`.
+  `claude mcp add` is not exercised.
+- Tests: the stdio MCP server refuses by name, `not_found` and with no provider request, an
+  operation with a Write requirement or semantic effects whose approval is not required, with or
+  without a revision (story:mcp-write-operation-call-by-name-is-refused). Further cases hold a
+  binding check that admits `connectors-private/2`, variant names and frames, and the `2025-11-25`
+  lifecycle.
+
+## 0.66.0 — 2026-11-05
+
+### Changed
+
+- MCP stdio server: a `tools/call` without `_meta["io.beyond10x.connectors/revision"]` now runs
+  against the revision the server currently advertises for that tool, instead of being refused as
+  invalid params (story:claude-connects-to-the-mcp-server). A present but stale revision is still
+  refused `stale_description` before any provider request, and a revision that is null, not a
+  string or not a valid id, or a `_meta` that is not an object, is still invalid params (`-32602`).
+  Such a client cannot tell that a tool's description changed since it listed it. The contract
+  (`adapters/mcp/contracts/server/v1alpha1/projection.md`) and its case file state the rule.
+- ESS 0.86.0: the pin and the `ess-*` crates move from 0.84.0. Generated MCP launch, configuration
+  and operation types change in their version stamp only.
+
+### Added
+
+- GitHub: the ten reads of connectors-definitions 0.5.2 `connectors/github.yaml` are tested against
+  a scripted provider (story:catalog-github-reads): exact paths and queries, caller-driven paging,
+  the `per_page` and page bounds, the 1,000-result search cap, fields a caller may not set, the
+  raw-read limits, and `rate_limited` with its wait. A new page, `website/docs/connectors/github.md`,
+  shows running GitHub as a definition file.
+- CI runs the ignored tests that a built catalog provider suffices for on every pull request
+  (story:provider-ignored-tests-run-in-ci): `connectors-build ignored --required
+  --only-prerequisite provider`.
+
+### Fixed
+
+- `connectors-build ignored` no longer inventories `harness = false` test targets. The CLI's stand-in
+  targets run their own `main` and answered the terse listing with a summary line, which the
+  inventory refused, so the full lane could not run since the first stand-in target.
+
+## 0.65.2 — 2026-11-04
+
+### Fixed
+
+- `connections connect --endpoint` names a catalog provider that prints its bootstrap and then
+  fails to start, instead of refusing the endpoint (story:connect-names-a-failed-provider-start).
+  A provider that is killed, exits, misses its handshake deadline or prints an unreadable
+  handshake during the derivation answers `unavailable` at stage `installed_provider`, with
+  `installed_provider_path` and `installed_provider_failure`. In 0.65.1 such a start was
+  `invalid_input` on `endpoint`. An endpoint that a running provider refuses still answers
+  `invalid_input` on `endpoint`.
+
+### Known issue
+
+- On one macOS Apple-silicon laptop the catalog provider is killed during its start, before the
+  handshake (story:macos-release-provider-starts-through-the-private-copy). This is under
+  investigation and does not reproduce on CI macOS 26.6.2: the published 0.65.0 provider and
+  a fresh build both start through the host there. Such a start now reports the kill as above.
+
+### Added
+
+- CI: a macOS job builds the release CLI and catalog provider, checks the published archive,
+  and starts both providers through the host twice, as a standing guard.
+
 ## 0.65.1 — 2026-11-03
 
 ### Fixed

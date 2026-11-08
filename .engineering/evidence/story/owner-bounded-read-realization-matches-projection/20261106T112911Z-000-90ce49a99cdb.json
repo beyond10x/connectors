@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-06T11:29:11Z",
+  "actor": "human:timo",
+  "artifact": "story:owner-bounded-read-realization-matches-projection",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-20261106-u2-adversary",
+    "review": "review-result:wave-20261106-u2-adversary",
+    "outcome": "fixed"
+  }
+}

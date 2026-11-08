@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-06T05:34:08Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-mutating-tool-call-revision-rule",
+  "kind": "story",
+  "revision": 13,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "local staged gate S1-S5c at cd51cd062 on wave/2026-11-05b-connectors, 0 failed",
+    "reference": "sha256:ba4ef60b4d9bf57b4b4803a64635d66e3375101cdab8395ba0cb00a3ff0b84a4"
+  }
+}

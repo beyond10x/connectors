@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-04T08:45:48Z",
+  "actor": "human:timo",
+  "artifact": "story:connect-names-a-failed-provider-start",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "merge a99bab09c on main (PR #237, release v0.65.2, fix commit 035b14c7a); holder apps/connectors/tests/catalog_provider_failure.rs a_provider_that_prints_but_does_not_start_is_named_not_the_endpoint (killed, exited: unavailable at installed_provider) and an_endpoint_the_running_provider_refuses_is_still_the_argument (invalid_input on endpoint at arguments); PR #237 checks green: repository gate run 41765596911, macOS host and CLI and release-built provider start 41765596975, Windows 41765597207; main after merge: Rust gate 41773271342, macOS host 41773271276, Windows host 41773271488, release binaries 41773412671; verify-release v0.65.2 EXIT=0",
+    "reference": "release v0.65.2"
+  }
+}

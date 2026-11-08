@@ -20,8 +20,8 @@
 //!
 //! [`index`] renders `website/docs/connectors/index.md`. A row per catalog connector comes from
 //! its declaration (`adapters/catalog/providers/<p>/connector.json` and the selection it names);
-//! the connectors without one (OpenRouter, the connectors served by their own executables,
-//! MCP) have a row in [`HAND`]. Each row links the page whose front matter `connectors` names it,
+//! the connectors without one (OpenRouter, GitHub, the connectors served by their own
+//! executables, MCP) have a row in [`HAND`]. Each row links the page whose front matter `connectors` names it,
 //! and generation fails when a row has no page, a page no row, or a catalog provider directory
 //! neither a declaration nor a hand row.
 
@@ -352,10 +352,14 @@ pub struct Hand {
 
 /// How a pinned instance is configured.
 const PINNED: &str = "pinned";
+/// How an instance of a released connector definition file is configured.
+const DEFINITION_FILE: &str = "definition file";
 
 /// The connectors with no catalog declaration. OpenRouter is served by the catalog provider from
-/// one selection through pinned instances; the others by an executable
-/// of their own, each pinned by its instance; MCP has no runtime.
+/// one selection through pinned instances; GitHub by the catalog provider from a released
+/// definition file, through its instance `definition`; the others by an executable
+/// of their own, each pinned by its instance; MCP as a connector has no runtime, so its row stays
+/// planned (the local MCP server, `server --transport stdio`, is no connector and has no row).
 pub const HAND: &[Hand] = &[
     Hand {
         connector: "openrouter",
@@ -366,6 +370,27 @@ pub const HAND: &[Hand] = &[
         writes: &[],
         profiles: &["openrouter.api-key"],
         configured: PINNED,
+    },
+    Hand {
+        connector: "github",
+        provider: "GitHub",
+        catalog: None,
+        selections: &[],
+        reads: &[
+            "review_requests.list",
+            "issues.assigned",
+            "notifications.list",
+            "user.me",
+            "repos.list",
+            "repo.get",
+            "releases.list",
+            "release.latest",
+            "readme.raw",
+            "file.raw",
+        ],
+        writes: &[],
+        profiles: &["github.token"],
+        configured: DEFINITION_FILE,
     },
     Hand {
         connector: "kubernetes",
@@ -727,8 +752,10 @@ pub fn index(root: &Path) -> Result<String> {
          else comes from the declaration shipped with the `connectors-catalog-provider` installed \
          beside `connectors`. A **pinned** instance names its executable, that executable's \
          SHA-256 and its configuration revision, because no declaration exists to derive them \
-         from; its page says why. Every write is a required-approval mutation: it runs only with \
-         a proof issued for its exact input.\n\n\
+         from; its page says why. A **definition file** instance is the instance `definition` \
+         that `connectors invoke --definition <file>` makes from a released connector definition, \
+         served by the same catalog provider; the configuration file names nothing. Every write \
+         is a required-approval mutation: it runs only with a proof issued for its exact input.\n\n\
          The rows of the catalog connectors are generated from their declarations under \
          [`adapters/catalog/providers/`]({SOURCE}/{PROVIDERS}); the others are written by hand in \
          the generator. Start with [Set up the local CLI](../guides/set-up-the-local-cli.md) \
@@ -742,7 +769,7 @@ pub fn index(root: &Path) -> Result<String> {
             "Every connector has one onboarding page with the same eight steps, from what it reads and writes to its limits."
         ),
         yaml_string(
-            "adapters/catalog/providers/*/connector.json and their selections; OpenRouter, the connectors served by their own executables and MCP by hand in crates/connectors-docs/src/onboarding.rs"
+            "adapters/catalog/providers/*/connector.json and their selections; OpenRouter, GitHub, the connectors served by their own executables and MCP by hand in crates/connectors-docs/src/onboarding.rs"
         ),
     ))
 }
