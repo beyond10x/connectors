@@ -95,9 +95,31 @@ jobs:
           TMPDIR: ${{ runner.temp }}
         run: |
           set -euo pipefail
+          export CONNECTORS_TEST_CLI="$GITHUB_WORKSPACE/target/debug/connectors"
           packages=()
           for program in $PROGRAMS; do packages+=(-p "$program"); done
           cargo test --locked --no-fail-fast "${packages[@]}"
+      - name: The Grafana CLI journey on the login keychain
+        shell: bash
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          export CONNECTORS_TEST_CLI="$GITHUB_WORKSPACE/target/debug/connectors"
+          log="$RUNNER_TEMP/grafana-cli-journey.log"
+          cargo test --locked -p connectors-grafana --test local_runtime -- --exact \
+            cli_journey::grafana_cli_connects_with_a_service_account_token_and_lists_datasources_with_the_login_keychain \
+            --nocapture 2>&1 | tee "$log"
+          grep -q 'test result: ok. 1 passed' "$log"
+      - name: Keychain state and security log after a failure
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          set +e
+          security list-keychains
+          security show-keychain-info "$HOME/Library/Keychains/login.keychain-db" < /dev/null 2>&1
+          echo "show-keychain-info exit $?"
+          log show --last 15m --style compact --predicate 'process == "securityd" OR subsystem == "com.apple.securityd" OR eventMessage CONTAINS[c] "connectors"' | tail -n 200
 
   release-start:
     name: release-built providers start through the host on macos-latest
