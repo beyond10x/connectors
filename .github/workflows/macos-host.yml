@@ -82,6 +82,7 @@ jobs:
         shell: bash
         run: cargo build --locked -p connectors -p connectors-catalog-provider
       - name: Each program names its version
+        id: versions
         shell: bash
         run: |
           set -euo pipefail
@@ -89,7 +90,41 @@ jobs:
           for program in $PROGRAMS; do packages+=(-p "$program"); done
           cargo build --locked "${packages[@]}"
           for program in $PROGRAMS; do "target/debug/${program}" --version; done
+      # Each keychain step records the local time span of its run, so that the
+      # step after a failure shows the unified log of exactly that span.
+      - name: The Grafana CLI journey on the login keychain
+        if: ${{ !cancelled() && steps.versions.outcome == 'success' }}
+        shell: bash
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          export CONNECTORS_TEST_CLI="$GITHUB_WORKSPACE/target/debug/connectors"
+          log="$RUNNER_TEMP/grafana-cli-journey.log"
+          cargo test --locked -p connectors-grafana --test local_runtime --no-run
+          date -v-1S '+%Y-%m-%d %H:%M:%S' > "$RUNNER_TEMP/span-journey-start"
+          cargo test --locked -p connectors-grafana --test local_runtime -- --exact \
+            cli_journey::grafana_cli_connects_with_a_service_account_token_and_lists_datasources_with_the_login_keychain \
+            --nocapture 2>&1 | tee "$log" || true
+          date -v+1S '+%Y-%m-%d %H:%M:%S' > "$RUNNER_TEMP/span-journey-end"
+          grep -q 'test result: ok. 1 passed' "$log"
+      - name: Login keychain writes from a launch copy, left on disk and removed after start
+        if: ${{ !cancelled() && steps.versions.outcome == 'success' }}
+        shell: bash
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/launch-copy.log"
+          cargo test --locked -p connectors-custody --lib --no-run
+          date -v-1S '+%Y-%m-%d %H:%M:%S' > "$RUNNER_TEMP/span-launch-copy-start"
+          cargo test --locked -p connectors-custody --lib -- --exact \
+            tests::macos_login_keychain_writes_from_a_launch_copy_left_on_disk_and_removed_after_start \
+            --include-ignored --nocapture 2>&1 | tee "$log" || true
+          date -v+1S '+%Y-%m-%d %H:%M:%S' > "$RUNNER_TEMP/span-launch-copy-end"
+          grep -q 'test result: ok. 1 passed' "$log"
       - name: Test the programs
+        if: ${{ !cancelled() && steps.versions.outcome == 'success' }}
         shell: bash
         env:
           TMPDIR: ${{ runner.temp }}
@@ -98,20 +133,9 @@ jobs:
           export CONNECTORS_TEST_CLI="$GITHUB_WORKSPACE/target/debug/connectors"
           packages=()
           for program in $PROGRAMS; do packages+=(-p "$program"); done
-          cargo test --locked --no-fail-fast "${packages[@]}"
-      - name: The Grafana CLI journey on the login keychain
-        shell: bash
-        env:
-          TMPDIR: ${{ runner.temp }}
-        run: |
-          set -euo pipefail
-          export CONNECTORS_TEST_CLI="$GITHUB_WORKSPACE/target/debug/connectors"
-          log="$RUNNER_TEMP/grafana-cli-journey.log"
-          cargo test --locked -p connectors-grafana --test local_runtime -- --exact \
-            cli_journey::grafana_cli_connects_with_a_service_account_token_and_lists_datasources_with_the_login_keychain \
-            --nocapture 2>&1 | tee "$log"
-          grep -q 'test result: ok. 1 passed' "$log"
-      - name: Keychain state and security log after a failure
+          cargo test --locked --no-fail-fast "${packages[@]}" -- --skip \
+            cli_journey::grafana_cli_connects_with_a_service_account_token_and_lists_datasources_with_the_login_keychain
+      - name: Keychain state and unified log of the keychain steps after a failure
         if: ${{ failure() }}
         shell: bash
         run: |
@@ -119,7 +143,19 @@ jobs:
           security list-keychains
           security show-keychain-info "$HOME/Library/Keychains/login.keychain-db" < /dev/null 2>&1
           echo "show-keychain-info exit $?"
-          log show --last 15m --style compact --predicate 'process == "securityd" OR subsystem == "com.apple.securityd" OR eventMessage CONTAINS[c] "connectors"' | tail -n 200
+          for span in journey launch-copy; do
+            [ -f "$RUNNER_TEMP/span-$span-start" ] || continue
+            start="$(cat "$RUNNER_TEMP/span-$span-start")"
+            end="$(cat "$RUNNER_TEMP/span-$span-end" 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')"
+            echo "::group::$span, $start to $end: processes named image (the owner and every launch copy), securityd, the custody lines and the launch copies"
+            log show --style compact --info --debug --start "$start" --end "$end" \
+              --predicate 'process == "image" OR process == "securityd" OR eventMessage BEGINSWITH "connectors custody:" OR eventMessage CONTAINS "connectors-image."' \
+              | head -n 4000
+            echo "::endgroup::"
+            echo "custody lines of $span:"
+            log show --style compact --start "$start" --end "$end" \
+              --predicate 'eventMessage BEGINSWITH "connectors custody:"'
+          done
 
   release-start:
     name: release-built providers start through the host on macos-latest

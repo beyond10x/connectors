@@ -245,6 +245,8 @@ impl JourneyCustody for Custody {
 struct LoginKeychain {
     /// The CLI's state directory, whose metadata store names the authority.
     state: PathBuf,
+    /// When the test started, which bounds the log it prints on a failure.
+    started: Instant,
 }
 #[cfg(target_os = "macos")]
 impl LoginKeychain {
@@ -352,8 +354,44 @@ impl JourneyCustody for LoginKeychain {
     fn restart(&mut self) {}
 }
 #[cfg(target_os = "macos")]
+impl LoginKeychain {
+    /// On a failure: the unified log's errors of the owner's process (named
+    /// `image`, after its launch copy) since this test started. The custody
+    /// binding names each failing keychain call there with its `OSStatus`
+    /// (`connectors custody: … answered OSStatus …`), which the CLI's closed
+    /// refusal does not carry.
+    fn print_owner_errors(&self) {
+        let minutes = self.started.elapsed().as_secs() / 60 + 2;
+        let shown = Command::new("/usr/bin/log")
+            .args(["show", "--style", "compact", "--last"])
+            .arg(format!("{minutes}m"))
+            .arg("--predicate")
+            .arg(
+                r#"process == "image" AND (eventMessage BEGINSWITH "connectors custody:" OR messageType == error OR messageType == fault)"#,
+            )
+            .stdin(Stdio::null())
+            .output();
+        match shown {
+            Ok(output) => {
+                let text = String::from_utf8_lossy(&output.stdout);
+                eprintln!(
+                    "owner errors in the unified log (log show exit {}):",
+                    output.status
+                );
+                for line in text.lines().take(300) {
+                    eprintln!("  {line}");
+                }
+            }
+            Err(error) => eprintln!("log show did not run: {error}"),
+        }
+    }
+}
+#[cfg(target_os = "macos")]
 impl Drop for LoginKeychain {
     fn drop(&mut self) {
+        if std::thread::panicking() {
+            self.print_owner_errors();
+        }
         match self.remove_written() {
             Ok(removed) => eprintln!("removed {removed} login keychain item(s) of this test"),
             Err(error) => eprintln!("login keychain cleanup failed: {error}"),
@@ -550,6 +588,7 @@ fn grafana_cli_connects_with_a_service_account_token_and_lists_datasources_with_
     // (the CLI's drop) before the keychain items are removed (this drop).
     let mut keychain = LoginKeychain {
         state: provider.root.path().join("cli/state"),
+        started: Instant::now(),
     };
     let cli = Cli::new(provider.root.path());
     assert_eq!(cli.paths.state, keychain.state);

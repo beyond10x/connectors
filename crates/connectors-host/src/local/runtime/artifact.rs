@@ -28,7 +28,9 @@ use std::{
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "macos")]
-pub(crate) use macos::{ExactChild, Image, Launch, capture, launch_path, path_of, received, sent};
+pub(crate) use macos::{
+    ExactChild, Image, Launch, capture, launch_path, own_copy, path_of, received, sent,
+};
 
 #[cfg(windows)]
 pub(crate) mod windows;
