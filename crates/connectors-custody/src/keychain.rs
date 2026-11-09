@@ -31,7 +31,7 @@ use security_framework_sys::{
     keychain_item::{SecItemAdd, SecKeychainItemDelete},
 };
 use std::{
-    ffi::CStr,
+    ffi::{CStr, CString},
     os::unix::ffi::OsStrExt,
     path::PathBuf,
     sync::{Mutex, MutexGuard, TryLockError},
@@ -45,6 +45,49 @@ pub const SERVICE: &str = "connectors";
 type OSStatus = i32;
 const ERR_SEC_INTERACTION_NOT_ALLOWED: OSStatus = -25308;
 const UNLOCKED: u32 = 1; // kSecUnlockStateStatus
+
+/// Names a keychain call of a write that did not answer success: the call,
+/// its `OSStatus` and the Security framework's text for that status
+/// (`SecCopyErrorMessageString`), or that it failed without one. The refusal
+/// stays closed ([`Failure`] carries no store
+/// diagnostics); this line is what names its cause. It goes to `syslog`,
+/// which macOS keeps in the unified log under this process's name (the
+/// owner's is `image`, the name of its launch copy), and carries neither an
+/// item name nor material.
+fn report(call: &str, status: Option<OSStatus>) {
+    let line = match status {
+        Some(status) => format!(
+            "connectors custody: {call} answered OSStatus {status} ({})",
+            security_framework::base::Error::from_code(status)
+                .message()
+                .unwrap_or_else(|| "no message".to_owned())
+        ),
+        None => format!("connectors custody: {call} failed without an OSStatus"),
+    };
+    #[cfg(test)]
+    REPORTED
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .push(line.clone());
+    if let Ok(line) = CString::new(line) {
+        // SAFETY: a constant format with one `%s` and a NUL-terminated
+        // argument that is live for the call.
+        unsafe { libc::syslog(libc::LOG_ERR, c"%s".as_ptr(), line.as_ptr()) };
+    }
+}
+
+/// Every line [`report`] wrote in this process, for a test to print.
+#[cfg(test)]
+static REPORTED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// The lines [`report`] wrote in this process so far, oldest first.
+#[cfg(test)]
+pub(crate) fn reported() -> Vec<String> {
+    REPORTED
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone()
+}
 
 type Found = (
     security_framework::os::macos::passwords::SecKeychainItemPassword,
@@ -92,19 +135,35 @@ unsafe extern "C" {
 /// authorizes decrypt gets a NULL application list, which means any
 /// application. An empty list would mean none. The other ACLs, the owner's
 /// change-ACL authorization among them, keep what `SecAccessCreate` gave them.
+///
+/// The access is created with an empty trusted-application array, not NULL.
+/// NULL asks the Security framework to trust "the calling application", which
+/// it derives from the calling executable on disk; the owner runs from a
+/// private copy the CLI removes once the owner has answered, so that lookup
+/// can fail and the write would answer `Unavailable` (inferred from the first
+/// macOS CI run, where the owner's first saving connect answered
+/// `custody_unavailable` while the custody contract test passed from a binary
+/// that stays on disk). The trusted list only fills the decrypt ACL's
+/// application list (`Access::makeStandard` in Apple's Security sources),
+/// which the loop below replaces with NULL either way, so
+/// the item's ACLs end as before: change-ACL as `SecAccessCreate` makes it,
+/// decrypt for any application.
 fn any_application_access() -> Result<SecAccess> {
     let descriptor = CFString::new(SERVICE);
+    let trusted = CFArray::<CFType>::from_CFTypes(&[]);
     let mut access: SecAccessRef = std::ptr::null_mut();
-    // SAFETY: descriptor is live for the call, a NULL trusted list is
-    // documented (the calling application), and access is a valid output.
+    // SAFETY: descriptor and the empty trusted list are live for the call (an
+    // array with no elements is documented: no trusted application), and
+    // access is a valid output.
     let status = unsafe {
         SecAccessCreate(
             descriptor.as_concrete_TypeRef(),
-            std::ptr::null(),
+            trusted.as_concrete_TypeRef(),
             &mut access,
         )
     };
     if status != 0 || access.is_null() {
+        report("SecAccessCreate", (status != 0).then_some(status));
         return Err(Failure::Unavailable);
     }
     // SAFETY: SecAccessCreate returned the access retained (create rule).
@@ -117,11 +176,13 @@ fn any_application_access() -> Result<SecAccess> {
         )
     };
     if acls.is_null() {
+        report("SecAccessCopyMatchingACLList", None);
         return Err(Failure::Unavailable);
     }
     // SAFETY: the copy function returned the array retained (create rule).
     let acls = unsafe { CFArray::<CFType>::wrap_under_create_rule(acls) };
     if acls.is_empty() {
+        report("SecAccessCopyMatchingACLList (no decrypt ACL)", None);
         return Err(Failure::Unavailable);
     }
     for acl in acls.iter() {
@@ -139,6 +200,7 @@ fn any_application_access() -> Result<SecAccess> {
         let description = (!description.is_null())
             .then(|| unsafe { CFString::wrap_under_create_rule(description) });
         if status != 0 {
+            report("SecACLCopyContents", Some(status));
             return Err(Failure::Unavailable);
         }
         let description = description.unwrap_or_else(|| descriptor.clone());
@@ -153,6 +215,7 @@ fn any_application_access() -> Result<SecAccess> {
             )
         };
         if status != 0 {
+            report("SecACLSetContents", Some(status));
             return Err(Failure::Unavailable);
         }
     }
@@ -302,13 +365,18 @@ impl Keychain {
     }
 
     fn find(&self, version: Version) -> Result<Option<Found>> {
+        self.lookup(version).map_err(|_| Failure::Unavailable)
+    }
+
+    /// [`Self::find`] with the keychain's status code of a failed lookup.
+    fn lookup(&self, version: Version) -> std::result::Result<Option<Found>, OSStatus> {
         match self
             .keychain
             .find_generic_password(SERVICE, &version.item_name())
         {
             Ok(found) => Ok(Some(found)),
             Err(error) if error.code() == errSecItemNotFound => Ok(None),
-            Err(_) => Err(Failure::Unavailable),
+            Err(error) => Err(error.code()),
         }
     }
 
@@ -408,17 +476,41 @@ impl Backend for Keychain {
         let _writer = writer(until)?;
         self.admit(version)?;
         guard()?;
-        if self.find(version)?.is_some() {
-            return Err(Failure::Conflict);
+        match self.lookup(version) {
+            Ok(None) => {}
+            Ok(Some(_)) => return Err(Failure::Conflict),
+            Err(status) => {
+                report(
+                    "SecKeychainFindGenericPassword before the add",
+                    Some(status),
+                );
+                return Err(Failure::Unavailable);
+            }
         }
         match self.add(version, material)? {
             0 => {}
             status if status == errSecDuplicateItem => return Err(Failure::Conflict),
-            ERR_SEC_INTERACTION_NOT_ALLOWED => return Err(Failure::Unavailable),
-            _ => return Err(Failure::OutcomeUnknown),
+            status => {
+                report("SecItemAdd", Some(status));
+                return Err(if status == ERR_SEC_INTERACTION_NOT_ALLOWED {
+                    Failure::Unavailable
+                } else {
+                    Failure::OutcomeUnknown
+                });
+            }
         }
-        let retained = self.read(version).map_err(|_| Failure::OutcomeUnknown)?;
+        let retained = match self.read_observed(version) {
+            (Ok(retained), _) => retained,
+            (Err(_), status) => {
+                report(
+                    "SecKeychainFindGenericPassword reading back the add",
+                    status,
+                );
+                return Err(Failure::OutcomeUnknown);
+            }
+        };
         if !retained.ct_eq(material.as_bytes()) {
+            report("reading back the add (other bytes)", None);
             return Err(Failure::OutcomeUnknown);
         }
         Ok(())

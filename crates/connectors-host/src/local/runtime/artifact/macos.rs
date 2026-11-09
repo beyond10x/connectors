@@ -311,6 +311,23 @@ impl Launch {
     pub(crate) fn path(&self) -> &Path {
         &self.path
     }
+    /// Hands the copy to the process it launched, which removes it when it
+    /// exits ([`own_copy`]): the copy stays on disk for that process's whole
+    /// run. The owner needs that. The keychain checks the code identity of the
+    /// process that creates and reads an item against the file at its
+    /// executable's path, as the owner's own build measure reads that file.
+    pub(crate) fn leave(self) {
+        let mut copies = copies();
+        if let Some(index) = copies
+            .iter()
+            .position(|copy| copy.id == self.id && copy.custody == Custody::Launched)
+        {
+            copies.swap_remove(index);
+        }
+        drop(copies);
+        // The removal is the launched process's now.
+        std::mem::forget(self);
+    }
 }
 impl Drop for Launch {
     fn drop(&mut self) {
@@ -323,6 +340,41 @@ impl Drop for Launch {
         }
         discard(&self.path);
     }
+}
+
+/// This process's own launch copy, which its launcher left on disk
+/// ([`Launch::leave`]); dropping it removes the copy and its directory.
+pub(crate) struct OwnCopy {
+    id: (u64, u64),
+    path: PathBuf,
+}
+impl Drop for OwnCopy {
+    fn drop(&mut self) {
+        // Only the file this process was started from: one put at its path
+        // since is left alone.
+        if std::fs::symlink_metadata(&self.path)
+            .is_ok_and(|named| named.file_type().is_file() && identity(&named) == self.id)
+        {
+            discard(&self.path);
+        }
+    }
+}
+
+/// The running executable when it is a launch copy, named as [`capture`]
+/// names one: an `image` file in a `connectors-image.*` directory. Anything
+/// else is `None` and is never removed.
+pub(crate) fn own_copy() -> Option<OwnCopy> {
+    let path = std::env::current_exe().ok()?;
+    let ours = path.file_name() == Some(OsStr::new(IMAGE))
+        && path
+            .parent()
+            .and_then(Path::file_name)
+            .is_some_and(|name| name.as_bytes().starts_with(DIRECTORY_PREFIX.as_bytes()));
+    let named = std::fs::symlink_metadata(&path).ok()?;
+    (ours && named.file_type().is_file()).then(|| OwnCopy {
+        id: identity(&named),
+        path,
+    })
 }
 
 /// The launch path of a descriptor on a copy this process captured or received
@@ -741,5 +793,26 @@ mod tests {
         drop(launched);
         assert!(image.exists(), "launch_path removed a file it did not make");
         assert!(refused, "launch_path admitted a file it did not make");
+    }
+
+    /// A launch left to the process it launched keeps the copy on disk after
+    /// the image is dropped; only that process's [`OwnCopy`] removes it, with
+    /// its directory. This test binary is not a launch copy, so it has none.
+    #[test]
+    fn a_left_launch_keeps_the_copy_until_its_process_removes_it() {
+        let root = tempfile::tempdir().unwrap();
+        let (path, hash) = source(root.path(), MACH_O_64);
+        let snapshot = capture(File::open(&path).unwrap(), &hash, until()).unwrap();
+        let launch = launch_path(&snapshot).unwrap();
+        let copy = launch.path().to_path_buf();
+        launch.leave();
+        drop(snapshot);
+        assert!(copy.exists(), "a left launch removed its copy");
+        assert!(own_copy().is_none(), "this test binary is no launch copy");
+        drop(OwnCopy {
+            id: identity(&std::fs::symlink_metadata(&copy).unwrap()),
+            path: copy.clone(),
+        });
+        assert!(!copy.parent().unwrap().exists());
     }
 }

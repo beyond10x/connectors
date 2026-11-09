@@ -330,6 +330,14 @@ impl Client {
                         greeting,
                     );
                     match &result {
+                        // On macOS the owner keeps its launch copy for its whole
+                        // run and removes it when it exits (`serve`): the
+                        // keychain checks the code identity of the process that
+                        // creates and reads an item against the file at its
+                        // executable's path (story:provider-programs-run-on-macos).
+                        #[cfg(target_os = "macos")]
+                        Ok(_) => launched.leave(),
+                        #[cfg(not(target_os = "macos"))]
                         Ok(_) => {}
                         // A caller that stopped waiting leaves the owner it
                         // started to finish its start: the next command reaches
@@ -1419,7 +1427,10 @@ const START_DELAY: &str = "CONNECTORS_TEST_OWNER_START_DELAY_MS";
 /// build from the file at its running executable's path
 /// (`own_image_build_measure`: `launch_path_read`), which is that copy, before
 /// it answers. Removing the copy as soon as exec returned would leave the
-/// owner nothing to measure, and it would refuse to serve.
+/// owner nothing to measure, and it would refuse to serve. Once it has
+/// answered, the caller leaves the copy to the owner (`Launch::leave`),
+/// which removes it when it exits: its keychain items are created and read
+/// back against that file too.
 #[cfg(target_os = "linux")]
 struct Launched;
 #[cfg(target_os = "macos")]
@@ -1460,8 +1471,8 @@ fn spawn(
     let (private_fd, lock_fd) = (private.as_raw_fd(), lifetime.as_raw_fd());
     #[cfg(target_os = "linux")]
     let mut command = Command::new(format!("/proc/self/fd/{}", executable.as_raw_fd()));
-    // macOS executes the owner-private copy by its path; the caller drops the
-    // launch, which removes the copy, once the owner has answered (`Launched`).
+    // macOS executes the owner-private copy by its path; the caller holds the
+    // launch until the owner has answered, then leaves it to the owner (`Launched`).
     #[cfg(target_os = "macos")]
     let launch = runtime::artifact::launch_path(&executable)?;
     #[cfg(target_os = "macos")]
@@ -1562,6 +1573,10 @@ pub fn serve(paths: Paths) -> Result<()> {
 /// [`serve`], governed reads admitted and projected by `read_policy`.
 pub fn serve_with_read_policy(paths: Paths, read_policy: Arc<dyn ReadPolicy>) -> Result<()> {
     bound_allocator();
+    // The launch copy the starting CLI left on disk for this run (macOS), removed
+    // when serving ends, whichever way it ends here.
+    #[cfg(target_os = "macos")]
+    let _own_copy = runtime::artifact::own_copy();
     // Before any protected input: the owner holds credentials in memory.
     crate::local::core_dumps::forbid().map_err(|_| Error::from(Code::Unavailable))?;
     IN_OWNER.store(true, Ordering::SeqCst);
