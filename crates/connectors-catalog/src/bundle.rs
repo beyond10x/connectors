@@ -73,12 +73,50 @@ pub fn read_index(directory: &Path) -> Result<Index> {
     }
     let bytes =
         std::fs::read(&path).map_err(|_| refuse(ErrorCode::NotFound, "index cannot be read"))?;
-    connectors_core::read_json(&bytes).map_err(|_| {
+    let index: Index = connectors_core::read_json(&bytes).map_err(|_| {
         refuse(
             ErrorCode::InvalidInput,
             "index is not a document this build parses",
         )
-    })
+    })?;
+    check_rows(&index)?;
+    Ok(index)
+}
+
+/// The one file name a provider's bundle has. `write` names files with it and
+/// `read_index` refuses a row that names any other.
+fn bundle_file_name(provider: &str) -> String {
+    format!("{provider}.bundle.json")
+}
+
+/// Refuse an index `write` could not have produced: a row whose provider is not
+/// an identifier, a row whose file is not `<provider>.bundle.json`, or two rows
+/// for one provider. `load` joins the row's file name onto the directory and
+/// `Index::find` takes the first match, so either shape would let a hand-edited
+/// index name a file outside the directory or pick between two answers.
+fn check_rows(index: &Index) -> Result<()> {
+    let mut seen = std::collections::BTreeSet::new();
+    for entry in &index.entries {
+        if !connectors_core::valid_id(&entry.provider) {
+            return Err(refuse(
+                ErrorCode::InvalidInput,
+                "index names an invalid provider identifier",
+            ));
+        }
+        if entry.file_name != bundle_file_name(&entry.provider) {
+            return Err(refuse(
+                ErrorCode::InvalidInput,
+                "index names a bundle file other than <provider>.bundle.json",
+            ));
+        }
+        if !seen.insert(entry.provider.as_str()) {
+            return Err(refuse(
+                ErrorCode::InvalidInput,
+                "index names one provider more than once",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn put_index(directory: &Path, bytes: &[u8]) -> Result<()> {
@@ -264,7 +302,7 @@ pub fn write(directory: &Path, bundle: &Bundle, replace: bool) -> Result<Entry> 
             "provider is already indexed; ask for replacement",
         ));
     }
-    let file_name = format!("{}.bundle.json", bundle.provider);
+    let file_name = bundle_file_name(&bundle.provider);
     let (operations, unsupported) = bundle.inventory.coverage();
     let entry = Entry {
         provider: bundle.provider.clone(),
