@@ -271,7 +271,7 @@ fn each_guide_documents_the_basic_gateway_form_a_service_account_token_uses() {
             "issue.comments",
             json!({"issueIdOrKey": "FIX-1", "startAt": 0, "maxResults": 2}),
             [
-                "/ex/jira/your-cloud-id/rest/api/3/myself?",
+                "/ex/jira/your-cloud-id/rest/api/3/myself",
                 "/ex/jira/your-cloud-id/rest/api/3/issue/FIX-1/comment?startAt=0&maxResults=2",
             ],
         ),
@@ -281,7 +281,7 @@ fn each_guide_documents_the_basic_gateway_form_a_service_account_token_uses() {
             "page.get",
             json!({"id": "1001", "body-format": "storage"}),
             [
-                "/ex/confluence/your-cloud-id/wiki/rest/api/user/current?",
+                "/ex/confluence/your-cloud-id/wiki/rest/api/user/current",
                 "/ex/confluence/your-cloud-id/wiki/api/v2/pages/1001?body-format=storage",
             ],
         ),
@@ -381,7 +381,7 @@ fn the_acceptance_form_with_the_gateway_root_as_api_base_sends_the_full_document
     assert_eq!(
         paths,
         [
-            "/ex/jira/cloud-1/rest/api/3/myself?",
+            "/ex/jira/cloud-1/rest/api/3/myself",
             "/ex/jira/cloud-1/rest/api/3/issue/FIX-2/changelog?startAt=0&maxResults=1",
         ]
     );

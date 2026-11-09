@@ -1029,8 +1029,8 @@ fn connecting_records_the_current_user_as_the_identity() {
     assert_eq!(baseline.granted_scopes, None);
     let requests = provider.requests();
     assert_eq!(requests.len(), 1);
-    // The identity probe carries an empty query.
-    assert_eq!(requests[0].0, "/api/v2/users/me?");
+    // The identity probe carries no query.
+    assert_eq!(requests[0].0, "/api/v2/users/me");
     assert_eq!(requests[0].1.as_deref(), Some(HEADER));
     // A wrong token is answered 401 and refuses the connection.
     let wrong =
@@ -1065,7 +1065,7 @@ fn first_pages() -> [(&'static str, Value, String); 8] {
         (
             "ticket.show",
             json!({"ticket_id": 101}),
-            "/api/v2/tickets/101?".into(),
+            "/api/v2/tickets/101".into(),
         ),
         (
             "ticket.comments",
@@ -1086,7 +1086,7 @@ fn first_pages() -> [(&'static str, Value, String); 8] {
         (
             "user.show",
             json!({"user_id": 201}),
-            "/api/v2/users/201?".into(),
+            "/api/v2/users/201".into(),
         ),
         (
             "organizations.incremental",
@@ -1096,7 +1096,7 @@ fn first_pages() -> [(&'static str, Value, String); 8] {
         (
             "organization.show",
             json!({"organization_id": 301}),
-            "/api/v2/organizations/301?".into(),
+            "/api/v2/organizations/301".into(),
         ),
     ]
 }
@@ -1703,13 +1703,13 @@ fn each_approved_write_sends_its_preflight_and_exactly_one_put_with_the_exact_bo
             [
                 (
                     "GET".to_owned(),
-                    "/api/v2/tickets/101?".to_owned(),
+                    "/api/v2/tickets/101".to_owned(),
                     Some(HEADER.to_owned()),
                     Value::Null
                 ),
                 (
                     "PUT".to_owned(),
-                    "/api/v2/tickets/101?".to_owned(),
+                    "/api/v2/tickets/101".to_owned(),
                     Some(HEADER.to_owned()),
                     body.clone()
                 ),

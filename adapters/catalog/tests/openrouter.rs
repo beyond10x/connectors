@@ -622,9 +622,9 @@ fn connecting_proves_the_key_and_names_its_label_as_the_subject() {
     assert_eq!(baseline.granted_scopes, None);
     let requests = provider.requests();
     assert_eq!(requests.len(), 1);
-    // The identity probe carries an empty query.
+    // The identity probe carries no query.
     assert_eq!(requests[0].0, "GET");
-    assert_eq!(requests[0].1, format!("{KEY_PATH}?"));
+    assert_eq!(requests[0].1, KEY_PATH.to_string());
     assert_eq!(requests[0].2, bearer());
     // A wrong key is answered 401 and refuses the connection.
     let wrong = Secret(br#"{"token":"wrong-key"}"#.to_vec());
@@ -646,7 +646,7 @@ fn key_get_returns_the_key_record() {
         provider.requests(),
         [(
             "GET".to_owned(),
-            format!("{KEY_PATH}?"),
+            KEY_PATH.to_string(),
             bearer(),
             Value::Null
         )]
@@ -673,7 +673,7 @@ fn workspaces_list_sends_its_paging_and_returns_the_workspaces() {
     assert_eq!(
         targets,
         [
-            format!("{WORKSPACES}?"),
+            WORKSPACES.to_string(),
             format!("{WORKSPACES}?offset=1&limit=1")
         ]
     );
@@ -848,8 +848,8 @@ fn key_create_hands_over_the_created_key_and_returns_only_its_hash() {
     assert_eq!(
         sent,
         [
-            ("GET".to_owned(), format!("{KEY_PATH}?"), created.clone()),
-            ("GET".to_owned(), format!("{KEY_PATH}?"), created),
+            ("GET".to_owned(), KEY_PATH.to_string(), created.clone()),
+            ("GET".to_owned(), KEY_PATH.to_string(), created),
         ]
     );
     // The created key is refused the management routes: OpenRouter's 403.

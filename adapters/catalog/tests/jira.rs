@@ -910,7 +910,7 @@ fn the_lowered_jira_definition_serves_issue_get_against_the_fixture() {
 
 /// Jira answers `404` for an issue that does not exist or that the account
 /// may not see; the read refuses with the provider's not-found, after exactly
-/// one request to the declared path (no query, so the path ends in `?`).
+/// one request to the declared path, with no query and no `?`.
 #[test]
 fn an_issue_jira_does_not_find_is_refused_as_provider_not_found() {
     let provider = Provider::new();
@@ -931,7 +931,7 @@ fn an_issue_jira_does_not_find_is_refused_as_provider_not_found() {
     );
     let requests = provider.requests();
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].0, "/rest/api/3/issue/FIX-404?");
+    assert_eq!(requests[0].0, "/rest/api/3/issue/FIX-404");
 }
 
 #[test]
@@ -986,7 +986,7 @@ fn issue_create_meta_lists_the_issue_types_a_project_can_create() {
     );
     assert_eq!(
         provider.requests().last().unwrap().0,
-        "/rest/api/3/issue/createmeta/FIX/issuetypes?"
+        "/rest/api/3/issue/createmeta/FIX/issuetypes"
     );
     let names: Vec<&str> = result["body"]["issueTypes"]
         .as_array()
@@ -1026,7 +1026,7 @@ fn issue_create_meta_fields_lists_one_issue_types_fields_and_needs_its_id() {
     );
     assert_eq!(
         provider.requests().last().unwrap().0,
-        "/rest/api/3/issue/createmeta/FIX/issuetypes/10001?"
+        "/rest/api/3/issue/createmeta/FIX/issuetypes/10001"
     );
     let fields: Vec<(&str, bool)> = result["body"]["fields"]
         .as_array()
@@ -1051,12 +1051,12 @@ fn issue_transitions_lists_the_transitions_on_one_issue_with_their_target_status
     );
     let requests = provider.requests();
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].0, "/rest/api/3/issue/FIX-1/transitions?");
+    assert_eq!(requests[0].0, "/rest/api/3/issue/FIX-1/transitions");
     assert_eq!(requests[0].1.as_deref(), Some(HEADER));
     assert_eq!(result["status"], 200);
     assert_eq!(
         Some(&result["body"]),
-        page("/rest/api/3/issue/FIX-1/transitions?").as_ref()
+        page("/rest/api/3/issue/FIX-1/transitions").as_ref()
     );
     assert_eq!(result["provenance"]["instance"], "fixture-jira");
     let offered: Vec<(&str, &str, &str)> = result["body"]["transitions"]
@@ -1233,5 +1233,5 @@ fn transitions_of_an_issue_jira_does_not_find_are_refused_as_provider_not_found(
     );
     let requests = provider.requests();
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].0, "/rest/api/3/issue/FIX-404/transitions?");
+    assert_eq!(requests[0].0, "/rest/api/3/issue/FIX-404/transitions");
 }

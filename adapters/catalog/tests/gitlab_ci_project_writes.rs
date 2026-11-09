@@ -701,7 +701,7 @@ fn declared(operation: &str, effect: Effect) -> connectors_core::Operation {
         .unwrap_or_else(|| panic!("`{operation}` is not a declared {effect:?}"))
 }
 fn request(method: &str, path: &str, body: Value) -> (String, String, Value) {
-    (method.to_owned(), format!("{PROJECT}/{path}?"), body)
+    (method.to_owned(), format!("{PROJECT}/{path}"), body)
 }
 fn get_pipeline(id: u64) -> (String, String, Value) {
     request("GET", &format!("pipelines/{id}"), Value::Null)
@@ -719,7 +719,7 @@ fn get_commit(reference: &str) -> (String, String, Value) {
 fn get_namespace(path: &str) -> (String, String, Value) {
     (
         "GET".to_owned(),
-        format!("/api/v4/namespaces/{}?", path.replace('/', "%2F")),
+        format!("/api/v4/namespaces/{}", path.replace('/', "%2F")),
         Value::Null,
     )
 }
@@ -1084,7 +1084,7 @@ fn environments_list_answers_through_the_provider_process() {
             ),
             (
                 "GET".to_owned(),
-                "/api/v4/projects/org%2Fmissing/environments?".to_owned(),
+                "/api/v4/projects/org%2Fmissing/environments".to_owned(),
                 Value::Null
             ),
         ]
@@ -1188,7 +1188,7 @@ fn commit_create_lands_on_the_pinned_head_as_json() {
         provider.content_types(),
         [(
             "POST".to_owned(),
-            format!("{PROJECT}/repository/commits?"),
+            format!("{PROJECT}/repository/commits"),
             Some("application/json".to_owned())
         )]
     );
@@ -1245,7 +1245,7 @@ fn file_update_proves_its_commit_on_the_pinned_head_by_a_read_after() {
         provider.content_types(),
         [(
             "PUT".to_owned(),
-            format!("{PROJECT}/repository/files/docs%2Fguide.md?"),
+            format!("{PROJECT}/repository/files/docs%2Fguide.md"),
             Some("application/json".to_owned())
         )]
     );
@@ -1402,7 +1402,7 @@ fn project_create_resolves_the_namespace_by_path_and_proves_the_project_in_it() 
             get_namespace("org/team"),
             (
                 "POST".to_owned(),
-                "/api/v4/projects?".to_owned(),
+                "/api/v4/projects".to_owned(),
                 input["body"].clone()
             ),
         ]
@@ -1411,7 +1411,7 @@ fn project_create_resolves_the_namespace_by_path_and_proves_the_project_in_it() 
         provider.content_types(),
         [(
             "POST".to_owned(),
-            "/api/v4/projects?".to_owned(),
+            "/api/v4/projects".to_owned(),
             Some("application/json".to_owned())
         )]
     );

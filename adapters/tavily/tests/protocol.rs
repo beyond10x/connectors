@@ -123,7 +123,7 @@ async fn a_search_posts_the_query_and_maps_each_result() {
         .unwrap();
     let seen = seen.lock().unwrap()[0].clone();
     assert!(
-        seen.head.starts_with("POST /search? HTTP/1.1\r\n"),
+        seen.head.starts_with("POST /search HTTP/1.1\r\n"),
         "{}",
         seen.head
     );
@@ -208,7 +208,7 @@ async fn a_fetch_reports_pages_and_failures_and_is_complete_when_every_url_answe
         .unwrap();
     let seen = seen.lock().unwrap()[0].clone();
     assert!(
-        seen.head.starts_with("POST /extract? HTTP/1.1\r\n"),
+        seen.head.starts_with("POST /extract HTTP/1.1\r\n"),
         "{}",
         seen.head
     );
@@ -248,7 +248,7 @@ async fn a_crawl_that_reaches_its_limit_is_incomplete() {
         .unwrap();
     let seen = seen.lock().unwrap()[0].clone();
     assert!(
-        seen.head.starts_with("POST /crawl? HTTP/1.1\r\n"),
+        seen.head.starts_with("POST /crawl HTTP/1.1\r\n"),
         "{}",
         seen.head
     );
@@ -329,7 +329,7 @@ async fn the_key_is_validated_by_usage_without_a_search() {
     assert!(
         seen.lock().unwrap()[0]
             .head
-            .starts_with("GET /usage? HTTP/1.1\r\n")
+            .starts_with("GET /usage HTTP/1.1\r\n")
     );
     assert!(matches!(
         auth::validate(&http, || 1_000).await,

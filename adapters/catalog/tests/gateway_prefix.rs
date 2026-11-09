@@ -444,7 +444,7 @@ fn a_jira_read_and_its_identity_read_go_through_the_gateway_prefix() {
         paths,
         [
             // The host transport ends a query-less GET with an empty `?`.
-            format!("/ex/jira/{CLOUD}/rest/api/3/myself?"),
+            format!("/ex/jira/{CLOUD}/rest/api/3/myself"),
             format!("/ex/jira/{CLOUD}/rest/api/3/issue/FIX-1/comment?startAt=0&maxResults=2"),
         ]
     );
@@ -462,7 +462,7 @@ fn a_confluence_read_and_its_identity_read_go_through_the_gateway_prefix() {
         paths,
         [
             // The host transport ends a query-less GET with an empty `?`.
-            format!("/ex/confluence/{CLOUD}/wiki/rest/api/user/current?"),
+            format!("/ex/confluence/{CLOUD}/wiki/rest/api/user/current"),
             format!("/ex/confluence/{CLOUD}/wiki/api/v2/pages/1001?body-format=storage"),
         ]
     );
