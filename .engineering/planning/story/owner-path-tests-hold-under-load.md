@@ -2,11 +2,23 @@
 format: aep.planning-md/3
 id: story:owner-path-tests-hold-under-load
 kind: story
-status: draft
+status: active
 title: Owner and store path tests hold under machine load
 relations:
 - informed_by: story:connectors-do-short-invocation
-revision: 7
+- decomposes: epic:zero-open-issues-and-store-defects
+- serves: vision:independent-contract-adapters
+scope:
+- confidence: inferred
+  path: apps/connectors/tests/local_mcp_server.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/config.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/registry/tests.rs
+revision: 12
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:59:46Z", actor: "human:timo", revision: 8, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:59:46Z", actor: "human:timo", revision: 9, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Problem
 

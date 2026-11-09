@@ -2,9 +2,18 @@
 format: aep.planning-md/3
 id: story:catalog-oversized-body-one-classification
 kind: story
-status: draft
+status: active
 title: An over-bound catalog response body has one classification in contract, model and transport
-revision: 1
+relations:
+- decomposes: epic:zero-open-issues-and-store-defects
+- serves: vision:independent-contract-adapters
+scope:
+- confidence: inferred
+  path: contracts/catalog/v1alpha1/semantics.md
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:59:46Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:59:47Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Problem
 

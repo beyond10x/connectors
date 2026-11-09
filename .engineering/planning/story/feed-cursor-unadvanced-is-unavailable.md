@@ -2,12 +2,19 @@
 format: aep.planning-md/3
 id: story:feed-cursor-unadvanced-is-unavailable
 kind: story
-status: draft
+status: active
 title: A cursor feed answer that is incomplete and does not advance is unavailable
 summary: 'review run 3 C2 F1: returned as a page with an unchanged watermark'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: adapters/catalog/src/feed.rs
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:03Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:04Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 

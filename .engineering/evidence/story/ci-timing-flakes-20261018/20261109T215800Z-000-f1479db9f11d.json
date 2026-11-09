@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-09T21:58:00Z",
+  "actor": "human:timo",
+  "artifact": "story:ci-timing-flakes-20261018",
+  "kind": "story",
+  "revision": 12,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test --locked -p connectors-host --lib -- a_connection_closed_by_a_retiring_owner_reaches_the_next_owner (issue #183)",
+    "reference": "origin/main bd338daa0: 1 passed locally; macOS host run 42537155135 job 128903887722 success; none of 8 failed macOS host runs 2026-10-23..11-08 failed on this test"
+  }
+}

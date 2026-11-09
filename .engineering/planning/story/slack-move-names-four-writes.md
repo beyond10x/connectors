@@ -2,11 +2,18 @@
 format: aep.planning-md/3
 id: story:slack-move-names-four-writes
 kind: story
-status: draft
+status: active
 title: The Slack move guide enables the five writes the shipped selection carries
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: docs/catalog-slack.md
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:44Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:45Z", actor: "human:timo", revision: 5, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Observed
 

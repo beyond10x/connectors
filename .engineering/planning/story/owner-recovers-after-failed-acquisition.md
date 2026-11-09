@@ -2,11 +2,20 @@
 format: aep.planning-md/3
 id: story:owner-recovers-after-failed-acquisition
 kind: story
-status: draft
+status: active
 title: An owner that saw an acquisition fail still admits work
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/registry/lifecycle.rs
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:16Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:17Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Report (knowledge-ingest consumer, 2026-09-29, v0.15.1, not reproduced here)
 

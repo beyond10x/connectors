@@ -2,13 +2,24 @@
 format: aep.planning-md/3
 id: story:generated-output-regenerates-in-a-fresh-checkout
 kind: story
-status: draft
+status: active
 title: ESS-generated outputs regenerate in a fresh checkout with the command the gate names
 tags:
 - d298
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: crates/connectors-build/src/mcp.rs
+- confidence: inferred
+  path: crates/connectors-build/src/service_metadata.rs
+- confidence: inferred
+  path: docs/development.md
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:05Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:05Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Problem
 

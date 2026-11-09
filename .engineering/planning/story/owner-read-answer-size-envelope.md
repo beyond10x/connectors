@@ -2,12 +2,19 @@
 format: aep.planning-md/3
 id: story:owner-read-answer-size-envelope
 kind: story
-status: draft
+status: active
 title: A read result the child admits fits the owner's answer
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:owner-read-answers-json-value
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: crates/connectors-host/src/local/runtime/channel.rs
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:15Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:16Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Defect
 

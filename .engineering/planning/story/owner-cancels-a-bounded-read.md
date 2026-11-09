@@ -2,13 +2,25 @@
 format: aep.planning-md/3
 id: story:owner-cancels-a-bounded-read
 kind: story
-status: draft
+status: active
 title: The local owner cancels a bounded read the MCP server abandons
 relations:
 - decomposes: epic:mcp-contracts
 - informed_by: story:mcp-stdio-runtime-branch
 - informed_by: review-result:w1022-u3-adversary-r2
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+- serves: vision:independent-contract-adapters
+scope:
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner/supervisor.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/runtime/bounded.rs
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:59:29Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:59:29Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Problem
 

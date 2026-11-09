@@ -2,12 +2,19 @@
 format: aep.planning-md/3
 id: story:websearch-contract-states-host-deadline
 kind: story
-status: draft
+status: active
 title: The websearch contract states the deadline a call actually has
 summary: contract promises 160 s / 150 s; the CLI cuts every call at 30 s
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: adapters/tavily/src/lib.rs
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:46Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:46Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 

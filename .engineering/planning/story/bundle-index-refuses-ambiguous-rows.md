@@ -2,12 +2,19 @@
 format: aep.planning-md/3
 id: story:bundle-index-refuses-ambiguous-rows
 kind: story
-status: draft
+status: active
 title: The bundle index refuses a repeated provider and a file name outside the bundle directory
 summary: 'review run 3 C4 F2: load joins an unchecked file_name and takes the first row'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: crates/connectors-catalog/src/bundle.rs
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:57:48Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:57:49Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 

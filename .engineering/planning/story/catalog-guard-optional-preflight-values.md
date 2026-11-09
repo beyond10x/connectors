@@ -2,11 +2,18 @@
 format: aep.planning-md/3
 id: story:catalog-guard-optional-preflight-values
 kind: story
-status: draft
+status: active
 title: A guard preflight can forward an optional input value when the caller gives it
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: adapters/catalog/src/lib.rs
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:57:50Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:57:50Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Source
 

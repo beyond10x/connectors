@@ -2,12 +2,19 @@
 format: aep.planning-md/3
 id: story:definition-refusal-keeps-deprecations
 kind: story
-status: draft
+status: active
 title: A refused definition invoke still reports its deprecated options
 summary: 'review run 3 C3 F2: the failure envelope drops deprecations'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: apps/connectors/src/local.rs
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:01Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:01Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 
