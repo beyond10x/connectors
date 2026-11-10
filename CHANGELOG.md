@@ -13,6 +13,40 @@
   carries no configuration or credential (`docs/running-services.md` § In a container). A pull
   request that changes the workflow or the image builds both architectures and pushes nothing.
 
+### Fixed
+
+- A provider request with no query parameters is sent without a trailing `?`
+  (story:http-empty-query-no-trailing-question-mark).
+- The catalog bundle index refuses ambiguous or escaping rows, and loading a bundle reads no file
+  outside its directory (story:bundle-index-refuses-ambiguous-rows).
+- macOS: the owner keeps its private launch copy for its whole run and removes it when it stops; a
+  keychain write from a process whose executable was deleted (OSStatus 100002) is pinned by a
+  custody test, and the Grafana journey runs on the login keychain (issue #229,
+  story:provider-programs-run-on-macos).
+- `connections connect --endpoint`: connects that read one configuration text and write different
+  endpoints replace it at most once, under an exclusive lock on the configuration whatever state
+  directory each selects. A lock held past 30 s is `revision_conflict` with `retry_explicitly`; a
+  lock the host refuses is `metadata_unavailable` (story:endpoint-publish-holds-one-writer).
+- Following the next actions from a pending connection no longer cycles: a refused connect answers
+  `retry_explicitly`, a revalidation the upgraded provider refuses names `revoke_connection`, and
+  `connections list` and `describe` carry `pending_reason` (issue #181,
+  story:connection-next-actions-no-cycle).
+- Catalog guards: a preflight's `optional_values` stay optional, are forwarded when given, and are
+  checked when the selection loads like `values`; a `values` or `optional_values` key the probe
+  read does not declare, or a key bound in both, is refused at load
+  (story:catalog-guard-optional-preflight-values).
+- Catalog feeds: an incomplete cursor answer that does not advance its cursor is `unavailable`
+  instead of a page read again forever (story:feed-cursor-unadvanced-is-unavailable).
+- SQL: `query.read` provenance names the connected database, and the contract, the adapter page
+  and the MySQL guide say the configured user's grants are the boundary
+  (story:mysql-query-read-provenance).
+- Tavily: the crawl `timeout` is derived from the caller's remaining deadline (less 5 s, within
+  10–150 s), the tool profile bounds every call at 30 s, and the websearch contract states only
+  the bounds that apply (story:websearch-contract-states-host-deadline).
+- The owner's read answer is bounded at the result limit plus a fixed envelope and carries the
+  adapter child's result bytes unchanged, so a read result the child admits reaches the CLI
+  (story:owner-read-answer-size-envelope).
+
 ## 0.69.0 — 2026-11-06
 
 ### Changed
