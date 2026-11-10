@@ -154,6 +154,16 @@ fn named(config: &Config) -> Vec<Named> {
     named
 }
 
+/// Whether a legacy `[adapters.<alias>]` entry is known by `connector` and
+/// `instance` (story:legacy-alias-sharing-an-instance-name): an instance table
+/// written under that name would be a second entry of it.
+pub(super) fn held_by_legacy(config: &Config, connector: &str, instance: &str) -> bool {
+    config.legacy_aliases().into_iter().any(|alias| {
+        entry_name(config, alias, &config.adapters[alias])
+            .is_some_and(|(c, i)| c == connector && i == instance)
+    })
+}
+
 /// The connector and instance of every entry [`named`] lists, by alias: the
 /// instances `instances list` lists and `--connector`/`--instance` select,
 /// each entry once. A name a legacy entry and a `[connectors]` instance both
@@ -207,7 +217,8 @@ pub(super) fn select(
         },
         several => {
             // A name two entries hold (story:legacy-alias-sharing-an-instance-name)
-            // is listed once per entry, by alias, so none is listed twice.
+            // is listed once per entry, by alias; an instance that has no entry
+            // yet (it awaits a profile) has no alias and is listed by its name.
             let shared = |n: &Named| {
                 several
                     .iter()
@@ -221,7 +232,6 @@ pub(super) fn select(
                     let name = format!("{}/{}", n.connector, n.instance);
                     match (&n.alias, shared(n)) {
                         (Some(alias), true) => format!("{name} (alias {alias})"),
-                        (None, true) => format!("{name} (no entry)"),
                         _ => name,
                     }
                 })

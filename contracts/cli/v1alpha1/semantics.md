@@ -545,8 +545,11 @@ The endpoint must pass the configuration's own endpoint rule (non-empty, at
 most 2048 bytes, no whitespace or control character); otherwise the command is
 `invalid_input` with `field = endpoint` and nothing is written. So is
 `--endpoint` with no `<connector>/<instance>` named (`--adapter` or the default
-instance), and on an instance that carries the pins of a legacy entry, whose
-endpoint is its pinned selection's. A connector that declares no default
+instance), on an instance that carries the pins of a legacy entry, whose
+endpoint is its pinned selection's, and on a name a legacy `[adapters.<alias>]`
+entry holds (a table written beside it would make the name two entries, which
+selection refuses as `instance_ambiguous`): `setup migrate` moves the entry to
+an instance first. A connector that declares no default
 endpoint, selected on an instance that is not listed or is listed with neither
 `endpoint` nor pins, is `invalid_input` with `field = endpoint` when `--endpoint` is
 absent, before any credential is asked for.
@@ -754,7 +757,8 @@ instance and a legacy `[adapters.<alias>]` entry both derive. It is a usage
 refusal at `arguments`, exit 2, `next_action = none`, and its
 `Failure.instances` lists, sorted, every instance of that connector as
 `<connector>/<instance>`, so the caller can name one; for a shared name it lists
-the two entries as `<connector>/<instance> (alias <alias>)`, each once. Nothing
+the two entries as `<connector>/<instance> (alias <alias>)`, each once (an
+instance that has no entry yet is listed as `<connector>/<instance>`). Nothing
 was read beyond the configuration, no credential is read and no request is
 sent. A target that names its instance is `instance_ambiguous` only for such a
 shared name. `--connector` with `--instance` and `default_instance` select by

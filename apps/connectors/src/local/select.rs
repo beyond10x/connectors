@@ -172,7 +172,15 @@ pub(super) fn alias(input: &Value, config: &Config) -> Result<String, Refused> {
             // `--instance` do, so a shared name is refused the same way.
             Some(default) => {
                 let (connector, instance) = default.split_once('/').ok_or(Refused::InvalidInput)?;
-                return chosen(connector, instance);
+                match chosen(connector, instance) {
+                    // A name no entry derives: `default_instance` is admitted
+                    // at load by an entry's own names, `catalog/<alias>` for a
+                    // legacy catalog entry, and selects that entry.
+                    Err(refused @ (Refused::NotFound | Refused::Unmigrated)) => {
+                        config.select(Selector::Default).ok_or(refused)?
+                    }
+                    other => return other,
+                }
             }
             None => config
                 .select(Selector::Default)

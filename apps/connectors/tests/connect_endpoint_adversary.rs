@@ -78,6 +78,10 @@ mod tests {
                 "an_endpoint_needs_a_named_instance",
                 an_endpoint_needs_a_named_instance,
             ),
+            (
+                "an_endpoint_on_a_name_a_legacy_entry_holds_writes_nothing",
+                an_endpoint_on_a_name_a_legacy_entry_holds_writes_nothing,
+            ),
         ]);
     }
 
@@ -298,5 +302,27 @@ mod tests {
             );
             assert_eq!(installation.text(), before);
         }
+    }
+
+    /// story:legacy-alias-sharing-an-instance-name: a legacy `[adapters.ref-1]`
+    /// catalog entry `setup migrate` derives `gitlab` for is selected as
+    /// `gitlab/ref-1`. `connections connect gitlab/ref-1 --endpoint <url>` would
+    /// create `[connectors.gitlab.instances.ref-1]`, a second entry of that
+    /// name, which every selection then refuses as `instance_ambiguous`. A
+    /// refused command never writes the file (this file's charter), and a
+    /// command must not make the name its own selection refuses.
+    pub fn an_endpoint_on_a_name_a_legacy_entry_holds_writes_nothing() {
+        let installation = Installation::new();
+        let before = installation.configure(&format!(
+            "[adapters.ref-1]\ninstance_id='gitlab-legacy'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.ref-1.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=['--connector','gitlab']\n[adapters.ref-1.permissions]\nprofiles=['gitlab.pat']\noperations=['gitlab.whoami']\n",
+            "a".repeat(64)
+        ));
+        let output = installation.run(GITLAB);
+        let (_, data) = refusal(&output);
+        assert_eq!(
+            installation.text(),
+            before,
+            "the configuration was written by a connect answering {data}"
+        );
     }
 }
