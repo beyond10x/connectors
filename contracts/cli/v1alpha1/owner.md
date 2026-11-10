@@ -302,13 +302,18 @@ connection its exchange ended on, per refusal to start and per panic, each
 naming a fixed event and the owner's error code (`code=<code>`), or a panic's
 source location. A line never carries text from a request, a provider or a
 credential. The file is created owner-only (mode `0600` on Unix; on Windows it
-takes the access list of the owner-only state directory) and is bounded to
-262144 bytes: a line that would pass the bound empties the file first, and the
+takes the access list of the owner-only state directory). A file already at
+that name is written only if it is a private regular file of the current user
+with one link (the rule of every private file here), and no reparse point or
+symbolic link is followed. The log is bounded to 262144 bytes: a line that would pass the bound empties the file first, and the
 first line then says so. The CLI never prints it.
 
 An `outcome_unknown` after the owner failed names that log as `owner_log` and
-the last code the owner logged since this command connected to it as
-`owner_error`. Without a log or a logged code the data carries no such field.
+the code of the newest line the owner logged for this command's own
+connection (each line carries the challenge of the connection it served) as
+`owner_error`; a newest line without a code, a panic, gives none, and no other
+connection's line is read. Without a log or such a code the data carries no
+such field.
 `owner_error` is the owner's code, not a promise about the effect: the status
 of the write still decides it ([semantics](semantics.md)).
 

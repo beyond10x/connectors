@@ -31,7 +31,12 @@ pub const NAME: &str = "owner.log";
 pub const LIMIT: u64 = 256 * 1024;
 
 /// The log of the owner this process last connected to, and its length then.
-static WATCHED: Mutex<Option<(PathBuf, u64)>> = Mutex::new(None);
+static WATCHED: Mutex<Option<(PathBuf, u64, Option<String>)>> = Mutex::new(None);
+
+thread_local! {
+    /// The connection the owner thread is serving: its lines carry this id.
+    static SERVING: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
 /// Serializes this process's writers, so a truncation never splits a line.
 static WRITING: Mutex<()> = Mutex::new(());
 
@@ -55,18 +60,19 @@ fn open(path: &Path) -> std::io::Result<File> {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
     }
-    let file = options.open(path)?;
-    #[cfg(unix)]
+    // `FILE_FLAG_OPEN_REPARSE_POINT`: a final reparse point is opened, not
+    // followed, and refused below.
+    #[cfg(windows)]
     {
-        use std::os::unix::fs::{MetadataExt, PermissionsExt};
-        let info = file.metadata()?;
-        if !info.is_file() || info.uid() != super::super::filesystem::uid() {
-            return Err(std::io::ErrorKind::PermissionDenied.into());
-        }
-        if info.mode() & 0o077 != 0 {
-            file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
-        }
+        use std::os::windows::fs::OpenOptionsExt;
+        options.custom_flags(0x0020_0000);
     }
+    let file = options.open(path)?;
+    // The repository's own rule for a private file: a regular file of the
+    // current user, owner-only, with one link. Before any write, so a second
+    // name for another file is never appended to, emptied or chmodded.
+    super::super::filesystem::check_private_file(&file)
+        .map_err(|_| std::io::Error::from(std::io::ErrorKind::PermissionDenied))?;
     Ok(file)
 }
 
@@ -89,6 +95,14 @@ fn write_line(state: &Path, line: &str) {
     let _ = file.write_all(text.as_bytes());
 }
 
+fn tag() -> String {
+    SERVING
+        .try_with(|id| id.borrow().as_ref().map(|id| format!(" conn={id}")))
+        .ok()
+        .flatten()
+        .unwrap_or_default()
+}
+
 fn now() -> u128 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -101,9 +115,10 @@ pub fn record(state: &Path, event: &'static str, code: Code) {
     write_line(
         state,
         &format!(
-            "{} pid={} {event} code={}\n",
+            "{} pid={}{} {event} code={}\n",
             now(),
             std::process::id(),
+            tag(),
             code_name(code)
         ),
     );
@@ -125,7 +140,12 @@ pub fn record_panic(state: &Path, location: Option<&std::panic::Location<'_>>) {
     );
     write_line(
         state,
-        &format!("{} pid={} panic at={at}\n", now(), std::process::id()),
+        &format!(
+            "{} pid={}{} panic at={at}\n",
+            now(),
+            std::process::id(),
+            tag()
+        ),
     );
 }
 
@@ -138,6 +158,26 @@ pub(super) fn log_panics(state: PathBuf) {
     }));
 }
 
+/// Marks the lines this thread logs as those of the connection `id`, the
+/// challenge its client sent: a uuid, as the greeting admits.
+pub(super) fn serving(id: &str) {
+    if uuid::Uuid::parse_str(id).is_ok() {
+        SERVING.with(|serving| *serving.borrow_mut() = Some(id.to_owned()));
+    }
+}
+
+/// Names the connection whose lines [`observed`] reads: the challenge this
+/// process sent the owner.
+pub(super) fn identify(id: &str) {
+    if let Some((_, _, own)) = WATCHED
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .as_mut()
+    {
+        *own = Some(id.to_owned());
+    }
+}
+
 /// Notes the log of `state` and its length, before this process talks to the
 /// owner: what the owner logs from here is what [`attach`] reads.
 pub(super) fn watch(state: &Path) {
@@ -145,12 +185,13 @@ pub(super) fn watch(state: &Path) {
     let length = std::fs::symlink_metadata(&path).map_or(0, |info| info.len());
     *WATCHED
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some((path, length));
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some((path, length, None));
 }
 
-/// The last `code=` of the lines at or after `offset`; a file shorter than
-/// `offset` was emptied since, and is read whole.
-fn last_code(path: &Path, offset: u64) -> Option<String> {
+/// The code of the newest line of connection `id` at or after `offset`, or
+/// `None` when that line carries none (a panic): never an older line's code. A
+/// file shorter than `offset` was emptied since, and is read whole.
+fn last_code(path: &Path, offset: u64, id: &str) -> Option<String> {
     let info = std::fs::symlink_metadata(path).ok()?;
     if !info.is_file() {
         return None;
@@ -160,11 +201,11 @@ fn last_code(path: &Path, offset: u64) -> Option<String> {
     file.seek(SeekFrom::Start(offset)).ok()?;
     let mut text = String::new();
     file.take(LIMIT).read_to_string(&mut text).ok()?;
-    text.lines().rev().find_map(|line| {
-        let code = line.rsplit_once(" code=")?.1;
-        (!code.is_empty() && code.bytes().all(|b| b.is_ascii_lowercase() || b == b'_'))
-            .then(|| code.to_owned())
-    })
+    let mark = format!(" conn={id} ");
+    let line = text.lines().rev().find(|line| line.contains(&mark))?;
+    let code = line.rsplit_once(" code=")?.1;
+    (!code.is_empty() && code.bytes().all(|b| b.is_ascii_lowercase() || b == b'_'))
+        .then(|| code.to_owned())
 }
 
 /// For an `outcome_unknown`, the owner's log that exists and the code the owner
@@ -173,7 +214,7 @@ pub fn observed(code: Code) -> Option<super::OwnerLog> {
     if code != Code::OutcomeUnknown {
         return None;
     }
-    let (path, offset) = WATCHED
+    let (path, offset, id) = WATCHED
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .clone()?;
@@ -181,7 +222,7 @@ pub fn observed(code: Code) -> Option<super::OwnerLog> {
         return None;
     }
     Some(super::OwnerLog {
-        code: last_code(&path, offset),
+        code: id.and_then(|id| last_code(&path, offset, &id)),
         path: path.to_string_lossy().into_owned(),
     })
 }
@@ -190,12 +231,15 @@ pub fn observed(code: Code) -> Option<super::OwnerLog> {
 mod tests {
     use super::*;
 
+    const ID: &str = "0b9c1d5e-6f1a-4c53-9a54-2d3e4f5a6b7c";
+
     fn state() -> tempfile::TempDir {
         tempfile::tempdir().unwrap()
     }
 
     #[test]
     fn a_line_names_the_event_and_the_code() {
+        serving(ID);
         let state = state();
         record(state.path(), "request failed", Code::Unavailable);
         let text = std::fs::read_to_string(path(state.path())).unwrap();
@@ -204,26 +248,26 @@ mod tests {
             "{text}"
         );
         assert_eq!(
-            last_code(&path(state.path()), 0).as_deref(),
+            last_code(&path(state.path()), 0, ID).as_deref(),
             Some("unavailable")
         );
     }
 
     #[cfg(unix)]
     #[test]
-    fn the_log_is_owner_only_even_where_a_wider_file_was_there() {
+    fn a_wider_file_at_the_log_is_not_written() {
         use std::os::unix::fs::PermissionsExt;
         let state = state();
         let file = path(state.path());
         std::fs::write(&file, b"").unwrap();
         std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o644)).unwrap();
         record(state.path(), "request failed", Code::Timeout);
-        let mode = std::fs::metadata(&file).unwrap().permissions().mode() & 0o777;
-        assert_eq!(mode, 0o600);
+        assert_eq!(std::fs::read(&file).unwrap(), b"");
     }
 
     #[test]
     fn the_log_never_passes_its_limit_and_keeps_the_newest_line() {
+        serving(ID);
         let state = state();
         for _ in 0..(LIMIT as usize / 40) + 100 {
             record(state.path(), "request failed", Code::Capacity);
@@ -233,20 +277,29 @@ mod tests {
         assert!(std::fs::metadata(&file).unwrap().len() <= LIMIT);
         let text = std::fs::read_to_string(&file).unwrap();
         assert!(text.contains("log emptied"), "{text}");
-        assert_eq!(last_code(&file, 0).as_deref(), Some("timeout"));
+        assert_eq!(last_code(&file, 0, ID).as_deref(), Some("timeout"));
     }
 
     #[test]
     fn only_lines_after_the_offset_are_read() {
+        serving(ID);
         let state = state();
         record(state.path(), "request failed", Code::Capacity);
         let offset = std::fs::metadata(path(state.path())).unwrap().len();
-        assert_eq!(last_code(&path(state.path()), offset), None);
+        assert_eq!(last_code(&path(state.path()), offset, ID), None);
         record(state.path(), "request failed", Code::Timeout);
         assert_eq!(
-            last_code(&path(state.path()), offset).as_deref(),
+            last_code(&path(state.path()), offset, ID).as_deref(),
             Some("timeout")
         );
+    }
+
+    #[test]
+    fn a_line_of_another_connection_is_never_this_ones() {
+        serving("1a2b3c4d-0000-4000-8000-000000000001");
+        let state = state();
+        record(state.path(), "request failed", Code::NotFound);
+        assert_eq!(last_code(&path(state.path()), 0, ID), None);
     }
 
     #[test]

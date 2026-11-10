@@ -892,8 +892,8 @@ types:
       - {name: attempts, type: "Optional<Integer>"}
       # ESS-LIMIT: owner_log and owner_error appear only on `outcome_unknown` after an owner-side
       # failure (contracts/cli/v1alpha1/owner.md, "Owner log"): owner_log is the path of the
-      # owner's bounded, owner-only log, owner_error the last code the owner logged since the
-      # command connected to it, a snake_case error code and absent when it logged none. As for
+      # owner's bounded, owner-only log, owner_error the code of the newest line the owner logged for the
+      # command's own connection, a snake_case error code and absent when it logged none. As for
       # instance_id above, ESS declares no invariant on a CLI type, so the presence rule is
       # enforced by the host and pinned by tests.
       - {name: owner_log, type: "Optional<String>"}

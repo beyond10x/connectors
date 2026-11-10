@@ -520,6 +520,7 @@ impl Client {
             return Ok(Err(error.into()));
         }
         let challenge = uuid::Uuid::new_v4().to_string();
+        diagnostics::identify(&challenge);
         if let Err(error) = channel::write(
             &mut stream,
             &Request::Hello {
@@ -1625,13 +1626,14 @@ pub fn serve_with_read_policy(paths: Paths, read_policy: Arc<dyn ReadPolicy>) ->
     // Before any protected input: the owner holds credentials in memory.
     crate::local::core_dumps::forbid().map_err(|_| Error::from(Code::Unavailable))?;
     IN_OWNER.store(true, Ordering::SeqCst);
-    diagnostics::log_panics(paths.state.clone());
     // Duplicate before opening anything: a direct invocation with missing fds
     // must not mistake newly opened configuration files for inherited authority.
     let (startup, lifetime) = inherited()?;
     let build = own_build()?;
     let config = Config::load(&paths.config)?;
     let directory = fs::directory(&paths.state, false, true)?;
+    // Only into a state directory admitted private.
+    diagnostics::log_panics(paths.state.clone());
     let metadata = Metadata::start_owner(&paths.state)?;
     // A test build waits here as long as a large store's verification takes.
     #[cfg(debug_assertions)]
@@ -2112,6 +2114,8 @@ fn exchange(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     {
         return Err(Code::ReadinessMismatch.into());
     }
+    // From here the owner's lines for this exchange carry the client's challenge.
+    diagnostics::serving(&challenge);
     let same_build = build.as_deref() == Some(owner.build);
     channel::write(
         stream,
