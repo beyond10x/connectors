@@ -29,7 +29,7 @@ use std::{
     process::{Child, Command, Stdio},
     sync::{
         Arc, Mutex, OnceLock,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         mpsc,
     },
     thread::JoinHandle,
@@ -55,8 +55,8 @@ const GRANTED: [&str; 4] = ["read", "disabled", "hidden", "guarded"];
 const EXPOSED: [&str; 4] = ["read", "disabled", "guarded", "ungranted"];
 /// The input whose answer the provider holds for 3 s.
 const SLOW: &str = "999";
-/// The input whose answer the provider holds for 300 ms, well inside one
-/// data lease.
+/// The input whose answer the provider holds until [`Provider::release`]: the
+/// test closes stdin while the call is at the owner, then lets it answer.
 const BRIEF: &str = "333";
 /// An input number no f64 holds: it reaches the provider and comes back as
 /// these digits only through lossless reads.
@@ -221,10 +221,11 @@ fn local_mcp_server_adapter_fixture() {
 
 /// A loopback HTTP/1.1 provider answering `GET /observe/<n>` with
 /// `{"observed":<n>}`, the digits as sent and any query dropped; [`SLOW`] is
-/// answered after 3 s.
+/// answered after 3 s and [`BRIEF`] once released.
 struct Provider {
     address: String,
     requests: Arc<AtomicUsize>,
+    released: Arc<AtomicBool>,
 }
 
 impl Provider {
@@ -233,10 +234,13 @@ impl Provider {
         let address = listener.local_addr().unwrap().to_string();
         let requests = Arc::new(AtomicUsize::new(0));
         let counted = requests.clone();
+        let released = Arc::new(AtomicBool::new(false));
+        let release = released.clone();
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let Ok(mut stream) = stream else { return };
                 let counted = counted.clone();
+                let released = release.clone();
                 std::thread::spawn(move || {
                     loop {
                         let mut head = Vec::new();
@@ -258,7 +262,10 @@ impl Provider {
                         if n == SLOW {
                             std::thread::sleep(Duration::from_secs(3));
                         } else if n == BRIEF {
-                            std::thread::sleep(Duration::from_millis(300));
+                            let until = Instant::now() + Duration::from_secs(30);
+                            while !released.load(Ordering::SeqCst) && Instant::now() < until {
+                                std::thread::sleep(Duration::from_millis(5));
+                            }
                         }
                         let body = format!("{{\"observed\":{n}}}");
                         let answer = format!(
@@ -272,7 +279,15 @@ impl Provider {
                 });
             }
         });
-        Self { address, requests }
+        Self {
+            address,
+            requests,
+            released,
+        }
+    }
+    /// Let every held [`BRIEF`] answer go out.
+    fn release(&self) {
+        self.released.store(true, Ordering::SeqCst);
     }
     fn requests(&self) -> usize {
         self.requests.load(Ordering::SeqCst)
@@ -986,7 +1001,7 @@ fn stdin_close_still_answers_requests_already_read() {
     let mut peer = Peer::start(&served, true);
     let (tool, revision) = admitted(&served, &mut peer, 1);
     send_call(&mut peer, &tool, 333, &revision);
-    let until = Instant::now() + Duration::from_secs(5);
+    let until = Instant::now() + Duration::from_secs(30);
     while served.provider.requests() == 0 {
         assert!(
             Instant::now() < until,
@@ -995,11 +1010,12 @@ fn stdin_close_still_answers_requests_already_read() {
         std::thread::sleep(Duration::from_millis(5));
     }
     drop(peer.child.stdin.take());
-    let reply = match peer.frames.recv_timeout(Duration::from_secs(5)) {
+    served.provider.release();
+    let reply = match peer.frames.recv_timeout(Duration::from_secs(15)) {
         Ok(Ok(reply)) => reply,
         Ok(Err(line)) => panic!("{line}"),
         Err(_) => panic!(
-            "no reply to a call read before stdin closed (provider holds {BRIEF} for 300 ms): \
+            "no reply to a call read before stdin closed (provider held {BRIEF} until stdin closed): \
              the server is {:?}, provider requests {}",
             peer.child.try_wait().unwrap(),
             served.provider.requests()
