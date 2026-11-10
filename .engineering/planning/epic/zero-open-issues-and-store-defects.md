@@ -7,7 +7,7 @@ title: Zero open GitHub issues and every defect story in the store fixed, in one
 summary: 'Operator goal 2026-11-09: 9 open issues and 56 defect stories, delivered by one pull request'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:46Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:57:46Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
@@ -157,3 +157,43 @@ failing with the owner-read change and 3 of 23 without it, the known
 `story:mcp-reply-after-hangup-owner-latency-under-load`.
 
 From-finding drafts: `story:slack-file-read-checks-exact-path`, `story:tavily-crawl-cut-short-is-not-complete`.
+
+## Single defect wave (in progress)
+
+Approved by `approval-record:zero-issues-single-defect-wave` (non-interactive), which replaces
+`approval-record:zero-issues-wave-b`. One wave, integration branch `wave/zero-issues-b` off origin/main
+`23b9f1bc4`, one pull request. 48 stories: the 46 active stories of this epic and the two wave A
+from-finding stories. `story:macos-release-provider-starts-through-the-private-copy` stays behind
+`hardware-blocker:macos-adopter-provider-sigkill`; 47 are implemented.
+
+Lanes follow the derived waves of `aep plan artifact waves --kind story --status active` at
+`7f42c789b`: a story of a later derived wave starts only after the stories it collides with have merged.
+At most five units run at once. Each unit: branch `impl/<story name>`, a managed worktree with the id
+listed below, the shared build directory of the wave, a sonnet implementor, an opus adversary on guard,
+emitted-bytes and auth or custody units, merge into the integration branch, push.
+
+- Lane 1 (derived wave 1): the 29 implementable stories of derived wave 1, then
+  `story:slack-file-read-checks-exact-path` and `story:tavily-crawl-cut-short-is-not-complete`.
+- Lane 2 (derived wave 2): `story:catalog-validates-enum-and-date-time`,
+  `story:clock-quorum-windows-unreachable-flake`, `story:definition-reader-refuses-what-the-feed-engine-refuses`,
+  `story:exec-plugin-busy-reaches-the-operator`, `story:lease-early-recollection-relaunch-margin`,
+  `story:owner-errors-are-readable`, `story:owner-path-tests-hold-under-load`,
+  `story:owner-recovers-after-failed-acquisition`, `story:required-body-key-refuses-null`.
+- Lane 3: `story:configuration-change-error`, `story:required-parameter-refuses-empty`,
+  `story:windows-clock-check-bracket-flake`.
+- Lane 4: `story:definition-connect-begin-carries-selection`. Lane 5: `story:owner-cancels-a-bounded-read`.
+  Lane 6: `story:owner-invoke-frame-effects-boundary`.
+
+Commits the approval authorises: one commit per unit on its branch, a correction commit per adversary
+round, one merge per unit into `wave/zero-issues-b`, store commits on the integration branch, the
+closing store commit, and the squash merge of the pull request. No tag, no release.
+
+### Units
+
+| Unit | Worktree id | Stage |
+|---|---|---|
+| `story:adapter-private-protocol-refusal-named` | `cb-protocol` | implementing |
+| `story:catalog-guard-typed-comparison` | `cb-guard-typed` | implementing |
+| `story:legacy-alias-sharing-an-instance-name` | `cb-alias` | implementing |
+| `story:sql-length-units` | `cb-sql-units` | implementing |
+| `story:slack-move-names-four-writes` | `cb-slack-move` | implementing |
