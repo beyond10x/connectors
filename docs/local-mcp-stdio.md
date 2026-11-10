@@ -141,6 +141,8 @@ A list or call that reaches its own deadline before the owner answers (the
 owner is busy, or the store is held) is answered with the `timeout` refusal,
 written within a short grace after the deadline, and the session continues: the
 next request is admitted as usual. A request's timeout does not end the session.
+A client that leaves a reply unread for longer than that grace (2 s) past its
+request's deadline loses the session.
 
 Cancellation suppresses the matching reply, does not replay a call and frees the
 request slot at once, so the next list or call is admitted. A reply already partly

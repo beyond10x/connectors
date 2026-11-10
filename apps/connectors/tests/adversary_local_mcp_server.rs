@@ -1160,9 +1160,33 @@ fn adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_r
 #[test]
 fn adversary_a_request_past_its_deadline_answers_timeout_and_the_session_continues() {
     let served = Served::new();
+    // Warm the owner under the default budget: a cold owner start inside the
+    // 2 s budget below would end the server at startup, not at the deadline.
+    let mut warm = Peer::start(&served, true);
+    assert!(warm.request(1, "ping", json!({})).get("result").is_some());
     served.exposures_within(true, 2000);
-    let mut peer = Peer::start(&served, true);
-    assert!(peer.request(1, "ping", json!({})).get("result").is_some());
+    // The server's startup is bounded by the same 2 s, so on a loaded host it
+    // can end before it answers its first ping; that is not what is measured
+    // here, so such a start is retried (a session that answered and then
+    // ended is not).
+    let mut peer = None;
+    for _ in 0..5 {
+        let mut candidate = Peer::start(&served, true);
+        let ping = json!({"jsonrpc":"2.0","id":1,"method":"ping","params":{"_meta":meta()}});
+        let _ = candidate
+            .child
+            .stdin
+            .as_mut()
+            .unwrap()
+            .write_all(format!("{ping}\n").as_bytes());
+        if let Ok(Ok(reply)) = candidate.frames.recv_timeout(Duration::from_secs(15))
+            && reply.get("result").is_some()
+        {
+            peer = Some(candidate);
+            break;
+        }
+    }
+    let mut peer = peer.expect("the server never started within 2 s in 5 tries");
     let lock = hold_store(&served);
     let held = peer.request(2, "tools/list", json!({}));
     assert_eq!(
