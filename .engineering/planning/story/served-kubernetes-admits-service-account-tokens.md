@@ -8,7 +8,7 @@ summary: ServiceConfigV3 admission service-account-token with audience and princ
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:served-admission-admits-a-set-of-service-accounts
-revision: 1
+revision: 2
 ---
 Requested by Assembly (assembly-dev session), 2026-11-10.
 
@@ -44,3 +44,11 @@ static bearer. `serve` already takes `impl Into<ServiceConfigV3>` (`server.rs:55
 
 - Whether a v3 Kubernetes configuration may still choose `admission: static-bearer`, or whether
   static callers stay on v2 only.
+
+## Consumer preference (Assembly, 2026-11-11)
+
+These are the consumer's preferences, not decisions. The ambiguities above stay open for the
+operator.
+
+- A v3 configuration admits callers either by TokenReview or by a static bearer. One instance
+  never admits both.

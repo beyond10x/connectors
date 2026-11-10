@@ -8,7 +8,7 @@ summary: In-cluster token and CA from the standard paths, rotation without resta
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:served-instance-admits-a-service-account-token
-revision: 1
+revision: 2
 ---
 Requested by Assembly (assembly-dev session), 2026-11-10. Reason: the pod holds no long-lived
 credential.
@@ -56,3 +56,13 @@ rotating `..data` directory and is refreshed by the kubelet, so that rule refuse
   `credential: in-cluster`) in a new service configuration version, or by the absence of
   `credential` and `base_url`. An explicit member is the safer default.
 - The fixed in-cluster paths: whether they are fixed, or overridable for tests only.
+
+## Consumer preference (Assembly, 2026-11-11)
+
+These are the consumer's preferences, not decisions. The ambiguities above stay open for the
+operator.
+
+- In-cluster authentication is selected by an explicit configuration member (for example
+  `auth: in_cluster`), not inferred from a missing credential.
+- A configuration that names both a credential and in-cluster authentication is refused.
+- The in-cluster paths can be overridden only for tests.

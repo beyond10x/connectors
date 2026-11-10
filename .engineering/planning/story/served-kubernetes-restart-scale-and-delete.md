@@ -9,7 +9,7 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:served-kubernetes-authenticates-in-cluster
 - depends_on: story:served-kubernetes-admits-service-account-tokens
-revision: 1
+revision: 2
 ---
 Requested by Assembly (assembly-dev session), 2026-11-10.
 
@@ -67,3 +67,13 @@ operations are listed at `lib.rs:145-161`.
   second. Write the decision down before acceptance.
 - Whether the replica maximum is one value per instance or one per workload.
 - Whether `pods.delete` takes a grace period, and what bounds it.
+
+## Consumer preference (Assembly, 2026-11-11)
+
+These are the consumer's preferences, not decisions. The ambiguities above stay open for the
+operator.
+
+- The replica maximum is one number per instance. A workload may have an optional lower override.
+- `pods.delete` uses the pod's own grace period. A grace of 0 and a force delete are refused.
+- No write operation is served to a caller admitted by a static bearer. Writes go only to
+  principals admitted by TokenReview.

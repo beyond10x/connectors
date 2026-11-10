@@ -8,7 +8,7 @@ summary: pods.create, opt-in, playground namespaces a subset of write_namespaces
 relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:served-kubernetes-restart-scale-and-delete
-revision: 1
+revision: 2
 ---
 Requested by Assembly (assembly-dev session), 2026-11-10.
 
@@ -42,3 +42,16 @@ These need the operator's decision before acceptance:
   `securityContext` members, `hostPath` and other volume types, and `serviceAccountName`.
 - Resource limits: whether they are required, and their per-instance maximum.
 - An image allow-list: whether there is one, and its form (registry, repository, digest).
+
+## Consumer preference (Assembly, 2026-11-11)
+
+These are the consumer's preferences, not decisions. The ambiguities above stay open for the
+operator.
+
+- Refused: `hostNetwork`, `hostPID`, `hostIPC`, `privileged`, added capabilities, `hostPath`, and
+  any volume other than `emptyDir`, `configMap` or `projected`.
+- `serviceAccountName` is forced to a configured one, with `automountServiceAccountToken: false`.
+- Resource limits are required and capped per instance.
+- An image allow-list by registry prefix is required. An empty list means the operation is absent
+  from the descriptor.
+- Every created pod gets a label naming the caller and an `activeDeadlineSeconds` cap.
