@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.70.0 — 2026-11-10
 
 ### Added
 
@@ -47,6 +47,24 @@
 - The owner's read answer is bounded at the result limit plus a fixed envelope and carries the
   adapter child's result bytes unchanged, so a read result the child admits reaches the CLI
   (story:owner-read-answer-size-envelope).
+
+### Compatibility
+
+- No breaking change and no migration. A catalog selection that binds a `values` or
+  `optional_values` key its probe read does not declare, or binds one key in both, is now refused
+  at load; the shipped selections load. The Google Drive instance's configuration revision
+  changes.
+
+### Limitations
+
+- Releases after 0.4.1 and before 0.70.0 have no image.
+- Unfinished: the second defect wave of epic:zero-open-issues-and-store-defects (51 stories) and
+  21 draft review findings are not in this release. Open blockers:
+  credential-blocker:google-oauth-client,
+  credential-blocker:live-read-loop-no-configured-connections,
+  credential-blocker:sandbox-accounts-jira-confluence-hubspot,
+  hardware-blocker:macos-adopter-provider-sigkill and
+  upstream-blocker:definitions-lack-agent-projections.
 
 ## 0.69.0 — 2026-11-06
 
