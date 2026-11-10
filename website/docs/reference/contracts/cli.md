@@ -571,7 +571,14 @@ in a file whose every line ends in CRLF, the added lines end in CRLF too), check
 checks it before anything is written, and replaces the file atomically: a
 sibling temporary file with the file's own owner-only mode, synced, then
 renamed over it, while the file still holds the text the edit was made from
-(else `revision_conflict`). The file is then read back; a read-back that does
+(else `revision_conflict`). The check and the rename are one step under an
+exclusive lock on the configuration (the directory holding it; on Windows
+`<configuration>.lock` beside it, which is never followed as a link), so of
+connects that read one text and write different endpoints at most one
+replaces it, whatever state directory each selects. A lock another connect
+holds for 30 seconds is `revision_conflict` at `publication` with
+`next_action = retry_explicitly`, nothing written; a lock the host refuses is
+`metadata_unavailable`. The file is then read back; a read-back that does
 not hold the endpoint restores the original text and is
 `invalid_configuration`. A file that is not the caller's own, admits another
 user, or is a symbolic link is refused as every read refuses it, unwritten.
