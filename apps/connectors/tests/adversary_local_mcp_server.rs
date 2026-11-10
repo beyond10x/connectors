@@ -399,6 +399,11 @@ impl Served {
     /// Write the companion: each of [`EXPOSED`] as a tool, enabled when
     /// `enabled`, except `disabled`, which never is.
     fn exposures(&self, enabled: bool) {
+        self.exposures_within(enabled, 120_000);
+    }
+
+    /// [`Served::exposures`] with the request budget `request_milliseconds`.
+    fn exposures_within(&self, enabled: bool, request_milliseconds: u64) {
         let exposures: Vec<Value> = EXPOSED
             .iter()
             .map(|operation| {
@@ -409,7 +414,7 @@ impl Served {
         private(
             &self.container.path(COMPANION),
             json!({"format":"connectors-mcp-local/1","limits":{"frame_octets":1048576,"response_octets":33554432,
-                "concurrent_requests":1,"request_milliseconds":120000},"exposures":exposures})
+                "concurrent_requests":1,"request_milliseconds":request_milliseconds},"exposures":exposures})
             .to_string(),
         );
     }
@@ -1144,6 +1149,37 @@ fn adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_r
         "{reply}"
     );
     assert!(peer.request(3, "ping", json!({})).get("result").is_some());
+    peer.finish();
+}
+
+/// story:mcp-tool-deadline-keeps-the-server (CR-001). A list whose owner does
+/// not answer within `request_milliseconds` (the store lock is held, so the
+/// owner's authority read waits on it) is refused `timeout` at its own
+/// deadline, and the session goes on: the same server then answers the next
+/// list once the store is free.
+#[test]
+fn adversary_a_request_past_its_deadline_answers_timeout_and_the_session_continues() {
+    let served = Served::new();
+    served.exposures_within(true, 2000);
+    let mut peer = Peer::start(&served, true);
+    assert!(peer.request(1, "ping", json!({})).get("result").is_some());
+    let lock = hold_store(&served);
+    let held = peer.request(2, "tools/list", json!({}));
+    assert_eq!(
+        held["error"]["data"]["error"]["code"], "timeout",
+        "the held list was not refused timeout: {held}"
+    );
+    let status = peer.child.try_wait().unwrap();
+    if status.is_some() {
+        let stderr = peer.errors.take().unwrap().join().unwrap();
+        panic!(
+            "the session ended at a request's deadline: {status:?}, stderr {}",
+            String::from_utf8_lossy(&stderr)
+        );
+    }
+    drop(lock);
+    let next = peer.request(3, "tools/list", json!({}));
+    assert!(next.get("result").is_some(), "{next}");
     peer.finish();
 }
 

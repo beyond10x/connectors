@@ -137,6 +137,11 @@ does not shorten them. The supervisor renews the lease while the session is
 ready, so a read that outlasts one lease, or a reply the client drains slowly, is
 still answered. An unrenewed lease still ends the session at its expiry.
 
+A list or call that reaches its own deadline before the owner answers (the
+owner is busy, or the store is held) is answered with the `timeout` refusal,
+written within a short grace after the deadline, and the session continues: the
+next request is admitted as usual. A request's timeout does not end the session.
+
 Cancellation suppresses the matching reply, does not replay a call and frees the
 request slot at once, so the next list or call is admitted. A reply already partly
 written when its cancellation arrives is finished rather than cut off, and the
