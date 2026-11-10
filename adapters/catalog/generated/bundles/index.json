@@ -19,7 +19,7 @@
     {
       "provider": "confluence",
       "file_name": "confluence.bundle.json",
-      "bundle_sha256": "4c8f661a7cf322e20b8f8ed8e263d714f0eb17faf899e8d78370a23e6b52cdac",
+      "bundle_sha256": "689fc18a0418215b011bdad537fa83d075a95550a9c6fd0cc942b55770bd79ae",
       "source_sha256": "edb639bbc700ee451a996acd2568e51db4ceab954449427537df30f0ce20ca08",
       "operations": 218,
       "unsupported": 30
@@ -91,7 +91,7 @@
     {
       "provider": "openrouter",
       "file_name": "openrouter.bundle.json",
-      "bundle_sha256": "41fca68adfa1ba85e7a680d58bc020191c8354c8d05b9ffe609a65809552743e",
+      "bundle_sha256": "28f4f5e09d510e5f0385708791ecf6fe62dc12edca30f148a02582f284d41e65",
       "source_sha256": "fe4f1ad414f5bd25e69b387598d23f3abd24fe74801cd157c633e30bbf766142",
       "operations": 150,
       "unsupported": 2

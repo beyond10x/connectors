@@ -180,8 +180,8 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "catalog-confluence.md",
         "confluence",
-        "541e85e9965d47bc191cb8ec2337b60e925cecd1a932e2d8b6cf0ba15a255033",
-        "79df6697d5170cc278e87f838abdaad9e047643a4caff15dfe3aaecc5d6c39e8",
+        "0fe66eacbc8e9de076e0ebebc70a188b662182cc643f6c858e70ab0379ec723e",
+        "cf2b9b88cde553a08d9655804d782d95f71b410053200beb825d06aacb82cd16",
     ),
 ];
 

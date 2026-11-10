@@ -819,15 +819,15 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "01 catalog-confluence.md",
-            "79df6697d5170cc278e87f838abdaad9e047643a4caff15dfe3aaecc5d6c39e8",
+            "cf2b9b88cde553a08d9655804d782d95f71b410053200beb825d06aacb82cd16",
         ),
         (
             "02 catalog-confluence.md",
-            "a93bf6601f476ffbde75751a986633783a73d16e570276ea051285333be9eead",
+            "fd76431c0eee380736f69fb23bd2ce11c9e61a9e060c57d472de100e93ba7eb1",
         ),
         (
             "03 catalog-confluence.md",
-            "e1a9a16bdebe9f2c90230867951dbfe2c1573d3d1002f3efea15425dbbced01b",
+            "85991fe70f2ecb22220c8e59153aad2f3a7bc6dafc1b3e2870dafb4cba02455b",
         ),
         (
             "04 catalog-confluence.md",
@@ -875,11 +875,11 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "15 catalog-openrouter.md",
-            "a51319ea16dc0138da5db0377b4896833f10f74fdcb2f2aaed34aff44c9a18e4",
+            "7426f67e0bae66733ee6e8c6ecc6f602d85a3cb79a43d8058f54f90224a8a731",
         ),
         (
             "16 catalog-openrouter.md",
-            "d28e25acdb4287378a377a6374ab48837312a2878c31fb123e831c665ffab1f9",
+            "6472c864700269c252a6040a05397e3370fccd7bce155098ce25916b16ffa7bc",
         ),
         (
             "17 catalog-opsgenie.md",

@@ -1065,19 +1065,27 @@ fn check_declared(operation: &Operation, values: &BTreeMap<String, Supplied>) ->
         if parameter.allowed.is_empty() && parameter.format.is_none() {
             continue;
         }
-        let texts = match values.get(&parameter.name) {
+        // One scalar for a repeated parameter may be a comma-joined list of
+        // elements ([`Engine::parameter_values`]): each is held to the
+        // declaration, and the value is sent as given.
+        let texts: Vec<&str> = match values.get(&parameter.name) {
             None => continue,
-            Some(Supplied::One(text)) => std::slice::from_ref(text),
-            Some(Supplied::Many(texts)) => texts.as_slice(),
+            Some(Supplied::One(text))
+                if parameter.repeated && !parameter.allowed.iter().any(|a| a == text) =>
+            {
+                text.split(',').collect()
+            }
+            Some(Supplied::One(text)) => vec![text.as_str()],
+            Some(Supplied::Many(texts)) => texts.iter().map(String::as_str).collect(),
         };
         for text in texts {
-            if !parameter.allowed.is_empty() && !parameter.allowed.contains(text) {
+            if !parameter.allowed.is_empty() && !parameter.allowed.iter().any(|a| a == text) {
                 return Err(refuse(format!(
                     "parameter `{}` is not one of the values its enum allows",
                     parameter.name
                 )));
             }
-            if parameter.format == Some(Format::DateTime) && !is_rfc3339_date_time(text) {
+            if parameter.format == Some(Format::DateTime) && feed::instant(text).is_none() {
                 return Err(refuse(format!(
                     "parameter `{}` is not an RFC 3339 date-time",
                     parameter.name
@@ -1086,79 +1094,6 @@ fn check_declared(operation: &Operation, values: &BTreeMap<String, Supplied>) ->
         }
     }
     Ok(())
-}
-
-/// Whether `text` is an RFC 3339 `date-time` (section 5.6): `YYYY-MM-DD`, `T`
-/// or `t`, `HH:MM:SS` with optional fractional seconds of one digit or more,
-/// and an offset of `Z`, `z`, `+HH:MM` or `-HH:MM`. The date must exist
-/// (leap years counted), the hour is at most 23, the minute at most 59 and the
-/// second at most 60 (a leap second); the offset's hour is at most 23 and its
-/// minute at most 59. Anything else is refused, a space for `T` included, so
-/// is a date alone, a time alone and a value with no offset.
-fn is_rfc3339_date_time(text: &str) -> bool {
-    fn digits(bytes: &[u8], from: usize, count: usize) -> Option<u32> {
-        let part = bytes.get(from..from + count)?;
-        part.iter()
-            .all(u8::is_ascii_digit)
-            .then(|| part.iter().fold(0, |n, d| n * 10 + u32::from(d - b'0')))
-    }
-    let bytes = text.as_bytes();
-    let (Some(year), Some(month), Some(day)) = (
-        digits(bytes, 0, 4),
-        digits(bytes, 5, 2),
-        digits(bytes, 8, 2),
-    ) else {
-        return false;
-    };
-    if bytes.get(4) != Some(&b'-') || bytes.get(7) != Some(&b'-') {
-        return false;
-    }
-    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
-    let days = match month {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 if leap => 29,
-        2 => 28,
-        _ => return false,
-    };
-    if day < 1 || day > days || !matches!(bytes.get(10), Some(b'T' | b't')) {
-        return false;
-    }
-    let (Some(hour), Some(minute), Some(second)) = (
-        digits(bytes, 11, 2),
-        digits(bytes, 14, 2),
-        digits(bytes, 17, 2),
-    ) else {
-        return false;
-    };
-    if bytes.get(13) != Some(&b':')
-        || bytes.get(16) != Some(&b':')
-        || hour > 23
-        || minute > 59
-        || second > 60
-    {
-        return false;
-    }
-    let mut at = 19;
-    if bytes.get(at) == Some(&b'.') {
-        let start = at + 1;
-        at = start;
-        while bytes.get(at).is_some_and(u8::is_ascii_digit) {
-            at += 1;
-        }
-        if at == start {
-            return false;
-        }
-    }
-    match &bytes[at.min(bytes.len())..] {
-        [b'Z' | b'z'] => true,
-        [b'+' | b'-', ..] if bytes.len() == at + 6 => {
-            bytes[at + 3] == b':'
-                && digits(bytes, at + 1, 2).is_some_and(|h| h <= 23)
-                && digits(bytes, at + 4, 2).is_some_and(|m| m <= 59)
-        }
-        _ => false,
-    }
 }
 
 /// Raw segments under the base path, and raw query pairs.

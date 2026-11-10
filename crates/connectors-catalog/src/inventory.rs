@@ -173,10 +173,36 @@ pub enum Format {
     DateTime,
 }
 
+/// The schema a local schema reference names, or the schema itself when it
+/// holds none; `None` when the reference leaves the document, names nothing or
+/// chains past [`PARAMETER_REF_HOPS`].
+fn resolve_schema<'a>(document: &'a Value, schema: &'a Value) -> Option<&'a Value> {
+    let mut current = schema;
+    for _ in 0..=PARAMETER_REF_HOPS {
+        let Some(reference) = current.get("$ref") else {
+            return Some(current);
+        };
+        let target = reference
+            .as_str()
+            .and_then(|r| r.strip_prefix("#/components/schemas/"))
+            .filter(|name| !name.is_empty() && !name.contains('/'))?;
+        // RFC 6901: `~1` is `/` and `~0` is `~`, unescaped in that order.
+        let name = target.replace("~1", "/").replace("~0", "~");
+        current = document
+            .get("components")
+            .and_then(|c| c.get("schemas"))
+            .and_then(|s| s.get(&name))?;
+    }
+    None
+}
+
 /// What a value schema constrains beyond its type: the `enum` it lists and a
 /// `format` of `date-time` on a string.
-fn constraints(schema: Option<&Value>) -> (Vec<String>, Option<Format>) {
-    let Some(schema) = schema else {
+/// A local `#/components/schemas/<name>` reference is followed, through further
+/// such references, as far as [`PARAMETER_REF_HOPS`]; one that names nothing, or
+/// loops, constrains nothing.
+fn constraints(document: &Value, schema: Option<&Value>) -> (Vec<String>, Option<Format>) {
+    let Some(schema) = schema.and_then(|schema| resolve_schema(document, schema)) else {
         return (Vec::new(), None);
     };
     let members = schema.get("enum").and_then(Value::as_array);
@@ -351,7 +377,11 @@ type Expansion = (Vec<Parameter>, Option<String>);
 /// ([`deep_object_schema`]). `None` when it is not a `deepObject`; an error
 /// when it is one this pass does not expand, which is then named and sent as
 /// one value as given.
-fn deep_object(parameter: &Value, name: &str) -> Option<Result<Expansion, String>> {
+fn deep_object(
+    document: &Value,
+    parameter: &Value,
+    name: &str,
+) -> Option<Result<Expansion, String>> {
     if parameter.get("style").and_then(Value::as_str) != Some("deepObject") {
         return None;
     }
@@ -391,7 +421,7 @@ fn deep_object(parameter: &Value, name: &str) -> Option<Result<Expansion, String
         let Some(value_type) = ValueType::of_schema(&properties[property]) else {
             return Some(refused());
         };
-        let (allowed, format) = constraints(Some(&properties[property]));
+        let (allowed, format) = constraints(document, Some(&properties[property]));
         out.push(Parameter {
             name: format!("{name}[{property}]"),
             location: Location::Query,
@@ -437,7 +467,7 @@ fn parameters(
                     let shape = array.then(|| array_shape(parameter, name));
                     let repeated = matches!(shape, Some(Ok(())));
                     let deep = if location == Location::Query {
-                        deep_object(parameter, name)
+                        deep_object(document, parameter, name)
                     } else {
                         None
                     };
@@ -453,11 +483,14 @@ fn parameters(
                     } else {
                         ValueType::declared(parameter)
                     };
-                    let (allowed, format) = constraints(if repeated {
-                        schema.and_then(|s| s.get("items"))
-                    } else {
-                        schema
-                    });
+                    let (allowed, format) = constraints(
+                        document,
+                        if repeated {
+                            schema.and_then(|s| s.get("items"))
+                        } else {
+                            schema
+                        },
+                    );
                     out.push((
                         Parameter {
                             name: name.to_owned(),
