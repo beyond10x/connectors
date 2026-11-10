@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T18:56:43Z",
+  "actor": "human:timo",
+  "artifact": "story:legacy-alias-sharing-an-instance-name",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-alias-contract-adversary-1",
+    "reference": "5b9131c73: connect and reconnect with a credential source answer instance_ambiguous with the entries before any credential is read",
+    "review": "review-result:wave-b-alias-contract-adversary-1",
+    "outcome": "fixed"
+  }
+}
