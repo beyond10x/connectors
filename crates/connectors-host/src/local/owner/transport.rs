@@ -131,6 +131,16 @@ fn read_shape(answer: Value) -> Result<Value> {
     }
     Ok(answer)
 }
+/// The bound of the document answering `request`. A read's answer wraps a
+/// result the child admitted up to [`runtime::RESULT_LIMIT`] in its envelope
+/// and is bounded at that plus the envelope; every other answer stays at
+/// [`runtime::RESULT_LIMIT`].
+fn answer_limit(request: &Request) -> usize {
+    match request {
+        Request::Invoke { .. } => runtime::READ_ANSWER_LIMIT,
+        _ => runtime::RESULT_LIMIT,
+    }
+}
 /// A request without a well-formed reply may have been carried out: its
 /// outcome is unknown, whatever failed while sending or while reading and
 /// decoding the reply. An interruption stays one (C03 "or interruption as
@@ -633,7 +643,11 @@ impl Client {
         // answer decides the failure's stage; wait a bounded grace beyond it for
         // the answer. A sent invoke whose answer never arrives may have been
         // dispatched, so its outcome is unknown, not the host's admission.
-        match self.answer_within(deadline + ANSWER_GRACE, channel::DEPTH + 1) {
+        match self.answer_within(
+            deadline + ANSWER_GRACE,
+            channel::DEPTH + 1,
+            answer_limit(&request),
+        ) {
             Ok(answer) => read_shape(answer?),
             Err(error) => Err(lost(error)),
         }
@@ -1089,22 +1103,27 @@ impl Client {
     /// closed, or the frame was not a well-formed answer. The inner result is
     /// the owner's own answer, a success or its definite `Failed` reply.
     fn answer(&mut self, deadline: Instant) -> std::result::Result<Result<Value>, Error> {
-        self.answer_within(deadline, channel::DEPTH)
+        self.answer_within(deadline, channel::DEPTH, runtime::RESULT_LIMIT)
     }
     /// A read's answer as `invoke` reads it ([`read_shape`]).
     #[cfg(all(test, unix))]
     fn read_answer(&mut self, deadline: Instant) -> Result<Value> {
         read_shape(
-            self.answer_within(deadline, channel::DEPTH + 1)
-                .unwrap_or_else(Err)?,
+            self.answer_within(
+                deadline,
+                channel::DEPTH + 1,
+                answer_limit(&test_read_request()),
+            )
+            .unwrap_or_else(Err)?,
         )
     }
     fn answer_within(
         &mut self,
         deadline: Instant,
         depth: usize,
+        limit: usize,
     ) -> std::result::Result<Result<Value>, Error> {
-        let frame = read_reply(&mut self.stream, deadline, runtime::RESULT_LIMIT)?;
+        let frame = read_reply(&mut self.stream, deadline, limit)?;
         match frame.control {
             Reply::Success => {
                 channel::depth_within(&frame.document, depth)?;
@@ -2115,6 +2134,7 @@ fn exchange(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     } else {
         None
     };
+    let limit = answer_limit(&frame.control);
     let result = action(owner, stream, frame.control, frame.document);
     let shutdown = shutdown && result.is_ok();
     let (reply, document) = match result {
@@ -2124,12 +2144,13 @@ fn exchange(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
         ),
         Err(error) => (Reply::Failed { error }, Vec::new()),
     };
-    let written = channel::write(
+    let written = channel::write_within(
         stream,
         &reply,
         None,
         &document,
         write_until.unwrap_or_else(|| Instant::now() + Duration::from_secs(5)),
+        limit,
     );
     if shutdown {
         owner.shutdown.store(true, Ordering::SeqCst);
@@ -3574,6 +3595,80 @@ mod invoke_answer_tests {
             .unwrap_err();
         drop(owner);
         assert_eq!(error.code, Code::OutcomeUnknown);
+    }
+}
+
+#[cfg(all(test, unix))]
+fn test_read_request() -> Request {
+    Request::Invoke {
+        adapter: "forge".into(),
+        connection: "connection".into(),
+        operation: "item.read".into(),
+        schema: "schema".into(),
+        revision: "desc-1".into(),
+        deadline_ms: 0,
+    }
+}
+
+#[cfg(all(test, unix))]
+mod read_answer_size_tests {
+    use super::*;
+
+    /// A read answer whose document is `size` bytes: the envelope and a string result.
+    fn document(size: usize, result: usize) -> Vec<u8> {
+        let head = br#"{"adapter":"forge","operation":"item.read","revision":"desc-1","result":""#;
+        let mut bytes = head.to_vec();
+        bytes.resize(bytes.len() + result, b'x');
+        bytes.extend_from_slice(b"\"}");
+        assert!(size == 0 || bytes.len() == size);
+        bytes
+    }
+
+    /// The owner writes `document` as `request`'s answer; the client reads it as a read's.
+    fn through(request: &Request, document: Vec<u8>) -> (Result<()>, Result<Value>) {
+        let (client, mut owner) = UnixStream::pair().unwrap();
+        let until = Instant::now() + Duration::from_secs(20);
+        let limit = answer_limit(request);
+        let writer = std::thread::spawn(move || {
+            channel::write_within(&mut owner, &Reply::Success, None, &document, until, limit)
+        });
+        let mut client = Client {
+            stream: client,
+            host_incarnation: "fixture-host".into(),
+            authority: "authority".into(),
+            owner_build: None,
+        };
+        let read = client.read_answer(until);
+        (writer.join().unwrap().map_err(Error::from), read)
+    }
+
+    /// story:owner-read-answer-size-envelope: the child admits a result of `RESULT_LIMIT`
+    /// bytes and the owner wraps it in its envelope; that answer reaches the client, and an
+    /// answer one byte over the read bound does not. No other answer's bound moves.
+    #[test]
+    fn a_read_answer_carries_every_result_size_the_child_admits_and_no_more() {
+        let request = test_read_request();
+        let result = runtime::RESULT_LIMIT - 2;
+        let (written, read) = through(&request, document(0, result));
+        written.unwrap();
+        let answer = read.unwrap();
+        assert_eq!(
+            answer["result"].as_str().unwrap().len(),
+            runtime::RESULT_LIMIT - 2
+        );
+        let overhead = document(0, 0).len();
+        let exact = runtime::READ_ANSWER_LIMIT - overhead;
+        let (written, read) = through(&request, document(runtime::READ_ANSWER_LIMIT, exact));
+        written.unwrap();
+        assert!(read.is_ok());
+        let (written, _) = through(&request, document(0, exact + 1));
+        assert_eq!(written.unwrap_err().code, Code::Capacity);
+        let other = Request::Status {
+            adapter: "forge".into(),
+        };
+        assert_eq!(answer_limit(&other), runtime::RESULT_LIMIT);
+        let (written, _) = through(&other, document(0, runtime::RESULT_LIMIT));
+        assert_eq!(written.unwrap_err().code, Code::Capacity);
     }
 }
 
