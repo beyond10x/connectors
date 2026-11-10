@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T14:32:42Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-tool-deadline-keeps-the-server",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-mcp-deadline-security-1",
+    "reference": "eed1107db: every reply gets the write grace; security_an_on_time_reply_written_across_its_deadline_keeps_the_session green (security_mcp_deadline 4 passed)",
+    "review": "review-result:wave-b-mcp-deadline-security-1",
+    "outcome": "fixed"
+  }
+}
