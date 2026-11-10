@@ -1448,6 +1448,42 @@ fn abandoned_candidates_require_acknowledged_retirement_and_full_retention() {
     assert!(retired[0].version() == candidate.version());
 }
 
+/// One repair attempt of `connection` through `prepare`.
+fn repair_prepare(registry: &Registry, connection: &str, now: u64) -> Result<PreparedCandidate> {
+    let revision = describe(registry, connection, now).revision;
+    let attempt = registry
+        .begin_repair(&binding(), connection, &revision, now)
+        .unwrap();
+    let claim = registry.consume(attempt, now).unwrap();
+    registry.prepare(&claim, baseline("one", now), 12, now)
+}
+
+#[test]
+fn a_reconnect_below_the_refresh_retention_bound_is_not_refused_capacity() {
+    let (_root, registry) = fixture();
+    let (_claim, first) = prepared(&registry, "one", NOW);
+    let connection = publish_fixture(&registry, first, NOW);
+    // Far past eight undeleted versions, below the refresh bound of 64.
+    for _ in 0..20 {
+        repair_prepare(&registry, &connection, NOW + 1).unwrap();
+    }
+}
+
+#[test]
+fn a_reconnect_at_the_retention_bound_is_refused_capacity() {
+    let (_root, registry) = fixture();
+    let (_claim, first) = prepared(&registry, "one", NOW);
+    let connection = publish_fixture(&registry, first, NOW);
+    RETAINED_BOUND.with(|bound| bound.set(10));
+    for _ in 0..9 {
+        repair_prepare(&registry, &connection, NOW + 1).unwrap();
+    }
+    assert!(matches!(
+        repair_prepare(&registry, &connection, NOW + 1),
+        Err(Failure::Capacity)
+    ));
+}
+
 #[test]
 fn receipt_identity_and_known_missing_material_cannot_be_substituted() {
     let (root, registry) = fixture();

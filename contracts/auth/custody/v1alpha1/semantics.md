@@ -144,7 +144,7 @@ refresh. A read-only binding (§5.2) writes no version and is never a copy's tar
 | Concern | Rule |
 |---|---|
 | Value size | 64 KiB default |
-| Versions per connection | bounded (default 8 retained including active) |
+| Versions per connection | bounded (default 64 retained including active) |
 | Read latency budget | part of the provider deadline; a read exceeding it is `Unavailable` |
 | Retry | reads may be retried by the caller; writes are not retried after an unknown outcome without a new version id |
 

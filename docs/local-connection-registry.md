@@ -217,7 +217,8 @@ Acknowledged deletion clears byte-size metadata but retains identity/fence histo
 An unknown response retains the cleanup obligation for guarded reconciliation.
 
 The initial bounds are 1,000 connections per instance, 10,000 total connections,
-100,000 acquisition histories, eight retained material versions per connection,
+100,000 acquisition histories, 64 retained material versions per connection (one bound
+for connect, reconnect and refresh),
 1,000 concurrent read-use records and 10,000 live cursors. Exhaustion refuses;
 it does not evict authority or pretend an incomplete list is complete. Pages accept
 1–500 members, bind instance/configuration/limit/epoch, and expire at the
