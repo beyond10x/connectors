@@ -41,12 +41,10 @@ the [Grafana adapter's](../grafana/index.md) `datasources.list`.
 
 ## Limits
 
-- No `X-Scope-OrgID` tenant header is sent, so a backend that requires one from the client is
-  not reachable.
+- The tenant header, the token's scopes and the missing query scope are on the [Prometheus connector page](../../../connectors/prometheus.md#limits).
 - No query `timeout` parameter is sent; the host's transport deadline bounds each call.
 - Too many samples is answered by Prometheus as an execution error and reaches the caller as
   `upstream_protocol`, not as a capacity error.
-- Every query reads everything the token reaches; a matcher scope is not supported.
 - A Prometheus without authentication cannot be connected, because the local host admits no
   credential-less profile.
 
