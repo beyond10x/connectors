@@ -323,14 +323,21 @@ impl Client {
                     // Held to the end of this block: the owner measures its build
                     // before it answers the greeting (or never will), and only
                     // then may its launch copy go.
-                    let (stream, mut process, launched) = spawn(paths, &lock, wait)?;
+                    //
+                    // The launch (reading and sealing the executable, then the
+                    // exec) is part of that start: a command without a
+                    // deadline of its own counts the startup bound from here,
+                    // not 10 seconds that a loaded host spends on the launch
+                    // alone (story:cli-connect-admission-timeout-under-load).
+                    let started = Instant::now();
+                    let launch = start_bound.map_or(wait, |bound| wait.max(started + bound));
+                    let (stream, mut process, launched) = spawn(paths, &lock, launch)?;
                     // The owner verifies the whole store before it answers, so
                     // its greeting takes longer as the store grows. A command
                     // without a deadline of its own waits for it up to the
                     // startup bound, not the 10 seconds it allows a running
                     // owner (story:owner-start-outlasts-a-fixed-bound).
-                    let greeting =
-                        start_bound.map_or(wait, |bound| wait.max(Instant::now() + bound));
+                    let greeting = launch;
                     let result = Self::greet(
                         stream,
                         paths,
@@ -1442,6 +1449,12 @@ fn lock(directory: &File) -> Result<File> {
 /// large store (tests/owner_slow_start.rs).
 #[cfg(debug_assertions)]
 const START_DELAY: &str = "CONNECTORS_TEST_OWNER_START_DELAY_MS";
+/// The environment variable a test build's CLI waits on, in milliseconds,
+/// between reading its executable and sealing the copy the owner runs from: a
+/// stand-in for the time a loaded host spends launching an owner
+/// (tests/owner_slow_start.rs).
+#[cfg(all(unix, debug_assertions))]
+const LAUNCH_DELAY: &str = "CONNECTORS_TEST_OWNER_LAUNCH_DELAY_MS";
 /// What a started owner's caller holds until the owner has answered its
 /// greeting. On macOS that is the owner's launch copy: the owner measures its
 /// build from the file at its running executable's path
@@ -1474,6 +1487,13 @@ fn spawn(
         sha256: hash,
         args: Vec::new(),
     };
+    #[cfg(debug_assertions)]
+    if let Some(delay) = std::env::var(LAUNCH_DELAY)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+    {
+        std::thread::sleep(Duration::from_millis(delay));
+    }
     let executable = selection.capture(deadline)?;
     let (parent, child) = UnixStream::pair().map_err(|_| Code::Unavailable)?;
     // Put source fds beyond the destination slots before fork.
