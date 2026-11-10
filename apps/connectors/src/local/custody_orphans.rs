@@ -69,6 +69,11 @@ pub(super) fn execute(call: &Invocation<'_>, paths: &Paths) -> Result<Value, Han
             .iter()
             .map(|(item, why)| json!({"item": item.path, "failure": format!("{why:?}")}))
             .collect();
+        // The deletes ran but could not be made durable: `removed` still names
+        // them, and this row names the failure.
+        if let Some(why) = removal.synchronization {
+            failed.push(json!({"item": "synchronization", "failure": format!("{why:?}")}));
+        }
     } else {
         let found =
             keyring::custody_orphans(socket, &HashSet::from([own]), false).map_err(unavailable)?;

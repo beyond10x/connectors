@@ -151,6 +151,10 @@ impl Persistence {
     }
 
     fn encrypted_file(&self) -> Result<File> {
+        self.encrypted_file_named(&self.file)
+    }
+
+    fn encrypted_file_named(&self, file: &str) -> Result<File> {
         let current = fs::directory(&self.path, true).map_err(unavailable)?;
         let current = current.metadata().map_err(unavailable)?;
         let held = self.directory.metadata().map_err(unavailable)?;
@@ -158,7 +162,7 @@ impl Persistence {
             return Err(Failure::Unavailable);
         }
         let mut file =
-            fs::private_file_at(&self.directory, OsStr::new(&self.file)).map_err(unavailable)?;
+            fs::private_file_at(&self.directory, OsStr::new(file)).map_err(unavailable)?;
         let mut header = [0; 20];
         file.read_exact(&mut header).map_err(unavailable)?;
         if &header != HEADER {
@@ -172,6 +176,16 @@ impl Persistence {
     }
 
     pub(super) fn synchronize(&self) -> Result<()> {
+        self.synchronize_file(&self.file)
+    }
+
+    /// Synchronize the file behind `collection`, which may be another than the
+    /// one custody writes to: the legacy `login` collection after a delete there.
+    pub(super) fn synchronize_collection(&self, collection: &str) -> Result<()> {
+        self.synchronize_file(&collection_file(collection)?)
+    }
+
+    fn synchronize_file(&self, file: &str) -> Result<()> {
         self.check_process()?;
         #[cfg(any(test, feature = "test-support"))]
         if self.fail_sync.load(std::sync::atomic::Ordering::SeqCst) {
@@ -179,7 +193,9 @@ impl Persistence {
         }
         // GNOME rewrites the collection through rename. Open the current exact
         // encrypted file AFTER the method acknowledgement, not the previous inode.
-        self.encrypted_file()?.sync_all().map_err(unavailable)?;
+        self.encrypted_file_named(file)?
+            .sync_all()
+            .map_err(unavailable)?;
         self.directory.sync_all().map_err(unavailable)?;
         for ancestor in &self.ancestors {
             ancestor.sync_all().map_err(unavailable)?;

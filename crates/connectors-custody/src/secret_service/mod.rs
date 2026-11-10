@@ -479,7 +479,13 @@ impl Backend for SecretService {
         let _lock = self.persistence.lock(until)?;
         self.admit(version)?;
         guard()?;
+        // The collection whose file the delete rewrote: the legacy `login` one when
+        // the item was found there, else the one custody writes to.
+        let mut touched = self.service.collection.clone();
         if let Some(item) = self.find(version)? {
+            if let Some(owner) = self.service.collections().find(|c| is_item_of(&item, c)) {
+                touched = owner.clone();
+            }
             let proxy = self
                 .service
                 .proxy(item.as_str(), ITEM_INTERFACE)
@@ -497,7 +503,7 @@ impl Backend for SecretService {
             return Err(Failure::OutcomeUnknown);
         }
         self.persistence
-            .synchronize()
+            .synchronize_collection(touched.as_str())
             .map_err(|_| Failure::OutcomeUnknown)?;
         Ok(())
     }

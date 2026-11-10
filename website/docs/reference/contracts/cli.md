@@ -1287,7 +1287,9 @@ machine that the command cannot see. It deletes nothing.
 Without `--authority`, with an id that is not a UUID, or with the selected store's own
 authority, it is `invalid_input` at `arguments` with `field` `authority`, and nothing is
 deleted. `list` with `--authority` is the same refusal. `removed` names each item deleted
-and `failed` each item whose delete failed, with its failure; neither is silent. An
+and `failed` each item whose delete failed, with its failure; neither is silent. When the
+deletes ran but could not be made durable, `removed` still names them and `failed` carries one
+row whose item is `synchronization`. An
 authority with no items answers empty `removed` and `failed`. An unavailable or locked
 Secret Service is `custody_unavailable`.
 

@@ -17,11 +17,14 @@ pub struct CustodyItem {
     pub version: String,
 }
 
-/// Items a removal deleted, and each it could not, named with its failure.
+/// Items a removal deleted, each it could not delete with its failure, and the
+/// failure of the closing durability barrier when the deletes ran but could not
+/// be made durable.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Removal {
     pub deleted: Vec<CustodyItem>,
     pub failed: Vec<(CustodyItem, Failure)>,
+    pub synchronization: Option<Failure>,
 }
 
 /// The items no store names; `removal` is present only when removal was asked.
@@ -106,9 +109,20 @@ fn remove(
             Err(failure) => removal.failed.push((item, failure)),
         }
     }
-    persistence
-        .synchronize()
-        .map_err(|_| Failure::OutcomeUnknown)?;
+    // Every file a delete rewrote is synchronized, the legacy `login` one included.
+    // A failed barrier does not drop the record: the deletes ran, so the answer
+    // names them together with the failure.
+    let rewritten: std::collections::BTreeSet<&str> = removal
+        .deleted
+        .iter()
+        .map(|i| i.collection.as_str())
+        .collect();
+    for collection in rewritten {
+        if persistence.synchronize_collection(collection).is_err() {
+            removal.synchronization = Some(Failure::OutcomeUnknown);
+            break;
+        }
+    }
     Ok(removal)
 }
 
@@ -153,4 +167,41 @@ pub fn orphans_at(
         None
     };
     Ok(Orphans { orphans, removal })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Backend, Material, Scope, Version, secret_service::fixture::Fixture};
+    use std::sync::atomic::Ordering;
+
+    #[test]
+    #[ignore = "requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR"]
+    fn a_failed_barrier_still_names_the_deleted_items() {
+        let fixture = Fixture::new();
+        let authority = Uuid::new_v4();
+        for _ in 0..2 {
+            let scope = Scope::new(authority, Uuid::new_v4()).unwrap();
+            let version = Version::new(scope, Uuid::new_v4()).unwrap();
+            fixture
+                .backend(scope)
+                .unwrap()
+                .write_new(
+                    version,
+                    &Material::new(vec![7; 16]),
+                    Instant::now() + Duration::from_secs(10),
+                    || Ok(()),
+                )
+                .unwrap();
+        }
+        let (service, persistence) = open(Some(&fixture.socket)).unwrap();
+        persistence.fail_sync.store(true, Ordering::SeqCst);
+        let items = list(&service).unwrap();
+        let removal = remove(&service, &persistence, items).unwrap();
+        assert_eq!(removal.deleted.len(), 2);
+        assert!(removal.failed.is_empty());
+        assert_eq!(removal.synchronization, Some(Failure::OutcomeUnknown));
+        persistence.fail_sync.store(false, Ordering::SeqCst);
+        assert!(list(&service).unwrap().is_empty());
+    }
 }
