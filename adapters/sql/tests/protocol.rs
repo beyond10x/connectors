@@ -223,7 +223,7 @@ async fn fixture(mut scenario: Scenario) -> (Sql, tokio::task::JoinHandle<()>) {
                     } else if query.starts_with("SET") {
                         assert_eq!(
                             query.trim_end_matches('\0'),
-                            "SET LOCAL statement_timeout = '10s'; SET LOCAL lock_timeout = '2s'; SET LOCAL search_path = public, pg_catalog"
+                            "SET LOCAL statement_timeout = '10s'; SET LOCAL lock_timeout = '2s'; SET LOCAL search_path = pg_catalog, public"
                         );
                         setup = true;
                     }
@@ -244,18 +244,19 @@ async fn fixture(mut scenario: Scenario) -> (Sql, tokio::task::JoinHandle<()>) {
                         original = query.into();
                     } else {
                         assert!(query.starts_with(
-                            "SELECT CASE WHEN (COALESCE(pg_catalog.octet_length(result.c0::text),0)::bigint"
+                            "SELECT CASE WHEN (COALESCE(pg_catalog.octet_length(result.c0::pg_catalog.text),0)::bigint"
                         ));
                         // The wrapper never resolves a function or operator through
                         // `public`: a shadow created there by another principal is not called.
                         assert!(!query.contains("(octet_length("));
+                        assert!(!query.contains("::bigintOPERATOR"));
                         assert!(!query.contains("+COALESCE"));
                         assert_eq!(
                             query.matches("OPERATOR(pg_catalog.+)").count(),
                             scenario.columns.len() - 1
                         );
                         assert!(query.contains(&format!(
-                            ") OPERATOR(pg_catalog.>) {} THEN NULL::text[] ELSE ARRAY[",
+                            ") OPERATOR(pg_catalog.>) {} THEN NULL::pg_catalog.text[] ELSE ARRAY[",
                             connectors_core::RESPONSE_LIMIT
                         )));
                         let aliases = (0..scenario.columns.len())
@@ -263,7 +264,7 @@ async fn fixture(mut scenario: Scenario) -> (Sql, tokio::task::JoinHandle<()>) {
                             .collect::<Vec<_>>();
                         let casts = aliases
                             .iter()
-                            .map(|c| format!("result.{c}::text"))
+                            .map(|c| format!("result.{c}::pg_catalog.text"))
                             .collect::<Vec<_>>()
                             .join(",");
                         assert!(query.contains(&format!("ARRAY[{casts}]")));
@@ -1249,7 +1250,7 @@ fn label_profile(kind: &str) -> connectors_sql::ReadProfile {
 async fn postgresql_a_text_ordering_orders_and_continues_by_the_returned_bytes() {
     let number = "+99900000101";
     let port = free_port();
-    let order = " ORDER BY result.c1::text COLLATE \"C\" LIMIT 6";
+    let order = " ORDER BY result.c1::pg_catalog.text COLLATE pg_catalog.\"C\" LIMIT 6";
     let first = catalogue(
         Scenario {
             rows: vec![
@@ -1279,7 +1280,7 @@ async fn postgresql_a_text_ordering_orders_and_continues_by_the_returned_bytes()
             columns: vec![("id", INT8), ("label", TEXT)],
             read_profiles: vec![label_profile("text")],
             port: Some(port),
-            suffix: format!(" WHERE result.c1::text COLLATE \"C\" OPERATOR(pg_catalog.>) $2::text COLLATE \"C\"{order}"),
+            suffix: format!(" WHERE result.c1::pg_catalog.text COLLATE pg_catalog.\"C\" OPERATOR(pg_catalog.>) $2::pg_catalog.text COLLATE pg_catalog.\"C\"{order}"),
             ..Scenario::default()
         },
         "profile.read",
