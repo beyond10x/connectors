@@ -34,7 +34,8 @@
 - Catalog guards: a preflight's `optional_values` stay optional, are forwarded when given, and are
   checked when the selection loads like `values`; a `values` or `optional_values` key the probe
   read does not declare, or a key bound in both, is refused at load
-  (story:catalog-guard-optional-preflight-values).
+  (story:catalog-guard-optional-preflight-values). The shipped Google Drive selection uses
+  `optional_values`, so its configuration revision changes.
 - Catalog feeds: an incomplete cursor answer that does not advance its cursor is `unavailable`
   instead of a page read again forever (story:feed-cursor-unadvanced-is-unavailable).
 - SQL: `query.read` provenance names the connected database, and the contract, the adapter page
