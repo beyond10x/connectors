@@ -3302,20 +3302,15 @@ mod derived_instance_tests {
     fn printing_the_bootstrap_is_bounded_when_a_descendant_keeps_the_output() {
         let fixture = Fixture::gmail("gmail.private");
         let ended = fixture.root.path().join("ended");
-        fixture.behave(&format!(
-            "sleep 25 &\ndate +%s%N > '{}'\nexit 0",
-            ended.display()
-        ));
+        fixture.behave(&format!("sleep 25 &\ntouch '{}'\nexit 0", ended.display()));
         assert_eq!(fixture.read(GMAIL).err(), INVALID);
         // The bound is on the load after the provider ended, not on the whole
         // read: starting the provider and the shell is as slow as the host is
         // loaded, and the ten-second deadline it must stay clear of is not.
-        let returned = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap();
-        let ended = std::fs::read_to_string(&ended).unwrap();
-        let ended = std::time::Duration::from_nanos(ended.trim().parse().unwrap());
-        let held = returned.saturating_sub(ended);
+        // The file's modification time marks the end; `date +%N` is not POSIX.
+        let returned = std::time::SystemTime::now();
+        let ended = std::fs::metadata(&ended).unwrap().modified().unwrap();
+        let held = returned.duration_since(ended).unwrap_or_default();
         assert!(
             held < std::time::Duration::from_secs(5),
             "the load returned {held:?} after the provider ended: a descendant held the output toward the 10 s deadline"
