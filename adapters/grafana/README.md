@@ -10,8 +10,9 @@ connection in [the connection domain](spec/ess/domains/connection.yaml). It runs
 the [qualified Secret Service binding](../../docs/local-secret-service.md) and on Apple-silicon
 macOS with the login keychain, like every saved credential. The macOS job of `macos-host.yml`
 runs its tests, among them the CLI journey that connects with a service account token through the
-built `connectors` and lists the data sources of the recorded fixture, with the credential saved
-in the login keychain. The release archives hold `connectors-grafana` beside `connectors`; see
+built `connectors`, saves the credential in the login keychain and lists the data sources of the
+recorded fixture. The owner keeps its private copy of `connectors` until it stops, because the
+keychain refuses to save an item for a process whose executable was removed. The release archives hold `connectors-grafana` beside `connectors`; see
 [From the release archive](#from-the-release-archive).
 
 Connector, instance and connection are the terms of the [vocabulary](../../README.md#vocabulary).

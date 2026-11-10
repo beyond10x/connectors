@@ -545,8 +545,8 @@ fn macos_locked_keychain_is_unavailable_without_a_prompt() {
 
 /// The variable that makes this test binary, started from a launch copy, the
 /// child of [`macos_login_keychain_writes_from_a_launch_copy_left_on_disk_and_removed_after_start`];
-/// its value names the variant, and the child's answer is the stdout line that
-/// starts with it.
+/// its value names the variant, and the child's answer is the stdout text that
+/// starts at it (the harness may print its own text before it on that line).
 #[cfg(target_os = "macos")]
 const LAUNCH_COPY_CHILD: &str = "CONNECTORS_CUSTODY_LAUNCH_COPY_CHILD";
 
@@ -574,17 +574,24 @@ fn macos_login_keychain_writes_from_a_launch_copy_left_on_disk_and_removed_after
     for (variant, answer) in &answers {
         eprintln!("launch copy {variant}: {answer}");
     }
-    let failed: Vec<String> = answers
-        .iter()
-        .filter(|(_, answer)| {
-            !(answer.contains(" write=Ok(()) ") && answer.contains(" delete=Ok(()) "))
-        })
-        .map(|(variant, answer)| format!("{variant}: {answer}"))
-        .collect();
+    let [(_, left), (_, removed)] = &answers[..] else {
+        unreachable!()
+    };
+    // The executable left on disk writes, reads back and deletes.
     assert!(
-        failed.is_empty(),
-        "a login keychain write from a launch copy failed: {}",
-        failed.join(" | ")
+        left.contains(" write=Ok(()) ")
+            && left.contains(" delete=Ok(()) ")
+            && left.ends_with(" reported=[]"),
+        "a login keychain write from a launch copy left on disk failed: {left}"
+    );
+    // Pinned macOS fact, which is why the owner keeps its launch copy until it
+    // stops serving: SecItemAdd from a process whose executable is gone answers
+    // OSStatus 100002 (ENOENT), which the binding reports as outcome unknown.
+    assert!(
+        removed.contains(" executable_on_disk=Ok(false) ")
+            && removed.contains(" write=Err(OutcomeUnknown) ")
+            && removed.contains("SecItemAdd answered OSStatus 100002"),
+        "a login keychain write from a removed executable no longer fails as pinned: {removed}"
     );
 }
 
@@ -650,9 +657,11 @@ fn launch_copy(variant: &str) -> String {
         std::thread::sleep(Duration::from_millis(20));
     };
     let stdout = std::fs::read_to_string(&stdout).unwrap_or_default();
+    // The libtest harness prints "test <name> ... " before the child's line on
+    // the same line, so the answer starts where the marker does, not at a line start.
     match stdout
         .lines()
-        .find(|line| line.starts_with(LAUNCH_COPY_CHILD))
+        .find_map(|line| line.find(LAUNCH_COPY_CHILD).map(|at| &line[at..]))
     {
         Some(line) => line.to_owned(),
         None => format!(

@@ -594,12 +594,20 @@ fn grafana_cli_connects_with_a_service_account_token_and_lists_datasources_with_
     assert_eq!(cli.paths.state, keychain.state);
     journey(&provider, &mut keychain, &cli);
     cli.shutdown();
-    let removed = keychain.remove_written().unwrap();
+    let written = keychain.written().unwrap();
     assert!(
-        removed >= 1,
+        !written.is_empty(),
         "the saved credential was not in the login keychain"
     );
-    assert_eq!(keychain.written().unwrap(), Vec::<String>::new());
+    // The owner created the item from its launch copy, so this test binary is
+    // not on its access list, and no product command deletes a connection's
+    // credential item yet (`connections revoke` fences it; nothing sweeps the
+    // fence). Removal from here is attempted and reported, never asserted: the
+    // item belongs to a disposable runner's keychain.
+    match keychain.remove_written() {
+        Ok(removed) => eprintln!("removed {removed} login keychain item(s) of this test"),
+        Err(error) => eprintln!("login keychain cleanup left items behind: {error}"),
+    }
 }
 
 /// Connect refuses an unaccepted token, connects with the accepted one,

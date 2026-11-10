@@ -334,7 +334,8 @@ impl Client {
                         // run and removes it when it exits (`serve`): the
                         // keychain checks the code identity of the process that
                         // creates and reads an item against the file at its
-                        // executable's path (story:provider-programs-run-on-macos).
+                        // executable's path: SecItemAdd answers OSStatus 100002
+                        // (ENOENT) once the executable is gone (story:provider-programs-run-on-macos).
                         #[cfg(target_os = "macos")]
                         Ok(_) => launched.leave(),
                         #[cfg(not(target_os = "macos"))]
