@@ -69,9 +69,27 @@ pub struct Server {
     thread: Option<JoinHandle<()>>,
 }
 impl Server {
-    /// A source answering every request with `fixture`'s signed reply.
+    /// A source answering every request with `fixture`'s signed reply. It has
+    /// answered once before it is returned (and is then counted as unasked),
+    /// so a client's fixed deadline never pays for the serving thread's cold
+    /// start, which a loaded runner can stretch past 2 s.
     pub fn fixture(fixture: Fixture) -> Self {
-        Self::spawn(Box::new(move |_, request| Some(fixture.reply(request))))
+        let server = Self::spawn(Box::new(move |_, request| Some(fixture.reply(request))));
+        server.warm();
+        server
+    }
+    fn warm(&self) {
+        let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
+        socket
+            .set_read_timeout(Some(Duration::from_secs(30)))
+            .unwrap();
+        socket
+            .send_to(&frame(&message([(*b"NONC", vec![0u8; 32])])), &self.address)
+            .unwrap();
+        socket
+            .recv_from(&mut [0u8; 4096])
+            .expect("the fixture answers its warm-up request");
+        self.requests.store(0, Ordering::SeqCst);
     }
     /// A source that receives and never answers.
     pub fn silent() -> Self {
@@ -104,13 +122,20 @@ impl Server {
                             continue;
                         }
                         if let Some(reply) = answer(n, &packet[..size]) {
-                            socket.send_to(&reply, peer).unwrap();
+                            // A peer that has gone is not the source's failure.
+                            let _ = socket.send_to(&reply, peer);
                         }
                     }
+                    // Windows reports an earlier ICMP port-unreachable to a peer
+                    // that closed as a reset on this unconnected socket's next
+                    // receive (WSAECONNRESET); the source keeps serving.
                     Err(e)
                         if matches!(
                             e.kind(),
-                            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                            std::io::ErrorKind::WouldBlock
+                                | std::io::ErrorKind::TimedOut
+                                | std::io::ErrorKind::ConnectionReset
+                                | std::io::ErrorKind::ConnectionAborted
                         ) => {}
                     Err(e) => panic!("fixture clock source: {e}"),
                 }
