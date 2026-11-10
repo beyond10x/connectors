@@ -10,14 +10,11 @@ connectors: "kubernetes"
 # Kubernetes
 
 The `kubernetes` connector is served by its own executable, `connectors-kubernetes`, not by the
-catalog provider. The words connector, instance, connection and operation are those of the
-[README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+catalog provider. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full Kubernetes guide](https://github.com/beyond10x/connectors/blob/main/docs/local-kubernetes-cli.md)
 has every field, operation and refusal.
 
-No declaration ships for it, so the instance is pinned: it names its executable, that
-executable's SHA-256 and the configuration revision the executable prints for your native file.
-Commands that need a cluster are shown without output.
+It is a [pinned instance](../guides/pinned-instances.md). Commands that need a cluster are shown without output.
 
 ## What it reads and writes
 
@@ -119,14 +116,10 @@ An RBAC denial appears when the read is dispatched, as a `forbidden` refusal.
 
 `pods.exec` is the one write. Set `"pod_exec": true` in the native file, copy the new
 configuration revision, select `private_protocol = "connectors-private/2"` and add `pods.exec` to
-`operations`. Create the signing key (`connectors approvals key-init --connector kubernetes
---instance cluster`), add an `[approval_clock]` table
-([the approval clock](https://github.com/beyond10x/connectors/blob/main/docs/local-clock.md)) and
-publish the policy:
+`operations`. Set up the [signing key and clock](../guides/guarded-write.md#once-per-instance), then publish this policy with `approvals policy-set`:
 
 ```sh
 printf '{"operations":["pods.exec"]}\n' > policy.json
-connectors approvals policy-set --connector kubernetes --instance cluster --input-file policy.json
 ```
 
 `exec.json` names the pod, the container and the argument vector; no shell is added:
@@ -135,43 +128,14 @@ connectors approvals policy-set --connector kubernetes --instance cluster --inpu
 {"namespace":"default","pod":"api-7d4b9c","container":"api","command":["cat","/etc/os-release"],"timeout_seconds":10}
 ```
 
-Take the connection, and the schema and revision of `pods.exec` from `invoke --describe`, then
-prepare, issue and invoke:
-
-```sh
-connection=$(connectors --output json connections list --connector kubernetes --instance cluster \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json invoke kubernetes/cluster pods.exec --describe \
-  | jq -r .result.schema)
-revision=$(connectors --output json invoke kubernetes/cluster pods.exec --describe \
-  | jq -r .result.revision)
-connectors --output json approvals prepare --connector kubernetes --instance cluster \
-  --connection "$connection" --operation pods.exec \
-  --schema "$schema" --revision "$revision" --input-file exec.json
-connectors approvals clock-check --connector kubernetes --instance cluster
-connectors approvals issue --connector kubernetes --instance cluster \
-  --connection "$connection" --operation pods.exec \
-  --schema "$schema" --revision "$revision" --input-file exec.json \
-  --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-exec-1.json"
-connectors invoke kubernetes/cluster pods.exec \
-  --input-file exec.json --approval-file "$HOME/private/proof-exec-1.json" \
-  --idempotency-key exec-1
-```
+[Prepare, issue and invoke](../guides/guarded-write.md#prepare-issue-and-invoke) `pods.exec` on `kubernetes/cluster` with `exec.json`, `--idempotency-key exec-1`.
 
 A non-zero exit is an applied attempt with that `exit_code`. A lost stream is `unknown`: the
 command may have run, and it is never sent again.
 
 ## Reconnect when the connection is Stale
 
-A token the cluster no longer accepts makes the connection `stale`, and an invoke answers
-`next_action: repair_connection`. Publish a new token for the same username:
-
-```sh
-connectors --output json connections list --connector kubernetes --instance cluster \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector kubernetes --instance cluster \
-  --expected-revision "<revision from the list>" --credential-prompt
-```
+A token the cluster no longer accepts makes the connection `stale`. Publish a new token for the same username. [Reconnect](../guides/reconnect-a-connection.md) `kubernetes/cluster` with `--credential-prompt`.
 
 A token of a different username is refused as an identity mismatch and the saved one is kept.
 

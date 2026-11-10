@@ -15,9 +15,7 @@ operation are those of the [README vocabulary](https://github.com/beyond10x/conn
 the [full Zendesk guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-zendesk.md)
 has every parameter, paging rule and refusal.
 
-Commands use `connectors` on your `PATH` with your own configuration. Outputs were produced in
-the repository's tree against a scratch configuration, whose `--config` and `--state-dir` are left
-out here. A command that needs a Zendesk account is shown without output.
+[How these commands were run](../guides/first-read.md#examples).
 
 ## What it reads and writes
 
@@ -48,14 +46,6 @@ enabled = true
 [connectors.zendesk.instances.support]
 endpoint = "https://your-subdomain.zendesk.com"
 profile = "zendesk.oauth"
-```
-
-```sh
-connectors instances list | jq -c '.[] | arrays | .[]'
-```
-
-```json
-{"connector":"zendesk","instance":"support","instance_id":"zendesk.support","restart":"never","startup":"on-demand"}
 ```
 
 ## Connect
@@ -103,14 +93,10 @@ The writes are verified with `zendesk.basic` only: the `zendesk.oauth` profile r
 scope `read`, which does not cover a write. Name `profile = "zendesk.basic"` on the instance and
 connect with an API token of an agent allowed to update the ticket.
 
-Once per instance, create the signing key (`connectors approvals key-init --connector zendesk
---instance support`) and add an `[approval_clock]` table to the configuration
-([the approval clock](https://github.com/beyond10x/connectors/blob/main/docs/local-clock.md)).
-Publish a policy naming the writes:
+Set up the [signing key and clock](../guides/guarded-write.md#once-per-instance), then publish this policy with `approvals policy-set`:
 
 ```sh
 printf '{"operations":["ticket.update","ticket.note","ticket.draft_reply"]}\n' > policy.json
-connectors approvals policy-set --connector zendesk --instance support --input-file policy.json
 ```
 
 Read the ticket with `ticket.show` and pin its `ticket.updated_at` as `updated_stamp` in
@@ -120,29 +106,7 @@ Read the ticket with `ticket.show` and pin its `ticket.updated_at` as `updated_s
 {"ticket_id": 101, "body": {"ticket": {"comment": {"body": "Checked the billing history."}, "updated_stamp": "2025-09-16T10:00:00Z"}}}
 ```
 
-Take the connection, and the schema and revision of `ticket.note` from `invoke --describe`, then
-prepare, issue and invoke:
-
-```sh
-connection=$(connectors --output json connections list --connector zendesk --instance support \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json invoke zendesk/support ticket.note --describe \
-  | jq -r .result.schema)
-revision=$(connectors --output json invoke zendesk/support ticket.note --describe \
-  | jq -r .result.revision)
-subject_sha256=$(connectors --output json approvals prepare --connector zendesk --instance support \
-  --connection "$connection" --operation ticket.note \
-  --schema "$schema" --revision "$revision" --input-file note.json \
-  | jq -r .result.preparation.subject_sha256)
-connectors approvals clock-check --connector zendesk --instance support
-connectors approvals issue --connector zendesk --instance support \
-  --connection "$connection" --operation ticket.note \
-  --schema "$schema" --revision "$revision" --input-file note.json \
-  --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-note-101.json"
-connectors invoke zendesk/support ticket.note \
-  --input-file note.json --approval-file "$HOME/private/proof-note-101.json" \
-  --idempotency-key note-101
-```
+[Prepare, issue and invoke](../guides/guarded-write.md#prepare-issue-and-invoke) `ticket.note` on `zendesk/support` with `note.json`, `--idempotency-key note-101`.
 
 A ticket changed since the read is refused with `service_code: conflict`; read it again and prepare a new
 approval, since the approval binds the whole input, the stamp included. A note sent twice is two
@@ -152,15 +116,7 @@ lists each write's input and guard.
 
 ## Reconnect when the connection is Stale
 
-A client secret or token Zendesk refuses makes the connection `stale`, and an invoke answers
-`next_action: repair_connection`. Publish a new secret on the same connection:
-
-```sh
-connectors --output json connections list --connector zendesk --instance support \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector zendesk --instance support \
-  --expected-revision "<revision from the list>" --credential-file ~/private/zendesk-oauth.json
-```
+A client secret or token Zendesk refuses makes the connection `stale`. Publish a new secret on the same connection. [Reconnect](../guides/reconnect-a-connection.md) `zendesk/support` with `--credential-file ~/private/zendesk-oauth.json`.
 
 ## Limits
 
@@ -168,5 +124,4 @@ connectors connections reconnect --connector zendesk --instance support \
   (`adapters/catalog/tests/zendesk.rs`); nothing has run against a live Zendesk account.
 - Whether Zendesk accepts the form-encoded token request, and whether per-resource scopes alone
   admit the exports, has not been checked live.
-- The provider does not walk pages or bound `per_page`; a read answered `429` is `rate_limited`
-  with `retry_after_seconds` when the retry does not fit.
+- The provider does not walk pages or bound `per_page`; [a read answered `429` follows the shared rule](../guides/first-read.md#rate-limits).
