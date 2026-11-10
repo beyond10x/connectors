@@ -1686,3 +1686,64 @@ async fn every_page_boundary_is_one_the_model_admits() {
         assert!(conforms(&model, &wrong).is_err(), "{wrong}");
     }
 }
+
+/// The password bound is bytes, in the model, the executable and (by the host's
+/// `EntryField.max_bytes`) the entry: 4,096 two-byte characters are 8,192 bytes, one more is over.
+#[test]
+fn the_password_bound_counts_bytes_in_the_model_and_the_executable() {
+    let out = tempfile::tempdir().unwrap();
+    let model = schema(out.path(), "connection.Password");
+    for (password, admitted) in [
+        ("p".repeat(8192), true),
+        ("p".repeat(8193), false),
+        ("\u{e9}".repeat(4096), true),
+        ("\u{e9}".repeat(4097), false),
+        (String::new(), false),
+    ] {
+        let modelled = conforms(&model, &json!(password)).is_ok();
+        let entry = serde_json::to_vec(&json!({ "password": password })).unwrap();
+        let executed = connectors_sql::auth::ProtectedEntry::parse(entry).is_ok();
+        assert_eq!(
+            (modelled, executed),
+            (admitted, admitted),
+            "{} bytes, {} characters",
+            password.len(),
+            password.chars().count()
+        );
+    }
+}
+
+/// The query text and each parameter are bounded in characters, as the descriptor's
+/// `maxLength` states: 8,192 two-byte characters are admitted (they get as far as the
+/// connection), one more is refused as invalid input.
+#[tokio::test]
+async fn query_text_and_parameters_are_bounded_in_characters() {
+    for engine in [Engine::Postgresql, Engine::Mysql] {
+        let adapter = sql(engine, 1);
+        let at = "\u{e9}".repeat(8192);
+        let past = "\u{e9}".repeat(8193);
+        for (input, admitted) in [
+            (json!({"query": at, "limit": 1}), true),
+            (json!({"query": past, "limit": 1}), false),
+            (
+                json!({"query": "SELECT 1", "limit": 1, "parameters": [at]}),
+                true,
+            ),
+            (
+                json!({"query": "SELECT 1", "limit": 1, "parameters": [past]}),
+                false,
+            ),
+        ] {
+            let refused = matches!(
+                adapter.invoke("query.read", input.clone()).await,
+                Err(e) if e.code == ErrorCode::InvalidInput
+            );
+            assert_eq!(
+                refused,
+                !admitted,
+                "{engine:?}: {} bytes of input",
+                input.to_string().len()
+            );
+        }
+    }
+}

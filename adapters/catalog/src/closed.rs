@@ -27,6 +27,11 @@ fn path(key: &str) -> Option<Path> {
     }
 }
 
+/// Whether a pointer segment is an array index: digits only.
+fn index(segment: &str) -> bool {
+    !segment.is_empty() && segment.bytes().all(|b| b.is_ascii_digit())
+}
+
 /// Whether `inner` lies strictly inside `outer`.
 fn inside(inner: &[String], outer: &[String]) -> bool {
     inner.len() > outer.len() && inner.starts_with(outer)
@@ -111,6 +116,18 @@ impl Closed {
                         .iter()
                         .all(|p| !paths.iter().any(|other| inside(p, other)))
             });
+            // A closed body is objects only: a segment of digits would name a
+            // list's element, and is sent as an object's key.
+            if let Some(key) = paths
+                .iter()
+                .flat_map(|paths| paths.iter())
+                .zip(&selection.body_keys)
+                .find_map(|(p, key)| p.iter().any(|s| index(s)).then_some(key))
+            {
+                return refused(&format!(
+                    "declares body_keys `{key}`, whose segment of digits would name a list element; a closed body names object keys only"
+                ));
+            }
             if selection.effect != crate::Effect::Write || !request_body || !valid {
                 return refused(
                     "declares body_keys that do not close a write's body with distinct plain names or pointers, none inside another",
@@ -306,6 +323,11 @@ impl Closed {
                 Some(path)
                     if string(&path) && !fixed_names.contains(&path) && !prefix.is_empty() =>
                 {
+                    if closed.enums.contains_key(&path) {
+                        return Err(refuse(format!(
+                            "selection `{id}` names body_enums and body_prefixes key `{name}`; the prefix would send a value outside the set"
+                        )));
+                    }
                     if closed.prefixes.iter().any(|(seen, _)| *seen == path) {
                         return Err(refuse(format!(
                             "selection `{id}` repeats body_prefixes key `{name}`"

@@ -2768,6 +2768,49 @@ mod connector_instance_tests {
         assert_eq!(read("connectors-local/5", &twice).err(), INVALID);
     }
 
+    /// A legacy `[adapters.work]` entry of `adapter_id`, beside the instance
+    /// `work` of the connector `kubernetes`: the name is both a legacy alias
+    /// and an instance's name.
+    fn alias_and_instance_sharing_a_name(adapter_id: &str) -> String {
+        let slack = &KINDS[1];
+        let scalars = slack.scalars.replace(
+            "adapter_id='slack-credentials'",
+            &format!("adapter_id='{adapter_id}'"),
+        );
+        let legacy = Kind::table("adapters.work", &scalars, slack);
+        format!("{legacy}{}", KINDS[4].instance(""))
+    }
+
+    /// story:legacy-alias-sharing-an-instance-name. A legacy alias names an
+    /// entry as `(adapter_id, alias)` and an instance as `(connector,
+    /// instance)`. Where both name one pair the name reaches either entry, and
+    /// the file is refused at load, so no request is sent. Where the pairs
+    /// differ each selector reaches exactly the entry it names.
+    #[test]
+    fn a_read_through_a_name_that_is_both_alias_and_instance_is_refused_as_ambiguous() {
+        let same = alias_and_instance_sharing_a_name("kubernetes");
+        assert_eq!(read("connectors-local/5", &same).err(), INVALID);
+        let other = alias_and_instance_sharing_a_name("slack-credentials");
+        let config = read("connectors-local/5", &other).unwrap();
+        let reached = |selector| config.select(selector).map(|s| s.alias);
+        assert_eq!(reached(Selector::Alias("work")), Some("work"));
+        assert_eq!(
+            reached(Selector::Instance {
+                connector: "kubernetes",
+                instance: "work"
+            }),
+            Some("cluster")
+        );
+        assert_eq!(
+            reached(Selector::Instance {
+                connector: "slack-credentials",
+                instance: "work"
+            }),
+            Some("work")
+        );
+        assert_eq!(reached(Selector::Alias("cluster")), Some("cluster"));
+    }
+
     #[test]
     fn connector_tables_are_refused_outside_format_five_and_when_malformed() {
         let kind = &KINDS[4];

@@ -556,3 +556,10 @@ rebind through the CLI. No live Confluence site has been read through such an in
   time of its own before the invocation deadline, and otherwise returns it as a `rate_limited` refusal carrying that
   delay as `retry_after_seconds`
   ([Limits](local-catalog-provider.md#limits)).
+
+## Support-table summary
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> Confluence Cloud REST v2 from the pinned OpenAPI document, and REST v1 from a document this repository writes from Atlassian's reference pages; profile `atlassian.basic`, shared with Jira; reads only, one page per call; verified against local fixtures only, see [the Confluence guide](docs/catalog-confluence.md)

@@ -959,7 +959,8 @@ The complete configuration used against the sandbox is
   objects. A guard reads a nested key through its dotted path
   (`body.ticket.updated_stamp` is `/ticket/updated_stamp`). A read, an operation
   without a request body, an empty, dotted or repeated name, a pointer with an
-  empty segment or a `~`, a key inside another admitted key, or a guard reading
+  empty segment or a `~`, a segment of digits (it would name a list element,
+  and the body is objects only), a key inside another admitted key, or a guard reading
   a `body.<path>` the set does not admit is refused when the selection loads.
   The bundle records no body schema, so the names are not checked against the
   provider's.
@@ -1014,7 +1015,9 @@ The complete configuration used against the sandbox is
   refused as `invalid_input` naming the key, before any request, and the
   declared input schema gives the key that `enum`. A key `body_types` does not
   type as `string`, a fixed key, an empty set, or an empty or repeated value is
-  refused when the selection loads.
+  refused when the selection loads, and so is a key `body_prefixes` also names:
+  the set is checked on the caller's text before the prefix is added, so the
+  value sent would fall outside it.
 - `body_any_of` is optional, beside `body_keys`: `["<key>", …]` names keys of
   which a body must carry at least one, for a write that changes whichever
   members the caller sends, such as Zendesk's ticket update of `group_id`,
@@ -1056,7 +1059,10 @@ The complete configuration used against the sandbox is
   `issue.create` answers. An absent member fails it exactly as a `null` one
   does, so before the write both refuse with the same code. `present` is only `true`; `false` is refused when
   the selection loads. The model's `connectors_catalog.guard.Expectation`
-  holds exactly one of the four. A `literal` of `"true"` or `"false"` is refused when the selection
+  holds exactly one of the four. An `input` that names a JSON boolean compares
+  by JSON type, as `boolean` does, so a string `"true"` answered for a requested
+  `true` differs; an `input` naming a string or a number keeps comparing as
+  text. A `literal` of `"true"` or `"false"` is refused when the selection
   loads, on every check: the bundle does not record an answer member's type,
   and as text it would hold for a look-alike string where a boolean is meant.
   GitLab's `/resolvable` and `/merge_when_pipeline_succeeds` and Jira's
@@ -1559,3 +1565,24 @@ appeared, which opened merge request 11 at the moved head and was classified
   a value the preflight must not have.
 - Only GitLab has run live. A second provider through the same engine is still
   required by `specification:catalog-http-runtime-handoff`.
+
+## Support-table summary: ChatGPT
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> ChatGPT subscription sign-in as the Codex CLI makes it, profile `chatgpt.subscription` (`oauth2_grant`): browser with PKCE on `127.0.0.1:1455`, or `--device` through the ChatGPT device sign-in; JSON refresh with rotation 300 seconds before expiry; the connection is the ChatGPT account id from the `id_token`; `connections token --reveal` hands the access token to its owner; one read, `models.list`; no client id ships, so the instance is pinned with its own `oauth2_client_id`; verified against a local fixture only, see [the ChatGPT guide](website/docs/connectors/chatgpt.md)
+
+## Support-table summary: Claude subscription
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> The Claude Code sign-in (OAuth 2.0 authorization code with PKCE, JSON exchange and refresh) for the operator's own Claude plan only, as the guide's quote of the provider's terms says; profiles `claude.subscription` (loopback redirect) and `claude.subscription-pasted` (pasted `code#state`); no client id ships, so the instance is pinned and configures `oauth2_client_id`; `connections token` issues the access token; one read, `account.profile`; verified against a local fake authorization server only, see [the Claude subscription guide](website/docs/connectors/claude-subscription.md)
+
+## Support-table summary: GitHub
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> GitHub REST API from `connectors/github.yaml` of [connectors-definitions 0.5.2](https://github.com/beyond10x/connectors-definitions/releases/tag/0.5.2), run as a definition file (`invoke --definition`); profile `github.token`, a fine-grained or classic token as `Authorization: Bearer` from keyring custody; reads only: review requests, assigned issues, notifications, the user, an organization's repositories, one repository, releases and the latest release, a README or file as text; one page per call, the caller walks until a short page, the search to its first 1,000 results; a spent rate limit is `rate_limited` with its wait; verified against a scripted provider only, see [the GitHub page](website/docs/connectors/github.md)

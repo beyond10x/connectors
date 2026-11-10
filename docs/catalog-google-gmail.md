@@ -356,3 +356,10 @@ connections of the old pair with `connections revoke` and remove their entries.
   [the catalog provider guide](local-catalog-provider.md) says: only its
   documented definite refusals are refused, and among them a `403` naming one
   of those reasons is a `rate_limited` refusal.
+
+## Support-table summary
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> Gmail API v1 from the pinned Discovery document projected to OpenAPI; profile `google.oauth` (`oauth2_refresh`), one instance per Google account consenting to `gmail.readonly` and `gmail.compose`; mail leaves only as a draft: `users.drafts.send` guarded by a preflight `users.drafts.get` whose `message.id` must equal the input's `messageId`, `users.drafts.create` unguarded, `users.messages.send` not selected; verified against a local fixture only, see [the Gmail guide](docs/catalog-google-gmail.md)

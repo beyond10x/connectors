@@ -255,3 +255,10 @@ connections of the old pair with `connections revoke` and remove their entries.
   caller as `rate_limited`, not
   `forbidden`. Adding them changed the selection set, and so the
   configuration revision of a Slides instance.
+
+## Support-table summary
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> Slides API v1 from the pinned Discovery document projected to OpenAPI; profile `google.oauth`, one instance per Google account consenting to `presentations` and `presentations.readonly`; `presentations.batchUpdate` guarded by a preflight `presentations.get` whose `revisionId` must equal the body's `writeControl.requiredRevisionId`, `presentations.create` unguarded; verified against a local fixture only, see [the Slides guide](docs/catalog-google-slides.md)

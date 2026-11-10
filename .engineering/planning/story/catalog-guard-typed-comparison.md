@@ -10,15 +10,17 @@ relations:
 scope:
 - confidence: inferred
   path: adapters/catalog/src/lib.rs
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:51Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:57:51Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 
-A catalog guard compares JSON values by type: a boolean literal matches only a JSON boolean, a
-number only a number, a string only a string.
+A catalog guard compares JSON booleans by type: a boolean expectation, or an input that resolves to a
+JSON boolean, matches only a JSON boolean in the provider's answer. Numbers taken from number-typed
+body keys are `story:guard-number-inputs-compare-by-type` (narrowed on 2026-11-10 after
+`review-result:wave-b-guard-typed-adversary-1`: a global number arm would break path-parameter checks).
 
 ## Why
 

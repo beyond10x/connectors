@@ -13,7 +13,7 @@ scope:
   path: adapters/catalog/src/lib.rs
 - confidence: cited
   path: adapters/catalog/tests/slack_adversary.rs
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:24Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:25Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
@@ -37,3 +37,7 @@ The rule is shared by every provider, so it is its own story.
   `#[ignore]`) and passes.
 - The provider package's suites stay green; a selection that needs an empty required value is
   named in the story before the rule changes, or there is none.
+
+## Code review
+
+The operator-ordered code review of the repository at `23b9f1bc4` (2026-11-10, no cargo command run; "verified" means traced by reading) lists this as CR-027, taken from this story: `adapters/catalog/tests/slack_adversary.rs:905`; the source line this story cites is stale.
