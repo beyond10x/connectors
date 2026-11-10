@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-10T06:48:59Z",
+  "actor": "human:timo",
+  "artifact": "story:provider-programs-run-on-macos",
+  "kind": "story",
+  "revision": 25,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/pull/244 CI on head f8317aec7: provider programs on macos-latest (job 129670472125), host and CLI on macos-latest (job 129670472583), custody on macos-latest (job 129670472038)",
+    "reference": "f8317aec7: Grafana CLI journey (--exact, --include-ignored) 1 passed; an_owner_that_stops_removes_its_launch_copy ok; local::runtime::artifact::macos::tests::an_owner_started_from_its_launch_copy_finds_and_removes_it ok; custody launch copy left_on_disk write=Ok(()), removed_after_start write=Err(OutcomeUnknown) reported SecItemAdd OSStatus 100002"
+  }
+}
