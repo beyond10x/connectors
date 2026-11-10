@@ -1832,7 +1832,11 @@ impl Launch<'_> {
                         log: error.log,
                     });
                 }
-                return Err(error.failure.into());
+                return Err(lifecycle::refusal(
+                    error.failure,
+                    error.step,
+                    self.current.private_protocol(),
+                ));
             }
         };
         let mut guard = lock_before(self.control, bounded)?;
@@ -2498,6 +2502,75 @@ mod idle_tests {
             assert!(Instant::now() < until, "the idle child outlived shutdown");
             std::thread::sleep(Duration::from_millis(20));
         }
+    }
+
+    /// story:adapter-private-protocol-refusal-named: a start of a program that
+    /// refuses the entry's private protocol is refused as
+    /// `unsupported_private_protocol` beside the protocol asked for and those
+    /// the program speaks, by a launch (what a connect begins with) and by
+    /// the status of the instance afterwards, never as `unavailable`.
+    #[cfg(unix)]
+    #[test]
+    fn a_program_refusing_the_private_protocol_is_named_by_launch_and_status() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Paths {
+            config: root.path().join("config/config.toml"),
+            state: root.path().join("state"),
+        };
+        Config::initialize(&paths).unwrap();
+        let mut config = Config::load(&paths.config).unwrap();
+        let (path, sha256) = crate::local::test_executable::path_and_sha256();
+        let adapter = Adapter {
+            credential_revision: None,
+            instance_id: "refusing".into(),
+            adapter_id: "fixture".into(),
+            configuration_revision: "fixture-config".into(),
+            protocol: "v1alpha1".into(),
+            private_protocol: Some(crate::local::runtime::PrivateProtocol::V2),
+            startup: Startup::OnDemand,
+            restart: Default::default(),
+            permissions: Default::default(),
+            executable: Executable {
+                path,
+                sha256,
+                args: vec![
+                    "--exact".into(),
+                    "local::runtime::process::tests::protocol_fixture".into(),
+                    "--".into(),
+                    "fixture-mode-refuse-private-protocol".into(),
+                ],
+            },
+        };
+        config.adapters.insert("refusing".into(), adapter.clone());
+        std::fs::write(&paths.config, toml::to_string(&config).unwrap()).unwrap();
+        let pool = Pool::new(Arc::new(paths), uuid::Uuid::new_v4().to_string());
+        let named = |error: Error| {
+            let error = serde_json::to_value(error).unwrap();
+            assert_eq!(error["code"], "unsupported_private_protocol", "{error}");
+            assert_eq!(
+                error["protocol_refusal"]["private_protocol"], "connectors-private/2",
+                "{error}"
+            );
+            assert_eq!(
+                error["protocol_refusal"]["supported_private_protocols"],
+                json!(["connectors-private/1"]),
+                "{error}"
+            );
+        };
+        let Err(error) = pool.run(
+            "refusing",
+            &adapter,
+            Task::Ensure { resume: false },
+            connectors_sdk::now_ms() + 20_000,
+        ) else {
+            panic!("the start succeeded")
+        };
+        named(error);
+        let Err(error) = pool.status("refusing", &adapter) else {
+            panic!("a refused instance's status is a refusal")
+        };
+        named(error);
+        pool.shutdown().unwrap();
     }
 
     /// story:program-start-failure-reason: the observation `instances status`

@@ -52,8 +52,53 @@ pub enum StartFailure {
     /// its configuration expects (`readiness_mismatch`), or broke its channel
     /// while still running.
     HandshakeMismatch,
+    /// The program answered the handshake by refusing the private protocol its
+    /// entry selects (`unsupported_private_protocol`), naming those it speaks
+    /// (story:adapter-private-protocol-refusal-named). It is answered as a
+    /// failure of its own, not an observation: `instances status` never prints
+    /// it as `start_failure`.
+    UnsupportedPrivateProtocol { supported: SupportedProtocols },
+}
+/// The private protocols a refusing program said it speaks, among those this
+/// host knows (a version it does not know is not kept).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SupportedProtocols(u8);
+impl SupportedProtocols {
+    fn bit(protocol: PrivateProtocol) -> u8 {
+        match protocol {
+            PrivateProtocol::V1 => 1,
+            PrivateProtocol::V2 => 2,
+            PrivateProtocol::V3 => 4,
+        }
+    }
+    fn named(versions: &[String]) -> Self {
+        Self(
+            versions
+                .iter()
+                .filter_map(|version| PrivateProtocol::parse(version))
+                .fold(0, |bits, protocol| bits | Self::bit(protocol)),
+        )
+    }
+    /// The protocols, lowest first.
+    pub fn protocols(self) -> Vec<PrivateProtocol> {
+        [
+            PrivateProtocol::V1,
+            PrivateProtocol::V2,
+            PrivateProtocol::V3,
+        ]
+        .into_iter()
+        .filter(|protocol| self.0 & Self::bit(*protocol) != 0)
+        .collect()
+    }
 }
 impl StartFailure {
+    /// The protocols a program that refused its entry's said it speaks.
+    pub fn supported_private_protocols(self) -> Vec<PrivateProtocol> {
+        match self {
+            Self::UnsupportedPrivateProtocol { supported } => supported.protocols(),
+            _ => Vec::new(),
+        }
+    }
     /// The value `instances status` prints as `start_failure`.
     pub fn as_str(self) -> &'static str {
         match self {
@@ -64,6 +109,7 @@ impl StartFailure {
             Self::ExitedBeforeHandshake { .. } => "exited_before_handshake",
             Self::HandshakeDeadline => "handshake_deadline",
             Self::HandshakeMismatch => "handshake_mismatch",
+            Self::UnsupportedPrivateProtocol { .. } => "unsupported_private_protocol",
         }
     }
 }
@@ -450,6 +496,18 @@ impl Child {
             Err(failure) => return Err((failure, child.interrupted(failure))),
         };
         let mismatch = (Failure::ReadinessMismatch, StartFailure::HandshakeMismatch);
+        // The program refuses the protocol this entry selects, by name.
+        if let Reply::Refused { version, supported } = &response.control {
+            if version != config.private_protocol().as_str() {
+                return Err(mismatch);
+            }
+            return Err((
+                Failure::UnsupportedPrivateProtocol,
+                StartFailure::UnsupportedPrivateProtocol {
+                    supported: SupportedProtocols::named(supported),
+                },
+            ));
+        }
         let Reply::Ready {
             version,
             nonce: returned,
@@ -1338,6 +1396,33 @@ executable: None,
             stderr(b"fixture: refused to start\n");
             std::process::exit(3);
         }
+        // A program serving through the host library that speaks only
+        // `connectors-private/1`: asked for another, it refuses by the
+        // library's own reply (story:adapter-private-protocol-refusal-named).
+        #[cfg(unix)]
+        if mode == "fixture-mode-refuse-private-protocol" {
+            struct V1Only;
+            #[async_trait::async_trait]
+            impl crate::local::runtime::Adapter for V1Only {
+                fn bootstrap(&self) -> Bootstrap {
+                    bootstrap()
+                }
+                async fn validate(&self, _: &str, _: Secret) -> Result<Baseline> {
+                    Err(Failure::Unsupported)
+                }
+                async fn invoke(
+                    &self,
+                    _: &str,
+                    _: &str,
+                    _: Secret,
+                    _: serde_json::Value,
+                ) -> Result<serde_json::Value> {
+                    Err(Failure::Unsupported)
+                }
+            }
+            let _ = crate::local::runtime::serve(3, V1Only);
+            std::process::exit(1);
+        }
         // Four times the start log, more than a pipe holds, before anything
         // else: exits 3, or with `-start` goes on to its handshake.
         if mode.starts_with("fixture-mode-stderr-flood") {
@@ -1870,6 +1955,28 @@ executable: None,
         let again = failed_start(&fixture_config("fixture-mode-stderr-exit"), state.path());
         assert_eq!(again.log.as_ref(), Some(&log));
         assert_eq!(std::fs::read_to_string(&log).unwrap(), kept);
+    }
+
+    /// story:adapter-private-protocol-refusal-named: a program that speaks
+    /// only `connectors-private/1`, asked for `connectors-private/2`, fails its
+    /// start as `unsupported_private_protocol`, not `unavailable`, and names
+    /// the protocols it speaks.
+    #[cfg(unix)]
+    #[test]
+    fn a_program_refusing_the_selected_private_protocol_is_named() {
+        let state = private_state();
+        let mut config = fixture_config("fixture-mode-refuse-private-protocol");
+        config.private_protocol = Some(PrivateProtocol::V2);
+        let error = failed_start(&config, state.path());
+        assert_eq!(error.step.as_str(), "unsupported_private_protocol");
+        assert_eq!(
+            serde_json::to_value(error.failure).unwrap(),
+            "unsupported_private_protocol"
+        );
+        assert_eq!(
+            error.step.supported_private_protocols(),
+            [PrivateProtocol::V1]
+        );
     }
 
     /// story:program-start-failure-reason: an executable whose content is

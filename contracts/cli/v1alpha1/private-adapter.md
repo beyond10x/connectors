@@ -125,6 +125,7 @@ idempotency key or authority to repeat provider work.
 | `invoke` | `request_id`, `operation`, `revision`, `partition`, `deadline_ms`, optional `binding` | exact retained material / decoded provider-input carrier |
 | `success` | `request_id` | empty / provider-result carrier |
 | `stop` / `stopped` | `request_id` | both empty |
+| `refused` | `version` (the protocol the `hello` asked for), `supported` (the versions the child speaks) | both empty |
 | `failed` | `request_id`, closed `code`, optional `reason` and `retry_after_seconds` (a failed `invoke` only, or a `reason` beside a validation's `insufficient_scope`; the latter beside `provider_rate_limited` only) | both empty |
 
 Version is `connectors-private/1`. Startup challenges and child incarnations are

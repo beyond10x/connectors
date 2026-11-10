@@ -277,6 +277,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -557,6 +558,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -687,6 +694,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -889,6 +905,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -1169,6 +1186,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -1299,6 +1322,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -1468,6 +1500,7 @@
                           "lifecycle_conflict",
                           "incarnation_mismatch",
                           "readiness_mismatch",
+                          "unsupported_private_protocol",
                           "description_unavailable",
                           "stale_description",
                           "not_found",
@@ -1748,6 +1781,12 @@
                           "none"
                         ]
                       },
+                      "private_protocol": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
                       "read_with": {
                         "kind": "optional",
                         "of": {
@@ -1878,6 +1917,15 @@
                         "kind": "optional",
                         "of": {
                           "kind": "string"
+                        }
+                      },
+                      "supported_private_protocols": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "list",
+                          "of": {
+                            "kind": "string"
+                          }
                         }
                       }
                     }
@@ -2054,6 +2102,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -2334,6 +2383,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -2464,6 +2519,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -2642,6 +2706,7 @@
                           "lifecycle_conflict",
                           "incarnation_mismatch",
                           "readiness_mismatch",
+                          "unsupported_private_protocol",
                           "description_unavailable",
                           "stale_description",
                           "not_found",
@@ -2922,6 +2987,12 @@
                           "none"
                         ]
                       },
+                      "private_protocol": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
                       "read_with": {
                         "kind": "optional",
                         "of": {
@@ -3052,6 +3123,15 @@
                         "kind": "optional",
                         "of": {
                           "kind": "string"
+                        }
+                      },
+                      "supported_private_protocols": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "list",
+                          "of": {
+                            "kind": "string"
+                          }
                         }
                       }
                     }
@@ -3228,6 +3308,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -3508,6 +3589,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -3638,6 +3725,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -3846,6 +3942,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -4126,6 +4223,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -4256,6 +4359,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -4453,6 +4565,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -4733,6 +4846,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -4863,6 +4982,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -5074,6 +5202,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -5354,6 +5483,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -5484,6 +5619,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -5695,6 +5839,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -5975,6 +6120,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -6105,6 +6256,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -6316,6 +6476,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -6596,6 +6757,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -6726,6 +6893,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -6937,6 +7113,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -7217,6 +7394,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -7347,6 +7530,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -7558,6 +7750,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -7838,6 +8031,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -7968,6 +8167,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -8173,6 +8381,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -8453,6 +8662,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -8583,6 +8798,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -8802,6 +9026,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -9082,6 +9307,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -9212,6 +9443,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -9422,6 +9662,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -9702,6 +9943,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -9832,6 +10079,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -10223,6 +10479,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -10503,6 +10760,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -10633,6 +10896,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -10929,6 +11201,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -11209,6 +11482,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -11339,6 +11618,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -11608,6 +11896,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -11888,6 +12177,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -12018,6 +12313,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -12194,6 +12498,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -12474,6 +12779,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -12604,6 +12915,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -12851,6 +13171,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -13131,6 +13452,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -13261,6 +13588,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -13551,6 +13887,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -13831,6 +14168,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -13961,6 +14304,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -14247,6 +14599,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -14527,6 +14880,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -14657,6 +15016,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -14848,6 +15216,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -15128,6 +15497,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -15258,6 +15633,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -15601,6 +15985,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -15881,6 +16266,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -16011,6 +16402,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -16196,6 +16596,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -16476,6 +16877,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -16606,6 +17013,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -16759,6 +17175,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -17039,6 +17456,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -17169,6 +17592,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -17346,6 +17778,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -17626,6 +18059,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -17756,6 +18195,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -18107,6 +18555,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -18387,6 +18836,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -18517,6 +18972,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -18730,6 +19194,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -19010,6 +19475,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -19140,6 +19611,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -19368,6 +19848,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -19648,6 +20129,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -19778,6 +20265,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -19992,6 +20488,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -20272,6 +20769,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -20402,6 +20905,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -20567,6 +21079,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -20847,6 +21360,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -20977,6 +21496,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -21128,6 +21656,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -21408,6 +21937,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -21538,6 +22073,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -21875,6 +22419,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -22155,6 +22700,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -22285,6 +22836,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }
@@ -22431,6 +22991,7 @@
                   "lifecycle_conflict",
                   "incarnation_mismatch",
                   "readiness_mismatch",
+                  "unsupported_private_protocol",
                   "description_unavailable",
                   "stale_description",
                   "not_found",
@@ -22711,6 +23272,12 @@
                   "none"
                 ]
               },
+              "private_protocol": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "read_with": {
                 "kind": "optional",
                 "of": {
@@ -22841,6 +23408,15 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "supported_private_protocols": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "string"
+                  }
                 }
               }
             }

@@ -1456,7 +1456,9 @@ pub fn derivation_start_failure(
         } => ProviderFailure::Killed,
         StartFailure::ExitedBeforeHandshake { .. } => ProviderFailure::Exited,
         StartFailure::HandshakeDeadline => ProviderFailure::Deadline,
-        StartFailure::HandshakeMismatch => ProviderFailure::UnreadableOutput,
+        StartFailure::HandshakeMismatch | StartFailure::UnsupportedPrivateProtocol { .. } => {
+            ProviderFailure::UnreadableOutput
+        }
         StartFailure::Admission
         | StartFailure::Digest
         | StartFailure::Copy

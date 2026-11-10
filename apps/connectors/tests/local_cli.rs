@@ -1822,3 +1822,94 @@ fn instances_status_names_why_a_program_did_not_start() {
     let stopped = success(&command(&root, &["setup", "owner-stop"]));
     assert_eq!(stopped["disposition"], "stopped", "{stopped}");
 }
+
+/// The program [`status_names_a_program_refusing_the_private_protocol`]
+/// configures: this test binary, re-entered through libtest's filter, serving
+/// descriptor three as an adapter that speaks only `connectors-private/1`.
+/// An ordinary run does nothing.
+#[cfg(unix)]
+#[test]
+fn private_protocol_one_only_fixture() {
+    use connectors_host::local::runtime::{Baseline, Bootstrap, Failure, Result};
+    struct One;
+    #[async_trait::async_trait]
+    impl connectors_host::local::runtime::Adapter for One {
+        fn bootstrap(&self) -> Bootstrap {
+            unreachable!("the host asks for another protocol")
+        }
+        async fn validate(&self, _: &str, _: connectors_sdk::Secret) -> Result<Baseline> {
+            Err(Failure::Unsupported)
+        }
+        async fn invoke(
+            &self,
+            _: &str,
+            _: &str,
+            _: connectors_sdk::Secret,
+            _: Value,
+        ) -> Result<Value> {
+            Err(Failure::Unsupported)
+        }
+    }
+    if !std::env::args().any(|argument| argument == "--connectors-private-fd") {
+        return;
+    }
+    let _ = connectors_host::local::runtime::serve(3, One);
+    std::process::exit(1);
+}
+
+/// story:adapter-private-protocol-refusal-named: `instances status` and the
+/// deprecated `adapters status` of an instance whose program refuses the
+/// private protocol its entry selects answer `unsupported_private_protocol`
+/// at `readiness`, naming the protocol asked for and those the program speaks,
+/// and exit 1, instead of a bare failed observation. Unix only: the owner is
+/// started the way the CLI starts it.
+#[cfg(unix)]
+#[test]
+fn status_names_a_program_refusing_the_private_protocol() {
+    let root = tempfile::tempdir().unwrap();
+    success(&command(&root, &["setup", "init"]));
+    let config_path = root.path().join("config/config.toml");
+    let program = std::env::current_exe().unwrap().canonicalize().unwrap();
+    let digest: String = ring::digest::digest(&ring::digest::SHA256, &fs::read(&program).unwrap())
+        .as_ref()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let path = serde_json::to_string(program.to_str().unwrap()).unwrap();
+    let config = fs::read_to_string(&config_path).unwrap()
+        + &format!(
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\nstartup='automatic'\nrestart='never'\n[adapters.forge.executable]\npath={path}\nsha256='{digest}'\nargs=['--exact','private_protocol_one_only_fixture','--']\n"
+        );
+    fs::write(&config_path, config).unwrap();
+    let _owner = start_owner(
+        std::path::Path::new(env!("CARGO_BIN_EXE_connectors")),
+        &root,
+    );
+    for group in ["instances", "adapters"] {
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        let error = loop {
+            let output = command(&root, &[group, "status", "--adapter", "forge"]);
+            if output.status.code() == Some(1) {
+                assert!(output.stdout.is_empty(), "{output:?}");
+                break serde_json::from_slice::<Value>(&output.stderr).unwrap();
+            }
+            assert!(
+                std::time::Instant::now() < until,
+                "{group} status never refused: {output:?}"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        };
+        let data = &error["error"]["data"];
+        assert_eq!(data["code"], "unsupported_private_protocol", "{error}");
+        assert_eq!(data["stage"], "readiness", "{error}");
+        assert_eq!(data["next_action"], "check_configuration", "{error}");
+        assert_eq!(data["private_protocol"], "connectors-private/2", "{error}");
+        assert_eq!(
+            data["supported_private_protocols"],
+            serde_json::json!(["connectors-private/1"]),
+            "{error}"
+        );
+    }
+    let stopped = success(&command(&root, &["setup", "owner-stop"]));
+    assert_eq!(stopped["disposition"], "stopped", "{stopped}");
+}

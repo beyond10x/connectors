@@ -382,7 +382,9 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         StaleCursor => ("observation", "retry_explicitly", false),
         Interrupted => ("protected_entry", "retry_status", false),
         Unsupported => ("admission", "none", false),
-        ReadinessMismatch => ("readiness", "check_configuration", false),
+        ReadinessMismatch | UnsupportedPrivateProtocol => {
+            ("readiness", "check_configuration", false)
+        }
         IncarnationMismatch => ("stop", "retry_status", false),
         StaleDescription | DescriptionUnavailable => ("observation", "refresh_description", false),
         ServiceFailure => ("dispatch", "retry_explicitly", false),
@@ -420,6 +422,12 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
     }
     if let Some(retry_after_seconds) = error.retry_after_seconds {
         data["retry_after_seconds"] = json!(retry_after_seconds);
+    }
+    if error.code == UnsupportedPrivateProtocol
+        && let Some(refusal) = error.protocol_refusal
+    {
+        data["private_protocol"] = json!(refusal.private_protocol);
+        data["supported_private_protocols"] = json!(refusal.supported_private_protocols);
     }
     if error.clock_format_retired && error.code == InvalidConfiguration {
         data["configuration_rule"] = json!(Rule::ApprovalClockFormatRetired.as_str());
