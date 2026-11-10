@@ -473,9 +473,9 @@ impl Sql {
             .join(",");
         let size = aliases
             .iter()
-            .map(|c| format!("COALESCE(octet_length(result.{c}::text),0)::bigint"))
+            .map(|c| format!("COALESCE(pg_catalog.octet_length(result.{c}::text),0)::bigint"))
             .collect::<Vec<_>>()
-            .join("+");
+            .join("OPERATOR(pg_catalog.+)");
         // A keyset page orders by one expression of its column and continues after
         // the cursor compared by that same expression, the cursor bound after the
         // statement's own parameters (a native comparison takes the column's type).
@@ -487,7 +487,7 @@ impl Sql {
                 if let Some(after) = &keyset.after {
                     parameters.push(Some(after.clone()));
                     let cursor = expression.over(&format!("${}", parameters.len()));
-                    clause = format!(" WHERE {column} > {cursor}");
+                    clause = format!(" WHERE {column} OPERATOR(pg_catalog.>) {cursor}");
                 }
                 format!(
                     "{clause} ORDER BY {column} LIMIT {}",
@@ -501,7 +501,7 @@ impl Sql {
         // The derived table closes on its own line, so a trailing `--` comment in the
         // caller's statement cannot reach the aliases, the keyset or LIMIT.
         let wrapped = format!(
-            "SELECT CASE WHEN ({size}) > {} THEN NULL::text[] ELSE ARRAY[{casts}] END FROM ({query}\n) AS result({}){keyset}",
+            "SELECT CASE WHEN ({size}) OPERATOR(pg_catalog.>) {} THEN NULL::text[] ELSE ARRAY[{casts}] END FROM ({query}\n) AS result({}){keyset}",
             connectors_core::RESPONSE_LIMIT,
             aliases.join(",")
         );

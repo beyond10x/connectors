@@ -244,10 +244,18 @@ async fn fixture(mut scenario: Scenario) -> (Sql, tokio::task::JoinHandle<()>) {
                         original = query.into();
                     } else {
                         assert!(query.starts_with(
-                            "SELECT CASE WHEN (COALESCE(octet_length(result.c0::text),0)::bigint"
+                            "SELECT CASE WHEN (COALESCE(pg_catalog.octet_length(result.c0::text),0)::bigint"
                         ));
+                        // The wrapper never resolves a function or operator through
+                        // `public`: a shadow created there by another principal is not called.
+                        assert!(!query.contains("(octet_length("));
+                        assert!(!query.contains("+COALESCE"));
+                        assert_eq!(
+                            query.matches("OPERATOR(pg_catalog.+)").count(),
+                            scenario.columns.len() - 1
+                        );
                         assert!(query.contains(&format!(
-                            ") > {} THEN NULL::text[] ELSE ARRAY[",
+                            ") OPERATOR(pg_catalog.>) {} THEN NULL::text[] ELSE ARRAY[",
                             connectors_core::RESPONSE_LIMIT
                         )));
                         let aliases = (0..scenario.columns.len())
@@ -1139,7 +1147,7 @@ async fn postgresql_profile_read_orders_by_the_keyset_column_and_binds_the_curso
             columns: vec![("id", INT8), ("from_number", TEXT)],
             read_profiles: vec![number_profile()],
             port: Some(port),
-            suffix: " WHERE result.c0 > $2 ORDER BY result.c0 LIMIT 6".into(),
+            suffix: " WHERE result.c0 OPERATOR(pg_catalog.>) $2 ORDER BY result.c0 LIMIT 6".into(),
             ..Scenario::default()
         },
         "profile.read",
@@ -1271,7 +1279,7 @@ async fn postgresql_a_text_ordering_orders_and_continues_by_the_returned_bytes()
             columns: vec![("id", INT8), ("label", TEXT)],
             read_profiles: vec![label_profile("text")],
             port: Some(port),
-            suffix: format!(" WHERE result.c1::text COLLATE \"C\" > $2::text COLLATE \"C\"{order}"),
+            suffix: format!(" WHERE result.c1::text COLLATE \"C\" OPERATOR(pg_catalog.>) $2::text COLLATE \"C\"{order}"),
             ..Scenario::default()
         },
         "profile.read",
