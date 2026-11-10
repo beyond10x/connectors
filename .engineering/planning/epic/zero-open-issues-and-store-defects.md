@@ -7,7 +7,7 @@ title: Zero open GitHub issues and every defect story in the store fixed, in one
 summary: 'Operator goal 2026-11-09: 9 open issues and 56 defect stories, delivered by one pull request'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 7
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:46Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:57:46Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
@@ -189,6 +189,8 @@ emitted-bytes and auth or custody units, merge into the integration branch, push
   `story:sql-length-units`), `story:reconnect-retained-bound-matches-refresh`,
   `story:read-use-bound-counts-live-reads`. The 21 S3 findings are draft stories tagged `from-review`,
   outside this wave.
+- Joined by `approval-record:zero-issues-release-image-joins-the-wave`:
+  `story:release-image-platform-check-tolerates-padding`, red first over captured inspect output.
 
 Commits the approval authorises: one commit per unit on its branch, a correction commit per adversary
 round, one merge per unit into `wave/zero-issues-b`, store commits on the integration branch, the
@@ -198,13 +200,33 @@ closing store commit, and the squash merge of the pull request. No tag, no relea
 
 | Unit | Worktree id | Stage |
 |---|---|---|
-| `story:adapter-private-protocol-refusal-named` | `cb-protocol` | implementing |
-| `story:catalog-guard-typed-comparison` | `cb-guard-typed` | adversary |
-| `story:legacy-alias-sharing-an-instance-name` | `cb-alias` | implementing |
-| `story:sql-length-units` | `cb-sql-units` | merged, tree finished |
-| `story:slack-move-names-four-writes` | `cb-slack-move` | merged, tree finished |
-| `story:closed-body-load-refuses-ambiguous-pointers` | `cb-closed-body` | implementing |
-| `story:definition-import-merges-shared-auth` | `cb-import-auth` | implementing |
-| `story:definition-refusal-keeps-deprecations` | `cb-refusal-depr` | tree created |
-| `story:readme-back-under-its-size-limit` | `cb-readme` | tree created |
-| `story:mcp-projection-cases-carry-read-or-mutating` | `cb-mcp-cases` | tree created |
+| `story:adapter-private-protocol-refusal-named` | `cb-protocol` | merged, tree finished (merge `1bfda4b51`) |
+| `story:catalog-guard-typed-comparison` | `cb-guard-typed` | merged, tree finished (merge `18ae97dd1`) |
+| `story:legacy-alias-sharing-an-instance-name` | `cb-alias` | merged, tree finished (merge `7be17a9aa`) |
+| `story:sql-length-units` | `cb-sql-units` | merged, tree finished (merge `470e149db`) |
+| `story:slack-move-names-four-writes` | `cb-slack-move` | merged, tree finished (merge `548cdd93d`) |
+| `story:closed-body-load-refuses-ambiguous-pointers` | `cb-closed-body` | merged, tree finished (merge `a9d5c0270`) |
+| `story:definition-import-merges-shared-auth` | `cb-import-auth` | merged, tree finished (merge `de978726b`) |
+| `story:definition-refusal-keeps-deprecations` | `cb-refusal-depr` | not reproducible, no change, tree finished |
+| `story:readme-back-under-its-size-limit` | `cb-readme` | merged, tree finished (merge `7ae9054fa`) |
+| `story:mcp-projection-cases-carry-read-or-mutating` | `cb-mcp-cases` | merged, tree finished (merge `6489d43af`) |
+| `story:sql-wrapper-resolves-pg-catalog-first` | `cb-sql-pgcat` | merged, tree finished (merge `9c4fdfd75`) |
+| `story:reconnect-retained-bound-matches-refresh` | `cb-reconnect` | merged, tree finished (merge `63e774d11`) |
+| `story:read-use-bound-counts-live-reads` | `cb-read-use` | merged, tree finished (merge `7d72ba5ec`) |
+| `story:slack-file-read-checks-exact-path` | `cb-slack-path` | merged, tree finished (merge `62d0e3c18`) |
+| `story:mcp-tool-deadline-keeps-the-server` | `cb-mcp-deadline` | merged, tree finished (merge `25cf2b02d`) |
+| `story:catalog-oversized-body-one-classification` | `cb-oversized` | merged, tree finished (merge `09d1e03f6`) |
+| `story:pool-idle-checks-wait-outside-the-pool-lock` | `cb-pool-idle` | merged, tree finished (merge `c3b1590c6`) |
+| `story:owner-bounded-generic-read-inline-schemas` | `cb-inline-schemas` | merged, tree finished (merge `66a7c9bca`) |
+| `story:metadata-conformance-emit-manifest-format` | `cb-meta-manifest` | already fixed, pin test merged, tree finished |
+| `story:live-acceptance-without-serve` | `cb-live-accept` | merged, tree finished |
+| `story:oauth-browser-empty-connection-fixture` | `cb-oauth-fixture` | merged, tree finished |
+| `story:release-image-platform-check-tolerates-padding` | `cb-release-image` | merged, tree finished |
+| `story:upgrade-refusal-test-port-reuse` | `cb-upgrade-port` | merged, tree finished |
+| `story:tests-stop-the-owners-they-start` | `cb-stop-owners` | implementing |
+| `story:custody-keeps-out-of-the-session-keyring` | `cb-custody-keyring` | implementing |
+| `story:connection-lease-tests-pin-the-window` | `cb-lease-window` | merged, tree finished (merge `609da4250`) |
+| `story:ignored-journeys-run-in-ci` | `cb-ignored-ci` | merged, tree finished (merge `0d27f9912`) |
+| `story:authored-scenarios-known-failing` | `cb-authored-scen` | implementing |
+| `story:cli-connect-admission-timeout-under-load` | `cb-cli-admission` | implementing |
+| `story:clock-quorum-test-tolerates-a-slow-loopback-source` | `cb-clock-loopback` | implementing |
