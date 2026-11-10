@@ -145,6 +145,13 @@ fn required(paths: &Paths, connector: &str, instance: &str) -> Result<(), Handle
     if !needs {
         return Ok(());
     }
+    // A name only a legacy entry holds is that entry, whose pinned selection
+    // carries its endpoint, as it does under `--adapter`.
+    if Config::read(&paths.config)
+        .is_ok_and(|config| super::invoke::held_by_legacy(&config, connector, instance))
+    {
+        return Ok(());
+    }
     let Ok((text, _)) = read(paths) else {
         return Ok(());
     };

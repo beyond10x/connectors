@@ -182,6 +182,27 @@ impl Session {
             }
             error
         };
+        // A name two entries hold is refused before the approval document is
+        // read (story:legacy-alias-sharing-an-instance-name): nothing beyond
+        // the configuration is read. Any other refusal is the command's own.
+        if approval && let Some(selection) = self.selection.as_ref() {
+            let shared = Paths::resolve(
+                selection.context.config.as_deref(),
+                selection.context.state_dir.as_deref(),
+            )
+            .ok()
+            .and_then(|paths| Config::load_at(&paths).ok())
+            .and_then(|config| {
+                match super::select::alias(&selection.selectors, &config) {
+                    Err(super::select::Refused::Ambiguous(instances)) => Some(instances),
+                    _ => None,
+                }
+            });
+            if let Some(instances) = shared {
+                self.ambiguous = Some(instances);
+                return Err(Code::InvalidInput.into());
+            }
+        }
         if approval || is_write {
             return match source {
                 ProtectedSource::DocumentFile(path) => protected::document_until(

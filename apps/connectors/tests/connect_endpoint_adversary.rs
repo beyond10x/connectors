@@ -82,6 +82,10 @@ mod tests {
                 "an_endpoint_on_a_name_a_legacy_entry_holds_writes_nothing",
                 an_endpoint_on_a_name_a_legacy_entry_holds_writes_nothing,
             ),
+            (
+                "an_endpoint_beside_legacy_entries_of_other_names_is_written",
+                an_endpoint_beside_legacy_entries_of_other_names_is_written,
+            ),
         ]);
     }
 
@@ -323,6 +327,33 @@ mod tests {
             installation.text(),
             before,
             "the configuration was written by a connect answering {data}"
+        );
+    }
+
+    /// Adversary pass 2 on story:legacy-alias-sharing-an-instance-name: the
+    /// endpoint refusal (`invoke::held_by_legacy`) covers only a name a legacy
+    /// entry derives, connector and instance both. A legacy `ref-1` that
+    /// derives `jira`, and a legacy `other` that derives `gitlab`, hold neither
+    /// half of `gitlab/ref-1` alone: the connect writes the endpoint and goes on
+    /// to the credential, as it does with no legacy entry at all.
+    pub fn an_endpoint_beside_legacy_entries_of_other_names_is_written() {
+        let installation = Installation::new();
+        let entry = |alias: &str, connector: &str, profile: &str| {
+            format!(
+                "[adapters.{alias}]\ninstance_id='{alias}-legacy'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.{alias}.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=['--connector','{connector}']\n[adapters.{alias}.permissions]\nprofiles=['{profile}']\noperations=['x.read']\n",
+                "a".repeat(64)
+            )
+        };
+        installation.configure(&format!(
+            "{}{}",
+            entry("ref-1", "jira", "atlassian.basic"),
+            entry("other", "gitlab", "gitlab.pat")
+        ));
+        let (_, data) = refusal(&installation.run(GITLAB));
+        assert_eq!(data["stage"], "protected_entry", "{data}");
+        assert_eq!(
+            parsed(&installation.text())["connectors"]["gitlab"]["instances"]["ref-1"]["endpoint"],
+            URL.into()
         );
     }
 }

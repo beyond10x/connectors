@@ -458,3 +458,150 @@ fn a_default_instance_without_a_shared_name_selects_as_before() {
         "{answer}"
     );
 }
+
+/// Adversary pass 2. Contract "Invoking an operation", `instance_ambiguous`, as
+/// b90f3b349 extends it to `--connector`/`--instance` on every command: "Nothing
+/// was read beyond the configuration, no credential is read and no request is
+/// sent." Each command here names a document file that does not exist. A
+/// command that refuses the shared name before reading anything answers
+/// `instance_ambiguous`; one that opens the document first answers the
+/// document's own refusal. `invoke jira` (several instances, no instance) is
+/// the same claim as it stood before the unit, for comparison.
+#[test]
+fn a_shared_name_reads_no_document_before_its_refusal() {
+    let root = shared("");
+    let missing = root.path().join("absent.json");
+    let m: &str = missing.to_str().unwrap();
+    let write = |target: &'static str| -> Vec<String> {
+        [
+            "invoke",
+            target,
+            WRITE,
+            "--connection",
+            "c1",
+            "--approval-file",
+            m,
+            "--idempotency-key",
+            "k1",
+            "--input-json",
+            "{}",
+        ]
+        .iter()
+        .map(|arg| (*arg).to_owned())
+        .collect()
+    };
+    let named = |command: &[&str]| -> Vec<String> {
+        [command, &["--connector", "jira", "--instance", "main"]]
+            .concat()
+            .iter()
+            .map(|arg| (*arg).to_owned())
+            .collect()
+    };
+    let commands: Vec<Vec<String>> = vec![
+        write("jira/main"),
+        write("jira"),
+        named(&["approvals", "policy-set", "--input-file", m]),
+        named(&[
+            "approvals",
+            "prepare",
+            "--connection",
+            "c1",
+            "--operation",
+            WRITE,
+            "--schema",
+            "s1",
+            "--revision",
+            "desc-1",
+            "--input-file",
+            m,
+        ]),
+        named(&[
+            "approvals",
+            "issue",
+            "--connection",
+            "c1",
+            "--operation",
+            WRITE,
+            "--schema",
+            "s1",
+            "--revision",
+            "desc-1",
+            "--approve-subject",
+            "x",
+            "--proof-output",
+            "proof.json",
+            "--input-file",
+            m,
+        ]),
+        named(&[
+            "connections",
+            "connect",
+            "--profile",
+            "token",
+            "--credential-file",
+            m,
+        ]),
+    ];
+    let mut wrong = Vec::new();
+    for command in &commands {
+        let args: Vec<&str> = command.iter().map(String::as_str).collect();
+        let output = run(root.path(), &args);
+        let answer = envelope(&output);
+        if code(&answer) != "instance_ambiguous" {
+            wrong.push(format!(
+                "{:?} exit {:?}: {}",
+                &args[..2],
+                output.status.code(),
+                answer["error"]["data"]
+            ));
+        }
+    }
+    assert!(
+        wrong.is_empty(),
+        "a shared name was refused only after a document was opened:\n{}",
+        wrong.join("\n")
+    );
+}
+
+/// Adversary pass 2. docs/local-catalog-provider.md: a legacy entry "keeps
+/// working: each is selected by the connector `setup migrate` derives for it
+/// and its alias"; contract "Giving an instance its endpoint": `--endpoint` on
+/// a name a legacy entry holds is refused, the entry's endpoint being its own
+/// pins. So `connections connect jira/main` on a pinned legacy `main` that
+/// derives `jira` (Atlassian, no default endpoint) selects that entry and
+/// asks for no endpoint, as `--adapter main` does; with `--endpoint` refused
+/// for it there is no other answer an operator can give.
+#[test]
+fn a_legacy_entry_is_connected_by_its_name_without_an_endpoint() {
+    let root = configured(
+        &legacy("main", "jira", "jira-legacy"),
+        &[("main", "jira-legacy")],
+    );
+    let file = root.path().join("credential.json");
+    fs::write(&file, "{\"token\":\"secret\"}").unwrap();
+    let file = file.to_str().unwrap();
+    let connect = |selector: &[&str]| {
+        envelope(&run(
+            root.path(),
+            &[
+                &["connections", "connect"][..],
+                selector,
+                &["--profile", "token", "--credential-file", file],
+            ]
+            .concat(),
+        ))
+    };
+    let by_alias = connect(&["--adapter", "main"]);
+    assert_ne!(by_alias["error"]["data"]["field"], "endpoint", "{by_alias}");
+    for selector in [
+        &["jira/main"][..],
+        &["--connector", "jira", "--instance", "main"],
+    ] {
+        let answer = connect(selector);
+        assert_ne!(
+            answer["error"]["data"]["field"], "endpoint",
+            "{selector:?} asks for an endpoint the legacy entry pins; --adapter answered \
+             {by_alias}; answered {answer}"
+        );
+    }
+}
