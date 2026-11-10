@@ -89,6 +89,11 @@ retirement; OS process exit releases it. These handles must not be held across
 provider work. Entity Runtime over Eventlog SQLite owns the durable metadata
 authority; the compatibility connection projects its verified state.
 
+`connections connect --endpoint` serializes its check and replacement of the
+configuration file under an exclusive lock on the configuration's directory; on
+Windows the lock is `<configuration>.lock` beside it, a file the host creates
+and never follows as a link.
+
 If a dispatched metadata batch or legacy import exceeds its deadline, the result
 remains uncertain. The refused handle transfers its lifecycle lock to an
 autonomous cleanup worker and returns without waiting indefinitely. The lock is

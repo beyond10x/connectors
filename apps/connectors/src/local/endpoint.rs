@@ -485,23 +485,40 @@ fn moves_no_connection(
 /// How long a writer waits for another writer's check and replacement.
 const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
 
-/// The exclusive lock on the state directory's `endpoint.lock`, a file of its
-/// own (never the configuration file, which every replacement renames over),
-/// released when the returned file closes. A holder that outlasts
-/// [`LOCK_WAIT`] or a lock the host refuses is `metadata_unavailable`.
-fn endpoint_lock(state: &std::path::Path) -> Result<std::fs::File, HandlerReply> {
-    let unavailable = || host_failure(Failure::MetadataUnavailable);
-    filesystem::directory(state, true, true).map_err(host_failure)?;
-    let mut options = std::fs::OpenOptions::new();
-    options.read(true).write(true).create(true);
+/// The exclusive lock on the configuration, released when the returned file
+/// closes: on unix the configuration's directory (the configuration file is
+/// renamed over by every replacement, and the directory is the one inode
+/// every writer of it shares, whatever state directory it selects); on
+/// Windows `<configuration>.lock` beside it, opened without following a
+/// link. A holder that outlasts [`LOCK_WAIT`] is `revision_conflict` (nothing
+/// was written; connect again); a lock the host refuses is
+/// `metadata_unavailable`.
+fn configuration_lock(
+    directory: &std::fs::File,
+    config: &std::path::Path,
+) -> Result<std::fs::File, HandlerReply> {
     #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    let file = options
-        .open(state.join("endpoint.lock"))
-        .map_err(|_| unavailable())?;
+    let file = {
+        let _ = config;
+        directory
+            .try_clone()
+            .map_err(|_| host_failure(Failure::MetadataUnavailable))?
+    };
+    #[cfg(windows)]
+    let file = {
+        use std::os::windows::fs::OpenOptionsExt;
+        let _ = directory;
+        let mut name = config.as_os_str().to_owned();
+        name.push(".lock");
+        // FILE_FLAG_OPEN_REPARSE_POINT: a link is opened, never followed.
+        std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .custom_flags(0x0020_0000)
+            .open(name)
+            .map_err(|_| host_failure(Failure::MetadataUnavailable))?
+    };
     let deadline = std::time::Instant::now() + LOCK_WAIT;
     loop {
         match file.try_lock() {
@@ -509,7 +526,10 @@ fn endpoint_lock(state: &std::path::Path) -> Result<std::fs::File, HandlerReply>
             Err(std::fs::TryLockError::WouldBlock) if std::time::Instant::now() < deadline => {
                 std::thread::sleep(std::time::Duration::from_millis(5));
             }
-            Err(_) => return Err(unavailable()),
+            Err(std::fs::TryLockError::WouldBlock) => {
+                return Err(host_failure(Failure::ConcurrentRevision));
+            }
+            Err(_) => return Err(host_failure(Failure::MetadataUnavailable)),
         }
     }
 }
@@ -523,7 +543,7 @@ fn publish(paths: &Paths, old: &str, new: &str, mode: u32) -> Result<(), Handler
     let directory = filesystem::directory(parent, false, false).map_err(host_failure)?;
     // The check and the replacement are one step: every writer of this file
     // holds the endpoint lock from the check to the rename.
-    let _lock = endpoint_lock(&paths.state)?;
+    let _lock = configuration_lock(&directory, config)?;
     if read(paths)?.0 != old {
         return Err(host_failure(Failure::ConcurrentRevision));
     }
@@ -567,6 +587,49 @@ mod tests {
             let handles: Vec<_> = (0..8)
                 .map(|n| {
                     let paths = &paths;
+                    scope.spawn(move || {
+                        let new = format!("{old}# writer {n}\n");
+                        publish(paths, old, &new, 0o600).is_ok().then_some(new)
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .filter_map(|handle| handle.join().unwrap())
+                .collect()
+        });
+        WINDOW_MILLIS.store(0, Ordering::SeqCst);
+        assert_eq!(published.len(), 1, "{published:?}");
+        assert_eq!(std::fs::read_to_string(&config).unwrap(), published[0]);
+    }
+
+    /// Adversary pass 2, story:endpoint-publish-holds-one-writer: writers of one
+    /// configuration file that select their own state directories (`--state-dir`,
+    /// `XDG_STATE_HOME`) are writers of one instance too; at most one of them
+    /// replaces the text they all read.
+    #[test]
+    fn writers_of_one_file_with_their_own_state_replace_it_at_most_once() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = directory.path().join("config.toml");
+        let old = "format='connectors-local/5'\n";
+        std::fs::write(&config, old).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&config, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        let paths: Vec<Paths> = (0..8)
+            .map(|n| {
+                let state = directory.path().join(format!("state-{n}"));
+                Paths::resolve(Some(&config), Some(&state)).unwrap()
+            })
+            .collect();
+        WINDOW_MILLIS.store(100, Ordering::SeqCst);
+        let published: Vec<String> = std::thread::scope(|scope| {
+            let handles: Vec<_> = paths
+                .iter()
+                .enumerate()
+                .map(|(n, paths)| {
                     scope.spawn(move || {
                         let new = format!("{old}# writer {n}\n");
                         publish(paths, old, &new, 0o600).is_ok().then_some(new)
