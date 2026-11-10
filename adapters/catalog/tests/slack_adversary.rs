@@ -902,7 +902,6 @@ fn a_missing_or_unusable_user_or_email_sends_nothing() {
 /// An empty `user` or `email` names nobody: the read is refused before any
 /// request rather than asking Slack for no one.
 #[test]
-#[ignore = "story:required-parameter-refuses-empty: the engine sends a required query parameter given as an empty string (adapters/catalog/src/lib.rs:1259)"]
 fn an_empty_user_or_email_sends_nothing() {
     let provider = Provider::reading(Arc::new(|_: &Exchange| {
         Reply::Json(200, json!({"ok": false, "error": "user_not_found"}))

@@ -1800,6 +1800,18 @@ impl Engine {
                 }
                 _ => Supplied::One(Self::element(parameter, value, true)?),
             };
+            // A required path or query parameter names something: an empty
+            // string is refused as an absent one is, before any request.
+            if parameter.required
+                && parameter.location != Location::Header
+                && parameter.location != Location::Cookie
+                && matches!(&supplied, Supplied::One(text) if text.is_empty())
+            {
+                return Err(refuse(format!(
+                    "parameter `{}` is required and empty",
+                    parameter.name
+                )));
+            }
             values.insert(parameter.name.clone(), supplied);
         }
         check_declared(operation, &values)?;
