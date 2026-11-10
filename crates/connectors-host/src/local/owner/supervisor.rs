@@ -2101,9 +2101,11 @@ fn revalidate_inner(
             };
             registry.finish_revalidation(dispatched, Err(reason), connectors_sdk::now_ms())?;
             // Repair refuses the changed binding of an upgrade, so a
-            // credential the new provider refuses needs a new connection.
+            // credential the new provider refuses needs a new connection,
+            // which the instance admits once it no longer holds this one:
+            // the revocation comes first.
             let mut error = retried(error, attempts, cause);
-            error.reconnect = upgrade && reason.is_some();
+            error.revoke = upgrade && reason.is_some();
             if matches!(reason, Some(registry::InvalidCredential::Insufficient)) {
                 error.service_reason = refused.take();
             }

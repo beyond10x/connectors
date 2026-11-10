@@ -995,6 +995,13 @@ types:
     kind: enum
     variants: [admission, digest, copy, spawn, exited_before_handshake, handshake_deadline, handshake_mismatch]
   # References existing qualified Connection and AuthProfile coordinates. revision is public semantic revision, never private generation/publication fence. State is an observation, not a second lifecycle.
+  # Why a connection observes as pending, present exactly then (story:connection-next-actions-no-cycle):
+  # configuration_changed (saved under another configuration revision), configuration_refused
+  # (the same, and the configured provider already refused its credential: only a new connection
+  # helps), no_credential (none was published), evidence_expired (a revalidation recollects it).
+  - name: connectors.cli.PendingReason
+    kind: enum
+    variants: [configuration_changed, configuration_refused, no_credential, evidence_expired]
   - name: connectors.cli.ConnectionSummary
     kind: struct
     fields:
@@ -1006,6 +1013,7 @@ types:
       - {name: profile, type: "String"}
       - {name: revision, type: "String"}
       - {name: state, type: "connectors.connection_admission.ConnectionState"}
+      - {name: pending_reason, type: "Optional<connectors.cli.PendingReason>"}
   - name: connectors.cli.ConnectionDescription
     kind: struct
     fields:
