@@ -1,6 +1,7 @@
 //! Owner-side composition for the production local CLI. Provider libraries never
 //! receive this authority, the metadata database, or a credential resolver.
 pub mod approval_issuance;
+pub mod diagnostics;
 mod governed;
 mod lifecycle;
 mod maintenance;
@@ -204,6 +205,13 @@ pub struct Error {
     /// error small.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub protocol_refusal: Option<Box<ProtocolRefusal>>,
+}
+/// The owner's log and the last code it logged (`owner_log`, `owner_error` of the
+/// failure's data).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OwnerLog {
+    pub path: String,
+    pub code: Option<String>,
 }
 /// What an `unsupported_private_protocol` names.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

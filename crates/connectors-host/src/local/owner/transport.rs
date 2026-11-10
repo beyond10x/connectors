@@ -271,6 +271,8 @@ impl Client {
         start_bound: Option<Duration>,
     ) -> Result<Self> {
         let directory = fs::directory(&paths.state, false, true)?;
+        // What the owner logs from here on is what a failure names.
+        diagnostics::watch(&paths.state);
         // The pipe name's salt, published by the first caller and refused by
         // name when it is not owner-only.
         #[cfg(windows)]
@@ -1623,6 +1625,7 @@ pub fn serve_with_read_policy(paths: Paths, read_policy: Arc<dyn ReadPolicy>) ->
     // Before any protected input: the owner holds credentials in memory.
     crate::local::core_dumps::forbid().map_err(|_| Error::from(Code::Unavailable))?;
     IN_OWNER.store(true, Ordering::SeqCst);
+    diagnostics::log_panics(paths.state.clone());
     // Duplicate before opening anything: a direct invocation with missing fds
     // must not mistake newly opened configuration files for inherited authority.
     let (startup, lifetime) = inherited()?;
@@ -2074,7 +2077,9 @@ fn handle(owner: Arc<Owner>, mut stream: channel::Stream) -> Result<()> {
     if std::thread::Builder::new()
         .name("connectors-local-request".into())
         .spawn(move || {
-            let _ = exchange(&owner, &mut stream);
+            if let Err(error) = exchange(&owner, &mut stream) {
+                diagnostics::record(&owner.paths.state, "exchange ended", error.code);
+            }
             // Closed before it stops counting: an owner that retires once no
             // client is counted finds no pipe instance of this one still open.
             drop(stream);
@@ -2162,7 +2167,10 @@ fn exchange(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     let shutdown = shutdown && result.is_ok();
     let (reply, document) = match result {
         Ok(answered) => (Reply::Success, answered.document()?),
-        Err(error) => (Reply::Failed { error }, Vec::new()),
+        Err(error) => {
+            diagnostics::record(&owner.paths.state, "request failed", error.code);
+            (Reply::Failed { error }, Vec::new())
+        }
     };
     let written = channel::write_within(
         stream,
@@ -2268,7 +2276,10 @@ fn exchange_write(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
             }
             (WriteReply::Done, document)
         }
-        Err(error) => (WriteReply::Failed { error }, Vec::new()),
+        Err(error) => {
+            diagnostics::record(&owner.paths.state, "write failed", error.code);
+            (WriteReply::Failed { error }, Vec::new())
+        }
     };
     // A terminal response may report a known effect even if metadata work used
     // the last budget. This bounded delivery grace grants no native dispatch.

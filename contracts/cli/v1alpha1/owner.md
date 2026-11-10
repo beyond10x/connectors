@@ -28,8 +28,8 @@ replacement process. A startup socket carries a fresh challenge, owner incarnati
 and metadata authority before the parent releases startup ownership. The daemon
 keeps the inherited lock and owns its children after the launching CLI exits.
 An owner that refuses to start or to keep serving exits with status 1 and writes
-only its refusal code to standard error (`connectors owner: "<code>"`), which
-the launching CLI discards.
+its refusal code to standard error (`connectors owner: "<code>"`), which the
+launching CLI discards, and to the owner log (below).
 Once it starts admitting requests, that lock is retained until kernel process
 exit even on early return or unwinding. Recovery runs between jobs on a retained
 worker, or under the supervisor's worker-creation lock with no live worker for
@@ -293,6 +293,24 @@ onto one fresh revalidation instead: the first of them leads it and runs the
 identity probe, the others join that one and answer its answer, each within its
 own deadline. A revalidation at another expected
 revision, or of another connection, never joins.
+
+## Owner log
+
+The owner's standard streams are discarded, so it writes what failed to the
+owner log, `owner.log` in the state directory: one line per failed request, per
+connection its exchange ended on, per refusal to start and per panic, each
+naming a fixed event and the owner's error code (`code=<code>`), or a panic's
+source location. A line never carries text from a request, a provider or a
+credential. The file is created owner-only (mode `0600` on Unix; on Windows it
+takes the access list of the owner-only state directory) and is bounded to
+262144 bytes: a line that would pass the bound empties the file first, and the
+first line then says so. The CLI never prints it.
+
+An `outcome_unknown` after the owner failed names that log as `owner_log` and
+the last code the owner logged since this command connected to it as
+`owner_error`. Without a log or a logged code the data carries no such field.
+`owner_error` is the owner's code, not a promise about the effect: the status
+of the write still decides it ([semantics](semantics.md)).
 
 ## Stopping an owner
 
