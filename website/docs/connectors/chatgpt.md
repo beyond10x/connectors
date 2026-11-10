@@ -14,14 +14,11 @@ by the catalog provider, and its profile `chatgpt.subscription` declares the aut
 the [Codex CLI](https://github.com/openai/codex/tree/970111f6cb62cc02fe36a82ea7d71b37a2889c97/codex-rs/login)
 signs in to, value by value, each with the source line it was read from
 ([declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/chatgpt/connector.json)).
-The words connector, instance, connection and operation are those of the
-[README vocabulary](https://github.com/beyond10x/connectors#vocabulary).
+Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary).
 
 The profile ships no client id. An instance names the one it signs in as in its own configuration
 (`oauth2_client_id`), so the instance cannot be derived from the declaration: it pins its
-executable, that executable's SHA-256 and its configuration revision. Commands use `connectors` on
-your `PATH` with your own configuration; a command that needs a ChatGPT account is shown without
-output.
+executable, that executable's SHA-256 and its configuration revision.
 
 ## What it reads and writes
 
@@ -205,13 +202,7 @@ Connectors' approvals and ledger.
 
 A refresh the server refuses (a revoked sign-in, a spent refresh token) makes the connection
 `stale`; `connections token` and an invoke answer `next_action: repair_connection`. Sign in again
-on the same connection, by browser or with `--device`:
-
-```sh
-connectors connections list --connector chatgpt --instance personal
-connectors connections reconnect --connector chatgpt --instance personal \
-  --expected-revision "<revision from the list>"
-```
+on the same connection, by browser or with `--device`. [Reconnect](../guides/reconnect-a-connection.md) `chatgpt/personal`.
 
 A sign-in to another ChatGPT account is refused as an identity mismatch.
 

@@ -14,14 +14,10 @@ The `github` connector of the provider GitHub is served by the catalog provider 
 [connectors-definitions 0.5.2 release](https://github.com/beyond10x/connectors-definitions/releases/tag/0.5.2),
 run as a definition file: `connectors invoke --definition` lowers the file and runs its operations
 through the connector's instance `definition`
-([Invoke a definition file](../guides/invoke-a-definition-file.md)). The words connector,
-instance, connection and operation are those of the
-[README vocabulary](https://github.com/beyond10x/connectors#vocabulary). Later releases of the
+([Invoke a definition file](../guides/invoke-a-definition-file.md)). Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary). Later releases of the
 definitions add operations and a `github.app` profile this page does not cover.
 
-Commands use `connectors` on your `PATH` with your own configuration. Outputs were produced in
-the repository's tree against a scratch configuration, whose `--config` and `--state-dir` are left
-out here. A command that needs a GitHub token is shown without output.
+[How these commands were run](../guides/first-read.md#examples).
 
 ## What it reads and writes
 
@@ -122,15 +118,7 @@ not offered.
 
 ## Reconnect when the connection is Stale
 
-A token GitHub refuses makes the connection `stale`, and an invoke answers `next_action:
-repair_connection`. Publish a new token on the same connection:
-
-```sh
-connectors --output json connections list --connector github --instance definition \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector github --instance definition \
-  --expected-revision "<revision from the list>" --credential-file ~/private/github.json
-```
+A token GitHub refuses makes the connection `stale`. Publish a new token on the same connection. [Reconnect](../guides/reconnect-a-connection.md) `github/definition` with `--credential-file ~/private/github.json`.
 
 ## Limits
 
