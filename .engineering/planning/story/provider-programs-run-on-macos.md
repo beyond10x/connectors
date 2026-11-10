@@ -19,14 +19,32 @@ scope:
 - confidence: cited
   path: .github/workflows/macos-host.yml
 - confidence: cited
+  path: Cargo.lock
+- confidence: cited
   path: adapters/grafana/Cargo.toml
 - confidence: cited
   path: adapters/grafana/README.md
 - confidence: cited
   path: adapters/grafana/tests/local_runtime/cli_journey.rs
-- confidence: inferred
+- confidence: cited
+  path: apps/connectors/tests/owner_launch_copy_macos.rs
+- confidence: cited
+  path: contracts/cli/v1alpha1/owner.md
+- confidence: cited
+  path: contracts/cli/v1alpha1/semantics.md
+- confidence: cited
   path: crates/connectors-custody/src/keychain.rs
-revision: 14
+- confidence: cited
+  path: crates/connectors-custody/src/tests.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/transport.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/runtime/artifact.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/runtime/artifact/macos.rs
+- confidence: cited
+  path: ess/domains/cli.yaml
+revision: 25
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-02T07:27:32Z", actor: "human:timo", revision: 2, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
 - {from: "proposed", to: "active", at: "2026-11-02T07:27:32Z", actor: "human:timo", revision: 3, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
@@ -112,3 +130,22 @@ Next step for this story: log the `OSStatus` of the add and of the read-back in 
 custody test that runs the write from a binary deleted after start), and filter `log show` on the owner's process
 and the failure minute, before another macOS run. Whether the owner's private copy being removed also breaks the
 add or the read-back (code-signature or partition checks against a missing executable) is open.
+
+## Scope
+
+Landed on, from `git diff 9069c43a4...impl/provider-programs-run-on-macos` (merged into wave/zero-issues at a83a03b85); the earlier scoper lines marked inferred are replaced by this list. Generated reference pages are left out.
+
+- `adapters/grafana/Cargo.toml`
+- `adapters/grafana/README.md`
+- `adapters/grafana/tests/local_runtime/cli_journey.rs`
+- `apps/connectors/tests/owner_launch_copy_macos.rs`
+- `Cargo.lock`
+- `contracts/cli/v1alpha1/owner.md`
+- `contracts/cli/v1alpha1/semantics.md`
+- `crates/connectors-custody/src/keychain.rs`
+- `crates/connectors-custody/src/tests.rs`
+- `crates/connectors-host/src/local/owner/transport.rs`
+- `crates/connectors-host/src/local/runtime/artifact/macos.rs`
+- `crates/connectors-host/src/local/runtime/artifact.rs`
+- `ess/domains/cli.yaml`
+- `.github/workflows/macos-host.yml`
