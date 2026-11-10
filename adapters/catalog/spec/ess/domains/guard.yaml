@@ -89,6 +89,7 @@ types:
     fields:
       - {name: operation_id, type: String}
       - {name: values, type: "Map<String, connectors_catalog.guard.Reference>"}
+      - {name: optional_values, type: "Optional<Map<String, connectors_catalog.guard.Reference>>"}
       - {name: checks, type: "List<connectors_catalog.guard.Check>"}
       - {name: mismatch, type: "Optional<connectors_catalog.guard.MismatchCode>"}
     invariants:

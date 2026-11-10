@@ -176,15 +176,10 @@ the same instance as the reads, whose consent requests the write scope; see
   answer, which then carries the new version to pin next. The selection
   declares `fields` required (`"required": ["fields"]`), so the declared input
   schema says so too.
-- **Shared-drive files are not supported by `files.update` yet.** A caller
-  updating a shared-drive file sends `supportsAllDrives`, and the PATCH carries
-  it, but the preflight `files.get` is sent with `fileId` and `fields` only: a
-  guard value is required, so an optional `supportsAllDrives` cannot be passed
-  to the preflight. Google documents that a request for a shared-drive item
-  needs `supportsAllDrives=true`, so the preflight cannot read such a file and
-  the update is refused before any write (inferred from the documentation, not
-  run against live Drive). Optional preflight values are
-  `story:catalog-guard-optional-preflight-values`. `files.create` and
+- **Shared-drive files.** A caller updating a shared-drive file sends
+  `supportsAllDrives`; the PATCH carries it and the preflight `files.get`
+  carries it too, as an optional preflight value (`optional_values`). Without
+  it the preflight is sent with `fileId` and `fields` only. `files.create` and
   `files.copy` have no preflight and pass `supportsAllDrives` through.
 - **Race boundary.** Drive offers no precondition on `files.update`, so the pin
   is checked in preflight only: a change between the preflight and the PATCH is

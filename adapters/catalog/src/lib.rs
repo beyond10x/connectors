@@ -72,6 +72,11 @@ pub struct Check {
 pub struct Preflight {
     pub operation_id: String,
     pub values: BTreeMap<String, String>,
+    /// Probe parameters bound from input references that need not be given: a
+    /// present input value is forwarded, an absent one is left out of the
+    /// read. Omitted when empty, so a preflight without it keeps its bytes.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub optional_values: BTreeMap<String, String>,
     pub checks: Vec<Check>,
     /// The code a differing check refuses with instead of `forbidden`
     /// (`connectors_catalog.guard.MismatchCode`). Omitted when absent, so a
@@ -499,15 +504,27 @@ impl Guard {
     /// Every parameter a read binds, with the input reference it binds.
     fn bound(&self) -> impl Iterator<Item = (&String, &String)> {
         self.preflights()
-            .flat_map(|preflight| &preflight.values)
+            .flat_map(|preflight| preflight.values.iter().chain(&preflight.optional_values))
             .chain(self.postflight.read.iter().flat_map(|read| &read.values))
     }
 
-    /// Every input reference the guard reads: each read's values, then each
+    /// The input references a preflight may leave absent.
+    fn optional_references(&self) -> impl Iterator<Item = &String> {
+        self.preflights()
+            .flat_map(|preflight| preflight.optional_values.values())
+    }
+
+    /// Every input reference the guard requires: each read's values, then each
     /// check's expected input.
     fn references(&self) -> impl Iterator<Item = &String> {
-        self.bound()
-            .map(|(_, reference)| reference)
+        self.preflights()
+            .flat_map(|preflight| preflight.values.values())
+            .chain(
+                self.postflight
+                    .read
+                    .iter()
+                    .flat_map(|read| read.values.values()),
+            )
             .chain(self.checks().filter_map(|check| match &check.expect {
                 Expectation::Input(path) => Some(path),
                 Expectation::Literal(_) | Expectation::Boolean(_) | Expectation::Present(_) => None,
@@ -863,6 +880,7 @@ pub struct Held {
 pub(crate) fn guarded_body_paths(guard: &Guard) -> impl Iterator<Item = &str> {
     guard
         .references()
+        .chain(guard.optional_references())
         .filter_map(|path| path.strip_prefix("body."))
 }
 
@@ -1198,7 +1216,7 @@ impl Engine {
             let guard_inputs: Vec<&str> = selection
                 .guard
                 .iter()
-                .flat_map(Guard::references)
+                .flat_map(|guard| guard.references().chain(guard.optional_references()))
                 .map(|path| path.split('.').next().unwrap_or(path))
                 .collect();
             // A credential the document passes as a parameter travels in the
@@ -1989,24 +2007,35 @@ impl Engine {
                 .get(&exposed.selection.id)
                 .ok_or_else(Error::internal)?;
             // So does every read's request, the one after the write included.
-            let bind =
-                |values: &BTreeMap<String, String>, template: &Template| -> Result<Request> {
-                    let mut bound = BTreeMap::new();
-                    for (parameter, path) in values {
-                        let value = reference(&input, path)
-                            .and_then(scalar)
-                            .ok_or_else(|| refuse(format!("guard value `{path}` is absent")))?;
+            let bind = |values: &BTreeMap<String, String>,
+                        optional: &BTreeMap<String, String>,
+                        template: &Template|
+             -> Result<Request> {
+                let mut bound = BTreeMap::new();
+                for (parameter, path) in optional {
+                    if let Some(value) = reference(&input, path).and_then(scalar) {
                         bound.insert(parameter.clone(), Supplied::One(value));
                     }
-                    self.resolve(template, bound)
-                };
+                }
+                for (parameter, path) in values {
+                    let value = reference(&input, path)
+                        .and_then(scalar)
+                        .ok_or_else(|| refuse(format!("guard value `{path}` is absent")))?;
+                    bound.insert(parameter.clone(), Supplied::One(value));
+                }
+                self.resolve(template, bound)
+            };
             let requests = guard
                 .preflights()
                 .zip(&probe.preflights)
-                .map(|(preflight, template)| bind(&preflight.values, template))
+                .map(|(preflight, template)| {
+                    bind(&preflight.values, &preflight.optional_values, template)
+                })
                 .collect::<Result<Vec<_>>>()?;
             reread = match (&guard.postflight.read, &probe.postflight) {
-                (Some(read), Some(template)) => Some(bind(&read.values, template)?),
+                (Some(read), Some(template)) => {
+                    Some(bind(&read.values, &BTreeMap::new(), template)?)
+                }
                 (None, None) => None,
                 _ => return Err(Error::internal()),
             };
@@ -2734,6 +2763,11 @@ fn declare(
                 // no declared type; it keeps the any-scalar schema.
                 properties.insert(reference.clone(), declared_type(None));
                 required.push(reference.clone());
+            }
+        }
+        for reference in guard.optional_references() {
+            if !reference.starts_with("body.") && !properties.contains_key(reference.as_str()) {
+                properties.insert(reference.clone(), declared_type(None));
             }
         }
     }

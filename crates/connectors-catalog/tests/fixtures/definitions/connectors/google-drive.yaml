@@ -42,8 +42,8 @@ operations:
     op: drive.files.update
     effect: write
     required: [fields]
-    guard: {before: {read: files.get, with: {fields: fields}, expect: {/version: version}}}
-    description: "Change one file's metadata while its version is the pinned version; one update can also move the file (addParents, removeParents), trash it (body.trashed), remove the access it inherits (body.inheritedPermissionsDisabled), change who may share or copy it (body.writersCanShare, body.copyRequiresWriterPermission), lock or unlock it (body.contentRestrictions: readOnly, ownerRestricted) and restrict downloading it (body.downloadRestrictions); fields is required, selects both the preflight read and the answer and must include version; shared-drive files are not supported yet; the effects listed are not exhaustive: the approval binds the whole input by digest, so read the whole input before approving"
+    guard: {before: {read: files.get, with: {fields: fields}, with_optional: {supportsAllDrives: supportsAllDrives}, expect: {/version: version}}}
+    description: "Change one file's metadata while its version is the pinned version; one update can also move the file (addParents, removeParents), trash it (body.trashed), remove the access it inherits (body.inheritedPermissionsDisabled), change who may share or copy it (body.writersCanShare, body.copyRequiresWriterPermission), lock or unlock it (body.contentRestrictions: readOnly, ownerRestricted) and restrict downloading it (body.downloadRestrictions); fields is required, selects both the preflight read and the answer and must include version, and supportsAllDrives, when given, reaches the preflight read too; the effects listed are not exhaustive: the approval binds the whole input by digest, so read the whole input before approving"
   files.copy:
     op: drive.files.copy
     effect: write
