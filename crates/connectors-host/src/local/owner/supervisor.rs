@@ -847,16 +847,22 @@ impl Pool {
     /// A job is queued or running, or a child is being started: work that
     /// restarts the owner's idle clock. Recovery is not included; see `settled`.
     pub fn working(&self) -> Result<bool> {
-        let workers = self.workers.lock().map_err(|_| Code::Unavailable)?;
-        for worker in workers.values() {
-            if (worker.busy.load(Ordering::SeqCst) && !worker.recovering.load(Ordering::SeqCst))
-                || worker.queued.load(Ordering::SeqCst) > 0
-                || worker
-                    .control
-                    .lock()
-                    .map_err(|_| Code::Unavailable)?
-                    .starting
-            {
+        let mut controls = Vec::new();
+        {
+            let workers = self.workers.lock().map_err(|_| Code::Unavailable)?;
+            for worker in workers.values() {
+                if (worker.busy.load(Ordering::SeqCst) && !worker.recovering.load(Ordering::SeqCst))
+                    || worker.queued.load(Ordering::SeqCst) > 0
+                {
+                    return Ok(true);
+                }
+                controls.push(worker.control.clone());
+            }
+        }
+        // A control lock is waited on only after `workers` is released, so a
+        // held one delays this check and no request for another instance.
+        for control in controls {
+            if control.lock().map_err(|_| Code::Unavailable)?.starting {
                 return Ok(true);
             }
         }
@@ -871,17 +877,22 @@ impl Pool {
     /// A live adapter child with nothing in flight is not work. The owner's
     /// idle exit reads this; it grants no recovery or lifecycle authority.
     pub fn quiet(&self) -> Result<bool> {
-        let workers = self.workers.lock().map_err(|_| Code::Unavailable)?;
-        for worker in workers.values() {
-            if worker.busy.load(Ordering::SeqCst)
-                || worker.recovery_pending.load(Ordering::SeqCst)
-                || worker.queued.load(Ordering::SeqCst) > 0
-                || worker
-                    .control
-                    .lock()
-                    .map_err(|_| Code::Unavailable)?
-                    .starting
-            {
+        let mut controls = Vec::new();
+        {
+            let workers = self.workers.lock().map_err(|_| Code::Unavailable)?;
+            for worker in workers.values() {
+                if worker.busy.load(Ordering::SeqCst)
+                    || worker.recovery_pending.load(Ordering::SeqCst)
+                    || worker.queued.load(Ordering::SeqCst) > 0
+                {
+                    return Ok(false);
+                }
+                controls.push(worker.control.clone());
+            }
+        }
+        // See `working`: wait on control locks outside `workers`.
+        for control in controls {
+            if control.lock().map_err(|_| Code::Unavailable)?.starting {
                 return Ok(false);
             }
         }
@@ -3403,3 +3414,6 @@ mod pool_lock_tests {
 
 #[cfg(test)]
 mod adversary_tests;
+
+#[cfg(test)]
+mod adversary_lock_order_tests;
