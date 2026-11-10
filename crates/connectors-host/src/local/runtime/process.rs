@@ -330,6 +330,15 @@ impl Child {
     pub fn spawn(config: &super::super::config::Adapter) -> Result<Self> {
         Self::spawn_until(config, Instant::now() + Duration::from_secs(10))
     }
+    /// [`Child::spawn`] with a start budget the caller chooses, past the
+    /// ten seconds `spawn` and `start` cap a start at. For a test in another
+    /// crate, where `cfg(test)` of this one is not visible, that runs the
+    /// adapter on a loaded host.
+    #[doc(hidden)]
+    pub fn spawn_within(config: &super::super::config::Adapter, budget: Duration) -> Result<Self> {
+        Self::start_capped(config, Instant::now() + budget, budget, None)
+            .map_err(|error| error.failure)
+    }
     pub(crate) fn spawn_until(
         config: &super::super::config::Adapter,
         deadline: Instant,
@@ -349,8 +358,16 @@ impl Child {
         deadline: Instant,
         state: Option<&Path>,
     ) -> std::result::Result<Self, StartError> {
+        Self::start_capped(config, deadline, Duration::from_secs(10), state)
+    }
+    fn start_capped(
+        config: &super::super::config::Adapter,
+        deadline: Instant,
+        cap: Duration,
+        state: Option<&Path>,
+    ) -> std::result::Result<Self, StartError> {
         let mut stderr = None;
-        let started = Self::launch(config, deadline, &mut stderr);
+        let started = Self::launch(config, deadline, cap, &mut stderr);
         // A failed start's process has been ended and reaped by now: the log
         // holds what it wrote, and nothing more can arrive.
         let log = keep_start_log(stderr, state, &config.instance_id);
@@ -359,10 +376,11 @@ impl Child {
     fn launch(
         config: &super::super::config::Adapter,
         deadline: Instant,
+        cap: Duration,
         stderr: &mut Option<Stderr>,
     ) -> std::result::Result<Self, (Failure, StartFailure)> {
         let spawn = |failure| (failure, StartFailure::Spawn);
-        let until = deadline.min(Instant::now() + Duration::from_secs(10));
+        let until = deadline.min(Instant::now() + cap);
         let executable = config.executable.capture_explained(until)?;
         #[cfg(windows)]
         let _ = stderr;
