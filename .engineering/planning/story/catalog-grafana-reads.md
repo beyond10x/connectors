@@ -8,7 +8,7 @@ relations:
 - decomposes: epic:catalog-knowledge-sources
 - depends_on: story:catalog-slack-reads
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 2
 ---
 ## Source
 
@@ -43,3 +43,26 @@ Alert firing history, where needed, is read as `annotations.list` with `type=ale
 - Per operation, a recorded-fixture test asserts the exact request sent and that `operations invoke` returns the fixture body byte-identical.
 - For every paged list operation, a paging test walks two fixture pages and stops at the documented end condition.
 - `adapters/catalog/tests/bundle_drift.rs` reproduces this provider's bundle byte for byte.
+
+## Route: a definition a served instance loads
+
+Amended 2026-11-10. The goal is a definition that a served instance can load. A provider directory
+alone is not that goal.
+
+- By ADR D11 and epic:catalog-connectors-only-in-definitions, this selection is authored as
+  `connectors/grafana.yaml` in `beyond10x/connectors-definitions`. It is lowered into
+  `adapters/catalog/providers/grafana/operations.json` and its bundle only while those
+  directories still exist; story:catalog-provider-data-removed deletes them. The "Own files"
+  above name that lowered output, not a hand-written selection.
+- The definition declares exactly one profile: the service-account token as `Authorization:
+  Bearer`. It has no OAuth acquisition and no alternative binding. Start does not refuse it
+  (`docs/running-services.md`, "Start also refuses").
+- A served instance loads it either through `catalog.definition` (`definitions_root` plus the
+  file) or as a `connector` once the pinned release carries it. The credential is a
+  `mounted_secret` item `<directory>/grafana.<instance>/<profile id>`.
+
+Additional acceptance:
+
+- A served instance started from the definition file, with a mounted service-account token,
+  describes exactly the four reads above and answers one of them against a recorded fixture.
+- The definition passes the lowerer at the pinned definitions release with no warning.
