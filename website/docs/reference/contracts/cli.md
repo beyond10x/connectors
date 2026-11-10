@@ -1484,6 +1484,15 @@ start. The owner then closes its end and the runtime points the program's standa
 error at `/dev/null`: nothing the program writes once it can hold a credential is
 kept. Windows starts a program with no standard handles and keeps no start log.
 
+A program that does not speak the private protocol its entry selects
+(`private_protocol`) is named instead of `unavailable`: the start fails as
+`unsupported_private_protocol` at `readiness` with `next_action =
+check_configuration`, `private_protocol` the protocol asked for and
+`supported_private_protocols` the protocols the program answered that it speaks. A
+connect and `instances status` of that instance answer it, status with exit 1 instead
+of an observation. A program built before the refusal existed only exits, which stays
+`exited_before_handshake` under `unavailable`.
+
 ## 5. Protected entry and durable publication
 
 The Linux OS keyring binding selects the user's admitted Secret Service collection
@@ -1653,6 +1662,7 @@ never replay a possible write after interruption, timeout or lost response.
 | stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`: run `connectors setup owner-stop`); `connections connect` on an instance that holds its connection, or while another connect of it is in flight ([one connection per instance](#one-connection-per-instance)) | `lifecycle_conflict` | 1 |
 | stale/foreign stop target | `incarnation_mismatch` | 1 |
 | wrong readiness identity/version/revision | `readiness_mismatch` | 1 |
+| a program that refused the private protocol the entry selects (`stage = readiness`, `next_action = check_configuration`, `private_protocol` named and `supported_private_protocols` where the program said; `instances status` of the instance answers it too) | `unsupported_private_protocol` | 1 |
 | running owner is a different executable build (`next_action = stop_owner`: run `connectors setup owner-stop`) | `owner_build_mismatch` | 1 |
 | no selected cached description | `description_unavailable` | 1 |
 | schema/descriptor changed | `stale_description` | 1 |
