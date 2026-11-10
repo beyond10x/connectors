@@ -68,3 +68,49 @@ jobs:
         run: |
           df -h /
           du -sh target || true
+
+  journeys:
+    name: ignored CLI journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    container:
+      image: archlinux:base@sha256:d4594bb2300cba11f41c2f27923eb56f63d9988909c402f9c95517d1e362c899
+      options: --privileged
+    steps:
+      - name: Install system packages
+        run: |
+          pacman -Syu --noconfirm base-devel git curl jq sqlite rustup cmake pkgconf openssl \
+            dbus gcr gcr-4 dconf glib2 libcap-ng libgcrypt systemd-libs p11-kit
+          for tool in gzip sha256sum sqlite3 jq /usr/bin/dbus-daemon; do command -v "$tool"; done
+      - name: Install the qualified GNOME Keyring 50.0-1
+        working-directory: ${{ runner.temp }}
+        run: |
+          archive="gnome-keyring-1%3A50.0-1-x86_64.pkg.tar.zst"
+          curl -fsSLo gnome-keyring.pkg.tar.zst "https://archive.archlinux.org/packages/g/gnome-keyring/$archive"
+          echo "96c5f9dfd143103781ba78be1ee28e3a756e454adeb8a1a097ac34f7f5faed08  gnome-keyring.pkg.tar.zst" | sha256sum -c -
+          bsdtar -xOf gnome-keyring.pkg.tar.zst usr/bin/gnome-keyring-daemon > gnome-keyring-daemon
+          install -m 0755 gnome-keyring-daemon /usr/bin/gnome-keyring-daemon
+          echo "b9a71f6b4c4bfaf1759a99036b7b3ab6cf98b2b479c0c2a24f02f5f2ca53958b  /usr/bin/gnome-keyring-daemon" | sha256sum -c -
+          gnome-keyring-daemon --version
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install Rust 1.98.1
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal
+          rustup default 1.98.1
+          rustc --version
+      - name: Fetch locked dependencies
+        run: cargo fetch --locked
+      - name: Permit unprivileged user namespaces
+        run: |
+          if sysctl -n kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
+            sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - name: Run the ignored CLI journeys
+        run: cargo run --locked -p connectors-build -- ignored --required --only-prerequisite provider,cli,custody
+      - name: Name each journey that did not pass
+        if: always()
+        run: |
+          test -f .local/ignored-suites.json || exit 0
+          jq -r '.outcomes[] | select(.selected and .status != "passed") | "\(.status)\t\(.name)\t\(.reasons | join("; "))"' .local/ignored-suites.json
