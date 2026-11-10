@@ -363,10 +363,14 @@ impl Sql {
 
     async fn query(&self, args: Query) -> Result<Value> {
         if args.query.is_empty()
-            || args.query.len() > 8192
+            || args.query.chars().count() > 8192
             || args.parameters.len() > 64
             || !(1..=1000).contains(&args.limit)
-            || args.parameters.iter().flatten().any(|p| p.len() > 8192)
+            || args
+                .parameters
+                .iter()
+                .flatten()
+                .any(|p| p.chars().count() > 8192)
         {
             return Err(Error::invalid(
                 "query, parameters or row limit exceed bounds",
