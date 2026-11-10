@@ -253,7 +253,9 @@ async fn a_crawl_that_reaches_its_limit_is_incomplete() {
         seen.head
     );
     assert_eq!(seen.body["limit"], 2);
-    assert_eq!(seen.body["timeout"], 150);
+    let sent = seen.body["timeout"].as_u64().unwrap();
+    assert_eq!(sent, 12);
+    assert!(sent < 15, "below the service provider budget of 15 s");
     assert_eq!(seen.body["select_paths"], json!(["/docs/.*"]));
     assert_eq!(out["pages"].as_array().unwrap().len(), 2);
     assert_eq!(out["complete"], false);

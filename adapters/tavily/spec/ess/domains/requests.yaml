@@ -46,4 +46,4 @@ types:
     invariants:
       - limit >= 1
       - limit <= 100
-      - timeout == 150
+      - timeout == 12

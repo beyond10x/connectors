@@ -15,14 +15,17 @@ pub mod auth;
 pub const PROFILE: &str = "tavily/2026-10";
 /// The only paths this adapter POSTs to; the composition fixes exactly these.
 pub const READ_POSTS: [&[&str]; 3] = [&["search"], &["extract"], &["crawl"]];
-/// Tavily bounds a crawl at 150 s; the transport waits a little longer.
+/// The longest the transport may wait on a read POST; the host cuts it at the caller's remaining
+/// deadline (30 s in the CLI, 20 s at the service).
 pub const READ_POST_TIMEOUT: Duration = Duration::from_secs(160);
 /// Per-item content ceiling, clipped on a UTF-8 boundary.
 pub const CONTENT_BYTES: usize = 128 * 1024;
 /// Serialized-result ceiling; items past it are omitted and reported.
 pub const RESULT_BYTES: usize = 3 * 1024 * 1024;
-/// Tavily's own crawl deadline, in seconds, sent with every crawl.
-const CRAWL_TIMEOUT_S: u64 = 150;
+/// Tavily's own crawl deadline, in seconds, sent with every crawl. The adapter cannot read the
+/// caller's remaining deadline, so it sends one value under the narrowest bound a call has: the
+/// service's 15 s provider budget (the CLI cuts a call at 30 s).
+const CRAWL_TIMEOUT_S: u64 = 12;
 const OPERATIONS: [&str; 3] = ["websearch.search", "websearch.fetch", "websearch.crawl"];
 
 pub struct Tavily {
