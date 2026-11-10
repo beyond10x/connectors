@@ -372,13 +372,24 @@ async fn upgrade_unverified_switch_is_lost() {
     }
 }
 
+/// An address whose connect is refused and that no other process can claim
+/// while the returned socket lives: bound, never listening.
+async fn refused_address() -> (SocketAddr, tokio::net::TcpSocket) {
+    let socket = tokio::net::TcpSocket::new_v4().unwrap();
+    socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+    (socket.local_addr().unwrap(), socket)
+}
+
 /// A connection refused before any byte was sent is `not_sent`; the
 /// subprotocol list must be tokens, refused with no I/O.
 #[tokio::test]
 async fn upgrade_refusals_before_sending_are_not_sent() {
-    let unused = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = unused.local_addr().unwrap();
-    drop(unused);
+    let (address, _held) = refused_address().await;
+    // Another process taking the port after it was picked: it must not be able to.
+    assert!(
+        TcpListener::bind(address).await.is_err(),
+        "another listener could claim the refused address"
+    );
     let outcome = http(address)
         .into_upgrade_write(bounds(64, 256, Duration::from_secs(5)))
         .upgrade(&PATH, &[], &PROTOCOLS)
