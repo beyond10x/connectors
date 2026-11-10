@@ -97,6 +97,45 @@ fn clock_source(seed: u8, midpoint: u64, radius: u32) -> clock_fixture::Server {
     })
 }
 
+/// A source whose first answer comes `first` late, as a loopback fixture's does
+/// when a loaded runner schedules its thread late; later answers are prompt.
+fn slow_first_clock_source(
+    seed: u8,
+    midpoint: u64,
+    radius: u32,
+    first: std::time::Duration,
+) -> clock_fixture::Server {
+    let fixture = clock_fixture::Fixture {
+        seed,
+        midpoint,
+        radius,
+        ..Default::default()
+    };
+    clock_fixture::Server::spawn(Box::new(move |n, request| {
+        if n == 0 {
+            std::thread::sleep(first);
+        }
+        Some(fixture.reply(request))
+    }))
+}
+
+/// `source` once it has answered a request, so the check never waits on the
+/// fixture's first answer: the check's per-source wait is a fixed 2 s
+/// (`QUERY_TIMEOUT`), which a fixture's cold start on a loaded runner can pass.
+fn answering(source: clock_fixture::Server) -> clock_fixture::Server {
+    let socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    socket
+        .set_read_timeout(Some(std::time::Duration::from_secs(30)))
+        .unwrap();
+    let probe = clock_fixture::frame(&clock_fixture::message([(*b"NONC", vec![0u8; 32])]));
+    socket.send_to(&probe, &source.address).unwrap();
+    let mut reply = [0u8; 4096];
+    socket
+        .recv_from(&mut reply)
+        .expect("the fixture answers a probe");
+    source
+}
+
 /// `approvals clock-check` refused with `unavailable` at `stage = observation`;
 /// its `Failure`, after checking that nothing of the exchange leaks.
 fn clock_unavailable(root: &tempfile::TempDir) -> Value {
@@ -223,7 +262,12 @@ fn clock_check_split_refusal() {
 
 #[test]
 fn clock_check_below_quorum_refusal() {
-    let good = clock_source(7, CLOCK_T, 1);
+    let good = answering(slow_first_clock_source(
+        7,
+        CLOCK_T,
+        1,
+        std::time::Duration::from_millis(2500),
+    ));
     let silent = clock_fixture::Server::silent();
     // Signed with seed 8, configured with seed 12's key.
     let wrong_key = clock_source(8, CLOCK_T, 1);
