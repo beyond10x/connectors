@@ -1072,6 +1072,11 @@ The complete configuration used against the sandbox is
   never refused, because the provider may already have applied the write. No
   corrective request is ever issued. This is the C14 boundary the operator
   accepted for create and update, written as data.
+  - `optional_values` on a preflight is optional: parameters of the read bound
+    from input references like `values`, except that an input value the caller
+    did not give is left out of the read instead of refusing the write; a given
+    one is forwarded. A reference that names no declared input adds an optional
+    one.
   - `further_preflights` is optional: up to three more reads before the write,
     each `{"operation_id", "values", "checks"}` like `preflight`, read in order
     after it; the first that refuses stops the guard with nothing written. It

@@ -195,6 +195,11 @@ fn shipped_drive_selections_are_the_six_reads_and_three_writes() {
                     pointer: "/version".into(),
                     expect: Expectation::Input("version".into()),
                 }],
+                optional_values: [(
+                    "supportsAllDrives".to_owned(),
+                    "supportsAllDrives".to_owned()
+                )]
+                .into(),
                 mismatch: None,
             },
             further_preflights: vec![],

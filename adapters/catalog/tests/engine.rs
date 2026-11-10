@@ -153,6 +153,7 @@ fn mr_guard(values: &[(&str, &str)], preflight: Vec<Check>, postflight: Vec<Chec
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
             checks: preflight,
+            optional_values: BTreeMap::new(),
             mismatch: None,
         },
         further_preflights: vec![],
@@ -179,6 +180,7 @@ fn selections() -> Vec<Selection> {
                         ("branch".to_string(), "body.source_branch".to_string()),
                     ]),
                     checks: vec![input_check("/commit/id", "sha")],
+                    optional_values: BTreeMap::new(),
                     mismatch: None,
                 },
                 further_preflights: vec![],

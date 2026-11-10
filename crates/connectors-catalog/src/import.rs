@@ -262,6 +262,8 @@ struct ShippedGuard {
 struct ShippedPreflight {
     operation_id: String,
     values: IndexMap<String, String>,
+    #[serde(default)]
+    optional_values: IndexMap<String, String>,
     checks: Vec<ShippedCheck>,
     #[serde(default)]
     mismatch: Option<MismatchCode>,
@@ -1192,6 +1194,7 @@ impl Context<'_> {
         operation: &str,
         read: &str,
         values: &IndexMap<String, String>,
+        complete: bool,
     ) -> Result<Option<IndexMap<String, String>>, Failure> {
         let found = self.found(read).ok_or_else(|| {
             unexpressible(
@@ -1202,7 +1205,10 @@ impl Context<'_> {
         })?;
         let mut with = IndexMap::new();
         for parameter in &found.parameters {
-            if parameter.location == Location::Path && !values.contains_key(&parameter.name) {
+            if complete
+                && parameter.location == Location::Path
+                && !values.contains_key(&parameter.name)
+            {
                 return Err(unexpressible(
                     operation,
                     "guard",
@@ -1215,7 +1221,7 @@ impl Context<'_> {
                 .parameters
                 .iter()
                 .any(|p| p.location == Location::Path && &p.name == parameter);
-            if !(path && parameter == input) {
+            if !(complete && path && parameter == input) {
                 with.insert(parameter.clone(), input.clone());
             }
         }
@@ -1229,7 +1235,17 @@ impl Context<'_> {
     ) -> Result<GuardBefore, Failure> {
         Ok(GuardBefore {
             read: self.read_key(&preflight.operation_id),
-            with: self.with(operation, &preflight.operation_id, &preflight.values)?,
+            with: self.with(operation, &preflight.operation_id, &preflight.values, true)?,
+            with_optional: if preflight.optional_values.is_empty() {
+                None
+            } else {
+                self.with(
+                    operation,
+                    &preflight.operation_id,
+                    &preflight.optional_values,
+                    false,
+                )?
+            },
             expect: expectations(operation, &preflight.checks)?,
             mismatch: preflight.mismatch,
         })
@@ -1248,7 +1264,7 @@ impl Context<'_> {
             .map(|read| {
                 Ok::<_, Failure>(GuardRead {
                     read: self.read_key(&read.operation_id),
-                    with: self.with(operation, &read.operation_id, &read.values)?,
+                    with: self.with(operation, &read.operation_id, &read.values, true)?,
                 })
             })
             .transpose()?;

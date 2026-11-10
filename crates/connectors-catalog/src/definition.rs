@@ -323,13 +323,17 @@ pub enum MismatchCode {
 /// source; its path parameters take the input of the same name unless `with`
 /// binds them. `expect` maps a JSON pointer to an input reference (`sha`,
 /// `body.sha`), a literal (`=opened`) or a boolean (`=true`), in file order;
-/// `mismatch` names what a differing one refuses as.
+/// `mismatch` names what a differing one refuses as. `with_optional` binds
+/// parameters like `with` does, but an input the caller did not give is left
+/// out of the read instead of refusing the write.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GuardBefore {
     pub read: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub with: Option<IndexMap<String, String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub with_optional: Option<IndexMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expect: Option<IndexMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2848,11 +2852,12 @@ fn bound_values(
     key: &str,
     probe: &crate::inventory::Operation,
     with: Option<&IndexMap<String, String>>,
+    implicit: bool,
 ) -> Result<BTreeMap<String, String>, Refusal> {
     let mut values: BTreeMap<String, String> = probe
         .parameters
         .iter()
-        .filter(|parameter| parameter.location == crate::inventory::Location::Path)
+        .filter(|parameter| implicit && parameter.location == crate::inventory::Location::Path)
         .map(|parameter| (parameter.name.clone(), parameter.name.clone()))
         .collect();
     for (parameter, input) in with.into_iter().flatten() {
@@ -2894,9 +2899,17 @@ fn guard(
         let (operation_id, found) = probe(&before.read)?;
         let mut preflight = serde_json::json!({
             "operation_id": operation_id,
-            "values": bound_values(key, found, before.with.as_ref())?,
+            "values": bound_values(key, found, before.with.as_ref(), true)?,
             "checks": checks(before.expect.as_ref()),
         });
+        if before.with_optional.is_some() {
+            preflight["optional_values"] = serde_json::json!(bound_values(
+                key,
+                found,
+                before.with_optional.as_ref(),
+                false
+            )?);
+        }
         if let Some(mismatch) = before.mismatch {
             preflight["mismatch"] = serde_json::json!(mismatch);
         }
@@ -2916,7 +2929,7 @@ fn guard(
             let (operation_id, found) = probe(&read.read)?;
             postflight["read"] = serde_json::json!({
                 "operation_id": operation_id,
-                "values": bound_values(key, found, read.with.as_ref())?,
+                "values": bound_values(key, found, read.with.as_ref(), true)?,
             });
         }
         if after.any.is_some() {
@@ -2940,7 +2953,7 @@ fn guard_inputs<'a>(value: &'a Value, found: &mut Vec<&'a str>) {
             for (name, inner) in map {
                 match (name.as_str(), inner) {
                     ("input", Value::String(input)) => found.push(input),
-                    ("values", Value::Object(values)) => {
+                    ("values" | "optional_values", Value::Object(values)) => {
                         found.extend(values.values().filter_map(Value::as_str));
                     }
                     _ => guard_inputs(inner, found),
