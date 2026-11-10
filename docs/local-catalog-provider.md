@@ -236,13 +236,35 @@ JSON integer or its decimal string (`100` or `"100"`), a boolean as `true` or
 its decimal text); any other value, such as `per_page=true` or `page=2.0`, is
 refused as `invalid_input` before any request.
 
+Beyond its type, the engine holds a path or query parameter to what the pinned
+document declares for it, and only to that. A parameter whose schema lists an
+`enum` takes one of those values (as the text it is sent as: `"topo"`, `2` or
+`"2"`), so `commits.list` `order` takes `default` or `topo` and `projects.list`
+`order_by` takes one of its listed fields; a value outside the list, in another
+letter case included, is refused. A parameter whose schema is a string of
+`format: date-time` takes an RFC 3339 date-time and no other form: `YYYY-MM-DD`,
+`T` (or `t`), `HH:MM:SS`, optional fractional seconds of one digit or more, and
+an offset of `Z` (or `z`), `+HH:MM` or `-HH:MM`, for a date that exists, an hour
+of at most 23, a minute of at most 59 and a second of at most 60. A date alone,
+a time without an offset, a space in place of `T`, `yesterday`, an empty string
+and a JSON integer are refused: `since`, `until` and `last_activity_after`
+are sent only as RFC 3339 date-times. Both checks hold for each
+element of a repeated parameter, and a refusal is `invalid_input` before any
+request. An absent optional parameter is never refused, and a parameter whose
+schema declares no `enum` and no `date-time` format (a `format: date`, say) is
+sent as any string is. A `null` member of an `enum` only marks the parameter
+nullable; an `enum` with a member that is not a string, an integer or a boolean
+is not checked. A selection's `bounds` `values` is checked as well, so the
+narrower of the two holds. The engine does not check any other `format`, a
+`pattern` or a body member's `format`.
+
 | id | source operation | request | time filter | effect |
 |---|---|---|---|---|
 | `projects.list` | `getApiV4Projects` | `GET /projects`, e.g. `membership`, `simple=false`, `archived`, `order_by=last_activity_at` | `last_activity_after` | read |
 | `tags.list` | `getApiV4ProjectsIdRepositoryTags` | `GET /projects/{id}/repository/tags` | none; each tag carries its commit id | read |
 | `releases.list` | `getApiV4ProjectsIdReleases` | `GET /projects/{id}/releases` | none; each release carries `released_at` | read |
 | `project.events` | `getApiV4ProjectsIdEvents` | `GET /projects/{id}/events` | `after`, `before` (dates) | read |
-| `commits.list` | `getApiV4ProjectsIdRepositoryCommits` | `GET /projects/{id}/repository/commits`, e.g. `ref_name`, `first_parent`; each commit carries `parent_ids`; offset paging (`page`, `per_page`) only: the selection withholds `pagination` and its keyset cursor `page_token`, so an input carrying either (`pagination=keyset` included) is refused as `invalid_input` before any request, because the provider does not follow GitLab's `Link` header; `read_api` scope | `since`, `until`: a string that GitLab reads as an ISO 8601 date-time | read |
+| `commits.list` | `getApiV4ProjectsIdRepositoryCommits` | `GET /projects/{id}/repository/commits`, e.g. `ref_name`, `first_parent`; each commit carries `parent_ids`; offset paging (`page`, `per_page`) only: the selection withholds `pagination` and its keyset cursor `page_token`, so an input carrying either (`pagination=keyset` included) is refused as `invalid_input` before any request, because the provider does not follow GitLab's `Link` header; `read_api` scope | `since`, `until`: an RFC 3339 date-time | read |
 | `repository.compare` | `getApiV4ProjectsIdRepositoryCompare` | `GET /projects/{id}/repository/compare` with `from` and `to` (both required) and `straight`; not paged; `read_api` scope. The body is GitLab's own: an empty compare answers `200` with `"commits": []` and `"compare_timeout": false`, a compare GitLab cut short also answers `200`, possibly with `"commits": []`, but with `"compare_timeout": true`; so read `body.compare_timeout`, not the length of `commits`, to tell them apart. GitLab always includes `diffs`, and a body over the provider's 4 MiB response limit answers `capacity` with no body at all; to place commits between two tags, walk `commits.list` instead, which carries no diffs | none | read |
 | `deployments.list` | `getApiV4ProjectsIdDeployments` | `GET /projects/{id}/deployments`, e.g. `environment`, `status`, `order_by`, `sort`; the body is GitLab's own, so each deployment carries `environment.name` and `deployable`, the job that ran it (`deployable.id`); a project the token cannot read answers GitLab's `403` or `404` with the refusal the other list reads answer; `read_api` scope | `updated_after`, `updated_before`, `finished_after`, `finished_before`: strings that GitLab reads as ISO 8601 date-times | read |
 

@@ -151,6 +151,56 @@ pub struct Parameter {
     /// parameter that is not repeated serialises as it did before.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub repeated: bool,
+    /// The values the document's `enum` allows, as the text each is sent as:
+    /// recorded only when every member is a string, an integer or a boolean
+    /// (a `null` member is a nullable marker, not a value). For a repeated
+    /// parameter, the values of each element. Omitted when empty, so a
+    /// parameter without an `enum` serialises as it did before.
+    #[serde(rename = "enum", default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed: Vec<String>,
+    /// The `format` the document declares on a string value, recorded only
+    /// for `date-time`. Omitted when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<Format>,
+}
+
+/// A `format` of a string parameter this model records and a reader may hold
+/// a value to. Every other format is not recorded.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Format {
+    /// An RFC 3339 `date-time`.
+    #[serde(rename = "date-time")]
+    DateTime,
+}
+
+/// What a value schema constrains beyond its type: the `enum` it lists and a
+/// `format` of `date-time` on a string.
+fn constraints(schema: Option<&Value>) -> (Vec<String>, Option<Format>) {
+    let Some(schema) = schema else {
+        return (Vec::new(), None);
+    };
+    let members = schema.get("enum").and_then(Value::as_array);
+    let allowed = members
+        .map(|members| {
+            members
+                .iter()
+                .filter(|member| !member.is_null())
+                .map(|member| match member {
+                    Value::String(text) => Some(text.clone()),
+                    Value::Number(number) if number.is_i64() || number.is_u64() => {
+                        Some(number.to_string())
+                    }
+                    Value::Bool(flag) => Some(flag.to_string()),
+                    _ => None,
+                })
+                .collect::<Option<Vec<String>>>()
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+    let format = (single_type(schema) == Some("string")
+        && schema.get("format").and_then(Value::as_str) == Some("date-time"))
+    .then_some(Format::DateTime);
+    (allowed, format)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -341,12 +391,15 @@ fn deep_object(parameter: &Value, name: &str) -> Option<Result<Expansion, String
         let Some(value_type) = ValueType::of_schema(&properties[property]) else {
             return Some(refused());
         };
+        let (allowed, format) = constraints(Some(&properties[property]));
         out.push(Parameter {
             name: format!("{name}[{property}]"),
             location: Location::Query,
             required: whole && required.contains(&property.as_str()),
             value_type: Some(value_type),
             repeated: false,
+            allowed,
+            format,
         });
     }
     Some(Ok((out, gap)))
@@ -400,6 +453,11 @@ fn parameters(
                     } else {
                         ValueType::declared(parameter)
                     };
+                    let (allowed, format) = constraints(if repeated {
+                        schema.and_then(|s| s.get("items"))
+                    } else {
+                        schema
+                    });
                     out.push((
                         Parameter {
                             name: name.to_owned(),
@@ -410,6 +468,8 @@ fn parameters(
                                 .unwrap_or(false),
                             value_type,
                             repeated,
+                            allowed,
+                            format,
                         },
                         shape.and_then(Result::err).or(deep_gap),
                         expansion,

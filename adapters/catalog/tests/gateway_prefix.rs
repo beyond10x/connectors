@@ -159,18 +159,20 @@ fn refusal(config: &Value) -> String {
 /// `issue.comment.add` required the new `id` (and the issue's `key`) present
 /// after the write, and again when it gained `projects.list`, `project.get`
 /// and the issue `feed`, and again when `issues.search` declared its `walk`.
+/// Every pair was re-pinned once more when the bundles were rebuilt to record
+/// each parameter's `enum` and `format: date-time`.
 const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
         "gitlab",
-        "ae21bf2222058538c7eb9036973fe8612b04feef04628ace4a5394d59a0f4fd0",
-        "46e04a9d96d0c783771ca07baf47995e159e6d2f3a8dfa461b541f45dd35d9cb",
+        "b9cca5d0fa2fc6ccd31f0279dd46c1d7cb441e2318add9c527a2a094c0a9ac4a",
+        "e4b752f75723b2de2c968185cf72fd3701158f8b991c16cb197c47695f5965bd",
     ),
     (
         "catalog-jira.md",
         "jira",
-        "4957f983d76748a1effbf84b2945f22ac1b2375247a1163bbc04ce3699041f47",
-        "825e16fc6a087d3f237b49e2a29dbb1e1d44ede342bbf3b8fe4cfa80ac4db3a2",
+        "d1fab467ba797bddde1c937b0afac45d05c1a719d7c9b24f80e52b349c3e2aa3",
+        "b96bb4436bc1296375bb6ed70790fb65ee18b067325fc344851c677f65cac6c9",
     ),
     // The Confluence guide declares an `access` probe since #102, which is part of
     // its configuration and so of its revision. Its pair moved again when its
@@ -178,8 +180,8 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "catalog-confluence.md",
         "confluence",
-        "b28fc9739d6e43c7e50b6f060744f02caf12ea7a9e503414497922c6413c6db1",
-        "df461239a3e29d679d70ebd5388f42bbff7fcdd6469d5c6f431f01697e1e7b92",
+        "541e85e9965d47bc191cb8ec2337b60e925cecd1a932e2d8b6cf0ba15a255033",
+        "79df6697d5170cc278e87f838abdaad9e047643a4caff15dfe3aaecc5d6c39e8",
     ),
 ];
 

@@ -60,6 +60,9 @@ fn base_gitlab(directory: &Path) {
     let mut gitlab = bundle::load(&root().join("generated/bundles"), "gitlab").unwrap();
     for operation in &mut gitlab.inventory.operations {
         for parameter in &mut operation.parameters {
+            // The base recorded neither an `enum` nor a `format`.
+            parameter.allowed.clear();
+            parameter.format = None;
             if parameter.repeated {
                 parameter.repeated = false;
                 parameter.value_type = None;
