@@ -45,6 +45,7 @@
     "handler:operations-list: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-check: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-checkpoints-enable: implement the owner-qualified callable and its declared result/error contract",
+    "handler:setup-custody-orphans: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-init: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-migrate: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-owner-stop: implement the owner-qualified callable and its declared result/error contract"

@@ -1058,3 +1058,111 @@ fn largest_material_of_every_shipped_auth_profile_round_trips_through_the_split_
     largest_materials_round_trip(&|scope| Ok(Parted::new(entries.clone(), scope)));
     assert!(entries.names().is_empty());
 }
+
+#[cfg(target_os = "linux")]
+mod session_keyring {
+    use super::*;
+    use crate::secret_service::{items_at, orphans_at, remove_authority_at, session_bus_refusal};
+    use std::{collections::HashSet, path::Path};
+
+    #[test]
+    fn a_test_run_may_not_open_the_session_bus_secret_service() {
+        let session = format!("unix:path=/run/user/{}/bus", unsafe { libc::geteuid() });
+        let named = session_bus_refusal(None, Some(&session)).expect("refused");
+        assert!(named.contains("DBUS_SESSION_BUS_ADDRESS"), "{named}");
+        let unset = session_bus_refusal(None, None).expect("refused");
+        assert!(unset.contains("secret_service_socket"), "{unset}");
+        let selected = session_bus_refusal(
+            Some(Path::new(&session["unix:path=".len()..])),
+            Some(&session),
+        )
+        .expect("refused");
+        assert!(selected.contains("DBUS_SESSION_BUS_ADDRESS"), "{selected}");
+        assert_eq!(
+            session_bus_refusal(
+                Some(Path::new("/srv/fixture/private/bus")),
+                Some("unix:path=/srv/fixture/private/bus")
+            ),
+            None
+        );
+    }
+
+    fn put(fixture: &crate::secret_service::fixture::Fixture, scope: Scope) {
+        let version = Version::new(scope, Uuid::new_v4()).unwrap();
+        let length = if scope.purpose() == crate::Purpose::ApprovalSigning {
+            SIGNING_SEED_BYTES
+        } else {
+            16
+        };
+        fixture
+            .backend(scope)
+            .unwrap()
+            .write_new(version, &Material::new(vec![7u8; length]), until(), || {
+                Ok(())
+            })
+            .unwrap();
+    }
+
+    #[test]
+    #[ignore = "requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR"]
+    fn custody_writes_reach_the_default_alias_collection() {
+        let fixture = crate::secret_service::fixture::Fixture::new();
+        let scope = Scope::new(Uuid::new_v4(), Uuid::new_v4()).unwrap();
+        put(&fixture, scope);
+        let target = fixture.alias_target("default");
+        let items = items_at(Some(&fixture.socket)).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].collection, target);
+        assert!(items[0].path.starts_with(&format!("{target}/")));
+    }
+
+    #[test]
+    #[ignore = "requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR"]
+    fn removing_an_authority_leaves_no_item_carrying_it() {
+        let fixture = crate::secret_service::fixture::Fixture::new();
+        let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
+        for _ in 0..3 {
+            put(&fixture, Scope::new(a, Uuid::new_v4()).unwrap());
+        }
+        put(
+            &fixture,
+            Scope::approval_signing(a, Uuid::new_v4()).unwrap(),
+        );
+        put(&fixture, Scope::new(b, Uuid::new_v4()).unwrap());
+        let removal = remove_authority_at(Some(&fixture.socket), a).unwrap();
+        assert_eq!(removal.deleted.len(), 4);
+        assert!(removal.failed.is_empty());
+        let left = items_at(Some(&fixture.socket)).unwrap();
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0].authority, b.to_string());
+    }
+
+    #[test]
+    #[ignore = "requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR"]
+    fn orphans_are_listed_and_removed_only_on_the_flag() {
+        let fixture = crate::secret_service::fixture::Fixture::new();
+        let (held, lost) = (Uuid::new_v4(), Uuid::new_v4());
+        put(&fixture, Scope::new(held, Uuid::new_v4()).unwrap());
+        put(&fixture, Scope::new(lost, Uuid::new_v4()).unwrap());
+        put(
+            &fixture,
+            Scope::approval_signing(lost, Uuid::new_v4()).unwrap(),
+        );
+        let known = HashSet::from([held]);
+        let listed = orphans_at(Some(&fixture.socket), &known, false).unwrap();
+        assert_eq!(listed.orphans.len(), 2);
+        assert!(
+            listed
+                .orphans
+                .iter()
+                .all(|i| i.authority == lost.to_string())
+        );
+        assert!(listed.removal.is_none());
+        assert_eq!(items_at(Some(&fixture.socket)).unwrap().len(), 3);
+        let removed = orphans_at(Some(&fixture.socket), &known, true).unwrap();
+        assert_eq!(removed.removal.unwrap().deleted.len(), 2);
+        let left = items_at(Some(&fixture.socket)).unwrap();
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0].authority, held.to_string());
+    }
+}

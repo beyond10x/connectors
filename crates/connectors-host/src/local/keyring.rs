@@ -29,3 +29,27 @@ pub fn inspect_mounted(directory: &Path) -> State {
         State::Unavailable
     }
 }
+
+#[cfg(target_os = "linux")]
+pub use connectors_custody::secret_service::{CustodyItem, Orphans, Removal};
+
+/// Delete every custody item carrying `authority`; each failed delete is named
+/// in the result.
+#[cfg(target_os = "linux")]
+pub fn custody_remove_authority(
+    socket: Option<&Path>,
+    authority: uuid::Uuid,
+) -> Result<Removal, connectors_custody::Failure> {
+    connectors_custody::secret_service::remove_authority_at(socket, authority)
+}
+
+/// The custody items on the Secret Service that no store of `known` names;
+/// they are deleted only when `remove` is true. Reads attributes, never a value.
+#[cfg(target_os = "linux")]
+pub fn custody_orphans(
+    socket: Option<&Path>,
+    known: &std::collections::HashSet<uuid::Uuid>,
+    remove: bool,
+) -> Result<Orphans, connectors_custody::Failure> {
+    connectors_custody::secret_service::orphans_at(socket, known, remove)
+}

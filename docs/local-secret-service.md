@@ -41,10 +41,14 @@ that owner's PID, verifies the executable digest, and requires the same mount an
 user namespaces and filesystem root. A dead owner cannot be replaced underneath
 an existing capability. There is no service activation, unlock, or prompt.
 
-Only the persistent `login` collection, addressed by its object path
-`/org/freedesktop/secrets/collection/login` and already unlocked, is selected. The
-desktop's `default` alias belongs to every other application on the machine:
-Connectors never reads, requires or changes it, and never suggests changing it. The binding derives its storage directory from the
+Only the collection behind the Secret Service `default` alias (`ReadAlias("default")`;
+`login` on a stock GNOME Keyring), already unlocked, receives writes. The alias is read, never
+set. Items already stored under `/org/freedesktop/secrets/collection/login` stay readable and
+deletable when the alias resolves elsewhere; nothing is moved. The collection name must be
+alphanumeric or `_`, and its file is `<name>.keyring`. `items_at`, `remove_authority_at` and
+`orphans_at` list and delete custody items by authority, reading attributes only. Test builds
+refuse to open the session bus's Secret Service: they panic naming
+`DBUS_SESSION_BUS_ADDRESS` (or the missing `secret_service_socket`) before any write. The binding derives its storage directory from the
 verified daemon's bounded environment, using the audited HOME/XDG and legacy
 directory rules. It does not assume the client's environment matches the daemon's.
 The temporary environment buffer is zeroized without diagnostics. Duplicate or

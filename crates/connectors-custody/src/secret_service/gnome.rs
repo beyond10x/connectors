@@ -18,14 +18,14 @@ use zeroize::Zeroizing;
 // Arch Linux gnome-keyring 1:50.0-1; source and installed artifact receipts are
 // recorded in docs/local-secret-service.md. This pin is intentionally narrow.
 const DAEMON_SHA256: &str = "b9a71f6b4c4bfaf1759a99036b7b3ab6cf98b2b479c0c2a24f02f5f2ca53958b";
-const COLLECTION: &str = "/org/freedesktop/secrets/collection/login";
-const FILE: &str = "login.keyring";
+const COLLECTIONS: &str = "/org/freedesktop/secrets/collection/";
 const HEADER: &[u8; 20] = b"GnomeKeyring\n\r\0\n\0\0\0\0";
 
 pub(super) struct Persistence {
     process: File,
     pub(super) directory: File,
     path: PathBuf,
+    file: String,
     ancestors: Vec<File>,
     #[cfg(any(test, feature = "test-support"))]
     pub(super) fail_sync: std::sync::atomic::AtomicBool,
@@ -49,9 +49,7 @@ impl Persistence {
         }
     }
     pub(super) fn admit(service: &Service) -> Result<Self> {
-        if service.collection.as_str() != COLLECTION {
-            return Err(Failure::Unavailable);
-        }
+        let file = collection_file(service.collection.as_str())?;
         let bus = zbus::blocking::fdo::DBusProxy::new(&service.connection).map_err(unavailable)?;
         let pid = bus
             .get_connection_unix_process_id(service.owner.clone().into())
@@ -126,6 +124,7 @@ impl Persistence {
             process,
             directory: directory_file,
             path: directory,
+            file,
             ancestors,
             #[cfg(any(test, feature = "test-support"))]
             fail_sync: std::sync::atomic::AtomicBool::new(false),
@@ -159,7 +158,7 @@ impl Persistence {
             return Err(Failure::Unavailable);
         }
         let mut file =
-            fs::private_file_at(&self.directory, OsStr::new(FILE)).map_err(unavailable)?;
+            fs::private_file_at(&self.directory, OsStr::new(&self.file)).map_err(unavailable)?;
         let mut header = [0; 20];
         file.read_exact(&mut header).map_err(unavailable)?;
         if &header != HEADER {
@@ -267,6 +266,16 @@ fn proc_file(proc: &File, name: &str) -> Result<File> {
     // SAFETY: openat returned a new owned descriptor.
     Ok(unsafe { File::from_raw_fd(fd) })
 }
+/// The encrypted file behind a collection: `<name>.keyring` for a plain
+/// collection name. Any other name is refused, never guessed.
+fn collection_file(collection: &str) -> Result<String> {
+    let name = collection
+        .strip_prefix(COLLECTIONS)
+        .filter(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_'))
+        .ok_or(Failure::Unavailable)?;
+    Ok(format!("{name}.keyring"))
+}
+
 fn unavailable<T>(_: T) -> Failure {
     Failure::Unavailable
 }

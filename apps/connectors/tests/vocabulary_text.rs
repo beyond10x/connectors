@@ -112,10 +112,11 @@ fn help_says_adapter_only_on_a_deprecated_line() {
         refused.push(format!("connectors-catalog-provider --help: {line}"));
     }
     assert!(refused.is_empty(), "{}", refused.join("\n"));
-    // Root, 7 groups, 34 command paths and 5 aliases: `invoke` is one, and
+    // Root, 7 groups, 35 command paths and 5 aliases: `invoke` is one, and
     // `operations invoke` is removed (story:connectors-do-short-invocation).
     // `definitions install` is the newest (story:definitions-install).
-    assert_eq!(paths.len(), 47, "{paths:?}");
+    // `setup custody-orphans` (story:custody-keeps-out-of-the-session-keyring) is the newest.
+    assert_eq!(paths.len(), 48, "{paths:?}");
 }
 
 /// The listing line `help` writes for `name`, the words after the name.
