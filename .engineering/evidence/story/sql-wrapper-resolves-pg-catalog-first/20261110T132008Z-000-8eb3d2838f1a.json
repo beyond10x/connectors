@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T13:20:08Z",
+  "actor": "human:timo",
+  "artifact": "story:sql-wrapper-resolves-pg-catalog-first",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-sql-pgcat-security-1",
+    "reference": "correction on impl/sql-wrapper-resolves-pg-catalog-first: OPERATOR(pg_catalog.+) joined with spaces; search_path pg_catalog, public; ::pg_catalog.text and COLLATE pg_catalog.\"C\"; live PostgreSQL 17: protocol 21, adversary_pg_catalog 6, security_pg_catalog 11 passed with --include-ignored",
+    "review": "review-result:wave-b-sql-pgcat-security-1",
+    "outcome": "fixed"
+  }
+}
