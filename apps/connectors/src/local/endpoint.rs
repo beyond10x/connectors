@@ -489,9 +489,65 @@ fn publish(paths: &Paths, old: &str, new: &str, mode: u32) -> Result<(), Handler
     let parent = config.parent().ok_or_else(invalid_configuration)?;
     let name = config.file_name().ok_or_else(invalid_configuration)?;
     let directory = filesystem::directory(parent, false, false).map_err(host_failure)?;
+    // The check and the replacement are one step: every writer of this file
+    // holds the directory's exclusive lock (released when `directory`
+    // closes) from the check to the rename.
+    directory
+        .lock()
+        .map_err(|_| host_failure(Failure::InvalidConfiguration))?;
     if read(paths)?.0 != old {
         return Err(host_failure(Failure::ConcurrentRevision));
     }
+    #[cfg(test)]
+    tests::between_check_and_replacement();
     filesystem::publish_replace_keeping(&directory, name, new.as_bytes(), mode)
         .map_err(host_failure)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static WINDOW_MILLIS: AtomicU64 = AtomicU64::new(0);
+
+    /// Widens the window between `publish`'s check and its replacement.
+    pub(super) fn between_check_and_replacement() {
+        let millis = WINDOW_MILLIS.load(Ordering::SeqCst);
+        std::thread::sleep(std::time::Duration::from_millis(millis));
+    }
+
+    /// story:endpoint-publish-holds-one-writer: with the window between the
+    /// check and the replacement wide open, at most one of several writers
+    /// that read the same text replaces it, and the file holds that one's
+    /// text.
+    #[test]
+    fn writers_of_one_text_replace_it_at_most_once() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = tempfile::tempdir().unwrap();
+        let config = directory.path().join("config.toml");
+        let old = "format='connectors-local/5'\n";
+        std::fs::write(&config, old).unwrap();
+        std::fs::set_permissions(&config, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let paths = Paths::resolve(Some(&config), Some(&directory.path().join("state"))).unwrap();
+        WINDOW_MILLIS.store(100, Ordering::SeqCst);
+        let published: Vec<String> = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..8)
+                .map(|n| {
+                    let paths = &paths;
+                    scope.spawn(move || {
+                        let new = format!("{old}# writer {n}\n");
+                        publish(paths, old, &new, 0o600).is_ok().then_some(new)
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .filter_map(|handle| handle.join().unwrap())
+                .collect()
+        });
+        WINDOW_MILLIS.store(0, Ordering::SeqCst);
+        assert_eq!(published.len(), 1, "{published:?}");
+        assert_eq!(std::fs::read_to_string(&config).unwrap(), published[0]);
+    }
 }
