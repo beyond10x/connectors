@@ -7,7 +7,7 @@ title: Zero open GitHub issues and every defect story in the store fixed, in one
 summary: 'Operator goal 2026-11-09: 9 open issues and 56 defect stories, delivered by one pull request'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 8
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:46Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:57:46Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
@@ -223,10 +223,25 @@ closing store commit, and the squash merge of the pull request. No tag, no relea
 | `story:oauth-browser-empty-connection-fixture` | `cb-oauth-fixture` | merged, tree finished |
 | `story:release-image-platform-check-tolerates-padding` | `cb-release-image` | merged, tree finished |
 | `story:upgrade-refusal-test-port-reuse` | `cb-upgrade-port` | merged, tree finished |
-| `story:tests-stop-the-owners-they-start` | `cb-stop-owners` | implementing |
-| `story:custody-keeps-out-of-the-session-keyring` | `cb-custody-keyring` | implementing |
+| `story:tests-stop-the-owners-they-start` | `cb-stop-owners` | merged, tree finished (merge `dbdf32e26`) |
+| `story:custody-keeps-out-of-the-session-keyring` | `cb-custody-keyring` | merged, tree finished (merge `7988b0427`) |
 | `story:connection-lease-tests-pin-the-window` | `cb-lease-window` | merged, tree finished (merge `609da4250`) |
 | `story:ignored-journeys-run-in-ci` | `cb-ignored-ci` | merged, tree finished (merge `0d27f9912`) |
-| `story:authored-scenarios-known-failing` | `cb-authored-scen` | implementing |
-| `story:cli-connect-admission-timeout-under-load` | `cb-cli-admission` | implementing |
-| `story:clock-quorum-test-tolerates-a-slow-loopback-source` | `cb-clock-loopback` | implementing |
+| `story:authored-scenarios-known-failing` | `cb-authored-scen` | merged, tree finished (merge `32b7edf45`) |
+| `story:cli-connect-admission-timeout-under-load` | `cb-cli-admission` | merged, tree finished (merge `b28bcf031`) |
+| `story:clock-quorum-test-tolerates-a-slow-loopback-source` | `cb-clock-loopback` | merged, tree finished (merge `5f5d1e108`) |
+| `story:docs-provider-pages-shared-guides` | `cb-docs-guides` | merged, tree finished (merge `bd8343ae3`) |
+| `story:tavily-crawl-cut-short-is-not-complete` | `cb-tavily-crawl` | merged-partial (merge `5d76bbad9`) |
+| `story:generated-output-regenerates-in-a-fresh-checkout` | `cb-fresh-regen` | merged, tree finished (merge `8b8a729d8`) |
+| `story:legacy-alias-sharing-an-instance-name` | `cb-alias-contract` | merged, tree finished (merge `7be17a9aa`) |
+| `story:docs-specification-sidebar` | `cb-docs-sidebar` | merged, tree finished (merge `e5e891798`) |
+| `story:gmail-attachment-read-flaky-under-load` | `cb-gmail-attach` | not-reproduced |
+| `story:host-gate-load-sensitivity-w3` | `cb-gate-w3` | implementing |
+| `story:mcp-reply-after-hangup-owner-latency-under-load` | `cb-mcp-hangup` | merged, tree finished (merge `56067e56f`) |
+| `story:catalog-validates-enum-and-date-time` | `cb-enum-date` | merged, tree finished (merge `e728524d0`) |
+| `story:owner-recovers-after-failed-acquisition` | `cb-owner-recover` | merged, tree finished (merge `d3bd6fcd4`) |
+| `story:owner-errors-are-readable` | `cb-owner-errors` | merged, tree finished (merge `13367cb99`) |
+| `story:owner-path-tests-hold-under-load` | `cb-owner-paths` | merged, tree finished (merge `96212520e`) |
+| `story:clock-quorum-windows-unreachable-flake` | `cb-clock-win` | implementing |
+| `story:configuration-change-error` | `cb-config-change` | implementing |
+| `story:lease-early-recollection-relaunch-margin` | `cb-lease-margin` | implementing |
