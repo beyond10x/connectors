@@ -7,7 +7,7 @@ title: Zero open GitHub issues and every defect story in the store fixed, in one
 summary: 'Operator goal 2026-11-09: 9 open issues and 56 defect stories, delivered by one pull request'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:46Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:57:46Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
@@ -137,3 +137,23 @@ Derived once, 2026-11-09, by `aep plan artifact waves --kind story --status acti
 ### Delivery
 
 Nothing delivered yet.
+
+## Wave A (delivered 2026-11-10)
+
+Approved by `approval-record:zero-issues-wave-a` (non-interactive). Ten stories, one managed worktree
+each, an adversary pass each (two for four of them), merged into `wave/zero-issues`:
+`story:http-empty-query-no-trailing-question-mark`, `story:bundle-index-refuses-ambiguous-rows`,
+`story:provider-programs-run-on-macos` (#229), `story:endpoint-publish-holds-one-writer`,
+`story:connection-next-actions-no-cycle` (#181), `story:catalog-guard-optional-preflight-values`,
+`story:feed-cursor-unadvanced-is-unavailable`, `story:mysql-query-read-provenance`,
+`story:websearch-contract-states-host-deadline`, `story:owner-read-answer-size-envelope`.
+
+Nine are implemented on the local repository gate at `74030787c`. `story:provider-programs-run-on-macos`
+stays active until the pull request's macOS jobs prove it. Integration fixes the gate found: the
+metadata Entity Runtime definitions and the operation-type digests regenerated after two `cli.yaml`
+changes, two `cli.yaml` line citations re-pointed, and the Google Drive configuration revisions
+re-pinned. `local_mcp_server` failed under load in two gate runs; an implementor measured 3 of 22
+failing with the owner-read change and 3 of 23 without it, the known
+`story:mcp-reply-after-hangup-owner-latency-under-load`.
+
+From-finding drafts: `story:slack-file-read-checks-exact-path`, `story:tavily-crawl-cut-short-is-not-complete`.

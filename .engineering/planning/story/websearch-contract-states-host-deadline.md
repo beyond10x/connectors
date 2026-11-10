@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:websearch-contract-states-host-deadline
 kind: story
-status: active
+status: implemented
 title: The websearch contract states the deadline a call actually has
 summary: contract promises 160 s / 150 s; the CLI cuts every call at 30 s
 relations:
@@ -27,10 +27,11 @@ scope:
   path: adapters/tavily/tests/protocol.rs
 - confidence: cited
   path: website/docs/connectors/tavily.md
-revision: 14
+revision: 15
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:46Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:46Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-10T06:20:12Z", actor: "human:timo", revision: 15, decided_on: {"recorded":{"test_result":1,"review_outcome":4,"verification":1}}, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 

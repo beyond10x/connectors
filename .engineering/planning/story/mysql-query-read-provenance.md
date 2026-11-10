@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:mysql-query-read-provenance
 kind: story
-status: active
+status: implemented
 title: MySQL query.read provenance says which database it names
 relations:
 - decomposes: epic:fluxplane-plugin-parity
@@ -19,10 +19,11 @@ scope:
   path: adapters/sql/tests/query_provenance_adversary.rs
 - confidence: cited
   path: docs/local-mysql-cli.md
-revision: 13
+revision: 14
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:11Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:12Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-10T06:20:11Z", actor: "human:timo", revision: 14, decided_on: {"recorded":{"test_result":1,"review_outcome":4,"verification":1}}, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 

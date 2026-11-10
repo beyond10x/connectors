@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:owner-read-answer-size-envelope
 kind: story
-status: active
+status: implemented
 title: A read result the child admits fits the owner's answer
 relations:
 - serves: vision:independent-contract-adapters
@@ -19,10 +19,11 @@ scope:
   path: crates/connectors-host/src/local/runtime.rs
 - confidence: cited
   path: crates/connectors-host/src/local/runtime/channel.rs
-revision: 10
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:15Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:16Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-10T06:20:12Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"test_result":1,"review_outcome":1,"verification":1}}, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Defect
 

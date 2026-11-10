@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:connection-next-actions-no-cycle
 kind: story
-status: active
+status: implemented
 title: Every next action a connection command answers is accepted by the state it leads to
 summary: 'issue #181: revalidate, reconnect and connect answer each other''s next action in a loop'
 refs:
@@ -37,10 +37,11 @@ scope:
   path: crates/connectors-host/src/local/registry/observation.rs
 - confidence: cited
   path: ess/domains/cli.yaml
-revision: 21
+revision: 22
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:56Z", actor: "human:timo", revision: 5, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:57:56Z", actor: "human:timo", revision: 6, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-10T06:20:10Z", actor: "human:timo", revision: 22, decided_on: {"recorded":{"test_result":1,"review_outcome":3}}, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 

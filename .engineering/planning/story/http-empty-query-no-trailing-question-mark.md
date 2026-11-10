@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:http-empty-query-no-trailing-question-mark
 kind: story
-status: active
+status: implemented
 title: A provider request with no query parameters is sent without a trailing ?
 relations:
 - serves: vision:independent-contract-adapters
@@ -74,10 +74,11 @@ scope:
   path: crates/connectors-host/tests/http_service_account_token.rs
 - confidence: cited
   path: crates/connectors-host/tests/http_write.rs
-revision: 38
+revision: 39
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:06Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:06Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-10T06:20:08Z", actor: "human:timo", revision: 39, decided_on: {"recorded":{"test_result":1,"review_outcome":1,"verification":1}}, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Source
 

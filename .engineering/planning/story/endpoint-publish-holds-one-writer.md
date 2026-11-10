@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:endpoint-publish-holds-one-writer
 kind: story
-status: active
+status: implemented
 title: Concurrent connects with different endpoints on one instance publish at most one of them
 summary: endpoint.rs publish() checks the file and then renames with no lock between; two writers can both go on (run 41742146209)
 tags:
@@ -18,10 +18,11 @@ scope:
   path: contracts/cli/v1alpha1/semantics.md
 - confidence: cited
   path: docs/local-runtime-foundation.md
-revision: 10
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:59:25Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:59:25Z", actor: "human:timo", revision: 5, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-10T06:20:09Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"test_result":1,"review_outcome":6,"verification":1}}, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Defect
 
