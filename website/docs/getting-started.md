@@ -25,7 +25,7 @@ target/debug/connectors --version
 ```
 
 ```text
-connectors 0.69.0
+connectors 0.70.0
 ```
 
 Ordinary builds read checked-in generated Rust and need no ESS. Cargo downloads dependencies on
@@ -40,9 +40,11 @@ The walkthrough below builds from source because it also needs the Kubernetes se
 existed
 ([`release-binaries.yml`](https://github.com/beyond10x/connectors/blob/main/.github/workflows/release-binaries.yml))
 carry source archives only, and there is no Windows binary. Each archive holds a directory with
-two binaries, `connectors` and the catalog provider `connectors-catalog-provider` (archives of
-0.50.0 and earlier hold `connectors` alone), and `README.md` and `CHANGELOG.md`; the Kubernetes
-service and the other connectors are built from source, as their guides show. A catalog instance
+`connectors`, the catalog provider `connectors-catalog-provider`, the provider programs
+`connectors-kubernetes`, `connectors-grafana`, `connectors-prometheus` and `connectors-loki`, and
+`README.md` and `CHANGELOG.md` (archives of 0.64.0 and earlier hold `connectors` and
+`connectors-catalog-provider` only, those of 0.50.0 and earlier `connectors` alone); the other
+connectors are built from source, as their guides show. A catalog instance
 that pins nothing is served by the `connectors-catalog-provider` next to `connectors`, so keep the
 two binaries in one directory. The Linux binaries are built on Ubuntu 24.04 and need its glibc or
 a newer one.

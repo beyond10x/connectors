@@ -419,7 +419,7 @@ and is logged. At most 4 pushes are worked on at once; another one is `503`.
 
 ## In a container
 
-Releases after 0.65.1 publish the image `ghcr.io/beyond10x/connectors:<version>` for
+Releases from 0.70.0 on publish the image `ghcr.io/beyond10x/connectors:<version>` for
 `linux/amd64` and `linux/arm64`. It holds the binaries of that release's Linux archives in
 `/usr/local/bin`, on `gcr.io/distroless/cc-debian13`, runs as user and group `65532`, and starts
 `connectors-catalog-provider`; pass `--config <file>` to serve a catalog instance. Each binary
@@ -431,8 +431,8 @@ docker run --rm --entrypoint /usr/local/bin/connectors-kubernetes "ghcr.io/beyon
 ```
 
 ```text
-connectors-catalog-provider 0.65.1
-connectors-kubernetes 0.65.1
+connectors-catalog-provider 0.70.0
+connectors-kubernetes 0.70.0
 ```
 
 The image carries no configuration and no credential. Mount the configuration file, give the
