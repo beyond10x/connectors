@@ -28,8 +28,17 @@ fn main() {
         } else {
             Err(connectors_host::local::owner::Code::InvalidInput.into())
         };
-        // The refusal's code alone, on standard error; the CLI starts its owner
-        // with standard error discarded (contracts/cli/v1alpha1/owner.md).
+        // The refusal's code, in the owner's log when the state directory is
+        // one the owner may write to, and alone on standard error, which the CLI
+        // discards (contracts/cli/v1alpha1/owner.md).
+        if let Err(error) = &result
+            && args.len() == 4
+        {
+            connectors_host::local::owner::diagnostics::record_refusal(
+                std::path::Path::new(&args[3]),
+                error.code,
+            );
+        }
         if let Err(error) = &result
             && let Ok(code) = serde_json::to_string(&error.code)
         {

@@ -890,6 +890,14 @@ types:
       # enforced by the host and pinned by tests.
       - {name: cause, type: "Optional<connectors.cli.FailureCause>"}
       - {name: attempts, type: "Optional<Integer>"}
+      # ESS-LIMIT: owner_log and owner_error appear only on `outcome_unknown` after an owner-side
+      # failure (contracts/cli/v1alpha1/owner.md, "Owner log"): owner_log is the path of the
+      # owner's bounded, owner-only log, owner_error the code of the newest line the owner logged for the
+      # command's own connection, a snake_case error code and absent when it logged none. As for
+      # instance_id above, ESS declares no invariant on a CLI type, so the presence rule is
+      # enforced by the host and pinned by tests.
+      - {name: owner_log, type: "Optional<String>"}
+      - {name: owner_error, type: "Optional<String>"}
       # ESS-LIMIT: feature appears only on `definitions install`'s unmet_feature: the first
       # feature, in the index's sorted order, that the release requires and this build does
       # not support. file appears only on its digest_mismatch: the path, relative to the

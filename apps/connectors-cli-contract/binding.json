@@ -558,6 +558,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -1186,6 +1198,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -1780,6 +1804,18 @@
                           "choose_clock_source",
                           "none"
                         ]
+                      },
+                      "owner_error": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "owner_log": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
                       },
                       "private_protocol": {
                         "kind": "optional",
@@ -2382,6 +2418,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",
@@ -2987,6 +3035,18 @@
                           "none"
                         ]
                       },
+                      "owner_error": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "owner_log": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
                       "private_protocol": {
                         "kind": "optional",
                         "of": {
@@ -3588,6 +3648,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",
@@ -4223,6 +4295,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -4845,6 +4929,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",
@@ -5483,6 +5579,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -6119,6 +6227,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",
@@ -6757,6 +6877,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -7393,6 +7525,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",
@@ -8031,6 +8175,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -8661,6 +8817,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",
@@ -9307,6 +9475,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -9942,6 +10122,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",
@@ -10760,6 +10952,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -11482,6 +11686,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -12177,6 +12393,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -12778,6 +13006,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",
@@ -13451,6 +13691,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",
@@ -14168,6 +14420,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -14880,6 +15144,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -15496,6 +15772,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",
@@ -16266,6 +16554,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -16877,6 +17177,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -17455,6 +17767,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",
@@ -18058,6 +18382,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",
@@ -18836,6 +19172,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -19474,6 +19822,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",
@@ -20129,6 +20489,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -20769,6 +21141,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -21359,6 +21743,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",
@@ -22006,6 +22402,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -22582,6 +22990,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",
@@ -23346,6 +23766,18 @@
                   "none"
                 ]
               },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "private_protocol": {
                 "kind": "optional",
                 "of": {
@@ -23917,6 +24349,18 @@
                   "choose_clock_source",
                   "none"
                 ]
+              },
+              "owner_error": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "owner_log": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               },
               "private_protocol": {
                 "kind": "optional",

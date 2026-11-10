@@ -418,6 +418,12 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
     if let Some(service_code) = error.service_code {
         data["service_code"] = json!(service_code);
     }
+    if let Some(log) = owner::diagnostics::observed(error.code) {
+        data["owner_log"] = json!(log.path);
+        if let Some(code) = log.code {
+            data["owner_error"] = json!(code);
+        }
+    }
     if let Some(service_reason) = error.service_reason {
         data["service_reason"] = json!(service_reason);
     }

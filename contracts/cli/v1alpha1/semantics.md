@@ -1664,7 +1664,7 @@ never replay a possible write after interruption, timeout or lost response.
 | metadata authority unavailable | `metadata_unavailable` | 1 |
 | store written by a newer binary whose record model differs (its marker names a newer or an unorderable version), a store whose SQL level is above this binary's highest, or a store record carrying a field this binary's model does not declare; nothing read or written (`stage = admission`, `next_action = upgrade`, `store_version` and `binary_version` named) | `metadata_schema_newer` | 1 |
 | a non-guarded metadata write the store changed under (a concurrent commit); nothing was written (`stage = publication`, `next_action = retry_explicitly`). A guarded write keeps the guarded-write rule below: its mutation record, `next_action = retry_status` | `revision_conflict` | 1 |
-| metadata publication acknowledgement uncertain | `outcome_unknown` | 1 |
+| metadata publication acknowledgement uncertain, or an owner that failed or answered none (`owner_log` names its [log](owner.md#owner-log) and `owner_error` the code it logged, when it logged one) | `outcome_unknown` | 1 |
 | changed principal/account/target during repair (`next_action = revoke_connection`, [one connection per instance](#one-connection-per-instance)) | `identity_mismatch` | 1 |
 | stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`: run `connectors setup owner-stop`); `connections connect` on an instance that holds its connection, or while another connect of it is in flight ([one connection per instance](#one-connection-per-instance)) | `lifecycle_conflict` | 1 |
 | stale/foreign stop target | `incarnation_mismatch` | 1 |
