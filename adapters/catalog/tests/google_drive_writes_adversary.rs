@@ -113,11 +113,9 @@ fn writes_section(guide: &str) -> String {
 /// parameter with the same meaning ("Whether the requesting application
 /// supports both My Drives and shared drives", the pinned Discovery document);
 /// the guide says the preflight is "one `files.get` for `fileId` with the same
-/// `fields`". The guard maps only `fileId` and `fields` into the preflight
-/// (`operations.json`), so the preflight of a shared-drive update asks Drive
-/// for the file as an application that does not support shared drives, while
-/// the PATCH it guards says it does. The preflight has to read the file the
-/// PATCH writes, under the same shared-drive mode.
+/// `fields`". The preflight has to read the file the PATCH writes, under the
+/// same shared-drive mode, so `operations.json` maps `supportsAllDrives` as an
+/// optional preflight value.
 #[tokio::test]
 async fn files_update_preflight_reads_under_the_shared_drive_mode_of_the_patch() {
     let http = scripted(200, &json!({"id": "fixture-shared-1", "version": "7"}));

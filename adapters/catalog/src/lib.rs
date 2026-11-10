@@ -880,7 +880,6 @@ pub struct Held {
 pub(crate) fn guarded_body_paths(guard: &Guard) -> impl Iterator<Item = &str> {
     guard
         .references()
-        .chain(guard.optional_references())
         .filter_map(|path| path.strip_prefix("body."))
 }
 
@@ -1519,6 +1518,30 @@ impl Engine {
                 for preflight in &guard.further_preflights {
                     reads.push(probe_operation(&preflight.operation_id)?);
                 }
+                for (read, preflight) in reads.iter().zip(guard.preflights()) {
+                    let bound = preflight
+                        .values
+                        .keys()
+                        .chain(preflight.optional_values.keys());
+                    for name in bound {
+                        if !read.parameters.iter().any(|p| &p.name == name) {
+                            return Err(refuse(format!(
+                                "guard of `{}` binds `{name}`, which `{}` does not declare",
+                                selection.id, preflight.operation_id
+                            )));
+                        }
+                    }
+                    if let Some(name) = preflight
+                        .optional_values
+                        .keys()
+                        .find(|name| preflight.values.contains_key(*name))
+                    {
+                        return Err(refuse(format!(
+                            "guard of `{}` binds `{name}` both in values and optional_values",
+                            selection.id
+                        )));
+                    }
+                }
                 let template = |operation: &Operation| {
                     Template::from_operation(operation).map_err(|refusal| refuse(refusal.reason()))
                 };
@@ -2013,7 +2036,12 @@ impl Engine {
              -> Result<Request> {
                 let mut bound = BTreeMap::new();
                 for (parameter, path) in optional {
-                    if let Some(value) = reference(&input, path).and_then(scalar) {
+                    // Absent is left out; a given value the read cannot carry
+                    // refuses, as a required one does.
+                    if let Some(given) = reference(&input, path) {
+                        let value = scalar(given).ok_or_else(|| {
+                            refuse(format!("guard value `{path}` is not a scalar"))
+                        })?;
                         bound.insert(parameter.clone(), Supplied::One(value));
                     }
                 }

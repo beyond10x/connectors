@@ -82,8 +82,10 @@ types:
 
   # A read before the write, whose answer must satisfy every check. A read that answers 404 is a
   # refusal before dispatch. A check that differs refuses the write unsent, as `forbidden`, or
-  # with `mismatch` when the preflight declares one. Absent when unused, so a preflight without
-  # it keeps its serialised form.
+  # with `mismatch` when the preflight declares one. `optional_values` binds read parameters like
+  # `values`, except that an input the caller did not give is left out of the read; a given one
+  # is forwarded, and a parameter is bound in one of the two. Absent when unused, so a preflight
+  # without them keeps its serialised form.
   - name: connectors_catalog.guard.Preflight
     kind: struct
     fields:

@@ -1221,7 +1221,7 @@ impl Context<'_> {
                 .parameters
                 .iter()
                 .any(|p| p.location == Location::Path && &p.name == parameter);
-            if !(path && parameter == input) {
+            if !(complete && path && parameter == input) {
                 with.insert(parameter.clone(), input.clone());
             }
         }
