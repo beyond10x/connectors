@@ -170,6 +170,26 @@ fn clock_unavailable(root: &tempfile::TempDir) -> Value {
     failure
 }
 
+/// `observation` brackets the time a source signed `truth` (Unix ms) said it
+/// was when it replied, once `elapsed` has passed since that reply.
+///
+/// The fixtures sign one fixed instant, but the check reports the time of its
+/// own reading: a source's lower bound is `truth - radius - 3 ms` plus the
+/// monotonic time since its reply, which exceeds the radius when the reading
+/// comes late. The true time at the reading is `truth` plus that same time, at
+/// most `elapsed`, the whole command's own measured wall time. So the lower
+/// bound may exceed `truth` by `elapsed`, and the upper bound may not fall
+/// below `truth`.
+fn assert_brackets(observation: &Value, truth: i64, elapsed: std::time::Duration) {
+    let elapsed = i64::try_from(elapsed.as_millis()).unwrap();
+    let (lower, upper) = (
+        observation["lower_unix_ms"].as_i64().unwrap(),
+        observation["upper_unix_ms"].as_i64().unwrap(),
+    );
+    assert!(lower <= truth + elapsed, "{lower} > {truth} + {elapsed}");
+    assert!(upper >= truth, "{upper} < {truth}");
+}
+
 /// Each line's `result`, in order.
 fn clock_results(lines: &Value) -> Vec<&str> {
     lines
@@ -231,7 +251,9 @@ fn clock_check_reports_each_source() {
         10_000,
         &[(&a.address, 7), (&liar.address, 8), (&b.address, 9)],
     ));
+    let started = std::time::Instant::now();
     let output = command(&root, &["approvals", "clock-check", "--adapter", "forge"]);
+    let elapsed = started.elapsed();
     let text = String::from_utf8_lossy(&output.stdout).into_owned();
     for leaked in ["ROUGHTIM", "midpoint", "nonce"] {
         assert!(!text.contains(leaked), "{leaked}: {text}");
@@ -239,8 +261,7 @@ fn clock_check_reports_each_source() {
     let view = success(&output);
     let observation = &view["observation"];
     let truth = i64::try_from(CLOCK_T * 1000).unwrap();
-    assert!(observation["lower_unix_ms"].as_i64().unwrap() <= truth);
-    assert!(observation["upper_unix_ms"].as_i64().unwrap() >= truth);
+    assert_brackets(observation, truth, elapsed);
     assert_eq!(
         observation["sources"],
         serde_json::json!([
@@ -249,6 +270,32 @@ fn clock_check_reports_each_source() {
             {"index": 2, "address": b.address, "result": "agreed", "radius_ms": 2000},
         ])
     );
+}
+
+/// A source that answers 1.2 s late holds the reading that long after the
+/// others replied, longer than the 1 s radius of the first: the reading's lower
+/// bound is then above the instant they signed, and still brackets the time.
+#[test]
+fn clock_check_brackets_the_time_when_a_source_answers_late() {
+    let late = std::time::Duration::from_millis(1200);
+    let (a, b) = (
+        clock_source(7, CLOCK_T, 1),
+        slow_first_clock_source(9, CLOCK_T, 2, late),
+    );
+    let root = clock_root(&clock_fixture::quorum_toml(
+        2,
+        10_000,
+        &[(&a.address, 7), (&b.address, 9)],
+    ));
+    let started = std::time::Instant::now();
+    let view = success(&command(
+        &root,
+        &["approvals", "clock-check", "--adapter", "forge"],
+    ));
+    let elapsed = started.elapsed();
+    assert!(elapsed >= late, "{elapsed:?}");
+    let truth = i64::try_from(CLOCK_T * 1000).unwrap();
+    assert_brackets(&view["observation"], truth, elapsed);
 }
 
 #[test]
