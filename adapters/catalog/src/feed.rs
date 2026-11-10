@@ -1599,14 +1599,20 @@ impl Feed {
                     .map(|mapped| mapped.value)
             })
             .collect::<Result<Vec<_>>>()?;
-        if let Some(next) = answer
+        let next = answer
             .pointer(&cursor.next)
             .and_then(scalar)
-            .filter(|next| !next.is_empty())
-        {
-            mark.cursor = Some(next);
-        }
+            .filter(|next| !next.is_empty());
         let complete = cursor.complete.holds(&answer);
+        // An incomplete answer that leaves the cursor where it was would be read again forever.
+        if !complete && (next.is_none() || next == mark.cursor) {
+            return Err(unavailable(
+                "provider answered more changes without advancing its cursor",
+            ));
+        }
+        if next.is_some() {
+            mark.cursor = next;
+        }
         Ok((items, mark, complete))
     }
 
