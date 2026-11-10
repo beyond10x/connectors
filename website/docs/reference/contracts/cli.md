@@ -1912,6 +1912,15 @@ changed configuration's description is cached by the first read command that
 [launches for it](#launching-for-a-description); a write after an
 executable-only change validates the connection once, as a read does.
 
+A `pending` connection says why in `pending_reason`, a member of its summary
+that `connections list` and `connections describe` carry and that is absent
+for every other state: `configuration_changed` (saved under another
+configuration revision of its instance), `configuration_refused` (the same, and
+the configured provider already refused its credential, so only a new
+connection helps), `no_credential` (none was published for it) or
+`evidence_expired` (its validation evidence lapsed; a revalidation recollects
+it).
+
 A connection saved under another configuration revision of its instance also
 reports `pending` (`stale = true`), and no status change is pending for it: a
 read on `invoke`, an approval naming it and a consumer launch refuse

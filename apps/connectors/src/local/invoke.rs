@@ -1382,6 +1382,7 @@ mod tests {
             profile: "token".into(),
             revision: "r1".into(),
             state,
+            pending_reason: None,
             identity: None,
             observed_at_ms: 1,
             valid_until_ms: 2,

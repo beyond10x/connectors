@@ -470,8 +470,12 @@ pub(super) fn held_one(paths: &Paths, alias: &str) -> owner::Result<String> {
 }
 
 fn summary(alias: &str, connection: &ObservedConnection) -> Value {
-    json!({"adapter":alias,"instance_id":connection.instance,"connection":connection.reference,"profile":connection.profile,
-        "revision":connection.revision,"state":connection.state})
+    let mut value = json!({"adapter":alias,"instance_id":connection.instance,"connection":connection.reference,"profile":connection.profile,
+        "revision":connection.revision,"state":connection.state});
+    if let Some(reason) = connection.pending_reason {
+        value["pending_reason"] = json!(reason);
+    }
+    value
 }
 fn description(alias: &str, connection: &ObservedConnection) -> Value {
     let mut value = json!({"summary":summary(alias,connection),"observed_at_ms":connection.observed_at_ms,
