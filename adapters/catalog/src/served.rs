@@ -773,9 +773,10 @@ fn error(refusal: Refusal) -> Error {
             false,
         ),
         StaleCursor => (ErrorCode::StaleCursor, "the cursor is stale", false),
-        ReadinessMismatch | IncarnationMismatch | InvalidConfiguration => {
-            (ErrorCode::Internal, "internal error", false)
-        }
+        ReadinessMismatch
+        | UnsupportedPrivateProtocol
+        | IncarnationMismatch
+        | InvalidConfiguration => (ErrorCode::Internal, "internal error", false),
         ProviderNotFound => (ErrorCode::NotFound, PROVIDER_NOT_FOUND, true),
         ProviderRateLimited => (ErrorCode::RateLimited, "the provider is rate limited", true),
         ProviderInternal => (ErrorCode::Internal, "the provider failed", true),

@@ -1913,3 +1913,66 @@ fn status_names_a_program_refusing_the_private_protocol() {
     let stopped = success(&command(&root, &["setup", "owner-stop"]));
     assert_eq!(stopped["disposition"], "stopped", "{stopped}");
 }
+
+/// Adversary, story:adapter-private-protocol-refusal-named. semantics.md: the refusal names
+/// "`private_protocol` the protocol asked for and `supported_private_protocols` the protocols the
+/// program answered that it speaks". The operator follows `next_action = check_configuration` and
+/// points the entry at `connectors-private/1`, which the program says it speaks, then asks
+/// `instances status` before anything starts the instance again. The status must not claim the
+/// program refused `connectors-private/1`: the protocol it was asked for, and refused, is
+/// `connectors-private/2`.
+#[cfg(unix)]
+#[test]
+fn adversary_status_after_reconfiguring_names_the_protocol_actually_refused() {
+    let root = tempfile::tempdir().unwrap();
+    success(&command(&root, &["setup", "init"]));
+    let config_path = root.path().join("config/config.toml");
+    let program = std::env::current_exe().unwrap().canonicalize().unwrap();
+    let digest: String = ring::digest::digest(&ring::digest::SHA256, &fs::read(&program).unwrap())
+        .as_ref()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let path = serde_json::to_string(program.to_str().unwrap()).unwrap();
+    let initial = fs::read_to_string(&config_path).unwrap();
+    let entry = |protocol: &str| {
+        format!(
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='{protocol}'\nstartup='automatic'\nrestart='never'\n[adapters.forge.executable]\npath={path}\nsha256='{digest}'\nargs=['--exact','private_protocol_one_only_fixture','--']\n"
+        )
+    };
+    fs::write(
+        &config_path,
+        initial.clone() + &entry("connectors-private/2"),
+    )
+    .unwrap();
+    let _owner = start_owner(
+        std::path::Path::new(env!("CARGO_BIN_EXE_connectors")),
+        &root,
+    );
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    loop {
+        let output = command(&root, &["instances", "status", "--adapter", "forge"]);
+        if output.status.code() == Some(1) {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < until,
+            "status never refused: {output:?}"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    fs::write(&config_path, initial + &entry("connectors-private/1")).unwrap();
+    let output = command(&root, &["instances", "status", "--adapter", "forge"]);
+    if output.status.code() == Some(1) {
+        let error = serde_json::from_slice::<Value>(&output.stderr).unwrap();
+        let data = &error["error"]["data"];
+        if data["code"] == "unsupported_private_protocol" {
+            assert_eq!(
+                data["private_protocol"], "connectors-private/2",
+                "the refusal names a protocol the program was never asked for: {error}"
+            );
+        }
+    }
+    let stopped = success(&command(&root, &["setup", "owner-stop"]));
+    assert_eq!(stopped["disposition"], "stopped", "{stopped}");
+}

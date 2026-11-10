@@ -25,6 +25,8 @@ pub(super) struct Owned {
 pub(super) struct Start {
     pub step: runtime::StartFailure,
     pub log: Option<std::path::PathBuf>,
+    /// The private protocol the entry selected when this start began.
+    pub asked: runtime::PrivateProtocol,
 }
 /// The refusal a failed start answers: `failure` as its code, and for a
 /// program that refused the private protocol the entry selects, the protocol
@@ -94,7 +96,7 @@ impl Control {
         // A failed instance whose program refused the private protocol its
         // entry selects is answered by that refusal, not observed.
         if state == "failed"
-            && let Some(Start { step, .. }) = &self.start_failure
+            && let Some(Start { step, asked, .. }) = &self.start_failure
             && matches!(
                 step,
                 runtime::StartFailure::UnsupportedPrivateProtocol { .. }
@@ -103,7 +105,7 @@ impl Control {
             return Err(refusal(
                 runtime::Failure::UnsupportedPrivateProtocol,
                 *step,
-                adapter.private_protocol(),
+                *asked,
             ));
         }
         let revision = self

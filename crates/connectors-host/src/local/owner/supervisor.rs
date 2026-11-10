@@ -1830,6 +1830,7 @@ impl Launch<'_> {
                     guard.start_failure = Some(lifecycle::Start {
                         step: error.step,
                         log: error.log,
+                        asked: self.current.private_protocol(),
                     });
                 }
                 return Err(lifecycle::refusal(
