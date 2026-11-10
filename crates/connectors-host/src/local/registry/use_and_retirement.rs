@@ -1,6 +1,38 @@
 use super::lifecycle::{bump, custody_version, mark_stale};
 use super::*;
 
+/// Concurrent read-use records the registry admits.
+const READ_USE_BOUND: i64 = 1_000;
+
+#[cfg(test)]
+thread_local! {
+    /// A test's smaller bound, so the refusal needs a few uses, not a thousand.
+    pub(super) static TEST_READ_USE_BOUND: std::cell::Cell<Option<i64>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// A new read use is refused `Capacity` while the bound of them are open. An
+/// open use is one not yet released; a released one only waits for its
+/// deadline sweep and holds no capacity.
+pub(super) fn admit_read_use_capacity(tx: &Transaction<'_>) -> Result<()> {
+    let bound = READ_USE_BOUND;
+    #[cfg(test)]
+    let bound = TEST_READ_USE_BOUND
+        .with(std::cell::Cell::get)
+        .unwrap_or(bound);
+    let count: i64 = tx
+        .query_row(
+            "SELECT count(*) FROM registry_uses WHERE released=0",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(db)?;
+    if count >= bound {
+        return Err(Failure::Capacity);
+    }
+    Ok(())
+}
+
 /// `preflight` admits a connection whose provider executable alone changed
 /// (`Follow::Executable`) on its readiness, since the owner validates it
 /// before its capture; the capture refuses it as `ExecutableChanged` until
@@ -231,8 +263,7 @@ impl Registry {
             tx.execute("DELETE FROM registry_uses WHERE expires_at_ms<=?1", [timestamp(now)?]).map_err(db)?;
             let row = admitted_read(tx, binding, reference, required_scopes, now, false)?;
             let baseline = row.baseline.as_ref().ok_or(Failure::MetadataUnavailable)?;
-            let count: i64 = tx.query_row("SELECT count(*) FROM registry_uses", [], |r| r.get(0)).map_err(db)?;
-            if count>=1000 { return Err(Failure::Capacity); }
+            admit_read_use_capacity(tx)?;
             let version_id = row.material.as_ref().ok_or(Failure::MetadataUnavailable)?;
             let id = new_id();
             // The original use deadline can only narrow. A later evidence
