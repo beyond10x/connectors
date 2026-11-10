@@ -1287,6 +1287,54 @@ types:
       - {name: backup_path, type: "Optional<String>"}
       - {name: configuration, type: "String"}
       - {name: entries, type: "List<connectors.cli.MigrateEntry>"}
+  # `setup custody-orphans` (contracts/cli/v1alpha1/semantics.md §3, "Custody
+  # orphans") lists the Secret Service custody items the store of this state
+  # directory does not name, grouped by authority with each purpose and count;
+  # absent, the mode is list. `--mode remove --authority <id>` deletes the items
+  # of that one authority and refuses without --authority or for the store's own
+  # authority. Another store of this machine may hold a listed authority, which
+  # the command cannot see, so it never removes more than the one authority it is
+  # told. ess-cli/1 has no valueless switch source, so the mode is a value; the
+  # handler enforces that remove needs authority. Item attributes are read,
+  # never a secret value.
+  - name: connectors.cli.CustodyOrphansMode
+    kind: enum
+    variants: [list, remove]
+  - name: connectors.cli.SetupCustodyOrphansInput
+    kind: struct
+    fields:
+      - {name: mode, type: "Optional<connectors.cli.CustodyOrphansMode>"}
+      - {name: authority, type: "Optional<String>"}
+  - name: connectors.cli.CustodyOrphanGroup
+    kind: struct
+    fields:
+      - {name: authority, type: "String"}
+      - {name: purpose, type: "String"}
+      - {name: count, type: Integer}
+  - name: connectors.cli.CustodyOrphan
+    kind: struct
+    fields:
+      - {name: item, type: "String"}
+      - {name: purpose, type: "String"}
+      - {name: authority, type: "String"}
+      - {name: scope, type: "String"}
+      - {name: version, type: "String"}
+  - name: connectors.cli.CustodyOrphanFailure
+    kind: struct
+    fields:
+      - {name: item, type: "String"}
+      - {name: failure, type: "String"}
+  # groups is empty in remove mode; removed and failed are empty in list mode.
+  # removed names each item deleted and failed each item that could not be.
+  - name: connectors.cli.SetupCustodyOrphansResult
+    kind: struct
+    fields:
+      - {name: mode, type: "connectors.cli.CustodyOrphansMode"}
+      - {name: state_path, type: "String"}
+      - {name: groups, type: "List<connectors.cli.CustodyOrphanGroup>"}
+      - {name: notice, type: "String"}
+      - {name: removed, type: "List<connectors.cli.CustodyOrphan>"}
+      - {name: failed, type: "List<connectors.cli.CustodyOrphanFailure>"}
   # `connectors list` (story:cli-lists-available-connectors;
   # contracts/cli/v1alpha1/semantics.md §3, "Listing connectors"): one row per
   # connector this build ships a declaration for (connectors.declarations.Connector),

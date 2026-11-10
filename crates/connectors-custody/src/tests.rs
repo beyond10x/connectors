@@ -1058,3 +1058,432 @@ fn largest_material_of_every_shipped_auth_profile_round_trips_through_the_split_
     largest_materials_round_trip(&|scope| Ok(Parted::new(entries.clone(), scope)));
     assert!(entries.names().is_empty());
 }
+
+#[cfg(target_os = "linux")]
+mod session_keyring {
+    use super::*;
+    use crate::secret_service::{items_at, orphans_at, remove_authority_at, session_bus_refusal};
+    use std::{collections::HashSet, path::Path};
+
+    #[test]
+    fn a_test_run_may_not_open_the_session_bus_secret_service() {
+        let session = format!("unix:path=/run/user/{}/bus", unsafe { libc::geteuid() });
+        let named = session_bus_refusal(None, Some(&session)).expect("refused");
+        assert!(named.contains("DBUS_SESSION_BUS_ADDRESS"), "{named}");
+        let unset = session_bus_refusal(None, None).expect("refused");
+        assert!(unset.contains("secret_service_socket"), "{unset}");
+        let selected = session_bus_refusal(
+            Some(Path::new(&session["unix:path=".len()..])),
+            Some(&session),
+        )
+        .expect("refused");
+        assert!(selected.contains("DBUS_SESSION_BUS_ADDRESS"), "{selected}");
+        assert_eq!(
+            session_bus_refusal(
+                Some(Path::new("/srv/fixture/private/bus")),
+                Some("unix:path=/srv/fixture/private/bus")
+            ),
+            None
+        );
+    }
+
+    fn put(fixture: &crate::secret_service::fixture::Fixture, scope: Scope) {
+        let version = Version::new(scope, Uuid::new_v4()).unwrap();
+        let length = if scope.purpose() == crate::Purpose::ApprovalSigning {
+            SIGNING_SEED_BYTES
+        } else {
+            16
+        };
+        fixture
+            .backend(scope)
+            .unwrap()
+            .write_new(version, &Material::new(vec![7u8; length]), until(), || {
+                Ok(())
+            })
+            .unwrap();
+    }
+
+    #[test]
+    #[ignore = "requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR"]
+    fn custody_writes_reach_the_default_alias_collection() {
+        let fixture = crate::secret_service::fixture::Fixture::new();
+        let scope = Scope::new(Uuid::new_v4(), Uuid::new_v4()).unwrap();
+        put(&fixture, scope);
+        let target = fixture.alias_target("default");
+        let items = items_at(Some(&fixture.socket)).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].collection, target);
+        assert!(items[0].path.starts_with(&format!("{target}/")));
+    }
+
+    #[test]
+    #[ignore = "requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR"]
+    fn removing_an_authority_leaves_no_item_carrying_it() {
+        let fixture = crate::secret_service::fixture::Fixture::new();
+        let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
+        for _ in 0..3 {
+            put(&fixture, Scope::new(a, Uuid::new_v4()).unwrap());
+        }
+        put(
+            &fixture,
+            Scope::approval_signing(a, Uuid::new_v4()).unwrap(),
+        );
+        put(&fixture, Scope::new(b, Uuid::new_v4()).unwrap());
+        let removal = remove_authority_at(Some(&fixture.socket), a).unwrap();
+        assert_eq!(removal.deleted.len(), 4);
+        assert!(removal.failed.is_empty());
+        let left = items_at(Some(&fixture.socket)).unwrap();
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0].authority, b.to_string());
+    }
+
+    #[test]
+    #[ignore = "requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR"]
+    fn orphans_are_listed_and_removed_only_on_the_flag() {
+        let fixture = crate::secret_service::fixture::Fixture::new();
+        let (held, lost) = (Uuid::new_v4(), Uuid::new_v4());
+        put(&fixture, Scope::new(held, Uuid::new_v4()).unwrap());
+        put(&fixture, Scope::new(lost, Uuid::new_v4()).unwrap());
+        put(
+            &fixture,
+            Scope::approval_signing(lost, Uuid::new_v4()).unwrap(),
+        );
+        let known = HashSet::from([held]);
+        let listed = orphans_at(Some(&fixture.socket), &known, false).unwrap();
+        assert_eq!(listed.orphans.len(), 2);
+        assert!(
+            listed
+                .orphans
+                .iter()
+                .all(|i| i.authority == lost.to_string())
+        );
+        assert!(listed.removal.is_none());
+        assert_eq!(items_at(Some(&fixture.socket)).unwrap().len(), 3);
+        let removed = orphans_at(Some(&fixture.socket), &known, true).unwrap();
+        assert_eq!(removed.removal.unwrap().deleted.len(), 2);
+        let left = items_at(Some(&fixture.socket)).unwrap();
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0].authority, held.to_string());
+    }
+}
+
+// Security review of story:custody-keeps-out-of-the-session-keyring: integrity
+// conformance checks of the removal boundary, the default alias and the
+// session bus guard's wiring, against a private Secret Service only.
+#[cfg(target_os = "linux")]
+mod session_keyring_review {
+    use super::*;
+    use crate::secret_service::{
+        SecretService, fixture::Fixture, items_at, orphans_at, remove_authority_at,
+    };
+    use std::{
+        collections::{HashMap, HashSet},
+        os::unix::net::UnixStream,
+        panic::{AssertUnwindSafe, catch_unwind},
+    };
+    use zbus::zvariant::{OwnedObjectPath, OwnedValue, Value};
+
+    const LOGIN: &str = "/org/freedesktop/secrets/collection/login";
+
+    /// A raw client of the fixture's Secret Service, for state the binding
+    /// never builds itself: a second collection, a moved alias and items of
+    /// another application.
+    struct Raw {
+        connection: zbus::blocking::Connection,
+        session: OwnedObjectPath,
+    }
+
+    impl Raw {
+        fn new(fixture: &Fixture) -> Self {
+            let connection = zbus::blocking::connection::Builder::async_io_unix_stream(
+                UnixStream::connect(&fixture.socket).unwrap(),
+            )
+            .build()
+            .unwrap();
+            let reply = connection
+                .call_method(
+                    Some("org.freedesktop.secrets"),
+                    "/org/freedesktop/secrets",
+                    Some("org.freedesktop.Secret.Service"),
+                    "OpenSession",
+                    &("plain", Value::from("")),
+                )
+                .unwrap();
+            let (_, session): (OwnedValue, OwnedObjectPath) = reply.body().deserialize().unwrap();
+            Self {
+                connection,
+                session,
+            }
+        }
+
+        /// A new unlocked collection, created without a prompt.
+        fn create_collection(&self, label: &str) -> String {
+            let mut properties: HashMap<&str, Value<'_>> = HashMap::new();
+            properties.insert(
+                "org.freedesktop.Secret.Collection.Label",
+                Value::from(label),
+            );
+            let master = (
+                &self.session,
+                Vec::<u8>::new(),
+                b"fictional-review-password".to_vec(),
+                "text/plain",
+            );
+            let reply = self
+                .connection
+                .call_method(
+                    Some("org.freedesktop.secrets"),
+                    "/org/freedesktop/secrets",
+                    Some("org.gnome.keyring.InternalUnsupportedGuiltRiddenInterface"),
+                    "CreateWithMasterPassword",
+                    &(properties, master),
+                )
+                .unwrap();
+            let path: OwnedObjectPath = reply.body().deserialize().unwrap();
+            path.as_str().to_owned()
+        }
+
+        fn set_alias(&self, alias: &str, collection: &str) {
+            self.connection
+                .call_method(
+                    Some("org.freedesktop.secrets"),
+                    "/org/freedesktop/secrets",
+                    Some("org.freedesktop.Secret.Service"),
+                    "SetAlias",
+                    &(alias, OwnedObjectPath::try_from(collection).unwrap()),
+                )
+                .unwrap();
+        }
+
+        /// An item carrying exactly `attributes`, as any application could write.
+        fn create_item(&self, collection: &str, attributes: &[(&str, &str)]) -> String {
+            let attributes: HashMap<String, String> = attributes
+                .iter()
+                .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+                .collect();
+            let mut properties: HashMap<&str, Value<'_>> = HashMap::new();
+            properties.insert("org.freedesktop.Secret.Item.Label", Value::from("review"));
+            properties.insert(
+                "org.freedesktop.Secret.Item.Attributes",
+                Value::from(attributes),
+            );
+            let secret = (
+                &self.session,
+                Vec::<u8>::new(),
+                b"fictional".to_vec(),
+                "application/octet-stream",
+            );
+            let reply = self
+                .connection
+                .call_method(
+                    Some("org.freedesktop.secrets"),
+                    collection,
+                    Some("org.freedesktop.Secret.Collection"),
+                    "CreateItem",
+                    &(properties, secret, false),
+                )
+                .unwrap();
+            let (item, prompt): (OwnedObjectPath, OwnedObjectPath) =
+                reply.body().deserialize().unwrap();
+            assert_eq!(prompt.as_str(), "/");
+            item.as_str().to_owned()
+        }
+
+        /// Whether the item still exists in `collection`.
+        fn holds(&self, collection: &str, item: &str) -> bool {
+            let proxy = zbus::blocking::Proxy::new(
+                &self.connection,
+                "org.freedesktop.secrets",
+                collection,
+                "org.freedesktop.Secret.Collection",
+            )
+            .unwrap();
+            let items: Vec<OwnedObjectPath> = proxy.get_property("Items").unwrap();
+            items.iter().any(|i| i.as_str() == item)
+        }
+    }
+
+    fn write(fixture: &Fixture, scope: Scope, byte: u8) -> Version {
+        let version = Version::new(scope, Uuid::new_v4()).unwrap();
+        let length = if scope.purpose() == crate::Purpose::ApprovalSigning {
+            SIGNING_SEED_BYTES
+        } else {
+            16
+        };
+        fixture
+            .backend(scope)
+            .unwrap()
+            .write_new(version, &Material::new(vec![byte; length]), until(), || {
+                Ok(())
+            })
+            .unwrap();
+        version
+    }
+
+    /// The panic text of `call`, which must panic.
+    fn refusal(call: impl FnOnce()) -> String {
+        let payload = catch_unwind(AssertUnwindSafe(call)).expect_err("guard did not refuse");
+        payload
+            .downcast_ref::<String>()
+            .cloned()
+            .or_else(|| payload.downcast_ref::<&str>().map(|s| (*s).to_owned()))
+            .unwrap_or_default()
+    }
+
+    /// Invariant 3, wiring: every write-capable or inventory entry point
+    /// refuses the session bus before connecting, not only the pure helper.
+    /// A guard removed from any one call site turns this red.
+    #[test]
+    fn every_entry_point_refuses_the_session_bus_before_connecting() {
+        let scope = Scope::new(Uuid::new_v4(), Uuid::new_v4()).unwrap();
+        let named = "refusing to open the session bus Secret Service";
+        let open = refusal(|| {
+            let _ = SecretService::open_at(scope, None);
+        });
+        assert!(open.contains(named), "open_at: {open}");
+        let open = refusal(|| {
+            let _ = SecretService::open(scope);
+        });
+        assert!(open.contains(named), "open: {open}");
+        let listed = refusal(|| {
+            let _ = items_at(None);
+        });
+        assert!(listed.contains(named), "items_at: {listed}");
+        let removed = refusal(|| {
+            let _ = remove_authority_at(None, Uuid::new_v4());
+        });
+        assert!(removed.contains(named), "remove_authority_at: {removed}");
+        let orphans = refusal(|| {
+            let _ = orphans_at(None, &HashSet::new(), false);
+        });
+        assert!(orphans.contains(named), "orphans_at: {orphans}");
+    }
+
+    /// Invariants 1 and 2 on one private daemon whose `default` alias is moved
+    /// off `login`: a new write lands behind the alias, the item already in
+    /// `login` still reads, and removing the authority deletes both and
+    /// nothing else: not another spelling of the id, not a longer id it
+    /// prefixes, not a Connectors item without the attribute, and not another
+    /// application's item carrying the same `connectors.authority`.
+    #[test]
+    #[ignore = "requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR"]
+    fn moved_alias_writes_behind_it_reads_login_and_removal_stays_inside_the_authority() {
+        let fixture = Fixture::new();
+        let raw = Raw::new(&fixture);
+        let authority = Uuid::new_v4();
+        let wanted = authority.to_string();
+        let old_scope = Scope::new(authority, Uuid::new_v4()).unwrap();
+        let old = write(&fixture, old_scope, 3);
+        assert_eq!(fixture.alias_target("default"), LOGIN);
+
+        let elsewhere = raw.create_collection("elsewhere");
+        assert_ne!(elsewhere, LOGIN);
+        raw.set_alias("default", &elsewhere);
+        assert_eq!(fixture.alias_target("default"), elsewhere);
+
+        let new_scope = Scope::approval_signing(authority, Uuid::new_v4()).unwrap();
+        write(&fixture, new_scope, 5);
+        let items = items_at(Some(&fixture.socket)).unwrap();
+        let mine: Vec<_> = items.iter().filter(|i| i.authority == wanted).collect();
+        assert_eq!(mine.len(), 2, "{items:?}");
+        assert!(
+            mine.iter()
+                .any(|i| i.collection == elsewhere && i.path.starts_with(&format!("{elsewhere}/"))),
+            "the new write is not behind the alias: {items:?}"
+        );
+        assert!(
+            mine.iter().any(|i| i.collection == LOGIN),
+            "the login item is not listed: {items:?}"
+        );
+        let read = fixture.backend(old_scope).unwrap().read(old).unwrap();
+        assert!(read.ct_eq(&[3u8; 16]), "the login item no longer reads");
+
+        let credential = "org.beyond10x.Connectors.Credential";
+        let upper = wanted.to_uppercase();
+        let longer = format!("{wanted}0");
+        let keep = [
+            (
+                LOGIN.to_owned(),
+                raw.create_item(
+                    LOGIN,
+                    &[("xdg:schema", credential), ("connectors.authority", &upper)],
+                ),
+            ),
+            (
+                elsewhere.clone(),
+                raw.create_item(
+                    &elsewhere,
+                    &[
+                        ("xdg:schema", credential),
+                        ("connectors.authority", &longer),
+                    ],
+                ),
+            ),
+            (
+                elsewhere.clone(),
+                raw.create_item(&elsewhere, &[("xdg:schema", credential)]),
+            ),
+            (
+                LOGIN.to_owned(),
+                raw.create_item(
+                    LOGIN,
+                    &[
+                        ("xdg:schema", "org.example.Unrelated"),
+                        ("connectors.authority", &wanted),
+                    ],
+                ),
+            ),
+            (
+                elsewhere.clone(),
+                raw.create_item(
+                    &elsewhere,
+                    &[
+                        ("xdg:schema", "org.example.Unrelated"),
+                        ("connectors.authority", &wanted),
+                    ],
+                ),
+            ),
+        ];
+
+        let removal = remove_authority_at(Some(&fixture.socket), authority).unwrap();
+        assert!(removal.failed.is_empty(), "{removal:?}");
+        assert_eq!(removal.deleted.len(), 2, "{removal:?}");
+        assert!(
+            removal.deleted.iter().all(|i| i.authority == wanted),
+            "{removal:?}"
+        );
+        let left = items_at(Some(&fixture.socket)).unwrap();
+        assert!(left.iter().all(|i| i.authority != wanted), "{left:?}");
+        for (collection, item) in &keep {
+            assert!(raw.holds(collection, item), "{item} was deleted");
+        }
+    }
+
+    /// Acceptance 3, literally: a private daemon that serves only the alias's
+    /// collection (no `login` collection at all) receives the write.
+    #[test]
+    #[ignore = "requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR"]
+    fn a_daemon_without_login_receives_the_write_behind_the_alias() {
+        let fixture = Fixture::new();
+        let raw = Raw::new(&fixture);
+        let elsewhere = raw.create_collection("onlyalias");
+        raw.set_alias("default", &elsewhere);
+        let reply = raw
+            .connection
+            .call_method(
+                Some("org.freedesktop.secrets"),
+                LOGIN,
+                Some("org.freedesktop.Secret.Collection"),
+                "Delete",
+                &(),
+            )
+            .unwrap();
+        let prompt: OwnedObjectPath = reply.body().deserialize().unwrap();
+        assert_eq!(prompt.as_str(), "/", "login delete prompted");
+        let scope = Scope::new(Uuid::new_v4(), Uuid::new_v4()).unwrap();
+        write(&fixture, scope, 9);
+        let items = items_at(Some(&fixture.socket)).unwrap();
+        assert_eq!(items.len(), 1, "{items:?}");
+        assert_eq!(items[0].collection, elsewhere);
+    }
+}

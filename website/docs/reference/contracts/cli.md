@@ -91,6 +91,7 @@ management wire payload or a persistent record.
 | `setup init` | local configuration writer | inputless Context → `SetupInitResult` | no / no |
 | `setup check` | local configuration inspector | inputless Context → `SetupCheckResult` | no / no |
 | `setup checkpoints-enable` | local metadata store, under the owner lifetime lock | `SetupCheckpointsEnableInput` → `SetupCheckpointsEnableResult` | no / no |
+| `setup custody-orphans` | Secret Service custody items, attributes only | `SetupCustodyOrphansInput` → `SetupCustodyOrphansResult` | no / no |
 | `setup owner-stop` | the running owner of the state directory, through its shutdown request (owner transport) | inputless Context → `SetupOwnerStopResult` | no / no |
 | `approvals clock-check` | configured clock inspector | `ApprovalClockCheckInput` → `ApprovalClockCheckResult` | no / no |
 | `approvals policy-status` | local policy inspector | `ApprovalPolicyStatusInput` → `ApprovalPolicyResult` | no / no |
@@ -1270,6 +1271,27 @@ configuration that changed in between is `revision_conflict` at `publication`.
 Rollback is restoring the backup and running the previous release. Under
 `--output json` a refusal is one failure envelope on standard error, like every
 other command's.
+
+### Custody orphans
+
+`setup custody-orphans [--mode list|remove] [--authority ID]` works on the custody items in
+the Secret Service (`docs/local-secret-service.md`) whose `connectors.authority` is not the
+authority of the store in the selected state directory. The store must exist
+(`metadata_unavailable` otherwise). Item attributes are read, never a secret value.
+
+`list`, the default, answers `groups`, one row per authority and purpose with its item
+count, and a `notice` saying that a listed authority may belong to another store on this
+machine that the command cannot see. It deletes nothing.
+
+`remove` needs `--authority ID`, one authority id, and deletes only the items carrying it.
+Without `--authority`, with an id that is not a UUID, or with the selected store's own
+authority, it is `invalid_input` at `arguments` with `field` `authority`, and nothing is
+deleted. `list` with `--authority` is the same refusal. `removed` names each item deleted
+and `failed` each item whose delete failed, with its failure; neither is silent. When the
+deletes ran but could not be made durable, `removed` still names them and `failed` carries one
+row whose item is `synchronization`. An
+authority with no items answers empty `removed` and `failed`. An unavailable or locked
+Secret Service is `custody_unavailable`.
 
 ### Durable open checkpoints on an existing store
 

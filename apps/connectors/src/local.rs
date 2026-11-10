@@ -15,6 +15,7 @@ mod approvals;
 mod checkpoints;
 mod connections;
 mod cursor;
+mod custody_orphans;
 mod declarations;
 mod definition;
 mod dialects;
@@ -665,6 +666,9 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
     let paths = resolved(call)?;
     if call.callable == "setup-checkpoints-enable" {
         return checkpoints::execute(call, &paths);
+    }
+    if call.callable == "setup-custody-orphans" {
+        return custody_orphans::execute(call, &paths);
     }
     if call.callable == "setup-owner-stop" {
         return owner_stop::execute(&paths);
