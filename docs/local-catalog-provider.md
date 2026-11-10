@@ -1565,3 +1565,24 @@ appeared, which opened merge request 11 at the moved head and was classified
   a value the preflight must not have.
 - Only GitLab has run live. A second provider through the same engine is still
   required by `specification:catalog-http-runtime-handoff`.
+
+## Support-table summary: ChatGPT
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> ChatGPT subscription sign-in as the Codex CLI makes it, profile `chatgpt.subscription` (`oauth2_grant`): browser with PKCE on `127.0.0.1:1455`, or `--device` through the ChatGPT device sign-in; JSON refresh with rotation 300 seconds before expiry; the connection is the ChatGPT account id from the `id_token`; `connections token --reveal` hands the access token to its owner; one read, `models.list`; no client id ships, so the instance is pinned with its own `oauth2_client_id`; verified against a local fixture only, see [the ChatGPT guide](website/docs/connectors/chatgpt.md)
+
+## Support-table summary: Claude subscription
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> The Claude Code sign-in (OAuth 2.0 authorization code with PKCE, JSON exchange and refresh) for the operator's own Claude plan only, as the guide's quote of the provider's terms says; profiles `claude.subscription` (loopback redirect) and `claude.subscription-pasted` (pasted `code#state`); no client id ships, so the instance is pinned and configures `oauth2_client_id`; `connections token` issues the access token; one read, `account.profile`; verified against a local fake authorization server only, see [the Claude subscription guide](website/docs/connectors/claude-subscription.md)
+
+## Support-table summary: GitHub
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> GitHub REST API from `connectors/github.yaml` of [connectors-definitions 0.5.2](https://github.com/beyond10x/connectors-definitions/releases/tag/0.5.2), run as a definition file (`invoke --definition`); profile `github.token`, a fine-grained or classic token as `Authorization: Bearer` from keyring custody; reads only: review requests, assigned issues, notifications, the user, an organization's repositories, one repository, releases and the latest release, a README or file as text; one page per call, the caller walks until a short page, the search to its first 1,000 results; a spent rate limit is `rate_limited` with its wait; verified against a scripted provider only, see [the GitHub page](website/docs/connectors/github.md)

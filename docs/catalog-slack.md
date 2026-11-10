@@ -965,3 +965,10 @@ is refused when the selection loads. `withhold` keeps its meaning.
 `adapters/catalog/tests/slack.rs` pins that each of the six ships this way and
 only this way, and `adapters/catalog/tests/selection_credential.rs` pins the
 field itself.
+
+## Support-table summary
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> Slack Web API from the pinned Swagger 2.0 document projected to OpenAPI; a bot instance derived from the shipped declaration (or pinned), with a bot token as `Authorization: Bearer` from keyring custody, and a pinned user instance with a user token under `slack.user` for search; the document's `token` parameter is never sent; each write is a required-approval mutation guarded by an `auth.test` preflight and an answer that must both carry `"ok": true`, and `files.delete` also reads the file with `files.info` first; one page per call; `file.download` reads a file's `url_private` as base64 with its media type, length and SHA-256, at most 2 MiB, only on a connection whose `hosts` admits `https://files.slack.com` with the credential; a Slack error is returned as `200` with `"ok": false`; verified against a local fixture only, see [the Slack guide](docs/catalog-slack.md)
