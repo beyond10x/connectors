@@ -556,7 +556,14 @@ in a file whose every line ends in CRLF, the added lines end in CRLF too), check
 checks it before anything is written, and replaces the file atomically: a
 sibling temporary file with the file's own owner-only mode, synced, then
 renamed over it, while the file still holds the text the edit was made from
-(else `revision_conflict`). The file is then read back; a read-back that does
+(else `revision_conflict`). The check and the rename are one step under an
+exclusive lock on the configuration (the directory holding it; on Windows
+`<configuration>.lock` beside it, which is never followed as a link), so of
+connects that read one text and write different endpoints at most one
+replaces it, whatever state directory each selects. A lock another connect
+holds for 30 seconds is `revision_conflict` at `publication` with
+`next_action = retry_explicitly`, nothing written; a lock the host refuses is
+`metadata_unavailable`. The file is then read back; a read-back that does
 not hold the endpoint restores the original text and is
 `invalid_configuration`. A file that is not the caller's own, admits another
 user, or is a symbolic link is refused as every read refuses it, unwritten.
@@ -1897,6 +1904,15 @@ changed configuration's description is cached by the first read command that
 [launches for it](#launching-for-a-description); a write after an
 executable-only change validates the connection once, as a read does.
 
+A `pending` connection says why in `pending_reason`, a member of its summary
+that `connections list` and `connections describe` carry and that is absent
+for every other state: `configuration_changed` (saved under another
+configuration revision of its instance), `configuration_refused` (the same, and
+the configured provider already refused its credential, so only a new
+connection helps), `no_credential` (none was published for it) or
+`evidence_expired` (its validation evidence lapsed; a revalidation recollects
+it).
+
 A connection saved under another configuration revision of its instance also
 reports `pending` (`stale = true`), and no status change is pending for it: a
 read on `invoke`, an approval naming it and a consumer launch refuse
@@ -1935,10 +1951,11 @@ command answers `retry_status` for it until `instances stop`. Only a credential
 validation captured by the earlier process is still refused as
 `lifecycle_conflict`; its `connections connect` starts again with a launch
 that replaces the process. A revalidation the new provider refuses (the
-credential invalid, below scope or another identity) answers `create_connection`
-and records the refusal against the configured revision
+credential invalid, below scope or another identity) answers `revoke_connection`,
+since the instance still holds that connection and connect names its revocation;
+it records the refusal against the configured revision
 (`Connection.refused_configuration_revision`), so the next read names
-`create_connection` too; the refusal invalidates nothing under the connection's
+`create_connection`; the refusal invalidates nothing under the connection's
 own revision, revalidation stays admitted, and a later upgrade that succeeds
 or a repair that replaces the credential removes it. An approval reads the
 wall clock for this classification only, as the read path does, without
@@ -2067,7 +2084,7 @@ On macOS one holds and six hold only in a named weaker form:
 
 | Guarantee | Linux | macOS | macOS mechanism |
 |---|---|---|---|
-| `sealed_executable` | holds | weaker: `owner_private_copy` | no memfd: the image is copied into a mode 0500 file in a fresh mode 0700 directory, and the digest and Mach-O header are checked on that copy before exec by its path. Other users cannot change it; a process of the same user can rewrite it between the check and exec. A copy that is refused or never launched is removed with its directory; a launched copy is removed by its launch once the exec it serves no longer needs it. |
+| `sealed_executable` | holds | weaker: `owner_private_copy` | no memfd: the image is copied into a mode 0500 file in a fresh mode 0700 directory, and the digest and Mach-O header are checked on that copy before exec by its path. Other users cannot change it; a process of the same user can rewrite it between the check and exec. A copy that is refused or never launched is removed with its directory; a launched program's copy is removed by its launch once the exec it serves no longer needs it. The owner's copy is the exception: the owner keeps it for its whole run and removes it when it stops serving, because the login keychain refuses to save an item for a process whose executable is gone. An owner killed before it stops leaves its copy and directory in the temporary directory; nothing sweeps them. |
 | `parent_death_kill` | holds | weaker: `adapter_channel_close` | no `PR_SET_PDEATHSIG`: an adapter exits when its inherited channel on descriptor 3 reaches end of file. A consumer has no channel and outlives a launcher that dies. |
 | `exact_process_signal` | holds | weaker: `child_reap_lock` | no pidfd: kqueue `EVFILT_PROC` with `NOTE_EXIT` observes exit, and `kill` signals the child's process id only while holding the lock that reaps it, so the id cannot be reused between the check and the signal. |
 | `own_image_build_measure` | holds | weaker: `launch_path_read` | no `/proc/self/exe`: the owner build digest is read from the executable's path. A file replaced there is measured as a new build and refused as `owner_build_mismatch`. |

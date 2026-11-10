@@ -114,7 +114,7 @@ async fn lost_reply_after_complete_put_is_never_retried() {
             assert!(bytes.len() < 8192);
             if let Some(end) = bytes.windows(4).position(|w| w == b"\r\n\r\n") {
                 let header = std::str::from_utf8(&bytes[..end]).unwrap();
-                assert_eq!(header.lines().next(), Some("PUT /api/v4/items/7? HTTP/1.1"));
+                assert_eq!(header.lines().next(), Some("PUT /api/v4/items/7 HTTP/1.1"));
                 let length = header
                     .lines()
                     .find_map(|line| {

@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-09T21:58:00Z",
+  "actor": "human:timo",
+  "artifact": "story:program-start-failure-reason",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test --locked -p connectors --test local_cli -- start_failure; cargo test -p connectors-host --lib -- local::runtime::process (issue #233)",
+    "reference": "origin/main bd338daa0: 1 passed, 25 passed; macOS host run 42537155135 job 128903887722 success"
+  }
+}

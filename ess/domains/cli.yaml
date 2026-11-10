@@ -533,7 +533,7 @@ types:
   # - owner_private_copy: the image is a mode 0500 copy in a mode 0700 directory,
   #   digest-checked before exec; other users cannot change it, the same user can.
   #   A copy that is refused or never launched is removed with its directory;
-  #   a launched copy is removed once, by the launch, after the exec it serves.
+  #   a launched program's copy is removed once, by the launch, after the exec it serves; the owner's copy is kept for its whole run and removed by the owner when it stops serving (an owner killed first leaves it).
   # - adapter_channel_close: an adapter exits when its inherited channel closes;
   #   a consumer has no such channel and outlives a dead launcher.
   # - child_reap_lock: a child is signalled by process id, under the same lock
@@ -995,6 +995,13 @@ types:
     kind: enum
     variants: [admission, digest, copy, spawn, exited_before_handshake, handshake_deadline, handshake_mismatch]
   # References existing qualified Connection and AuthProfile coordinates. revision is public semantic revision, never private generation/publication fence. State is an observation, not a second lifecycle.
+  # Why a connection observes as pending, present exactly then (story:connection-next-actions-no-cycle):
+  # configuration_changed (saved under another configuration revision), configuration_refused
+  # (the same, and the configured provider already refused its credential: only a new connection
+  # helps), no_credential (none was published), evidence_expired (a revalidation recollects it).
+  - name: connectors.cli.PendingReason
+    kind: enum
+    variants: [configuration_changed, configuration_refused, no_credential, evidence_expired]
   - name: connectors.cli.ConnectionSummary
     kind: struct
     fields:
@@ -1006,6 +1013,7 @@ types:
       - {name: profile, type: "String"}
       - {name: revision, type: "String"}
       - {name: state, type: "connectors.connection_admission.ConnectionState"}
+      - {name: pending_reason, type: "Optional<connectors.cli.PendingReason>"}
   - name: connectors.cli.ConnectionDescription
     kind: struct
     fields:
@@ -1848,7 +1856,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:1439, docs/local-connection-registry.md:222-223;
+    # contracts/cli/v1alpha1/semantics.md:1446, docs/local-connection-registry.md:222-223;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -2008,7 +2016,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1443) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1450) and the host
     # removal path (er.rs:4747-4749) only expires Active cursors. The error name is
     # the decision; no source names one.
 

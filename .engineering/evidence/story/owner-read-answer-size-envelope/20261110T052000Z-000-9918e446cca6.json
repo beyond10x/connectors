@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-10T05:20:00Z",
+  "actor": "human:timo",
+  "artifact": "story:owner-read-answer-size-envelope",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-a-owner-read-adversary-1",
+    "review": "review-result:wave-a-owner-read-adversary-1",
+    "outcome": "fixed"
+  }
+}

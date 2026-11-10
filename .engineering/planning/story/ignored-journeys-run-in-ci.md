@@ -2,9 +2,20 @@
 format: aep.planning-md/3
 id: story:ignored-journeys-run-in-ci
 kind: story
-status: draft
+status: active
 title: The ignored CLI journeys run in CI and fail a pull request when red
-revision: 1
+relations:
+- decomposes: epic:zero-open-issues-and-store-defects
+- serves: vision:independent-contract-adapters
+scope:
+- confidence: inferred
+  path: .github/workflows/rust-gate.yml
+- confidence: inferred
+  path: adapters/catalog/tests/local_runtime/lifecycle.rs
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:59:37Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:59:38Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Observed
 The ignored catalog CLI journeys (`adapters/catalog/tests/local_runtime/`) run in no CI job:

@@ -2,14 +2,27 @@
 format: aep.planning-md/3
 id: story:endpoint-publish-holds-one-writer
 kind: story
-status: draft
+status: implemented
 title: Concurrent connects with different endpoints on one instance publish at most one of them
 summary: endpoint.rs publish() checks the file and then renames with no lock between; two writers can both go on (run 41742146209)
 tags:
 - from-finding
 relations:
 - informed_by: story:connect-names-a-failed-provider-start
-revision: 3
+- decomposes: epic:zero-open-issues-and-store-defects
+- serves: vision:independent-contract-adapters
+scope:
+- confidence: cited
+  path: apps/connectors/src/local/endpoint.rs
+- confidence: cited
+  path: contracts/cli/v1alpha1/semantics.md
+- confidence: cited
+  path: docs/local-runtime-foundation.md
+revision: 11
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:59:25Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:59:25Z", actor: "human:timo", revision: 5, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-10T06:20:09Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"test_result":1,"review_outcome":6,"verification":1}}, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Defect
 
@@ -31,3 +44,11 @@ Found by wave D430 (D440).
   credential, and the file holds that one's endpoint: the check and the replacement are one step under a lock, or
   every writer that goes on re-reads the file after the last replacement.
 - A test that widens the window between the check and the rename is red before the change and green after it.
+
+## Scope
+
+Landed on, from `git diff 5087593c1...impl/endpoint-publish-holds-one-writer` (merged into wave/zero-issues at 43135990d); the earlier scoper lines marked inferred are replaced by this list. Generated reference pages are left out.
+
+- `apps/connectors/src/local/endpoint.rs`
+- `contracts/cli/v1alpha1/semantics.md`
+- `docs/local-runtime-foundation.md`

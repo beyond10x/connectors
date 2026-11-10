@@ -1193,3 +1193,166 @@ fn the_local_service_declares_the_feed_from_its_operations_file() {
         .collect();
     assert_eq!(required, [CONTAINERS, ITEMS]);
 }
+
+/// A cursor feed answer that is not complete and does not advance the cursor (absent, empty, or
+/// the one sent) is `unavailable`, never a page whose watermark is unchanged.
+#[tokio::test]
+async fn a_cursor_answer_that_is_incomplete_and_does_not_advance_is_unavailable() {
+    let engine = build(&declaration("cursor.operations.json"), &[]).unwrap();
+    let read = |listed: Value, watermark: Option<&str>| {
+        let engine = &engine;
+        let http = Admitting {
+            known: true,
+            status: 200,
+            listed,
+            queries: Default::default(),
+        };
+        let mut input = json!({"container": "room", "limit": 10});
+        if let Some(watermark) = watermark {
+            input["watermark"] = json!(watermark);
+        }
+        async move { engine.read(&http, "feed-instance", ITEMS, input).await }
+    };
+    let issued = read(
+        json!({"changes": [], "cursor": "7", "has_more": false}),
+        None,
+    )
+    .await
+    .unwrap()["next_watermark"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    for (case, listed, watermark) in [
+        (
+            "absent, first read",
+            json!({"changes": [], "has_more": true}),
+            None,
+        ),
+        (
+            "empty, first read",
+            json!({"changes": [], "cursor": "", "has_more": true}),
+            None,
+        ),
+        (
+            "absent, resumed",
+            json!({"changes": [], "has_more": true}),
+            Some(issued.as_str()),
+        ),
+        (
+            "empty, resumed",
+            json!({"changes": [], "cursor": "", "has_more": true}),
+            Some(issued.as_str()),
+        ),
+        (
+            "the value sent",
+            json!({"changes": [], "cursor": "7", "has_more": true}),
+            Some(issued.as_str()),
+        ),
+    ] {
+        let error = read(listed, watermark).await.unwrap_err();
+        assert_eq!(
+            error.code,
+            connectors_core::ErrorCode::Unavailable,
+            "{case}"
+        );
+    }
+    let advanced = read(
+        json!({"changes": [], "cursor": "8", "has_more": true}),
+        Some(&issued),
+    )
+    .await
+    .unwrap();
+    assert_eq!(advanced["complete"], json!(false), "control");
+    let finished = read(
+        json!({"changes": [], "cursor": "7", "has_more": false}),
+        Some(&issued),
+    )
+    .await
+    .unwrap();
+    assert_eq!(finished["complete"], json!(true), "control");
+}
+
+/// Adversary (story:feed-cursor-unadvanced-is-unavailable): the catalog engine's own contract
+/// row for the change cursor, `contracts/catalog/v1alpha1/semantics.md` "Watermark: `cursor`",
+/// enumerates the cursor position's refusals ("more records than `limit` is `unavailable`"). The
+/// engine now also refuses an incomplete answer that does not advance the cursor; the row must
+/// say so, or a declaration author reading the engine's contract is told one refusal fewer than
+/// the engine performs.
+#[tokio::test]
+async fn adversary_the_catalog_cursor_row_names_the_refusal_the_engine_performs() {
+    let engine = build(&declaration("cursor.operations.json"), &[]).unwrap();
+    let http = Admitting {
+        known: true,
+        status: 200,
+        listed: json!({"changes": [], "has_more": true}),
+        queries: Default::default(),
+    };
+    let error = engine
+        .read(
+            &http,
+            "feed-instance",
+            ITEMS,
+            json!({"container": "room", "limit": 10}),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, connectors_core::ErrorCode::Unavailable);
+    let contract = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../contracts/catalog/v1alpha1/semantics.md"),
+    )
+    .unwrap();
+    let row = contract
+        .lines()
+        .find(|line| line.starts_with("| Watermark: `cursor`"))
+        .expect("the catalog contract has a Watermark: `cursor` row");
+    assert!(
+        row.contains("advanc"),
+        "the engine refuses an incomplete answer that does not advance the cursor as \
+         `unavailable`, and the catalog row does not say so: {row}"
+    );
+}
+
+/// Adversary: the unit rewrote the line that keeps the sent cursor when an answer carries none
+/// (`if next.is_some() { mark.cursor = next }`). Nothing pinned it: with `mark.cursor = next`
+/// unconditional, a complete resume whose answer omits the cursor would issue a watermark that
+/// restarts as a first read. The read after it must still send the cursor.
+#[tokio::test]
+async fn adversary_a_complete_answer_without_a_cursor_keeps_the_one_sent() {
+    let engine = build(&declaration("cursor.operations.json"), &[]).unwrap();
+    let read = |listed: Value, watermark: Option<String>| {
+        let engine = &engine;
+        async move {
+            let http = Admitting {
+                known: true,
+                status: 200,
+                listed,
+                queries: Default::default(),
+            };
+            let mut input = json!({"container": "room", "limit": 10});
+            if let Some(watermark) = watermark {
+                input["watermark"] = json!(watermark);
+            }
+            let answer = engine
+                .read(&http, "feed-instance", ITEMS, input)
+                .await
+                .unwrap();
+            (answer, http.queries.into_inner().unwrap())
+        }
+    };
+    let (first, _) = read(
+        json!({"changes": [], "cursor": "7", "has_more": false}),
+        None,
+    )
+    .await;
+    let issued = first["next_watermark"].as_str().unwrap().to_owned();
+    let (finished, sent) = read(json!({"changes": [], "has_more": false}), Some(issued)).await;
+    assert_eq!(finished["complete"], json!(true));
+    assert!(sent[0].contains(&"cursor".to_owned()), "{sent:?}");
+    let kept = finished["next_watermark"].as_str().unwrap().to_owned();
+    let (_, sent) = read(json!({"changes": [], "has_more": false}), Some(kept)).await;
+    assert_eq!(sent.len(), 1);
+    assert!(
+        sent[0].contains(&"cursor".to_owned()),
+        "a complete answer without a cursor dropped the one sent; the next read is a first read: {sent:?}"
+    );
+}

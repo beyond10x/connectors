@@ -2,17 +2,21 @@
 format: aep.planning-md/3
 id: story:required-parameter-refuses-empty
 kind: story
-status: draft
+status: active
 title: A required parameter given as an empty string is refused before any request
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:slack-single-user-lookups
+- decomposes: epic:zero-open-issues-and-store-defects
 scope:
 - confidence: cited
   path: adapters/catalog/src/lib.rs
 - confidence: cited
   path: adapters/catalog/tests/slack_adversary.rs
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:24Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:25Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 

@@ -250,8 +250,8 @@ fn transport(base: &str) -> ScopedHttp {
 /// slashes are percent-encoded, a numeric id is its decimal text, and a ref
 /// with a slash is encoded in the query. An id the caller already encoded is
 /// encoded again (`%` becomes `%25`), on `commits.list` as on `tags.list`,
-/// which the base shipped. An empty query leaves a bare `?`, which is
-/// harmless. `.` and `..` are refused before any request.
+/// which the base shipped. An empty query sends no `?`. `.` and `..` are
+/// refused before any request.
 #[tokio::test]
 async fn adversary2_project_id_reaches_the_wire_as_one_encoded_segment() {
     let engine = engine();
@@ -292,8 +292,8 @@ async fn adversary2_project_id_reaches_the_wire_as_one_encoded_segment() {
             "/api/v4/projects/org%2Fsub%2Fproject/repository/commits?ref_name=release%2F1.0&per_page=100",
             "/api/v4/projects/42/repository/commits?all=true",
             "/api/v4/projects/org%2Fsub%2Fproject/repository/compare?from=v0.1.0&to=feature%2Fa+b",
-            "/api/v4/projects/org%252Fproject/repository/commits?",
-            "/api/v4/projects/org%252Fproject/repository/tags?",
+            "/api/v4/projects/org%252Fproject/repository/commits",
+            "/api/v4/projects/org%252Fproject/repository/tags",
         ]
     );
 }

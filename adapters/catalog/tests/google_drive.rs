@@ -195,6 +195,11 @@ fn shipped_drive_selections_are_the_six_reads_and_three_writes() {
                     pointer: "/version".into(),
                     expect: Expectation::Input("version".into()),
                 }],
+                optional_values: [(
+                    "supportsAllDrives".to_owned(),
+                    "supportsAllDrives".to_owned()
+                )]
+                .into(),
                 mismatch: None,
             },
             further_preflights: vec![],
@@ -950,9 +955,7 @@ fn first_requests() -> [(&'static str, Value, &'static str); 6] {
         (
             "changes.getStartPageToken",
             json!({}),
-            // The transport writes an empty query when no query parameter is
-            // bound, so the wire request ends in `?`.
-            "/drive/v3/changes/startPageToken?",
+            "/drive/v3/changes/startPageToken",
         ),
         (
             "changes.list",
@@ -1096,7 +1099,7 @@ fn changes_list_walks_two_pages_until_new_start_page_token() {
     assert_eq!(
         provider.api_targets(),
         [
-            "/drive/v3/changes/startPageToken?",
+            "/drive/v3/changes/startPageToken",
             "/drive/v3/changes?pageSize=2&pageToken=fixture-start-100",
             "/drive/v3/changes?pageSize=2&pageToken=fixture-changes-page-2",
         ]
@@ -1246,7 +1249,7 @@ fn each_write_sends_exactly_its_request_and_body_and_returns_the_answer() {
         (
             "files.copy",
             copy_input(),
-            calls(&[("POST", "/drive/v3/files/fixture-doc-1/copy?")]),
+            calls(&[("POST", "/drive/v3/files/fixture-doc-1/copy")]),
             copied(),
         ),
     ] {

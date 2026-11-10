@@ -191,6 +191,10 @@ The watermark is what makes a read resumable.
   reads again with `next_watermark`. Because the watermark resumes after the last returned item, a
   page bounded by `limit` or by the result-byte ceiling omits nothing; it ends early. Clipping of a
   body is reported inside that body's envelope, not as page incompleteness.
+- **Progress.** A page that is not `complete` has advanced `next_watermark`. A binding whose
+  provider answers more changes without a cursor past the one it sent (none, an empty one, or the
+  same one) refuses the read as `unavailable`; it never returns that page with an unchanged
+  watermark.
 - **A first read.** A read with no watermark starts as far back as the profile states and pages
   forward from there.
 - **Order.** Within a page the family promises no order. Across pages it promises only the rules

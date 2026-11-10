@@ -614,7 +614,7 @@ fn the_configured_identity_admits_only_a_200() {
             1,
             "the probe answered {status}: {requests:?}"
         );
-        assert_eq!(requests[0].1, format!("/v1/probe/{status}?"));
+        assert_eq!(requests[0].1, format!("/v1/probe/{status}"));
     }
 }
 

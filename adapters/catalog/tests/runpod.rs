@@ -754,9 +754,9 @@ fn connecting_proves_the_key_with_the_pod_list_and_names_the_connection() {
     assert_eq!(baseline.granted_scopes, None);
     let requests = provider.requests();
     assert_eq!(requests.len(), 1);
-    // The identity probe carries an empty query.
+    // The identity probe carries no query.
     assert_eq!(requests[0].0, "GET");
-    assert_eq!(requests[0].1, format!("{PODS}?"));
+    assert_eq!(requests[0].1, PODS.to_string());
     assert_eq!(requests[0].2, bearer());
     // A wrong key is answered 401 and refuses the connection.
     let wrong = Secret(br#"{"token":"wrong-key"}"#.to_vec());
@@ -821,7 +821,7 @@ fn a_created_pod_is_applied_and_returned() {
         requests.into_iter().zip(["created-201", "created-200"])
     {
         assert_eq!(method, "POST");
-        assert_eq!(target, format!("{PODS}?"));
+        assert_eq!(target, PODS.to_string());
         assert_eq!(authorization, bearer());
         assert_eq!(body, create_body(name));
     }
@@ -999,9 +999,9 @@ fn terminate_reports_204_and_200_as_applied_and_404_as_refused() {
     assert_eq!(
         requests,
         [
-            ("DELETE".into(), "/v1/pods/fixturepod204?".into()),
-            ("DELETE".into(), "/v1/pods/fixturepod200?".into()),
-            ("DELETE".into(), "/v1/pods/fixturegone?".into()),
+            ("DELETE".into(), "/v1/pods/fixturepod204".into()),
+            ("DELETE".into(), "/v1/pods/fixturepod200".into()),
+            ("DELETE".into(), "/v1/pods/fixturegone".into()),
         ]
     );
 }

@@ -464,9 +464,10 @@ struct Sources {
     selection: Option<OperationsFile>,
 }
 
-/// A compiled-in bundle, checked against the compiled-in index as
-/// `bundle::load` checks a directory: the index names it, its bytes have the
-/// digest the index recorded, and it names the same provider.
+/// A compiled-in bundle, checked against the compiled-in index: the index
+/// names it, its bytes have the digest the index recorded, and it names the
+/// same provider. The index rows are not re-checked here; the generated index
+/// is checked when it is written.
 fn shipped_bundle(provider: &str) -> Result<(bundle::Bundle, String)> {
     use std::fmt::Write as _;
     let index: bundle::Index = connectors_core::read_json(shipped::BUNDLE_INDEX)

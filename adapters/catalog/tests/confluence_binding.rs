@@ -55,7 +55,7 @@ const V2_PAGE: &str = "/wiki/api/v2/pages/1001?body-format=storage";
 const V1_PAGE: &str = "/wiki/rest/api/content/1001?expand=body.storage";
 /// The reads of a first `feed.items` page under v1 (story:confluence-feed-binding): the space,
 /// then its pages by CQL, oldest modification first.
-const V1_SPACE: &str = "/wiki/rest/api/space/DOCS?";
+const V1_SPACE: &str = "/wiki/rest/api/space/DOCS";
 const V1_FEED: &str = "/wiki/rest/api/content/search?cql=space+%3D+%22DOCS%22+and+type+%3D+page+order+by+lastmodified+asc&expand=history%2Cversion&limit=10";
 /// The feed's two reads, which only the v1 binding serves, and only with the feed declared.
 const FEED_IDS: [&str; 2] = ["feed.containers", "feed.items"];
@@ -639,7 +639,7 @@ fn scope_refused_on_v2_and_answered_on_v1_binds_to_v1() {
     assert_eq!(baseline.identity.subject, "fixture-account-id");
     assert_eq!(
         provider.take(),
-        [format!("{IDENTITY}?"), V2_ACCESS.into(), V1_ACCESS.into()]
+        [IDENTITY.to_string(), V2_ACCESS.into(), V1_ACCESS.into()]
     );
     let page = invoke(
         &mut child,
@@ -663,7 +663,7 @@ fn answered_on_v2_binds_to_v2_without_a_v1_request() {
     provider.take();
     let baseline = validate(&mut child, &secret()).unwrap();
     assert_eq!(baseline.binding.as_deref(), Some("v2"));
-    assert_eq!(provider.take(), [format!("{IDENTITY}?"), V2_ACCESS.into()]);
+    assert_eq!(provider.take(), [IDENTITY.to_string(), V2_ACCESS.into()]);
     let page = invoke(
         &mut child,
         "v2",
@@ -700,7 +700,7 @@ fn refused_by_both_does_not_connect_and_names_both_answers() {
     );
     assert_eq!(
         provider.take(),
-        [format!("{IDENTITY}?"), V2_ACCESS.into(), V1_ACCESS.into()]
+        [IDENTITY.to_string(), V2_ACCESS.into(), V1_ACCESS.into()]
     );
 }
 
@@ -716,7 +716,7 @@ fn a_refusal_that_is_not_about_scope_does_not_fall_back() {
         .expect("refused");
     assert_eq!(refusal.failure, Failure::InvalidCredential);
     assert_eq!(refusal.reason, None);
-    assert_eq!(provider.take(), [format!("{IDENTITY}?")]);
+    assert_eq!(provider.take(), [IDENTITY.to_string()]);
 
     provider.set(Mode {
         v2: Access::Refused,
@@ -728,7 +728,7 @@ fn a_refusal_that_is_not_about_scope_does_not_fall_back() {
         refusal.reason.as_deref(),
         Some("binding v2 answered 401 (Unauthorized)")
     );
-    assert_eq!(provider.take(), [format!("{IDENTITY}?"), V2_ACCESS.into()]);
+    assert_eq!(provider.take(), [IDENTITY.to_string(), V2_ACCESS.into()]);
 }
 
 /// Acceptance 5: each validation probes again from the first binding, so one
@@ -743,7 +743,7 @@ fn a_revalidation_that_sees_the_other_api_answering_rebinds() {
     provider.take();
     let second = validate(&mut child, &secret()).unwrap();
     assert_eq!(second.binding.as_deref(), Some("v2"));
-    assert_eq!(provider.take(), [format!("{IDENTITY}?"), V2_ACCESS.into()]);
+    assert_eq!(provider.take(), [IDENTITY.to_string(), V2_ACCESS.into()]);
     provider.set(V2_SCOPE_REFUSED);
     let third = validate(&mut child, &secret()).unwrap();
     assert_eq!(third.binding.as_deref(), Some("v1"));

@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-10T04:34:00Z",
+  "actor": "human:timo",
+  "artifact": "story:websearch-contract-states-host-deadline",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test --locked -p connectors-tavily; ess validate --path adapters/tavily/spec/ess; connectors-docs generate --check; connectors-tool-contracts generate --check",
+    "reference": "impl 8b79aef6b: lib 2, adversary_deadline 1 (red at cecb05675: tool profile max 160000), protocol 9 passed (crawl timeout derived from a 30 s deadline, clamp 10..150); ess valid; docs and tool contract current"
+  }
+}

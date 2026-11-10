@@ -220,9 +220,9 @@ async fn the_trailing_slash_never_admits_a_dot_segment_or_an_unencoded_slash() {
     }
     assert_eq!(accepted.load(Ordering::SeqCst), 0);
     for (segments, line) in [
-        (&["a/b", ""][..], "GET /base/a%2Fb/?"),
-        (&["%2e%2e", ""][..], "GET /base/%252e%252e/?"),
-        (&["a?b", ""][..], "GET /base/a%3Fb/?"),
+        (&["a/b", ""][..], "GET /base/a%2Fb/ "),
+        (&["%2e%2e", ""][..], "GET /base/%252e%252e/ "),
+        (&["a?b", ""][..], "GET /base/a%3Fb/ "),
     ] {
         assert_eq!(http.get(segments, &[]).await.unwrap().status, 200);
         let head = heads.lock().unwrap().last().unwrap().clone();

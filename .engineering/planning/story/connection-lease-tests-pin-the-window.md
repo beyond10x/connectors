@@ -2,17 +2,21 @@
 format: aep.planning-md/3
 id: story:connection-lease-tests-pin-the-window
 kind: story
-status: draft
+status: active
 title: The lease tests pin the half-life boundary and prove the join they claim
 summary: Two lease tests pass for windows and orderings other than the ones they name
 relations:
 - serves: vision:independent-contract-adapters
+- decomposes: epic:zero-open-issues-and-store-defects
 scope:
 - confidence: cited
   path: apps/connectors/tests/connection_lease.rs
 - confidence: cited
   path: apps/connectors/tests/connection_lease_adversary.rs
-revision: 4
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:29Z", actor: "human:timo", revision: 5, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:29Z", actor: "human:timo", revision: 6, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 

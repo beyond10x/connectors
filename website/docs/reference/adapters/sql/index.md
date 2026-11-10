@@ -32,9 +32,10 @@ session itself is the credential check, and the saved identity is the role or us
 database.
 
 Results preserve column names, native type names and values as text or JSON null, under the
-`postgresql-native-text` or `mysql-native-text` profile. A MySQL connection reads only its
-configured database: the table and index reads, like `schema.list`, refuse any other schema as
-`invalid_input`. `table.describe` of a table that does not exist is `not_found`, and on MySQL
+`postgresql-native-text` or `mysql-native-text` profile. On MySQL the catalogue reads (table and
+index reads) and `schema.list` read only the configured database and refuse any other schema as
+`invalid_input`; `query.read` follows the configured user's grants, so a statement may read
+another database the user is granted. `table.describe` of a table that does not exist is `not_found`, and on MySQL
 so is `table.describe` or `index.list` of a table name MySQL cannot hold. The catalogue reads
 hide what the role or user cannot see as the engine's `information_schema` does; on PostgreSQL
 that includes foreign keys into schemas, tables or columns the role cannot see and indexes

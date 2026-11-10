@@ -8,21 +8,29 @@ use connectors_core::{Descriptor, Error, ErrorCode, Result};
 use connectors_sdk::{Adapter, AuthenticatedHttp, HttpResponse};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 pub mod auth;
 
 pub const PROFILE: &str = "tavily/2026-10";
 /// The only paths this adapter POSTs to; the composition fixes exactly these.
 pub const READ_POSTS: [&[&str]; 3] = [&["search"], &["extract"], &["crawl"]];
-/// Tavily bounds a crawl at 150 s; the transport waits a little longer.
+/// The longest the transport may wait on a read POST; the host cuts it at the caller's remaining
+/// deadline (30 s in the CLI).
 pub const READ_POST_TIMEOUT: Duration = Duration::from_secs(160);
 /// Per-item content ceiling, clipped on a UTF-8 boundary.
 pub const CONTENT_BYTES: usize = 128 * 1024;
 /// Serialized-result ceiling; items past it are omitted and reported.
 pub const RESULT_BYTES: usize = 3 * 1024 * 1024;
-/// Tavily's own crawl deadline, in seconds, sent with every crawl.
-const CRAWL_TIMEOUT_S: u64 = 150;
+/// Tavily's crawl `timeout` is accepted from 10 to 150 seconds (`upstream/tavily-openapi.json`).
+pub const CRAWL_TIMEOUT_MIN: u64 = 10;
+pub const CRAWL_TIMEOUT_MAX: u64 = 150;
+/// What a crawl leaves of the caller's deadline for the transport and the answer: Tavily is told
+/// to end its crawl this long before the caller's deadline.
+pub const CRAWL_MARGIN: Duration = Duration::from_secs(5);
 const OPERATIONS: [&str; 3] = ["websearch.search", "websearch.fetch", "websearch.crawl"];
 
 pub struct Tavily {
@@ -30,6 +38,7 @@ pub struct Tavily {
     http: Arc<dyn AuthenticatedHttp>,
     descriptor: Descriptor,
     clock: fn() -> u64,
+    deadline: Option<Instant>,
 }
 
 impl Tavily {
@@ -49,6 +58,7 @@ impl Tavily {
             http,
             descriptor,
             clock: connectors_sdk::now_ms,
+            deadline: None,
         })
     }
 
@@ -59,7 +69,30 @@ impl Tavily {
             http,
             descriptor: self.descriptor.clone(),
             clock: self.clock,
+            deadline: self.deadline,
         }
+    }
+
+    /// The instant the caller's reply is due (the host passes it with each invocation). A crawl
+    /// asks Tavily to end before it; without one the crawl asks for the longest Tavily accepts.
+    pub fn with_deadline(mut self, deadline: Instant) -> Self {
+        self.deadline = Some(deadline);
+        self
+    }
+
+    /// The crawl `timeout`, in whole seconds: the time left to the caller's deadline less
+    /// `CRAWL_MARGIN`, kept within `CRAWL_TIMEOUT_MIN..=CRAWL_TIMEOUT_MAX`. When less than the
+    /// minimum remains the minimum is sent: Tavily accepts no less, and the transport still cuts
+    /// the call at the caller's deadline.
+    fn crawl_timeout(&self) -> u64 {
+        let seconds = match self.deadline {
+            Some(deadline) => deadline
+                .saturating_duration_since(Instant::now())
+                .saturating_sub(CRAWL_MARGIN)
+                .as_secs(),
+            None => CRAWL_TIMEOUT_MAX,
+        };
+        seconds.clamp(CRAWL_TIMEOUT_MIN, CRAWL_TIMEOUT_MAX)
     }
 
     /// For tests: a fixed clock, so provenance is deterministic.
@@ -360,7 +393,7 @@ impl Tavily {
         body.insert("limit".into(), json!(input.limit));
         body.insert("format".into(), json!("markdown"));
         body.insert("extract_depth".into(), json!("basic"));
-        body.insert("timeout".into(), json!(CRAWL_TIMEOUT_S));
+        body.insert("timeout".into(), json!(self.crawl_timeout()));
         for (key, value) in [
             ("max_depth", input.max_depth.map(Value::from)),
             ("max_breadth", input.max_breadth.map(Value::from)),

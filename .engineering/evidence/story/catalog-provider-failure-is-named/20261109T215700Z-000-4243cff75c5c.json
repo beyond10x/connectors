@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-09T21:57:00Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-provider-failure-is-named",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test --locked -p connectors --test catalog_provider_failure (issue #230)",
+    "reference": "origin/main bd338daa0: 8 passed; website/docs/connectors/gitlab.md:62-64 states the endpoint form"
+  }
+}

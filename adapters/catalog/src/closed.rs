@@ -130,11 +130,12 @@ impl Closed {
         // satisfied: refused here, not at every write. A path under an
         // admitted key reads into its value, which must then be untyped.
         let mut guarded = BTreeSet::new();
+        let mut read_keys = BTreeSet::new();
         let mut scalars = BTreeSet::new();
         if !closed.keys.is_empty()
             && let Some(guard) = &selection.guard
         {
-            for dotted in guarded_body_paths(guard) {
+            for (dotted, required) in guarded_body_paths(guard) {
                 let read: Path = dotted.split('.').map(str::to_owned).collect();
                 let Some((key, _)) = closed.keys.iter().find(|(key, _)| read.starts_with(key))
                 else {
@@ -145,7 +146,10 @@ impl Closed {
                 if read == *key {
                     scalars.insert(key.clone());
                 }
-                guarded.insert(key.clone());
+                read_keys.insert(key.clone());
+                if required {
+                    guarded.insert(key.clone());
+                }
             }
         }
         closed.guarded = guarded;
@@ -178,7 +182,7 @@ impl Closed {
         }
         // A guard path inside a typed key could never resolve.
         if let Some(guard) = &selection.guard {
-            for dotted in guarded_body_paths(guard) {
+            for (dotted, _) in guarded_body_paths(guard) {
                 let read: Path = dotted.split('.').map(str::to_owned).collect();
                 if closed.types.keys().any(|typed| inside(&read, typed)) {
                     return Err(refuse(format!(
@@ -235,9 +239,7 @@ impl Closed {
                 Some(path) if closed.required.contains(path) => {
                     Some("which its body_required also names")
                 }
-                Some(path) if closed.guarded.contains(path) => {
-                    Some("which its guard reads as an input")
-                }
+                Some(path) if read_keys.contains(path) => Some("which its guard reads as an input"),
                 Some(_) => None,
             };
             if let Some(reason) = reason {

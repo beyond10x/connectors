@@ -2,8 +2,10 @@
 //! "macOS platform guarantees").
 //!
 //! - [`capture`]: `sealed_executable` holds only as `owner_private_copy`.
-//! - [`launch_path`]: the copy is executed by its path, then removed; an
-//!   [`Image`] dropped before its launch, or before it was [`sent`], removes it.
+//! - [`launch_path`]: the copy is executed by its path, then removed by its
+//!   [`Launch`], except the owner's, which [`Launch::leave`] hands to the owner
+//!   ([`own_copy`]) to remove when it stops serving; an [`Image`] dropped before
+//!   its launch, or before it was [`sent`], removes it.
 //! - [`ExactChild`]: `exact_process_signal` holds only as `child_reap_lock`.
 use super::super::{Failure, Result};
 use sha2::{Digest, Sha256};
@@ -311,6 +313,23 @@ impl Launch {
     pub(crate) fn path(&self) -> &Path {
         &self.path
     }
+    /// Hands the copy to the process it launched, which removes it when it
+    /// exits ([`own_copy`]): the copy stays on disk for that process's whole
+    /// run. The owner needs that. The keychain checks the code identity of the
+    /// process that creates and reads an item against the file at its
+    /// executable's path, as the owner's own build measure reads that file.
+    pub(crate) fn leave(self) {
+        let mut copies = copies();
+        if let Some(index) = copies
+            .iter()
+            .position(|copy| copy.id == self.id && copy.custody == Custody::Launched)
+        {
+            copies.swap_remove(index);
+        }
+        drop(copies);
+        // The removal is the launched process's now.
+        std::mem::forget(self);
+    }
 }
 impl Drop for Launch {
     fn drop(&mut self) {
@@ -323,6 +342,41 @@ impl Drop for Launch {
         }
         discard(&self.path);
     }
+}
+
+/// This process's own launch copy, which its launcher left on disk
+/// ([`Launch::leave`]); dropping it removes the copy and its directory.
+pub(crate) struct OwnCopy {
+    id: (u64, u64),
+    path: PathBuf,
+}
+impl Drop for OwnCopy {
+    fn drop(&mut self) {
+        // Only the file this process was started from: one put at its path
+        // since is left alone.
+        if std::fs::symlink_metadata(&self.path)
+            .is_ok_and(|named| named.file_type().is_file() && identity(&named) == self.id)
+        {
+            discard(&self.path);
+        }
+    }
+}
+
+/// The running executable when it is a launch copy, named as [`capture`]
+/// names one: an `image` file in a `connectors-image.*` directory. Anything
+/// else is `None` and is never removed.
+pub(crate) fn own_copy() -> Option<OwnCopy> {
+    let path = std::env::current_exe().ok()?;
+    let ours = path.file_name() == Some(OsStr::new(IMAGE))
+        && path
+            .parent()
+            .and_then(Path::file_name)
+            .is_some_and(|name| name.as_bytes().starts_with(DIRECTORY_PREFIX.as_bytes()));
+    let named = std::fs::symlink_metadata(&path).ok()?;
+    (ours && named.file_type().is_file()).then(|| OwnCopy {
+        id: identity(&named),
+        path,
+    })
 }
 
 /// The launch path of a descriptor on a copy this process captured or received
@@ -741,5 +795,74 @@ mod tests {
         drop(launched);
         assert!(image.exists(), "launch_path removed a file it did not make");
         assert!(refused, "launch_path admitted a file it did not make");
+    }
+
+    /// The variable that makes this test binary, started from its launch copy,
+    /// the child of [`an_owner_started_from_its_launch_copy_finds_and_removes_it`].
+    const OWN_COPY_CHILD: &str = "CONNECTORS_HOST_OWN_COPY_CHILD";
+
+    /// The owner removes its own launch copy when it stops serving
+    /// (`serve_with_read_policy` holds `own_copy()`). This starts this test
+    /// binary from a launch copy as the CLI starts the owner and leaves the
+    /// copy to it; the child must find its copy with `own_copy()` and, once it
+    /// drops it, the copy and its directory are gone.
+    #[test]
+    fn an_owner_started_from_its_launch_copy_finds_and_removes_it() {
+        if std::env::var_os(OWN_COPY_CHILD).is_some() {
+            let copy = own_copy();
+            assert!(copy.is_some(), "the launch copy was not recognised");
+            drop(copy);
+            return;
+        }
+        let binary = std::env::current_exe().unwrap();
+        let hash = hex::encode(Sha256::digest(std::fs::read(&binary).unwrap()));
+        let snapshot = capture(File::open(&binary).unwrap(), &hash, until()).unwrap();
+        let launch = launch_path(&snapshot).unwrap();
+        let copy = launch.path().to_path_buf();
+        let output = std::process::Command::new(&copy)
+            .args([
+                "--exact",
+                "local::runtime::artifact::macos::tests::an_owner_started_from_its_launch_copy_finds_and_removes_it",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(OWN_COPY_CHILD, "1")
+            .output()
+            .unwrap();
+        launch.leave();
+        drop(snapshot);
+        let directory = copy.parent().unwrap().to_path_buf();
+        let present = directory.exists();
+        if present {
+            discard(&copy);
+        }
+        assert!(
+            output.status.success(),
+            "the child failed: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!present, "the owner left its launch copy {directory:?}");
+    }
+
+    /// A launch left to the process it launched keeps the copy on disk after
+    /// the image is dropped; only that process's [`OwnCopy`] removes it, with
+    /// its directory. This test binary is not a launch copy, so it has none.
+    #[test]
+    fn a_left_launch_keeps_the_copy_until_its_process_removes_it() {
+        let root = tempfile::tempdir().unwrap();
+        let (path, hash) = source(root.path(), MACH_O_64);
+        let snapshot = capture(File::open(&path).unwrap(), &hash, until()).unwrap();
+        let launch = launch_path(&snapshot).unwrap();
+        let copy = launch.path().to_path_buf();
+        launch.leave();
+        drop(snapshot);
+        assert!(copy.exists(), "a left launch removed its copy");
+        assert!(own_copy().is_none(), "this test binary is no launch copy");
+        drop(OwnCopy {
+            id: identity(&std::fs::symlink_metadata(&copy).unwrap()),
+            path: copy.clone(),
+        });
+        assert!(!copy.parent().unwrap().exists());
     }
 }

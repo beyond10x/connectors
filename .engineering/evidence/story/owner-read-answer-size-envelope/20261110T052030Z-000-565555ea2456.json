@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-10T05:20:30Z",
+  "actor": "human:timo",
+  "artifact": "story:owner-read-answer-size-envelope",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test --locked -p connectors-host --lib -- local::owner local::runtime::channel; clippy -D warnings; fmt --check",
+    "reference": "impl 3cc5f3e2b: 151 passed incl. a_read_answer_carries_every_result_size_the_child_admits_and_no_more (red on base: Capacity at the exact limit) and the adversary's re-encoding case (red at 2e0c234b2: 8390481 > 8389632); clippy and fmt clean"
+  }
+}

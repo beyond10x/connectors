@@ -2,15 +2,19 @@
 format: aep.planning-md/3
 id: story:gmail-attachment-read-flaky-under-load
 kind: story
-status: draft
+status: active
 title: A 3 MiB Gmail attachment read answered Unavailable under gate load
 relations:
 - decomposes: epic:tech-debt-review-20260930
 - serves: vision:independent-contract-adapters
+- decomposes: epic:zero-open-issues-and-store-defects
 scope:
 - confidence: cited
   path: adapters/catalog/tests/google_calendar_gmail_adversary_pass2.rs
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:29Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:30Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Defect
 

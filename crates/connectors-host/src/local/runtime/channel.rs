@@ -343,9 +343,23 @@ pub(crate) fn write(
     document: &[u8],
     until: Instant,
 ) -> Result<()> {
+    write_within(stream, control, secret, document, until, RESULT_LIMIT)
+}
+/// [`write`] with another bound on the document, for the one answer that wraps
+/// a result already held to [`RESULT_LIMIT`].
+pub(crate) fn write_within(
+    stream: &mut Stream,
+    control: &impl Serialize,
+    secret: Option<&Secret>,
+    document: &[u8],
+    until: Instant,
+    document_limit: usize,
+) -> Result<()> {
     let bytes = serde_json::to_vec(control).map_err(|_| Failure::Protocol)?;
     let protected = secret.map(|s| s.0.as_slice()).unwrap_or_default();
-    if bytes.len() > INPUT_LIMIT || protected.len() > SECRET_LIMIT || document.len() > RESULT_LIMIT
+    if bytes.len() > INPUT_LIMIT
+        || protected.len() > SECRET_LIMIT
+        || document.len() > document_limit
     {
         return Err(Failure::Capacity);
     }

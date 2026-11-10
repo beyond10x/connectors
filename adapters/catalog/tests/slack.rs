@@ -1385,9 +1385,9 @@ fn connecting_records_the_token_user_as_the_identity() {
     assert_eq!(baseline.granted_scopes, None);
     let requests = provider.requests();
     assert_eq!(requests.len(), 1);
-    // The identity probe carries an empty query and the bearer header, never
+    // The identity probe carries no query and the bearer header, never
     // the token as a query parameter.
-    assert_eq!(requests[0].0, "/api/auth.test?");
+    assert_eq!(requests[0].0, "/api/auth.test");
     assert_eq!(requests[0].1.as_deref(), Some(HEADER));
     assert!(matches!(
         child.validate("atlassian.basic", &secret(), deadline()),
@@ -1555,20 +1555,20 @@ fn assert_answered(
 /// `team.info`, `emoji.list` and `auth.test` on the bot connection: the token
 /// travels in the `Authorization` header only — no `token` query parameter,
 /// no `token` header — and Slack's answer comes back as served. An empty
-/// input sends an empty query.
+/// input sends no query.
 #[test]
 fn each_discovery_read_sends_the_bearer_header_and_no_token() {
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection()).unwrap();
     for (operation, input, expected) in [
-        ("team.info", json!({}), "/api/team.info?"),
+        ("team.info", json!({}), "/api/team.info"),
         (
             "team.info",
             json!({"team": "T0FIXTURE01"}),
             "/api/team.info?team=T0FIXTURE01",
         ),
-        ("emoji.list", json!({}), "/api/emoji.list?"),
-        ("auth.test", json!({}), "/api/auth.test?"),
+        ("emoji.list", json!({}), "/api/emoji.list"),
+        ("auth.test", json!({}), "/api/auth.test"),
     ] {
         let before = provider.requests().len();
         let raw = invoke_raw(&mut child, operation, &input);
@@ -1603,7 +1603,7 @@ fn search_runs_on_the_user_token_connection() {
     assert_eq!(baseline.identity.subject, "U0FIXTURE02");
     let requests = provider.requests();
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].0, "/api/auth.test?");
+    assert_eq!(requests[0].0, "/api/auth.test");
     assert_eq!(requests[0].1.as_deref(), Some(USER_HEADER));
     assert!(matches!(
         child.validate(PROFILE, &user_secret(), deadline()),

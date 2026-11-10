@@ -807,9 +807,8 @@ fn first_requests() -> [(&'static str, Value, &'static str); 3] {
         (
             "presentations.pages.get",
             json!({"presentationId": DECK, "pageObjectId": "fixture-slide-1"}),
-            // The transport writes an empty query when no query parameter is
-            // bound, so the wire request ends in `?`.
-            "/v1/presentations/fixture-deck-1/pages/fixture-slide-1?",
+            // With no query parameter bound, the wire request has no `?`.
+            "/v1/presentations/fixture-deck-1/pages/fixture-slide-1",
         ),
         (
             "presentations.pages.getThumbnail",
@@ -881,27 +880,27 @@ fn presentations_get_refuses_slash_in_id() {
         (
             "presentations.get",
             json!({"presentationId": "fixture/deck"}),
-            "/v1/presentations/fixture%2Fdeck?",
+            "/v1/presentations/fixture%2Fdeck",
         ),
         (
             "presentations.pages.get",
             json!({"presentationId": "fixture/deck", "pageObjectId": "fixture-slide-1"}),
-            "/v1/presentations/fixture%2Fdeck/pages/fixture-slide-1?",
+            "/v1/presentations/fixture%2Fdeck/pages/fixture-slide-1",
         ),
         (
             "presentations.pages.get",
             json!({"presentationId": DECK, "pageObjectId": "fixture/slide"}),
-            "/v1/presentations/fixture-deck-1/pages/fixture%2Fslide?",
+            "/v1/presentations/fixture-deck-1/pages/fixture%2Fslide",
         ),
         (
             "presentations.pages.getThumbnail",
             json!({"presentationId": "fixture/deck", "pageObjectId": "fixture-slide-1"}),
-            "/v1/presentations/fixture%2Fdeck/pages/fixture-slide-1/thumbnail?",
+            "/v1/presentations/fixture%2Fdeck/pages/fixture-slide-1/thumbnail",
         ),
         (
             "presentations.pages.getThumbnail",
             json!({"presentationId": DECK, "pageObjectId": "fixture/slide"}),
-            "/v1/presentations/fixture-deck-1/pages/fixture%2Fslide/thumbnail?",
+            "/v1/presentations/fixture-deck-1/pages/fixture%2Fslide/thumbnail",
         ),
     ];
     // The one write with a path parameter: its preflight read and its POST
@@ -952,8 +951,8 @@ fn presentations_get_refuses_slash_in_id() {
         assert_eq!(
             provider.api_targets()[before..],
             [
-                "/v1/presentations/fixture%2Fdeck?",
-                "/v1/presentations/fixture%2Fdeck:batchUpdate?",
+                "/v1/presentations/fixture%2Fdeck",
+                "/v1/presentations/fixture%2Fdeck:batchUpdate",
             ],
             "`{operation}` requests"
         );
@@ -1202,10 +1201,7 @@ fn batch_update_with_a_stale_required_revision_fails_the_preflight_and_sends_no_
         ),
         "a stale revision was not refused in preflight"
     );
-    assert_eq!(
-        provider.api_targets(),
-        ["/v1/presentations/fixture-deck-1?"]
-    );
+    assert_eq!(provider.api_targets(), ["/v1/presentations/fixture-deck-1"]);
     assert!(provider.bodies().is_empty(), "a write was sent");
 
     let mut unpinned = current.clone();
@@ -1234,15 +1230,15 @@ fn batch_update_with_a_stale_required_revision_fails_the_preflight_and_sends_no_
     assert_eq!(
         provider.api_targets(),
         [
-            "/v1/presentations/fixture-deck-1?",
-            "/v1/presentations/fixture-deck-1?",
-            "/v1/presentations/fixture-deck-1:batchUpdate?",
+            "/v1/presentations/fixture-deck-1",
+            "/v1/presentations/fixture-deck-1",
+            "/v1/presentations/fixture-deck-1:batchUpdate",
         ]
     );
     assert_eq!(
         provider.bodies(),
         [(
-            "/v1/presentations/fixture-deck-1:batchUpdate?".to_owned(),
+            "/v1/presentations/fixture-deck-1:batchUpdate".to_owned(),
             current["body"].clone()
         )]
     );
@@ -1262,10 +1258,10 @@ fn create_sends_one_post_with_its_body_and_no_preflight() {
     assert_eq!(result.effect, WriteEffect::Applied);
     let value = result.result.unwrap();
     assert_eq!(value["body"], posted("/v1/presentations").unwrap());
-    assert_eq!(provider.api_targets(), ["/v1/presentations?"]);
+    assert_eq!(provider.api_targets(), ["/v1/presentations"]);
     assert_eq!(
         provider.bodies(),
-        [("/v1/presentations?".to_owned(), input["body"].clone())]
+        [("/v1/presentations".to_owned(), input["body"].clone())]
     );
 }
 

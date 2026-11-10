@@ -10,6 +10,7 @@ refs:
   reference: beyond10x/connectors#180
 relations:
 - serves: vision:independent-contract-adapters
+- decomposes: epic:zero-open-issues-and-store-defects
 scope:
 - confidence: inferred
   path: adapters/catalog/tests/local_runtime

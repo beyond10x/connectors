@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-09T21:58:00Z",
+  "actor": "human:timo",
+  "artifact": "story:approval-issue-slack-bot-post",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test --locked -p connectors --test approval_field_adversary --test approval_field_adversary_2; cargo test -p connectors-host --lib -- approval_issuance (issue #180)",
+    "reference": "origin/main bd338daa0: 3 passed, 2 passed, 10 passed; 0 failed"
+  }
+}

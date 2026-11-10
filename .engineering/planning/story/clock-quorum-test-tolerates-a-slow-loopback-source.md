@@ -2,12 +2,21 @@
 format: aep.planning-md/3
 id: story:clock-quorum-test-tolerates-a-slow-loopback-source
 kind: story
-status: draft
+status: active
 title: clock_check_below_quorum_refusal holds when a loopback clock fixture answers late on a loaded runner
 summary: 'One red on main (Windows host run 41721788043): the first loopback fixture was counted unreachable instead of verified'
 tags:
 - from-finding
-revision: 3
+relations:
+- decomposes: epic:zero-open-issues-and-store-defects
+- serves: vision:independent-contract-adapters
+scope:
+- confidence: inferred
+  path: apps/connectors/tests/local_cli.rs
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:59:35Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:59:36Z", actor: "human:timo", revision: 5, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Defect
 

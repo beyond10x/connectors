@@ -424,8 +424,8 @@ fn reads() -> Vec<Read> {
         Read {
             id: "space.get",
             input: json!({"spaceKey": "DOCS"}),
-            // A request without query pairs ends in `?`, as on every provider.
-            requests: vec!["/wiki/rest/api/space/DOCS?".into()],
+            // A request without query pairs has no `?`, as on every provider.
+            requests: vec!["/wiki/rest/api/space/DOCS".into()],
             paging: None,
             items: 1,
         },

@@ -543,6 +543,166 @@ fn macos_locked_keychain_is_unavailable_without_a_prompt() {
     drop(temporary);
 }
 
+/// The variable that makes this test binary, started from a launch copy, the
+/// child of [`macos_login_keychain_writes_from_a_launch_copy_left_on_disk_and_removed_after_start`];
+/// its value names the variant, and the child's answer is the stdout text that
+/// starts at it (the harness may print its own text before it on that line).
+#[cfg(target_os = "macos")]
+const LAUNCH_COPY_CHILD: &str = "CONNECTORS_CUSTODY_LAUNCH_COPY_CHILD";
+
+/// The owner writes custody from a copy of its executable, which it keeps until
+/// it stops serving (`connectors-host`, `runtime::artifact::macos`
+/// and the owner spawn). This runs one login keychain write, read-back and
+/// delete in a child started as the CLI starts the owner: a mode 0500 copy of
+/// this test binary in a fresh `connectors-image.*` directory, executed by its
+/// path, with an empty environment, in its own session. The copy is left on
+/// disk for one child and removed after the start, before the write, for the
+/// other. Both answers are printed with every keychain status the binding
+/// reported, so one run tells whether the removed executable is what fails
+/// the owner's write.
+#[cfg(target_os = "macos")]
+#[test]
+#[ignore = "touches the platform credential store"]
+fn macos_login_keychain_writes_from_a_launch_copy_left_on_disk_and_removed_after_start() {
+    if let Some(variant) = std::env::var_os(LAUNCH_COPY_CHILD) {
+        return launch_copy_child(&variant.to_string_lossy());
+    }
+    let answers: Vec<(&str, String)> = ["left_on_disk", "removed_after_start"]
+        .into_iter()
+        .map(|variant| (variant, launch_copy(variant)))
+        .collect();
+    for (variant, answer) in &answers {
+        eprintln!("launch copy {variant}: {answer}");
+    }
+    let [(_, left), (_, removed)] = &answers[..] else {
+        unreachable!()
+    };
+    // The executable left on disk writes, reads back and deletes.
+    assert!(
+        left.contains(" write=Ok(()) ")
+            && left.contains(" delete=Ok(()) ")
+            && left.ends_with(" reported=[]"),
+        "a login keychain write from a launch copy left on disk failed: {left}"
+    );
+    // Pinned macOS fact, which is why the owner keeps its launch copy until it
+    // stops serving: SecItemAdd from a process whose executable is gone answers
+    // OSStatus 100002 (ENOENT), which the binding reports as outcome unknown.
+    assert!(
+        removed.contains(" executable_on_disk=Ok(false) ")
+            && removed.contains(" write=Err(OutcomeUnknown) ")
+            && removed.contains("SecItemAdd answered OSStatus 100002"),
+        "a login keychain write from a removed executable no longer fails as pinned: {removed}"
+    );
+}
+
+/// Starts this test binary from a launch copy, as the CLI starts the owner,
+/// and answers the child's line, or what it printed when it gave none.
+#[cfg(target_os = "macos")]
+fn launch_copy(variant: &str) -> String {
+    use std::{
+        io::Write,
+        os::unix::{fs::PermissionsExt, process::CommandExt},
+        process::{Command, Stdio},
+    };
+    let directory = tempfile::Builder::new()
+        .prefix("connectors-image.")
+        .tempdir()
+        .unwrap();
+    let outputs = tempfile::tempdir().unwrap();
+    let image = directory.path().join("image");
+    // As the host makes a copy: the bytes written into a new file, then mode 0500.
+    let bytes = std::fs::read(std::env::current_exe().unwrap()).unwrap();
+    std::fs::write(&image, bytes).unwrap();
+    std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o500)).unwrap();
+    let (stdout, stderr) = (outputs.path().join("stdout"), outputs.path().join("stderr"));
+    let mut command = Command::new(&image);
+    command
+        .args([
+            "--exact",
+            "tests::macos_login_keychain_writes_from_a_launch_copy_left_on_disk_and_removed_after_start",
+            "--include-ignored",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env_clear()
+        .env(LAUNCH_COPY_CHILD, variant)
+        .stdin(Stdio::piped())
+        .stdout(std::fs::File::create(&stdout).unwrap())
+        .stderr(std::fs::File::create(&stderr).unwrap());
+    // SAFETY: setsid is async-signal-safe; the owner's spawn starts its own
+    // session the same way.
+    unsafe {
+        command.pre_exec(|| {
+            if libc::setsid() < 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    let mut child = command.spawn().unwrap();
+    if variant == "removed_after_start" {
+        std::fs::remove_file(&image).unwrap();
+    }
+    child.stdin.take().unwrap().write_all(b"go\n").unwrap();
+    let until = Instant::now() + Duration::from_secs(60);
+    let status = loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            break Some(status);
+        }
+        if Instant::now() >= until {
+            let _ = child.kill();
+            let _ = child.wait();
+            break None;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    let stdout = std::fs::read_to_string(&stdout).unwrap_or_default();
+    // The libtest harness prints "test <name> ... " before the child's line on
+    // the same line, so the answer starts where the marker does, not at a line start.
+    match stdout
+        .lines()
+        .find_map(|line| line.find(LAUNCH_COPY_CHILD).map(|at| &line[at..]))
+    {
+        Some(line) => line.to_owned(),
+        None => format!(
+            "no answer from the child (exit {status:?}); stdout: {stdout:?}; stderr: {:?}",
+            std::fs::read_to_string(&stderr).unwrap_or_default()
+        ),
+    }
+}
+
+/// The child: waits for the parent's go (after the copy was removed, for that
+/// variant), then writes, reads back and deletes one fresh login keychain item.
+#[cfg(target_os = "macos")]
+fn launch_copy_child(variant: &str) {
+    use crate::keychain::Keychain;
+    let mut go = String::new();
+    std::io::stdin().read_line(&mut go).unwrap();
+    let on_disk = std::env::current_exe().map(|path| path.exists());
+    let scope = Scope::new(Uuid::new_v4(), Uuid::new_v4()).unwrap();
+    let version = Version::new(scope, Uuid::new_v4()).unwrap();
+    let keychain = Keychain::open(scope);
+    let write = keychain
+        .as_ref()
+        .map_err(|failure| *failure)
+        .and_then(|keychain| {
+            keychain.write_new(
+                version,
+                &Material::from_slice(b"fictional"),
+                until(),
+                || Ok(()),
+            )
+        });
+    let delete = keychain
+        .as_ref()
+        .map_err(|failure| *failure)
+        .and_then(|keychain| keychain.delete(version, until(), || Ok(())));
+    println!(
+        "{LAUNCH_COPY_CHILD} variant={variant} executable_on_disk={on_disk:?} write={write:?} delete={delete:?} reported={:?}",
+        crate::keychain::reported()
+    );
+}
+
 /// The Windows Credential Manager, generic credentials persisted on the
 /// local machine.
 #[cfg(target_os = "windows")]

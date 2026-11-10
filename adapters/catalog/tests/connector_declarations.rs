@@ -841,11 +841,11 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "07 catalog-google-drive.md",
-            "bd5b9027875019f49c099fb490f8ed65ed1f4dcc7bf09da0ad19a3505573c1f7",
+            "6bac52117e4df66c2b63a0d074c57e5f6ded77783002b5806845ed4a1d754d43",
         ),
         (
             "08 catalog-google-drive.md",
-            "27aa4e87e571bb8ba4920e571775c81c9383eac8fe171a70e7188b122562326d",
+            "1c5c5587e95ad69d271ad288df8c208885bc20456f90b59392383672095d80a9",
         ),
         (
             "09 catalog-google-gmail.md",

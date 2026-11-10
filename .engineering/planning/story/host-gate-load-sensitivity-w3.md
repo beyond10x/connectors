@@ -2,11 +2,22 @@
 format: aep.planning-md/3
 id: story:host-gate-load-sensitivity-w3
 kind: story
-status: draft
+status: active
 title: Three more host and adapter tests bound their own waits
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: adapters/sql/tests/local_runtime.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner/approval_issuance/tests.rs
+- confidence: inferred
+  path: crates/connectors-host/tests/service.rs
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:30Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:31Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Acceptance
 

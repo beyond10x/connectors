@@ -2,11 +2,21 @@
 format: aep.planning-md/3
 id: story:live-acceptance-without-serve
 kind: story
-status: draft
+status: active
 title: The live acceptance runner runs without the removed serve command
 relations:
 - informed_by: story:connectors-do-short-invocation
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+- serves: vision:independent-contract-adapters
+scope:
+- confidence: inferred
+  path: crates/connectors-conformance/src/main.rs
+- confidence: inferred
+  path: docs/live-e2e.md
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:59:41Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:59:42Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Problem
 

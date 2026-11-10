@@ -1227,7 +1227,7 @@ fn first_requests() -> [(&'static str, Value, &'static str); 3] {
         (
             "events.get",
             json!({"calendarId": "primary", "eventId": "fixture-event-1"}),
-            "/calendar/v3/calendars/primary/events/fixture-event-1?",
+            "/calendar/v3/calendars/primary/events/fixture-event-1",
         ),
     ]
 }
@@ -1536,7 +1536,7 @@ fn each_write_sends_exactly_its_request_and_body_and_returns_the_answer() {
     let mut child = Child::spawn(&provider.selection()).unwrap();
     let preflight = (
         "GET",
-        "/calendar/v3/calendars/primary/events/fixture-event-1?",
+        "/calendar/v3/calendars/primary/events/fixture-event-1",
     );
     for (operation, input, expected, body) in [
         (
@@ -1638,7 +1638,7 @@ fn a_stale_etag_fails_the_preflight_and_sends_no_write() {
         );
         assert_eq!(
             provider.api_calls()[before..],
-            calls(&[("GET", &format!("{EVENT_1}?"))])[..],
+            calls(&[("GET", EVENT_1)])[..],
             "`{operation}`"
         );
     }
@@ -1705,7 +1705,7 @@ fn a_write_to_an_event_google_does_not_have_sends_no_write() {
                 "`{operation}` of {event_id}: {:?}",
                 outcome.map(|result| result.effect)
             );
-            let route = format!("/calendar/v3/calendars/primary/events/{event_id}?");
+            let route = format!("/calendar/v3/calendars/primary/events/{event_id}");
             assert_eq!(
                 provider.api_calls()[before..],
                 calls(&[("GET", &route)])[..],
@@ -1736,7 +1736,7 @@ fn a_write_to_an_event_that_is_not_confirmed_sends_no_write() {
                 "`{operation}` of {event_id}: {:?}",
                 outcome.map(|result| result.effect)
             );
-            let route = format!("/calendar/v3/calendars/primary/events/{event_id}?");
+            let route = format!("/calendar/v3/calendars/primary/events/{event_id}");
             assert_eq!(
                 provider.api_calls()[before..],
                 calls(&[("GET", &route)])[..],

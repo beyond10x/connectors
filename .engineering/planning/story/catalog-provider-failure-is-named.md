@@ -5,9 +5,13 @@ kind: story
 status: implemented
 title: A catalog provider that cannot run is named, not blamed on the endpoint
 summary: 'D370 item 2: provider failure refusal, setup check, init writes local/5'
+refs:
+- provider: github
+  reference: beyond10x/connectors#230
 relations:
 - serves: vision:independent-contract-adapters
-revision: 5
+- decomposes: epic:zero-open-issues-and-store-defects
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-02T07:27:31Z", actor: "human:timo", revision: 2, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
 - {from: "proposed", to: "active", at: "2026-11-02T07:27:31Z", actor: "human:timo", revision: 3, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}

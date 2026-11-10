@@ -2,12 +2,32 @@
 format: aep.planning-md/3
 id: story:bundle-index-refuses-ambiguous-rows
 kind: story
-status: draft
+status: implemented
 title: The bundle index refuses a repeated provider and a file name outside the bundle directory
 summary: 'review run 3 C4 F2: load joins an unchecked file_name and takes the first row'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: cited
+  path: Cargo.lock
+- confidence: cited
+  path: adapters/catalog/src/local.rs
+- confidence: cited
+  path: crates/connectors-catalog/Cargo.toml
+- confidence: cited
+  path: crates/connectors-catalog/src/bundle.rs
+- confidence: cited
+  path: crates/connectors-catalog/tests/bundle.rs
+- confidence: cited
+  path: crates/connectors-catalog/tests/bundle_adversary.rs
+- confidence: cited
+  path: crates/connectors-catalog/tests/bundle_adversary_2.rs
+revision: 13
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:57:48Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:57:49Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-10T06:20:08Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"test_result":1,"review_outcome":3,"verification":1}}, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 
@@ -30,3 +50,15 @@ always writes `<provider>.bundle.json`. A hand-edited build tree is the only rea
 
 - `read_index` refuses both shapes with `InvalidInput`; the three scratch cases are tests in
   `crates/connectors-catalog/tests/bundle.rs`.
+
+## Scope
+
+Landed on, from `git diff 881139ac3...impl/bundle-index-refuses-ambiguous-rows` (merged into wave/zero-issues at 2d9b244e5); the earlier scoper lines marked inferred are replaced by this list. Generated reference pages are left out.
+
+- `adapters/catalog/src/local.rs`
+- `Cargo.lock`
+- `crates/connectors-catalog/Cargo.toml`
+- `crates/connectors-catalog/src/bundle.rs`
+- `crates/connectors-catalog/tests/bundle_adversary_2.rs`
+- `crates/connectors-catalog/tests/bundle_adversary.rs`
+- `crates/connectors-catalog/tests/bundle.rs`
