@@ -13,7 +13,7 @@ scope:
   path: adapters/catalog/src/lib.rs
 - confidence: cited
   path: adapters/catalog/tests/slack_adversary.rs
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:24Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:25Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
@@ -41,3 +41,7 @@ The rule is shared by every provider, so it is its own story.
 ## Code review
 
 The operator-ordered code review of the repository at `23b9f1bc4` (2026-11-10, no cargo command run; "verified" means traced by reading) lists this as CR-027, taken from this story: `adapters/catalog/tests/slack_adversary.rs:905`; the source line this story cites is stale.
+
+## Wave status
+
+Merged 279dc6a8ea (commit 91f0edb53e), 2026-11-10. Shipped selections needing an empty required value: none (all 17 bundles joined to every provider selection file: 160 selections, 185 required path or query parameters; none has an empty string in its enum or as a default; checked structurally). slack_adversary 11 passed with the case un-ignored; engine 44, openrouter 14, parameter_types 11, slack 54, slack_send_adversary 7 passed.
