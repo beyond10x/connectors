@@ -959,7 +959,8 @@ The complete configuration used against the sandbox is
   objects. A guard reads a nested key through its dotted path
   (`body.ticket.updated_stamp` is `/ticket/updated_stamp`). A read, an operation
   without a request body, an empty, dotted or repeated name, a pointer with an
-  empty segment or a `~`, a key inside another admitted key, or a guard reading
+  empty segment or a `~`, a segment of digits (it would name a list element,
+  and the body is objects only), a key inside another admitted key, or a guard reading
   a `body.<path>` the set does not admit is refused when the selection loads.
   The bundle records no body schema, so the names are not checked against the
   provider's.
@@ -1014,7 +1015,9 @@ The complete configuration used against the sandbox is
   refused as `invalid_input` naming the key, before any request, and the
   declared input schema gives the key that `enum`. A key `body_types` does not
   type as `string`, a fixed key, an empty set, or an empty or repeated value is
-  refused when the selection loads.
+  refused when the selection loads, and so is a key `body_prefixes` also names:
+  the set is checked on the caller's text before the prefix is added, so the
+  value sent would fall outside it.
 - `body_any_of` is optional, beside `body_keys`: `["<key>", …]` names keys of
   which a body must carry at least one, for a write that changes whichever
   members the caller sends, such as Zendesk's ticket update of `group_id`,

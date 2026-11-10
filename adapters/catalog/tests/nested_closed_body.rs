@@ -742,3 +742,49 @@ fn an_explicit_null_rate_limit_headers_or_embedded_text_is_refused_at_load() {
         assert!(loaded.is_err(), "`{member}: null` loaded as absent");
     }
 }
+
+/// A segment of digits is an array index in a pointer, and a closed body is
+/// objects only: `/tags/0` would send `{"tags": {"0": "x"}}` where the provider
+/// expects a list. An enum is checked on the caller's text, so a prefix on the
+/// same key would send a value outside the set. Both are refused at load, naming
+/// the key.
+#[test]
+fn an_array_index_pointer_or_an_enum_beside_a_prefix_is_refused_when_the_selection_loads() {
+    let plain = |extra: Value| {
+        let mut selection =
+            json!({"id": "thing.update", "operation_id": "UpdateTicket", "effect": "write"});
+        for (k, v) in extra.as_object().unwrap() {
+            selection[k] = v.clone();
+        }
+        selection
+    };
+    let cases: Vec<(&str, &str, Value)> = vec![
+        (
+            "an array index segment on a fixed key",
+            "/tags/0",
+            plain(json!({"body_keys": ["/tags/0"], "body_fixed": {"/tags/0": "x"}})),
+        ),
+        (
+            "an array index segment on a typed key",
+            "/tags/12/name",
+            plain(
+                json!({"body_keys": ["/tags/12/name"], "body_types": {"/tags/12/name": "string"}}),
+            ),
+        ),
+        (
+            "an enum and a prefix on one key",
+            "/s",
+            plain(json!({"body_keys": ["/s"], "body_types": {"/s": "string"},
+                         "body_enums": {"/s": ["a", "b"]}, "body_prefixes": {"/s": "X"}})),
+        ),
+    ];
+    for (name, key, selection) in cases {
+        let outcome = engine(std::slice::from_ref(&selection));
+        let error = outcome.err().unwrap_or_else(|| panic!("{name}: loaded"));
+        assert_eq!(error.code, ErrorCode::InvalidInput, "{name}");
+        assert!(error.message.contains(key), "{name}: {}", error.message);
+    }
+    // A segment that only starts with a digit is an object key, not an index.
+    let named = plain(json!({"body_keys": ["/a/0x"], "body_types": {"/a/0x": "string"}}));
+    assert!(engine(&[named]).is_ok(), "a name that starts with a digit");
+}
