@@ -19,5 +19,8 @@ tempfile.workspace = true
 indexmap = { version = "2", features = ["serde"] }
 regex = "1"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
 openapiv3 = "2.2"

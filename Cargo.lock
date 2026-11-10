@@ -648,6 +648,7 @@ dependencies = [
  "flate2",
  "hex",
  "indexmap",
+ "libc",
  "openapiv3",
  "regex",
  "serde",
