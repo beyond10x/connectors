@@ -18,6 +18,16 @@ pub fn run(root: &Path, ess: &Path, check: bool) -> Result<()> {
             return Err("public operation metadata types drift; run service-metadata".into());
         }
     } else {
+        super::ownership::adopt_existing(
+            root,
+            ess,
+            &super::ownership::Family {
+                destination: OUTPUT,
+                owner: "model-types",
+                sources: &["ess"],
+            },
+            &|source, out| generate(source, ess, out),
+        )?;
         generate(root, ess, &root.join(OUTPUT))?;
     }
     println!(
