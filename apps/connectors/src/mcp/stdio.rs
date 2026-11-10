@@ -58,6 +58,9 @@ struct Work {
 /// its own. A cancel frees the slot (server semantics § 3.4); this bounds what
 /// repeated cancels can leave running.
 const OWNER_CALLS: usize = 2;
+/// What a reply has to be written in past its request's deadline, or past the
+/// moment it is queued when that deadline has already passed.
+const LATE_WRITE_GRACE: Duration = Duration::from_secs(2);
 fn enqueue(
     queue: &mut VecDeque<Output>,
     id: Option<&Value>,
@@ -85,7 +88,7 @@ fn enqueue(
         id: id.cloned(),
         bytes,
         offset: 0,
-        until,
+        until: until.max(Instant::now()) + LATE_WRITE_GRACE,
     });
     Ok(())
 }
@@ -153,9 +156,16 @@ pub(super) fn serve(
                     Ok(reply) => {
                         let job = work.take().ok_or(Code::Unavailable)?;
                         job.thread.join().map_err(|_| Code::Unavailable)?;
-                        if Instant::now() >= job.until {
-                            return Err(Code::Timeout.into());
-                        }
+                        // A reply that reaches the loop at or past its request's
+                        // deadline (the worker's own `timeout` refusal does,
+                        // by construction) is answered `timeout`. `enqueue`
+                        // gives every reply `LATE_WRITE_GRACE` past its
+                        // deadline, so one written across it keeps the session.
+                        let reply = if Instant::now() >= job.until {
+                            Err(super::projection::refusal("timeout"))
+                        } else {
+                            reply
+                        };
                         enqueue(&mut queue, Some(&job.id), reply, job.until, response_limit)?;
                     }
                     Err(mpsc::TryRecvError::Disconnected) => return Err(Code::Unavailable.into()),
