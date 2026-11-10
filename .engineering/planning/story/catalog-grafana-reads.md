@@ -8,7 +8,7 @@ relations:
 - decomposes: epic:catalog-knowledge-sources
 - depends_on: story:catalog-slack-reads
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 ---
 ## Source
 
@@ -27,8 +27,14 @@ out of scope: too large for the corpus (consumer's assessment).
 | `annotations.list` | `GET /api/annotations` | `limit`, narrowing `to` | fewer items than `limit` | `from`, `to` (epoch ms) |
 | `dashboards.search` | `GET /api/search?type=dash-db` | `page`, `limit` | fewer items than `limit` | none; the consumer diffs titles and descriptions |
 | `dashboard.get` | `GET /api/dashboards/uid/{uid}` | single item | n/a | n/a |
+| `datasources.list` | `GET /api/datasources` | none (one response) | single response | none |
 
 Alert firing history, where needed, is read as `annotations.list` with `type=alert`.
+
+`datasources.list` was added on 2026-11-10 from an Assembly requirement: Assembly shows which
+environments' Prometheus and Loki data sources a connection reaches.
+
+The definition file holds no write operation (requirement confirmed by Assembly).
 
 ## Shared surfaces
 
@@ -37,7 +43,9 @@ Alert firing history, where needed, is read as `annotations.list` with `type=ale
 
 ## Acceptance
 
-- `operations.json` exposes exactly the ids above, each `effect: read`; `adapters/catalog/tests/grafana.rs` pins that exact id list.
+- `operations.json` exposes exactly the five ids above (`alert_rules.list`, `annotations.list`,
+  `dashboards.search`, `dashboard.get`, `datasources.list`), each `effect: read`, and no write
+  operation; `adapters/catalog/tests/grafana.rs` pins that exact id list.
 - `operations.json` loads against the committed bundle, which refuses any `operation_id` the pinned document lacks; `docs/catalog-grafana.md` cites, per operation, the pinned document's `operationId` and path.
 - `docs/catalog-grafana.md` states, per list operation, its paging parameters, its end condition and its time-window filter (or why there is none).
 - Per operation, a recorded-fixture test asserts the exact request sent and that `operations invoke` returns the fixture body byte-identical.
@@ -64,5 +72,5 @@ alone is not that goal.
 Additional acceptance:
 
 - A served instance started from the definition file, with a mounted service-account token,
-  describes exactly the four reads above and answers one of them against a recorded fixture.
+  describes exactly the five reads above and answers one of them against a recorded fixture.
 - The definition passes the lowerer at the pinned definitions release with no warning.

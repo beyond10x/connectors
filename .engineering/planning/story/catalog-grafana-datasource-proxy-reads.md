@@ -9,7 +9,7 @@ relations:
 - decomposes: epic:catalog-knowledge-sources
 - serves: vision:independent-contract-adapters
 - depends_on: story:catalog-grafana-reads
-revision: 2
+revision: 3
 ---
 ## Outcome
 
@@ -21,6 +21,8 @@ those backends.
 The route is a catalog definition: `connectors/grafana.yaml` in `beyond10x/connectors-definitions`.
 Serving the native adapters (`adapters/grafana`, the Prometheus and Loki adapters) is not the
 route.
+
+The definition file holds no write operation (requirement confirmed by Assembly).
 
 ## Operations (read-only)
 
@@ -41,9 +43,12 @@ route.
   answer is refused with the catalog's size reason, never cut short and reported complete. Loki's
   `limit` has a documented maximum.
 - A served instance started from the definition with a mounted token describes these three reads
-  beside the four from story:catalog-grafana-reads.
+  beside the five from story:catalog-grafana-reads.
 - `docs/catalog-grafana.md` states, per operation, the proxy path and the time and step bounds.
   It also says that a data source the token's role cannot query answers `forbidden`.
+- `uid` is a caller input. A `uid` outside a non-empty allow-list in the instance configuration
+  is refused before any upstream request, by a named reason; an empty or absent list admits
+  every data source the token can read.
 
 ## Ambiguities
 
@@ -52,5 +57,10 @@ route.
   a sub-path. Check whether the definition notation and the lowerer can fix that sub-path per
   operation. If they cannot, the gap goes to the definitions format first, as an upstream
   blocker.
-- Should `uid` be fixed per instance (configuration) or be a caller input? Decide when the story
-  is accepted. A caller input lets the token reach every data source its role can query.
+
+## Decisions
+
+- `uid` (resolved 2026-11-10 from an Assembly requirement): a caller input, validated against an
+  optional allow-list in the instance configuration; an empty list admits every data source the
+  token can read. Reason: a central Grafana has one data source per environment, so a fixed
+  `uid` would mean one instance per environment.
