@@ -198,7 +198,18 @@ pub(super) fn select(
         [] if names_unmigrated(config, connector, instance) => Err(Unselected::Unmigrated),
         [] => Err(Unselected::NotFound),
         [one] => match &one.alias {
-            Some(alias) => Ok((one.connector.clone(), one.instance.clone(), alias.clone())),
+            Some(alias) => match shadowed(config, one, alias) {
+                None => Ok((one.connector.clone(), one.instance.clone(), alias.clone())),
+                Some(legacy) => {
+                    let name = format!("{}/{}", one.connector, one.instance);
+                    let mut listed = vec![
+                        format!("{name} (alias {alias})"),
+                        format!("{name} (alias {legacy})"),
+                    ];
+                    listed.sort();
+                    Err(Unselected::Ambiguous(listed))
+                }
+            },
             None if config
                 .awaiting_profile(&one.connector, &one.instance)
                 .is_some() =>
@@ -216,6 +227,21 @@ pub(super) fn select(
             Err(Unselected::Ambiguous(listed))
         }
     }
+}
+
+/// The alias of a legacy entry that [`named`] left out because the entry
+/// `selected`, under `alias`, holds the same connector and instance names:
+/// selecting either silently would reach the other.
+fn shadowed(config: &Config, selected: &Named, alias: &str) -> Option<String> {
+    config
+        .legacy_aliases()
+        .into_iter()
+        .filter(|legacy| *legacy != alias)
+        .find(|legacy| {
+            entry_name(config, legacy, &config.adapters[*legacy])
+                .is_some_and(|(c, i)| c == selected.connector && i == selected.instance)
+        })
+        .map(str::to_owned)
 }
 
 /// Whether `connector` and `instance` name a legacy catalog entry no connector
@@ -1489,5 +1515,75 @@ mod tests {
             "revision"
         );
         assert_eq!(unnamed(&json!({"operation":"op","input":"{}"})), "input");
+    }
+
+    /// A legacy catalog entry under `[adapters.private]` that derives the
+    /// connector `gmail`, beside the pinned instance `gmail/private`: both are
+    /// known by the names `gmail/private`.
+    #[cfg(unix)]
+    fn legacy_and_instance_sharing_names() -> Config {
+        use std::os::unix::fs::MetadataExt;
+        let uid = std::fs::metadata(".").unwrap().uid();
+        let entry = |table: &str, id: &str, args: &str| {
+            format!(
+                "[{table}]\ninstance_id='{id}'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[{table}.executable]\npath='/opt/connectors/bin/connectors-catalog'\nsha256='1111111111111111111111111111111111111111111111111111111111111111'\nargs={args}\n[{table}.permissions]\nprofiles=['google.oauth']\noperations=['users.messages.list']\n"
+            )
+        };
+        let instance = entry(
+            "connectors.gmail.instances.private",
+            "gmail-pinned",
+            "['--local-config','/etc/connectors/gmail.json']",
+        )
+        .replace(
+            "[connectors.gmail.instances.private]\n",
+            "[connectors.gmail.instances.private]\nalias='pinned'\n",
+        );
+        let text = format!(
+            "format='connectors-local/5'\nowner_uid={uid}\n{}[connectors.gmail]\nenabled=true\n{instance}",
+            entry(
+                "adapters.private",
+                "gmail-legacy",
+                "['--connector','gmail']"
+            )
+        );
+        Config::parse(&text).unwrap()
+    }
+
+    /// story:legacy-alias-sharing-an-instance-name: a target both a legacy
+    /// entry (by the connector `setup migrate` derives for it) and a
+    /// `[connectors]` instance are known by selects neither silently: it is
+    /// refused as ambiguous, naming both entries.
+    #[cfg(unix)]
+    #[test]
+    fn a_read_through_a_name_that_is_both_alias_and_instance_is_refused_as_ambiguous() {
+        let config = legacy_and_instance_sharing_names();
+        for instance in [Some("private"), None] {
+            let refused = select(&config, "gmail", instance).unwrap_err();
+            assert!(
+                matches!(&refused, Unselected::Ambiguous(names) if names.len() == 2),
+                "{instance:?}: {refused:?}"
+            );
+        }
+    }
+
+    /// The target is selected (`prepare_with`) before the operation's effect
+    /// is known and before an approval file is required or any provider is
+    /// called, so a write through the shared name is refused exactly as a read
+    /// is: `instance_ambiguous`, a usage error, nothing approved or sent.
+    #[cfg(unix)]
+    #[test]
+    fn a_write_through_such_a_name_stays_refused() {
+        let config = legacy_and_instance_sharing_names();
+        let refused = select(&config, "gmail", Some("private")).unwrap_err();
+        let Unselected::Ambiguous(names) = &refused else {
+            panic!("{refused:?}");
+        };
+        assert_eq!(names.len(), 2, "{names:?}");
+        let HandlerReply::UsageError { data, .. } = unselected(refused) else {
+            panic!("a usage error");
+        };
+        assert_eq!(data["code"], "instance_ambiguous");
+        assert_eq!(data["stage"], "arguments");
+        assert_eq!(data["next_action"], "none");
     }
 }
