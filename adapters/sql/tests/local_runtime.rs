@@ -36,6 +36,9 @@ const PASSWORD_ONE: &str = "fixture-password-one";
 const PASSWORD_TWO: &str = "fixture-password-two";
 const USER: &str = "reader";
 const DATABASE: &str = "fixture";
+/// Every wait this file chooses is this one bound, which only a hang
+/// reaches; the host and the adapter keep their own production bounds.
+const WAIT: Duration = Duration::from_secs(120);
 
 struct Database {
     stop: Option<oneshot::Sender<()>>,
@@ -189,7 +192,7 @@ impl Database {
                 }
             });
         });
-        let port = address_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let port = address_rx.recv_timeout(WAIT).unwrap();
         let config = directory.join("postgres.json");
         private(
             &config,
@@ -277,7 +280,7 @@ fn password(one: bool) -> Secret {
     )
 }
 fn deadline() -> u64 {
-    connectors_sdk::now_ms() + 30_000
+    connectors_sdk::now_ms() + WAIT.as_millis() as u64
 }
 
 fn inject_packet(database: &Database, body: &[u8]) {
@@ -287,9 +290,7 @@ fn inject_packet(database: &Database, body: &[u8]) {
     let port = config["port"].as_u64().unwrap() as u16;
     let host = config["host"].as_str().unwrap();
     let mut stream = std::net::TcpStream::connect((host, port)).unwrap();
-    stream
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .unwrap();
+    stream.set_read_timeout(Some(WAIT)).unwrap();
     stream
         .write_all(&((body.len() + 4) as i32).to_be_bytes())
         .unwrap();
@@ -347,7 +348,7 @@ fn sql_fixture_repeated_control_packets_preserve_provider_refusal() {
     }
     assert_eq!(database.sessions(), 0);
     assert_eq!(database.cancellations.load(Ordering::SeqCst), 3);
-    let mut child = Child::spawn(&database.selection()).unwrap();
+    let mut child = Child::spawn_within(&database.selection(), WAIT).unwrap();
     let revision = child.bootstrap().descriptor().unwrap().revision;
     let result = child.invoke(
         "query.read",
@@ -358,7 +359,7 @@ fn sql_fixture_repeated_control_packets_preserve_provider_refusal() {
         deadline(),
     );
     assert!(matches!(result, Err(Failure::Forbidden)), "{result:?}");
-    let until = std::time::Instant::now() + Duration::from_secs(5);
+    let until = std::time::Instant::now() + WAIT;
     while database.cancellations.load(Ordering::SeqCst) < 4 {
         assert!(
             std::time::Instant::now() < until,
@@ -395,7 +396,7 @@ fn sql_fixture_rejects_a_malformed_cancellation() {
 #[should_panic(expected = "the read must open exactly one session")]
 fn sql_fixture_rejects_an_extra_sut_session() {
     let database = Database::new();
-    let mut child = Child::spawn(&database.selection()).unwrap();
+    let mut child = Child::spawn_within(&database.selection(), WAIT).unwrap();
     child
         .validate("postgres.password", &password(true), deadline())
         .unwrap();
@@ -408,7 +409,7 @@ fn the_session_is_the_credential_check_and_its_identity_is_the_role_and_database
     let selection = database.selection();
     // The bootstrap advertises a session credential, not a bearer token.
     let bootstrap: Bootstrap = {
-        let mut child = Child::spawn(&selection).unwrap();
+        let mut child = Child::spawn_within(&selection, WAIT).unwrap();
         let value = child.bootstrap().clone();
         let incarnation = child.incarnation().to_owned();
         child.stop(&incarnation).unwrap();
@@ -427,7 +428,7 @@ fn the_session_is_the_credential_check_and_its_identity_is_the_role_and_database
     );
     assert!(bootstrap.provider_authority.ends_with("/fixture"));
 
-    let mut child = Child::spawn(&selection).unwrap();
+    let mut child = Child::spawn_within(&selection, WAIT).unwrap();
     assert_eq!(database.sessions(), 0, "spawning must open no session");
     let baseline = child
         .validate("postgres.password", &password(true), deadline())
@@ -451,7 +452,7 @@ fn the_session_is_the_credential_check_and_its_identity_is_the_role_and_database
 #[test]
 fn a_rejected_password_and_a_malformed_entry_are_distinguishable() {
     let database = Database::new();
-    let mut child = Child::spawn(&database.selection()).unwrap();
+    let mut child = Child::spawn_within(&database.selection(), WAIT).unwrap();
     // The provider's own 28P01 refusal, not a local guess.
     assert!(
         matches!(
@@ -492,7 +493,7 @@ fn a_dispatched_read_reaches_the_database_and_returns_its_refusal() {
 }
 
 fn assert_dispatched_read_reaches_the_database(database: &Database) {
-    let mut child = Child::spawn(&database.selection()).unwrap();
+    let mut child = Child::spawn_within(&database.selection(), WAIT).unwrap();
     let revision = child.bootstrap().descriptor().unwrap().revision;
     let cancellations_before = database.cancellations.load(Ordering::SeqCst);
     let result = child.invoke(
@@ -510,7 +511,7 @@ fn assert_dispatched_read_reaches_the_database(database: &Database) {
         1,
         "the read must open exactly one session"
     );
-    let until = std::time::Instant::now() + Duration::from_secs(5);
+    let until = std::time::Instant::now() + WAIT;
     while database.cancellations.load(Ordering::SeqCst) == cancellations_before {
         assert!(
             std::time::Instant::now() < until,

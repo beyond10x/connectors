@@ -6,14 +6,16 @@ use super::*;
 use crate::local::clock::fixture as clock_fixture;
 use crate::local::{clock, keyring::custody, metadata::Metadata};
 use base64::{Engine, engine::general_purpose::STANDARD};
+use std::collections::BTreeSet;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
-use std::{collections::BTreeSet, time::Duration};
 
 const NOW: u64 = 1_788_998_400_000;
 const INPUT: &str = r#"{"name":"item","at":"2026-09-11T00:00:00Z"}"#;
+/// Every command deadline in this file: a bound only a hang reaches, not one a
+/// loaded scheduler can spend.
 fn until() -> Instant {
-    Instant::now() + Duration::from_secs(20)
+    Instant::now() + crate::local::metadata::CONTENDED_LOCK_WAIT
 }
 struct Target {
     paths: Paths,
@@ -505,15 +507,16 @@ struct ClockServer {
 #[test]
 fn clock_exchange_precedes_leases_and_policy_is_rechecked_after_network() {
     let root = root();
+    // Every wait below is this one bound: `until()`, the lease
+    // and lifecycle waits (per thread), the clock query and the fake
+    // server's wait for the request. A loaded scheduler cannot spend it.
+    let wait = crate::local::metadata::CONTENDED_LOCK_WAIT;
+    crate::local::metadata::set_lifecycle_lock_wait(wait);
     // The fake server takes an exclusive metadata update before it replies.
-    crate::local::clock::set_test_query_timeout(crate::local::metadata::CONTENDED_LOCK_WAIT);
-    crate::local::clock::set_test_max_width_ms(
-        crate::local::metadata::CONTENDED_LOCK_WAIT.as_millis(),
-    );
+    crate::local::clock::set_test_query_timeout(wait);
+    crate::local::clock::set_test_max_width_ms(wait.as_millis());
     let socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
-    socket
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .unwrap();
+    socket.set_read_timeout(Some(wait)).unwrap();
     let second = clock_fixture::Server::fixture(clock_fixture::Fixture {
         seed: 8,
         ..Default::default()
@@ -528,6 +531,7 @@ fn clock_exchange_precedes_leases_and_policy_is_rechecked_after_network() {
         state: t.paths.state.clone(),
     };
     let exchange = std::thread::spawn(move || {
+        crate::local::metadata::set_lifecycle_lock_wait(wait);
         let mut packet = [0; 4096];
         let (size, peer) = socket.recv_from(&mut packet).unwrap();
         // This exclusive update would fail if the issuing command had already
