@@ -1312,7 +1312,7 @@ impl std::fmt::Display for Refusal {
             ),
             Self::BodyPrefix { key, field } => write!(
                 f,
-                "{name}: operation `{key}` body_prefixes `{field}` is not a non-empty prefix of a string key its body declares and the caller sends"
+                "{name}: operation `{key}` body_prefixes `{field}` is not a non-empty prefix of a string key its body declares and the caller sends, and body_enums does not also name"
             ),
             Self::ConflictStatus { key, status } => write!(
                 f,
@@ -1576,6 +1576,18 @@ fn body(key: &str, operation: &Operation) -> Result<Body, Refusal> {
                 .to_owned(),
         });
     }
+    if let Some(field) = body.keys.iter().find(|field| {
+        path(field).is_some_and(|own| {
+            own.iter()
+                .any(|segment| !segment.is_empty() && segment.bytes().all(|b| b.is_ascii_digit()))
+        })
+    }) {
+        return Err(Refusal::BodyType {
+            key: key.to_owned(),
+            field: field.clone(),
+            spec: "a key of object names: a segment of digits would name a list element".to_owned(),
+        });
+    }
     let mut paths = BTreeSet::new();
     for field in &body.keys {
         if !paths.insert(path(field)) {
@@ -1645,7 +1657,10 @@ fn body(key: &str, operation: &Operation) -> Result<Body, Refusal> {
         body.any_of = any_of.clone();
     }
     for (field, prefix) in operation.body_prefixes.iter().flatten() {
-        if !body.sent_string(field) || prefix.is_empty() {
+        if !body.sent_string(field)
+            || prefix.is_empty()
+            || body.enums.keys().any(|named| path(named) == path(field))
+        {
             return Err(Refusal::BodyPrefix {
                 key: key.to_owned(),
                 field: field.clone(),
