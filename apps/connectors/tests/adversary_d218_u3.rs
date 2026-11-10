@@ -336,34 +336,41 @@ fn help_and_completion_offer_no_operations_invoke() {
 
 /// story:connectors-do-short-invocation: a `[connectors]` instance and a
 /// legacy catalog entry that `setup migrate` derives the same connector and
-/// instance for are one name. `invoke` already resolves the pair to the
-/// `[connectors]` instance (`invoke.rs` `named`: "each name is listed once");
-/// `instances list` must not list the pair twice, under two instance ids.
+/// instance for are one name, which no selection reaches.
+///
+/// Changed by story:legacy-alias-sharing-an-instance-name: the name is refused
+/// at selection (`instance_ambiguous`, naming both entries), so `instances
+/// list` must not hide it. It lists both entries, each once, under their two
+/// instance ids; `invoke jira/old` is refused and never reaches either.
 #[test]
-fn a_name_derived_twice_is_listed_once() {
+fn a_name_derived_twice_is_listed_for_both_entries_and_refused() {
     let body = legacy("old", "old-local", "['--connector','jira']")
         + "[connectors.jira]\nenabled=true\n"
         + &instance("jira", "old", "jira-current", "jira-current");
     let root = root_with(&body, &["old", "jira-current"]);
     let result = success(&run(root.path(), &["instances", "list"]));
-    let named = pairs(&result);
-    let twice = named
+    let ids: Vec<&Value> = result["adapters"]
+        .as_array()
+        .unwrap()
         .iter()
-        .filter(|(c, i)| c == "jira" && i == "old")
-        .count();
+        .filter(|item| item["connector"] == "jira" && item["instance"] == "old")
+        .map(|item| &item["instance_id"])
+        .collect();
     assert_eq!(
-        twice, 1,
-        "story:connectors-do-short-invocation: jira/old is listed {twice} times: {result}"
+        ids,
+        [&json!("jira-current"), &json!("old-local")],
+        "story:legacy-alias-sharing-an-instance-name: both entries of jira/old, once each: {result}"
     );
-    // The pair `invoke` selects is the `[connectors]` instance.
-    let described = success(&run(
+    // Neither is reached by the name.
+    let (_, refused) = refusal(&run(
         root.path(),
         &["invoke", "jira/old", READ, "--describe"],
     ));
+    assert_eq!(refused["code"], "instance_ambiguous", "{refused}");
     assert_eq!(
-        (&described["connector"], &described["instance"]),
-        (&json!("jira"), &json!("old")),
-        "{described}"
+        refused["instances"],
+        json!(["jira/old (alias jira-current)", "jira/old (alias old)"]),
+        "{refused}"
     );
 }
 

@@ -109,8 +109,9 @@ pub(super) fn unmigrated(config: &Config) -> Vec<String> {
 
 /// Every configured instance by the names `invoke` knows it by
 /// ([`entry_name`]). A catalog entry no connector is derived for has no name
-/// here. A `[connectors]` instance wins over a legacy entry that derives its
-/// names, as `Config::select` selects it, so each name is listed once.
+/// here. A legacy entry that derives the names of a `[connectors]` instance is
+/// listed beside it: the name is then held by two entries and [`select`]
+/// refuses it (story:legacy-alias-sharing-an-instance-name).
 fn named(config: &Config) -> Vec<Named> {
     let legacy = config.legacy_aliases();
     let mut named: Vec<Named> = config
@@ -144,25 +145,32 @@ fn named(config: &Config) -> Vec<Named> {
         let Some((connector, instance)) = entry_name(config, alias, &config.adapters[alias]) else {
             continue;
         };
-        if !named
-            .iter()
-            .any(|n| n.connector == connector && n.instance == instance)
-        {
-            named.push(Named {
-                connector,
-                instance,
-                alias: Some(alias.to_owned()),
-            });
-        }
+        named.push(Named {
+            connector,
+            instance,
+            alias: Some(alias.to_owned()),
+        });
     }
     named
 }
 
+/// Whether a legacy `[adapters.<alias>]` entry is known by `connector` and
+/// `instance` (story:legacy-alias-sharing-an-instance-name): an instance table
+/// written under that name would be a second entry of it.
+pub(super) fn held_by_legacy(config: &Config, connector: &str, instance: &str) -> bool {
+    config.legacy_aliases().into_iter().any(|alias| {
+        entry_name(config, alias, &config.adapters[alias])
+            .is_some_and(|(c, i)| c == connector && i == instance)
+    })
+}
+
 /// The connector and instance of every entry [`named`] lists, by alias: the
 /// instances `instances list` lists and `--connector`/`--instance` select,
-/// each name once. A legacy entry whose names a `[connectors]` instance holds
-/// is not among them, nor is a legacy catalog entry no connector is derived
-/// for (story:connectors-do-short-invocation).
+/// each entry once. A name a legacy entry and a `[connectors]` instance both
+/// derive is listed for both entries
+/// (story:legacy-alias-sharing-an-instance-name); a legacy catalog entry no
+/// connector is derived for is not among them
+/// (story:connectors-do-short-invocation).
 pub(super) fn instances(config: &Config) -> std::collections::BTreeMap<String, (String, String)> {
     named(config)
         .into_iter()
@@ -198,18 +206,7 @@ pub(super) fn select(
         [] if names_unmigrated(config, connector, instance) => Err(Unselected::Unmigrated),
         [] => Err(Unselected::NotFound),
         [one] => match &one.alias {
-            Some(alias) => match shadowed(config, one, alias) {
-                None => Ok((one.connector.clone(), one.instance.clone(), alias.clone())),
-                Some(legacy) => {
-                    let name = format!("{}/{}", one.connector, one.instance);
-                    let mut listed = vec![
-                        format!("{name} (alias {alias})"),
-                        format!("{name} (alias {legacy})"),
-                    ];
-                    listed.sort();
-                    Err(Unselected::Ambiguous(listed))
-                }
-            },
+            Some(alias) => Ok((one.connector.clone(), one.instance.clone(), alias.clone())),
             None if config
                 .awaiting_profile(&one.connector, &one.instance)
                 .is_some() =>
@@ -219,29 +216,30 @@ pub(super) fn select(
             None => Err(Unselected::NotFound),
         },
         several => {
+            // A name two entries hold (story:legacy-alias-sharing-an-instance-name)
+            // is listed once per entry, by alias; an instance that has no entry
+            // yet (it awaits a profile) has no alias and is listed by its name.
+            let shared = |n: &Named| {
+                several
+                    .iter()
+                    .filter(|m| m.connector == n.connector && m.instance == n.instance)
+                    .count()
+                    > 1
+            };
             let mut listed: Vec<String> = several
                 .iter()
-                .map(|n| format!("{}/{}", n.connector, n.instance))
+                .map(|n| {
+                    let name = format!("{}/{}", n.connector, n.instance);
+                    match (&n.alias, shared(n)) {
+                        (Some(alias), true) => format!("{name} (alias {alias})"),
+                        _ => name,
+                    }
+                })
                 .collect();
             listed.sort();
             Err(Unselected::Ambiguous(listed))
         }
     }
-}
-
-/// The alias of a legacy entry that [`named`] left out because the entry
-/// `selected`, under `alias`, holds the same connector and instance names:
-/// selecting either silently would reach the other.
-fn shadowed(config: &Config, selected: &Named, alias: &str) -> Option<String> {
-    config
-        .legacy_aliases()
-        .into_iter()
-        .filter(|legacy| *legacy != alias)
-        .find(|legacy| {
-            entry_name(config, legacy, &config.adapters[*legacy])
-                .is_some_and(|(c, i)| c == selected.connector && i == selected.instance)
-        })
-        .map(str::to_owned)
 }
 
 /// Whether `connector` and `instance` name a legacy catalog entry no connector
@@ -255,7 +253,7 @@ pub(super) fn names_unmigrated(config: &Config, connector: &str, instance: Optio
         })
 }
 
-fn unselected(refused: Unselected) -> HandlerReply {
+pub(super) fn unselected(refused: Unselected) -> HandlerReply {
     match refused {
         Unselected::Unmigrated => configuration_refusal(Refusal::Rule(Rule::LegacyEntryUnmigrated)),
         Unselected::Ambiguous(instances) => {

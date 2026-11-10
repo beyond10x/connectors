@@ -468,7 +468,10 @@ A catalog entry no connector is derived for is no instance: naming it so
 `configuration_rule` `legacy_entry_unmigrated` and `next_action`
 `check_configuration`. A
 configuration in which two entries would answer to one connector and instance
-pair refuses the whole file, as does `default_instance` that is not
+pair refuses the whole file; a legacy entry and an instance that are known by
+one pair only once the entry's connector is derived are not such a pair, and
+selecting that name is `instance_ambiguous` (see [invoking an
+operation](#invoking-an-operation)). The file is also refused for a `default_instance` that is not
 `"<connector>/<instance>"` naming a configured instance, `default_instance`
 outside `connectors-local/5`, or `default_instance` beside `default_adapter`.
 
@@ -558,8 +561,11 @@ The endpoint must pass the configuration's own endpoint rule (non-empty, at
 most 2048 bytes, no whitespace or control character); otherwise the command is
 `invalid_input` with `field = endpoint` and nothing is written. So is
 `--endpoint` with no `<connector>/<instance>` named (`--adapter` or the default
-instance), and on an instance that carries the pins of a legacy entry, whose
-endpoint is its pinned selection's. A connector that declares no default
+instance), on an instance that carries the pins of a legacy entry, whose
+endpoint is its pinned selection's, and on a name a legacy `[adapters.<alias>]`
+entry holds (a table written beside it would make the name two entries, which
+selection refuses as `instance_ambiguous`): `setup migrate` moves the entry to
+an instance first. A connector that declares no default
 endpoint, selected on an instance that is not listed or is listed with neither
 `endpoint` nor pins, is `invalid_input` with `field = endpoint` when `--endpoint` is
 absent, before any credential is asked for.
@@ -755,18 +761,26 @@ echoed. A `[connectors]` instance and a recorded definition instance are named
 by their own names; a legacy `[adapters.<alias>]` entry by its alias, under the
 connector `setup migrate` derives for it, or under its implementation when that
 is not the catalog; a catalog entry no connector is derived for cannot be named
-here. A `[connectors]` instance wins over a legacy entry that derives the same
-names, as `--connector` and `--instance` select it, so each instance has one
-name. With the instance left out the connector's only instance is selected;
-`default_instance` is never consulted. A connector or instance not configured
-is `not_found` at `admission` naming `check_configuration`.
+here. A name a `[connectors]` instance and a legacy entry both derive is
+refused, never resolved to either: see `instance_ambiguous`. With the instance
+left out the connector's only instance is selected; `default_instance` is never
+consulted. A connector or instance not configured is `not_found` at `admission`
+naming `check_configuration`.
 
 `instance_ambiguous`: the target names a connector with several instances and
-no instance. It is a usage refusal at `arguments`, exit 2, `next_action = none`,
-and its `Failure.instances` lists every instance of that connector as
-`<connector>/<instance>`, sorted, so the caller can name one. Nothing was read
-beyond the configuration. A target that names its instance is never
-`instance_ambiguous`.
+no instance, or names one `<connector>/<instance>` that a `[connectors]`
+instance and a legacy `[adapters.<alias>]` entry both derive. It is a usage
+refusal at `arguments`, exit 2, `next_action = none`, and its
+`Failure.instances` lists, sorted, every instance of that connector as
+`<connector>/<instance>`, so the caller can name one; for a shared name it lists
+the two entries as `<connector>/<instance> (alias <alias>)`, each once (an
+instance that has no entry yet is listed as `<connector>/<instance>`). Nothing
+was read beyond the configuration, no credential is read and no request is
+sent. A target that names its instance is `instance_ambiguous` only for such a
+shared name. `--connector` with `--instance` and `default_instance` select by
+the same rule and give the same refusal. The operator removes or renames one of
+the two entries; `setup migrate` keeps the legacy entry as `instance_conflict`
+and does not resolve it. `instances list` lists both entries.
 
 Without `--connection` the instance's one `ready` connection is selected. When
 none is ready, its one usable connection is: `pending` only because its
@@ -1689,7 +1703,7 @@ never replay a possible write after interruption, timeout or lost response.
 | no selected cached description | `description_unavailable` | 1 |
 | schema/descriptor changed | `stale_description` | 1 |
 | absent selected operation/connection | `not_found` | 1 |
-| `invoke` target naming a connector with several instances and no instance (`stage = arguments`, `next_action = none`, `instances` named; [invoking an operation](#invoking-an-operation)) | `instance_ambiguous` | 2 |
+| `invoke` target naming a connector with several instances and no instance, or a `<connector>/<instance>` a `[connectors]` instance and a legacy entry both derive, as does `--connector`/`--instance` or `default_instance` naming it (`stage = arguments`, `next_action = none`, `instances` named; [invoking an operation](#invoking-an-operation)) | `instance_ambiguous` | 2 |
 | `invoke` without `--connection` on an instance with no usable connection, several `ready`, or several usable and none `ready` (`stage = admission`, `connections` named; [invoking an operation](#invoking-an-operation)) | `connection_unresolved` | 1 |
 | `invoke` write without `--approval-file` (`stage = admission`, `next_action = none`, `approval_steps` named) | `approval_required` | 1 |
 | stale, expired or foreign list cursor (`stage = observation`, `next_action = retry_explicitly`) | `stale_cursor` | 1 |
