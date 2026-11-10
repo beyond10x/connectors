@@ -1344,7 +1344,7 @@ impl Provider {
                         let bot = authorization.as_deref() == Some(HEADER);
                         let (status, kind, bytes) = if !bot {
                             (403, "text/plain", b"fixture forbidden".to_vec())
-                        } else if path.trim_end_matches('?') == FILE_PATH {
+                        } else if path == FILE_PATH {
                             (200, "application/pdf", FILE_BYTES.to_vec())
                         } else {
                             (404, "text/plain", b"no fixture".to_vec())
@@ -2596,7 +2596,7 @@ fn the_download_reads_url_private_with_the_token_on_an_admitted_host() {
     );
     let requests = provider.requests();
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].0.trim_end_matches('?'), FILE_PATH);
+    assert_eq!(requests[0].0, FILE_PATH);
     assert_eq!(requests[0].1.as_deref(), Some(HEADER));
     // Off the prefix, or on a host the selection does not reach: refused, unsent.
     for url in [
