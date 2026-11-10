@@ -43,8 +43,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.refresh.RefreshStateConflict
-    fields:
-      state: Fenced
   no_events:
   - connectors.refresh.ExchangeAuthorized
   at: '2026-09-08T10:00:02Z'

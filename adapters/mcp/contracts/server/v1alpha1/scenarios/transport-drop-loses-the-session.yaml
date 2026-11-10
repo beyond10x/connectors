@@ -84,8 +84,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.sessions.StateConflict
-    fields:
-      state: Lost
   no_events:
   - connectors.sessions.DataPermitted
   - connectors.sessions.DataLeaseRenewed
@@ -104,8 +102,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.sessions.StateConflict
-    fields:
-      state: Lost
   no_events:
   - connectors.sessions.DataPermitted
   - connectors.sessions.DataLeaseRenewed

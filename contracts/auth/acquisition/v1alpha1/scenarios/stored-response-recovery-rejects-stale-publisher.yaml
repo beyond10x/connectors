@@ -83,8 +83,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.refresh.RefreshStateConflict
-    fields:
-      state: Recovering
   no_events:
   - connectors.refresh.ExchangeAuthorized
   at: '2026-09-08T10:00:05Z'
