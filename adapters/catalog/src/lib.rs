@@ -876,11 +876,15 @@ pub struct Held {
     pub secret: Option<Secret>,
 }
 
-/// The body paths a guard reads, each the part after `body.` of a reference.
-pub(crate) fn guarded_body_paths(guard: &Guard) -> impl Iterator<Item = &str> {
-    guard
-        .references()
-        .filter_map(|path| path.strip_prefix("body."))
+/// The body paths a guard reads, each the part after `body.` of a reference,
+/// with whether the guard requires it: a path read only through an optional
+/// preflight value is admitted and typed like any other, but never required.
+pub(crate) fn guarded_body_paths(guard: &Guard) -> impl Iterator<Item = (&str, bool)> {
+    let required = guard.references().map(|path| (path, true));
+    let optional = guard.optional_references().map(|path| (path, false));
+    required
+        .chain(optional)
+        .filter_map(|(path, required)| path.strip_prefix("body.").map(|path| (path, required)))
 }
 
 /// An input reference: a top-level key, or `body.` followed by dotted keys into
