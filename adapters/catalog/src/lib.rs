@@ -57,7 +57,8 @@ pub enum Expectation {
 }
 
 /// One comparison: the value at `pointer` in an observed body must equal what
-/// `expect` resolves to, as text or, for a `boolean`, by JSON type.
+/// `expect` resolves to, as text or, for a `boolean` or an `input` naming a
+/// JSON boolean, by JSON type.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Check {

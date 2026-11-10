@@ -23,11 +23,11 @@ types:
   # the four (Expectation's invariants); serialised as `{"input": "<reference>"}`,
   # `{"literal": "<value>"}`, `{"boolean": true}` or `{"present": true}`.
   #
-  # `input` and `literal` compare as text: the observed scalar (a string, a number or a boolean)
-  # is written as text and must equal the expected text, so a literal `"7"` holds for the
-  # number `7` and the string `"7"` alike. `boolean` compares by JSON type: the observed
-  # value must be exactly that JSON boolean, and a string, a number or `null` in its place
-  # differs. It is for an answer whose schema pins a boolean, such as Slack's `ok` (`true` on
+  # A `literal`, and an `input` that names a string or a number, compare as text: the observed
+  # scalar (a string, a number or a boolean) is written as text and must equal the expected
+  # text, so a literal `"7"` holds for the number `7` and the string `"7"` alike. `boolean`, and
+  # an `input` that names a JSON boolean, compare by JSON type: the observed value must be
+  # exactly that JSON boolean, and a string, a number or `null` in its place differs. It is for an answer whose schema pins a boolean, such as Slack's `ok` (`true` on
   # success), where a look-alike string must not pass. A `literal` of `"true"` or `"false"` is
   # therefore refused (the last invariant): the bundle does not record the type of an answer
   # member, so the engine refuses those two literals on every check when the selection loads, and
@@ -59,7 +59,8 @@ types:
       - any: [{not: defined(literal)}, {all: [literal != "true", literal != "false"]}]
 
   # The value at the RFC 6901 `pointer` in an observed answer must equal what `expect` resolves
-  # to, compared as text or, for a `boolean` expectation, by JSON type.
+  # to, compared as text or, for a `boolean` expectation or an `input` naming a JSON boolean, by
+  # JSON type.
   - name: connectors_catalog.guard.Check
     kind: struct
     fields:
