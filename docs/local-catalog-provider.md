@@ -1390,6 +1390,13 @@ in the same shape. They keep working: each is selected by the connector `setup m
 for it and its alias (here `gitlab/forge`, or `--connector gitlab --instance forge`), or by the
 deprecated `--adapter <alias>`. An entry no connector is derived for, such as an OpenRouter
 entry, is no instance: selecting it is `legacy_entry_unmigrated`.
+A legacy entry beside a `[connectors.<connector>.instances.<instance>]` table that derives the
+same connector and instance (a GitLab entry `forge` beside `[connectors.gitlab.instances.forge]`)
+has one name for two entries, so selecting `gitlab/forge`, by `invoke`, by `--connector
+gitlab --instance forge` or by `default_instance`, is refused as `instance_ambiguous`, naming both
+entries; nothing is sent and no credential is read. `instances list` lists both. Remove or
+rename one of the two entries: `setup migrate` keeps the legacy entry (`instance_conflict`) and
+does not resolve it.
 `setup migrate` moves every entry whose native configuration names a provider with a shipped
 declaration to `[connectors.<connector>.instances.<alias>]`, in the short form or with every
 pin unchanged (below), so its connections and approval policy stay valid. The dry run writes nothing; this one ran on a file
