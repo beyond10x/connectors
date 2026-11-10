@@ -181,12 +181,7 @@ impl Registry {
                 return Err(Failure::NotFound);
             }
             let baseline = row.baseline.as_ref().ok_or(Failure::MetadataUnavailable)?;
-            let count: i64 = tx
-                .query_row("SELECT count(*) FROM registry_uses", [], |r| r.get(0))
-                .map_err(db)?;
-            if count >= 1000 {
-                return Err(Failure::Capacity);
-            }
+            use_and_retirement::admit_read_use_capacity(tx)?;
             let version_id = row.material.as_ref().ok_or(Failure::MetadataUnavailable)?;
             let id = new_id();
             let expires = expires_at.min(baseline.valid_until());

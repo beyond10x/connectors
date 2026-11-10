@@ -369,8 +369,7 @@ impl Registry {
                 (true, Follow::Executable | Follow::Changed) => return Err(Failure::Conflict),
             };
             tx.execute("DELETE FROM registry_uses WHERE expires_at_ms<=?1", [timestamp(now)?]).map_err(db)?;
-            let count: i64 = tx.query_row("SELECT count(*) FROM registry_uses", [], |r| r.get(0)).map_err(db)?;
-            if count >= 1000 { return Err(Failure::Capacity); }
+            use_and_retirement::admit_read_use_capacity(tx)?;
             let version = row.material.as_ref().ok_or(Failure::MetadataUnavailable)?;
             let id = new_id();
             tx.execute("INSERT INTO registry_uses (use_id,connection_ref,generation_id,version_id,publication_fence,expires_at_ms) VALUES (?1,?2,?3,?4,?5,?6)",
