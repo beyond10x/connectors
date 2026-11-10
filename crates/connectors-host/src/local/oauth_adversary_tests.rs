@@ -244,11 +244,61 @@ fn chrome_following_the_redirect_is_accepted() {
     );
 }
 
+/// What the listener contract needs from Chrome's connections for one
+/// navigation: exactly one carries a request, and it is the navigation. A
+/// connection that carries no bytes is a speculative preconnect; the listener
+/// drops it without an answer and without effect (`oauth.rs`, and the idle
+/// cases above), so it is not counted. A second request-bearing connection
+/// would be a second request, which the flow refuses.
+fn single_request(seen: &[(Duration, Vec<u8>)], request_line: &str) -> Result<(), String> {
+    let carrying: Vec<&(Duration, Vec<u8>)> = seen.iter().filter(|(_, b)| !b.is_empty()).collect();
+    match carrying.as_slice() {
+        [(_, bytes)] if bytes.starts_with(request_line.as_bytes()) => Ok(()),
+        _ => Err(format!(
+            "expected exactly one connection carrying the navigation request \
+             `{request_line}`; (accepted at, bytes) per connection: {seen:?}"
+        )),
+    }
+}
+
+const NAVIGATION: &str = "GET /?state=s&code=c ";
+
+#[test]
+fn empty_preconnects_beside_the_navigation_are_allowed() {
+    let request = (Duration::from_millis(40), NAVIGATION.as_bytes().to_vec());
+    let empty = |ms| (Duration::from_millis(ms), Vec::new());
+    let seen = [empty(10), request, empty(90)];
+    assert_eq!(single_request(&seen, NAVIGATION), Ok(()));
+}
+
+#[test]
+fn negative_control_a_second_request_is_rejected() {
+    let request = |ms| (Duration::from_millis(ms), NAVIGATION.as_bytes().to_vec());
+    assert!(single_request(&[request(10), request(20)], NAVIGATION).is_err());
+}
+
+#[test]
+fn negative_control_no_request_or_a_foreign_one_is_rejected() {
+    let empty = (Duration::from_millis(10), Vec::new());
+    assert!(single_request(&[empty], NAVIGATION).is_err());
+    let foreign = (Duration::from_millis(10), b"GET /other ".to_vec());
+    assert!(single_request(&[foreign], NAVIGATION).is_err());
+}
+
 /// Reach, without the flow: every connection Chrome opens for one navigation
-/// to a loopback address, and the bytes each carries. The flow assumes one.
+/// to a loopback address, and the bytes each carries. The flow needs exactly
+/// one request-bearing connection; Chrome also opens empty preconnects (two
+/// were seen in the 2026-10-02 disposable-family run), which the listener
+/// ignores. The failure message keeps the browser's identity and every
+/// connection's accept time and bytes.
 #[test]
 #[ignore = "requires google-chrome-stable"]
 fn chrome_opens_one_connection_per_navigation() {
+    let identity = Command::new("google-chrome-stable")
+        .arg("--version")
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
+        .unwrap_or_default();
     let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
     let port = listener.local_addr().unwrap().port();
     let profile = tempfile::tempdir().unwrap();
@@ -277,20 +327,19 @@ fn chrome_opens_one_connection_per_navigation() {
         }
         std::thread::sleep(Duration::from_millis(5));
     }
-    let seen: Vec<(Duration, usize)> = connections
+    let seen: Vec<(Duration, Vec<u8>)> = connections
         .iter_mut()
         .map(|(at, stream)| {
             crate::local::test_streams::set_read_timeout(stream, Duration::from_millis(200));
             let mut bytes = vec![0; 8192];
             let read = stream.read(&mut bytes).unwrap_or(0);
-            (*at, read)
+            bytes.truncate(read);
+            (*at, bytes)
         })
         .collect();
     let _ = chrome.kill();
     let _ = chrome.wait();
-    assert_eq!(
-        seen.len(),
-        1,
-        "(accepted at, request bytes) per connection: {seen:?}"
-    );
+    if let Err(why) = single_request(&seen, NAVIGATION) {
+        panic!("{identity}: {why}");
+    }
 }
