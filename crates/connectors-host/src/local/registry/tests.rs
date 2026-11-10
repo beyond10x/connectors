@@ -1769,25 +1769,26 @@ fn seed_recorded_events(root: &Path, events: i64) {
     // a loaded host.
     const BATCH: i64 = 10;
     for first in (0..SUBJECTS).step_by(BATCH as usize) {
-        let mut metadata = Metadata::update(root, true).unwrap();
-        for member in first..first + BATCH {
+        seed_batch(root, |metadata| {
+            for member in first..first + BATCH {
+                metadata
+                    .connection
+                    .execute(
+                        "INSERT OR IGNORE INTO local_runtime_instances (instance_id,suppressed) VALUES (?1,0)",
+                        params![format!("seed-{member}")],
+                    )
+                    .unwrap();
+            }
+            metadata.persist_runtime_state()?;
             metadata
                 .connection
                 .execute(
-                    "INSERT INTO local_runtime_instances (instance_id,suppressed) VALUES (?1,0)",
-                    params![format!("seed-{member}")],
+                    "UPDATE local_runtime_instances SET selection='seed',bootstrap=?1,observed_at_ms=0 WHERE instance_id LIKE 'seed-%' AND bootstrap IS NULL",
+                    [&description],
                 )
                 .unwrap();
-        }
-        metadata.persist_runtime_state().unwrap();
-        metadata
-            .connection
-            .execute(
-                "UPDATE local_runtime_instances SET selection='seed',bootstrap=?1,observed_at_ms=0 WHERE instance_id LIKE 'seed-%' AND bootstrap IS NULL",
-                [&description],
-            )
-            .unwrap();
-        metadata.persist_runtime_state().unwrap();
+            metadata.persist_runtime_state()
+        });
     }
     // A quarter of the records flip in each later batch. Entity Runtime's batch
     // execution slows with both its member count and the store's size, so a
@@ -1795,17 +1796,43 @@ fn seed_recorded_events(root: &Path, events: i64) {
     const GROUPS: i64 = 4;
     let mut round = 0;
     while recorded_events(root) < events {
-        let mut metadata = Metadata::update(root, true).unwrap();
-        metadata
-            .connection
-            .execute(
-                "UPDATE local_runtime_instances SET suppressed=1-suppressed WHERE instance_id LIKE 'seed-%' AND CAST(substr(instance_id,6) AS INTEGER)%?1=?2",
-                params![GROUPS, round % GROUPS],
-            )
-            .unwrap();
-        metadata.persist_runtime_state().unwrap();
+        seed_batch(root, |metadata| {
+            metadata
+                .connection
+                .execute(
+                    "UPDATE local_runtime_instances SET suppressed=1-suppressed WHERE instance_id LIKE 'seed-%' AND CAST(substr(instance_id,6) AS INTEGER)%?1=?2",
+                    params![GROUPS, round % GROUPS],
+                )
+                .unwrap();
+            metadata.persist_runtime_state()
+        });
         round += 1;
     }
+}
+
+/// One seeding batch, run by `batch` in a fresh handle. Entity Runtime bounds a
+/// batch at 30 s; on a host loaded enough to pass that bound the commit's
+/// outcome is legitimately unknown, and the next action is to read the store
+/// again and run the batch again, which is safe because every batch is
+/// idempotent or only has to have run enough times. Anything else, or more
+/// than `UNKNOWN_LIMIT` unknown outcomes in a row, is a failure.
+fn seed_batch(
+    root: &Path,
+    mut batch: impl FnMut(&mut Metadata) -> std::result::Result<(), crate::local::Failure>,
+) {
+    const UNKNOWN_LIMIT: u32 = 3;
+    for _ in 0..=UNKNOWN_LIMIT {
+        let mut metadata = Metadata::update(root, true).unwrap();
+        match batch(&mut metadata) {
+            Ok(()) => return,
+            Err(crate::local::Failure::OutcomeUnknown) => {}
+            Err(other) => panic!("a seeding batch failed: {other:?}"),
+        }
+    }
+    panic!(
+        "{} seeding batches in a row ended with an unknown outcome: each passed Entity Runtime's 30 s batch deadline",
+        UNKNOWN_LIMIT + 1
+    );
 }
 
 pub(super) fn recorded_events(root: &Path) -> i64 {

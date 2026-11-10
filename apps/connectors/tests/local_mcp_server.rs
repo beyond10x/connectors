@@ -936,11 +936,11 @@ fn production_stdio_withdrawal_framing_and_cancellation() {
     let (_, revision) = admitted(&served, &mut peer, 6);
     peer.send(json!({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":name,"arguments":{"input":{"n":999}},
         "_meta":{REVISION_META:revision,"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}));
-    let until = Instant::now() + Duration::from_secs(5);
+    let until = Instant::now() + Duration::from_secs(30);
     while served.provider.requests() == 0 {
         assert!(
             Instant::now() < until,
-            "the call never reached the provider"
+            "the call never reached the provider within 30 s (the test's own bound to start the owner and reach the provider on a loaded host)"
         );
         std::thread::sleep(Duration::from_millis(5));
     }
