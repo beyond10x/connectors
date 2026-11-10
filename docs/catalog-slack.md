@@ -597,7 +597,7 @@ This section covers a local install that already reads Slack through the catalog
 three legacy `[adapters.<alias>]` entries: `slack-bot` (profile `slack.bot`) serves the ten bot
 reads, `slack-search` (profile `slack.user`) serves `search.messages` and the user reads, and an
 older `slack`, which serves no operations, still holds a connection. It moves the three entries to
-instances of the connector `slack`, enables the two writes on the bot instance, and retires the old
+instances of the connector `slack`, enables the five writes on the bot instance, and retires the old
 instance without touching the credentials the other two use.
 
 The outputs below come from a run against a scratch `--config` and `--state-dir`, a private
@@ -651,27 +651,32 @@ $ connectors connections list --connector slack --instance bot | jq -c '[.result
 [{"connector":"slack","instance":"bot","connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","revision":"8da8d006-a30a-41ae-b1d4-25030548c793","state":"ready"}]
 ```
 
-### Enable `chat.postMessage` and `conversations.open` on `bot`
+### Enable the five writes on `bot`
 
 Three things gate a write:
 
 - **The native configuration's selection contains it.** The shipped
-  [`operations.json`](../adapters/catalog/providers/slack/operations.json) has the ten reads and both
-  writes. A selection holding only the ten reads has to be replaced by it.
+  [`operations.json`](../adapters/catalog/providers/slack/operations.json) has the twelve reads and
+  the five writes (`chat.postMessage`, `conversations.open`, `chat.update`, `chat.delete` and
+  `files.delete`). A selection holding only the ten reads has to be replaced by it.
 - **The instance selects private protocol two.** Under `connectors-private/1` the provider
   offers its reads only.
-- **The instance permits both ids.** An id missing from `permissions.operations` is denied.
+- **The instance permits each id.** An id missing from `permissions.operations` is denied.
 
 The native configuration must stay owner-only (mode `0600`): a file other users can read is
 refused as `invalid_configuration` when the provider loads it.
 
-First check which selection the native configuration names and the revision it gives:
+First check which selection the native configuration names and the revision it gives. The revision
+digests the native configuration's `instance` (here `slack-bot`), so yours differs; the two below were
+printed by the binary of this release for the configuration of
+[the bot connection](#configure-the-two-instances), `bot-reads.json` holding the shipped entries of
+the ten reads:
 
 ```console
 $ jq -r '.operations_file | split("/") | last' ~/slack-bot.json
 bot-reads.json
 $ connectors-catalog-provider --local-config ~/slack-bot.json --print-local-bootstrap | jq -r .configuration_revision
-29905332e2bb4fb92993fb5a5d5db2f6102475fde0b0fdbd2ac1b1588211236d
+0b534a5bcce493783a886f374b03546094916e3799339453b15e84c12ca2bd85
 ```
 
 That selection is a ten-read file, so point `operations_file` at the shipped `operations.json` and
@@ -679,20 +684,20 @@ print the revision again:
 
 ```console
 $ connectors-catalog-provider --local-config ~/slack-bot.json --print-local-bootstrap | jq -r .configuration_revision
-c83a994655247e5ca6c4806cece66436a0ed52062ea95bab223dc8ccb51788c5
+c7f38801438351cea771bb3a0bf9540f64920292a809a580161dbb658e353910
 ```
 
 The revision digests the selected operations, so it moved. If `operations_file` already names the
 shipped file, it does not move, and only the instance changes. Then change the instance: the new
-revision, protocol two, and the two write ids. As a diff of the configuration used here:
+revision, protocol two, and the ids of the shipped file, the five writes included. As a diff of the configuration used here:
 
 ```diff
--configuration_revision = "29905332e2bb4fb92993fb5a5d5db2f6102475fde0b0fdbd2ac1b1588211236d"
-+configuration_revision = "c83a994655247e5ca6c4806cece66436a0ed52062ea95bab223dc8ccb51788c5"
+-configuration_revision = "0b534a5bcce493783a886f374b03546094916e3799339453b15e84c12ca2bd85"
++configuration_revision = "c7f38801438351cea771bb3a0bf9540f64920292a809a580161dbb658e353910"
 -private_protocol = "connectors-private/1"
 +private_protocol = "connectors-private/2"
 -operations = ["conversations.list", "conversations.history", "conversations.replies", "users.list", "team.info", "emoji.list", "auth.test", "files.list", "files.info", "file.download"]
-+operations = ["conversations.list", "conversations.history", "conversations.replies", "users.list", "team.info", "emoji.list", "auth.test", "files.list", "files.info", "file.download", "chat.postMessage", "conversations.open"]
++operations = ["conversations.list", "conversations.history", "conversations.replies", "users.list", "team.info", "emoji.list", "auth.test", "users.info", "users.lookupByEmail", "files.list", "files.info", "file.download", "chat.postMessage", "conversations.open", "chat.update", "chat.delete", "files.delete"]
 ```
 
 When the revision moved, the existing connection is `pending` and the page is `stale`. That is
@@ -716,7 +721,7 @@ the same identity and no token entered, and stops the process still running the 
 $ connectors connections revalidate --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --expected-revision 8da8d006-a30a-41ae-b1d4-25030548c793 | jq -c '.result.connection|{identity: .external_identity, summary: (.summary|{connector,instance,connection,revision,state})}'
 {"identity":{"kind":"slack.user","subject":"U0000000001"},"summary":{"connector":"slack","instance":"bot","connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","revision":"691cd61d-0a34-4ba9-8ab2-f499f90c71f6","state":"ready"}}
 $ connectors operations list --connector slack --instance bot | jq -c '[.result.operations[].id]'
-["conversations.list","conversations.history","conversations.replies","users.list","team.info","emoji.list","auth.test","files.list","files.info","chat.postMessage","conversations.open","file.download"]
+["conversations.list","conversations.history","conversations.replies","users.list","users.info","users.lookupByEmail","team.info","emoji.list","auth.test","files.list","files.info","chat.postMessage","conversations.open","chat.update","chat.delete","files.delete","file.download"]
 ```
 
 When the revision did not move, the connection stays `ready` and keeps its revision; stop the
@@ -755,10 +760,10 @@ $ connectors approvals key-init --connector slack --instance bot | jq -c '.resul
 $ connectors approvals policy-status --connector slack --instance bot | jq -c '.result|{connector,instance,policy}'
 {"connector":"slack","instance":"bot","policy":null}
 $ connectors approvals policy-set --connector slack --instance bot --input-file ~/private/slack-policy.json | jq -c '.result.policy|{instance_id,operations,revision}'
-{"instance_id":"slack-bot","operations":["chat.postMessage","conversations.open"],"revision":1}
+{"instance_id":"slack-bot","operations":["chat.delete","chat.postMessage","chat.update","conversations.open","files.delete"],"revision":1}
 ```
 
-`~/private/slack-policy.json` holds `{"operations":["chat.postMessage","conversations.open"]}`.
+`~/private/slack-policy.json` holds `{"operations":["chat.delete","chat.postMessage","chat.update","conversations.open","files.delete"]}`.
 The policy records the configuration revision, descriptor revision, executable and clock it was
 published under; after any of them changes, publish it again with
 `--expected-revision <current>`.
@@ -860,7 +865,7 @@ ready
 $ connectors connections revalidate --connector slack --instance search --connection conn_352bbc77ccfb465fbef6d1648d68811a_c019ec9863e6448fa9d13fb2ad322cd8 --expected-revision 87b27e15-155e-4ac5-953b-22b00189b442 | jq -r '.result.connection.summary.state'
 ready
 $ connectors approvals policy-status --connector slack --instance bot | jq -c '.result.policy.operations'
-["chat.postMessage","conversations.open"]
+["chat.delete","chat.postMessage","chat.update","conversations.open","files.delete"]
    ```
 
 Revoke before removing the instance. Once it is gone, every connection command answers

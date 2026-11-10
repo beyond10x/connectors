@@ -712,6 +712,170 @@ type Requests = Arc<Mutex<Vec<(String, Option<String>, bool)>>>;
 /// fixture request.
 type Exchanges = Arc<Mutex<Vec<(String, String, Option<String>, Value)>>>;
 
+/// The ten reads the move guide's starting selection names.
+const MOVE_START_READS: [&str; 10] = [
+    "conversations.list",
+    "conversations.history",
+    "conversations.replies",
+    "users.list",
+    "team.info",
+    "emoji.list",
+    "auth.test",
+    "files.list",
+    "files.info",
+    "file.download",
+];
+
+/// The configuration revision `--print-local-bootstrap` prints for the guide's bot
+/// configuration, named `slack-bot` as in the move section, over the shipped
+/// selection file narrowed to `keep` (every operation when `None`).
+fn bot_revision(keep: Option<&[&str]>) -> String {
+    let directory = tempfile::tempdir().unwrap();
+    let private = directory.path().join("private");
+    filesystem::directory(&private, true, true).unwrap();
+    let mut selection: Value =
+        serde_json::from_slice(&fs::read(root().join("providers/slack/operations.json")).unwrap())
+            .unwrap();
+    if let Some(keep) = keep {
+        selection["operations"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|o| keep.contains(&o["id"].as_str().unwrap()));
+    }
+    let operations = private.join("operations.json");
+    private_file(&operations, &serde_json::to_vec(&selection).unwrap());
+    let mut config = documented_config();
+    config["instance"] = json!("slack-bot");
+    config["bundle_directory"] = json!(root().join("generated/bundles").canonicalize().unwrap());
+    config["operations_file"] = json!(operations);
+    let file = private.join("slack-bot.json");
+    private_file(&file, &serde_json::to_vec(&config).unwrap());
+    let output = Command::new(env!("CARGO_BIN_EXE_connectors-catalog-provider"))
+        .arg("--local-config")
+        .arg(&file)
+        .arg("--print-local-bootstrap")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let bootstrap: Value = serde_json::from_slice(&output.stdout).unwrap();
+    bootstrap["configuration_revision"]
+        .as_str()
+        .unwrap()
+        .to_owned()
+}
+fn private_file(path: &Path, bytes: &[u8]) {
+    fs::write(path, bytes).unwrap();
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+}
+
+/// The sorted string array that follows `marker` on `line`.
+fn ids_after(line: &str, marker: &str) -> Vec<String> {
+    let at = line
+        .find(marker)
+        .unwrap_or_else(|| panic!("`{marker}` in {line}"));
+    let rest = line[at + marker.len()..].trim_start();
+    let value = serde_json::Deserializer::from_str(rest)
+        .into_iter::<Value>()
+        .next()
+        .unwrap()
+        .unwrap();
+    let mut ids: Vec<String> = serde_json::from_value(value).unwrap();
+    ids.sort();
+    ids
+}
+
+/// The section that moves a local install off a credential-only instance enables every
+/// write the shipped bot selection carries, and its revisions and lists are the ones a
+/// fresh run prints against that file.
+#[test]
+fn the_move_guide_enables_every_shipped_write_with_a_fresh_revision() {
+    let guide = fs::read_to_string(root().join("../../docs/catalog-slack.md")).unwrap();
+    let section = guide
+        .split("\n## Moving a local install off a credential-only instance\n")
+        .nth(1)
+        .and_then(|rest| rest.split("\n## Limits\n").next())
+        .expect("the move section");
+    let selected = shipped();
+    let mut writes: Vec<String> = selected
+        .iter()
+        .filter(|s| s.effect == Effect::Write)
+        .map(|s| s.id.clone())
+        .collect();
+    writes.sort();
+    let mut all: Vec<String> = selected.iter().map(|s| s.id.clone()).collect();
+    all.sort();
+    assert_eq!(writes.len(), 5, "{writes:?}");
+
+    let before = bot_revision(Some(&MOVE_START_READS));
+    let after = bot_revision(None);
+    let lines: Vec<&str> = section.lines().collect();
+    let revisions: Vec<&str> = lines
+        .iter()
+        .copied()
+        .filter(|l| l.len() == 64 && l.bytes().all(|b| b.is_ascii_hexdigit()))
+        .collect();
+    assert_eq!(revisions, [before.as_str(), after.as_str()]);
+    let line = |prefix: &str| {
+        *lines
+            .iter()
+            .find(|l| l.starts_with(prefix))
+            .unwrap_or_else(|| panic!("{prefix}"))
+    };
+    assert!(line("-configuration_revision").contains(&before));
+    assert!(line("+configuration_revision").contains(&after));
+    let mut start: Vec<String> = MOVE_START_READS.iter().map(|s| (*s).to_owned()).collect();
+    start.sort();
+    assert_eq!(ids_after(line("-operations"), "="), start);
+    assert_eq!(ids_after(line("+operations"), "="), all);
+
+    let after_command = |needle: &str| {
+        let at = lines
+            .iter()
+            .position(|l| l.contains(needle))
+            .unwrap_or_else(|| panic!("{needle}"));
+        lines[at + 1]
+    };
+    // `operations list` prints the descriptor: the selections in file order, downloads last.
+    let engine = Engine::new(&committed(), BASE, &selected).unwrap();
+    let described: Vec<String> = engine
+        .declarations(&[Effect::Read, Effect::Write])
+        .into_iter()
+        .map(|o| o.id)
+        .collect();
+    let mut described_sorted = described.clone();
+    described_sorted.sort();
+    assert_eq!(described_sorted, all, "the descriptor omits a selection");
+    let printed: Vec<String> = serde_json::from_str(after_command(
+        "operations list --connector slack --instance bot",
+    ))
+    .unwrap();
+    assert_eq!(printed, described);
+    assert_eq!(
+        ids_after(
+            after_command(
+                "approvals policy-status --connector slack --instance bot | jq -c '.result.policy.operations'"
+            ),
+            ""
+        ),
+        writes
+    );
+    let policies: Vec<&&str> = lines
+        .iter()
+        .filter(|l| l.contains("\"operations\":[\""))
+        .collect();
+    assert!(policies.len() >= 2, "{policies:?}");
+    for line in policies {
+        assert_eq!(ids_after(line, "\"operations\":"), writes, "{line}");
+    }
+    for stale in ["two writes", "both writes", "both ids", "the two write ids"] {
+        assert!(!section.contains(stale), "{stale}");
+    }
+}
+
 /// The `ts` the fixture gives every posted message.
 const POSTED_TS: &str = "1780000700.000700";
 /// The direct-message conversation the fixture opens with `U0FIXTURE11`.
