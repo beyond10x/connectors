@@ -15,6 +15,8 @@ use connectors_host::local::{
     owner::Client,
     registry, runtime,
 };
+const REASON: &str = "Unauthorized; scope does not match";
+
 use serde_json::{Value, json};
 use std::{
     collections::BTreeSet,
@@ -266,6 +268,17 @@ impl runtime::Adapter for RefusingProvider {
     ) -> runtime::Result<runtime::Baseline> {
         Err(runtime::Failure::InsufficientScope)
     }
+    async fn validate_explained(
+        &self,
+        _: &str,
+        _: connectors_sdk::Secret,
+    ) -> std::result::Result<runtime::Baseline, runtime::Refusal> {
+        Err(runtime::Refusal {
+            failure: runtime::Failure::InsufficientScope,
+            reason: Some(REASON.into()),
+            retry_after_seconds: None,
+        })
+    }
     async fn invoke(
         &self,
         _: &str,
@@ -288,6 +301,7 @@ struct Step {
     code: String,
     stage: String,
     next_action: String,
+    reason: String,
 }
 
 fn strings(words: &[&str]) -> Vec<String> {
@@ -299,6 +313,11 @@ fn strings(words: &[&str]) -> Vec<String> {
 /// answer's `next_action` from a `connections revalidate`, for at most
 /// `limit` commands.
 fn walk(limit: usize) -> Vec<Step> {
+    walk_from("revalidate_connection", limit)
+}
+
+/// `walk`, starting from the command the next action `start` names.
+fn walk_from(start: &str, limit: usize) -> Vec<Step> {
     let root = tempfile::tempdir().unwrap();
     let custody = Custody::new(root.path());
     let cli = Cli {
@@ -351,7 +370,7 @@ fn walk(limit: usize) -> Vec<Step> {
             .revision
     };
     let mut steps = Vec::new();
-    let mut action = "revalidate_connection".to_owned();
+    let mut action = start.to_owned();
     while steps.len() < limit {
         let mut args = strings(&["connections", "", "--adapter", "forge"]);
         let command = match action.as_str() {
@@ -407,6 +426,7 @@ fn walk(limit: usize) -> Vec<Step> {
             code: text("code"),
             stage: text("stage"),
             next_action: action.clone(),
+            reason: text("service_reason"),
         });
         if output.status.success() {
             // A revoked connection leaves the instance to connect again;
@@ -440,14 +460,15 @@ fn following_next_actions_from_a_refused_upgrade_does_not_cycle() {
         .collect();
     let distinct: BTreeSet<_> = seen.iter().collect();
     assert_eq!(distinct.len(), seen.len(), "an answer repeats: {steps:#?}");
-    // The one-connection rule makes the shortest end four commands: the
-    // revalidation, the connect that names the revocation, the revocation,
-    // and the connect whose refusal names the probe.
-    assert!(steps.len() <= 4, "no end within four commands: {steps:#?}");
+    // The revalidation, the revocation it names, and the connect whose
+    // refusal names the probe.
+    assert!(steps.len() <= 3, "no end within three commands: {steps:#?}");
     let last = steps.last().unwrap();
     assert!(
         last.exit == Some(0)
-            || (last.code == "not_granted" && last.next_action == "retry_explicitly"),
+            || (last.code == "not_granted"
+                && last.next_action == "retry_explicitly"
+                && last.reason == REASON),
         "the walk did not end in a connection or the probe's refusal: {steps:#?}"
     );
 }
@@ -468,4 +489,68 @@ fn a_pending_connection_says_why() {
         (json!("pending"), json!("configuration_refused")),
         "{steps:#?}"
     );
+}
+
+/// Adversary: the story's Outcome and Acceptance read literally for one walk.
+/// Every next action is one the state it leads to accepts (no command a step
+/// named is refused as `lifecycle_conflict`), no answer repeats, and the walk
+/// ends in a connection or the probe's refusal within three commands.
+fn assert_story_holds(start: &str, steps: &[Step], most: usize) {
+    let seen: Vec<_> = steps
+        .iter()
+        .map(|s| {
+            (
+                s.command,
+                s.code.clone(),
+                s.stage.clone(),
+                s.next_action.clone(),
+            )
+        })
+        .collect();
+    let distinct: BTreeSet<_> = seen.iter().collect();
+    assert_eq!(
+        distinct.len(),
+        seen.len(),
+        "from {start}, an answer repeats: {steps:#?}"
+    );
+    for (i, step) in steps.iter().enumerate().skip(1) {
+        assert_ne!(
+            step.code,
+            "lifecycle_conflict",
+            "from {start}, step {i} ({}) ran the command step {} named and was refused by the state it led to: {steps:#?}",
+            step.command,
+            i - 1
+        );
+    }
+    assert!(
+        steps.len() <= most,
+        "from {start}, no end within {most} commands (story Acceptance): {steps:#?}"
+    );
+    let last = steps.last().unwrap();
+    assert!(
+        last.exit == Some(0) || (last.code == "not_granted" && last.reason == REASON),
+        "from {start}, the walk did not end in a connection or the probe's refusal naming the probe: {steps:#?}"
+    );
+}
+
+#[test]
+#[ignore = "requires dbus-daemon and gnome-keyring-daemon"]
+fn adversary_the_walk_from_revalidate_satisfies_the_story() {
+    assert_story_holds("revalidate", &walk(6), 3);
+}
+
+#[test]
+#[ignore = "requires dbus-daemon and gnome-keyring-daemon"]
+/// The decided reading of the Acceptance: three next actions followed after
+/// the starting command, so at most four commands with the start.
+fn adversary_the_walk_from_reconnect_satisfies_the_story() {
+    assert_story_holds("reconnect", &walk_from("repair_connection", 6), 4);
+}
+
+#[test]
+#[ignore = "requires dbus-daemon and gnome-keyring-daemon"]
+/// The decided reading of the Acceptance: three next actions followed after
+/// the starting command, so at most four commands with the start.
+fn adversary_the_walk_from_connect_satisfies_the_story() {
+    assert_story_holds("connect", &walk_from("create_connection", 6), 4);
 }

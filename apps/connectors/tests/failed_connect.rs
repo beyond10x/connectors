@@ -818,8 +818,8 @@ fn revalidate_against_a_mismatching_provider(configured: &str) -> Mismatched {
 
 /// story:upgrade-adapter-identity-mismatch-names-new-connection. The adapter's
 /// own `identity_mismatch`, answered to the validation of an upgrading
-/// revalidation, reaches the CLI as `identity_mismatch` naming a new
-/// connection: repair refuses the changed binding. The upgrade publishes
+/// revalidation, reaches the CLI as `identity_mismatch` naming the revocation that
+/// frees the instance for a new connection: repair refuses the changed binding. The upgrade publishes
 /// nothing and invalidates nothing.
 #[test]
 #[ignore = "requires dbus-daemon and gnome-keyring-daemon"]
@@ -832,7 +832,7 @@ fn an_adapter_identity_mismatch_during_an_upgrade_names_a_new_connection() {
         (
             &json!("identity_mismatch"),
             &json!("admission"),
-            &json!("create_connection")
+            &json!("revoke_connection")
         ),
         "{data}"
     );

@@ -1944,10 +1944,11 @@ command answers `retry_status` for it until `instances stop`. Only a credential
 validation captured by the earlier process is still refused as
 `lifecycle_conflict`; its `connections connect` starts again with a launch
 that replaces the process. A revalidation the new provider refuses (the
-credential invalid, below scope or another identity) answers `create_connection`
-and records the refusal against the configured revision
+credential invalid, below scope or another identity) answers `revoke_connection`,
+since the instance still holds that connection and connect names its revocation;
+it records the refusal against the configured revision
 (`Connection.refused_configuration_revision`), so the next read names
-`create_connection` too; the refusal invalidates nothing under the connection's
+`create_connection`; the refusal invalidates nothing under the connection's
 own revision, revalidation stays admitted, and a later upgrade that succeeds
 or a repair that replaces the credential removes it. An approval reads the
 wall clock for this classification only, as the read path does, without

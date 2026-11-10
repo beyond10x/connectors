@@ -419,7 +419,10 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "connectors",
             "connection_next_actions",
             "following_next_actions_from_a_refused_upgrade_does_not_cycle"
-            | "a_pending_connection_says_why",
+            | "a_pending_connection_says_why"
+            | "adversary_the_walk_from_revalidate_satisfies_the_story"
+            | "adversary_the_walk_from_reconnect_satisfies_the_story"
+            | "adversary_the_walk_from_connect_satisfies_the_story",
         ) => Some((Disposable, vec![CUSTODY])),
         (
             "connectors",
