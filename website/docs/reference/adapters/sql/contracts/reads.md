@@ -121,6 +121,14 @@ seven columns, and the provenance resource names it; `udt_name` carries MySQL's
 `COLUMN_TYPE`. On PostgreSQL `schema` remains required (an input without it is
 `invalid_input`) and names a schema inside the connected database.
 
+`query.read` does not parse the statement. On MySQL a statement may name a table in
+another database (`SELECT * FROM other.t`) when the configured user is granted it, and
+the adapter neither refuses it nor reports it: the grants of the configured user are the
+boundary, and the provenance resource of every `query.read` answer names the connected
+database, not each database the statement touched. On PostgreSQL a connection cannot leave
+its database, so the same label is the database read
+(`connectors_sql.reads.QueryReadScope`).
+
 The connection uses only its configured endpoint (never a server-named Unix
 socket), installs no local-file handler, and without `allow_plaintext` requires TLS
 before any credential is sent; a configured CA bundle replaces the public roots and

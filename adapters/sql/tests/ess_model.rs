@@ -597,6 +597,50 @@ async fn schema_list_reads_only_what_the_model_fixes() {
     }
 }
 
+/// One `query.read` call as the model's `QueryReadCall`, read off the wire: the
+/// statement is sent to the server as written, and the provenance is the answer's own.
+async fn query_read_call(statement: &str, qualified: Option<&str>) -> Value {
+    let server = fixture::start(fixture::Script::default()).await;
+    let answer = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        sql(Engine::Mysql, server.port)
+            .invoke("query.read", json!({"query": statement, "limit": 10})),
+    )
+    .await
+    .expect("query.read hung")
+    .unwrap_or_else(|e| panic!("{statement}: {e:?}"));
+    let mut call = json!({
+        "engine": "mysql",
+        "connected_database": "fixture",
+        "provenance_resource": answer["provenance"]["resource"],
+    });
+    if let Some(database) = qualified {
+        call["statement_database"] = json!(database);
+    }
+    json!({ "call": call })
+}
+
+#[tokio::test]
+async fn query_read_provenance_names_the_connected_database_as_the_model_fixes() {
+    let out = tempfile::tempdir().unwrap();
+    let model = schema(out.path(), "reads.QueryReadScope");
+    for (statement, qualified) in [
+        ("SELECT * FROM t", None),
+        ("SELECT * FROM fixture.t", Some("fixture")),
+        ("SELECT * FROM other.t", Some("other")),
+    ] {
+        let document = query_read_call(statement, qualified).await;
+        assert_eq!(
+            document["call"]["provenance_resource"], "fixture",
+            "{document}"
+        );
+        conforms(&model, &document).unwrap_or_else(|e| panic!("{document}: {e}"));
+    }
+    let wrong = json!({"call":{"engine":"mysql","connected_database":"fixture",
+        "statement_database":"other","provenance_resource":"other"}});
+    assert!(conforms(&model, &wrong).is_err(), "{wrong}");
+}
+
 /// The answer a scripted MySQL server gives a catalogue read: its columns,
 /// one row (or none) and the number of parameters its statement takes.
 fn catalogue_script(read: &str, answered: bool) -> fixture::Script {
