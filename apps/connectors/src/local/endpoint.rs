@@ -482,6 +482,38 @@ fn moves_no_connection(
     Ok(())
 }
 
+/// How long a writer waits for another writer's check and replacement.
+const LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// The exclusive lock on the state directory's `endpoint.lock`, a file of its
+/// own (never the configuration file, which every replacement renames over),
+/// released when the returned file closes. A holder that outlasts
+/// [`LOCK_WAIT`] or a lock the host refuses is `metadata_unavailable`.
+fn endpoint_lock(state: &std::path::Path) -> Result<std::fs::File, HandlerReply> {
+    let unavailable = || host_failure(Failure::MetadataUnavailable);
+    filesystem::directory(state, true, true).map_err(host_failure)?;
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true).write(true).create(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let file = options
+        .open(state.join("endpoint.lock"))
+        .map_err(|_| unavailable())?;
+    let deadline = std::time::Instant::now() + LOCK_WAIT;
+    loop {
+        match file.try_lock() {
+            Ok(()) => return Ok(file),
+            Err(std::fs::TryLockError::WouldBlock) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            Err(_) => return Err(unavailable()),
+        }
+    }
+}
+
 /// Replace the configuration's `old` text with `new`, keeping `mode`, while
 /// the file still holds `old`.
 fn publish(paths: &Paths, old: &str, new: &str, mode: u32) -> Result<(), HandlerReply> {
@@ -490,11 +522,8 @@ fn publish(paths: &Paths, old: &str, new: &str, mode: u32) -> Result<(), Handler
     let name = config.file_name().ok_or_else(invalid_configuration)?;
     let directory = filesystem::directory(parent, false, false).map_err(host_failure)?;
     // The check and the replacement are one step: every writer of this file
-    // holds the directory's exclusive lock (released when `directory`
-    // closes) from the check to the rename.
-    directory
-        .lock()
-        .map_err(|_| host_failure(Failure::InvalidConfiguration))?;
+    // holds the endpoint lock from the check to the rename.
+    let _lock = endpoint_lock(&paths.state)?;
     if read(paths)?.0 != old {
         return Err(host_failure(Failure::ConcurrentRevision));
     }
@@ -523,12 +552,15 @@ mod tests {
     /// text.
     #[test]
     fn writers_of_one_text_replace_it_at_most_once() {
-        use std::os::unix::fs::PermissionsExt;
         let directory = tempfile::tempdir().unwrap();
         let config = directory.path().join("config.toml");
         let old = "format='connectors-local/5'\n";
         std::fs::write(&config, old).unwrap();
-        std::fs::set_permissions(&config, std::fs::Permissions::from_mode(0o600)).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&config, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
         let paths = Paths::resolve(Some(&config), Some(&directory.path().join("state"))).unwrap();
         WINDOW_MILLIS.store(100, Ordering::SeqCst);
         let published: Vec<String> = std::thread::scope(|scope| {
