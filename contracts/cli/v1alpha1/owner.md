@@ -337,7 +337,10 @@ names:
   build is refused with `owner_build_mismatch` exactly as against another build.
   A CLI that starts an owner runs it from its private launch copy and keeps
   that copy until the owner has answered the startup greeting, since the owner
-  measures its build there before it answers.
+  measures its build there before it answers. The owner then keeps the copy for
+  its whole run, because the login keychain refuses to save an item for a
+  process whose executable is gone, and removes it when it stops serving. An
+  owner killed before that leaves its copy in the temporary directory.
 - **Socket peer** (`peer_credential_snapshot`: `separate_pid_query`). The peer
   UID comes from `LOCAL_PEERCRED` and must be the configured UID, as on Linux;
   the pid is a separate `LOCAL_PEERPID` query used only for its sign. A peer

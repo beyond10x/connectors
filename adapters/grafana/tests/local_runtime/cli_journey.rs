@@ -581,6 +581,7 @@ fn grafana_cli_connects_with_a_service_account_token_and_lists_datasources_on_th
 /// fails without it rather than passing without having run.
 #[cfg(target_os = "macos")]
 #[test]
+#[ignore = "requires the built production CLI in CONNECTORS_TEST_CLI and touches the login keychain"]
 fn grafana_cli_connects_with_a_service_account_token_and_lists_datasources_with_the_login_keychain()
 {
     let provider = Provider::new();

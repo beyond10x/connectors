@@ -3954,10 +3954,10 @@ mod macos_tests {
     /// `spawn` executes the owner from its private copy. The owner measures
     /// its build from the file at its running executable's path, which is that
     /// copy: it must be able to, or every macOS owner refuses to serve. So
-    /// `spawn` hands the launch to its caller ([`Launched`]), which drops it,
-    /// removing the copy, only once the owner has answered its greeting; a
-    /// launch dropped as soon as exec returned removed the copy before the
-    /// owner could read it. This mirrors that with this test binary as the
+    /// `spawn` hands the launch to its caller ([`Launched`]), which holds it
+    /// until the owner has answered its greeting and then leaves the copy to
+    /// the owner; a launch dropped as soon as exec returned removed the copy
+    /// before the owner could read it. This mirrors that with this test binary as the
     /// image: the launch is held until the probe has measured and exited, and
     /// the copy is gone afterwards.
     #[test]
