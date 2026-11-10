@@ -129,7 +129,9 @@ An owner verifies the whole store before it answers its startup greeting, so its
 start takes longer as the store grows. A read on `invoke` that starts
 the owner waits for its greeting up to the read's own 30 seconds. A command without a
 deadline of its own reaches a running owner within 10 seconds and waits for the
-greeting of an owner it started up to 60 seconds from that start, and for an
+greeting of an owner it started up to 60 seconds from that start, which counts
+the time the command spends launching the owner (reading and sealing its own
+executable) and not only the owner's wait to answer, and for an
 owner another process is starting up to 60 seconds from when it found it
 starting. A caller that stops waiting with `timeout` leaves the owner it started
 to finish its start, and the next command reaches it; a caller that fails
