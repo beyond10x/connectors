@@ -138,7 +138,7 @@ fn adversary_a_revalidation_during_a_reads_recollection_joins_it_within_the_boun
     let (read, (elapsed, revalidated)) = std::thread::scope(|scope| {
         let read = scope.spawn(|| container.invoke(&connection));
         // The read's job is on the worker, probing, when the revalidation arrives.
-        std::thread::sleep(Duration::from_millis(3_000));
+        await_probe_in_flight(&container, probes, &read);
         let started = Instant::now();
         let revalidated = container.revalidate(&connection, &revision);
         (read.join().unwrap(), (started.elapsed(), revalidated))
@@ -203,6 +203,34 @@ fn adversary_a_hanging_early_recollection_does_not_cost_a_read_its_current_evide
     );
     let read = success(&output);
     assert_eq!(read["result"]["credential"], digest(SECRET), "{read}");
+}
+
+/// Wait until the adapter child has recorded the read's own probe (one
+/// validation beyond `before`), then assert the read is still running, so the
+/// probe is in flight: a revalidation made now arrives while it runs. Without
+/// this, a revalidation that probes alone also counts one probe.
+fn await_probe_in_flight<T>(
+    container: &Container,
+    before: usize,
+    read: &std::thread::ScopedJoinHandle<'_, T>,
+) {
+    let until = Instant::now() + Duration::from_secs(20);
+    while container.seen("validations").len() <= before {
+        assert!(
+            Instant::now() < until,
+            "the read's recollection never reached the provider"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert_eq!(
+        container.seen("validations").len() - before,
+        1,
+        "the read recorded more than its own probe"
+    );
+    assert!(
+        !read.is_finished(),
+        "the read finished before the revalidation could arrive in its probe"
+    );
 }
 
 fn now_ms() -> u64 {
@@ -283,7 +311,7 @@ fn adversary_a_revalidation_joining_a_failed_read_recollection_runs_no_probe_of_
     let (read, (elapsed, revalidated)) = std::thread::scope(|scope| {
         let read = scope.spawn(|| container.invoke(&connection));
         // The read's job is on the worker, probing, when the revalidation arrives.
-        std::thread::sleep(Duration::from_millis(3_000));
+        await_probe_in_flight(&container, probes, &read);
         let started = Instant::now();
         let revalidated = container.revalidate(&connection, &revision);
         (read.join().unwrap(), (started.elapsed(), revalidated))

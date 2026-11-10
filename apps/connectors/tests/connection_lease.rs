@@ -70,23 +70,103 @@ fn a_revalidated_connection_serves_reads_across_three_evidence_lifetimes() {
     assert!(reads >= 3, "{reads} reads");
 }
 
-/// The early-lapse window is half the evidence's own lifetime, not half the
-/// profile's 60 s bound: evidence the provider gave 20 s, read right after its
-/// revalidation, still has more than half of that left, so the read runs no
-/// identity probe of its own.
-#[test]
-fn a_read_in_its_evidence_first_half_life_probes_nothing() {
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
+}
+
+/// When the adapter child last wrote one of its logs, in epoch milliseconds.
+fn last_written_ms(container: &Container, log: &str) -> u64 {
+    container
+        .path("/work")
+        .join(log)
+        .metadata()
+        .and_then(|metadata| metadata.modified())
+        .unwrap()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
+}
+
+/// The identity probes one read ran, when it was admitted `age_ms` (within
+/// `TOLERANCE_MS`) after evidence of a 20 s lifetime was collected (its
+/// `valid_until_ms` less the lifetime).
+///
+/// The CLI process takes a host-dependent time between its launch and the
+/// owner's admission of the read, so the launch cannot say what age the read
+/// was admitted at. The adapter child's own logs do: a read that probed
+/// began that probe at its admission (the `validations` log's last write), and
+/// one that did not was dispatched after it (the `invocations` log's last
+/// write), so the age it was dispatched at bounds the age it was admitted at.
+/// A first read on fresh evidence measures the launch-to-dispatch time, and
+/// the second is launched that much before its age. A run whose admission
+/// missed the age is repeated, so a loaded host cannot fail it; a read that
+/// never lands near the age fails the test.
+fn probes_of_a_read_at(age_ms: u64) -> usize {
     const LIFETIME_MS: u64 = 20_000;
-    let (container, connection, revision) = connected();
+    const TOLERANCE_MS: u64 = 500;
+    const ATTEMPTS: usize = 6;
+    let mut missed = Vec::new();
+    let (container, connection, mut revision) = connected();
     container.set_knob("evidence_ms", LIFETIME_MS);
-    let started = Instant::now();
-    success(&container.revalidate(&connection, &revision));
-    let validations = container.seen("validations").len();
-    let read = success(&container.invoke(&connection));
-    assert_eq!(read["result"]["credential"], digest(SECRET), "{read}");
-    // Only meaningful while the read began inside the first half life.
-    assert!(started.elapsed() < Duration::from_millis(LIFETIME_MS / 2));
-    assert_eq!(container.seen("validations").len(), validations);
+    for _ in 0..ATTEMPTS {
+        let revalidated = success(&container.revalidate(&connection, &revision));
+        revision = revalidated["connection"]["summary"]["revision"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{revalidated}"))
+            .to_owned();
+        let valid_until = revalidated["connection"]["valid_until_ms"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("{revalidated}"));
+        let collected = valid_until - LIFETIME_MS;
+        let launched = now_ms();
+        success(&container.invoke(&connection));
+        let cost = last_written_ms(&container, "invocations").saturating_sub(launched);
+        std::thread::sleep(Duration::from_millis(
+            (collected + age_ms)
+                .saturating_sub(cost)
+                .saturating_sub(now_ms()),
+        ));
+        let validations = container.seen("validations").len();
+        let read = success(&container.invoke(&connection));
+        assert_eq!(read["result"]["credential"], digest(SECRET), "{read}");
+        let probes = container.seen("validations").len() - validations;
+        let admitted = last_written_ms(
+            &container,
+            if probes == 0 {
+                "invocations"
+            } else {
+                "validations"
+            },
+        )
+        .saturating_sub(collected);
+        if admitted.abs_diff(age_ms) < TOLERANCE_MS {
+            return probes;
+        }
+        missed.push(admitted);
+    }
+    panic!(
+        "no read was admitted within {TOLERANCE_MS} ms of {age_ms} ms of the \
+         evidence's {LIFETIME_MS} ms in {ATTEMPTS} attempts: {missed:?}"
+    );
+}
+
+/// The early-lapse window is half the evidence's own lifetime, not half the
+/// profile's 60 s bound and not nine tenths of it: evidence the provider gave
+/// 20 s, read at 9.5 s, still has more than half of that left, so the read
+/// runs no identity probe of its own.
+#[test]
+fn a_read_at_9_5_s_of_a_20_s_lifetime_probes_nothing() {
+    assert_eq!(probes_of_a_read_at(9_500), 0);
+}
+
+/// The other side of the half life: the same evidence read at 10.5 s has
+/// under half its lifetime left, so the read recollects it once first.
+#[test]
+fn a_read_at_10_5_s_of_a_20_s_lifetime_recollects_once() {
+    assert_eq!(probes_of_a_read_at(10_500), 1);
 }
 
 /// A read whose evidence lapsed recollects it once; when the provider refuses
