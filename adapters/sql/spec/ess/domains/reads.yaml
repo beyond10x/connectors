@@ -89,6 +89,33 @@ types:
       - any: [call.engine != postgresql, "defined(call.requested_schema)", call.outcome == invalid_input]
       - any: [call.engine != postgresql, call.outcome != read, call.schema_read == call.requested_schema]
 
+  # One `query.read` call: the engine and database the connection is bound to, the database
+  # the statement qualified a table with (absent when it qualified none) and the answer's
+  # provenance resource.
+  - name: connectors_sql.reads.QueryReadCall
+    kind: struct
+    fields:
+      - {name: engine, type: connectors_sql.reads.Engine}
+      - {name: connected_database, type: String}
+      - {name: statement_database, type: "Optional<String>"}
+      - {name: provenance_resource, type: String}
+
+  # What the provenance of a `query.read` answer names. The adapter does not parse the
+  # statement, so it neither refuses nor reports a database the statement qualified a table
+  # with. The provenance resource is the connected database, whatever the statement read: on
+  # PostgreSQL a connection cannot leave its database, unless an extension such as `dblink` or
+  # `postgres_fdw` is granted to the role, so that is the database read; on
+  # MySQL the grants of the configured user are the boundary, and a statement such as
+  # `SELECT * FROM other.t` by a user granted `other` is answered with the connected database
+  # as the resource. `schema.list` and the catalogue reads, which the adapter builds, are
+  # bound to the connected database and are not affected.
+  - name: connectors_sql.reads.QueryReadScope
+    kind: struct
+    fields:
+      - {name: call, type: connectors_sql.reads.QueryReadCall}
+    invariants:
+      - call.provenance_resource == call.connected_database
+
   # The MySQL column families the binary result protocol distinguishes.
   # `binary_string` is any string or BLOB column in the binary character set (63);
   # `text_string` is one in any other character set, ENUM and SET included.
