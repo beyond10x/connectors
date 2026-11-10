@@ -216,7 +216,7 @@ operations:
     determinism: nondeterministic
     bounds:
       timeout_ms:
-        max: 160000
+        max: 30000
       output_bytes:
         max: 3145728
     requires: {}
@@ -260,7 +260,7 @@ operations:
     determinism: nondeterministic
     bounds:
       timeout_ms:
-        max: 160000
+        max: 30000
       output_bytes:
         max: 3145728
     requires: {}
@@ -321,7 +321,7 @@ operations:
     determinism: nondeterministic
     bounds:
       timeout_ms:
-        max: 160000
+        max: 30000
       output_bytes:
         max: 3145728
     requires: {}

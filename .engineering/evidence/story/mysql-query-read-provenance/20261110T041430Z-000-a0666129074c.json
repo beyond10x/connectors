@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-10T04:14:30Z",
+  "actor": "human:operator",
+  "artifact": "story:mysql-query-read-provenance",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test --locked -p connectors-sql --test ess_model --test query_provenance_adversary; connectors-docs generate --check",
+    "reference": "impl 66cc98099: ess_model 15 passed incl. query_read_provenance_names_the_connected_database_as_the_model_fixes (red on base: model type absent); query_provenance_adversary 2 passed (website case red at da41df915); docs current"
+  }
+}

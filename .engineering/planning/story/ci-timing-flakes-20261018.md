@@ -11,6 +11,7 @@ relations:
 - serves: vision:independent-contract-adapters
 - supersedes: story:oauth-drain-macos-race
 - supersedes: story:kubernetes-exec-fixture-busy
+- decomposes: epic:zero-open-issues-and-store-defects
 scope:
 - confidence: cited
   path: adapters/kubernetes/src/exec_credential.rs

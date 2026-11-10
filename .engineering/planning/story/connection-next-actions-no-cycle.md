@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:connection-next-actions-no-cycle
 kind: story
-status: draft
+status: implemented
 title: Every next action a connection command answers is accepted by the state it leads to
 summary: 'issue #181: revalidate, reconnect and connect answer each other''s next action in a loop'
 refs:
@@ -11,26 +11,37 @@ refs:
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:confluence-token-kind-binding
+- decomposes: epic:zero-open-issues-and-store-defects
 scope:
-- confidence: inferred
+- confidence: cited
+  path: apps/connectors-cli-contract/binding.json
+- confidence: cited
   path: apps/connectors/src/local.rs
 - confidence: cited
   path: apps/connectors/src/local/connections.rs
-- confidence: inferred
+- confidence: cited
+  path: apps/connectors/src/local/invoke.rs
+- confidence: cited
   path: apps/connectors/tests/connection_next_actions.rs
-- confidence: inferred
+- confidence: cited
+  path: apps/connectors/tests/failed_connect.rs
+- confidence: cited
   path: contracts/cli/v1alpha1/semantics.md
-- confidence: inferred
-  path: crates/connectors-host/src/local/owner.rs
-- confidence: inferred
-  path: crates/connectors-host/src/local/registry/lifecycle.rs
-- confidence: inferred
+- confidence: cited
+  path: crates/connectors-build/src/ignored.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/supervisor.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/registry.rs
+- confidence: cited
   path: crates/connectors-host/src/local/registry/observation.rs
-- confidence: inferred
-  path: crates/connectors-host/src/local/registry/revalidation.rs
-- confidence: inferred
+- confidence: cited
   path: ess/domains/cli.yaml
-revision: 4
+revision: 22
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:57:56Z", actor: "human:operator", revision: 5, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:57:56Z", actor: "human:operator", revision: 6, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-10T06:20:10Z", actor: "human:operator", revision: 22, decided_on: {"recorded":{"test_result":1,"review_outcome":3}}, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 
@@ -56,18 +67,19 @@ v1 200) is `story:confluence-token-kind-binding`; the loop itself has no story. 
 
 ## Scope
 
-Derived 2026-10-19 by `story-scoper` on origin/main 0c6cbba7f. Every line is **cited** (read from the story or the tree) or **inferred** (a reading that could be wrong).
+Landed on, from `git diff 5087593c1...impl/connection-next-actions-no-cycle` (merged into wave/zero-issues at 39078c638); the earlier scoper lines marked inferred are replaced by this list. Generated reference pages are left out.
 
-- **Primary surface:** `apps/connectors/src/local` and `crates/connectors-host/src/local/registry`, where each connection command's failure becomes a `next_action` — cited (story names `connections.rs:318-335`)
-- **Files:** `apps/connectors/src/local/connections.rs` (`registry_failure`, 294-357: `BindingChanged` → `create_connection` at 318-322, `InstanceConnected` → `repair_connection` at 330-335) — cited
-- **Also likely:** `apps/connectors/src/local.rs` (`connect_failure` 218-227, `owner_failure` 229-300: the `reconnect` flag sets `create_connection` and the `held` flag sets `repair_connection`, at 287-297) — inferred
-- **Also likely:** `crates/connectors-host/src/local/registry/revalidation.rs` (`admitted` 51-86 and `changed` 98-113 produce `BindingChanged`) — inferred
-- **Also likely:** `crates/connectors-host/src/local/registry/lifecycle.rs` (`admit_allocation` 584-616: `InstanceConnected` when `follow` is Same/Operations/Executable) — inferred
-- **Also likely:** `crates/connectors-host/src/local/owner.rs` (`reconnect`/`held` flags 116-130, `saved_binding` 649-660: `Unsupported` → `BindingChanged`) — inferred
-- **Also likely (pending reason):** `crates/connectors-host/src/local/registry/observation.rs` (`ObservedConnection` 14, `observe` 299-307, `readiness` 340-370) — inferred
-- **Also likely (pending reason):** `ess/domains/cli.yaml` (`ConnectionSummary`/`ConnectionDescription` 838-858 have no reason field) — inferred
-- **Documents:** `contracts/cli/v1alpha1/semantics.md` (~1248, 1310-1325) — inferred
-- **Tests:** a new `apps/connectors/tests/connection_next_actions.rs` plus registry unit tests beside `crates/connectors-host/src/local/registry/cardinality_tests.rs` and `upgrade_tests.rs` — inferred; fixture pattern `apps/connectors/tests/failed_connect.rs:383-437`
-- **Confidence:** medium — the loop's cause is spread over three producers picked from the code, not from a trace; whether 0.54.0 still loops is unknown
-- **Would collide with:** registry `revalidation.rs`/`lifecycle.rs`/`observation.rs`, the CLI's `local.rs`/`local/connections.rs`, the `ConnectionSummary` schema in `ess/domains/cli.yaml`, and `story:confluence-token-kind-binding` (adds a reason beside `insufficient_scope`)
-- **Safety fact:** the three `next_action`s come from flags every connection command and `operations invoke` read through `owner_failure`, so changing one mapping changes reads, approvals and consumer launches too (`apps/connectors/src/local.rs:283-300`) — unproven
+- `apps/connectors-cli-contract/binding.json`
+- `apps/connectors/src/local/connections.rs`
+- `apps/connectors/src/local/invoke.rs`
+- `apps/connectors/src/local.rs`
+- `apps/connectors/tests/connection_next_actions.rs`
+- `apps/connectors/tests/failed_connect.rs`
+- `contracts/cli/v1alpha1/semantics.md`
+- `crates/connectors-build/src/ignored.rs`
+- `crates/connectors-host/src/local/owner/supervisor.rs`
+- `crates/connectors-host/src/local/registry/observation.rs`
+- `crates/connectors-host/src/local/registry.rs`
+- `ess/domains/cli.yaml`
+
+Decision (coordinator, wave A, non-interactive): the Acceptance's "within three commands" is read as at most three followed `next_action`s after the starting command. The one-connection rule makes a refused upgrade name the revocation first (`revoke_connection`), then `create_connection`, then the connect; `apps/connectors/tests/connection_next_actions.rs` walks from revalidate, reconnect and connect and asserts no answer repeats and the bound holds. A pending connection reports `pending_reason` (`configuration_changed`, `configuration_refused`, `no_credential`, `evidence_expired`).

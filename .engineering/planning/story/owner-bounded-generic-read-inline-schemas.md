@@ -2,13 +2,21 @@
 format: aep.planning-md/3
 id: story:owner-bounded-generic-read-inline-schemas
 kind: story
-status: draft
+status: active
 title: The owner's bounded generic read requires inline schemas, as the projection does
 tags:
 - from-finding
 relations:
 - informed_by: story:owner-bounded-read-realization-matches-projection
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+- serves: vision:independent-contract-adapters
+scope:
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner.rs
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:59:27Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:59:28Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Why
 

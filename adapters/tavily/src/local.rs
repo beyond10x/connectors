@@ -6,14 +6,16 @@ use connectors_host::{
     http::{HttpConfig, ScopedHttp},
     local::{
         filesystem, registry,
-        runtime::{Baseline, Bootstrap, Effect, EntryField, Failure, Profile, Requirement, Result},
+        runtime::{
+            Baseline, Bootstrap, Effect, EntryField, Failure, Profile, Refusal, Requirement, Result,
+        },
     },
 };
 use connectors_sdk::{Adapter as _, Credential, Secret};
 use connectors_tavily::{READ_POST_TIMEOUT, READ_POSTS, Tavily, auth};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{collections::BTreeSet, path::Path, sync::Arc};
+use std::{collections::BTreeSet, path::Path, sync::Arc, time::Instant};
 
 pub const DEFAULT_API_BASE: &str = "https://api.tavily.com/";
 
@@ -189,6 +191,24 @@ impl connectors_host::local::runtime::Adapter for Local {
             .invoke(operation, input)
             .await
             .map_err(Failure::from_provider)
+    }
+    /// The same read, told when the reply is due so a crawl asks Tavily to end before it.
+    async fn invoke_explained(
+        &self,
+        operation: &str,
+        _partition: &str,
+        document: Secret,
+        input: Value,
+        deadline: Instant,
+    ) -> std::result::Result<Value, Refusal> {
+        let http = self.authenticated(document)?;
+        self.adapter
+            .with_authenticated_http(Arc::new(http))
+            .with_deadline(deadline)
+            .invoke(operation, input)
+            .await
+            .map_err(Failure::from_provider)
+            .map_err(Refusal::from)
     }
 }
 fn native_failure(value: auth::Failure) -> Failure {

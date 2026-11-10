@@ -2,15 +2,20 @@
 format: aep.planning-md/3
 id: story:oauth-browser-empty-connection-fixture
 kind: story
-status: draft
+status: active
 title: Explain and correct the browser fixture empty-connection assertion
 relations:
 - informed_by: story:ignored-suites-have-a-runner
 - decomposes: epic:tech-debt-review-20260930
+- decomposes: epic:zero-open-issues-and-store-defects
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
   path: crates/connectors-host/src/local/oauth_adversary_tests.rs
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:59:45Z", actor: "human:operator", revision: 3, decided_on: {"recorded":{"test_result":1}}, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:59:45Z", actor: "human:operator", revision: 4, decided_on: {"recorded":{"test_result":1}}, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Observed failure
 

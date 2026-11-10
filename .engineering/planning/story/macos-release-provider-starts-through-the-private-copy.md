@@ -8,7 +8,11 @@ summary: A downstream adopter on a macOS Apple-silicon laptop sees every provide
 relations:
 - informed_by: story:host-runs-on-macos
 - serves: vision:independent-contract-adapters
-revision: 4
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: crates/connectors-host/src/local/runtime/artifact/macos.rs
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-03T22:00:13Z", actor: "human:operator", revision: 2}
 - {from: "proposed", to: "active", at: "2026-11-03T22:00:13Z", actor: "human:operator", revision: 3}

@@ -10780,6 +10780,18 @@
                     "instance_id": {
                       "kind": "string"
                     },
+                    "pending_reason": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "enum",
+                        "variants": [
+                          "configuration_changed",
+                          "configuration_refused",
+                          "no_credential",
+                          "evidence_expired"
+                        ]
+                      }
+                    },
                     "profile": {
                       "kind": "string"
                     },
@@ -11446,6 +11458,18 @@
                     },
                     "instance_id": {
                       "kind": "string"
+                    },
+                    "pending_reason": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "enum",
+                        "variants": [
+                          "configuration_changed",
+                          "configuration_refused",
+                          "no_credential",
+                          "evidence_expired"
+                        ]
+                      }
                     },
                     "profile": {
                       "kind": "string"
@@ -12656,6 +12680,18 @@
                   "instance_id": {
                     "kind": "string"
                   },
+                  "pending_reason": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "enum",
+                      "variants": [
+                        "configuration_changed",
+                        "configuration_refused",
+                        "no_credential",
+                        "evidence_expired"
+                      ]
+                    }
+                  },
                   "profile": {
                     "kind": "string"
                   },
@@ -13366,6 +13402,18 @@
                     "instance_id": {
                       "kind": "string"
                     },
+                    "pending_reason": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "enum",
+                        "variants": [
+                          "configuration_changed",
+                          "configuration_refused",
+                          "no_credential",
+                          "evidence_expired"
+                        ]
+                      }
+                    },
                     "profile": {
                       "kind": "string"
                     },
@@ -14035,6 +14083,18 @@
                     },
                     "instance_id": {
                       "kind": "string"
+                    },
+                    "pending_reason": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "enum",
+                        "variants": [
+                          "configuration_changed",
+                          "configuration_refused",
+                          "no_credential",
+                          "evidence_expired"
+                        ]
+                      }
                     },
                     "profile": {
                       "kind": "string"
@@ -15390,6 +15450,18 @@
                       },
                       "instance_id": {
                         "kind": "string"
+                      },
+                      "pending_reason": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "enum",
+                          "variants": [
+                            "configuration_changed",
+                            "configuration_refused",
+                            "no_credential",
+                            "evidence_expired"
+                          ]
+                        }
                       },
                       "profile": {
                         "kind": "string"

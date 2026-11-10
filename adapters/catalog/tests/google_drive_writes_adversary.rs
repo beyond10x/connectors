@@ -113,11 +113,9 @@ fn writes_section(guide: &str) -> String {
 /// parameter with the same meaning ("Whether the requesting application
 /// supports both My Drives and shared drives", the pinned Discovery document);
 /// the guide says the preflight is "one `files.get` for `fileId` with the same
-/// `fields`". The guard maps only `fileId` and `fields` into the preflight
-/// (`operations.json`), so the preflight of a shared-drive update asks Drive
-/// for the file as an application that does not support shared drives, while
-/// the PATCH it guards says it does. The preflight has to read the file the
-/// PATCH writes, under the same shared-drive mode.
+/// `fields`". The preflight has to read the file the PATCH writes, under the
+/// same shared-drive mode, so `operations.json` maps `supportsAllDrives` as an
+/// optional preflight value.
 #[tokio::test]
 async fn files_update_preflight_reads_under_the_shared_drive_mode_of_the_patch() {
     let http = scripted(200, &json!({"id": "fixture-shared-1", "version": "7"}));
@@ -141,31 +139,36 @@ async fn files_update_preflight_reads_under_the_shared_drive_mode_of_the_patch()
         patch_query.contains(&flag),
         "the PATCH carries the flag: {patch_query:?}"
     );
-    // Today's state, pinned: a guard value is required (`lib.rs` refuses an
-    // absent one), so an optional `supportsAllDrives` cannot reach the
-    // preflight, and the guide says `files.update` on a shared-drive file is
-    // not supported yet. When optional preflight values land, map the flag in
-    // `operations.json` and flip this assertion to `contains`.
     let calls = http.calls.lock().unwrap();
     let (_, preflight_query) = &calls[0];
     assert!(
-        !preflight_query.contains(&flag),
-        "the preflight now carries supportsAllDrives: story:catalog-guard-optional-preflight-values \
-         has landed; flip this case to require it and drop the guide's shared-drive limit: \
-         {preflight_query:?}"
-    );
-    assert_eq!(
-        preflight_query,
-        &[("fields".to_owned(), "id,version".to_owned())],
-        "the preflight's query until story:catalog-guard-optional-preflight-values"
+        preflight_query.contains(&flag),
+        "the preflight carries supportsAllDrives: {preflight_query:?}"
     );
     let guide = guide();
     let writes = writes_section(&guide);
     assert!(
-        writes.contains("Shared-drive files are not supported by `files.update` yet")
-            && writes.contains("story:catalog-guard-optional-preflight-values"),
-        "the guide's Writes section must state the shared-drive limit and name \
-         story:catalog-guard-optional-preflight-values"
+        !writes.contains("Shared-drive files are not supported by `files.update` yet"),
+        "the guide no longer states the shared-drive limit"
+    );
+}
+
+/// An update without `supportsAllDrives` sends a preflight without it: the
+/// optional value is omitted, not refused.
+#[tokio::test]
+async fn files_update_preflight_omits_an_absent_shared_drive_flag() {
+    let http = scripted(200, &json!({"id": "fixture-1", "version": "7"}));
+    let input = json!({"fileId": "fixture-1", "version": "7", "fields": "id,version",
+                       "body": {"name": "renamed"}});
+    let _ = drive()
+        .prepare(&http, "fixture-google-drive", "files.update", input)
+        .await
+        .expect("the pin matches");
+    let calls = http.calls.lock().unwrap();
+    let (_, preflight_query) = &calls[0];
+    assert_eq!(
+        preflight_query,
+        &[("fields".to_owned(), "id,version".to_owned())]
     );
 }
 

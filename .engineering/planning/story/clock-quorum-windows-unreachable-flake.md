@@ -2,11 +2,20 @@
 format: aep.planning-md/3
 id: story:clock-quorum-windows-unreachable-flake
 kind: story
-status: draft
+status: active
 title: A verified clock source is never reported unreachable on Windows
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: apps/connectors/tests/local_cli.rs
+- confidence: inferred
+  path: crates/connectors-host/tests/fixtures/clock/server.rs
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:27Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:28Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Observed
 

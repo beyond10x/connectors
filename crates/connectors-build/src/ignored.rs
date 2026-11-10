@@ -417,6 +417,15 @@ fn classify(suite: &Suite, name: &str) -> Entry {
         ) => Some((Disposable, vec![CUSTODY])),
         (
             "connectors",
+            "connection_next_actions",
+            "following_next_actions_from_a_refused_upgrade_does_not_cycle"
+            | "a_pending_connection_says_why"
+            | "adversary_the_walk_from_revalidate_satisfies_the_story"
+            | "adversary_the_walk_from_reconnect_satisfies_the_story"
+            | "adversary_the_walk_from_connect_satisfies_the_story",
+        ) => Some((Disposable, vec![CUSTODY])),
+        (
+            "connectors",
             "definition_connect_question",
             "the_connect_question_names_the_host_the_token_is_sent_to"
             | "the_connect_question_of_an_oauth_profile_names_its_token_host_too"

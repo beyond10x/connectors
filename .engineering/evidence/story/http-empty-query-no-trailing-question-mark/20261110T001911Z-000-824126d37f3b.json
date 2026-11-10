@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-10T00:19:11Z",
+  "actor": "human:operator",
+  "artifact": "story:http-empty-query-no-trailing-question-mark",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test --locked -p connectors-host --test http -- empty_query_sends_no_question_mark (base vs unit)",
+    "reference": "base 9069c43a4: FAILED, request lines ended in ?; impl ecfa7d465: ok; adversary rerun 7 passed (VERIFIED)"
+  }
+}

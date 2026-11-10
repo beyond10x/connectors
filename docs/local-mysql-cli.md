@@ -152,7 +152,8 @@ function called as `SELECT f()` through `query.read` ran `SET PERSIST`
 call from a built-in function. **Grant the configured user `SELECT` only, and no
 `EXECUTE` on any routine with side effects** (server variables, external
 calls, definer-rights writes); the user's grants, not the instance, are the
-boundary for routines.
+boundary for routines and for the databases `query.read` may read: a statement may
+name a table in another database the user is granted.
 
 The input bounds, the 1,000-row limit and the 5 s / 10 s / 15 s deadlines with 2 s
 reserved for cleanup are the PostgreSQL path's. When the instance's own deadline
@@ -198,8 +199,8 @@ checked on the wire by `adapters/sql/tests/mysql_protocol.rs`.
 A connection is bound to one database, and on MySQL a schema is a database, so
 `schema.list` reads only the connected database: omit `schema`, or pass the
 connected database's exact name. Any other name is refused as `invalid_input`
-before a session is opened; to read another database, configure a connection for
-it. The answer's provenance resource is the connected database. It reads
+before a session is opened. `query.read` is different: the grants of the configured
+user are the database boundary, so grant the user only the databases it may read. The answer's provenance resource is the connected database. It reads
 `information_schema.COLUMNS` for that database, and the columns are those of the PostgreSQL path (`table_schema`, `table_name`,
 `column_name`, `data_type`, `udt_name`, `is_nullable`, `ordinal_position`);
 `udt_name` carries MySQL's full `COLUMN_TYPE`, such as `bigint unsigned` or

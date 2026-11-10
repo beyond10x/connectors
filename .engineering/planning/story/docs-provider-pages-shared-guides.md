@@ -2,13 +2,20 @@
 format: aep.planning-md/3
 id: story:docs-provider-pages-shared-guides
 kind: story
-status: draft
+status: active
 title: Provider pages keep their own facts and link shared guides for the repeated steps
 summary: 'docs review run 3: about 36 KB repeated across provider pages; three wrong facts'
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: specification:public-documentation-website
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: website/docs/connectors/gitlab.md
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:41Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:42Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 

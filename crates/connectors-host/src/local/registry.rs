@@ -9,7 +9,9 @@ mod reuse;
 mod revalidation;
 mod use_and_retirement;
 pub use issue::{Issuance, Issue, Published, Recorded};
-pub use observation::{ObservedAcquisition, ObservedConnection, Page, PageOptions, State};
+pub use observation::{
+    ObservedAcquisition, ObservedConnection, Page, PageOptions, PendingReason, State,
+};
 #[cfg(test)]
 pub(in crate::local) use refresh::RETAINED_BOUND;
 pub use refresh::{

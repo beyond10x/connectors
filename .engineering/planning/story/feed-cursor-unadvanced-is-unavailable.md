@@ -2,12 +2,26 @@
 format: aep.planning-md/3
 id: story:feed-cursor-unadvanced-is-unavailable
 kind: story
-status: draft
+status: implemented
 title: A cursor feed answer that is incomplete and does not advance is unavailable
 summary: 'review run 3 C2 F1: returned as a page with an unchanged watermark'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: cited
+  path: adapters/catalog/src/feed.rs
+- confidence: cited
+  path: adapters/catalog/tests/feed_engine.rs
+- confidence: cited
+  path: contracts/catalog/v1alpha1/semantics.md
+- confidence: cited
+  path: contracts/datasources/feed/v1alpha1/semantics.md
+revision: 10
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:03Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:04Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-10T06:20:11Z", actor: "human:operator", revision: 10, decided_on: {"recorded":{"test_result":1,"review_outcome":1,"verification":1}}, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 
@@ -30,3 +44,12 @@ analogue (feed.rs:736-744), and the conformance harness bounds its loop
 - The scratch cases (cursor absent, `""`, the value already sent) are tests in
   `adapters/catalog/tests/feed_engine.rs` and answer `unavailable`.
 - `contracts/datasources/feed/v1alpha1/semantics.md` states the rule beside the `cursor.last` one.
+
+## Scope
+
+Landed on, from `git diff a83a03b85...impl/feed-cursor-unadvanced-is-unavailable` (merged into wave/zero-issues at 7fa243531); the earlier scoper lines marked inferred are replaced by this list. Generated reference pages are left out.
+
+- `adapters/catalog/src/feed.rs`
+- `adapters/catalog/tests/feed_engine.rs`
+- `contracts/catalog/v1alpha1/semantics.md`
+- `contracts/datasources/feed/v1alpha1/semantics.md`

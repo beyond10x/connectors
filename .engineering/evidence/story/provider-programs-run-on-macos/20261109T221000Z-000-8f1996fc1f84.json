@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-09T22:10:00Z",
+  "actor": "human:operator",
+  "artifact": "story:provider-programs-run-on-macos",
+  "kind": "story",
+  "revision": 14,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "release v0.69.0 connectors-0.69.0-aarch64-apple-darwin.tar.gz: sha256sum -c OK; tar -tz lists connectors, connectors-catalog-provider, connectors-grafana, connectors-prometheus, connectors-loki, connectors-kubernetes (issue #231)",
+    "reference": "https://github.com/beyond10x/connectors/releases/tag/v0.69.0"
+  }
+}

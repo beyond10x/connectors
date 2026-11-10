@@ -479,8 +479,8 @@ fn connecting_records_the_portal_as_the_identity() {
     assert_eq!(baseline.granted_scopes, None);
     let requests = provider.requests();
     assert_eq!(requests.len(), 1);
-    // The identity probe carries an empty query.
-    assert_eq!(requests[0].0, "/account-info/2026-09/details?");
+    // The identity probe carries no query.
+    assert_eq!(requests[0].0, "/account-info/2026-09/details");
     assert_eq!(requests[0].1.as_deref(), Some(HEADER));
     // A basic credential document is not this profile's entry.
     let basic = Secret(br#"{"account":"a@example.test","token":"t"}"#.to_vec());

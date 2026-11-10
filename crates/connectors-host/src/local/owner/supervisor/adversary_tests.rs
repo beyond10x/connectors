@@ -244,3 +244,41 @@ fn the_queued_count_is_returned_on_every_way_out_of_send() {
     drop(guard);
     pool.shutdown().unwrap();
 }
+
+/// story:owner-read-answer-size-envelope, adversary: the child admits a result
+/// by its own encoding of the provider's JSON, which keeps a number's source
+/// spelling (`arbitrary_precision`), and the owner's `read_answer` re-encodes
+/// every non-integer as the shortest `f64` form. A Java-style `1.0E10`, which
+/// the child writes as `1.0e+10`, becomes
+/// `10000000000.0`, so a result the child admits can outgrow the fixed
+/// 1024-byte envelope allowance and the owner's write refuses it as Capacity.
+#[test]
+fn a_read_answer_re_encoding_a_child_admitted_result_stays_within_the_read_bound() {
+    let numbers = 300;
+    let pad = runtime::RESULT_LIMIT - 4 - 8 * numbers;
+    let mut provider = b"[".to_vec();
+    for _ in 0..numbers {
+        provider.extend_from_slice(b"1.0e+10,");
+    }
+    provider.push(b'"');
+    provider.resize(provider.len() + pad, b'x');
+    provider.extend_from_slice(b"\"]");
+    // The child's own encoding (runtime/server.rs): a Value, then `to_vec`.
+    let result: Value = serde_json::from_slice(&provider).unwrap();
+    let document = serde_json::to_vec(&result).unwrap();
+    assert!(
+        document.windows(7).any(|w| w == b"1.0e+10"),
+        "{}",
+        String::from_utf8_lossy(&document[..40])
+    );
+    assert_eq!(document.len(), runtime::RESULT_LIMIT, "the child admits it");
+    // The owner's answer and the bytes `exchange` writes under the read bound.
+    let answer = read_answer("forge", "item.read", "desc-1", document).unwrap();
+    let written = serde_json::to_vec(&answer).unwrap();
+    assert!(
+        written.len() <= runtime::READ_ANSWER_LIMIT,
+        "a result the child admitted is refused at the owner: answer {} bytes, bound {}",
+        written.len(),
+        runtime::READ_ANSWER_LIMIT
+    );
+}

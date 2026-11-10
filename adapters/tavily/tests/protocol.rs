@@ -3,9 +3,13 @@
 use connectors_core::ErrorCode;
 use connectors_host::http::{HttpConfig, ScopedHttp};
 use connectors_sdk::{Adapter, Credential, Secret};
-use connectors_tavily::{CONTENT_BYTES, READ_POST_TIMEOUT, READ_POSTS, Tavily, auth};
+use connectors_tavily::{
+    CONTENT_BYTES, CRAWL_MARGIN, CRAWL_TIMEOUT_MAX, CRAWL_TIMEOUT_MIN, READ_POST_TIMEOUT,
+    READ_POSTS, Tavily, auth,
+};
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// Assembled at runtime so no credential-shaped literal sits in the source.
@@ -123,7 +127,7 @@ async fn a_search_posts_the_query_and_maps_each_result() {
         .unwrap();
     let seen = seen.lock().unwrap()[0].clone();
     assert!(
-        seen.head.starts_with("POST /search? HTTP/1.1\r\n"),
+        seen.head.starts_with("POST /search HTTP/1.1\r\n"),
         "{}",
         seen.head
     );
@@ -208,7 +212,7 @@ async fn a_fetch_reports_pages_and_failures_and_is_complete_when_every_url_answe
         .unwrap();
     let seen = seen.lock().unwrap()[0].clone();
     assert!(
-        seen.head.starts_with("POST /extract? HTTP/1.1\r\n"),
+        seen.head.starts_with("POST /extract HTTP/1.1\r\n"),
         "{}",
         seen.head
     );
@@ -239,6 +243,7 @@ async fn a_crawl_that_reaches_its_limit_is_incomplete() {
     )])
     .await;
     let out = tavily(&base)
+        .with_deadline(Instant::now() + Duration::from_secs(30))
         .invoke(
             "websearch.crawl",
             json!({"url": "https://a.example", "limit": 2, "max_depth": 2,
@@ -248,16 +253,60 @@ async fn a_crawl_that_reaches_its_limit_is_incomplete() {
         .unwrap();
     let seen = seen.lock().unwrap()[0].clone();
     assert!(
-        seen.head.starts_with("POST /crawl? HTTP/1.1\r\n"),
+        seen.head.starts_with("POST /crawl HTTP/1.1\r\n"),
         "{}",
         seen.head
     );
     assert_eq!(seen.body["limit"], 2);
-    assert_eq!(seen.body["timeout"], 150);
+    let sent = seen.body["timeout"].as_u64().unwrap();
+    let ceiling = 30 - CRAWL_MARGIN.as_secs();
+    assert!(
+        sent <= ceiling && sent + 3 >= ceiling,
+        "a 30 s deadline leaves {ceiling} s less the time spent here, sent {sent}"
+    );
     assert_eq!(seen.body["select_paths"], json!(["/docs/.*"]));
     assert_eq!(out["pages"].as_array().unwrap().len(), 2);
     assert_eq!(out["complete"], false);
     assert_eq!(out["truncation"], json!(["result_limit"]));
+}
+
+/// The `timeout` a crawl sends for a caller deadline `remaining` away; `None` is no deadline.
+async fn crawl_timeout_sent(remaining: Option<Duration>) -> u64 {
+    let (base, seen) = server(vec![(
+        200,
+        json!({"base_url": "https://a.example", "results": []}),
+    )])
+    .await;
+    let t = tavily(&base);
+    let t = match remaining {
+        Some(r) => t.with_deadline(Instant::now() + r),
+        None => t,
+    };
+    t.invoke(
+        "websearch.crawl",
+        json!({"url": "https://a.example", "limit": 2}),
+    )
+    .await
+    .unwrap();
+    let body = seen.lock().unwrap()[0].body.clone();
+    body["timeout"].as_u64().unwrap()
+}
+
+#[tokio::test]
+async fn a_crawl_timeout_is_clamped_to_what_tavily_accepts() {
+    assert_eq!((CRAWL_TIMEOUT_MIN, CRAWL_TIMEOUT_MAX), (10, 150));
+    // Less than the minimum remains, or the deadline has passed: the minimum is sent.
+    assert_eq!(crawl_timeout_sent(Some(Duration::from_secs(2))).await, 10);
+    assert_eq!(crawl_timeout_sent(Some(Duration::ZERO)).await, 10);
+    // Far more than the maximum remains, or no deadline is given: the maximum is sent.
+    assert_eq!(
+        crawl_timeout_sent(Some(Duration::from_secs(3600))).await,
+        150
+    );
+    assert_eq!(crawl_timeout_sent(None).await, 150);
+    // In between, the remaining time less the margin, whole seconds rounded down.
+    let sent = crawl_timeout_sent(Some(Duration::from_secs(60))).await;
+    assert!((52..=55).contains(&sent), "sent {sent}");
 }
 
 #[tokio::test]
@@ -329,7 +378,7 @@ async fn the_key_is_validated_by_usage_without_a_search() {
     assert!(
         seen.lock().unwrap()[0]
             .head
-            .starts_with("GET /usage? HTTP/1.1\r\n")
+            .starts_with("GET /usage HTTP/1.1\r\n")
     );
     assert!(matches!(
         auth::validate(&http, || 1_000).await,

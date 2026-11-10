@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-10T03:30:30Z",
+  "actor": "human:operator",
+  "artifact": "story:feed-cursor-unadvanced-is-unavailable",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test --locked -p connectors-catalog-provider --test feed_engine; connectors-docs generate --check",
+    "reference": "impl c23e06bbd: 13 passed incl. a_cursor_answer_that_is_incomplete_and_does_not_advance_is_unavailable (red on base: 0 passed 1 failed) and the adversary's contract-row case (red at 2d2186cfa); docs current; 13 feed targets green in adversary pass 1"
+  }
+}

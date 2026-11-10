@@ -5,9 +5,13 @@ kind: story
 status: implemented
 title: instances status names why a program did not start and keeps its stderr
 summary: 'D370 item 3: start failure reason and log file'
+refs:
+- provider: github
+  reference: beyond10x/connectors#233
 relations:
 - serves: vision:independent-contract-adapters
-revision: 4
+- decomposes: epic:zero-open-issues-and-store-defects
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-02T07:27:31Z", actor: "human:operator", revision: 2, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
 - {from: "proposed", to: "active", at: "2026-11-02T07:27:32Z", actor: "human:operator", revision: 3, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}

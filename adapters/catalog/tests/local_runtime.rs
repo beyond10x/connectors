@@ -1428,10 +1428,10 @@ fn raw_file_text_and_project_languages_through_the_child() {
     .unwrap();
     assert_eq!(languages["status"], 200);
     assert_eq!(languages["body"], fixture_languages());
-    // The transport writes an empty query as a bare `?`.
+    // The transport sends no `?` for an empty query.
     assert_eq!(
         provider.calls.lock().unwrap().last().unwrap(),
-        "/api/v4/projects/org%2Fproject/languages?"
+        "/api/v4/projects/org%2Fproject/languages"
     );
 }
 

@@ -616,7 +616,7 @@ fn an_approved_note_sends_exactly_one_post_with_the_body_as_supplied() {
         provider.requests(),
         [(
             "POST".to_owned(),
-            format!("{PROJECT}/merge_requests/7/notes?"),
+            format!("{PROJECT}/merge_requests/7/notes"),
             input["body"].clone()
         )]
     );
@@ -640,7 +640,7 @@ fn an_approved_reply_sends_exactly_one_post_to_the_discussion() {
         provider.requests(),
         [(
             "POST".to_owned(),
-            format!("{PROJECT}/merge_requests/7/discussions/{THREAD}/notes?"),
+            format!("{PROJECT}/merge_requests/7/discussions/{THREAD}/notes"),
             input["body"].clone()
         )]
     );
@@ -664,7 +664,7 @@ fn discussion_get_reads_one_discussion() {
         provider.requests(),
         [(
             "GET".to_owned(),
-            format!("{PROJECT}/merge_requests/7/discussions/{THREAD}?"),
+            format!("{PROJECT}/merge_requests/7/discussions/{THREAD}"),
             Value::Null
         )]
     );
@@ -725,7 +725,7 @@ fn resolve_declares_a_closed_body_of_resolved_which_its_guard_reads() {
 fn an_approved_resolve_reads_the_discussion_then_sends_one_put_and_proves_the_new_state() {
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection()).unwrap();
-    let discussion_route = format!("{PROJECT}/merge_requests/7/discussions/{THREAD}?");
+    let discussion_route = format!("{PROJECT}/merge_requests/7/discussions/{THREAD}");
     for resolved in [true, false] {
         let before = provider.requests().len();
         let input = resolve_input(THREAD, resolved);

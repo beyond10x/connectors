@@ -2,15 +2,19 @@
 format: aep.planning-md/3
 id: story:pool-idle-checks-wait-outside-the-pool-lock
 kind: story
-status: draft
+status: active
 title: The pool's idle checks wait on an instance's lock outside the pool lock
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: review-result:wave-20261019-post0540-u3-adversary-1
+- decomposes: epic:zero-open-issues-and-store-defects
 scope:
 - confidence: cited
   path: crates/connectors-host/src/local/owner/supervisor.rs
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:20Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:21Z", actor: "human:operator", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 

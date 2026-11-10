@@ -312,11 +312,27 @@ fn invoke_failure(error: owner::Error) -> HandlerReply {
 fn connect_failure(callable: &str, error: owner::Error) -> HandlerReply {
     let other_account =
         callable == "connections-reconnect" && error.code == owner::Code::IdentityMismatch;
+    // A credential the provider's probe refused as below the profile's scope
+    // while the connection is made (story:connection-next-actions-no-cycle):
+    // the repair `owner_failure` names for a stored credential is this very
+    // command, or a reconnect that finds nothing to reconnect, so the answer
+    // would send the caller round in a loop. Entering another credential is
+    // the same command again.
+    let refused_entry = matches!(
+        error.code,
+        owner::Code::NotGranted | owner::Code::InsufficientScope
+    ) && !(error.reconfigure
+        || error.revoke
+        || error.held
+        || error.reconnect
+        || error.revalidate);
     let mut reply = owner_failure(error);
-    if other_account
-        && let HandlerReply::Error { data, .. } | HandlerReply::UsageError { data, .. } = &mut reply
-    {
-        data["next_action"] = json!("revoke_connection");
+    if let HandlerReply::Error { data, .. } | HandlerReply::UsageError { data, .. } = &mut reply {
+        if other_account {
+            data["next_action"] = json!("revoke_connection");
+        } else if refused_entry {
+            data["next_action"] = json!("retry_explicitly");
+        }
     }
     reply
 }

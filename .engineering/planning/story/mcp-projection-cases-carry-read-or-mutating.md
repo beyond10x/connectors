@@ -2,11 +2,19 @@
 format: aep.planning-md/3
 id: story:mcp-projection-cases-carry-read-or-mutating
 kind: story
-status: draft
+status: active
 title: MCP projection cases say whether each operation reads or mutates
 relations:
 - derived_from: review-result:wave-20261105b-u1-adversary
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+- serves: vision:independent-contract-adapters
+scope:
+- confidence: inferred
+  path: adapters/mcp/contracts/server/v1alpha1/projection-cases.json
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:59:43Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:59:43Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 
 ## Why

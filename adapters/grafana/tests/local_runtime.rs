@@ -585,7 +585,7 @@ fn a_saved_irm_connection_reads_alert_groups_and_incidents_through_the_private_r
     );
     assert_eq!(read[0].stack, stack);
     assert_eq!(read[1].method, "POST");
-    assert_eq!(read[1].target, format!("{QUERY_INCIDENTS}?"));
+    assert_eq!(read[1].target, QUERY_INCIDENTS.to_string());
     // The incident service is the stack itself; the stack header belongs to the IRM API.
     assert_eq!(read[1].stack, "");
     let body: Value = serde_json::from_slice(&read[1].body).unwrap();

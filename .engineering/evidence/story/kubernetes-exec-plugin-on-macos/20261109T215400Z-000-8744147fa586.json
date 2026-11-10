@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-09T21:54:00Z",
+  "actor": "human:operator",
+  "artifact": "story:kubernetes-exec-plugin-on-macos",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "macOS host on macos-latest: a_script_plugin_runs_from_its_own_path, a_native_plugin_runs_from_its_own_path, digest_mismatch_group_writable_and_set_id_plugins_are_refused (issue #234)",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/42537155135/job/128903888015 on bd338daa0: ok"
+  }
+}

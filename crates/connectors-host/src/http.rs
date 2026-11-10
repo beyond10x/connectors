@@ -580,8 +580,11 @@ impl ScopedHttp {
         query: &[(&str, String)],
     ) -> Result<reqwest::RequestBuilder> {
         self.remaining()?;
-        url.query_pairs_mut()
-            .extend_pairs(query.iter().map(|(k, v)| (*k, v.as_str())));
+        // No pairs, no query: `query_pairs_mut` would leave a bare `?`.
+        if !query.is_empty() {
+            url.query_pairs_mut()
+                .extend_pairs(query.iter().map(|(k, v)| (*k, v.as_str())));
+        }
         let mut request = self.client.request(method, url);
         if let Some((name, value)) = &self.fixed_header {
             request = request.header(name, value.clone());
@@ -1644,8 +1647,8 @@ mod tests {
         assert_eq!(response.status, 200);
         assert_eq!(response.body, br#"{"results":[]}"#);
         let (head, body) = server.await.unwrap();
-        // The empty query keeps its `?`, as every request through `request` does.
-        assert!(head.starts_with("POST /search? HTTP/1.1\r\n"), "{head}");
+        // An empty query sends no `?`, as on every request through `request`.
+        assert!(head.starts_with("POST /search HTTP/1.1\r\n"), "{head}");
         let lower = head.to_ascii_lowercase();
         assert!(
             lower.contains("authorization: bearer "),

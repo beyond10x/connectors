@@ -65,20 +65,99 @@ fn refuse(code: ErrorCode, message: &str) -> Error {
     Error::new(code, message)
 }
 
+/// Open a file in the bundle directory once, without following a link, and
+/// read it from that handle. A link is refused as `InvalidInput`, a file that is
+/// not regular is too, and a file that is missing is `NotFound`; nothing is
+/// resolved twice, so a link swapped in after the check cannot be followed.
+fn read_regular(path: &Path, what: &str) -> Result<Vec<u8>> {
+    use std::io::Read;
+    let not_regular = || {
+        refuse(
+            ErrorCode::InvalidInput,
+            &format!("{what} is not a regular file"),
+        )
+    };
+    let unreadable = || refuse(ErrorCode::NotFound, &format!("{what} cannot be read"));
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
+    #[cfg(not(unix))]
+    if std::fs::symlink_metadata(path).is_ok_and(|m| !m.is_file()) {
+        return Err(not_regular());
+    }
+    let mut file = options.open(path).map_err(|error| {
+        #[cfg(unix)]
+        if error.raw_os_error() == Some(libc::ELOOP) {
+            return not_regular();
+        }
+        if error.kind() == std::io::ErrorKind::NotFound {
+            return refuse(ErrorCode::NotFound, &format!("{what} is absent"));
+        }
+        unreadable()
+    })?;
+    if !file.metadata().is_ok_and(|m| m.is_file()) {
+        return Err(not_regular());
+    }
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).map_err(|_| unreadable())?;
+    Ok(bytes)
+}
+
 /// Read the index, or an empty one when the directory holds none yet.
 pub fn read_index(directory: &Path) -> Result<Index> {
     let path = index_path(directory);
-    if !path.exists() {
+    if std::fs::symlink_metadata(&path).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound) {
         return Ok(Index::default());
     }
-    let bytes =
-        std::fs::read(&path).map_err(|_| refuse(ErrorCode::NotFound, "index cannot be read"))?;
-    connectors_core::read_json(&bytes).map_err(|_| {
+    let bytes = read_regular(&path, "index")?;
+    let index: Index = connectors_core::read_json(&bytes).map_err(|_| {
         refuse(
             ErrorCode::InvalidInput,
             "index is not a document this build parses",
         )
-    })
+    })?;
+    check_rows(&index)?;
+    Ok(index)
+}
+
+/// The one file name a provider's bundle has. `write` names files with it and
+/// `read_index` refuses a row that names any other.
+fn bundle_file_name(provider: &str) -> String {
+    format!("{provider}.bundle.json")
+}
+
+/// Refuse an index `write` could not have produced: a row whose provider is not
+/// an identifier, a row whose file is not `<provider>.bundle.json`, or two rows
+/// for one provider. `load` joins the row's file name onto the directory and
+/// `Index::find` takes the first match, so either shape would let a hand-edited
+/// index name a file outside the directory or pick between two answers.
+fn check_rows(index: &Index) -> Result<()> {
+    let mut seen = std::collections::BTreeSet::new();
+    for entry in &index.entries {
+        if !connectors_core::valid_id(&entry.provider) {
+            return Err(refuse(
+                ErrorCode::InvalidInput,
+                "index names an invalid provider identifier",
+            ));
+        }
+        if entry.file_name != bundle_file_name(&entry.provider) {
+            return Err(refuse(
+                ErrorCode::InvalidInput,
+                "index names a bundle file other than <provider>.bundle.json",
+            ));
+        }
+        if !seen.insert(entry.provider.as_str()) {
+            return Err(refuse(
+                ErrorCode::InvalidInput,
+                "index names one provider more than once",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn put_index(directory: &Path, bytes: &[u8]) -> Result<()> {
@@ -264,7 +343,7 @@ pub fn write(directory: &Path, bundle: &Bundle, replace: bool) -> Result<Entry> 
             "provider is already indexed; ask for replacement",
         ));
     }
-    let file_name = format!("{}.bundle.json", bundle.provider);
+    let file_name = bundle_file_name(&bundle.provider);
     let (operations, unsupported) = bundle.inventory.coverage();
     let entry = Entry {
         provider: bundle.provider.clone(),
@@ -302,8 +381,7 @@ pub fn load(directory: &Path, provider: &str) -> Result<Bundle> {
         .find(provider)
         .ok_or_else(|| refuse(ErrorCode::NotFound, "index carries no such provider"))?;
     let path = directory.join(&entry.file_name);
-    let bytes = std::fs::read(&path)
-        .map_err(|_| refuse(ErrorCode::NotFound, "indexed bundle file is absent"))?;
+    let bytes = read_regular(&path, "indexed bundle file")?;
     if bytes.len() > BUNDLE_LIMIT {
         return Err(refuse(
             ErrorCode::Capacity,

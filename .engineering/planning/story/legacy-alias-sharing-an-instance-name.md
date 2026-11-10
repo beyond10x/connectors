@@ -2,12 +2,19 @@
 format: aep.planning-md/3
 id: story:legacy-alias-sharing-an-instance-name
 kind: story
-status: draft
+status: active
 title: A legacy alias that shares an instance's name never routes a read to the other entry
 summary: 'Reported by loom 0.52.0''s review: a read can reach the other entry; writes stay refused'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: crates/connectors-host/src/local/config.rs
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:07Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:08Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 

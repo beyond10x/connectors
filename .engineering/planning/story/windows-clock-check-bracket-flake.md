@@ -2,11 +2,18 @@
 format: aep.planning-md/3
 id: story:windows-clock-check-bracket-flake
 kind: story
-status: draft
+status: active
 title: Clock-check tests of the local CLI sometimes fail on Windows CI
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: apps/connectors/tests/local_cli.rs
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:39Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:40Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Defect
 

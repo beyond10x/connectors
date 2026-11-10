@@ -11,12 +11,30 @@ pub enum State {
     Revoked,
 }
 
+/// Why a connection observes as `pending`, the one fact its state alone does
+/// not say (story:connection-next-actions-no-cycle).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PendingReason {
+    /// Saved under another configuration revision than the configured one.
+    ConfigurationChanged,
+    /// As `ConfigurationChanged`, and the configured provider already refused
+    /// the credential: a new connection helps, a revalidation does not.
+    ConfigurationRefused,
+    /// No credential was published for it.
+    NoCredential,
+    /// Its validation evidence expired: a revalidation recollects it.
+    EvidenceExpired,
+}
+
 pub struct ObservedConnection {
     pub reference: String,
     pub instance: String,
     pub profile: String,
     pub revision: String,
     pub state: State,
+    /// Present exactly when `state` is `Pending`.
+    pub pending_reason: Option<PendingReason>,
     pub identity: Option<ExternalIdentity>,
     pub observed_at_ms: u64,
     pub valid_until_ms: u64,
@@ -316,6 +334,19 @@ fn observe(
     } else {
         readiness(tx, &row, now, custody_available)?
     };
+    let pending_reason = (state == State::Pending).then(|| {
+        if !configured.current(&row.binding) {
+            if row.kept.refused.as_deref() == Some(configured.configuration_revision) {
+                PendingReason::ConfigurationRefused
+            } else {
+                PendingReason::ConfigurationChanged
+            }
+        } else if row.material.is_none() {
+            PendingReason::NoCredential
+        } else {
+            PendingReason::EvidenceExpired
+        }
+    });
     let stale = row.state != "revoked" && !configured.current(&row.binding);
     let valid_until_ms = if stale {
         now
@@ -344,6 +375,7 @@ fn observe(
         profile: row.binding.profile.id,
         revision: row.revision,
         state,
+        pending_reason,
         identity: row.identity,
         observed_at_ms: now,
         valid_until_ms,

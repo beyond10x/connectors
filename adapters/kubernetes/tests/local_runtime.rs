@@ -532,8 +532,7 @@ impl Cluster {
     fn count(&self) -> usize {
         self.calls.lock().unwrap().len()
     }
-    /// Observed paths without their query string. The shared HTTP binding
-    /// appends an empty query to a request that carries no parameters.
+    /// Observed paths without their query string.
     fn routes(&self) -> Vec<String> {
         self.calls
             .lock()

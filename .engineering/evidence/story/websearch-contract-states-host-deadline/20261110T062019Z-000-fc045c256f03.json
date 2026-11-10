@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-10T06:20:19Z",
+  "actor": "human:operator",
+  "artifact": "story:websearch-contract-states-host-deadline",
+  "kind": "story",
+  "revision": 14,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate on wave/zero-issues 74030787c (proof/gate-5.log), rerun from its failed step: cargo test --workspace --locked --offline --no-fail-fast, connectors-tool-contracts generate --check, clippy --workspace --all-targets -D warnings, connectors-docs generate --check (proof/gate-5-steps.log)",
+    "reference": "74030787c: every gate step before the workspace tests exit 0; workspace tests 432 test results ok, 0 failed; tool contracts, clippy and docs exit 0. The first test-step failure was sccache refusing a too-long socket path inside two connectors-build tests (server restarted without idle timeout); they passed in the rerun. Not run locally: the library-boundary builds and dependency-tree checks after docs (CI's repository gate runs them)."
+  }
+}

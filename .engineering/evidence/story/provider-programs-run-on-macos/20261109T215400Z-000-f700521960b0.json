@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-09T21:54:00Z",
+  "actor": "human:operator",
+  "artifact": "story:provider-programs-run-on-macos",
+  "kind": "story",
+  "revision": 14,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "macOS host job 'provider programs on macos-latest' (issue #232)",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/42537155135/job/128903888015 on bd338daa0: success"
+  }
+}

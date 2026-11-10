@@ -2,13 +2,20 @@
 format: aep.planning-md/3
 id: story:docs-specification-sidebar
 kind: story
-status: draft
+status: active
 title: Contract and model pages move into a collapsed Specification category
 summary: 'docs review run 3: 107 spec pages (1.46 MB) share the user''s Reference navigation'
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: specification:public-documentation-website
-revision: 1
+- decomposes: epic:zero-open-issues-and-store-defects
+scope:
+- confidence: inferred
+  path: website/sidebars.ts
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-09T21:58:42Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "proposed", to: "active", at: "2026-11-09T21:58:43Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 ---
 ## Outcome
 

@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-10T02:53:00Z",
+  "actor": "human:operator",
+  "artifact": "story:endpoint-publish-holds-one-writer",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test --locked -p connectors --bin connectors local::endpoint::tests; --test adversary_d218_u2 --test connect_endpoint --test connect_endpoint_adversary; cargo check --target x86_64-pc-windows-gnu",
+    "reference": "impl 435a5903f: bin 2 passed (incl. writers_of_one_file_with_their_own_state_replace_it_at_most_once, red 8 of 8 writers replaced at e82cff3b8 per adversary pass 2); 16+7+10 passed; windows check exit 0 (coordinator run)"
+  }
+}

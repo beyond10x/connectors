@@ -117,3 +117,4 @@ connectors connections reconnect --connector tavily --instance tavily \
   detect a key of another account.
 - A key grants no scopes and exposes no expiry.
 - Validation lasts 60 seconds; a scheduled caller revalidates before reading.
+- A call ends at the caller's deadline: 30 seconds in the CLI, 20 seconds at the service. A crawl sends Tavily a 12-second `timeout`.

@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-10T00:46:43Z",
+  "actor": "human:operator",
+  "artifact": "story:bundle-index-refuses-ambiguous-rows",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test --locked -p connectors-catalog --test bundle --test bundle_adversary --test bundle_adversary_2",
+    "reference": "base: 5 new bundle cases FAILED (read_index accepted each bad index); unit: bundle 11, bundle_adversary 1, bundle_adversary_2 2 passed (VERIFIED)"
+  }
+}

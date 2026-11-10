@@ -228,3 +228,84 @@ async fn custom_ca_accepts_its_endpoint_and_refuses_other_roots() {
     );
     task.abort();
 }
+
+/// story:http-empty-query-no-trailing-question-mark: a request with no query
+/// pairs reaches the provider as its path alone, with no `?`; one with pairs
+/// still carries them. Read, read prefix and write share the one URL builder.
+#[tokio::test]
+async fn empty_query_sends_no_question_mark() {
+    use connectors_sdk::WriteMethod;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let mut targets = Vec::new();
+        for _ in 0..4 {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut head = Vec::new();
+            while !head.ends_with(b"\r\n\r\n") {
+                head.push(socket.read_u8().await.unwrap());
+            }
+            let head = String::from_utf8(head).unwrap();
+            let length: usize = head
+                .lines()
+                .find_map(|line| {
+                    line.split_once(':')
+                        .filter(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+                        .map(|(_, value)| value.trim().parse().unwrap())
+                })
+                .unwrap_or(0);
+            let mut body = vec![0; length];
+            socket.read_exact(&mut body).await.unwrap();
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}")
+                .await
+                .unwrap();
+            targets.push(head.lines().next().unwrap().to_owned());
+        }
+        targets
+    });
+    let config = HttpConfig {
+        base_url: format!("http://{address}/api/"),
+        credential: None,
+        credential_header: "authorization".into(),
+        bearer: true,
+        allow_plaintext: true,
+        ca_file: None,
+    };
+    let http = ScopedHttp::from_config(&config).unwrap();
+    assert_eq!(http.get(&["token"], &[]).await.unwrap().status, 200);
+    assert_eq!(
+        http.get_prefix(&["token"], &[], 16).await.unwrap().status,
+        200
+    );
+    assert_eq!(
+        http.get(&["list"], &[("page", "a b".to_string())])
+            .await
+            .unwrap()
+            .status,
+        200
+    );
+    assert_eq!(
+        http.into_write()
+            .send_json(
+                WriteMethod::Post,
+                &["files", "copy"],
+                &[],
+                &serde_json::json!({})
+            )
+            .await
+            .unwrap()
+            .status,
+        200
+    );
+    assert_eq!(
+        server.await.unwrap(),
+        [
+            "GET /api/token HTTP/1.1",
+            "GET /api/token HTTP/1.1",
+            "GET /api/list?page=a+b HTTP/1.1",
+            "POST /api/files/copy HTTP/1.1",
+        ]
+    );
+}

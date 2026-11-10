@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-10T04:13:00Z",
+  "actor": "human:operator",
+  "artifact": "story:mysql-query-read-provenance",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-a-mysql-provenance-adversary-1",
+    "review": "review-result:wave-a-mysql-provenance-adversary-1",
+    "outcome": "fixed"
+  }
+}

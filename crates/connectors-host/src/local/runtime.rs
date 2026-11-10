@@ -45,6 +45,12 @@ impl PrivateProtocol {
 pub const SECRET_LIMIT: usize = 65536;
 pub const INPUT_LIMIT: usize = 1024 * 1024;
 pub const RESULT_LIMIT: usize = 8 * 1024 * 1024;
+/// What the owner's read answer adds around a result: the adapter, operation
+/// and revision members, each name at most 128 bytes, with room for escaping.
+pub const READ_ENVELOPE_LIMIT: usize = 1024;
+/// The bound of the owner's read answer: a result the child admits, whole,
+/// inside its envelope.
+pub const READ_ANSWER_LIMIT: usize = RESULT_LIMIT + READ_ENVELOPE_LIMIT;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
