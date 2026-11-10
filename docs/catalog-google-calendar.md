@@ -85,8 +85,8 @@ the end of a walk are in it.
   `["default", "focusTime"]`, and each element is sent as its own `eventTypes`
   pair in the order given. The pinned document enumerates `birthday`,
   `default`, `focusTime`, `fromGmail`, `outOfOffice` and `workingLocation`. The
-  engine does not check a value against that list: another value is sent, and
-  Google answers it.
+  engine refuses a value outside that list as `invalid_input` before any
+  request.
 - **`maxResults`.** The pinned document states a minimum of 1 for both lists
   and, in each description only, a ceiling: a page is never larger than 2500
   events for `events.list` and never larger than 250 entries for
@@ -179,11 +179,11 @@ the write scope; see [The write scope](#the-write-scope).
 - **`sendUpdates`** decides whom Google emails about the write: `all`,
   `externalOnly` (guests not on Google Calendar) or `none`. Name it in every
   write input. Each write's selection requires it, so an input without it is
-  refused as `invalid_input` before any request. The engine checks only that it
-  is present: the bundle records no list of allowed values, so any string or
-  integer, such as `""`, `NONE` or `0`, is sent to Google as given, and what
-  Google does with it is not documented. The issuer checks that it is one of
-  `all`, `externalOnly` or `none` before approving. The pinned document gives
+  refused as `invalid_input` before any request. The engine checks that it
+  is present and one of `all`, `externalOnly` or `none`, the values the pinned
+  document lists: any other string or integer, such as `""`, `NONE` or `0`, is
+  refused as `invalid_input` before any request, so nothing is approved for it.
+  The pinned document gives
   no default for patch and delete; for insert it says the default is false and that some emails might
   still be sent, and it warns that `none` "can have significant adverse
   effects, including events not syncing to external calendars or events being

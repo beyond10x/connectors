@@ -676,7 +676,7 @@ fn write_descriptions_name_their_effects_and_the_digest_binding() {
     assert!(missing.is_empty(), "descriptions omit {missing:#?}");
 }
 
-/// The guide says what the engine does not check about `sendUpdates`, how a
+/// The guide says what the engine checks about `sendUpdates`, how a
 /// rate-limited write is classified, and which operations truncate a guest
 /// list.
 #[test]
@@ -684,8 +684,8 @@ fn guide_states_what_the_engine_leaves_to_the_approver_and_the_caller() {
     let guide = guide();
     let flat = guide.split_whitespace().collect::<Vec<_>>().join(" ");
     for phrase in [
-        // `sendUpdates` is required, but its value is not checked.
-        "The issuer checks that it is one of `all`, `externalOnly` or `none` before approving.",
+        // `sendUpdates` is required, and its value is held to the three the document lists.
+        "The engine checks that it is present and one of `all`, `externalOnly` or `none`",
         // A write answered `429` is `unknown`, as the provider guide says.
         "A write that Google answers `429` is reported `unknown`",
         // Insert and patch take `maxAttendees` like the reads.
@@ -1288,22 +1288,20 @@ fn events_list_repeats_event_types() {
     );
 }
 
-/// The guide: the engine does not check an `eventTypes` value against the
-/// pinned document's enumeration (`connectors_catalog::inventory::Parameter`
-/// records no `enum`); an unknown type is sent, and Google answers it.
+/// The guide: the engine refuses an `eventTypes` value outside the pinned
+/// document's enumeration as `invalid_input`, and sends no request.
 #[test]
-fn events_list_sends_an_event_type_outside_the_enumeration() {
+fn events_list_refuses_an_event_type_outside_the_enumeration() {
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection()).unwrap();
-    invoke(
+    let before = provider.api_targets().len();
+    let refused = attempt(
         &mut child,
         "events.list",
-        json!({"calendarId": "primary", "eventTypes": ["default", "fixture-unknown"]}),
+        &json!({"calendarId": "primary", "eventTypes": ["default", "fixture-unknown"]}),
     );
-    assert_eq!(
-        provider.api_targets(),
-        ["/calendar/v3/calendars/primary/events?eventTypes=default&eventTypes=fixture-unknown"]
-    );
+    assert!(refused.is_err(), "an unknown event type was sent");
+    assert_eq!(provider.api_targets().len(), before, "a request was sent");
 }
 
 /// Walk one list from `input` following `nextPageToken`, and return the ids

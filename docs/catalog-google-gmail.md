@@ -99,8 +99,8 @@ end of a walk are in it.
   `minimal` or `raw`; `users.threads.get` takes `full`, `metadata` or
   `minimal`. `metadata` returns ids, labels and headers, narrowed by
   `metadataHeaders`, which is repeated like `labelIds`. `raw` returns the whole
-  message as one base64url string in `raw`. The engine does not check a value
-  against these lists: another value is sent, and Gmail answers it.
+  message as one base64url string in `raw`. The engine refuses a value
+  outside these lists as `invalid_input` before any request.
 - **Large messages and attachments.** `raw` cannot be narrowed: neither
   `metadataHeaders` nor `fields` shortens the one string, so a message whose
   encoded form is over the 4 MiB response limit cannot be read with `raw`. Read
