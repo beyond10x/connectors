@@ -529,3 +529,33 @@ fn mounted_reconnect_publishes_the_new_credential_as_repair_does() {
     );
     assert_eq!(answers[0], answers[1]);
 }
+
+/// story:tests-stop-the-owners-they-start: the owner a container's commands
+/// started does not outlive the container, which stops it on drop.
+#[test]
+fn a_container_stops_the_owner_it_started() {
+    let container = container("connectors-local/4", &Container::mounted());
+    success(&container.connect(PROFILE));
+    let root = container.path("/");
+    assert!(
+        !container.owners().is_empty(),
+        "the connect started an owner"
+    );
+    drop(container);
+    assert_eq!(owners_under(&root), Vec::<i32>::new());
+}
+
+/// The same when the test panics while the owner runs.
+#[test]
+fn a_panicking_test_still_stops_the_owner() {
+    let root = std::sync::Mutex::new(None);
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let container = container("connectors-local/4", &Container::mounted());
+        success(&container.connect(PROFILE));
+        *root.lock().unwrap() = Some(container.path("/"));
+        panic!("the test fails with the owner running");
+    }));
+    assert!(outcome.is_err());
+    let root = root.lock().unwrap().take().unwrap();
+    assert_eq!(owners_under(&root), Vec::<i32>::new());
+}
