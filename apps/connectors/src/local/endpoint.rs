@@ -515,6 +515,7 @@ fn configuration_lock(
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .custom_flags(0x0020_0000)
             .open(name)
             .map_err(|_| host_failure(Failure::MetadataUnavailable))?
