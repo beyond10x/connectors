@@ -1193,3 +1193,81 @@ fn the_local_service_declares_the_feed_from_its_operations_file() {
         .collect();
     assert_eq!(required, [CONTAINERS, ITEMS]);
 }
+
+/// A cursor feed answer that is not complete and does not advance the cursor (absent, empty, or
+/// the one sent) is `unavailable`, never a page whose watermark is unchanged.
+#[tokio::test]
+async fn a_cursor_answer_that_is_incomplete_and_does_not_advance_is_unavailable() {
+    let engine = build(&declaration("cursor.operations.json"), &[]).unwrap();
+    let read = |listed: Value, watermark: Option<&str>| {
+        let engine = &engine;
+        let http = Admitting {
+            known: true,
+            status: 200,
+            listed,
+            queries: Default::default(),
+        };
+        let mut input = json!({"container": "room", "limit": 10});
+        if let Some(watermark) = watermark {
+            input["watermark"] = json!(watermark);
+        }
+        async move { engine.read(&http, "feed-instance", ITEMS, input).await }
+    };
+    let issued = read(
+        json!({"changes": [], "cursor": "7", "has_more": false}),
+        None,
+    )
+    .await
+    .unwrap()["next_watermark"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    for (case, listed, watermark) in [
+        (
+            "absent, first read",
+            json!({"changes": [], "has_more": true}),
+            None,
+        ),
+        (
+            "empty, first read",
+            json!({"changes": [], "cursor": "", "has_more": true}),
+            None,
+        ),
+        (
+            "absent, resumed",
+            json!({"changes": [], "has_more": true}),
+            Some(issued.as_str()),
+        ),
+        (
+            "empty, resumed",
+            json!({"changes": [], "cursor": "", "has_more": true}),
+            Some(issued.as_str()),
+        ),
+        (
+            "the value sent",
+            json!({"changes": [], "cursor": "7", "has_more": true}),
+            Some(issued.as_str()),
+        ),
+    ] {
+        let error = read(listed, watermark).await.unwrap_err();
+        assert_eq!(
+            error.code,
+            connectors_core::ErrorCode::Unavailable,
+            "{case}"
+        );
+    }
+    let advanced = read(
+        json!({"changes": [], "cursor": "8", "has_more": true}),
+        Some(&issued),
+    )
+    .await
+    .unwrap();
+    assert_eq!(advanced["complete"], json!(false), "control");
+    let finished = read(
+        json!({"changes": [], "cursor": "7", "has_more": false}),
+        Some(&issued),
+    )
+    .await
+    .unwrap();
+    assert_eq!(finished["complete"], json!(true), "control");
+}
