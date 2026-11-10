@@ -235,3 +235,10 @@ Both variants are checked against a fixture in the pinned document's shapes
 (`adapters/catalog/tests/gitlab_mr_variants.rs`), not against a running GitLab. The pinned
 document declares `merge_when_pipeline_succeeds` on the merge request GitLab answers; that GitLab
 answers an accepted auto-merge with it `true` has not been observed against a running GitLab.
+
+## Support-table summary
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> GitLab API v4 from the pinned OpenAPI source; one bound request per operation, the provider's body unchanged; merge guarded by five declared checks, auto-merge and reopen by the pinned head with their fixed body value, discussion resolve by the requested, resolvable discussion and the answered id and state, tag and release writes by the caller's commit, tag delete proven by a 404 after, pipeline, commit, file and branch writes by the caller's commit (commit and file writes onto an existing branch only), branch delete proven by a 404 after, project create by the namespace path and id; commit, file and project bodies sent as JSON through a cited media-type correction; code search with `scope` held to `blobs`; issue creation, notes and replies unguarded; the host's permitted operation ids are the scope

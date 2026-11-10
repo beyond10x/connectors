@@ -266,3 +266,10 @@ its own `base_url`, and Grafana, not Connectors, decides which data sources the 
 The instance pins the executable's SHA-256. After rebuilding `connectors-grafana`, update `sha256`,
 stop the running incarnation (`instances stop`), then `connections revalidate` or reconnect the
 connection, which performs the admitted launch under the same connection id.
+
+## Support-table summary: Grafana
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> Grafana HTTP API, one `GET /api/datasources`; service-account token from keyring custody, proved with that same GET; records carry uid, name, type, access and default flag only. The IRM reads run under `grafana.irm_service_account` on a stack whose `irm_api_url` is configured, read only. A Loki or Prometheus data source is read through Grafana as a Loki or Prometheus connection on its proxy path; see [the Grafana guide](adapters/grafana/README.md)

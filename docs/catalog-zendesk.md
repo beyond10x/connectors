@@ -380,3 +380,10 @@ carries `Authorization: Basic base64(<email>/token:<API token>)`.
   time of its own before the invocation deadline, and otherwise returns it as a `rate_limited` refusal carrying that
   delay as `retry_after_seconds`
   ([Limits](local-catalog-provider.md#limits)).
+
+## Support-table summary
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> Zendesk Support API from the pinned OpenAPI document; two profiles, `zendesk.oauth` (OAuth client credentials) and `zendesk.basic` (API token), chosen per instance by `profile`; the incremental exports read from a `start_time`; the three ticket writes are refused as `conflict` unless the ticket's `updated_at` is the caller's stamp, a note and a draft reply are private comments; the writes are verified with `zendesk.basic` only; verified against a local fixture only, see [the Zendesk guide](docs/catalog-zendesk.md)

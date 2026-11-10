@@ -382,3 +382,10 @@ old pair with `connections revoke` and remove their entries.
   [the catalog provider guide](local-catalog-provider.md) says: only its
   documented definite refusals are refused, and among them a `403` naming one
   of those reasons is a `rate_limited` refusal.
+
+## Support-table summary
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> Calendar API v3 from the pinned Discovery document projected to OpenAPI; profile `google.oauth`, one instance per Google account consenting to `calendar.readonly` and `calendar.events`; `events.patch` and `events.delete` guarded by a preflight `events.get` (status `confirmed`, `etag` equal to the input's), `events.insert` unguarded; every write names `sendUpdates`; verified against a local fixture only, see [the Calendar guide](docs/catalog-google-calendar.md)
