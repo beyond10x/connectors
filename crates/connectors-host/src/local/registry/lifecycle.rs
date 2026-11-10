@@ -191,7 +191,13 @@ impl Registry {
         guard: Option<&super::reuse::ReuseGuard>,
     ) -> Result<String> {
         let prepared = stored.prepared;
-        self.transaction(now, false, |tx, _, now| {
+        #[cfg(debug_assertions)]
+        if std::env::var_os(PUBLICATION_FAILS_ONCE)
+            .is_some_and(|marker| std::fs::remove_file(marker).is_ok())
+        {
+            return Err(Failure::OutcomeUnknown);
+        }
+        let published = self.transaction(now, false, |tx, _, now| {
             if let Some(guard) = guard {
                 super::reuse::guarded(tx, guard)?;
             }
@@ -221,7 +227,15 @@ impl Registry {
             follow(tx, &row)?;
             bump(tx, &row.binding.instance_id)?;
             Ok(row.reference)
-        })
+        });
+        #[cfg(debug_assertions)]
+        if published.is_ok()
+            && std::env::var_os(PUBLICATION_REPLY_LOST_ONCE)
+                .is_some_and(|marker| std::fs::remove_file(marker).is_ok())
+        {
+            return Err(Failure::OutcomeUnknown);
+        }
+        published
     }
 
     /// Production composition of the separate physical and metadata boundaries.
@@ -661,6 +675,34 @@ fn allocate(
     create_acquisition(tx, authority, connection, fence, now)
 }
 
+/// The environment variable a test build's owner reads: milliseconds an
+/// acquisition stays in flight instead of [`ENTRY_MS`], a stand-in for the
+/// four-minute window of an acquisition whose outcome stayed unknown
+/// (tests/owner_recovers_after_failed_acquisition.rs).
+#[cfg(debug_assertions)]
+pub(crate) const ACQUISITION_MS: &str = "CONNECTORS_TEST_ACQUISITION_MS";
+/// The environment variable a test build's owner reads: the path of a file the
+/// first publication removes and, having removed it, answers `outcome_unknown`
+/// without committing, as a publication whose commit is not confirmed does.
+#[cfg(debug_assertions)]
+pub(crate) const PUBLICATION_FAILS_ONCE: &str = "CONNECTORS_TEST_PUBLICATION_FAILS_ONCE";
+
+/// As [`PUBLICATION_FAILS_ONCE`], after the publication committed: the answer
+/// is lost, not the commit.
+#[cfg(debug_assertions)]
+pub(crate) const PUBLICATION_REPLY_LOST_ONCE: &str = "CONNECTORS_TEST_PUBLICATION_REPLY_LOST_ONCE";
+
+fn acquisition_ms() -> u64 {
+    #[cfg(debug_assertions)]
+    if let Some(ms) = std::env::var(ACQUISITION_MS)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+    {
+        return ms;
+    }
+    ENTRY_MS
+}
+
 fn create_acquisition(
     tx: &Transaction<'_>,
     authority: Uuid,
@@ -679,7 +721,7 @@ fn create_acquisition(
     let id = qualified("acq", authority);
     let owner = new_id();
     tx.execute("INSERT INTO registry_acquisitions (acquisition_ref,connection_ref,owner_token,expected_fence,state,created_at_ms,expires_at_ms,generation_id,capture_id) VALUES (?1,?2,?3,?4,'pending',?5,?6,?7,?8)",
-        params![id,connection,owner,fence,timestamp(now)?,timestamp(deadline(now,ENTRY_MS)?)?,new_id(),new_id()]).map_err(db)?;
+        params![id,connection,owner,fence,timestamp(now)?,timestamp(deadline(now,acquisition_ms())?)?,new_id(),new_id()]).map_err(db)?;
     Ok(Acquisition {
         id,
         connection,

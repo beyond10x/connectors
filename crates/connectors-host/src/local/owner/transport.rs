@@ -1544,6 +1544,9 @@ fn spawn(
         "CONNECTORS_TEST_OAUTH_FOLLOW",
         START_DELAY,
         crate::local::metadata::VERIFICATION_LOG,
+        crate::local::registry::ACQUISITION_MS,
+        crate::local::registry::PUBLICATION_FAILS_ONCE,
+        crate::local::registry::PUBLICATION_REPLY_LOST_ONCE,
     ] {
         if let Some(value) = std::env::var_os(name) {
             command.env(name, value);
