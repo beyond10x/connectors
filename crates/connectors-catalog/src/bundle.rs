@@ -340,6 +340,14 @@ pub fn load(directory: &Path, provider: &str) -> Result<Bundle> {
         .find(provider)
         .ok_or_else(|| refuse(ErrorCode::NotFound, "index carries no such provider"))?;
     let path = directory.join(&entry.file_name);
+    let metadata = std::fs::symlink_metadata(&path)
+        .map_err(|_| refuse(ErrorCode::NotFound, "indexed bundle file is absent"))?;
+    if !metadata.is_file() {
+        return Err(refuse(
+            ErrorCode::InvalidInput,
+            "indexed bundle file is not a regular file",
+        ));
+    }
     let bytes = std::fs::read(&path)
         .map_err(|_| refuse(ErrorCode::NotFound, "indexed bundle file is absent"))?;
     if bytes.len() > BUNDLE_LIMIT {
