@@ -13,7 +13,7 @@
         "idempotency": "idempotent",
         "determinism": "nondeterministic",
         "bounds": {
-          "timeout_ms": {"max": 160000},
+          "timeout_ms": {"max": 30000},
           "output_bytes": {"max": 3145728}
         },
         "placement": "local",
@@ -32,7 +32,7 @@
         "idempotency": "idempotent",
         "determinism": "nondeterministic",
         "bounds": {
-          "timeout_ms": {"max": 160000},
+          "timeout_ms": {"max": 30000},
           "output_bytes": {"max": 3145728}
         },
         "subjects": [{"field": "urls", "kind": "url"}],
@@ -52,7 +52,7 @@
         "idempotency": "idempotent",
         "determinism": "nondeterministic",
         "bounds": {
-          "timeout_ms": {"max": 160000},
+          "timeout_ms": {"max": 30000},
           "output_bytes": {"max": 3145728}
         },
         "subjects": [{"field": "url", "kind": "url"}],

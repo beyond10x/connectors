@@ -48,7 +48,7 @@ told apart by identity, and a repair cannot detect that a key belongs to another
 | `fetch.urls` (1–20) | `POST /extract` `urls`, with `format: "markdown"`, `extract_depth: "basic"` |
 | page `url`, `content` | `results[].url`, `results[].raw_content`; `title` is null, Tavily gives none |
 | failure `url`, `reason` | `failed_results[].url`; `reason` is always `provider_refused`, and Tavily's `error` text is not passed on |
-| `crawl.url`, `limit` (1–100), `max_depth` (1–5), `max_breadth` (1–100), `select_paths`, `exclude_paths`, `allow_external`, `instructions` | `POST /crawl`, the parameters of the same names, with `format: "markdown"`, `extract_depth: "basic"`, `timeout: 12` |
+| `crawl.url`, `limit` (1–100), `max_depth` (1–5), `max_breadth` (1–100), `select_paths`, `exclude_paths`, `allow_external`, `instructions` | `POST /crawl`, the parameters of the same names, with `format: "markdown"`, `extract_depth: "basic"`, `timeout` (below) |
 
 A result or page without a `url` is dropped. Every other Tavily parameter (`search_depth` values
 other than `basic`, `topic: finance`, `include_answer`, `include_images`, `chunks_per_source`,
@@ -78,5 +78,10 @@ the input schema admits only the family's fields.
 
 No Tavily error text, request body or key enters an error. A `search` costs one search credit at
 `basic` depth; a `fetch` and a `crawl` cost extract credits per page Tavily reads (Tavily's
-published pricing, not checked by this adapter). A call ends at the caller's deadline, 30 s in the CLI and 20 s at the service (15 s for the provider request there); the transport's own 160 s ceiling never applies. The adapter sends a crawl `timeout` of 12 s,
-so Tavily ends a crawl before either cut. Tavily's answer to a crawl it cut short is not checked by this adapter.
+published pricing, not checked by this adapter). Tavily runs only on the local host, where a call
+ends at the caller's deadline, 30 s in the CLI; the transport's own 160 s ceiling never applies.
+The host passes that deadline with each call, and the adapter sends a crawl `timeout` of the time
+left to it less a 5 s margin for the transport and the answer, in whole seconds, so Tavily ends a
+crawl before the cut. Tavily accepts 10 to 150 s: when less than 15 s remain the adapter sends 10,
+and the transport still cuts the call at the deadline; when more than 155 s remain, or no deadline
+is given, it sends 150. Tavily's answer to a crawl it cut short is not checked by this adapter.
