@@ -514,7 +514,7 @@ fn declared(operation: &str, effect: Effect) -> connectors_core::Operation {
         .unwrap_or_else(|| panic!("`{operation}` is not a declared {effect:?}"))
 }
 fn request(method: &str, path: &str, body: Value) -> (String, String, Value) {
-    (method.to_owned(), format!("{PROJECT}/{path}?"), body)
+    (method.to_owned(), format!("{PROJECT}/{path}"), body)
 }
 fn encoded(name: &str) -> String {
     name.replace('/', "%2F")

@@ -417,21 +417,21 @@ fn reopen_input(iid: u64, sha: &str) -> Value {
 fn get(iid: u64) -> (String, String, Value) {
     (
         "GET".to_owned(),
-        format!("{PROJECT}/merge_requests/{iid}?"),
+        format!("{PROJECT}/merge_requests/{iid}"),
         Value::Null,
     )
 }
 fn put_merge(iid: u64) -> (String, String, Value) {
     (
         "PUT".to_owned(),
-        format!("{PROJECT}/merge_requests/{iid}/merge?"),
+        format!("{PROJECT}/merge_requests/{iid}/merge"),
         json!({"sha": HEAD, "auto_merge": true}),
     )
 }
 fn put_reopen(iid: u64) -> (String, String, Value) {
     (
         "PUT".to_owned(),
-        format!("{PROJECT}/merge_requests/{iid}?"),
+        format!("{PROJECT}/merge_requests/{iid}"),
         json!({"state_event": "reopen"}),
     )
 }

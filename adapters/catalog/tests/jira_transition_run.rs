@@ -417,7 +417,7 @@ fn run_input(key: &str, transition: &str, current: &str, target: &str) -> Value 
            "body": {"transition": {"id": transition}}})
 }
 fn issue_target(key: &str) -> String {
-    format!("/rest/api/3/issue/{key}?")
+    format!("/rest/api/3/issue/{key}")
 }
 fn transitions_target(key: &str, transition: &str) -> String {
     format!("/rest/api/3/issue/{key}/transitions?transitionId={transition}")
@@ -425,7 +425,7 @@ fn transitions_target(key: &str, transition: &str) -> String {
 fn post(key: &str, transition: &str) -> (String, String, Value) {
     (
         "POST".to_owned(),
-        format!("/rest/api/3/issue/{key}/transitions?"),
+        format!("/rest/api/3/issue/{key}/transitions"),
         json!({"transition": {"id": transition}}),
     )
 }

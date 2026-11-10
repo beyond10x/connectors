@@ -421,10 +421,10 @@ fn write(child: &mut Child, operation: &str, input: &Value) -> Result<WriteResul
     Ok(prepared.commit())
 }
 fn get(target: &str) -> (String, String, Value) {
-    ("GET".to_owned(), format!("{target}?"), Value::Null)
+    ("GET".to_owned(), target.to_string(), Value::Null)
 }
 fn sent(method: &str, target: &str, body: Value) -> (String, String, Value) {
-    (method.to_owned(), format!("{target}?"), body)
+    (method.to_owned(), target.to_string(), body)
 }
 fn issue_target(key: &str) -> String {
     format!("/rest/api/3/issue/{key}")

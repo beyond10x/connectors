@@ -715,8 +715,8 @@ fn connecting_records_the_configured_instance_as_the_identity() {
     assert_eq!(baseline.granted_scopes, None);
     let requests = provider.requests();
     assert_eq!(requests.len(), 1);
-    // The identity probe carries an empty query.
-    assert_eq!(requests[0].0, "/v2/alerts?");
+    // The identity probe carries no query.
+    assert_eq!(requests[0].0, "/v2/alerts");
     assert_eq!(requests[0].1.as_deref(), Some(HEADER));
     // A wrong key is answered 401 and refuses the connection.
     let wrong = Secret(serde_json::to_vec(&json!({"token": "wrong-key"})).unwrap());

@@ -401,9 +401,8 @@ fn an_approved_issue_create_sends_exactly_the_declared_request_and_body() {
         provider.requests(),
         [(
             "POST".to_owned(),
-            // The transport writes an empty query when no query parameter is
-            // bound, so the wire request ends in `?`.
-            format!("{ISSUES}?"),
+            // With no query parameter bound, the wire request has no `?`.
+            ISSUES.to_string(),
             issue_body()
         )]
     );

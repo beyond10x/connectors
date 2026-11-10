@@ -1221,20 +1221,19 @@ fn first_requests() -> [(&'static str, Value, &'static str); 8] {
         (
             "users.getProfile",
             json!({"userId": "me"}),
-            // The transport writes an empty query when no query parameter is
-            // bound, so the wire request ends in `?`.
-            "/gmail/v1/users/me/profile?",
+            // With no query parameter bound, the wire request has no `?`.
+            "/gmail/v1/users/me/profile",
         ),
         (
             "users.labels.list",
             json!({"userId": "me"}),
-            "/gmail/v1/users/me/labels?",
+            "/gmail/v1/users/me/labels",
         ),
         (
             "users.messages.attachments.get",
             json!({"userId": "me", "messageId": "fixture-message-1",
                    "id": "fixture-attachment-1"}),
-            "/gmail/v1/users/me/messages/fixture-message-1/attachments/fixture-attachment-1?",
+            "/gmail/v1/users/me/messages/fixture-message-1/attachments/fixture-attachment-1",
         ),
         (
             "users.messages.list",
@@ -1349,7 +1348,7 @@ fn messages_attachments_get_reads_a_part_named_by_a_full_message() {
         provider.api_targets(),
         [
             "/gmail/v1/users/me/messages/fixture-message-1?format=full",
-            "/gmail/v1/users/me/messages/fixture-message-1/attachments/fixture-attachment-1?",
+            "/gmail/v1/users/me/messages/fixture-message-1/attachments/fixture-attachment-1",
         ]
     );
 }
@@ -1488,7 +1487,7 @@ fn history_list_walks_two_pages_from_the_profile_baseline() {
     assert_eq!(
         provider.api_targets(),
         [
-            "/gmail/v1/users/me/profile?",
+            "/gmail/v1/users/me/profile",
             "/gmail/v1/users/me/history?maxResults=2&startHistoryId=1000",
             "/gmail/v1/users/me/history?maxResults=2&pageToken=fixture-history-page-2\
              &startHistoryId=1000",
@@ -1835,7 +1834,7 @@ fn users_drafts_send_of_a_changed_draft_fails_the_preflight_and_sends_nothing() 
     let mut child = Child::spawn(&provider.write_selection()).unwrap();
     let operation = "users.drafts.send";
     let [_, (_, current)] = write_inputs();
-    let draft = "/gmail/v1/users/me/drafts/fixture-draft-1?";
+    let draft = "/gmail/v1/users/me/drafts/fixture-draft-1";
 
     let mut stale = current.clone();
     stale["messageId"] = json!(STALE_MESSAGE);
@@ -1873,7 +1872,7 @@ fn users_drafts_send_of_a_changed_draft_fails_the_preflight_and_sends_nothing() 
     );
     assert_eq!(
         provider.api_targets()[1..],
-        ["/gmail/v1/users/me/drafts/fixture-draft-gone?"]
+        ["/gmail/v1/users/me/drafts/fixture-draft-gone"]
     );
     assert!(provider.bodies().is_empty(), "a write was sent");
 
@@ -1887,12 +1886,12 @@ fn users_drafts_send_of_a_changed_draft_fails_the_preflight_and_sends_nothing() 
     );
     assert_eq!(
         provider.api_targets()[2..],
-        [draft, "/gmail/v1/users/me/drafts/send?"]
+        [draft, "/gmail/v1/users/me/drafts/send"]
     );
     assert_eq!(
         provider.bodies(),
         [(
-            "/gmail/v1/users/me/drafts/send?".to_owned(),
+            "/gmail/v1/users/me/drafts/send".to_owned(),
             json!({"id": DRAFT})
         )]
     );
@@ -1966,11 +1965,11 @@ fn users_drafts_create_sends_one_post_with_its_body_and_no_preflight() {
     assert_eq!(value["body"], posted("/gmail/v1/users/me/drafts").unwrap());
     assert!(value["body"]["id"].is_string());
     assert!(value["body"]["message"]["id"].is_string());
-    assert_eq!(provider.api_targets(), ["/gmail/v1/users/me/drafts?"]);
+    assert_eq!(provider.api_targets(), ["/gmail/v1/users/me/drafts"]);
     assert_eq!(
         provider.bodies(),
         [(
-            "/gmail/v1/users/me/drafts?".to_owned(),
+            "/gmail/v1/users/me/drafts".to_owned(),
             input["body"].clone()
         )]
     );

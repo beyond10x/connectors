@@ -459,12 +459,8 @@ async fn the_review_names_the_configured_audience() {
     assert_eq!(reviews.len(), 1);
     let sent = &reviews[0];
     assert_eq!(sent.method, "POST");
-    // The fixed review path with no query (the shared client writes an empty
-    // one as a bare `?`).
-    assert_eq!(
-        sent.path.strip_suffix('?').unwrap_or(&sent.path),
-        REVIEW_PATH
-    );
+    // The fixed review path with no query and no `?`.
+    assert_eq!(sent.path, REVIEW_PATH);
     assert_eq!(
         sent.authorization.as_deref(),
         Some(bearer(INSTANCE_TOKEN).as_str())
