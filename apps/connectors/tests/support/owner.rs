@@ -1,5 +1,8 @@
 //! A directly started `__connectors-owner`: where its standard error goes, and
 //! the wait for its socket, which fails with the owner's own refusal.
+#[allow(clippy::duplicate_mod)]
+#[path = "reap.rs"]
+pub mod reap;
 use std::{
     fs::File,
     path::{Path, PathBuf},
@@ -37,4 +40,38 @@ pub fn wait_listening(owner: &mut Child, root: &Path) {
         }
         std::thread::sleep(Duration::from_millis(20));
     }
+}
+
+/// Starts `binary`'s `__connectors-owner` for `root` (`root/config/config.toml`,
+/// `root/state`, which must exist) the way the CLI does: startup channel on
+/// descriptor 3, lifetime lock on descriptor 4. Returns once it listens. The
+/// caller owns the child and stops it.
+#[cfg(unix)]
+#[allow(dead_code)]
+pub fn spawn(binary: &Path, root: &Path) -> Child {
+    use std::os::unix::{fs::OpenOptionsExt, net::UnixStream};
+    let state = root.join("state");
+    let lock = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .mode(0o600)
+        .open(state.join("owner.lock"))
+        .unwrap();
+    let (startup, owner_end) = UnixStream::pair().unwrap();
+    let mut owner = std::process::Command::new("/bin/sh")
+        .arg("-c")
+        .arg(r#"exec "$0" __connectors-owner "$1" "$2" 3<&0 4<&1 </dev/null >/dev/null"#)
+        .arg(binary)
+        .arg(root.join("config/config.toml"))
+        .arg(&state)
+        .stdin(Stdio::from(std::os::fd::OwnedFd::from(owner_end)))
+        .stdout(Stdio::from(lock))
+        .stderr(stderr(root))
+        .spawn()
+        .unwrap();
+    drop(startup);
+    wait_listening(&mut owner, root);
+    owner
 }

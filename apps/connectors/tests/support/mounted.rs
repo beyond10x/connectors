@@ -15,6 +15,10 @@ use connectors_custody::mounted::fixture::{Jail, Map};
 use connectors_host::local::{registry, runtime};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+#[allow(clippy::duplicate_mod)]
+#[path = "reap.rs"]
+pub mod reap;
+pub use reap::owners_under;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
@@ -233,10 +237,25 @@ pub fn serve_when_child() {
 }
 
 /// One jail with the CLI, the adapter, a configuration and a custody source.
+/// Dropping it, on a pass or a panic, stops every owner its commands started.
 pub struct Container {
     pub jail: Jail,
     adapter_digest: String,
     adapter_args: Vec<String>,
+}
+
+impl Drop for Container {
+    /// The owner-stop route first, then a kill of the owners' process groups.
+    fn drop(&mut self) {
+        let root = self.path("/");
+        reap::under(&root, || {
+            let mut stop = self.jail.command("/bin-test/connectors", Map::Own);
+            stop.args(["--config", CONFIG, "--state-dir", STATE])
+                .args(["setup", "owner-stop"])
+                .env_clear();
+            reap::owner_stop(&mut stop);
+        });
+    }
 }
 
 impl Container {
@@ -273,6 +292,11 @@ impl Container {
                 CONNECTOR.into(),
             ],
         }
+    }
+
+    /// The owners this container's jail runs.
+    pub fn owners(&self) -> Vec<i32> {
+        owners_under(&self.path("/"))
     }
 
     /// The host path of a path inside the jail.

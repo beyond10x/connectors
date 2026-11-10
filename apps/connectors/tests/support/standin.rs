@@ -25,6 +25,9 @@
 use connectors_host::local::{registry, runtime};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+#[allow(clippy::duplicate_mod)]
+#[path = "reap.rs"]
+mod reap;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
@@ -389,6 +392,13 @@ fn private_file(path: &Path, bytes: &[u8], mode: u32) {
 /// binary as `connectors-catalog-provider`.
 pub struct Installation {
     pub root: tempfile::TempDir,
+}
+
+impl Drop for Installation {
+    /// Stops the owner the installation's commands started, before the root goes.
+    fn drop(&mut self) {
+        reap::under_root(self.root.path(), &self.root.path().join("bin/connectors"));
+    }
 }
 
 impl Installation {

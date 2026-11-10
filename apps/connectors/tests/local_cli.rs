@@ -14,6 +14,20 @@ use std::{
     process::{Command, Output},
 };
 
+/// A temporary root; where owners may run it stops them when it drops.
+#[cfg(unix)]
+type TempRoot = owner_start::reap::Root;
+#[cfg(unix)]
+fn tempdir() -> owner_start::reap::Root {
+    owner_start::reap::Root::new()
+}
+#[cfg(not(unix))]
+type TempRoot = tempfile::TempDir;
+#[cfg(not(unix))]
+fn tempdir() -> tempfile::TempDir {
+    tempfile::tempdir().unwrap()
+}
+
 /// A directory holding no executable. An entry's executable is an absolute local
 /// path (`contracts/cli/v1alpha1/semantics.md` §3), and on Windows an absolute path
 /// names its drive: `/not-installed` there is refused as `invalid_configuration`.
@@ -78,8 +92,8 @@ fn clock_configuration(original: &str, table: &str) -> String {
 }
 
 /// A set-up root whose `[approval_clock]` is `table`.
-fn clock_root(table: &str) -> tempfile::TempDir {
-    let root = tempfile::tempdir().unwrap();
+fn clock_root(table: &str) -> TempRoot {
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let original = fs::read_to_string(&config_path).unwrap();
@@ -322,7 +336,7 @@ fn clock_check_legacy_format_refusal() {
 
 #[test]
 fn production_parser_initializes_and_inspects_across_processes() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     assert_eq!(
         success(&command(&root, &["setup", "init"]))["disposition"],
         "created"
@@ -363,7 +377,7 @@ fn setup_reports_the_build_platform_and_its_custody_backend() {
     } else {
         ("windows", "windows_credential_manager")
     };
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     assert_eq!(success(&command(&root, &["setup", "init"]))["os"], os);
     let check = success(&command(&root, &["setup", "check"]));
     assert_eq!(check["os"], os);
@@ -372,7 +386,7 @@ fn setup_reports_the_build_platform_and_its_custody_backend() {
 
 #[test]
 fn setup_init_admits_an_adapter_entry_that_selects_its_private_protocol() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
@@ -409,7 +423,7 @@ fn configured_entry(root: &tempfile::TempDir, format: &str, private_protocol: &s
 /// any owner starts, metadata opens or a credential is read.
 #[test]
 fn a_platform_binding_refuses_a_connect_with_no_protected_source() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     configured_entry(
         &root,
         "connectors-local/2",
@@ -448,7 +462,7 @@ fn a_private_protocol_that_contradicts_the_format_is_refused_naming_format_and_e
         ),
         ("connectors-local/2", ""),
     ] {
-        let root = tempfile::tempdir().unwrap();
+        let root = tempdir();
         configured_entry(&root, format, private_protocol);
         let output = command(&root, &["instances", "list"]);
         assert_eq!(output.status.code(), Some(2), "{format}");
@@ -465,7 +479,7 @@ fn a_private_protocol_that_contradicts_the_format_is_refused_naming_format_and_e
         );
     }
     // Any other invalid entry keeps the uncoordinated refusal.
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     configured_entry(
         &root,
         "connectors-local/2",
@@ -483,7 +497,7 @@ fn a_private_protocol_that_contradicts_the_format_is_refused_naming_format_and_e
 
 #[test]
 fn inventory_and_unavailable_status_never_launch_configured_executable() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
@@ -613,16 +627,32 @@ fn inventory_and_unavailable_status_never_launch_configured_executable() {
     }
 }
 
+/// story:tests-stop-the-owners-they-start: a test root stops the owners run
+/// under it when it drops, though the test let go of its handle on the owner.
+#[cfg(unix)]
+#[test]
+fn a_root_stops_the_owner_run_under_it() {
+    let root = tempdir();
+    success(&command(&root, &["setup", "init"]));
+    let path = root.path().to_owned();
+    let owner = owner_start::spawn(
+        std::path::Path::new(env!("CARGO_BIN_EXE_connectors")),
+        &path,
+    );
+    assert!(!owner_start::reap::owners_under(&path).is_empty());
+    // The test loses its handle on the owner, as a CLI-started owner has none.
+    std::mem::forget(owner);
+    drop(root);
+    assert_eq!(owner_start::reap::owners_under(&path), Vec::<i32>::new());
+}
+
 /// The test's own owner child; a failing assertion must not leave it serving.
 #[cfg(unix)]
 struct OwnerProcess(std::process::Child);
 #[cfg(unix)]
 impl Drop for OwnerProcess {
     fn drop(&mut self) {
-        if self.0.try_wait().ok().flatten().is_none() {
-            let _ = self.0.kill();
-            let _ = self.0.wait();
-        }
+        owner_start::reap::child(&mut self.0);
     }
 }
 
@@ -732,7 +762,7 @@ fn other_build(root: &tempfile::TempDir) -> std::path::PathBuf {
 #[cfg(unix)]
 #[test]
 fn a_cli_refuses_an_owner_running_a_different_build_and_leaves_it_running() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
@@ -870,7 +900,7 @@ fn setup_owner_stop_without_an_owner_answers_no_owner_and_starts_nothing() {
     assert_eq!(gone["disposition"], "no_owner", "{gone}");
     assert!(!state.join("owner.sock").exists(), "an owner was started");
 
-    let missing = tempfile::tempdir().unwrap();
+    let missing = tempdir();
     success(&command(&missing, &["setup", "init"]));
     fs::remove_dir_all(missing.path().join("state")).unwrap();
     let absent = stop(&missing);
@@ -950,8 +980,8 @@ fn setup_owner_stop_refuses_an_owner_that_does_not_answer_and_never_signals_it()
 
 /// Config with one adapter whose executable is never launched by `instances status`.
 #[cfg(unix)]
-fn adversary_owner_root() -> tempfile::TempDir {
-    let root = tempfile::tempdir().unwrap();
+fn adversary_owner_root() -> TempRoot {
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
@@ -968,7 +998,7 @@ fn adversary_owner_root() -> tempfile::TempDir {
 /// of `root` (same authority, same configuration path) while `root`'s socket
 /// path stays free for a relay.
 #[cfg(unix)]
-fn adversary2_owner_root(root: &tempfile::TempDir) -> tempfile::TempDir {
+fn adversary2_owner_root(root: &tempfile::TempDir) -> TempRoot {
     use std::os::unix::fs::DirBuilderExt;
     fn copy(from: &std::path::Path, to: &std::path::Path) {
         fs::DirBuilder::new().mode(0o700).create(to).unwrap();
@@ -982,7 +1012,7 @@ fn adversary2_owner_root(root: &tempfile::TempDir) -> tempfile::TempDir {
             }
         }
     }
-    let owner_root = tempfile::tempdir().unwrap();
+    let owner_root = tempdir();
     copy(&root.path().join("state"), &owner_root.path().join("state"));
     owner_root
 }
@@ -1247,7 +1277,7 @@ fn an_owner_answers_a_greeting_sent_after_the_connection_settled() {
 #[cfg(unix)]
 #[test]
 fn a_same_build_owner_at_its_client_limit_answers_capacity_not_another_build() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
@@ -1270,7 +1300,7 @@ fn a_same_build_owner_at_its_client_limit_answers_capacity_not_another_build() {
 
 #[test]
 fn protected_sources_are_not_consumed_before_configuration_admission() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     let output = command(
         &root,
         &[
@@ -1684,7 +1714,7 @@ fn a_connected_client_keeps_an_owner_past_its_idle_bound() {
 /// custody, which here names a Secret Service socket that does not exist.
 #[test]
 fn adversary_a_permitted_profile_with_no_protected_source_is_refused_before_the_owner() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     configured_entry(
         &root,
         "connectors-local/2",
@@ -1758,7 +1788,7 @@ fn start_failure_fixture() {
 #[cfg(unix)]
 #[test]
 fn instances_status_names_why_a_program_did_not_start() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let program = std::env::current_exe().unwrap().canonicalize().unwrap();
@@ -1866,7 +1896,7 @@ fn private_protocol_one_only_fixture() {
 #[cfg(unix)]
 #[test]
 fn status_names_a_program_refusing_the_private_protocol() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let program = std::env::current_exe().unwrap().canonicalize().unwrap();
@@ -1924,7 +1954,7 @@ fn status_names_a_program_refusing_the_private_protocol() {
 #[cfg(unix)]
 #[test]
 fn adversary_status_after_reconfiguring_names_the_protocol_actually_refused() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let program = std::env::current_exe().unwrap().canonicalize().unwrap();

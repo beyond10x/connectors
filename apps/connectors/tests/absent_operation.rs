@@ -301,8 +301,7 @@ struct OwnerProcess(std::process::Child);
 #[cfg(unix)]
 impl Drop for OwnerProcess {
     fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
+        owner_start::reap::child(&mut self.0);
     }
 }
 
