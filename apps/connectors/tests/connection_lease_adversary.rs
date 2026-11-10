@@ -168,15 +168,18 @@ fn adversary_a_revalidation_during_a_reads_recollection_joins_it_within_the_boun
 /// evidence: when it fails with anything but such a credential refusal (the
 /// provider or custody briefly unavailable, a timeout), the read is served on
 /// the evidence it was admitted on, for as long as that evidence stays
-/// current". Evidence of 20 s, read 11 s after its revalidation, has about 9 s
+/// current". Evidence of 60 s, read 31 s after its revalidation, has about 29 s
 /// left. The provider's identity probe now hangs (40 s). The optional early
 /// recollection is bounded by the read's deadline (at most 30 s), not by the
 /// evidence it was admitted on, so it outlives that evidence and the read,
 /// which a provider serving reads could have answered on its current evidence,
-/// is lost to the probe.
+/// is lost to the probe. The lifetime is long because the relaunch after the
+/// hung probe has half of what is left (about 14 s), and the test adapter is
+/// this 133 MB binary: the margin must outlast its start and handshake on a
+/// loaded host.
 #[test]
 fn adversary_a_hanging_early_recollection_does_not_cost_a_read_its_current_evidence() {
-    const LIFETIME_MS: u64 = 20_000;
+    const LIFETIME_MS: u64 = 60_000;
     let (container, connection, revision) = connected();
     container.set_knob("evidence_ms", LIFETIME_MS);
     success(&container.revalidate(&connection, &revision));
