@@ -116,7 +116,7 @@ impl Registry {
             baseline.validate(&row.binding, acquired.consumed.ok_or(Failure::MetadataUnavailable)?, now)?;
             if row.identity.as_ref().is_some_and(|old| old!=&baseline.identity) { return Err(Failure::IdentityMismatch); }
             let retained: i64 = tx.query_row("SELECT count(*) FROM registry_materials WHERE connection_ref=?1 AND deleted=0", [&row.reference], |r| r.get(0)).map_err(db)?;
-            if retained>=8 { return Err(Failure::Capacity); }
+            if retained>=super::refresh::retained_bound() { return Err(Failure::Capacity); }
             let version_id = new_id();
             tx.execute("INSERT INTO registry_generations VALUES (?1,?2,?3,?4)", params![acquired.generation,row.reference,acquired.capture,encode(&baseline.identity)?]).map_err(db)?;
             tx.execute("INSERT INTO registry_materials (version_id,connection_ref,acquisition_ref,generation_id,byte_size) VALUES (?1,?2,?3,?4,?5)", params![version_id,row.reference,claim.acquisition.id,acquired.generation,byte_size as i64]).map_err(db)?;
