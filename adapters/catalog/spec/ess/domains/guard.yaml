@@ -33,6 +33,11 @@ types:
   # member, so the engine refuses those two literals on every check when the selection loads, and
   # a boolean is compared with `boolean`.
   #
+  # An `input` that names a JSON boolean (a typed body member such as `resolved`) compares as
+  # `boolean` does: the observed value must be exactly that JSON boolean, so the string `"true"`
+  # a provider might answer for a requested `true` differs, before the write refused and after
+  # it unknown. An `input` that names a string or a number keeps comparing as text.
+  #
   # `present`, only `true`, compares nothing: the observed member must exist and must not be
   # `null`, whatever its value. It is for an answer that names what the write made, whose value
   # is not known before the write, such as the `id` and `key` of the issue Jira's `createIssue`

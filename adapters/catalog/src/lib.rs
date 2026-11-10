@@ -2010,11 +2010,13 @@ impl Engine {
                     .iter()
                     .map(|check| {
                         let value = match &check.expect {
-                            Expectation::Input(path) => Pinned::Text(
-                                reference(&input, path).and_then(scalar).ok_or_else(|| {
+                            Expectation::Input(path) => match reference(&input, path) {
+                                // A JSON boolean input compares by type, as `boolean` does.
+                                Some(Value::Bool(flag)) => Pinned::Boolean(*flag),
+                                given => Pinned::Text(given.and_then(scalar).ok_or_else(|| {
                                     refuse(format!("guard expects input `{path}`, which is absent"))
-                                })?,
-                            ),
+                                })?),
+                            },
                             Expectation::Literal(text) => Pinned::Text(text.clone()),
                             Expectation::Boolean(flag) => Pinned::Boolean(*flag),
                             Expectation::Present(_) => Pinned::Present,

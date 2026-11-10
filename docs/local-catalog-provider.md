@@ -1056,7 +1056,10 @@ The complete configuration used against the sandbox is
   `issue.create` answers. An absent member fails it exactly as a `null` one
   does, so before the write both refuse with the same code. `present` is only `true`; `false` is refused when
   the selection loads. The model's `connectors_catalog.guard.Expectation`
-  holds exactly one of the four. A `literal` of `"true"` or `"false"` is refused when the selection
+  holds exactly one of the four. An `input` that names a JSON boolean compares
+  by JSON type, as `boolean` does, so a string `"true"` answered for a requested
+  `true` differs; an `input` naming a string or a number keeps comparing as
+  text. A `literal` of `"true"` or `"false"` is refused when the selection
   loads, on every check: the bundle does not record an answer member's type,
   and as text it would hold for a look-alike string where a boolean is meant.
   GitLab's `/resolvable` and `/merge_when_pipeline_succeeds` and Jira's
