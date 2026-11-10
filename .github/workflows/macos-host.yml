@@ -105,7 +105,7 @@ jobs:
           date -v-1S '+%Y-%m-%d %H:%M:%S' > "$RUNNER_TEMP/span-journey-start"
           cargo test --locked -p connectors-grafana --test local_runtime -- --exact \
             cli_journey::grafana_cli_connects_with_a_service_account_token_and_lists_datasources_with_the_login_keychain \
-            --nocapture 2>&1 | tee "$log" || true
+            --include-ignored --nocapture 2>&1 | tee "$log" || true
           date -v+1S '+%Y-%m-%d %H:%M:%S' > "$RUNNER_TEMP/span-journey-end"
           grep -q 'test result: ok. 1 passed' "$log"
       - name: Login keychain writes from a launch copy, left on disk and removed after start

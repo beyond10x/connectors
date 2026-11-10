@@ -2,8 +2,10 @@
 //! "macOS platform guarantees").
 //!
 //! - [`capture`]: `sealed_executable` holds only as `owner_private_copy`.
-//! - [`launch_path`]: the copy is executed by its path, then removed; an
-//!   [`Image`] dropped before its launch, or before it was [`sent`], removes it.
+//! - [`launch_path`]: the copy is executed by its path, then removed by its
+//!   [`Launch`], except the owner's, which [`Launch::leave`] hands to the owner
+//!   ([`own_copy`]) to remove when it stops serving; an [`Image`] dropped before
+//!   its launch, or before it was [`sent`], removes it.
 //! - [`ExactChild`]: `exact_process_signal` holds only as `child_reap_lock`.
 use super::super::{Failure, Result};
 use sha2::{Digest, Sha256};
@@ -793,6 +795,54 @@ mod tests {
         drop(launched);
         assert!(image.exists(), "launch_path removed a file it did not make");
         assert!(refused, "launch_path admitted a file it did not make");
+    }
+
+    /// The variable that makes this test binary, started from its launch copy,
+    /// the child of [`an_owner_started_from_its_launch_copy_finds_and_removes_it`].
+    const OWN_COPY_CHILD: &str = "CONNECTORS_HOST_OWN_COPY_CHILD";
+
+    /// The owner removes its own launch copy when it stops serving
+    /// (`serve_with_read_policy` holds `own_copy()`). This starts this test
+    /// binary from a launch copy as the CLI starts the owner and leaves the
+    /// copy to it; the child must find its copy with `own_copy()` and, once it
+    /// drops it, the copy and its directory are gone.
+    #[test]
+    fn an_owner_started_from_its_launch_copy_finds_and_removes_it() {
+        if std::env::var_os(OWN_COPY_CHILD).is_some() {
+            let copy = own_copy();
+            assert!(copy.is_some(), "the launch copy was not recognised");
+            drop(copy);
+            return;
+        }
+        let binary = std::env::current_exe().unwrap();
+        let hash = hex::encode(Sha256::digest(std::fs::read(&binary).unwrap()));
+        let snapshot = capture(File::open(&binary).unwrap(), &hash, until()).unwrap();
+        let launch = launch_path(&snapshot).unwrap();
+        let copy = launch.path().to_path_buf();
+        let output = std::process::Command::new(&copy)
+            .args([
+                "--exact",
+                "local::runtime::artifact::macos::tests::an_owner_started_from_its_launch_copy_finds_and_removes_it",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(OWN_COPY_CHILD, "1")
+            .output()
+            .unwrap();
+        launch.leave();
+        drop(snapshot);
+        let directory = copy.parent().unwrap().to_path_buf();
+        let present = directory.exists();
+        if present {
+            discard(&copy);
+        }
+        assert!(
+            output.status.success(),
+            "the child failed: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!present, "the owner left its launch copy {directory:?}");
     }
 
     /// A launch left to the process it launched keeps the copy on disk after

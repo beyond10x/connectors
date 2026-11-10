@@ -139,7 +139,9 @@ unsafe extern "C" {
 /// The access is created with an empty trusted-application array, not NULL.
 /// NULL asks the Security framework to trust "the calling application", which
 /// it derives from the calling executable on disk; the owner runs from a
-/// private copy the CLI removes once the owner has answered, so that lookup
+/// private copy, which it keeps on disk for its whole run: a creating process
+/// whose executable is gone gets `OSStatus` 100002 (ENOENT) from `SecItemAdd`
+/// (macOS CI, `macos_login_keychain_writes_from_a_launch_copy_...`). The lookup
 /// can fail and the write would answer `Unavailable` (inferred from the first
 /// macOS CI run, where the owner's first saving connect answered
 /// `custody_unavailable` while the custody contract test passed from a binary
