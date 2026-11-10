@@ -509,63 +509,36 @@ fn authored_scenarios(root: &Path, ess: &Path, temp: &Path) -> Result<()> {
             .map_err(|error| format!("authored execution wrote no report ({status}): {error}"))?,
     )?;
     let passed = authored_execution(&outcomes["outcomes"], collected)?;
-    println!(
-        "gate: executed {collected} authored scenarios, {passed} passed, {} known failing; exit=0",
-        collected - passed
-    );
+    if passed == collected {
+        println!("gate: executed {collected} authored scenarios, {passed} passed; exit=0");
+    } else {
+        println!(
+            "gate: executed {collected} authored scenarios, {passed} passed, {} known failing; exit=0",
+            collected - passed
+        );
+    }
     Ok(())
 }
 
-/// Authored scenarios that fail when the pinned ESS interpreter executes them, measured with
-/// 0.59.0 on 2026-10-16 when the gate first executed authored traces, and the same 34 under
-/// 0.67.0 on 2026-10-21, 0.68.0 on 2026-10-23, 0.69.2 on 2026-10-26, 0.72.0, 0.74.0 and 0.75.0 on 2026-10-28, 0.77.0 on 2026-10-29, 0.84.0 on 2026-11-03,
-/// 0.86.0 on 2026-11-04, 0.87.0 on 2026-11-06.
-/// Each needs its owner's triage; none is waived silently. Most claim an error field this ess/18
-/// model never fills (`state`, `reason`: an error's fields need payload sources, ess/19); the
-/// mutations traces also expect outcomes the model answers differently (`subject-missing`,
-/// `wrong-state`). A listed scenario that starts passing fails the gate too, so the list cannot
-/// outlive its cause.
-const AUTHORED_KNOWN_FAILING: &[&str] = &[
-    "connectors.credential_evidence/authored/configured-replacement-identity",
-    "connectors.credential_evidence/authored/retained-lineage-expires-before-dispatch",
-    "connectors.credential_evidence/authored/revocation-before-dispatch",
-    "connectors.credential_evidence/authored/rotation-before-dispatch",
-    "connectors.credential_evidence/authored/same-identity-refresh",
-    "connectors.credential_evidence/authored/unvalidated-configured-replacement",
-    "connectors.idempotency/authored/idempotency-known-result-expiry",
-    "connectors.idempotency/authored/idempotency-namespace-values",
-    "connectors.idempotency/authored/idempotency-pending-no-expiry",
-    "connectors.idempotency/authored/idempotency-unknown-no-expiry",
-    "connectors.mutations/authored/deadline-after-gate",
-    "connectors.mutations/authored/deadline-before-gate",
-    "connectors.mutations/authored/definitive-refusal",
-    "connectors.mutations/authored/definitive-success",
-    "connectors.mutations/authored/indeterminate-is-terminal",
-    "connectors.mutations/authored/recovery-after-gate",
-    "connectors.mutations/authored/recovery-before-gate",
-    "connectors.refresh/authored/authorization-wins-fence-race",
-    "connectors.refresh/authored/authorized-owner-loss-no-second-exchange",
-    "connectors.refresh/authored/binding-replacement-before-publication",
-    "connectors.refresh/authored/durable-response-wins-owner-loss-race",
-    "connectors.refresh/authored/expired-candidate-before-publication",
-    "connectors.refresh/authored/late-response-after-quarantine",
-    "connectors.refresh/authored/published-reply-loss-no-reexchange",
-    "connectors.refresh/authored/recovery-owner-loss-never-reopens-source",
-    "connectors.refresh/authored/reserved-owner-fenced-before-successor",
-    "connectors.refresh/authored/revocation-before-authorization",
-    "connectors.refresh/authored/revocation-before-publication",
-    "connectors.refresh/authored/stored-response-recovery-rejects-stale-publisher",
-    "connectors.refresh/authored/two-replicas-one-authorization",
-    "connectors.sessions/authored/graceful-stdin-close-ends-the-session",
-    "connectors.sessions/authored/partial-result-never-reported-complete",
-    "connectors.sessions/authored/transport-drop-loses-the-session",
-    "connectors.sessions/authored/unsupported-version-denies-readiness",
-];
+/// Authored scenarios that fail when the pinned ESS interpreter executes them. Empty: every
+/// authored scenario passes, and a scenario that fails fails the gate. An entry needs its
+/// owner's triage and a story; none is waived silently. A listed scenario that starts passing
+/// fails the gate too, so the list cannot outlive its cause.
+const AUTHORED_KNOWN_FAILING: &[&str] = &[];
 
 /// Holds an `ess-conformance-run/2` report's `outcomes` to the authored scenarios the gate
 /// collected: every one ran, every one not in [`AUTHORED_KNOWN_FAILING`] passed, and every
 /// listed one still failed. Returns the number that passed.
 fn authored_execution(outcomes: &serde_json::Value, collected: usize) -> Result<usize> {
+    authored_execution_with(outcomes, collected, AUTHORED_KNOWN_FAILING)
+}
+
+/// [`authored_execution`] against an explicit known-failing list.
+fn authored_execution_with(
+    outcomes: &serde_json::Value,
+    collected: usize,
+    known_failing: &[&str],
+) -> Result<usize> {
     let names = |status: &str| -> Result<Vec<String>> {
         outcomes[status]
             .as_array()
@@ -589,11 +562,11 @@ fn authored_execution(outcomes: &serde_json::Value, collected: usize) -> Result<
         }
     }
     for name in &failed {
-        if !AUTHORED_KNOWN_FAILING.contains(&name.as_str()) {
+        if !known_failing.contains(&name.as_str()) {
             problems.push(format!("failed: {name}"));
         }
     }
-    for name in AUTHORED_KNOWN_FAILING {
+    for name in known_failing {
         if passed.iter().any(|passed| passed == name) {
             problems.push(format!("passes but is listed as known failing: {name}"));
         } else if !failed.iter().any(|failed| failed == name) {
@@ -614,7 +587,9 @@ fn authored_execution(outcomes: &serde_json::Value, collected: usize) -> Result<
 
 #[cfg(test)]
 mod authored_execution_tests {
-    use super::{AUTHORED_KNOWN_FAILING, authored_execution, authored_scenarios};
+    use super::{
+        AUTHORED_KNOWN_FAILING, authored_execution, authored_execution_with, authored_scenarios,
+    };
     use serde_json::json;
     use std::path::Path;
 
@@ -629,18 +604,35 @@ mod authored_execution_tests {
         authored_scenarios(&root, &ess, temp.path()).unwrap();
     }
 
+    /// Every authored scenario passes when executed: none is waived as a known failure, and the
+    /// pinned ESS interpreter reports no failed, errored, unsupported or skipped one.
+    #[test]
+    fn no_authored_scenario_is_waived_as_known_failing() {
+        assert!(
+            AUTHORED_KNOWN_FAILING.is_empty(),
+            "authored scenarios still waived: {AUTHORED_KNOWN_FAILING:#?}"
+        );
+    }
+
+    /// Names a real-shaped list so the mechanism is held without waiving any scenario.
+    const WAIVED: &[&str] = &[
+        "connectors.refresh/authored/waived-a",
+        "connectors.refresh/authored/waived-b",
+    ];
+
     fn report(passed: &[&str], failed: &[&str]) -> serde_json::Value {
         json!({"passed": passed, "failed": failed, "error": [], "unsupported": [], "skipped": []})
     }
 
     #[test]
     fn every_unlisted_scenario_must_pass() {
-        let failed: Vec<&str> = AUTHORED_KNOWN_FAILING
+        let failed: Vec<&str> = WAIVED
             .iter()
             .copied()
             .chain(["connectors.auth_bindings/authored/stale"])
             .collect();
-        let error = authored_execution(&report(&[], &failed), failed.len()).unwrap_err();
+        let error =
+            authored_execution_with(&report(&[], &failed), failed.len(), WAIVED).unwrap_err();
         assert!(
             error
                 .to_string()
@@ -649,12 +641,39 @@ mod authored_execution_tests {
     }
 
     #[test]
-    fn a_listed_scenario_that_passes_fails_the_gate() {
+    fn with_nothing_listed_a_failed_scenario_fails_the_gate() {
         let error = authored_execution(
-            &report(&AUTHORED_KNOWN_FAILING[..1], &AUTHORED_KNOWN_FAILING[1..]),
-            AUTHORED_KNOWN_FAILING.len(),
+            &report(
+                &["connectors.declarations/authored/a"],
+                &["connectors.refresh/authored/b"],
+            ),
+            2,
         )
         .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("failed: connectors.refresh/authored/b")
+        );
+    }
+
+    #[test]
+    fn with_nothing_listed_every_passed_scenario_counts() {
+        let passed = [
+            "connectors.declarations/authored/a",
+            "connectors.refresh/authored/b",
+        ];
+        assert_eq!(
+            authored_execution(&report(&passed, &[]), passed.len()).unwrap(),
+            passed.len()
+        );
+    }
+
+    #[test]
+    fn a_listed_scenario_that_passes_fails_the_gate() {
+        let error =
+            authored_execution_with(&report(&WAIVED[..1], &WAIVED[1..]), WAIVED.len(), WAIVED)
+                .unwrap_err();
         assert!(
             error
                 .to_string()
@@ -664,12 +683,10 @@ mod authored_execution_tests {
 
     #[test]
     fn a_scenario_that_did_not_run_fails_the_gate() {
-        let error = authored_execution(
-            &report(
-                &["connectors.declarations/authored/a"],
-                AUTHORED_KNOWN_FAILING,
-            ),
-            AUTHORED_KNOWN_FAILING.len() + 2,
+        let error = authored_execution_with(
+            &report(&["connectors.declarations/authored/a"], WAIVED),
+            WAIVED.len() + 2,
+            WAIVED,
         )
         .unwrap_err();
         assert!(error.to_string().contains("collected"));
@@ -679,11 +696,7 @@ mod authored_execution_tests {
     fn known_failures_and_passes_hold() {
         let passed = ["connectors.declarations/authored/a"];
         assert_eq!(
-            authored_execution(
-                &report(&passed, AUTHORED_KNOWN_FAILING),
-                AUTHORED_KNOWN_FAILING.len() + 1
-            )
-            .unwrap(),
+            authored_execution_with(&report(&passed, WAIVED), WAIVED.len() + 1, WAIVED).unwrap(),
             1
         );
     }
