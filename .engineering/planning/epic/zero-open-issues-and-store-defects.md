@@ -7,7 +7,7 @@ title: Zero open GitHub issues and every defect story in the store fixed, in one
 summary: 'Operator goal 2026-11-09: 9 open issues and 56 defect stories, delivered by one pull request'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:46Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:57:46Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
@@ -183,6 +183,12 @@ emitted-bytes and auth or custody units, merge into the integration branch, push
   `story:windows-clock-check-bracket-flake`.
 - Lane 4: `story:definition-connect-begin-carries-selection`. Lane 5: `story:owner-cancels-a-bounded-read`.
   Lane 6: `story:owner-invoke-frame-effects-boundary`.
+- Joined by `approval-record:zero-issues-review-s2-join-the-wave`: the four S2 findings of the code
+  review at `23b9f1bc4`, each red first: `story:mcp-tool-deadline-keeps-the-server` (after the stories
+  touching the MCP server), `story:sql-wrapper-resolves-pg-catalog-first` (after
+  `story:sql-length-units`), `story:reconnect-retained-bound-matches-refresh`,
+  `story:read-use-bound-counts-live-reads`. The 21 S3 findings are draft stories tagged `from-review`,
+  outside this wave.
 
 Commits the approval authorises: one commit per unit on its branch, a correction commit per adversary
 round, one merge per unit into `wave/zero-issues-b`, store commits on the integration branch, the
@@ -193,7 +199,12 @@ closing store commit, and the squash merge of the pull request. No tag, no relea
 | Unit | Worktree id | Stage |
 |---|---|---|
 | `story:adapter-private-protocol-refusal-named` | `cb-protocol` | implementing |
-| `story:catalog-guard-typed-comparison` | `cb-guard-typed` | implementing |
+| `story:catalog-guard-typed-comparison` | `cb-guard-typed` | adversary |
 | `story:legacy-alias-sharing-an-instance-name` | `cb-alias` | implementing |
-| `story:sql-length-units` | `cb-sql-units` | implementing |
-| `story:slack-move-names-four-writes` | `cb-slack-move` | implementing |
+| `story:sql-length-units` | `cb-sql-units` | merged, tree finished |
+| `story:slack-move-names-four-writes` | `cb-slack-move` | merged, tree finished |
+| `story:closed-body-load-refuses-ambiguous-pointers` | `cb-closed-body` | implementing |
+| `story:definition-import-merges-shared-auth` | `cb-import-auth` | implementing |
+| `story:definition-refusal-keeps-deprecations` | `cb-refusal-depr` | tree created |
+| `story:readme-back-under-its-size-limit` | `cb-readme` | tree created |
+| `story:mcp-projection-cases-carry-read-or-mutating` | `cb-mcp-cases` | tree created |

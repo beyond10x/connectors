@@ -22,7 +22,7 @@ scope:
   path: crates/connectors-oauth2
 - confidence: cited
   path: website/docs/reference/crates.md
-revision: 9
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-25T21:11:53Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":2}}}
 - {from: "proposed", to: "active", at: "2026-10-25T21:11:54Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":2}}}
@@ -106,3 +106,7 @@ server on `127.0.0.1` (as `adapters/catalog/tests/local_runtime/oauth2_refresh.r
 
 The host's use of the crate (later stories); any provider declaration; changing
 `crates/connectors-host/src/local/oauth.rs` (`story:google-consent-on-the-oauth2-core`).
+
+## Code review
+
+The operator-ordered code review of the repository at `23b9f1bc4` (2026-11-10, no cargo command run; "verified" means traced by reading) lists this as CR-028, known as intended: `crates/connectors-oauth2/src/declaration.rs:241-250` admits `localhost` as a redirect host while `crates/connectors-oauth2/src/receiver.rs:60-61` binds only `127.0.0.1`; PKCE prevents redemption, so the flow fails and no token is lost (code verified, resolver behaviour inferred).
