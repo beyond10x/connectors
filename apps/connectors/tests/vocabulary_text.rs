@@ -275,10 +275,11 @@ fn a_failure_rendered_for_a_person_never_says_adapter() {
             rendered += 1;
         }
     }
-    // 39 codes, 12 stages and 15 next actions; `instance_ambiguous` and
+    // 40 codes, 12 stages and 15 next actions; `instance_ambiguous` and
     // `connection_unresolved` (story:connectors-do-short-invocation), the four
-    // refusals of `definitions install` (story:definitions-install) and the
-    // `installed_provider` stage (story:catalog-provider-failure-is-named) are
-    // the newest.
-    assert_eq!(rendered, 66);
+    // refusals of `definitions install` (story:definitions-install), the
+    // `installed_provider` stage (story:catalog-provider-failure-is-named) and
+    // `unsupported_private_protocol`
+    // (story:adapter-private-protocol-refusal-named) are the newest.
+    assert_eq!(rendered, 67);
 }
