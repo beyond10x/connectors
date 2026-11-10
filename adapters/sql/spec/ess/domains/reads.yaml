@@ -103,7 +103,8 @@ types:
   # What the provenance of a `query.read` answer names. The adapter does not parse the
   # statement, so it neither refuses nor reports a database the statement qualified a table
   # with. The provenance resource is the connected database, whatever the statement read: on
-  # PostgreSQL a connection cannot leave its database, so that is the database read; on
+  # PostgreSQL a connection cannot leave its database, unless an extension such as `dblink` or
+  # `postgres_fdw` is granted to the role, so that is the database read; on
   # MySQL the grants of the configured user are the boundary, and a statement such as
   # `SELECT * FROM other.t` by a user granted `other` is answered with the connected database
   # as the resource. `schema.list` and the catalogue reads, which the adapter builds, are

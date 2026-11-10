@@ -111,7 +111,7 @@ another database (`SELECT * FROM other.t`) when the configured user is granted i
 the adapter neither refuses it nor reports it: the grants of the configured user are the
 boundary, and the provenance resource of every `query.read` answer names the connected
 database, not each database the statement touched. On PostgreSQL a connection cannot leave
-its database, so the same label is the database read
+its database, unless an extension such as `dblink` or `postgres_fdw` is granted to the role, so the same label is the database read
 (`connectors_sql.reads.QueryReadScope`).
 
 The connection uses only its configured endpoint (never a server-named Unix
