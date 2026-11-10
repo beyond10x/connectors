@@ -576,8 +576,8 @@ fn grafana_cli_connects_with_a_service_account_token_and_lists_datasources_on_th
 
 /// The same journey on macOS through the production CLI, with the platform
 /// binding the macOS build fixes: the user's login keychain. It touches the
-/// login keychain (service `connectors`) and removes every item it wrote at the
-/// end. It needs `CONNECTORS_TEST_CLI` (the built `target/debug/connectors`) and
+/// login keychain (service `connectors`) and tries to remove every item it wrote at the
+/// end, reporting a refusal without failing (the owner's items are not the test's to delete). It needs `CONNECTORS_TEST_CLI` (the built `target/debug/connectors`) and
 /// fails without it rather than passing without having run.
 #[cfg(target_os = "macos")]
 #[test]

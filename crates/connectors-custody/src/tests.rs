@@ -550,8 +550,8 @@ fn macos_locked_keychain_is_unavailable_without_a_prompt() {
 #[cfg(target_os = "macos")]
 const LAUNCH_COPY_CHILD: &str = "CONNECTORS_CUSTODY_LAUNCH_COPY_CHILD";
 
-/// The owner writes custody from a copy of its executable that the CLI removes
-/// once the owner has answered (`connectors-host`, `runtime::artifact::macos`
+/// The owner writes custody from a copy of its executable, which it keeps until
+/// it stops serving (`connectors-host`, `runtime::artifact::macos`
 /// and the owner spawn). This runs one login keychain write, read-back and
 /// delete in a child started as the CLI starts the owner: a mode 0500 copy of
 /// this test binary in a fresh `connectors-image.*` directory, executed by its
