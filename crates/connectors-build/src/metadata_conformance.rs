@@ -1055,6 +1055,27 @@ mod tests {
                 );
             }
         }
+
+        // The pinned `ess` reads the emission itself. No report is written, so nothing is
+        // scored (exit 3 at the most); a refused manifest is exit 2 and names its file.
+        let ess = connectors_spec::toolchain::resolve(None).unwrap();
+        let collect = std::process::Command::new(ess)
+            .current_dir(&root)
+            .args(["verify", "conform", "mutate", "--collect"])
+            .arg(out.path())
+            .args(["--component", metadata_entities::COMPONENT])
+            .output()
+            .unwrap();
+        let text = format!(
+            "{}{}",
+            String::from_utf8_lossy(&collect.stdout),
+            String::from_utf8_lossy(&collect.stderr)
+        );
+        assert!(
+            !text.contains("manifest.json:") && collect.status.code() != Some(2),
+            "the pinned ess refuses the manifest ({:?}):\n{text}",
+            collect.status
+        );
     }
 
     /// `story:oauth2-refresh-metadata-authority`: the local metadata authority owns
