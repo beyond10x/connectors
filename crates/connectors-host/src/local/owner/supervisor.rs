@@ -223,6 +223,8 @@ pub(super) enum Output {
     Bootstrap(runtime::Bootstrap, u64),
     Baseline(runtime::Baseline),
     Value(Value),
+    /// An ungoverned read's answer.
+    Read(ReadAnswer),
     /// A governed read's result, exactly as the adapter wrote it.
     Document(Vec<u8>),
     Write(mutation::Delivery),
@@ -1778,7 +1780,7 @@ fn worker(
                     if governed {
                         return result.map(Output::Document).map_err(Error::from);
                     }
-                    read_answer(&job.alias, &operation, &revision, result?).map(Output::Value)
+                    read_answer(&job.alias, &operation, &revision, result?).map(Output::Read)
                 }
             }
         })();
@@ -2118,12 +2120,32 @@ fn revalidate_inner(
 
 /// The answer to a read: the provider result as the JSON value the adapter
 /// answered, never a string holding its JSON text
-/// (`contracts/cli/v1alpha1/semantics.md` section 6). The child has already
-/// held the document to the operation's output schema; one that is not a single
-/// unambiguous JSON value here is the adapter's fault.
-fn read_answer(alias: &str, operation: &str, revision: &str, document: Vec<u8>) -> Result<Value> {
-    let result: Value = connectors_core::read_json(&document).map_err(|_| Code::Unavailable)?;
-    Ok(json!({"adapter":alias,"operation":operation,"revision":revision,"result":result}))
+/// (`contracts/cli/v1alpha1/semantics.md` section 6), in the bytes the adapter
+/// child wrote, so the answer is its result plus a fixed envelope.
+#[derive(Debug, Serialize)]
+pub(super) struct ReadAnswer {
+    adapter: String,
+    operation: String,
+    revision: String,
+    result: Box<serde_json::value::RawValue>,
+}
+
+/// The child has already held the document to the operation's output schema;
+/// one that is not a single unambiguous JSON value here is the adapter's fault.
+fn read_answer(
+    alias: &str,
+    operation: &str,
+    revision: &str,
+    document: Vec<u8>,
+) -> Result<ReadAnswer> {
+    connectors_core::read_json::<Value>(&document).map_err(|_| Code::Unavailable)?;
+    let text = String::from_utf8(document).map_err(|_| Code::Unavailable)?;
+    Ok(ReadAnswer {
+        adapter: alias.into(),
+        operation: operation.into(),
+        revision: revision.into(),
+        result: serde_json::value::RawValue::from_string(text).map_err(|_| Code::Unavailable)?,
+    })
 }
 
 /// A worker's markers, shared with the pool.
@@ -2844,21 +2866,19 @@ mod read_answer_tests {
     /// answered, never as a string holding its JSON text.
     #[test]
     fn a_read_answer_carries_the_provider_result_as_a_json_value() {
-        let answer = read_answer(
-            "forge",
-            "item.read",
-            "desc-1",
-            br#"{"id":7,"body":{"name":"fixture"}}"#.to_vec(),
-        )
-        .unwrap();
+        let answer = |document: &[u8]| -> Value {
+            let answer = read_answer("forge", "item.read", "desc-1", document.to_vec()).unwrap();
+            serde_json::from_slice(&serde_json::to_vec(&answer).unwrap()).unwrap()
+        };
+        let answered = answer(br#"{"id":7,"body":{"name":"fixture"}}"#);
         assert_eq!(
-            answer,
+            answered,
             json!({"adapter":"forge","operation":"item.read","revision":"desc-1",
                    "result":{"id":7,"body":{"name":"fixture"}}})
         );
-        assert!(answer["result"].is_object(), "{answer}");
+        assert!(answered["result"].is_object(), "{answered}");
         // An array and a scalar result stay what the adapter answered.
-        let listed = read_answer("forge", "items.list", "desc-1", b"[1,\"two\"]".to_vec()).unwrap();
+        let listed = answer(b"[1,\"two\"]");
         assert_eq!(listed["result"], json!([1, "two"]));
         // A document that is not one unambiguous JSON value is the adapter's
         // fault, never a string handed on.

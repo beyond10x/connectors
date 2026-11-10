@@ -2138,10 +2138,7 @@ fn exchange(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     let result = action(owner, stream, frame.control, frame.document);
     let shutdown = shutdown && result.is_ok();
     let (reply, document) = match result {
-        Ok(value) => (
-            Reply::Success,
-            serde_json::to_vec(&value).map_err(|_| Code::Unavailable)?,
-        ),
+        Ok(answered) => (Reply::Success, answered.document()?),
         Err(error) => (Reply::Failed { error }, Vec::new()),
     };
     let written = channel::write_within(
@@ -2337,7 +2334,83 @@ fn write_action(
         _ => Err(Code::OutcomeUnknown.into()),
     }
 }
+/// What an action answers: a JSON value, or a read's answer, whose result
+/// keeps the bytes the adapter child wrote.
+enum Answered {
+    Value(Value),
+    Read(supervisor::ReadAnswer),
+}
+impl Answered {
+    fn document(&self) -> Result<Vec<u8>> {
+        match self {
+            Answered::Value(value) => serde_json::to_vec(value),
+            Answered::Read(answer) => serde_json::to_vec(answer),
+        }
+        .map_err(|_| Code::Unavailable.into())
+    }
+}
 fn action(
+    owner: &Owner,
+    stream: &mut channel::Stream,
+    request: Request,
+    document: Vec<u8>,
+) -> Result<Answered> {
+    if let Request::Invoke { .. } = request {
+        if owner.shutdown.load(Ordering::SeqCst) {
+            return Err(Code::Unavailable.into());
+        }
+        return invoke_action(owner, request, document).map(Answered::Read);
+    }
+    action_value(owner, stream, request, document).map(Answered::Value)
+}
+fn invoke_action(
+    owner: &Owner,
+    request: Request,
+    document: Vec<u8>,
+) -> Result<supervisor::ReadAnswer> {
+    use supervisor::{Output, Task};
+    let Request::Invoke {
+        adapter: alias,
+        connection,
+        operation,
+        schema,
+        revision,
+        deadline_ms,
+    } = request
+    else {
+        return Err(Code::InvalidInput.into());
+    };
+    let (_, adapter) = selected(&owner.paths, &alias)?;
+    if !(1..=120_000).contains(&deadline_ms.saturating_sub(connectors_sdk::now_ms())) {
+        return Err(Code::Timeout.into());
+    }
+    // Admission decides existence, then grant, then revision.
+    admit_invoke(
+        &owner.paths,
+        &alias,
+        &json!({"connection":connection,"operation":operation,"schema":schema,"revision":revision}),
+        &document,
+    )?;
+    match owner.pool.run(
+        &alias,
+        &adapter,
+        Task::Invoke {
+            connection,
+            operation,
+            schema,
+            revision,
+            document,
+            governed: false,
+            projection_revision: None,
+            budget: None,
+        },
+        deadline_ms,
+    )? {
+        Output::Read(answer) => Ok(answer),
+        _ => Err(Code::Unavailable.into()),
+    }
+}
+fn action_value(
     owner: &Owner,
     stream: &mut channel::Stream,
     request: Request,
@@ -2699,43 +2772,6 @@ fn action(
                 error.acquisition = Some(reference);
                 error
             })
-        }
-        Request::Invoke {
-            connection,
-            operation,
-            schema,
-            revision,
-            deadline_ms,
-            ..
-        } => {
-            if !(1..=120_000).contains(&deadline_ms.saturating_sub(connectors_sdk::now_ms())) {
-                return Err(Code::Timeout.into());
-            }
-            // Admission decides existence, then grant, then revision.
-            admit_invoke(
-                &owner.paths,
-                &alias,
-                &json!({"connection":connection,"operation":operation,"schema":schema,"revision":revision}),
-                &document,
-            )?;
-            match owner.pool.run(
-                &alias,
-                &adapter,
-                Task::Invoke {
-                    connection,
-                    operation,
-                    schema,
-                    revision,
-                    document,
-                    governed: false,
-                    projection_revision: None,
-                    budget: None,
-                },
-                deadline_ms,
-            )? {
-                Output::Value(value) => Ok(value),
-                _ => Err(Code::Unavailable.into()),
-            }
         }
         Request::Launch {
             connection,
