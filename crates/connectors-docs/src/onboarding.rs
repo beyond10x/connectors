@@ -608,6 +608,18 @@ pub const HAND: &[Hand] = &[
         profiles: &["grafana.service_account", "grafana.irm_service_account"],
         configured: PINNED,
     },
+    // The same connector name served by the catalog provider from its own selection, run from
+    // its definition file or pinned: a declaration would make a second `grafana` connector.
+    Hand {
+        connector: "grafana",
+        provider: "Grafana Labs",
+        catalog: Some("grafana"),
+        selections: &["operations.json"],
+        reads: &[],
+        writes: &[],
+        profiles: &["grafana.service-account"],
+        configured: PINNED,
+    },
     Hand {
         connector: "prometheus",
         provider: "Prometheus",

@@ -38,6 +38,7 @@ Every connector you can configure, with its provider, how many reads and writes 
 | [Tavily](./tavily.md) `tavily` | Tavily | 3 | 0 | `tavily.api-key` | pinned | hand-written |
 | [Loki](./loki.md) `loki` | Grafana Labs | 5 | 0 | `loki.bearer` | pinned | hand-written |
 | [Grafana](./grafana.md) `grafana` | Grafana Labs | 5 | 0 | `grafana.service_account`, `grafana.irm_service_account` | pinned | hand-written |
+| [Grafana](./grafana.md) `grafana` | Grafana Labs | 5 | 0 | `grafana.service-account` | pinned | hand-written |
 | [Prometheus](./prometheus.md) `prometheus` | Prometheus | 3 | 0 | `prometheus.bearer` | pinned | hand-written |
 | [MCP](./mcp.md) `mcp` | any MCP server | 0 | 0 | none | not yet: planned | hand-written |
 

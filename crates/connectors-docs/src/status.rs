@@ -438,6 +438,13 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Catalog provider",
+        "Grafana alert rules, annotations, dashboards and data sources",
+        "alert_rules.list, annotations.list over an epoch-millisecond window, dashboards.search paged by page and limit, dashboard.get and datasources.list from Grafana's pinned OpenAPI 3 document, read only, with a service-account token as Authorization: Bearer, from its definition file on a served instance or pinned; verified against a local fixture only (*unreleased*).",
+        "adapters/catalog/tests/grafana.rs::shipped_grafana_selections_are_exactly_the_five_reads",
+        "/docs/connectors/grafana",
+    ),
+    shipped(
+        "Catalog provider",
         "GitHub reads from a definition file",
         "The ten reads of connectors-definitions 0.5.2 connectors/github.yaml (review_requests.list, issues.assigned, notifications.list, user.me, repos.list, repo.get, releases.list, release.latest, readme.raw and file.raw) send their path and query with the definition's fixed values and the since fold, pass page and per_page through, refuse a per_page above its bound and a search page above 1,000 before any request and GitHub's answer for a page past the first 1,000 search results as invalid_input, and return GitHub's answer unchanged, a README or file as its decoded text; verified against a scripted provider only.",
         "adapters/catalog/tests/github_definition_reads.rs::each_list_passes_page_and_per_page_through_unchanged",
@@ -596,7 +603,7 @@ pub const CAPABILITIES: &[Capability] = &[
     decided(
         "Native adapters",
         "Specification-only adapters",
-        "Alertmanager has a design or typed model and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built.",
+        "Alertmanager has a design or typed model and no runtime; the native Grafana adapter's dashboard reads, datasource discovery and mediated route are specified and not built (dashboards are read through the catalog provider).",
         "/docs/reference/adapters",
     ),
     planned(

@@ -10,6 +10,15 @@
 - An owner writes its failures to `<state>/owner.log`: owner-only, bounded at 256 KiB, holding fixed
   event names and error codes only. An `outcome_unknown` caused by an owner-side failure carries
   `owner_log` and this connection's `owner_error` in its error data (story:owner-errors-are-readable).
+- Grafana through the catalog provider, from Grafana's OpenAPI 3 document pinned at tag
+  `v13.3.1` with its AGPL-3.0 licence (`adapters/grafana/upstream/`): five reads, no write.
+  `alert_rules.list`, `annotations.list` over a `from`/`to` window in epoch milliseconds,
+  `dashboards.search` (`type` held to `dash-db`, paged by `page` and `limit`), `dashboard.get`
+  and `datasources.list`, with a service-account token as `Authorization: Bearer` under the
+  profile `grafana.service-account`, proved by `GET /api/user`. The definition
+  `connectors/grafana.yaml` runs the five reads on a served instance with a mounted token
+  (`catalog.definition`); locally the selection runs as a pinned instance. Paging, end conditions
+  and time windows are in `docs/catalog-grafana.md` (story:catalog-grafana-reads).
 
 ### Changed
 
@@ -76,6 +85,12 @@
   (story:release-image-platform-check-tolerates-padding).
 - The Slack move guide enables the five writes the shipped selection carries
   (story:slack-move-names-four-writes).
+
+### Limitations
+
+- The Grafana catalog reads are verified against a local fixture only. The catalog selection
+  ships no connector declaration, because `grafana` is the native `connectors-grafana`
+  connector's name; that connector is unchanged.
 
 ## 0.70.0 — 2026-11-10
 

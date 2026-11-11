@@ -1,0 +1,18 @@
+{
+  "format": "connectors-catalog-operations/1",
+  "provider": "grafana",
+  "operations": [
+    {"id": "alert_rules.list", "operation_id": "RouteGetAlertRules", "effect": "read",
+     "description": "List every alert rule of the organization in one answer, unpaged and with no time filter; a consumer diffs the definitions it read before"},
+    {"id": "annotations.list", "operation_id": "getAnnotations", "effect": "read",
+     "description": "List the annotations of a from/to window in epoch milliseconds, at most limit per call; type alert reads alert state history. While a page holds limit items, ask again with to set to the smallest time on it and deduplicate by id; a page with fewer items than limit is the last"},
+    {"id": "dashboards.search", "operation_id": "search", "effect": "read",
+     "description": "List dashboards (type dash-db, required) matching query, tag or folderUIDs, one page per call: page from 1, limit the page size; a page with fewer hits than limit is the last. No time filter",
+     "required": ["type"],
+     "bounds": {"type": {"values": ["dash-db"]}}},
+    {"id": "dashboard.get", "operation_id": "getDashboardByUID", "effect": "read",
+     "description": "Read one dashboard by uid: its JSON model under dashboard and its metadata under meta"},
+    {"id": "datasources.list", "operation_id": "getDataSources", "effect": "read",
+     "description": "List every data source the token may read in one answer, unpaged: uid, name, type and url of each, such as the Prometheus and Loki data sources the connection reaches"}
+  ]
+}

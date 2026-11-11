@@ -29,7 +29,8 @@ use std::path::Path;
 /// gap.
 /// The Claude subscription source is authored here too: the one read behind its
 /// identity probe, with no gap.
-const SOURCES: [(&str, &str, Option<&str>, &str, usize); 16] = [
+/// Grafana's source is its OpenAPI 3 document; all 314 operations are represented, no gap.
+const SOURCES: [(&str, &str, Option<&str>, &str, usize); 17] = [
     (
         "chatgpt",
         "providers/chatgpt/chatgpt-codex-backend.yaml",
@@ -91,6 +92,13 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 16] = [
         "../google/generated/slides.openapi.json",
         Some("../google/upstream/slides/slides-api.json"),
         "google.oauth",
+        0,
+    ),
+    (
+        "grafana",
+        "../grafana/upstream/openapi3.json",
+        None,
+        "grafana.service-account",
         0,
     ),
     (

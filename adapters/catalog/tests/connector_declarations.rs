@@ -21,8 +21,10 @@ const DECLARATION: &str = "connector.json";
 const DECLARATION_FORMAT: &str = "connectors-catalog-connector/1";
 const GMAIL_READONLY: &str = "https://www.googleapis.com/auth/gmail.readonly";
 const GMAIL_COMPOSE: &str = "https://www.googleapis.com/auth/gmail.compose";
-/// The catalog providers that ship no declaration and stay pinned.
-const UNDECLARED: [&str; 1] = ["openrouter"];
+/// The catalog providers that ship no declaration and stay pinned. Grafana's
+/// connector name, `grafana`, is the native `connectors-grafana` connector's, so
+/// its catalog selection runs from its definition file or as a pinned instance.
+const UNDECLARED: [&str; 2] = ["grafana", "openrouter"];
 
 fn root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -214,7 +216,8 @@ fn gmail_derived_from_its_declaration_has_the_reference_revision() {
 }
 
 /// OpenRouter holds one selection run as a management and an inference instance
-/// joined by custody, so it ships no declaration and stays pinned; every other
+/// joined by custody, so it ships no declaration and stays pinned, and Grafana's
+/// catalog selection ships none beside the native `grafana` connector; every other
 /// catalog provider directory ships exactly one, naming its own directory, its
 /// own selection and a distinct connector. Slack's declares the bot selection
 /// (`operations.json`) as the connector `slack`; its user selection
@@ -809,7 +812,9 @@ fn slack_derived_from_its_declaration_is_the_documented_bot_instance() {
 /// Google Calendar, Drive and Gmail, HubSpot, Jira, Slack and Zendesk moved
 /// when their selections declared a `walk` (story:catalog-operation-declares-its-walk),
 /// and again when the bundles were rebuilt to record each parameter's `enum` and
-/// `format: date-time` (story:catalog-validates-enum-and-date-time).
+/// `format: date-time` (story:catalog-validates-enum-and-date-time). The Grafana
+/// guide's pin is new with its selection (story:catalog-grafana-reads); it moved
+/// the index of every later page and no revision.
 #[test]
 fn documented_native_configurations_keep_their_revisions() {
     let pinned: BTreeMap<String, &str> = [
@@ -858,55 +863,59 @@ fn documented_native_configurations_keep_their_revisions() {
             "3ba7cb1ade963d628b80a9a4330f36501ccfc24cde08bdfe613565c3ec8f6d4c",
         ),
         (
-            "11 catalog-hubspot.md",
+            "11 catalog-grafana.md",
+            "c0bdd19cddb8130b7dcf0e48d70a4a8edf8b834cb006ae4c951569ba19d3ce31",
+        ),
+        (
+            "12 catalog-hubspot.md",
             "f22df2fc89858454b75fc46c55187aa467458a05c8fd0d476cf052dd73e70fe9",
         ),
         (
-            "12 catalog-jira.md",
+            "13 catalog-jira.md",
             "b96bb4436bc1296375bb6ed70790fb65ee18b067325fc344851c677f65cac6c9",
         ),
         (
-            "13 catalog-jira.md",
+            "14 catalog-jira.md",
             "939aa4a3531aa1cee72ad9e36ad72911fda44ea3f3b726ca98d098cae979bf62",
         ),
         (
-            "14 catalog-jira.md",
+            "15 catalog-jira.md",
             "5a58ed45a06f82a7415b7c135b133850749ab45e87aeeca6be20c144084f8d2b",
         ),
         (
-            "15 catalog-openrouter.md",
+            "16 catalog-openrouter.md",
             "7426f67e0bae66733ee6e8c6ecc6f602d85a3cb79a43d8058f54f90224a8a731",
         ),
         (
-            "16 catalog-openrouter.md",
+            "17 catalog-openrouter.md",
             "6472c864700269c252a6040a05397e3370fccd7bce155098ce25916b16ffa7bc",
         ),
         (
-            "17 catalog-opsgenie.md",
+            "18 catalog-opsgenie.md",
             "2429e78e18775efb337892511a61756edf2e2027ef3f76dda50c3b850e95ed1e",
         ),
         (
-            "18 catalog-runpod.md",
+            "19 catalog-runpod.md",
             "d07cd9583fdd53e294e6c535ecdc665b8fff85191d55d0cf875bdca5ae0138bc",
         ),
         (
-            "19 catalog-slack.md",
+            "20 catalog-slack.md",
             "e7220d48c9c68cfbb78e363d2a6ea5d4ce3e2595c4baad8f86492b02b010f79b",
         ),
         (
-            "20 catalog-slack.md",
+            "21 catalog-slack.md",
             "abe8a377d7f6cc4e17df36e888e4df0c4a55cfad753b4eb1b1039ac2509a1009",
         ),
         (
-            "21 catalog-zendesk.md",
+            "22 catalog-zendesk.md",
             "d14dae6d913cda517f992e5890521b8d481be0900acbff4807476d3a42387a50",
         ),
         (
-            "22 catalog-zendesk.md",
+            "23 catalog-zendesk.md",
             "181d0a89b6bb91e32d9666157c053594794e9841946c42598e7bffd9e9bcca2a",
         ),
         (
-            "23 local-catalog-provider.md",
+            "24 local-catalog-provider.md",
             "e4b752f75723b2de2c968185cf72fd3701158f8b991c16cb197c47695f5965bd",
         ),
     ]
