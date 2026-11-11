@@ -113,4 +113,14 @@ jobs:
         if: always()
         run: |
           test -f .local/ignored-suites.json || exit 0
-          jq -r '.outcomes[] | select(.selected and .status != "passed") | "\(.status)\t\(.name)\t\(.reasons | join("; "))"' .local/ignored-suites.json
+          jq -r '.result.outcomes[] | select(.selected and .status != "passed") | "\(.status)\t\(.name)\t\(.reasons | join("; "))"' .local/ignored-suites.json
+          shown=0
+          for log in .local/ignored-suites.logs/*.log; do
+            [ -f "$log" ] || continue
+            grep -q '^test result: ok. 1 passed' "$log" && continue
+            echo "::group::$log"
+            tail -n 60 "$log"
+            echo "::endgroup::"
+            shown=$((shown + 1))
+            [ "$shown" -lt 5 ] || break
+          done
