@@ -50,6 +50,11 @@ pub enum Code {
     Forbidden,
     NotFound,
     LifecycleConflict,
+    /// The provider authority or the profile's authentication changed under
+    /// the configuration: connect, repair and revalidate under this instance id
+    /// are refused, and only a new instance id admits a connection
+    /// (`registry::Failure::AuthenticationChanged`).
+    ConfigurationChanged,
     Revoked,
     NotGranted,
     ConnectionNotReady,
@@ -299,6 +304,7 @@ impl From<registry::Failure> for Error {
         let reconnect = matches!(e, F::BindingChanged | F::UpgradeIdentityMismatch);
         let mut error = Error::from(match e {
             F::BindingChanged => Code::LifecycleConflict,
+            F::AuthenticationChanged => Code::ConfigurationChanged,
             F::MetadataUnavailable => Code::MetadataUnavailable,
             F::MetadataSchemaNewer(_) => Code::MetadataSchemaNewer,
             F::ConcurrentRevision => Code::RevisionConflict,
@@ -307,7 +313,6 @@ impl From<registry::Failure> for Error {
             F::Conflict
             | F::UpgradeRequired
             | F::ExecutableChanged
-            | F::AuthenticationChanged
             | F::InstanceConnected
             | F::InstanceConnectionChanged => Code::LifecycleConflict,
             F::Revoked => Code::Revoked,

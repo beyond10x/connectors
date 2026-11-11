@@ -393,7 +393,7 @@ types:
   # repair, a read and a write first replace an adapter process still running an
   # earlier adapter entry. One that changes the identity refuses revalidate,
   # repair, a read and connect under the same instance id with
-  # `lifecycle_conflict` and next_action check_configuration: only a new instance
+  # `configuration_changed` and next_action check_configuration: only a new instance
   # id helps, and `connections revoke` through the moved entry still reaches the
   # connections left under an instance id no entry configures any longer.
   # ESS-LIMIT: no construct relates two revisions' values field by field, so the
@@ -707,7 +707,7 @@ types:
     variants: [usage, operational, interrupted]
   - name: connectors.cli.FailureCode
     kind: enum
-    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, unsupported_private_protocol, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer, instance_ambiguous, connection_unresolved, digest_mismatch, unknown_format_version, unmet_feature, release_invalid]
+    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, configuration_changed, incarnation_mismatch, readiness_mismatch, unsupported_private_protocol, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer, instance_ambiguous, connection_unresolved, digest_mismatch, unknown_format_version, unmet_feature, release_invalid]
   - name: connectors.cli.FailureStage
     kind: enum
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop, installed_provider]

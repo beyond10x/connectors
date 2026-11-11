@@ -522,8 +522,9 @@ pub(super) fn registry_failure(error: registry::Failure) -> HandlerReply {
             "create_connection",
             false,
         ),
+        // Only a new instance id helps, and no retry can succeed.
         AuthenticationChanged => (
-            "lifecycle_conflict",
+            "configuration_changed",
             "admission",
             "check_configuration",
             false,

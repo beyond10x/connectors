@@ -144,7 +144,7 @@ instance to the configured revision in the same metadata commit. Reads are then
 admitted under the new binding and refused under the old one.
 
 A changed provider authority or profile authentication refuses before provider
-work as `lifecycle_conflict` with `next_action = check_configuration`, from
+work as `configuration_changed` with `next_action = check_configuration`, from
 revalidate, reconnect, a read and a new connect under the same instance id alike:
 only a new instance id helps. An invoked definition file takes one itself: its moved instance
 (`definitions::moved`; [CLI semantics](../contracts/cli/v1alpha1/semantics.md), "Invoking a

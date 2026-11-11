@@ -1290,8 +1290,10 @@ parameter. After upgrading:
    `connections revoke` the old connection first; `connections connect` under the
    same `instance` id then answers `ready` with the new lifetime. When the provider host or any other `auth` field of
    the profile changed, revalidate, reconnect, reads and `connections connect` all
-   refuse with `lifecycle_conflict` and `next_action = check_configuration`:
-   only a new `instance` id helps. Give the instance a new id in the native
+   refuse with `configuration_changed` and `next_action = check_configuration`:
+   a retry cannot succeed, and only a new `instance` id helps. A change to the
+   native configuration that moves the provider host or the profile's
+   authentication needs a new instance id. Give the instance a new id in the native
    configuration and the instance's `instance_id`, copy the new revision, and
    connect; then revoke the old connection through the same instance with
    `connections revoke`, which still reaches it. A changed `auth.profile` id
