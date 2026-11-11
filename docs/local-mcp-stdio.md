@@ -67,9 +67,10 @@ probes a credential or invokes the provider.
 
 The owner holds the effects rule itself on the bounded and projected governed
 reads: a declared semantic effect, or an effect other than `network`, is
-`unsupported` before any provider request. The owner's plain `invoke` frame
-(`connectors invoke`) does not read that metadata; the host configuration's
-grant, and for a write its approval, alone govern it
+`unsupported` before any provider request. The owner's plain `invoke` frame,
+which carries only reads, does not read that metadata: it enforces the host
+configuration's grant and the read's admission, not the effects rule. A write
+takes the write frames, under its approval
 ([owner](../contracts/cli/v1alpha1/owner.md)).
 
 ```console
