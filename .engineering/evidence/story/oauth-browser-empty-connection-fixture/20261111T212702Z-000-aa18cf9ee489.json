@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-11T21:27:02Z",
+  "actor": "human:timo",
+  "artifact": "story:oauth-browser-empty-connection-fixture",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/actions/runs/43094189169/job/130796624068",
+    "reference": "https://github.com/beyond10x/connectors/pull/253"
+  }
+}
