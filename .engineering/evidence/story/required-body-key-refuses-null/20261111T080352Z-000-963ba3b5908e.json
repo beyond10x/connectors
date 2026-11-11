@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-11T08:03:52Z",
+  "actor": "human:timo",
+  "artifact": "story:required-body-key-refuses-null",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-c-body-null-adversary-2",
+    "review": "review-result:wave-c-body-null-adversary-2",
+    "outcome": "fixed"
+  }
+}

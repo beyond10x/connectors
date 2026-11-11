@@ -13,6 +13,23 @@
 
 ### Changed
 
+- A connect, repair, revalidation or read under a changed provider authority or profile
+  authentication answers `authentication_changed`, not `lifecycle_conflict`: only a new instance
+  id helps, and `check_configuration` says so. MCP clients still see `unavailable`
+  (story:configuration-change-error).
+- A definition whose feed the catalog engine would refuse when an instance starts is refused when
+  the definition loads, under a named rule (`feed_parameter_twice`, `feed_parameter_required`,
+  `feed_operation_query`, `feed_query_template`, `feed_operation_get`, `feed_parameter_unbound`,
+  `feed_item_pointer` and others)
+  (story:definition-reader-refuses-what-the-feed-engine-refuses).
+- A catalog write body whose required key, or `body_any_of` key, is given as `null` is refused
+  before any request: null counts as missing. A selection may declare `body_null_clears: true`
+  so a null `body_any_of` member is the change and is sent; Jira `issue.edit` does, so
+  `assignee`, `description` or `priority` given as null alone still unassigns or clears. A
+  nested `body_any_of` now requires its parent in the declared input schema. Jira's
+  configuration revision moves: a pinned `configuration_revision` must be copied again, and a
+  connected Jira instance is `pending` until `connections revalidate`
+  (story:required-body-key-refuses-null).
 - A name that both a legacy `[connectors]` entry and an `[instances]` entry derive is refused as
   `instance_ambiguous` at every selection (invoke, connect, approvals prepare and issue), naming both
   entries. Before, it reached the instance silently. A name that only a legacy entry holds still
