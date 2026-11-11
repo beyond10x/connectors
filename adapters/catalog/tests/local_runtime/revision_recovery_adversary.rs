@@ -126,7 +126,7 @@ fn adversary_the_connection_left_by_a_changed_authentication_stays_revocable() {
         |native| native["auth"]["label"] = json!("GitLab token"),
         str::to_owned,
     );
-    let refused = refusal(scenario.revalidate(), "lifecycle_conflict");
+    let refused = refusal(scenario.revalidate(), "configuration_changed");
     assert_eq!(refused["next_action"], "check_configuration", "{refused}");
 
     scenario.reconfigure(

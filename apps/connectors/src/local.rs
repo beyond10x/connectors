@@ -374,6 +374,7 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         Forbidden => ("admission", "request_permission", false),
         NotFound => ("admission", "check_configuration", false),
         LifecycleConflict => ("admission", "retry_status", false),
+        ConfigurationChanged => ("admission", "check_configuration", false),
         Revoked => ("admission", "create_connection", false),
         NotGranted | IdentityMismatch | ConnectionNotReady | InsufficientScope => {
             ("admission", "repair_connection", false)
@@ -1190,12 +1191,6 @@ mod tests {
         for (failure, action) in [
             (registry::Failure::UpgradeRequired, "revalidate_connection"),
             (registry::Failure::BindingChanged, "create_connection"),
-            // story:revision-change-keeps-a-recovery-path: a changed provider
-            // authority or profile authentication needs a new instance id.
-            (
-                registry::Failure::AuthenticationChanged,
-                "check_configuration",
-            ),
         ] {
             let error = owner::Error::from(failure);
             assert_eq!(error.code, owner::Code::LifecycleConflict, "{failure:?}");
@@ -1254,6 +1249,51 @@ mod tests {
                 "{data}"
             );
         }
+    }
+
+    /// story:configuration-change-error: a changed provider authority or
+    /// profile authentication is `configuration_changed`, not a
+    /// `lifecycle_conflict` a retry could clear: only a new instance id helps,
+    /// and the next action is `check_configuration`, as the owner transport
+    /// carries it to the CLI and as the registry's own refusal answers it.
+    #[test]
+    fn a_changed_authentication_is_configuration_changed() {
+        use connectors_host::local::registry;
+        let error = owner::Error::from(registry::Failure::AuthenticationChanged);
+        assert_eq!(error.code, owner::Code::ConfigurationChanged);
+        let received: owner::Error =
+            serde_json::from_value(serde_json::to_value(&error).unwrap()).unwrap();
+        for error in [error, received] {
+            for reply in [
+                invoke_failure(error.clone()),
+                connect_failure("connections-connect", error),
+            ] {
+                let HandlerReply::Error { data, .. } = reply else {
+                    panic!("not a failure");
+                };
+                assert_eq!(
+                    (&data["code"], &data["stage"], &data["next_action"]),
+                    (
+                        &json!("configuration_changed"),
+                        &json!("admission"),
+                        &json!("check_configuration")
+                    ),
+                    "{data}"
+                );
+            }
+        }
+        let HandlerReply::Error { data, .. } =
+            connections::registry_failure(registry::Failure::AuthenticationChanged)
+        else {
+            panic!("not a failure");
+        };
+        assert_eq!(
+            (&data["code"], &data["next_action"]),
+            (
+                &json!("configuration_changed"),
+                &json!("check_configuration")
+            )
+        );
     }
 
     /// story:connect-refused-while-instance-holds-connection: a reconnect that
