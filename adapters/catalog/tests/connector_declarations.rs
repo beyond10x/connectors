@@ -809,7 +809,9 @@ fn slack_derived_from_its_declaration_is_the_documented_bot_instance() {
 /// Google Calendar, Drive and Gmail, HubSpot, Jira, Slack and Zendesk moved
 /// when their selections declared a `walk` (story:catalog-operation-declares-its-walk),
 /// and again when the bundles were rebuilt to record each parameter's `enum` and
-/// `format: date-time` (story:catalog-validates-enum-and-date-time).
+/// `format: date-time` (story:catalog-validates-enum-and-date-time). The Jira
+/// revisions moved again when `issue.edit` gained `body_null_clears`
+/// (story:required-body-key-refuses-null).
 #[test]
 fn documented_native_configurations_keep_their_revisions() {
     let pinned: BTreeMap<String, &str> = [

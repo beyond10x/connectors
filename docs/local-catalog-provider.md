@@ -1052,10 +1052,12 @@ The complete configuration used against the sandbox is
   does not admit, a fixed or repeated key, or keys under more than one parent
   object are refused when the selection loads.
 - `body_null_clears` is optional, beside `body_any_of`: `true` declares that the
-  provider clears a field on JSON `null`, so a `body_any_of` key given as
-  `null` counts as the one change and is sent as `null`, such as Jira's
-  `issue.edit` unassigning an issue with `assignee: null`. The declared input
-  schema then requires only that one of the keys is present. Without it a
+  provider clears a field on JSON `null`, so an untyped `body_any_of` key given
+  as `null` counts as the one change and is sent as `null`, such as Jira's
+  `issue.edit` unassigning an issue with `assignee: null`. A key typed by
+  `body_types` given as `null` is still refused as not of its declared type.
+  The declared input schema then requires only that one of the keys is
+  present, and requires each parent object above them. Without it a
   `null` key counts as missing; a `body_required` key given as `null` is
   refused either way. `body_null_clears` without `body_any_of` is refused when
   the selection loads.
