@@ -19,7 +19,7 @@
 //! write's method, route and body, so "no write was sent" is a count of what
 //! the fixture saw.
 #![cfg(unix)]
-mod hand_written;
+use crate::hand_written;
 
 use connectors_catalog::{bundle, discovery};
 use connectors_catalog_provider::{

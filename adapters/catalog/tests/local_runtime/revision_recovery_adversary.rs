@@ -6,8 +6,8 @@
 //! ```console
 //! cargo build --locked -p connectors -p connectors-catalog-provider --bins
 //! CONNECTORS_TEST_CLI="$PWD/target/debug/connectors" \
-//!   cargo test --locked -p connectors-catalog-provider --test local_runtime -- \
-//!   --ignored --test-threads 1 --nocapture cli_journey::revision_recovery_adversary
+//!   cargo test --locked -p connectors-catalog-provider --test main -- \
+//!   --ignored --test-threads 1 --nocapture local_runtime::cli_journey::revision_recovery_adversary
 //! ```
 //!
 //! The same production CLI, owner, catalog child, TLS fixture and disposable

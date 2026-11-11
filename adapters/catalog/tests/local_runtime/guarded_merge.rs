@@ -626,7 +626,7 @@ fn journey_case(mode: u8) {
         let output = Command::new(std::env::current_exe().unwrap())
             .args([
                 "--exact",
-                "cli_journey::guarded_merge::prepared_attempt_exit_fixture",
+                "local_runtime::cli_journey::guarded_merge::prepared_attempt_exit_fixture",
                 "--ignored",
                 "--nocapture",
             ])

@@ -1311,7 +1311,7 @@ mod tests {
         let ready = root.path().join("ready");
         let mut diagnostics = tempfile::tempfile().unwrap();
         let mut child = Child(
-            Command::new(std::env::current_exe().unwrap())
+            crate::local::parent_death::bind(&mut Command::new(std::env::current_exe().unwrap()))
                 .args([
                     "--exact",
                     "local::oauth::tests::cancellation_fixture",

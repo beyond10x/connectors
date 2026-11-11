@@ -27,6 +27,7 @@ mod oauth_adversary_pass2_tests;
 mod oauth_adversary_tests;
 pub mod operation_curation;
 pub mod owner;
+pub(crate) mod parent_death;
 pub mod protected;
 pub mod registry;
 pub mod runtime;

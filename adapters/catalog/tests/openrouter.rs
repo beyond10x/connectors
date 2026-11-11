@@ -11,9 +11,8 @@
 //! second child, configured as the guide's inference alias, proves and sends
 //! exactly those bytes, as the owner does when it holds them in custody.
 #![cfg(unix)]
+use crate::clock_fixture;
 use connectors_catalog::bundle;
-#[path = "../../../crates/connectors-host/tests/fixtures/clock/server.rs"]
-mod clock_fixture;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
@@ -1011,8 +1010,8 @@ fn serve_custody(parent: &Path) -> (Owned, Owned, PathBuf) {
 /// It serves the HTTPS provider, a disposable Secret Service and two synthetic
 /// Roughtime sources, prints where each is, and answers until the file
 /// `FIXTURE_STOP` (named in its output) exists or `OPENROUTER_FIXTURE_SECONDS`
-/// (default 300) pass. `cargo test -p connectors-catalog-provider --test openrouter
-/// -- --ignored --nocapture serve_the_fixture`.
+/// (default 300) pass. `cargo test -p connectors-catalog-provider --test main
+/// -- --ignored --nocapture openrouter::serve_the_fixture`.
 #[test]
 #[ignore = "serves the fixture for the guide's commands"]
 fn serve_the_fixture() {

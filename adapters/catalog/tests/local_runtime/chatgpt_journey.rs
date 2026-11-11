@@ -1,6 +1,6 @@
 //! The `chatgpt` connector through the production CLI, owner, catalog child
 //! and disposable Secret Service (story:chatgpt-subscription-connector), with
-//! the fake authorization server of [`crate::chatgpt`] as the only trusted
+//! the fake authorization server of [`crate::local_runtime::chatgpt`] as the only trusted
 //! root. `connections connect` signs in by the browser (the debug-build follow
 //! hook consents where a person would) or by the ChatGPT device sign-in, the
 //! dialect composition registers for `chatgpt.subscription`; the owner
@@ -8,11 +8,11 @@
 //! journey ends with `connections token --reveal` printing the access token
 //! the fake server issued last.
 use super::*;
-use crate::chatgpt::{
+use crate::local_runtime::chatgpt::{
     CHATGPT_ACCESS, CHATGPT_ACCOUNT, CHATGPT_CLIENT_ID, CHATGPT_INSTANCE, CHATGPT_PROFILE,
     CHATGPT_REFRESH, CHATGPT_SCOPE, ChatgptServer, carries_chatgpt_material,
 };
-use crate::oauth2_refresh::{decode_form, field};
+use crate::local_runtime::oauth2_refresh::{decode_form, field};
 
 /// The alias of the fixture's pinned instance.
 const ALIAS: &str = "chatgpt";

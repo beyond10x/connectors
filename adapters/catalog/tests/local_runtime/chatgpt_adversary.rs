@@ -10,11 +10,11 @@
 //! scheme and pointer guards of an `id_token` claim pointer
 //! (`adapters/catalog/src/local.rs`, `configure`), which no case exercised.
 use super::*;
-use crate::chatgpt::{
+use crate::local_runtime::chatgpt::{
     CHATGPT_CLIENT_ID, CHATGPT_INSTANCE, CHATGPT_PROFILE, carries_chatgpt_material, chatgpt_config,
     profile_at,
 };
-use crate::oauth2_refresh::{Source, oauth_config};
+use crate::local_runtime::oauth2_refresh::{Source, oauth_config};
 use std::io::Read as _;
 
 /// The alias of the adversary's pinned instance.
