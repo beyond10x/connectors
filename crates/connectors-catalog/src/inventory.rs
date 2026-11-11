@@ -162,6 +162,67 @@ pub struct Parameter {
     /// for `date-time`. Omitted when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub format: Option<Format>,
+    /// A regular expression all of every value must match, as the text it is
+    /// sent as ([`pattern_matches`]). Recorded only from an amendment's added operation
+    /// ([`crate::amendment`]), never extracted from a document, so every
+    /// bundle compiled without one serialises as it did before. Omitted when
+    /// absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<String>,
+}
+
+/// Whether all of `text` matches `pattern`, a regular expression a parameter
+/// records ([`Parameter::pattern`]); `None` when `pattern` is not one
+/// ([`pattern_is_anchored`]).
+pub fn pattern_matches(pattern: &str, text: &str) -> Option<bool> {
+    whole_value(pattern).map(|compiled| compiled.is_match(text))
+}
+
+/// The longest pattern a parameter records.
+pub const PATTERN_MAX_BYTES: usize = 256;
+
+/// Whether `pattern` is one a parameter may record: at most
+/// [`PATTERN_MAX_BYTES`], starting with `^` and ending with an unescaped `$`,
+/// a regular expression that compiles on its own, and one that still compiles
+/// once wrapped as `\A(?:pattern)\z`, the form every value is matched in
+/// ([`pattern_matches`]). The wrap is what holds the whole value: a leading
+/// `^` and trailing `$` alone do not, since a top-level `|` leaves each
+/// branch one anchor, `(?m)` lets `$` match at a line end and `(?x)` makes a
+/// final `#$` a comment. A pattern whose `(?x)` comment would swallow the
+/// wrap's closing `)\z` does not compile wrapped and is refused.
+pub fn pattern_is_anchored(pattern: &str) -> bool {
+    whole_value(pattern).is_some()
+}
+
+/// `pattern` compiled in its whole-value form, `\A(?:pattern)\z`, once per
+/// process and pattern; `None` when it is not one a parameter may record.
+/// Compiling `pattern` on its own first means its groups balance, so the wrap's
+/// `(?:` and `)` enclose all of it.
+fn whole_value(pattern: &str) -> Option<std::sync::Arc<regex::Regex>> {
+    use std::collections::HashMap;
+    use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+    type Compiled = Mutex<HashMap<String, Option<Arc<regex::Regex>>>>;
+    static COMPILED: OnceLock<Compiled> = OnceLock::new();
+    if pattern.len() > PATTERN_MAX_BYTES
+        || !pattern.starts_with('^')
+        || !pattern.ends_with('$')
+        || pattern.ends_with("\\$")
+    {
+        return None;
+    }
+    let mut compiled = COMPILED
+        .get_or_init(Mutex::default)
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    if let Some(found) = compiled.get(pattern) {
+        return found.clone();
+    }
+    let whole = regex::Regex::new(pattern)
+        .ok()
+        .and_then(|_| regex::Regex::new(&format!(r"\A(?:{pattern})\z")).ok())
+        .map(Arc::new);
+    compiled.insert(pattern.to_owned(), whole.clone());
+    whole
 }
 
 /// A `format` of a string parameter this model records and a reader may hold
@@ -430,6 +491,7 @@ fn deep_object(
             repeated: false,
             allowed,
             format,
+            pattern: None,
         });
     }
     Some(Ok((out, gap)))
@@ -503,6 +565,7 @@ fn parameters(
                             repeated,
                             allowed,
                             format,
+                            pattern: None,
                         },
                         shape.and_then(Result::err).or(deep_gap),
                         expansion,

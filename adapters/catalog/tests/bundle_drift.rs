@@ -29,7 +29,9 @@ use std::path::Path;
 /// gap.
 /// The Claude subscription source is authored here too: the one read behind its
 /// identity probe, with no gap.
-const SOURCES: [(&str, &str, Option<&str>, &str, usize); 16] = [
+/// Grafana's source is its OpenAPI 3 document; its 314 operations and the three proxy reads its
+/// amendments add are represented, no gap.
+const SOURCES: [(&str, &str, Option<&str>, &str, usize); 17] = [
     (
         "chatgpt",
         "providers/chatgpt/chatgpt-codex-backend.yaml",
@@ -94,6 +96,13 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 16] = [
         0,
     ),
     (
+        "grafana",
+        "../grafana/upstream/openapi3.json",
+        None,
+        "grafana.service-account",
+        0,
+    ),
+    (
         "hubspot",
         "../hubspot/upstream/crm-objects-2026-09.json",
         None,
@@ -155,8 +164,9 @@ const OPSGENIE_UNSUPPORTED: usize = 76;
 
 /// The cited amendments applied to a provider's pinned source, relative to this
 /// crate. A provider absent here is built from its source as written.
-const AMENDMENTS: [(&str, &str); 4] = [
+const AMENDMENTS: [(&str, &str); 5] = [
     ("gitlab", "../gitlab/upstream/openapi_v3.amendments.json"),
+    ("grafana", "../grafana/upstream/grafana.amendments.json"),
     ("opsgenie", "../opsgenie/upstream/opsgenie.amendments.json"),
     ("slack", "../slack/upstream/slack-web.amendments.json"),
     (

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.71.0 — 2026-11-11
 
 ### Added
 
@@ -10,6 +10,36 @@
 - An owner writes its failures to `<state>/owner.log`: owner-only, bounded at 256 KiB, holding fixed
   event names and error codes only. An `outcome_unknown` caused by an owner-side failure carries
   `owner_log` and this connection's `owner_error` in its error data (story:owner-errors-are-readable).
+- Grafana through the catalog provider, from Grafana's OpenAPI 3 document pinned at tag
+  `v13.3.1` with its AGPL-3.0 licence (`adapters/grafana/upstream/`): five reads, no write.
+  `alert_rules.list`, `annotations.list` over a `from`/`to` window in epoch milliseconds,
+  `dashboards.search` (`type` held to `dash-db`, paged by `page` and `limit`), `dashboard.get`
+  and `datasources.list`, with a service-account token as `Authorization: Bearer` under the
+  profile `grafana.service-account`, proved by `GET /api/user`. The definition
+  `connectors/grafana.yaml` runs the five reads on a served instance with a mounted token
+  (`catalog.definition`); locally the selection runs as a pinned instance. Paging, end conditions
+  and time windows are in `docs/catalog-grafana.md` (story:catalog-grafana-reads).
+- Prometheus and Loki through Grafana's data-source proxy, on the same Grafana catalog selection
+  and token: `prometheus.query`, `prometheus.query_range` and `loki.query_range`, read only, under
+  `grafana.service-account`. Each proxy sub-path is a cited `add_operation` amendment to the pinned
+  document (`adapters/grafana/upstream/grafana.amendments.json`), which declares the proxy only as
+  one `{datasource_proxy_route}` parameter; the bundle carries 317 operations. Loki's `limit` is
+  held to 1 to 5000 (`max_entries_limit_per_query`), and an answer over the 4 MiB limit is refused
+  as `capacity`. `uid` is held to Grafana's data-source uid rule, letters, digits, `-` and `_`, at
+  most 40, and any other value is refused before any request, so a `uid` holding `/` or `\` cannot
+  reach another Grafana path. Each answer is the upstream JSON value, written compact with object
+  keys sorted, as for every catalog read. The definition `connectors/grafana.yaml` names the
+  amendments (story:catalog-grafana-datasource-proxy-reads).
+- An `add_operation` amendment's parameter may declare a `pattern`, a regular expression anchored
+  at both ends; the bundle records it and the catalog provider refuses a value that does not match
+  before any request, naming the parameter. The pipeline refuses an unanchored or invalid one, and
+  any `pattern` on an `add_parameter` amendment (`docs/local-catalog-provider.md`).
+- A served catalog instance takes `catalog.allowed_values`: per operation and string input, the
+  only values it may take. A value outside a non-empty list is `forbidden` by name before any
+  request; an empty or absent list admits every value; start refuses an operation the instance
+  does not describe, an input it does not take, an empty or repeated value, or an operation or
+  input written twice (`docs/running-services.md`). A Grafana instance holds the proxy reads'
+  `uid` to its data sources this way.
 
 ### Changed
 
@@ -76,6 +106,22 @@
   (story:release-image-platform-check-tolerates-padding).
 - The Slack move guide enables the five writes the shipped selection carries
   (story:slack-move-names-four-writes).
+
+### Compatibility
+
+- No migration. A name that both a legacy `[connectors]` entry and an `[instances]` entry
+  derive is now refused as `instance_ambiguous`; rename one of the two entries. The Grafana
+  catalog selection, the amendment `pattern` and `catalog.allowed_values` are additions; a
+  bundle or configuration without them loads as before.
+
+### Limitations
+
+- The Grafana catalog reads are verified against a local fixture only. The catalog selection
+  ships no connector declaration, because `grafana` is the native `connectors-grafana`
+  connector's name; that connector is unchanged.
+- The Prometheus and Loki proxy reads are verified against a local fixture only; that Grafana's
+  proxy passes each query and answer through unchanged is not checked against a live Grafana. A
+  pinned local instance has no `allowed_values`.
 
 ## 0.70.0 — 2026-11-10
 

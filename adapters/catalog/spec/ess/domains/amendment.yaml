@@ -88,7 +88,10 @@ types:
 
   # One parameter of an added operation. A path parameter is required and unrepeated; the
   # pipeline also refuses one the path template does not name, a placeholder no path parameter
-  # declares and a name declared twice in one location.
+  # declares and a name declared twice in one location. `pattern`, when present, is a regular
+  # expression from `^` to `$` of at most 256 bytes that all of every value must match, checked by
+  # the engine before any request as `\A(?:pattern)\z`, such as Grafana's data-source `uid`
+  # alphabet; the pipeline refuses one that does not compile on its own or in that form.
   - name: connectors_catalog.amendment.OperationParameter
     kind: struct
     fields:
@@ -97,6 +100,7 @@ types:
       - {name: required, type: Boolean}
       - {name: type, type: "Optional<connectors_catalog.amendment.ValueType>"}
       - {name: repeated, type: "Optional<Boolean>"}
+      - {name: pattern, type: "Optional<String>"}
     invariants:
       - name.count >= 1
       - any: [{not: {location: path}}, {required: true}]
