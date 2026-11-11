@@ -270,6 +270,7 @@ fn parameter(table: &Table) -> Refused<Parameter> {
         repeated: false,
         allowed: Vec::new(),
         format: None,
+        pattern: None,
     })
 }
 

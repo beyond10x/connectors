@@ -26,7 +26,11 @@
 //!    before any adapter call.
 //! 4. [`Bridge::invoke`]: an operation outside the described reads and writes
 //!    is `unsupported` before the credential is read. This repeats 2.
-//! 5. With `catalog.repositories`, a read or a write whose `owner` and `repo`
+//! 5. With `catalog.allowed_values`, an input of a named operation present
+//!    with a value its non-empty list does not name is `forbidden`, the
+//!    message naming the input as not one of the instance's allowed values
+//!    (story:catalog-grafana-datasource-proxy-reads). Then, with
+//!    `catalog.repositories`, a read or a write whose `owner` and `repo`
 //!    name no listed repository is `not_found`, with the message a missing
 //!    repository gets (story:catalog-reads-stay-inside-the-instance-repositories).
 //!    On `/v1alpha2/invoke` the host asks [`Bridge`]'s `admit` before it
@@ -51,8 +55,10 @@
 //! write whose answer carries a credential it created (the served host has no
 //! custody target), more than one profile, a profile whose material is
 //! acquired by OAuth, alternative bindings, a credential that cannot be read
-//! now, and a `catalog.repositories` that is empty or has an entry that is
-//! not `<owner>/<repo>`.
+//! now, a `catalog.repositories` that is empty or has an entry that is
+//! not `<owner>/<repo>`, and a `catalog.allowed_values` that names an
+//! operation the instance does not describe, an input that operation does
+//! not take, an empty or repeated value, or an operation or input named twice.
 use crate::local::{Instance, Local};
 use connectors_core::{Descriptor, Error, ErrorCode, Result};
 use connectors_host::{
@@ -63,7 +69,7 @@ use connectors_sdk::{Secret, WriteOutcome};
 use serde::Deserialize;
 use serde_json::Value;
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     sync::Arc,
     time::{Duration, Instant},
@@ -188,6 +194,73 @@ pub struct Catalog {
     /// as `null`, it is a list with no repository, which start refuses.
     #[serde(default, deserialize_with = "present")]
     repositories: Option<Vec<String>>,
+    /// Per described operation, per string input member, the values that
+    /// input may take ([`Bridge::allowing`]), such as the data source `uid`s
+    /// a Grafana instance's proxy reads reach. An empty or absent list admits
+    /// every value. A key repeated at either level is refused
+    /// ([`unique_allowed`]).
+    #[serde(default, deserialize_with = "unique_allowed")]
+    allowed_values: AllowedValues,
+}
+
+/// `catalog.allowed_values`: operation id, then input member, then values.
+type AllowedValues = BTreeMap<String, BTreeMap<String, Vec<String>>>;
+
+/// A map read with every key once. The YAML reader takes a repeated key and
+/// keeps its last value, so an empty list repeated after a non-empty one would
+/// otherwise admit every value; here the repeat is refused instead.
+struct Unique<V>(BTreeMap<String, V>);
+
+impl<'de, V: Deserialize<'de>> Deserialize<'de> for Unique<V> {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        struct Keys<V>(std::marker::PhantomData<V>);
+        impl<'de, V: Deserialize<'de>> serde::de::Visitor<'de> for Keys<V> {
+            type Value = Unique<V>;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a map that names each key once")
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> std::result::Result<Self::Value, A::Error> {
+                let mut entries = BTreeMap::new();
+                while let Some(key) = map.next_key::<String>()? {
+                    if entries.contains_key(&key) {
+                        return Err(serde::de::Error::custom(format!(
+                            "allowed_values repeats `{key}`"
+                        )));
+                    }
+                    let value = map.next_value()?;
+                    entries.insert(key, value);
+                }
+                Ok(Unique(entries))
+            }
+        }
+        deserializer.deserialize_map(Keys(std::marker::PhantomData))
+    }
+}
+
+/// `catalog.allowed_values`, refusing a repeated operation id or a repeated
+/// input member of one operation.
+fn unique_allowed<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<AllowedValues, D::Error> {
+    let operations = Unique::<Unique<Vec<String>>>::deserialize(deserializer)?;
+    Ok(operations
+        .0
+        .into_iter()
+        .map(|(operation, inputs)| (operation, inputs.0))
+        .collect())
+}
+
+/// The refusal of an input outside its operation's allowed values.
+fn not_allowed(input: &str) -> Error {
+    Error::new(
+        ErrorCode::Forbidden,
+        format!("input `{input}` is not one of the instance's allowed values"),
+    )
 }
 
 /// A member that is present is `Some`, `null` included (as no entry); only
@@ -231,7 +304,9 @@ pub async fn run(path: &Path) -> Result<()> {
     } else {
         Bridge::new(local, &config.credential).await?
     }
-    .within(bounds);
+    .within(bounds)
+    .allowing(&config.catalog.allowed_values)
+    .map_err(|refusal| Error::invalid(format!("catalog: {refusal}")))?;
     if config.service.instance != bridge.instance {
         return Err(Error::invalid(
             "service.instance must be the catalog instance's id",
@@ -323,6 +398,7 @@ impl Catalog {
                 endpoint,
                 profile,
                 repositories: _,
+                allowed_values: _,
             } => Local::derive(&Instance {
                 connector,
                 name,
@@ -340,6 +416,7 @@ impl Catalog {
                 endpoint: None,
                 profile: None,
                 repositories: _,
+                allowed_values: _,
             } => Local::load(path)
                 .map_err(|failure| refused("the local configuration cannot be loaded", failure)),
             Self {
@@ -351,6 +428,7 @@ impl Catalog {
                 endpoint,
                 profile,
                 repositories: _,
+                allowed_values: _,
             } => lowered(
                 definition,
                 root,
@@ -471,6 +549,9 @@ pub struct Bridge<A> {
     /// `catalog.repositories`: when set, the only repositories an operation
     /// reaches.
     repositories: Option<Vec<Repository>>,
+    /// `catalog.allowed_values` without its empty lists: per operation, per
+    /// input member, the only values it reaches.
+    allowed: AllowedValues,
 }
 
 /// Whether an operation's input has both `owner` and `repo` members.
@@ -501,9 +582,71 @@ impl<A> Bridge<A> {
         self
     }
 
-    /// Refusal: with a repository list, an input that names no listed
-    /// repository, answered as a missing repository is.
-    fn bounded(&self, input: &Value) -> Result<()> {
+    /// The bridge bounded to `allowed`: each named operation must be one this
+    /// bridge describes, each named input a member of its input, and each
+    /// value a non-empty string listed once. An empty list admits every value
+    /// and bounds nothing. The error is the refusal's text.
+    fn allowing(mut self, allowed: &AllowedValues) -> std::result::Result<Self, String> {
+        for (operation, inputs) in allowed {
+            let Some(described) = self
+                .descriptor
+                .operations
+                .iter()
+                .find(|described| &described.id == operation)
+            else {
+                return Err(format!(
+                    "allowed_values names `{operation}`, which the instance does not describe"
+                ));
+            };
+            for (input, values) in inputs {
+                if described.input_schema["properties"].get(input).is_none() {
+                    return Err(format!(
+                        "allowed_values names `{input}`, which is not an input of `{operation}`"
+                    ));
+                }
+                let mut seen = BTreeSet::new();
+                if values
+                    .iter()
+                    .any(|value| value.is_empty() || !seen.insert(value))
+                {
+                    return Err(format!(
+                        "allowed_values lists an empty or repeated value of `{input}` for `{operation}`"
+                    ));
+                }
+                if !values.is_empty() {
+                    self.allowed
+                        .entry(operation.clone())
+                        .or_default()
+                        .insert(input.clone(), values.clone());
+                }
+            }
+        }
+        Ok(self)
+    }
+
+    /// Refusal: an input of `operation` present with a value its non-empty
+    /// allowed values do not list, compared on the text the engine sends it
+    /// as (a string as it is, an integer or a boolean as its literal), and
+    /// any other JSON value, `forbidden` by name; then, with a repository
+    /// list, an input that names no listed repository, answered as a missing
+    /// repository is.
+    fn bounded(&self, operation: &str, input: &Value) -> Result<()> {
+        for (name, values) in self.allowed.get(operation).into_iter().flatten() {
+            let Some(value) = input.get(name) else {
+                continue;
+            };
+            let text = match value {
+                Value::String(text) => Some(text.clone()),
+                Value::Number(number) if number.is_i64() || number.is_u64() => {
+                    Some(number.to_string())
+                }
+                Value::Bool(flag) => Some(flag.to_string()),
+                _ => None,
+            };
+            if !text.is_some_and(|text| values.contains(&text)) {
+                return Err(not_allowed(name));
+            }
+        }
         let Some(list) = &self.repositories else {
             return Ok(());
         };
@@ -609,6 +752,7 @@ impl<A: runtime::Adapter> Bridge<A> {
                 profile: profile.id.clone(),
             },
             repositories: None,
+            allowed: AllowedValues::new(),
         };
         // A credential that cannot be read now refuses start.
         drop(bridge.credential.read().await?);
@@ -622,9 +766,10 @@ impl<A: runtime::Adapter> connectors_sdk::Adapter for Bridge<A> {
         self.descriptor.clone()
     }
 
-    /// The repository check, before the host anchors the call.
-    fn admit(&self, _operation: &str, input: &Value) -> Result<()> {
-        self.bounded(input)
+    /// The allowed-values and repository checks, before the host anchors the
+    /// call.
+    fn admit(&self, operation: &str, input: &Value) -> Result<()> {
+        self.bounded(operation, input)
     }
 
     async fn invoke(&self, operation: &str, input: Value) -> Result<Value> {
@@ -682,8 +827,9 @@ impl<A: runtime::Adapter> Bridge<A> {
                 "the served host dispatches only the operations it describes",
             ));
         }
-        // Refusal: with a repository list, an unlisted repository.
-        self.bounded(input)?;
+        // Refusal: an input outside its allowed values; with a repository
+        // list, an unlisted repository.
+        self.bounded(operation, input)?;
         // Refusal: no mounted credential now, so nothing is sent.
         self.credential.read().await
     }
@@ -994,6 +1140,7 @@ mod tests {
                 profile: "fixture.pat".into(),
             },
             repositories: None,
+            allowed: AllowedValues::new(),
             adapter,
         };
         use connectors_sdk::Adapter as _;
@@ -1019,6 +1166,7 @@ mod tests {
                 profile: "fixture.pat".into(),
             },
             repositories: None,
+            allowed: AllowedValues::new(),
             adapter,
         };
         use connectors_sdk::Adapter as _;
@@ -1086,6 +1234,94 @@ mod tests {
         );
     }
 
+    /// story:catalog-grafana-datasource-proxy-reads: `catalog.allowed_values`
+    /// that names an operation the instance does not describe, an input it
+    /// does not take, or an empty or repeated value refuses start. A listed
+    /// value passes, compared on the text it is sent as (an integer as its
+    /// decimal text); an unlisted one, or a value that is no scalar, is `forbidden`
+    /// before the credential is read and before any adapter call, an absent
+    /// input is left to the engine, an empty list bounds nothing, and an
+    /// operation the list does not name is not bounded by another's list.
+    #[tokio::test]
+    async fn allowed_values_refuse_start_or_bound_their_operation_alone() {
+        use connectors_sdk::Adapter as _;
+        let operations: &[(&str, Effect, &str, &[&str])] = &[
+            (
+                "proxy.query",
+                Effect::Read,
+                "generic-http",
+                &["uid", "query"],
+            ),
+            ("dashboard.get", Effect::Read, "generic-http", &["uid"]),
+        ];
+        let allowing = |allowed: Value| {
+            let allowed: AllowedValues = serde_json::from_value(allowed).unwrap();
+            unreadable(Listed::taking(operations)).allowing(&allowed)
+        };
+        for (allowed, refusal) in [
+            (
+                serde_json::json!({"other.read": {"uid": ["a"]}}),
+                "allowed_values names `other.read`, which the instance does not describe",
+            ),
+            (
+                serde_json::json!({"proxy.query": {"id": ["a"]}}),
+                "allowed_values names `id`, which is not an input of `proxy.query`",
+            ),
+            (
+                serde_json::json!({"proxy.query": {"uid": ["a", ""]}}),
+                "allowed_values lists an empty or repeated value of `uid` for `proxy.query`",
+            ),
+            (
+                serde_json::json!({"proxy.query": {"uid": ["a", "a"]}}),
+                "allowed_values lists an empty or repeated value of `uid` for `proxy.query`",
+            ),
+        ] {
+            assert_eq!(allowing(allowed).err().as_deref(), Some(refusal));
+        }
+
+        let bridge =
+            allowing(serde_json::json!({"proxy.query": {"uid": ["prom-a", "42"]}})).unwrap();
+        let forbidden = not_allowed("uid");
+        for input in [
+            serde_json::json!({"uid": "prom-b", "query": "up"}),
+            serde_json::json!({"uid": "PROM-A", "query": "up"}),
+            serde_json::json!({"uid": ["prom-a"], "query": "up"}),
+            serde_json::json!({"uid": 43, "query": "up"}),
+            serde_json::json!({"uid": 42.0, "query": "up"}),
+        ] {
+            let refused = bridge.admit("proxy.query", &input).unwrap_err();
+            assert_eq!(refused.code, ErrorCode::Forbidden, "{input}");
+            assert_eq!(refused.message, forbidden.message, "{input}");
+            let refused = bridge.invoke("proxy.query", input).await.unwrap_err();
+            assert_eq!(refused.code, ErrorCode::Forbidden);
+        }
+        assert_eq!(
+            forbidden.message,
+            "input `uid` is not one of the instance's allowed values"
+        );
+        // Past the list, the next check: no credential, so nothing is sent.
+        for (operation, input) in [
+            (
+                "proxy.query",
+                serde_json::json!({"uid": "prom-a", "query": "up"}),
+            ),
+            ("proxy.query", serde_json::json!({"uid": 42, "query": "up"})),
+            ("proxy.query", serde_json::json!({"query": "up"})),
+            ("dashboard.get", serde_json::json!({"uid": "prom-b"})),
+        ] {
+            bridge.admit(operation, &input).unwrap();
+            let refused = bridge.invoke(operation, input).await.unwrap_err();
+            assert_eq!(refused.code, ErrorCode::Unavailable, "{operation}");
+        }
+        assert_eq!(bridge.adapter.calls.load(Ordering::SeqCst), 0);
+
+        let empty = allowing(serde_json::json!({"proxy.query": {"uid": []}})).unwrap();
+        assert!(empty.allowed.is_empty());
+        empty
+            .admit("proxy.query", &serde_json::json!({"uid": "any"}))
+            .unwrap();
+    }
+
     /// The fixture bridge of `adapter`, its credential never readable, its
     /// reads and writes the described ones of each effect.
     fn unreadable(adapter: Listed) -> Bridge<Listed> {
@@ -1110,6 +1346,7 @@ mod tests {
                 profile: "fixture.pat".into(),
             },
             repositories: None,
+            allowed: AllowedValues::new(),
             adapter,
         }
     }

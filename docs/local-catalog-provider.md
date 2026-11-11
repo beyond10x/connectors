@@ -116,7 +116,13 @@ is one of:
   `GET /v1/incidents/{identifier}/associated-alert-ids`. `operation_id` names
   the new operation. Each parameter is written like an added parameter, with
   `location` `path` or `query`; the path parameters must be exactly the
-  path's `{...}` placeholders, each `required: true`. The operation declares no
+  path's `{...}` placeholders, each `required: true`. A parameter may add
+  `"pattern": "^...$"`, a regular expression of at most 256 bytes anchored at
+  both ends, which the engine holds all of every value of it to before any
+  request, matching it as `\A(?:pattern)\z` so a top-level `|`, `(?m)` or a
+  `(?x)` comment cannot match part of a value, and refusing another as ``parameter `<name>` does not match its pattern``; Grafana's
+  proxy reads hold `uid` to `^[A-Za-z0-9_-]{1,40}$` this way
+  ([Grafana guide](catalog-grafana.md#the-shipped-selection-set)). The operation declares no
   body and no response, and the engine reads its answer as JSON.
 
 The file must carry the source's SHA-256. An operation that is missing or
@@ -131,7 +137,8 @@ method is not `get`, whose `operation_id` the source already declares, whose
 path a GET of the source already has, does not start with `/` or holds a
 parenthesised group, query or fragment, whose path parameters are not exactly
 its placeholders, required and unrepeated, or which declares a header or cookie
-parameter or one parameter twice are each refused before any bundle
+parameter, one parameter twice or a `pattern` that is not anchored or does not
+compile on its own or in that form, and a `pattern` on an added parameter, are each refused before any bundle
 is written, and nothing is applied. The bundle's source record then names the file and its
 SHA-256 (`crates/connectors-catalog/src/amendment.rs`; the format is modelled as
 `connectors_catalog.amendment` in `adapters/catalog/spec/ess`). Zendesk uses it

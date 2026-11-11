@@ -73,6 +73,14 @@
       "unsupported": 0
     },
     {
+      "provider": "grafana",
+      "file_name": "grafana.bundle.json",
+      "bundle_sha256": "ea04d80f0d1608ba40aab06d03442e94185be519f5ffd07b3a32a27360e054cc",
+      "source_sha256": "be8923b42413a640f92af54a728f5b04f936a2851a04b8dfa277ae0db3bdebdc",
+      "operations": 317,
+      "unsupported": 0
+    },
+    {
       "provider": "hubspot",
       "file_name": "hubspot.bundle.json",
       "bundle_sha256": "d4d2b0e1adf9208a2b3e93022ae9ec25f6b13b0a2579d73f0129d54384ec1e86",

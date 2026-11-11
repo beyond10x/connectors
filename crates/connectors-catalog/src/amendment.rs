@@ -24,7 +24,9 @@
 //! does. An added operation is a GET under a new `operationId` and a path no
 //! GET of the source has, with path parameters exactly its placeholders and
 //! otherwise query parameters only, so it adds a read and leaves every
-//! declared operation as it was. Everything else is refused.
+//! declared operation as it was; a parameter of it may declare an anchored
+//! `pattern` its values must match, which only narrows what a caller may send,
+//! such as Grafana's data-source `uid` alphabet. Everything else is refused.
 
 use crate::SourceRecord;
 use crate::inventory::{Inventory, Location, Operation, Parameter};
@@ -211,6 +213,12 @@ fn add_parameter(id: &str, parameter: &Parameter, operation: &mut Operation) -> 
             parameter.name
         )));
     }
+    if parameter.pattern.is_some() {
+        return Err(invalid(format!(
+            "`{}` on `{id}`: only an added operation's parameter declares a `pattern`",
+            parameter.name
+        )));
+    }
     if operation
         .parameters
         .iter()
@@ -231,8 +239,11 @@ fn add_parameter(id: &str, parameter: &Parameter, operation: &mut Operation) -> 
 /// amendment before it applied; no GET there has its path; the path starts
 /// with `/` and holds no parenthesised group, query or fragment; its path
 /// parameters are exactly the placeholders of its path, each required and
-/// unrepeated; every other parameter is a named query parameter; and no
-/// parameter is declared twice in one location.
+/// unrepeated; every other parameter is a named query parameter; no
+/// parameter is declared twice in one location; and a parameter's `pattern`,
+/// when it declares one, is an anchored regular expression
+/// ([`crate::inventory::pattern_is_anchored`]), which the engine holds every
+/// value of it to before any request.
 fn add_operation(
     id: &str,
     added: &AddedOperation,
@@ -290,6 +301,16 @@ fn add_operation(
         if !fits {
             return Err(invalid(format!(
                 "`{id}`: `{name}` is not a query parameter or a required, unrepeated path parameter its path names"
+            )));
+        }
+        if parameter
+            .pattern
+            .as_deref()
+            .is_some_and(|pattern| !crate::inventory::pattern_is_anchored(pattern))
+        {
+            return Err(invalid(format!(
+                "`{id}`: `{name}` declares a `pattern` that is not a regular expression from `^` to `$` of at most {} bytes",
+                crate::inventory::PATTERN_MAX_BYTES
             )));
         }
     }
@@ -451,6 +472,7 @@ mod tests {
                     repeated: false,
                     allowed: Vec::new(),
                     format: None,
+                    pattern: None,
                 }],
                 request_media_types: Vec::new(),
                 responses: Vec::new(),
@@ -560,6 +582,7 @@ mod tests {
                 repeated: false,
                 allowed: Vec::new(),
                 format: None,
+                pattern: None,
             }],
             request_media_types: Vec::new(),
             responses: Vec::new(),
@@ -725,6 +748,7 @@ mod tests {
                 repeated: false,
                 allowed: Vec::new(),
                 format: None,
+                pattern: None,
             }],
             request_media_types: vec!["multipart/form-data".into()],
             responses: Vec::new(),
@@ -825,6 +849,7 @@ mod tests {
                     repeated: false,
                     allowed: Vec::new(),
                     format: None,
+                    pattern: None,
                 },
                 Parameter {
                     name: "identifierType".into(),
@@ -834,6 +859,7 @@ mod tests {
                     repeated: false,
                     allowed: Vec::new(),
                     format: None,
+                    pattern: None,
                 },
                 Parameter {
                     name: "limit".into(),
@@ -843,6 +869,7 @@ mod tests {
                     repeated: false,
                     allowed: Vec::new(),
                     format: None,
+                    pattern: None,
                 },
             ],
             request_media_types: Vec::new(),
@@ -925,6 +952,86 @@ mod tests {
                 String::from_utf8_lossy(&bytes)
             );
             assert_eq!(inventory, self::inventory());
+        }
+    }
+
+    /// story:catalog-grafana-datasource-proxy-reads (review finding A): an
+    /// added operation's parameter may declare an anchored `pattern`, which is
+    /// recorded on it; an unanchored, uncompilable or overlong one, and any
+    /// `pattern` on an added query parameter of a source operation, is refused
+    /// and nothing is applied.
+    #[test]
+    fn an_added_operations_pattern_is_recorded_only_when_anchored() {
+        let source = source();
+        let sha = source.source_sha256.clone();
+        let op = "GetAssociatedAlertIds";
+        let with = |pattern: &str| {
+            format!(
+                r#"[{{"name":"identifier","location":"path","required":true,"type":"string","pattern":{}}}]"#,
+                serde_json::to_string(pattern).unwrap()
+            )
+        };
+        let mut inventory = inventory();
+        let bytes = added(&sha, &[(op, "get", LINK, &with("^[A-Za-z0-9_-]{1,40}$"))]);
+        apply("amendments.json", &bytes, &source, &mut inventory).unwrap();
+        let recorded = &inventory.operations.last().unwrap().parameters[0];
+        assert_eq!(recorded.pattern.as_deref(), Some("^[A-Za-z0-9_-]{1,40}$"));
+        let overlong = format!("^{}$", "a".repeat(crate::inventory::PATTERN_MAX_BYTES));
+        let mut refused: Vec<Vec<u8>> = [
+            "[A-Za-z0-9_-]{1,40}$",
+            "^[A-Za-z0-9_-]{1,40}",
+            "^[A-Za-z0-9_-]{1,40}\\$",
+            "^[A-Za-z0-9_-{1,40}$",
+            "^[A-Za-z0-9_-]{1,40}(?x)#$",
+            "^[A-Za-z0-9_-]{1,40})|(x$",
+            overlong.as_str(),
+        ]
+        .iter()
+        .map(|pattern| added(&sha, &[(op, "get", LINK, &with(pattern))]))
+        .collect();
+        refused.push(document(
+            &sha,
+            "IncrementalTicketExportCursor",
+            r#"{"name":"per_page","location":"query","required":false,"pattern":"^[0-9]+$"}"#,
+        ));
+        for bytes in refused {
+            let mut inventory = self::inventory();
+            assert!(
+                apply("amendments.json", &bytes, &source, &mut inventory).is_err(),
+                "{}",
+                String::from_utf8_lossy(&bytes)
+            );
+            assert_eq!(inventory, self::inventory());
+        }
+        assert_eq!(
+            crate::inventory::pattern_matches("^[A-Za-z0-9_-]{1,40}$", "fixture-prom"),
+            Some(true)
+        );
+        for uid in ["a/b", "a\\b", "", "a\n", &"a".repeat(41)] {
+            assert_eq!(
+                crate::inventory::pattern_matches("^[A-Za-z0-9_-]{1,40}$", uid),
+                Some(false),
+                "{uid:?}"
+            );
+        }
+        // Security pass 2: a pattern that starts with `^` and ends with `$` still holds the
+        // whole value, whatever it holds inside: a top-level `|` and `(?m)` cannot open it.
+        for (pattern, uid, whole) in [
+            (
+                "^[A-Za-z0-9_-]{1,40}|x$",
+                "a/../../api/admin/settings",
+                false,
+            ),
+            ("^[A-Za-z0-9_-]{1,40}|x$", "x", true),
+            ("^[A-Za-z0-9_-]{1,40}|x$", "abc", true),
+            ("^(?m)[A-Za-z0-9_-]{1,40}$", "abc\n/../admin", false),
+            ("^(?m)[A-Za-z0-9_-]{1,40}$", "abc", true),
+        ] {
+            assert_eq!(
+                crate::inventory::pattern_matches(pattern, uid),
+                Some(whole),
+                "{pattern} {uid:?}"
+            );
         }
     }
 
