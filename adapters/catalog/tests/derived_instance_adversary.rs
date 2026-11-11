@@ -54,8 +54,10 @@ impl Installation {
 
     fn read(&self, body: &str) -> Result<Config, Failure> {
         let _guard = ENV.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        // SAFETY: every reader and writer of the environment in this test
-        // binary holds `ENV`.
+        // SAFETY: every reader and writer of this variable in this test
+        // binary holds `ENV`; the test binary also holds the other catalog
+        // suites, so the variable is put back before the lock is released.
+        let previous = std::env::var_os("CONNECTORS_INSTALLATION");
         unsafe { std::env::set_var("CONNECTORS_INSTALLATION", self.root.path().join("bin")) };
         let paths = Paths::resolve(
             Some(&self.root.path().join("config/config.toml")),
@@ -73,7 +75,12 @@ impl Installation {
             ),
         )
         .unwrap();
-        Config::load(&paths.config)
+        let loaded = Config::load(&paths.config);
+        match previous {
+            Some(value) => unsafe { std::env::set_var("CONNECTORS_INSTALLATION", value) },
+            None => unsafe { std::env::remove_var("CONNECTORS_INSTALLATION") },
+        }
+        loaded
     }
 }
 
