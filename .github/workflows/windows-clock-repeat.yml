@@ -1,0 +1,42 @@
+name: Windows clock-check repeat
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  repeat:
+    name: clock-check tests 20 times on windows-latest
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install Rust 1.98.1
+        shell: bash
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal
+          rustup default 1.98.1
+      - name: Build the local CLI tests
+        shell: bash
+        run: cargo test --locked -p connectors --test local_cli --no-run
+      - name: Run the clock-check tests 20 times
+        shell: bash
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          passed=0
+          for i in $(seq 1 20); do
+            echo "::group::run $i"
+            if cargo test --locked -p connectors --test local_cli clock_check -- --test-threads=1; then
+              passed=$((passed + 1))
+            else
+              echo "run $i failed"
+            fi
+            echo "::endgroup::"
+          done
+          echo "clock-check runs passed: $passed of 20"
+          test "$passed" -eq 20
