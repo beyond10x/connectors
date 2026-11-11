@@ -135,3 +135,14 @@ jobs:
             shown=$((shown + 1))
             [ "$shown" -lt 5 ] || break
           done
+      - name: Keep the journeys report and logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ignored-journeys
+          path: |
+            .local/ignored-suites.json
+            .local/ignored-suites.logs/
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 14
