@@ -73,6 +73,8 @@ jobs:
     name: ignored CLI journeys
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      CARGO_TARGET_DIR: /target
     container:
       image: archlinux:base@sha256:d4594bb2300cba11f41c2f27923eb56f63d9988909c402f9c95517d1e362c899
       options: --privileged
@@ -135,3 +137,14 @@ jobs:
             shown=$((shown + 1))
             [ "$shown" -lt 5 ] || break
           done
+      - name: Keep the journeys report and logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ignored-journeys
+          path: |
+            .local/ignored-suites.json
+            .local/ignored-suites.logs/
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 14
