@@ -54,12 +54,16 @@ pub enum Supplied {
     Provider,
     /// `CONNECTORS_TEST_CLI`, the built production CLI.
     Cli,
+    /// The qualified GNOME Secret Service and `/usr/bin/dbus-daemon`, which the
+    /// CI job installs; a host without them still reports the test missing.
+    Custody,
 }
 impl Supplied {
     fn key(self) -> &'static str {
         match self {
             Supplied::Provider => PROVIDER,
             Supplied::Cli => CLI,
+            Supplied::Custody => CUSTODY,
         }
     }
 }
@@ -1846,6 +1850,89 @@ fn selected_fixture() {{
         assert_eq!(waited, -1, "owned live leader must already be reaped");
         assert_eq!(error.raw_os_error(), Some(libc::ECHILD));
         assert!(other_still_running, "another fixture group was affected");
+    }
+
+    /// The CLI journeys' lane read from the workflow that declares it: a job
+    /// every pull request runs, whose red journey fails the pull request.
+    mod journeys_lane {
+        use super::*;
+        use serde_yaml_ng::Value;
+
+        const WORKFLOW: &str = include_str!("../../../.github/workflows/rust-gate.yml");
+        const JOURNEY: (&str, &str, &str) = (
+            "connectors-catalog-provider",
+            "local_runtime",
+            "cli_journey::lifecycle::catalog_cli_failed_repair_and_busy_stop_preserve_authority",
+        );
+        fn options_of(command: &str) -> Option<Options> {
+            let (_, args) = command.trim().split_once("connectors-build -- ")?;
+            let argv: Vec<&str> = std::iter::once("connectors-build")
+                .chain(args.split_whitespace())
+                .collect();
+            match crate::Args::try_parse_from(argv).ok()?.command {
+                crate::Action::Ignored(options) => Some(options),
+                _ => None,
+            }
+        }
+
+        #[test]
+        fn a_pull_request_job_runs_the_cli_journeys_and_a_red_one_fails_it() {
+            let workflow: Value = serde_yaml_ng::from_str(WORKFLOW).unwrap();
+            let trigger = workflow.get("on").expect("the workflow names its triggers");
+            let pull_request = trigger
+                .get("pull_request")
+                .expect("the workflow runs on every pull request");
+            assert!(
+                pull_request.is_null(),
+                "a branch or path filter would let a pull request skip the journeys"
+            );
+            let jobs = workflow.get("jobs").and_then(Value::as_mapping).unwrap();
+            let mut lanes = vec![];
+            for (name, job) in jobs {
+                let steps = job.get("steps").and_then(Value::as_sequence).unwrap();
+                for step in steps {
+                    let run = step.get("run").and_then(Value::as_str).unwrap_or("");
+                    let Some(options) = options_of(run) else {
+                        continue;
+                    };
+                    if options.only_prerequisite.contains(&Supplied::Cli) {
+                        lanes.push((name.as_str().unwrap().to_owned(), job, step, options));
+                    }
+                }
+            }
+            assert_eq!(
+                lanes.len(),
+                1,
+                "exactly one job runs the CLI journeys: {:?}",
+                lanes.iter().map(|lane| &lane.0).collect::<Vec<_>>()
+            );
+            let (name, job, step, options) = lanes.pop().unwrap();
+            assert!(
+                options.required,
+                "{name}: a missing prerequisite must refuse, not skip"
+            );
+            assert_eq!(options.family, [Family::Disposable], "{name}");
+            for needed in [Supplied::Provider, Supplied::Cli, Supplied::Custody] {
+                assert!(options.only_prerequisite.contains(&needed), "{name}");
+            }
+            for holder in [job, step] {
+                assert!(holder.get("continue-on-error").is_none(), "{name}");
+                assert!(
+                    holder.get("if").is_none(),
+                    "{name}: a conditional journey step can pass a pull request unrun"
+                );
+            }
+            let report = evaluate(classified(&[JOURNEY]), &options, |_| vec![], |_| Ok(false));
+            assert_eq!(
+                (report.selected, report.failed),
+                (1, 1),
+                "the lane selects the lifecycle journey"
+            );
+            assert!(
+                !report.accepted(options.required),
+                "a red journey must fail the lane"
+            );
+        }
     }
 
     /// The provider-only lane read from the documents that declare it: the
