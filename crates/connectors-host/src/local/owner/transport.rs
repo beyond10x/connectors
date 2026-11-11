@@ -571,7 +571,19 @@ impl Client {
         connection: Option<String>,
         expected_revision: Option<String>,
     ) -> Result<Capture> {
-        self.begin_capture(adapter, profile, connection, expected_revision, false)
+        self.begin_capture(adapter, profile, connection, expected_revision, false, None)
+    }
+    /// As [`Client::begin`] of a profile, for the entry whose selection digest
+    /// is `selection`: the owner refuses `revision_conflict` before any
+    /// admission when the instance's entry selects otherwise
+    /// (story:definition-connect-begin-carries-selection).
+    pub fn begin_selected(
+        self,
+        adapter: &str,
+        profile: String,
+        selection: String,
+    ) -> Result<Capture> {
+        self.begin_capture(adapter, Some(profile), None, None, false, Some(selection))
     }
     /// Begins the capture of a caller that holds no protected source and runs
     /// the profile's OAuth2 grant itself: the owner begins it only for an
@@ -584,7 +596,7 @@ impl Client {
         connection: Option<String>,
         expected_revision: Option<String>,
     ) -> Result<Capture> {
-        self.begin_capture(adapter, profile, connection, expected_revision, true)
+        self.begin_capture(adapter, profile, connection, expected_revision, true, None)
     }
     fn begin_capture(
         mut self,
@@ -593,6 +605,7 @@ impl Client {
         connection: Option<String>,
         expected_revision: Option<String>,
         grant: bool,
+        expected_selection: Option<String>,
     ) -> Result<Capture> {
         self.same_build()?;
         let deadline = Instant::now() + Duration::from_secs(40);
@@ -604,6 +617,7 @@ impl Client {
                 connection,
                 expected_revision,
                 grant,
+                expected_selection,
             },
             None,
             &[],
@@ -2568,10 +2582,14 @@ fn action_value(
             connection,
             expected_revision,
             grant,
+            expected_selection,
             ..
         } => {
             if !document.is_empty() {
                 return Err(Code::InvalidInput.into());
+            }
+            if expected_selection.is_some_and(|expected| expected != adapter.selection()) {
+                return Err(Code::RevisionConflict.into());
             }
             let registry = registry::Registry::with_system_clock(&owner.paths.state);
             let profile = match (&connection, &expected_revision, profile) {

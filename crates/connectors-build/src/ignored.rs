@@ -461,6 +461,11 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "the_connect_question_of_an_oauth_profile_names_its_token_host_too"
             | "an_entry_another_run_recorded_while_the_question_waits_is_not_connected",
         ) => Some((Disposable, vec![PROVIDER])),
+        (
+            "connectors",
+            "definition_connect_question",
+            "an_entry_replaced_after_the_cli_checked_it_is_refused_at_begin_before_any_credential",
+        ) => Some((Disposable, vec![PROVIDER, CUSTODY])),
         ("connectors", "adversary_d218_u1", "describe_of_a_definition_needs_no_connection") => {
             Some((Disposable, vec![PROVIDER]))
         }
