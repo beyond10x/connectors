@@ -279,6 +279,7 @@ impl Custody {
             assert!(Instant::now() < until, "fixture bus did not start");
             std::thread::sleep(Duration::from_millis(20));
         }
+        let keyring_stderr = (directory.join("runtime")).with_extension("stderr");
         let mut daemon = OwnedProcess(
             Command::new("/usr/bin/gnome-keyring-daemon")
                 .args([
@@ -299,7 +300,7 @@ impl Custody {
                 )
                 .stdin(Stdio::piped())
                 .stdout(Stdio::null())
-                .stderr(Stdio::null())
+                .stderr(Stdio::from(std::fs::File::create(&keyring_stderr).unwrap()))
                 .spawn()
                 .unwrap(),
         );
@@ -312,8 +313,16 @@ impl Custody {
             .unwrap();
         let until = Instant::now() + Duration::from_secs(10);
         while !keyring::custody::available_at(Some(&socket)) {
-            assert!(Instant::now() < until, "fixture custody unavailable");
-            assert!(daemon.0.try_wait().unwrap().is_none());
+            assert!(
+                Instant::now() < until,
+                "fixture custody unavailable; keyring stderr: {}",
+                keyring_stderr_tail(&keyring_stderr)
+            );
+            assert!(
+                daemon.0.try_wait().unwrap().is_none(),
+                "fixture keyring daemon exited; its stderr: {}",
+                keyring_stderr_tail(&keyring_stderr)
+            );
             std::thread::sleep(Duration::from_millis(30));
         }
         Self {
@@ -859,4 +868,19 @@ fn an_adapter_identity_mismatch_outside_an_upgrade_names_a_repair() {
     );
     assert_eq!(mismatched.before.1, registry::State::Ready);
     assert_eq!(mismatched.after.1, registry::State::Stale);
+}
+
+/// The last lines the fixture's GNOME Keyring wrote to its standard error, for
+/// a failure message: the daemon's own words on why it never answered.
+fn keyring_stderr_tail(path: &std::path::Path) -> String {
+    match std::fs::read_to_string(path) {
+        Ok(text) if text.trim().is_empty() => {
+            format!("(empty: {} was written nothing)", path.display())
+        }
+        Ok(text) => {
+            let lines: Vec<&str> = text.lines().collect();
+            lines[lines.len().saturating_sub(20)..].join("\n")
+        }
+        Err(error) => format!("(unreadable: {}: {error})", path.display()),
+    }
 }

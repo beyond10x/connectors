@@ -1933,6 +1933,46 @@ fn selected_fixture() {{
                 "a red journey must fail the lane"
             );
         }
+
+        /// The qualified Secret Service admits a keyring directory only on a
+        /// local ext filesystem (`gnome::Persistence::admit`, `f_type` 0xef53). The
+        /// job's container root is overlayfs, so the journeys directory must be an
+        /// ext4 mount made before the step that names it, and the job checks it.
+        #[test]
+        fn the_journeys_directory_is_an_ext4_mount_made_before_the_journeys_run() {
+            let workflow: Value = serde_yaml_ng::from_str(WORKFLOW).unwrap();
+            let job = workflow.get("jobs").and_then(|jobs| jobs.get("journeys"));
+            let steps = job
+                .and_then(|job| job.get("steps"))
+                .and_then(Value::as_sequence)
+                .expect("the journeys job has steps");
+            fn run(step: &Value) -> &str {
+                step.get("run").and_then(Value::as_str).unwrap_or("")
+            }
+            let journeys = steps
+                .iter()
+                .position(|step| options_of(run(step)).is_some())
+                .expect("a step runs the journeys");
+            let tmpdir = options_of(run(&steps[journeys])).unwrap().tmpdir.unwrap();
+            let mount = steps[..journeys]
+                .iter()
+                .position(|step| {
+                    let text = run(step);
+                    text.contains("mkfs.ext4")
+                        && text
+                            .contains(&format!("mount -o loop /journeys.img {}", tmpdir.display()))
+                })
+                .expect(
+                    "a step before the journeys makes an ext4 filesystem and mounts it on --tmpdir",
+                );
+            let text = run(&steps[mount]);
+            assert!(
+                text.contains("ef53") && text.contains("exit 1"),
+                "the mount step must refuse a directory that is not ext4"
+            );
+            let holder = &steps[mount];
+            assert!(holder.get("if").is_none() && holder.get("continue-on-error").is_none());
+        }
     }
 
     /// The provider-only lane read from the documents that declare it: the
