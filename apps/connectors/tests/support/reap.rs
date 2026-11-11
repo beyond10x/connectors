@@ -21,6 +21,9 @@ const BOUND: Duration = Duration::from_secs(10);
 /// names it with a ` (deleted)` suffix), or one given a path under `root` as an
 /// argument (its configuration or state directory).
 pub fn owners_under(root: &Path) -> Vec<i32> {
+    if !Path::new("/proc/self").exists() {
+        return owners_listed_by_ps(root);
+    }
     let mut pids = Vec::new();
     for entry in fs::read_dir("/proc").into_iter().flatten().flatten() {
         let Some(pid) = entry
@@ -51,6 +54,37 @@ pub fn owners_under(root: &Path) -> Vec<i32> {
         }
     }
     pids
+}
+
+/// Without `/proc` (macOS): the owners whose `ps` command line names
+/// `__connectors-owner` and a path under `root`. A jail cannot be seen this
+/// way, so only the given-path form is found.
+fn owners_listed_by_ps(root: &Path) -> Vec<i32> {
+    let Ok(output) = Command::new("ps")
+        .args(["-ax", "-o", "pid=", "-o", "command="])
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+    else {
+        return Vec::new();
+    };
+    let root = root.to_string_lossy();
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| {
+            let (pid, command) = line.trim_start().split_once(' ')?;
+            let words: Vec<&str> = command.split_whitespace().collect();
+            let owner = words.contains(&"__connectors-owner");
+            let given = words
+                .iter()
+                .any(|word| word.starts_with('/') && Path::new(word).starts_with(root.as_ref()));
+            if owner && given {
+                pid.parse().ok()
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn wait_gone(root: &Path, bound: Duration) -> Vec<i32> {

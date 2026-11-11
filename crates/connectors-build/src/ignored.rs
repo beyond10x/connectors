@@ -125,6 +125,7 @@ const PG: &str = "CONNECTORS_PG_SANDBOX";
 const PG_CONTAINER: &str = "CONNECTORS_PG_CONTAINER";
 const PG_ADVERSARY: &str = "CONNECTORS_PG_ADVERSARY_PORT";
 const MYSQL_ADVERSARY: &str = "CONNECTORS_MYSQL_ADVERSARY_PORT";
+const PG_SECURITY: &str = "CONNECTORS_PG_SECURITY_PORT";
 const DOCKER: &str = "docker";
 const K8S: &str = "CONNECTORS_K8S_SANDBOX";
 const CA: &str = "CONNECTORS_K8S_CA";
@@ -212,7 +213,13 @@ fn classify(suite: &Suite, name: &str) -> Entry {
         (
             "connectors-custody",
             "connectors_custody",
-            "tests::secret_service_answers_the_custody_contract",
+            "tests::secret_service_answers_the_custody_contract"
+            | "secret_service::inventory::tests::a_failed_barrier_still_names_the_deleted_items"
+            | "tests::session_keyring::custody_writes_reach_the_default_alias_collection"
+            | "tests::session_keyring::orphans_are_listed_and_removed_only_on_the_flag"
+            | "tests::session_keyring::removing_an_authority_leaves_no_item_carrying_it"
+            | "tests::session_keyring_review::a_daemon_without_login_receives_the_write_behind_the_alias"
+            | "tests::session_keyring_review::moved_alias_writes_behind_it_reads_login_and_removal_stays_inside_the_authority",
         ) => Some((Disposable, vec![CUSTODY])),
         (
             "connectors-catalog-provider",
@@ -393,7 +400,26 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "postgresql_a_partition_keeps_the_foreign_key_it_inherits"
             | "postgresql_index_list_leaves_out_a_whole_row_expression_over_a_hidden_column"
             | "postgresql_index_list_leaves_out_a_whole_row_predicate_over_a_hidden_column",
+        )
+        | (
+            "connectors-sql",
+            "adversary_pg_catalog",
+            "postgresql_live_catalogue_reads_of_several_columns_answer"
+            | "postgresql_live_read_never_runs_a_public_text_domain_check"
+            | "postgresql_live_read_of_two_columns_returns_its_row"
+            | "postgresql_live_type_lookup_never_runs_a_public_operator",
         ) => Some((Live, vec![PG_ADVERSARY])),
+        (
+            "connectors-sql",
+            "security_pg_catalog",
+            "live_catalogue_does_not_call_a_public_operator"
+            | "live_driver_type_lookup_does_not_call_a_public_operator"
+            | "live_size_guard_measures_what_the_page_sends"
+            | "live_text_keyset_orders_by_bytes_under_a_public_c_collation"
+            | "live_two_column_and_catalogue_reads_answer_without_any_shadow"
+            | "live_wrapper_cast_does_not_run_a_public_text_domain"
+            | "live_wrapper_does_not_call_a_public_octet_length_or_operator",
+        ) => Some((Live, vec![PG_SECURITY])),
         (
             "connectors-sql",
             "catalogue_adversary",
@@ -442,6 +468,14 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "connectors",
             "setup_migrate_records",
             "migrated_entries_keep_their_connections_and_approval_policies",
+        )
+        | (
+            "connectors",
+            "setup_custody_orphans",
+            "remove_deletes_only_the_named_foreign_authority"
+            | "remove_refuses_the_stores_own_authority"
+            | "remove_without_an_authority_deletes_nothing"
+            | "the_listing_groups_foreign_authorities_and_says_it_cannot_see_other_stores",
         ) => Some((Disposable, vec![CUSTODY])),
         (
             "connectors",
@@ -462,6 +496,11 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "connectors-catalog-provider",
             "jira_issue_writes_adversary",
             "a_comment_whose_content_is_null_is_refused_before_any_request",
+        )
+        | (
+            "connectors-catalog-provider",
+            "enum_date_time_adversary",
+            "adversary_declared_input_schema_lists_the_pinned_enum",
         )
         | (
             "connectors-catalog-provider",
@@ -868,7 +907,7 @@ fn prerequisites(environment: &BTreeMap<&str, OsString>) -> BTreeMap<&'static st
             "CONNECTORS_K8S_SANDBOX must name the prepared sandbox API base".into(),
         );
     }
-    for key in [PG_ADVERSARY, MYSQL_ADVERSARY] {
+    for key in [PG_ADVERSARY, MYSQL_ADVERSARY, PG_SECURITY] {
         if !std::env::var(key).is_ok_and(|port| port.parse::<u16>().is_ok_and(|port| port > 0)) {
             missing.insert(
                 key,

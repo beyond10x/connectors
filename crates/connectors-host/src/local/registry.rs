@@ -9,7 +9,7 @@ mod reuse;
 mod revalidation;
 mod use_and_retirement;
 pub use issue::{Issuance, Issue, Published, Recorded};
-#[cfg(debug_assertions)]
+#[cfg(all(debug_assertions, unix))]
 pub(crate) use lifecycle::{ACQUISITION_MS, PUBLICATION_FAILS_ONCE, PUBLICATION_REPLY_LOST_ONCE};
 pub use observation::{
     ObservedAcquisition, ObservedConnection, Page, PageOptions, PendingReason, State,
