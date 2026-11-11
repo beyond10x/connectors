@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:mcp-tool-deadline-keeps-the-server
 kind: story
-status: active
+status: implemented
 title: A tool request that reaches its own deadline answers timeout and the MCP server keeps running
 tags:
 - cr-001
@@ -15,10 +15,11 @@ scope:
   path: apps/connectors/src/mcp/stdio.rs
 - confidence: inferred
   path: apps/connectors/tests/adversary_local_mcp_server.rs
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-10T09:11:59Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-10T09:12:00Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:19Z", actor: "human:operator", revision: 5, decided_on: {"recorded":{"test_result":1,"review_outcome":7}}}
 ---
 ## Defect
 

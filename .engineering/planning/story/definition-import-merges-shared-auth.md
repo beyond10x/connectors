@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:definition-import-merges-shared-auth
 kind: story
-status: active
+status: implemented
 title: An import keeps the profiles of a shared auth file it does not ship
 summary: definition import rewrites auth/<prefix>.yaml whole from shipped profiles
 relations:
@@ -11,10 +11,11 @@ relations:
 scope:
 - confidence: cited
   path: crates/connectors-catalog/src/import.rs
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:59Z", actor: "human:operator", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:00Z", actor: "human:operator", revision: 5, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:07Z", actor: "human:operator", revision: 6, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 
