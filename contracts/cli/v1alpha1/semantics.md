@@ -1016,7 +1016,7 @@ step the held connection's own reconnect admits:
 | one connection that reconnect refuses as changed (`create_connection` on a read), or more than one | `revoke_connection`: `connections revoke` it, then connect |
 
 A connection with another identity (provider authority or profile
-authentication) is `configuration_changed` with `check_configuration`: only a new
+authentication) is `authentication_changed` with `check_configuration`: only a new
 instance id admits a connection. The refusal is the same
 under every custody binding: under the read-only `mounted_secret` binding the
 second connect of an instance is this `lifecycle_conflict`, not
@@ -1682,7 +1682,7 @@ never replay a possible write after interruption, timeout or lost response.
 | metadata publication acknowledgement uncertain, or an owner that failed or answered none (`owner_log` names its [log](owner.md#owner-log) and `owner_error` the code it logged, when it logged one) | `outcome_unknown` | 1 |
 | changed principal/account/target during repair (`next_action = revoke_connection`, [one connection per instance](#one-connection-per-instance)) | `identity_mismatch` | 1 |
 | stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`: run `connectors setup owner-stop`); `connections connect` on an instance that holds its connection, or while another connect of it is in flight ([one connection per instance](#one-connection-per-instance)) | `lifecycle_conflict` | 1 |
-| the provider authority or the profile's authentication changed under the configuration, so no connect, repair, revalidation, read or consumer launch under this instance id can succeed (`stage = admission`, `next_action = check_configuration`: configure a new instance id) | `configuration_changed` | 1 |
+| the provider authority or the profile's authentication changed under the configuration, so no connect, repair, revalidation or read under this instance id can succeed (`stage = admission`, `next_action = check_configuration`: configure a new instance id) | `authentication_changed` | 1 |
 | stale/foreign stop target | `incarnation_mismatch` | 1 |
 | wrong readiness identity/version/revision | `readiness_mismatch` | 1 |
 | a program that refused the private protocol the entry selects (`stage = readiness`, `next_action = check_configuration`, `private_protocol` named and `supported_private_protocols` where the program said; `instances status` of the instance answers it too) | `unsupported_private_protocol` | 1 |
@@ -1979,12 +1979,12 @@ id names the old connection's revocation while the instance holds it
 (`revoke_connection`, [one connection per instance](#one-connection-per-instance)),
 then admits the new connection. When the
 provider authority or the profile's authentication changed, the next action is
-`check_configuration` under the code `configuration_changed`, not
+`check_configuration` under the code `authentication_changed`, not
 `lifecycle_conflict`: no command under the same instance id can help, since
 `connections connect` there is refused for the same reason
-(`configuration_changed` at `stage = admission`, `next_action =
+(`authentication_changed` at `stage = admission`, `next_action =
 check_configuration`), and only a new instance id admits a new connection. The
-code names the cause, so a caller does not retry. The connections left under the earlier
+code names the cause, so a caller does not retry. A consumer launch there answers `lifecycle_conflict` with `revalidate_connection`; the revalidation that follows answers `authentication_changed`. The connections left under the earlier
 instance id stay revocable through the entry, under the same adapter, that
 moved: `connections revoke` reaches a connection whose recorded instance id no
 entry configures any longer, never one another entry still configures.

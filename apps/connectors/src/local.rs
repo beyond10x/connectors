@@ -374,7 +374,7 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         Forbidden => ("admission", "request_permission", false),
         NotFound => ("admission", "check_configuration", false),
         LifecycleConflict => ("admission", "retry_status", false),
-        ConfigurationChanged => ("admission", "check_configuration", false),
+        AuthenticationChanged => ("admission", "check_configuration", false),
         Revoked => ("admission", "create_connection", false),
         NotGranted | IdentityMismatch | ConnectionNotReady | InsufficientScope => {
             ("admission", "repair_connection", false)
@@ -1252,15 +1252,15 @@ mod tests {
     }
 
     /// story:configuration-change-error: a changed provider authority or
-    /// profile authentication is `configuration_changed`, not a
+    /// profile authentication is `authentication_changed`, not a
     /// `lifecycle_conflict` a retry could clear: only a new instance id helps,
     /// and the next action is `check_configuration`, as the owner transport
     /// carries it to the CLI and as the registry's own refusal answers it.
     #[test]
-    fn a_changed_authentication_is_configuration_changed() {
+    fn a_changed_authentication_is_authentication_changed() {
         use connectors_host::local::registry;
         let error = owner::Error::from(registry::Failure::AuthenticationChanged);
-        assert_eq!(error.code, owner::Code::ConfigurationChanged);
+        assert_eq!(error.code, owner::Code::AuthenticationChanged);
         let received: owner::Error =
             serde_json::from_value(serde_json::to_value(&error).unwrap()).unwrap();
         for error in [error, received] {
@@ -1274,7 +1274,7 @@ mod tests {
                 assert_eq!(
                     (&data["code"], &data["stage"], &data["next_action"]),
                     (
-                        &json!("configuration_changed"),
+                        &json!("authentication_changed"),
                         &json!("admission"),
                         &json!("check_configuration")
                     ),
@@ -1290,7 +1290,7 @@ mod tests {
         assert_eq!(
             (&data["code"], &data["next_action"]),
             (
-                &json!("configuration_changed"),
+                &json!("authentication_changed"),
                 &json!("check_configuration")
             )
         );

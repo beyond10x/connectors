@@ -711,7 +711,7 @@ fn no_next_action_after_a_revision_change_returns_to_an_earlier_refusal() {
                     refusals
                         .first()
                         .map(|(_, code, action)| (code.as_str(), action.as_str())),
-                    Some(("configuration_changed", "check_configuration")),
+                    Some(("authentication_changed", "check_configuration")),
                     "{start:?}"
                 );
             } else {

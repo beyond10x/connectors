@@ -524,7 +524,7 @@ pub(super) fn registry_failure(error: registry::Failure) -> HandlerReply {
         ),
         // Only a new instance id helps, and no retry can succeed.
         AuthenticationChanged => (
-            "configuration_changed",
+            "authentication_changed",
             "admission",
             "check_configuration",
             false,

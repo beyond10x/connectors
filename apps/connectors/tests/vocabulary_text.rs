@@ -276,7 +276,7 @@ fn a_failure_rendered_for_a_person_never_says_adapter() {
             rendered += 1;
         }
     }
-    // 41 codes, 12 stages and 15 next actions; `configuration_changed`
+    // 41 codes, 12 stages and 15 next actions; `authentication_changed`
     // (story:configuration-change-error), `instance_ambiguous` and
     // `connection_unresolved` (story:connectors-do-short-invocation), the four
     // refusals of `definitions install` (story:definitions-install), the

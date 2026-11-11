@@ -1057,7 +1057,7 @@ fn connect(
 /// A description that cannot be launched for because the connection is not
 /// current under the recorded entry answers what a read on that connection
 /// answers ([`Registry::admit_read`] against the binding the provider
-/// reported): an authority or profile change is today's `lifecycle_conflict`,
+/// reported): an authority or profile change is `authentication_changed`,
 /// and nothing is asked.
 fn described(
     paths: &Paths,
