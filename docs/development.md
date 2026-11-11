@@ -283,7 +283,10 @@ that record a known gap; [`ignored.rs`](../crates/connectors-build/src/ignored.r
 lists them, and each one's ignore reason names its limitation or follow-up story.
 They cover CLI contract invariants that ESS does not carry, a required catalog
 body key given as null, a required query parameter given as an empty string, and
-an owner bounded read that outlives a lost MCP stdio session. Select the family
+an owner bounded read that outlives a lost MCP stdio session. It also holds eleven
+CLI and host journeys that fail on `main` in the CI journeys container as well, deferred
+by `story:main-failing-ci-journeys` until that story fixes them, so the required
+`--only-prerequisite provider,cli,custody` job does not select them. Select the family
 explicitly to observe their current result. Subprocess helpers are always
 excluded from top-level execution; their owning parent tests invoke them.
 
