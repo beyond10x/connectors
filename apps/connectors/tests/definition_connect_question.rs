@@ -10,9 +10,10 @@
 //!
 //! The CLI runs on a fresh pseudo-terminal as the foreground of its own
 //! session, with the built catalog provider named by
-//! `CONNECTORS_TEST_CATALOG_PROVIDER` installed beside it. Custody names a
-//! socket that does not exist, so a connect that went on would be refused at
-//! its custody check: nothing is acquired or sent to any host.
+//! `CONNECTORS_TEST_CATALOG_PROVIDER` installed beside it.
+//! Custody is a live keyring, so a connect that went on would reach the token
+//! prompt; the owner refuses it first, so nothing is acquired or sent to any
+//! host.
 #![cfg(unix)]
 use sha2::{Digest, Sha256};
 use std::{
@@ -592,7 +593,8 @@ fn an_entry_replaced_after_the_cli_checked_it_is_refused_at_begin_before_any_cre
         "the hook did not replace A's entry before Begin"
     );
     // The owner refuses Begin for an entry the question was not asked for,
-    // before custody is consulted (which would answer `custody_unavailable`).
+    // before custody is consulted (a Begin that went on would reach the token
+    // prompt, custody being a live keyring here).
     let a_data = data(&output);
     assert_eq!(
         (&a_data["code"], &a_data["next_action"]),
