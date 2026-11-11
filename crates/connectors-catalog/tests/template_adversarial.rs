@@ -17,6 +17,7 @@ fn parameter(name: &str, location: Location, required: bool) -> Parameter {
         repeated: false,
         allowed: Vec::new(),
         format: None,
+        pattern: None,
     }
 }
 

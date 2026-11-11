@@ -31,7 +31,7 @@ struct Shipped {
     selection: &'static str,
 }
 
-const SHIPPED: [Shipped; 15] = [
+const SHIPPED: [Shipped; 16] = [
     Shipped {
         name: "confluence",
         catalog: "confluence",
@@ -66,6 +66,11 @@ const SHIPPED: [Shipped; 15] = [
         name: "google-slides",
         catalog: "google-slides",
         selection: "google-slides/operations.json",
+    },
+    Shipped {
+        name: "grafana",
+        catalog: "grafana",
+        selection: "grafana/operations.json",
     },
     Shipped {
         name: "hubspot",
@@ -250,8 +255,9 @@ fn assert_lowers_to_the_shipped_files(temp: &Path, name: &str, file: &Path, root
 }
 
 /// The selections with no committed connector declaration: Slack's user
-/// selection shares the catalog directory whose one declaration is the bot's.
-const UNDECLARED: [&str; 2] = ["openrouter", "slack-user"];
+/// selection shares the catalog directory whose one declaration is the bot's,
+/// and Grafana's connector name is the native `connectors-grafana` connector's.
+const UNDECLARED: [&str; 3] = ["grafana", "openrouter", "slack-user"];
 
 fn round_trip(name: &str) {
     let temp = tempfile::tempdir().unwrap();
@@ -371,6 +377,7 @@ connectors! {
     google_drive_round_trips, google_drive_is_committed => "google-drive";
     google_gmail_round_trips, google_gmail_is_committed => "google-gmail";
     google_slides_round_trips, google_slides_is_committed => "google-slides";
+    grafana_round_trips, grafana_is_committed => "grafana";
     hubspot_round_trips, hubspot_is_committed => "hubspot";
     jira_round_trips, jira_is_committed => "jira";
     openrouter_round_trips, openrouter_is_committed => "openrouter";

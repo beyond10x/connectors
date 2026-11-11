@@ -175,6 +175,20 @@ way. The file has three members:
 
   Without the list every described operation runs for any repository the credential
   reaches.
+
+  `catalog.allowed_values`, optional, holds an operation's string inputs to listed values: per
+  operation id, per input member, the values that input may take, for example
+  `{"prometheus.query": {"uid": ["prometheus-prod"]}}` for a Grafana instance's data sources
+  ([the catalog Grafana guide](catalog-grafana.md)). An input present with a value its
+  non-empty list does not name, compared exactly on the text it is sent as (an integer as its
+  decimal text), is `forbidden`, with the message
+  ``input `<name>` is not one of the instance's allowed values``, before the host records the
+  call, before the credential is read and before any request. An empty list, or no entry,
+  admits every value; an operation the member does not name is not bounded by it. Start refuses
+  an operation the instance does not describe, an input that operation does not take, an
+  empty or repeated value, and an operation id or an input member written twice, which a YAML
+  reader would otherwise take as its last entry, so a repeated empty list cannot open a
+  non-empty one.
 - `credential` names where the instance's credential document comes from. The only binding
   is `mounted_secret`. The document is the item `<directory>/<instance id>/<profile id>`,
   for example `gitlab.example-org/gitlab.pat`. Its content is the document the profile's
@@ -431,8 +445,8 @@ docker run --rm --entrypoint /usr/local/bin/connectors-kubernetes "ghcr.io/beyon
 ```
 
 ```text
-connectors-catalog-provider 0.70.0
-connectors-kubernetes 0.70.0
+connectors-catalog-provider 0.71.0
+connectors-kubernetes 0.71.0
 ```
 
 The image carries no configuration and no credential. Mount the configuration file, give the
