@@ -749,7 +749,7 @@ fn error(refusal: Refusal) -> Error {
             false,
         ),
         Forbidden => (ErrorCode::Forbidden, "forbidden", false),
-        Unavailable | Interrupted => (
+        Unavailable | Interrupted | PluginBusy => (
             ErrorCode::Unavailable,
             "the provider is not available",
             false,
