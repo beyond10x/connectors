@@ -55,9 +55,9 @@ fn check(until: Instant) -> Result<(), Value> {
 }
 /// What stops a request: its own cancellation before each owner call, and the
 /// end of local admission at the session's first terminal before its first one
-/// (sessions § 4.1); a request already at the owner keeps its reply. The owner
-/// protocol has no cancellation of its own, so an owner call already started
-/// runs out within its deadline.
+/// (sessions § 4.1). A request already at the owner keeps its reply unless its
+/// own cancellation is raised: the owner read it started is then cancelled
+/// there too (story:owner-cancels-a-bounded-read).
 pub(super) struct Halt {
     pub cancelled: Arc<AtomicBool>,
     pub admission_closed: Arc<AtomicBool>,
@@ -100,6 +100,19 @@ fn hung_up(input: std::os::fd::RawFd) -> bool {
 fn client(paths: &Paths, host: Option<&str>, until: Instant) -> Result<owner::Client, Value> {
     let client = owner::Client::connect_until(paths, host.is_none(), until).map_err(owner_error)?;
     if host.is_some_and(|host| host != client.host_incarnation) {
+        return Err(refusal("stale_authority"));
+    }
+    Ok(client)
+}
+/// [`client`] for a bounded read, which its cancellation reaches the owner by.
+fn read_client(
+    paths: &Paths,
+    host: Option<&str>,
+    until: Instant,
+) -> Result<owner::ReadClient, Value> {
+    let client =
+        owner::ReadClient::connect_until(paths, host.is_none(), until).map_err(owner_error)?;
+    if host.is_some_and(|host| host != client.host_incarnation()) {
         return Err(refusal("stale_authority"));
     }
     Ok(client)
@@ -681,7 +694,7 @@ impl Reader<'_> {
             .and_then(|b| b.constrain(until))
             .map_err(|_| refusal("timeout"))?;
         halt.cancelled()?;
-        let owner = client(self.paths, Some(&snapshot.host), until)?;
+        let owner = read_client(self.paths, Some(&snapshot.host), until)?;
         // The last check before the owner read: past it a cancellation only
         // suppresses the reply.
         halt.cancelled()?;
@@ -697,6 +710,7 @@ impl Reader<'_> {
                 },
                 &snapshot.revision,
                 budget,
+                &|| halt.cancelled.load(Ordering::SeqCst),
             )
             .map_err(owner_error)?;
         check(until)?;
