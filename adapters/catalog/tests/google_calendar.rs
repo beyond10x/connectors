@@ -23,7 +23,7 @@
 //! descriptor; the signing key is the public RFC 8032 section 7.1 test vector,
 //! never a deployment key.
 #![cfg(unix)]
-mod hand_written;
+use crate::hand_written;
 
 use connectors_catalog::{bundle, discovery};
 use connectors_catalog_provider::{Effect, Engine, Selection};

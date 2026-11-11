@@ -372,8 +372,8 @@ body. `file.get` stays as it is.
 
 The commands below were run in this tree with the debug `target/debug/connectors`
 against the local HTTPS GitLab fixture (the ignored test
-`cli_journey::serve_the_raw_file_fixture` in
-`adapters/catalog/tests/local_runtime.rs`), whose files and languages are
+`local_runtime::cli_journey::serve_the_raw_file_fixture` of the `main` test target, in
+`adapters/catalog/tests/local_runtime/cli_journey.rs`), whose files and languages are
 synthetic. Its disposable tree is named with `--config` and `--state-dir`, which
 the commands omit. The run, made before 0.60.0, described and invoked with the deprecated
 `--adapter gitlab` selector. Below is the 0.60.0 form on the instance `gitlab/forge`, which takes

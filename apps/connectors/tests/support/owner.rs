@@ -63,6 +63,10 @@ pub fn spawn(binary: &Path, root: &Path) -> Child {
     let mut owner = std::process::Command::new("/bin/sh")
         .arg("-c")
         .arg(r#"exec "$0" __connectors-owner "$1" "$2" 3<&0 4<&1 </dev/null >/dev/null"#)
+        .env(
+            "CONNECTORS_TEST_OWNER_PARENT",
+            std::process::id().to_string(),
+        )
         .arg(binary)
         .arg(root.join("config/config.toml"))
         .arg(&state)

@@ -5,10 +5,19 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+autotests = false
 
 [features]
 default = ["service"]
 service = ["dep:connectors-host", "dep:connectors-oauth2", "dep:connectors-custody", "dep:clap", "dep:tokio", "dep:ring", "dep:tempfile", "dep:axum", "dep:reqwest", "dep:rustls", "dep:flate2", "dep:url", "dep:tracing", "dep:libc"]
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+[[test]]
+name = "derived_instance_adversary"
+path = "tests/derived_instance_adversary.rs"
 
 [[bin]]
 name = "connectors-catalog-provider"

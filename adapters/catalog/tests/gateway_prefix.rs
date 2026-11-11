@@ -9,7 +9,7 @@
 //! (`hand_written`), whose gateway values the guide still shows, against a
 //! disposable HTTPS fixture. No live credential and no network.
 #![cfg(unix)]
-mod hand_written;
+use crate::hand_written;
 
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},

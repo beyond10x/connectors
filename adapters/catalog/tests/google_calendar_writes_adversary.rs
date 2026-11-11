@@ -2,7 +2,7 @@
 //! selection descriptions' claims about what reaches guests, read against the
 //! pinned Discovery document and driven through the engine against a scripted
 //! provider. No network, no credential.
-mod hand_written;
+use crate::hand_written;
 
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};

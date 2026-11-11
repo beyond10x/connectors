@@ -150,7 +150,7 @@ fn deployments_list_is_a_declared_read_with_its_pinned_inputs() {
     for sibling in ["tags.list", "commits.list"] {
         assert_eq!(
             properties["id"],
-            crate::properties(&engine, sibling)["id"],
+            crate::gitlab_deployment_reads::properties(&engine, sibling)["id"],
             "`id` as `{sibling}` declares it"
         );
     }

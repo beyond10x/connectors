@@ -965,7 +965,7 @@ fn pre_push_check_fixture() {
 fn a_failing_pre_push_check_refuses_the_push_with_no_upstream_request() {
     let (forge, served) = started(|git| {
         git["pre_push_check"] = json!({
-            "command": [CHECK, "--exact", "pre_push_check_fixture", "--nocapture", "--test-threads=1"],
+            "command": [CHECK, "--exact", "git_relay::pre_push_check_fixture", "--nocapture", "--test-threads=1"],
             "timeout_seconds": 60,
         });
     });

@@ -25,7 +25,7 @@ use std::{
 
 /// Set in the re-executed test process that runs inside the namespaces.
 const INSIDE: &str = "CONNECTORS_TEST_DERIVED_GMAIL_NAMESPACES";
-const NAME: &str = "derived_instance::a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_drafts";
+const NAME: &str = "local_runtime::derived_instance::a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_drafts";
 const HOSTS: [&str; 3] = [
     "gmail.googleapis.com",
     "oauth2.googleapis.com",

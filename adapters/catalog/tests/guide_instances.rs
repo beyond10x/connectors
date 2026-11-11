@@ -8,7 +8,7 @@
 //! declares, and the Google OAuth guide says that an app used only by its
 //! developer can be published without verification.
 #![cfg(unix)]
-mod hand_written;
+use crate::hand_written;
 
 use serde_json::Value;
 use std::{fs, path::Path, process::Command};

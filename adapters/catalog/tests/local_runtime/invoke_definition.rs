@@ -22,7 +22,7 @@ use std::sync::atomic::AtomicU64;
 
 /// Set in the re-executed test process that runs inside the namespaces.
 const INSIDE: &str = "CONNECTORS_TEST_INVOKE_DEFINITION_NAMESPACES";
-const NAME: &str = "cli_journey::invoke_definition::a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_without_asking";
+const NAME: &str = "local_runtime::cli_journey::invoke_definition::a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_without_asking";
 const HOST: &str = "gitlab.example.com";
 /// The host a definition is moved to: the same fixture answers it.
 const MOVED_HOST: &str = "gitlab-moved.example.com";
@@ -711,8 +711,8 @@ fn a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_witho
 /// story:invoke-definition-reuse-credential: the instance `main` of the
 /// connector `forge`, which the operator configured, holds a token connection
 /// at the definition's host.
-const REUSE_NAME: &str = "cli_journey::invoke_definition::a_stored_credential_of_a_configured_instance_is_reused_without_a_token_prompt";
-const MISMATCH_NAME: &str = "cli_journey::invoke_definition::a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offers_connect_fresh";
+const REUSE_NAME: &str = "local_runtime::cli_journey::invoke_definition::a_stored_credential_of_a_configured_instance_is_reused_without_a_token_prompt";
+const MISMATCH_NAME: &str = "local_runtime::cli_journey::invoke_definition::a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offers_connect_fresh";
 /// How the reuse question ends on the terminal with one candidate.
 const REUSE_QUESTION: &[u8] = b"[1/c/N] ";
 /// What the question lists for the candidate: its instance and its host.
@@ -1028,7 +1028,7 @@ fn a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offe
     assert_eq!(count(&shown, CANDIDATE), 0);
 }
 
-const MOVED_NAME: &str = "cli_journey::invoke_definition::a_definition_moved_to_another_host_connects_fresh_under_a_new_instance_id";
+const MOVED_NAME: &str = "local_runtime::cli_journey::invoke_definition::a_definition_moved_to_another_host_connects_fresh_under_a_new_instance_id";
 
 /// The second check beside the acceptance, restated by
 /// task:definition-moved-authority-new-instance. With the definition's own
