@@ -75,9 +75,9 @@
     {
       "provider": "grafana",
       "file_name": "grafana.bundle.json",
-      "bundle_sha256": "eb5845b1161abe11fd2ca408499d04f0934c485668ae838762eb2119627c9106",
+      "bundle_sha256": "ea04d80f0d1608ba40aab06d03442e94185be519f5ffd07b3a32a27360e054cc",
       "source_sha256": "be8923b42413a640f92af54a728f5b04f936a2851a04b8dfa277ae0db3bdebdc",
-      "operations": 314,
+      "operations": 317,
       "unsupported": 0
     },
     {

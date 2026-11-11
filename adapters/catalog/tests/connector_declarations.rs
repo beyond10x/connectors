@@ -814,7 +814,9 @@ fn slack_derived_from_its_declaration_is_the_documented_bot_instance() {
 /// and again when the bundles were rebuilt to record each parameter's `enum` and
 /// `format: date-time` (story:catalog-validates-enum-and-date-time). The Grafana
 /// guide's pin is new with its selection (story:catalog-grafana-reads); it moved
-/// the index of every later page and no revision.
+/// the index of every later page and no revision. It moved when the selection
+/// and the bundle gained the three data-source proxy reads and each proxy
+/// `uid` its pattern (story:catalog-grafana-datasource-proxy-reads).
 #[test]
 fn documented_native_configurations_keep_their_revisions() {
     let pinned: BTreeMap<String, &str> = [
@@ -864,7 +866,7 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "11 catalog-grafana.md",
-            "c0bdd19cddb8130b7dcf0e48d70a4a8edf8b834cb006ae4c951569ba19d3ce31",
+            "cd3a3ef9f85e05a990f6d8754e7aa2c5a190b71f0f629bec840b0d713b6dc948",
         ),
         (
             "12 catalog-hubspot.md",

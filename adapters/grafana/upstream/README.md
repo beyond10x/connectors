@@ -32,6 +32,17 @@ The document is otherwise pinned as published. Grafana's Swagger 2.0 document of
 the OpenAPI 3 document is the pinned source. The native `connectors-grafana` adapter does not
 read this file: its OpenAPI document is authored in this repository ([design](../design.md)).
 
+The document declares the data-source proxy only as
+`GET /datasources/proxy/uid/{uid}/{datasource_proxy_route}`, one parameter standing for the whole
+sub-path. `grafana.amendments.json` adds three cited GET operations, bound to the document's
+SHA-256, that fix the sub-path of Prometheus's instant and range queries and Loki's range query
+(`datasourceProxyPrometheusQuery`, `datasourceProxyPrometheusQueryRange`,
+`datasourceProxyLokiQueryRange`); each cites the Prometheus or Loki HTTP API reference at a
+pinned tag. Each holds `uid` to the pattern `^[A-Za-z0-9_-]{1,40}$`, Grafana's data-source uid
+rule (`ValidateUID`, `pkg/util/shortid_generator.go` at `v13.3.1`). The amendments are bound to
+the committed digest, `be8923b4…`, and leave the vendored bytes as they are: the bundle applies
+them to the operations it extracts and records the file's digest.
+
 The catalog provider's Grafana bundle and selection are in `adapters/catalog`
 ([guide](../../../docs/catalog-grafana.md)). Grafana Labs does not endorse this adapter.
 Refreshing the source means downloading the file at the new tag, removing the same member again,

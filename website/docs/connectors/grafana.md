@@ -1,8 +1,8 @@
 ---
 title: Grafana
 sidebar_position: 19
-description: List Grafana data sources with a service-account token, read Grafana IRM alert groups and incidents on a second instance, and read alert rules, annotations and dashboards through the catalog provider.
-lede: One Grafana instance lists the data sources a service account can read; a second instance with its own token reads IRM alert groups and incidents; the catalog provider reads alert rules, annotations, dashboards and data sources with one service-account token.
+description: List Grafana data sources with a service-account token, read Grafana IRM alert groups and incidents on a second instance, and read alert rules, annotations, dashboards, Prometheus series and Loki log lines through the catalog provider.
+lede: One Grafana instance lists the data sources a service account can read; a second instance with its own token reads IRM alert groups and incidents; the catalog provider reads alert rules, annotations, dashboards and data sources, and queries Prometheus and Loki through the data-source proxy, with one service-account token.
 source: adapters/grafana/README.md, adapters/grafana/spec/ess/domains/records.yaml, adapters/grafana/spec/ess/domains/irm.yaml, docs/catalog-grafana.md, adapters/catalog/providers/grafana/operations.json, adapters/catalog/tests/grafana.rs
 connectors: "grafana"
 ---
@@ -14,7 +14,8 @@ connector, instance, connection, auth profile and operation are those of the
 [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full Grafana guide](https://github.com/beyond10x/connectors/blob/main/adapters/grafana/README.md)
 has the records, windows and refusals. To query a Loki or Prometheus data source through Grafana,
-use a [Loki](./loki.md) or [Prometheus](./prometheus.md) instance on the data source's proxy path.
+use a [Loki](./loki.md) or [Prometheus](./prometheus.md) instance on the data source's proxy path,
+or the catalog provider's `prometheus.query`, `prometheus.query_range` and `loki.query_range`.
 
 It is a [pinned instance](../guides/pinned-instances.md). Commands that need a
 Grafana are shown without output.
@@ -25,13 +26,14 @@ Grafana are shown without output.
 |---|---|---|
 | `grafana.service_account` | `datasources.list` | none |
 | `grafana.irm_service_account` | `irm.alert_groups.list`, `irm.alert_group.get`, `irm.incidents.list`, `irm.incident.get` | none |
-| `grafana.service-account` (catalog provider) | `alert_rules.list`, `annotations.list`, `dashboards.search`, `dashboard.get`, `datasources.list` | none |
+| `grafana.service-account` (catalog provider) | `alert_rules.list`, `annotations.list`, `dashboards.search`, `dashboard.get`, `datasources.list`, `prometheus.query`, `prometheus.query_range`, `loki.query_range` | none |
 
 An instance holds one connection under one auth profile, so the IRM reads are a second instance.
 The last row is served by the catalog provider from Grafana's pinned OpenAPI 3 document, run from
 its definition file or as a pinned catalog instance; the
 [catalog Grafana guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-grafana.md)
-has its configuration, paging and time windows.
+has its configuration, paging, time windows, the proxy reads' time and step bounds, and the
+served instance's `uid` allow-list, `allowed_values`.
 
 ## Prerequisites at the provider
 

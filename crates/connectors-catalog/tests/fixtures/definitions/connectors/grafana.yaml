@@ -2,6 +2,7 @@ schema: urn:beyond10x:connectors-definition:1
 source:
   openapi: upstream/grafana/openapi3.json.gz
   sha256: be8923b42413a640f92af54a728f5b04f936a2851a04b8dfa277ae0db3bdebdc
+  amendments: upstream/grafana/grafana.amendments.json
 base_url: https://{hostname}/api
 config: {hostname: {type: string}}
 auth:
@@ -27,3 +28,13 @@ operations:
   datasources.list:
     op: getDataSources
     description: "List every data source the token may read in one answer, unpaged: uid, name, type and url of each, such as the Prometheus and Loki data sources the connection reaches"
+  prometheus.query:
+    op: datasourceProxyPrometheusQuery
+    description: Evaluate a PromQL instant query on the Prometheus data source uid (letters, digits, - and _, at most 40) through Grafana's data-source proxy, at time (RFC 3339 or Unix seconds) or now; answers Prometheus's JSON value, written compact with object keys sorted
+  prometheus.query_range:
+    op: datasourceProxyPrometheusQueryRange
+    description: Evaluate a PromQL range query on the Prometheus data source uid (letters, digits, - and _, at most 40) through Grafana's data-source proxy, from start to end (both inclusive, RFC 3339 or Unix seconds) every step (a duration or seconds); Prometheus refuses more than 11,000 points per series. Answers Prometheus's JSON value, written compact with object keys sorted
+  loki.query_range:
+    op: datasourceProxyLokiQueryRange
+    bounds: {limit: {minimum: 1, maximum: 5000}, direction: {values: [forward, backward]}}
+    description: Run a LogQL query on the Loki data source uid (letters, digits, - and _, at most 40) through Grafana's data-source proxy, from start (inclusive) to end (exclusive), nanosecond Unix epochs or RFC 3339, at most limit entries (1 to 5000), direction backward (newest first, the default) or forward; answers Loki's JSON value, written compact with object keys sorted

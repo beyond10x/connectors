@@ -440,7 +440,14 @@ pub const CAPABILITIES: &[Capability] = &[
         "Catalog provider",
         "Grafana alert rules, annotations, dashboards and data sources",
         "alert_rules.list, annotations.list over an epoch-millisecond window, dashboards.search paged by page and limit, dashboard.get and datasources.list from Grafana's pinned OpenAPI 3 document, read only, with a service-account token as Authorization: Bearer, from its definition file on a served instance or pinned; verified against a local fixture only (*unreleased*).",
-        "adapters/catalog/tests/grafana.rs::shipped_grafana_selections_are_exactly_the_five_reads",
+        "adapters/catalog/tests/grafana.rs::shipped_grafana_selections_are_exactly_the_eight_reads",
+        "/docs/connectors/grafana",
+    ),
+    shipped(
+        "Catalog provider",
+        "Prometheus and Loki through Grafana's data-source proxy",
+        "prometheus.query, prometheus.query_range and loki.query_range through Grafana's data-source proxy with the Grafana service-account token, each proxy sub-path a cited amendment to the pinned document; Loki's limit held to 1 to 5000, an answer over the 4 MiB limit refused as capacity, and on a served instance a uid outside catalog.allowed_values refused as forbidden before any request; verified against a local fixture only (*unreleased*).",
+        "adapters/catalog/tests/grafana.rs::the_proxy_reads_are_exactly_the_three_queries_under_the_one_profile",
         "/docs/connectors/grafana",
     ),
     shipped(

@@ -13,6 +13,13 @@
     {"id": "dashboard.get", "operation_id": "getDashboardByUID", "effect": "read",
      "description": "Read one dashboard by uid: its JSON model under dashboard and its metadata under meta"},
     {"id": "datasources.list", "operation_id": "getDataSources", "effect": "read",
-     "description": "List every data source the token may read in one answer, unpaged: uid, name, type and url of each, such as the Prometheus and Loki data sources the connection reaches"}
+     "description": "List every data source the token may read in one answer, unpaged: uid, name, type and url of each, such as the Prometheus and Loki data sources the connection reaches"},
+    {"id": "prometheus.query", "operation_id": "datasourceProxyPrometheusQuery", "effect": "read",
+     "description": "Evaluate a PromQL instant query on the Prometheus data source uid (letters, digits, - and _, at most 40) through Grafana's data-source proxy, at time (RFC 3339 or Unix seconds) or now; answers Prometheus's JSON value, written compact with object keys sorted"},
+    {"id": "prometheus.query_range", "operation_id": "datasourceProxyPrometheusQueryRange", "effect": "read",
+     "description": "Evaluate a PromQL range query on the Prometheus data source uid (letters, digits, - and _, at most 40) through Grafana's data-source proxy, from start to end (both inclusive, RFC 3339 or Unix seconds) every step (a duration or seconds); Prometheus refuses more than 11,000 points per series. Answers Prometheus's JSON value, written compact with object keys sorted"},
+    {"id": "loki.query_range", "operation_id": "datasourceProxyLokiQueryRange", "effect": "read",
+     "description": "Run a LogQL query on the Loki data source uid (letters, digits, - and _, at most 40) through Grafana's data-source proxy, from start (inclusive) to end (exclusive), nanosecond Unix epochs or RFC 3339, at most limit entries (1 to 5000), direction backward (newest first, the default) or forward; answers Loki's JSON value, written compact with object keys sorted",
+     "bounds": {"limit": {"minimum": 1, "maximum": 5000}, "direction": {"values": ["forward", "backward"]}}}
   ]
 }
