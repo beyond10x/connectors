@@ -295,6 +295,10 @@ Gating is Gates, not Atlas. Install coordinated local hooks with
 `b10x-gates --repository beyond10x/connectors_v2 install`. Use `b10x-gates bot` for
 direct commits, tags and pushes, retaining `b10x-bot[bot]`, and Gates `check`,
 `verify` and `publish` for signed common evidence; verify both author and committer.
+Pull requests merge through the bot (`b10x-gates api`, squash) once the required checks are
+green. GitHub auto-merge does not fire here: `b10x-gates` requires `b10x-bot-branch-authority`
+to cover every branch, main included (gates `src/published_merge.rs`), so only the bot's bypass
+updates main, and auto-merge does not use it. Ruleset changes are the owner's.
 The hooks scan the index, names, messages, metadata, tags and every outgoing commit.
 Ordinary commit and publish paths need no Atlas checkout, current Atlas main or
 organization-wide admission. Private policies and enrolled signing keys stay outside
