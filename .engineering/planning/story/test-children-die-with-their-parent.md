@@ -2,11 +2,15 @@
 format: aep.planning-md/3
 id: story:test-children-die-with-their-parent
 kind: story
-status: draft
+status: active
 title: A killed test leaves no owner, adapter or keyring running
 relations:
 - decomposes: epic:zero-open-issues-and-store-defects
-revision: 1
+- serves: vision:independent-contract-adapters
+revision: 3
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-11T19:51:16Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-11-11T19:51:17Z", actor: "human:timo", revision: 3}
 ---
 ## Finding
 
