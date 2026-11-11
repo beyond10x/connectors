@@ -14,6 +14,7 @@
 //! profiles) keep the file's order: the selection lists its operations, a closed
 //! body its keys and a guard its checks in the order the definition writes them.
 
+use crate::query_template::{self, Part};
 use crate::{bundle, pipeline};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -1165,6 +1166,17 @@ pub enum FeedRule {
     /// `page.parameter`, are query parameters of the items' list operation,
     /// which the engine binds them to.
     PositionParameter,
+    /// A query template is one the engine's parser reads: no slot beside a
+    /// quote or backslash or inside a literal, no unknown slot, no stray brace.
+    QueryTemplate,
+    /// `containers.query`, `items.query` and the cursor's parameter name query
+    /// parameters their operation takes.
+    OperationQuery,
+    /// No parameter of an operation is bound twice.
+    ParameterTwice,
+    /// A parameter the feed sends only on resume, `time`, `page.parameter` or
+    /// the cursor's, is not one its operation requires.
+    ParameterRequired,
 }
 
 impl FeedRule {
@@ -1181,6 +1193,10 @@ impl FeedRule {
             Self::UtcOffsetsPage => "feed_utc_offsets_page",
             Self::ItemPointer => "feed_item_pointer",
             Self::PositionParameter => "feed_position_parameter",
+            Self::QueryTemplate => "feed_query_template",
+            Self::OperationQuery => "feed_operation_query",
+            Self::ParameterTwice => "feed_parameter_twice",
+            Self::ParameterRequired => "feed_parameter_required",
         }
     }
 
@@ -1201,6 +1217,16 @@ impl FeedRule {
             Self::ItemPointer => "url, url_base and parent are JSON pointers",
             Self::PositionParameter => {
                 "the parameters a position names are query parameters of items.list"
+            }
+            Self::QueryTemplate => {
+                "a query template has no slot beside a quote or backslash or inside a literal, no unknown slot and no stray brace"
+            }
+            Self::OperationQuery => {
+                "containers.query, items.query and the cursor's parameter are query parameters of their operation"
+            }
+            Self::ParameterTwice => "an operation's parameter is bound once",
+            Self::ParameterRequired => {
+                "a parameter sent only on resume is not one its operation requires"
             }
         }
     }
@@ -2458,9 +2484,9 @@ fn page_size(
 /// (`adapters/catalog/src/feed.rs`, `max_limit` 1 to 100).
 pub const FEED_MAX_LIMIT: u64 = 100;
 
-/// How many times `needle` occurs in `text`, in words.
-fn times(text: &str, needle: &str) -> String {
-    match text.matches(needle).count() {
+/// How many times `slot` occurs in the parsed template `parts`, in words.
+fn times(parts: &[Part], slot: &Part) -> String {
+    match parts.iter().filter(|part| *part == slot).count() {
         1 => "once".to_owned(),
         count => format!("{count} times"),
     }
@@ -2547,25 +2573,31 @@ fn feed_rules(name: &str, datasource: &Datasource) -> Result<(), Refusal> {
         }
     };
     if let Some(query) = query {
-        if query.first.matches("{container}").count() != 1 || query.first.contains("{since}") {
+        // The engine's own parser reads each template; the slots are counted in its parts.
+        let parse = |field: &str, text: &str| {
+            query_template::parse(&format!("items.position.query.{field}"), text)
+                .map_err(|detail| refuse(FeedRule::QueryTemplate, detail))
+        };
+        let slots = |parts: &[Part], slot: Part| parts.iter().filter(|part| **part == slot).count();
+        let first = parse("first", &query.first)?;
+        if slots(&first, Part::Container) != 1 || slots(&first, Part::Since) != 0 {
             return Err(refuse(
                 FeedRule::QueryFirst,
                 format!(
                     "items.position.query.first holds {{container}} {} and {{since}} {}",
-                    times(&query.first, "{container}"),
-                    times(&query.first, "{since}")
+                    times(&first, &Part::Container),
+                    times(&first, &Part::Since)
                 ),
             ));
         }
-        if query.resume.matches("{container}").count() != 1
-            || query.resume.matches("{since}").count() != 1
-        {
+        let resume = parse("resume", &query.resume)?;
+        if slots(&resume, Part::Container) != 1 || slots(&resume, Part::Since) != 1 {
             return Err(refuse(
                 FeedRule::QueryResume,
                 format!(
                     "items.position.query.resume holds {{container}} {} and {{since}} {}",
-                    times(&query.resume, "{container}"),
-                    times(&query.resume, "{since}")
+                    times(&resume, &Part::Container),
+                    times(&resume, &Part::Since)
                 ),
             ));
         }
@@ -2711,6 +2743,135 @@ fn feed(
     )?;
     let (items_limit, max_limit) =
         page_size(definition, name, &items.list, items_operation, &items_query)?;
+    // What the engine's `bind` refuses of each operation: a parameter it does not take there,
+    // one bound twice, and a required one sent only on resume.
+    let keys = |query: &Option<BTreeMap<String, String>>| -> Vec<(String, String)> {
+        query
+            .iter()
+            .flatten()
+            .map(|(key, _)| (key.clone(), key.clone()))
+            .collect()
+    };
+    let items_container = if position.query.is_none() {
+        sole_path_parameter(name, &items.list, items_found).ok()
+    } else {
+        None
+    };
+    let mut items_bound: Vec<(String, String)> = Vec::new();
+    items_bound.extend(
+        items_container
+            .iter()
+            .map(|parameter| ("the items' container".to_owned(), parameter.clone())),
+    );
+    items_bound.push(("the items' page size".to_owned(), items_limit.clone()));
+    items_bound.extend(position.query.iter().map(|query| {
+        (
+            "items.position.query.parameter".to_owned(),
+            query.parameter.clone(),
+        )
+    }));
+    let sometimes: Vec<(String, String)> = [
+        ("items.position.time", position.time.as_deref()),
+        (
+            "items.position.page.parameter",
+            position.page.as_ref().map(|page| page.parameter.as_str()),
+        ),
+    ]
+    .into_iter()
+    .filter_map(|(field, parameter)| Some((field.to_owned(), parameter?.to_owned())))
+    .collect();
+    items_bound.extend(sometimes.iter().cloned());
+    items_bound.extend(
+        keys(&items.query)
+            .into_iter()
+            .map(|(key, parameter)| (format!("items.query `{key}`"), parameter)),
+    );
+    let mut containers_bound: Vec<(String, String)> = vec![
+        (
+            "the containers' page size".to_owned(),
+            containers_limit.clone(),
+        ),
+        (
+            "containers.cursor.parameter".to_owned(),
+            containers.cursor.parameter.clone(),
+        ),
+    ];
+    containers_bound.extend(
+        keys(&containers.query)
+            .into_iter()
+            .map(|(key, parameter)| (format!("containers.query `{key}`"), parameter)),
+    );
+    let feed_refusal = |rule: FeedRule, detail: String| Refusal::Feed {
+        datasource: name.clone(),
+        rule,
+        detail,
+    };
+    for (field, query, list_key, list_query) in [
+        (
+            "containers.query",
+            &containers.query,
+            &containers.list,
+            &list_query,
+        ),
+        ("items.query", &items.query, &items.list, &items_query),
+    ] {
+        for key in query.iter().flat_map(BTreeMap::keys) {
+            if !list_query.contains(&key.as_str()) {
+                return Err(feed_refusal(
+                    FeedRule::OperationQuery,
+                    format!("{field} `{key}` is not a query parameter of `{list_key}`"),
+                ));
+            }
+        }
+    }
+    if !list_query.contains(&containers.cursor.parameter.as_str()) {
+        return Err(feed_refusal(
+            FeedRule::OperationQuery,
+            format!(
+                "containers.cursor.parameter `{}` is not a query parameter of `{}`",
+                containers.cursor.parameter, containers.list
+            ),
+        ));
+    }
+    for (list_key, bound) in [
+        (&containers.list, &containers_bound),
+        (&items.list, &items_bound),
+    ] {
+        for (index, (field, parameter)) in bound.iter().enumerate() {
+            if let Some((other, _)) = bound[..index].iter().find(|(_, other)| other == parameter) {
+                return Err(feed_refusal(
+                    FeedRule::ParameterTwice,
+                    format!("{other} and {field} both bind `{parameter}` of `{list_key}`"),
+                ));
+            }
+        }
+    }
+    for (list_key, found, resumed) in [
+        (
+            &containers.list,
+            list,
+            vec![(
+                "containers.cursor.parameter".to_owned(),
+                containers.cursor.parameter.clone(),
+            )],
+        ),
+        (&items.list, items_found, sometimes),
+    ] {
+        for (field, parameter) in resumed {
+            if found
+                .parameters
+                .iter()
+                .any(|candidate| candidate.name == parameter && candidate.required)
+            {
+                return Err(feed_refusal(
+                    FeedRule::ParameterRequired,
+                    format!(
+                        "{field} `{parameter}` is sent only on resume, but `{list_key}` requires it"
+                    ),
+                ));
+            }
+        }
+    }
     for (filter, values) in datasource.filters.iter().flatten() {
         for parameter in values.keys() {
             if !items_query.contains(&parameter.as_str()) {
