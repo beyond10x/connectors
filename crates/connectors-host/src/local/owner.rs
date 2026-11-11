@@ -1288,6 +1288,12 @@ enum Request {
         /// Omitted when false, so every other request keeps its bytes.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         grant: bool,
+        /// The executable selection digest of the entry the caller checked
+        /// (`Adapter::selection`); the owner refuses `revision_conflict` when the
+        /// entry it loads selects otherwise. Omitted when the caller asked no
+        /// question of an entry, so every other request keeps its bytes.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        expected_selection: Option<String>,
     },
     Complete,
     /// story:invoke-definition-reuse-credential: a new connection of `adapter`

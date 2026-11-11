@@ -163,6 +163,17 @@ that acquisition; a lost acknowledgement is `outcome_unknown` with the acquisiti
 to follow. The CLI never receives, prints or logs the material, and the source
 connection's record is not written by any step but its read use.
 
+A `begin` request of a definition's connect
+(story:definition-connect-begin-carries-selection) carries
+`"expected_selection"`, the executable selection digest of the instance's entry
+as the CLI checked it when it asked the connect question. The owner compares it
+with the entry it loads, before any admission, custody check or capture, and
+refuses a difference as `revision_conflict`: an entry another run recorded
+between the question and the request is never connected under. The field is
+omitted by every other `begin`, whose bytes are unchanged, and an owner reads
+the request only from a caller of its own build (`build` above), so the field
+needs no protocol version.
+
 A command run while an owner of its own build runs for the state directory reads
 the store through that owner instead of opening it. The owner answers a `cached`
 request (`connectors.cli.LocalOwnerCachedRequest`, `{"kind":"cached","adapter":…}`)
