@@ -98,7 +98,7 @@ pub enum Failure {
     /// authentication of a profile, that the instance's connections were
     /// admitted under (`StaticProfile::same_authentication`): no revalidation,
     /// repair or connect under this instance id can follow it, a new instance
-    /// id can. Public code `lifecycle_conflict`, `next_action =
+    /// id can. Public code `authentication_changed`, `next_action =
     /// check_configuration`.
     AuthenticationChanged,
     /// The instance holds a published Live or Stale connection under the

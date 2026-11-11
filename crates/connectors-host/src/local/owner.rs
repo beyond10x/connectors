@@ -54,7 +54,7 @@ pub enum Code {
     /// the configuration: connect, repair and revalidate under this instance id
     /// are refused, and only a new instance id admits a connection
     /// (`registry::Failure::AuthenticationChanged`).
-    ConfigurationChanged,
+    AuthenticationChanged,
     Revoked,
     NotGranted,
     ConnectionNotReady,
@@ -304,7 +304,7 @@ impl From<registry::Failure> for Error {
         let reconnect = matches!(e, F::BindingChanged | F::UpgradeIdentityMismatch);
         let mut error = Error::from(match e {
             F::BindingChanged => Code::LifecycleConflict,
-            F::AuthenticationChanged => Code::ConfigurationChanged,
+            F::AuthenticationChanged => Code::AuthenticationChanged,
             F::MetadataUnavailable => Code::MetadataUnavailable,
             F::MetadataSchemaNewer(_) => Code::MetadataSchemaNewer,
             F::ConcurrentRevision => Code::RevisionConflict,
