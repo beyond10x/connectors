@@ -123,6 +123,32 @@ adapter launches, or before it reads the credential, reads no credential. An
 adapter process a cancel ended leaves its instance `not_running`, not `failed`. The cancelled read's answer, written to its own stream which the
 caller no longer reads, carries `interrupted`, and its audit records the failed read. A cancel
 ends no other request, no write and no configuration.
+
+The owner's effects rule binds only the bounded read and the projected governed
+read (story:owner-invoke-frame-effects-boundary). Both resolve the operation's
+projected metadata and refuse, `unsupported` before any provider request, an
+operation that declares a semantic effect or an effect other than `network`: the
+MCP projection offers an agent only such reads. A `read` frame that carries its
+projection revision reaches no wider set. A `GovernedRead` frame that omits
+`projection_revision` selects no projection, so it skips the projection's policy
+admission and the effects rule and dispatches what the projected read refuses;
+only a same-uid raw-frame client reaches it, as `Client::governed_read` has test
+callers only.
+
+The plain `invoke` frame is not a boundary against a same-uid client for that
+rule, and the owner does not read operation metadata there. What it enforces
+(`admit_invoke`) is, in order: an operation the description does not expose is
+`not_found`, one the configuration does not grant (operation or profile) is
+`forbidden`, a stale description revision or schema is `stale_description`, an
+operation whose requirement is not a read is `unsupported`, an input that is
+invalid or does not satisfy the operation's schema is `invalid_input`, a
+connection that is not visible, revoked, not ready or without the operation's
+scopes is refused by its own code, and unavailable custody is
+`custody_unavailable`. The effects rule is not among them. A write never reaches
+the `invoke` frame: `connectors invoke` sends it over the write frames, where its
+approval and idempotency key govern it. A configured, granted, connected read
+that declares effects is therefore served on `invoke`.
+
 The actual socket peer must be the configured UID. No credential, source path,
 keyring tuple or continuation is part of ordinary control JSON. A capture admission
 returns only the profile, acquisition reference and original 300-second expiry.
