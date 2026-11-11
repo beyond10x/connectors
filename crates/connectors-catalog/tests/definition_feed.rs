@@ -742,3 +742,149 @@ fn adversary_utc_offsets_at_their_bounds_lower() {
         );
     }
 }
+
+// ---- the reader refuses what the feed engine refuses at load -------------------------------
+
+const JIRA_ITEMS_QUERY: &str = "query: {fields: \"summary,created,updated,creator\"}";
+const JIRA_CONTAINERS_QUERY: &str = "query: {action: view, orderBy: key, status: live}";
+
+/// Row 1: the engine refuses a parameter bound twice ("feed binds `…` of `…` twice"): here
+/// `items.query` adds the key `query.parameter` binds.
+#[test]
+fn a_parameter_bound_twice_is_refused() {
+    assert_rule(
+        jira(&[(
+            JIRA_ITEMS_QUERY,
+            "query: {fields: \"summary\", jql: \"project = X\"}",
+        )]),
+        "feed_parameter_twice",
+        "issues",
+        "`jql`",
+    );
+}
+
+/// Row 2: a parameter sent only on resume (`time`, `page.parameter`) the operation requires is
+/// refused ("… only on resume, but it is required"). GitLab's changed-paths listing requires
+/// `from` and `to`.
+#[test]
+fn a_required_time_parameter_sent_only_on_resume_is_refused() {
+    let root = gitlab_root();
+    let text = GITLAB
+        .replace(
+            "merge_requests.list: {op: getApiV4ProjectsIdMergeRequests}",
+            "merge_requests.list: {op: getApiV4ProjectsIdRepositoryChangedPaths}",
+        )
+        .replace(
+            "query: {order_by: updated_at, sort: asc, state: all, scope: all}",
+            "query: {to: main}",
+        )
+        .replace("position: {time: updated_after}", "position: {time: from}")
+        .replace(
+            "    filters:\n      mine_open: {state: opened, scope: assigned_to_me}\n",
+            "",
+        );
+    assert_rule(
+        lower("gitlab", &text, root.path()),
+        "feed_parameter_required",
+        "merge_requests",
+        "`from`",
+    );
+}
+
+/// Row 3: `containers.query` and `items.query` name only query parameters their operation takes
+/// ("feed binds `…`, which `…` does not take there"), each its own case.
+mod a_query_key_the_operation_does_not_take_is_refused {
+    use super::{JIRA_CONTAINERS_QUERY, JIRA_ITEMS_QUERY, assert_rule, jira};
+
+    #[test]
+    fn containers_query() {
+        assert_rule(
+            jira(&[(
+                JIRA_CONTAINERS_QUERY,
+                "query: {action: view, orderBy: key, status: live, bogus: x}",
+            )]),
+            "feed_operation_query",
+            "issues",
+            "containers.query `bogus`",
+        );
+    }
+
+    #[test]
+    fn items_query() {
+        assert_rule(
+            jira(&[(JIRA_ITEMS_QUERY, "query: {fields: \"summary\", bogus: x}")]),
+            "feed_operation_query",
+            "issues",
+            "items.query `bogus`",
+        );
+    }
+}
+
+/// Row 4: the templates the engine's parser refuses, in `first` and in `resume`, are refused by
+/// the same parser, under one rule.
+mod a_template_the_engines_parser_refuses_is_refused {
+    use super::{JIRA_FIRST, JIRA_RESUME, assert_rule, jira};
+
+    fn first(template: &str, mentions: &str) {
+        let edited = format!("first: {template}");
+        assert_rule(
+            jira(&[(JIRA_FIRST, edited.as_str())]),
+            "feed_query_template",
+            "issues",
+            mentions,
+        );
+    }
+
+    #[test]
+    fn a_slot_beside_a_quote() {
+        first(
+            r#""project = '{container}' ORDER BY updated ASC""#,
+            "beside a quote",
+        );
+    }
+
+    #[test]
+    fn a_slot_inside_a_literal() {
+        first(
+            r#""summary ~ 'a {container} b' ORDER BY updated ASC""#,
+            "inside a literal",
+        );
+    }
+
+    #[test]
+    fn an_unknown_slot() {
+        first(
+            r#""project = {container} AND x = {other}""#,
+            "unknown slot `{other}`",
+        );
+    }
+
+    #[test]
+    fn a_stray_brace() {
+        first(
+            r#""project = {container} } ORDER BY updated ASC""#,
+            "stray brace",
+        );
+    }
+
+    #[test]
+    fn a_backslash_outside_a_literal() {
+        first(
+            r#""project = {container} \\ ORDER BY updated ASC""#,
+            "backslash",
+        );
+    }
+
+    #[test]
+    fn a_resume_slot_beside_a_quote() {
+        assert_rule(
+            jira(&[(
+                JIRA_RESUME,
+                r#"resume: "project = {container} AND updated >= '{since}' ORDER BY updated ASC""#,
+            )]),
+            "feed_query_template",
+            "issues",
+            "beside a quote",
+        );
+    }
+}

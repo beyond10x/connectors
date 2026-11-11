@@ -13,6 +13,7 @@ pub mod discovery;
 pub mod import;
 pub mod inventory;
 pub mod pipeline;
+pub mod query_template;
 pub mod swagger;
 pub mod template;
 
