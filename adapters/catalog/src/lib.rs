@@ -1060,14 +1060,18 @@ fn check_bound(name: &str, bound: &Bound, text: &str) -> Result<()> {
 }
 
 /// Every value present must be one the pinned document allows its parameter:
-/// one of its `enum`, and an RFC 3339 date-time under `format: date-time`. A
-/// parameter that declares neither is not held to anything here, and an absent
-/// one is never refused. Checked on the value strings, the text each is sent
-/// as, before any request; a repeated parameter's declaration holds for each
+/// one of its `enum`, an RFC 3339 date-time under `format: date-time`, and a
+/// match of the `pattern` an amendment's added operation declares (such as
+/// Grafana's data-source `uid` alphabet, so a `uid` holding `/` or `\` never
+/// becomes a segment a decoding server reads as two). A parameter that
+/// declares none of them is not held to anything here, and an absent one is
+/// never refused. Checked on the value strings, the text each is sent as,
+/// before any request; a repeated parameter's declaration holds for each
 /// element.
 fn check_declared(operation: &Operation, values: &BTreeMap<String, Supplied>) -> Result<()> {
     for parameter in &operation.parameters {
-        if parameter.allowed.is_empty() && parameter.format.is_none() {
+        if parameter.allowed.is_empty() && parameter.format.is_none() && parameter.pattern.is_none()
+        {
             continue;
         }
         // One scalar for a repeated parameter may be a comma-joined list of
@@ -1093,6 +1097,14 @@ fn check_declared(operation: &Operation, values: &BTreeMap<String, Supplied>) ->
             if parameter.format == Some(Format::DateTime) && feed::instant(text).is_none() {
                 return Err(refuse(format!(
                     "parameter `{}` is not an RFC 3339 date-time",
+                    parameter.name
+                )));
+            }
+            if let Some(pattern) = &parameter.pattern
+                && connectors_catalog::inventory::pattern_matches(pattern, text) != Some(true)
+            {
+                return Err(refuse(format!(
+                    "parameter `{}` does not match its pattern `{pattern}`",
                     parameter.name
                 )));
             }
@@ -1330,6 +1342,18 @@ impl Engine {
                 return Err(refuse(format!(
                     "selection `{}` is outside the configured base path",
                     selection.id
+                )));
+            }
+            // A pattern no value could be checked against would refuse every
+            // call; the bundle is refused when it loads instead.
+            if let Some(parameter) = operation.parameters.iter().find(|p| {
+                p.pattern.as_deref().is_some_and(|pattern| {
+                    !connectors_catalog::inventory::pattern_is_anchored(pattern)
+                })
+            }) {
+                return Err(refuse(format!(
+                    "selection `{}` exposes `{}`, whose pattern is not an anchored regular expression",
+                    selection.id, parameter.name
                 )));
             }
             if let Some(name) = selection.bounds.keys().find(|name| {

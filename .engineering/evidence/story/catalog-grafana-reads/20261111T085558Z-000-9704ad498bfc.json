@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-11T08:55:58Z",
+  "actor": "human:operator",
+  "artifact": "story:catalog-grafana-reads",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-catalog-provider (grafana 13, bundle_drift 1, connector_declarations 12, definition_auth 2); cargo test -p connectors-catalog --test definition_import 45",
+    "reference": "commit a2ccf224ed: all exit 0"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-11T08:56:00Z",
+  "actor": "human:operator",
+  "artifact": "story:catalog-grafana-datasource-proxy-reads",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-catalog-provider (grafana 18, grafana_adversary 8, grafana_security_review 10, grafana_security_review_r2 5, bundle_drift 1); cargo test -p connectors-catalog 417",
+    "reference": "commit 20a34e1373: all exit 0"
+  }
+}
