@@ -224,7 +224,6 @@ fn delete_input(stamp: &str) -> Value {
 /// "required" as "the key is present", so `null` passes and a comment of
 /// `{"type":"doc","version":1,"content":null}` is sent to Jira.
 #[test]
-#[ignore = "story:required-body-key-refuses-null: the engine admits null for a required untyped key today (adversary_catalog_body_types.rs:113)"]
 fn a_comment_whose_content_is_null_is_refused_before_any_request() {
     let mut input = comment_input();
     input["body"]["body"]["content"] = Value::Null;
