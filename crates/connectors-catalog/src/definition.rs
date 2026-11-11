@@ -1046,6 +1046,8 @@ pub enum Refusal {
     /// A `body_any_of` other than at least two distinct keys under one parent
     /// that `body` declares and the caller sends.
     BodyAnyOf { key: String, detail: String },
+    /// A `body_null_clears` other than `true` beside a valid `body_any_of`.
+    BodyNullClears { key: String, detail: String },
     /// A `body_prefixes` entry other than a non-empty prefix of a key `body`
     /// declares as a `string` the caller sends.
     BodyPrefix { key: String, field: String },
@@ -1122,6 +1124,7 @@ impl Refusal {
             Self::BodyType { .. } => "body_type",
             Self::BodyEnum { .. } => "body_enum",
             Self::BodyAnyOf { .. } => "body_any_of",
+            Self::BodyNullClears { .. } => "body_null_clears",
             Self::BodyPrefix { .. } => "body_prefix",
             Self::ConflictStatus { .. } => "conflict_status",
             Self::UnknownDatasourceOperation { .. } => "unknown_datasource_operation",
@@ -1381,6 +1384,10 @@ impl std::fmt::Display for Refusal {
             Self::BodyAnyOf { key, detail } => write!(
                 f,
                 "{name}: operation `{key}` body_any_of {detail}; expected at least two distinct keys under one parent that its body declares and the caller sends"
+            ),
+            Self::BodyNullClears { key, detail } => write!(
+                f,
+                "{name}: operation `{key}` body_null_clears {detail}; expected `true`, beside a body_any_of"
             ),
             Self::BodyPrefix { key, field } => write!(
                 f,
@@ -1734,10 +1741,16 @@ fn body(key: &str, operation: &Operation) -> Result<Body, Refusal> {
     match operation.body_null_clears {
         None => {}
         Some(true) if !body.any_of.is_empty() => body.null_clears = true,
-        Some(_) => {
-            return Err(Refusal::BodyAnyOf {
+        Some(true) => {
+            return Err(Refusal::BodyNullClears {
                 key: key.to_owned(),
-                detail: "is absent or body_null_clears is not `true`".to_owned(),
+                detail: "is given without a body_any_of".to_owned(),
+            });
+        }
+        Some(false) => {
+            return Err(Refusal::BodyNullClears {
+                key: key.to_owned(),
+                detail: "is `false`; omit it instead".to_owned(),
             });
         }
     }

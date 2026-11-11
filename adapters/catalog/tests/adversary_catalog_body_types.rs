@@ -250,3 +250,39 @@ async fn body_null_clears_lets_a_null_any_of_member_count_and_nothing_else() {
     }));
     assert!(Engine::new(&things_bundle(), "/v1", &[alone]).is_err());
 }
+
+/// The refusal names every any-of key and says what the selection counts: a
+/// value without `body_null_clears`, a present key with it.
+#[tokio::test]
+async fn the_any_of_refusal_names_the_keys_and_what_counts() {
+    for (clears, counts) in [
+        (false, "set to a value (each is absent or null)"),
+        (true, "present"),
+    ] {
+        let mut declared = json!({
+            "id": "thing.create", "operation_id": "createThing", "effect": "write",
+            "body_keys": ["name", "free"],
+            "body_any_of": ["name", "free"]
+        });
+        if clears {
+            declared["body_null_clears"] = json!(true);
+        }
+        let engine = Engine::new(&things_bundle(), "/v1", &[written(declared)]).unwrap();
+        let http = NoReads {
+            calls: Mutex::new(0),
+        };
+        let Err(error) = engine
+            .prepare(&http, "fixture", "thing.create", json!({"body": {}}))
+            .await
+        else {
+            panic!("an empty body was prepared");
+        };
+        assert_eq!(error.code, ErrorCode::InvalidInput);
+        assert_eq!(
+            error.message,
+            format!(
+                "body has none of `name`, `free` {counts}, one of which its selection requires"
+            )
+        );
+    }
+}

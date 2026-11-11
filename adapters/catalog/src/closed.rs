@@ -522,10 +522,17 @@ impl Closed {
             };
             properties.insert(segment.clone(), schema);
         }
+        let any_of_parents: Vec<&[String]> = self
+            .any_of
+            .first()
+            .map(|first| (1..first.len()).map(|n| &first[..n]).collect())
+            .unwrap_or_default();
         let required: BTreeSet<&str> = self
             .required
             .iter()
             .chain(&self.guarded)
+            .map(Vec::as_slice)
+            .chain(any_of_parents)
             .filter(|path| inside(path, at))
             .map(|path| path[at.len()].as_str())
             .collect();
