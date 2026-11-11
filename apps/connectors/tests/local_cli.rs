@@ -823,6 +823,10 @@ fn start_owner_holding_startup(
     let mut owner = owner
         .arg("-c")
         .arg(r#"exec "$0" __connectors-owner "$1" "$2" 3<&0 4<&1 </dev/null >/dev/null"#)
+        .env(
+            "CONNECTORS_TEST_OWNER_PARENT",
+            std::process::id().to_string(),
+        )
         .arg(binary)
         .arg(config_root.path().join("config/config.toml"))
         .arg(&state)

@@ -3,9 +3,11 @@
 //!
 //! On Linux [`bind`] asks the kernel to send a child `SIGKILL` when its parent
 //! dies, so a parent killed without running any `Drop`, such as a test that
-//! the build slot's timeout ends, leaves nothing behind. Other platforms have
-//! no parent-death signal and the command is left as it is (`parent_death_kill`
-//! in contracts/cli/v1alpha1/semantics.md).
+//! the build slot's timeout ends, no longer leaves that child behind. Only the
+//! direct child is covered: a process the child itself starts is not, and
+//! outlives it unless the child ends it. Other platforms have no parent-death
+//! signal and the command is left as it is (`parent_death_kill` in
+//! contracts/cli/v1alpha1/semantics.md).
 //!
 //! The kernel ties the signal to the parent *thread* that started the child,
 //! not to the process: the thread that calls `spawn` must outlive the child.
@@ -89,6 +91,22 @@ pub(crate) mod fixture {
         }
     }
 
+    /// A harness process: bound to the case that starts it, and killed and
+    /// reaped when the case ends, so neither a failed assertion nor a killed
+    /// case leaves it waiting.
+    pub(crate) struct Harness(pub(crate) std::process::Child);
+    impl Harness {
+        pub(crate) fn start(mut command: std::process::Command) -> Self {
+            Self(super::bind(&mut command).spawn().unwrap())
+        }
+    }
+    impl Drop for Harness {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+
     /// SIGKILLs `harness`, which runs no `Drop`, and requires `child` gone
     /// within two seconds.
     pub(crate) fn kill_harness_and_expect_gone(
@@ -115,7 +133,7 @@ pub(crate) mod fixture {
 
 #[cfg(all(test, target_os = "linux"))]
 mod tests {
-    use super::fixture::{Reaper, kill_harness_and_expect_gone, pid_in};
+    use super::fixture::{Harness, Reaper, kill_harness_and_expect_gone, pid_in};
     use crate::local::config::Executable;
     use std::{
         os::unix::fs::PermissionsExt,
@@ -136,7 +154,7 @@ mod tests {
         std::fs::write(
             &provider,
             format!(
-                "#!/bin/sh\necho $$ > '{pid}.tmp'\nmv '{pid}.tmp' '{pid}'\nexec /bin/sleep 300\n",
+                "#!/bin/sh\necho $$ > '{pid}.tmp'\nmv '{pid}.tmp' '{pid}'\nexec /bin/sleep 60\n",
                 pid = root.join("provider.pid").display()
             ),
         )
@@ -156,8 +174,8 @@ mod tests {
     #[test]
     fn a_killed_harness_leaves_no_provider_running() {
         let root = tempfile::tempdir().unwrap();
-        let mut harness = Command::new(std::env::current_exe().unwrap());
-        harness
+        let mut command = Command::new(std::env::current_exe().unwrap());
+        command
             .args([
                 "--exact",
                 "local::parent_death::tests::harness_fixture",
@@ -167,9 +185,9 @@ mod tests {
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null());
-        let mut harness = harness.spawn().unwrap();
-        let provider = pid_in(&root.path().join("provider.pid"), &mut harness);
+        let mut harness = Harness::start(command);
+        let provider = pid_in(&root.path().join("provider.pid"), &mut harness.0);
         let _reaper = Reaper(provider);
-        kill_harness_and_expect_gone(&mut harness, provider);
+        kill_harness_and_expect_gone(&mut harness.0, provider);
     }
 }

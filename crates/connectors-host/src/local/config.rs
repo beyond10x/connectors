@@ -2204,8 +2204,9 @@ impl Executable {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
-        // This thread waits for the provider below, so it outlives it: a
-        // killed owner or CLI leaves no provider running.
+        // This thread waits for the provider below, so it outlives it: when
+        // the process is killed, the provider itself ends. What the provider
+        // started is not covered (production providers are single-process).
         super::parent_death::bind(&mut command);
         #[cfg(unix)]
         std::os::unix::process::CommandExt::process_group(&mut command, 0);
