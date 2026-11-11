@@ -235,6 +235,7 @@ pub(super) enum Output {
 #[derive(Clone, Default)]
 pub(super) struct Cancel(Arc<AtomicBool>);
 impl Cancel {
+    #[cfg(unix)]
     pub(super) fn cancel(&self) {
         self.0.store(true, Ordering::SeqCst);
     }

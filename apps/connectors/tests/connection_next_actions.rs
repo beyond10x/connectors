@@ -566,6 +566,7 @@ fn adversary_the_walk_from_connect_satisfies_the_story() {
 
 /// The last lines the fixture's GNOME Keyring wrote to its standard error, for
 /// a failure message: the daemon's own words on why it never answered.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn keyring_stderr_tail(path: &std::path::Path) -> String {
     match std::fs::read_to_string(path) {
         Ok(text) if text.trim().is_empty() => {
