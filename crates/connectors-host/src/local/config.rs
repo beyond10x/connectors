@@ -1482,7 +1482,7 @@ enum Derived {
 
 /// Why a provider printed nothing usable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Unprinted {
+pub(crate) enum Unprinted {
     /// It exited unsuccessfully: it refused the selection.
     Refused,
     /// It did not start, ended on a signal, printed more than the bound, or
@@ -2192,7 +2192,7 @@ impl Executable {
     /// deadline, even while a descendant still holds it open. A printed
     /// revision is checked again when the child starts, against the bootstrap
     /// the child itself reports.
-    fn print(&self, flag: &str) -> std::result::Result<Vec<u8>, Unprinted> {
+    pub(crate) fn print(&self, flag: &str) -> std::result::Result<Vec<u8>, Unprinted> {
         use std::process::{Command, Stdio};
         use std::time::{Duration, Instant};
         const LIMIT: u64 = 4 * 1024 * 1024;
@@ -2204,6 +2204,9 @@ impl Executable {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
+        // This thread waits for the provider below, so it outlives it: a
+        // killed owner or CLI leaves no provider running.
+        super::parent_death::bind(&mut command);
         #[cfg(unix)]
         std::os::unix::process::CommandExt::process_group(&mut command, 0);
         #[cfg(windows)]

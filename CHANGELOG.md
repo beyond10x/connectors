@@ -4,6 +4,11 @@
 
 ### Changed
 
+- On Linux a catalog provider that a derivation, `--print-profiles` or the installed-provider check
+  starts for its printed output now ends when the process that started it is killed, as an adapter
+  already did (`PR_SET_PDEATHSIG`, SIGKILL, set before exec). Test processes that wait on a
+  child of their own ask the same, so a killed test leaves no process behind. An owner is not
+  tied to the CLI that started it. No contract changed (story:test-children-die-with-their-parent).
 - The owner contract now says what the plain `invoke` frame enforces: the grant, the description's
   revision and schema, a read requirement, the input and the connection's admission. The effects
   rule (a semantic effect or an effect other than `network` is `unsupported`) is not among them: it

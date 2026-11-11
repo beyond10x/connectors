@@ -2206,6 +2206,49 @@ executable: None,
         }
     }
 
+    #[cfg(target_os = "linux")]
+    const OWNER_STAND_IN: &str = "CONNECTORS_TEST_OWNER_STAND_IN_PID_FILE";
+
+    /// Run as the harness that stands in for an owner: it starts an adapter as
+    /// the owner does, publishes the adapter's pid and waits. An ordinary run
+    /// does nothing.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn owner_stand_in_fixture() {
+        let Some(file) = std::env::var_os(OWNER_STAND_IN).map(std::path::PathBuf::from) else {
+            return;
+        };
+        let child = fixture_child("fixture-mode-json");
+        crate::local::parent_death::fixture::publish(&file, child.process.id());
+        std::thread::sleep(Duration::from_secs(300));
+        drop(child);
+    }
+
+    /// `parent_death_kill` (story:test-children-die-with-their-parent): an
+    /// owner killed without running any `Drop` leaves none of its adapters.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_killed_owner_leaves_no_adapter_running() {
+        use crate::local::parent_death::fixture::{Reaper, kill_harness_and_expect_gone, pid_in};
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join("adapter.pid");
+        let mut harness = std::process::Command::new(std::env::current_exe().unwrap());
+        harness
+            .args([
+                "--exact",
+                "local::runtime::process::tests::owner_stand_in_fixture",
+                "--nocapture",
+            ])
+            .env(OWNER_STAND_IN, &file)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        let mut harness = harness.spawn().unwrap();
+        let adapter = pid_in(&file, &mut harness);
+        let _reaper = Reaper(adapter);
+        kill_harness_and_expect_gone(&mut harness, adapter);
+    }
+
     /// `exact_process_signal`: `child_reap_lock`, through the owner's stop
     /// handle: it reports the child exited and signals nothing once the
     /// child that owns the process has reaped it.
