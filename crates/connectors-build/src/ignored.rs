@@ -138,6 +138,8 @@ const GNOME_SHA256: &str = "b9a71f6b4c4bfaf1759a99036b7b3ab6cf98b2b479c0c2a24f02
 
 /// Each entry names an exact package, target and test. New tests, even in an
 /// existing module, are unknown until someone reviews their authority and needs.
+/// The catalog provider's integration tests are one target, `main`, so their names
+/// start with the module of the file that held them (`local_runtime::cli_journey::...`).
 fn classify(suite: &Suite, name: &str) -> Entry {
     use Family::*;
     let mut entry = Entry {
@@ -227,107 +229,107 @@ fn classify(suite: &Suite, name: &str) -> Entry {
         ) => Some((Disposable, vec![CUSTODY])),
         (
             "connectors-catalog-provider",
-            "local_runtime",
-            "cli_journey::guarded_merge::prepared_attempt_exit_fixture"
-            | "cli_journey::guarded_merge::owner_replay::catalog_same_image_owner_fixture"
-            | "cli_journey::serve_the_raw_file_fixture",
+            "main",
+            "local_runtime::cli_journey::guarded_merge::prepared_attempt_exit_fixture"
+            | "local_runtime::cli_journey::guarded_merge::owner_replay::catalog_same_image_owner_fixture"
+            | "local_runtime::cli_journey::serve_the_raw_file_fixture",
         )
-        | ("connectors-catalog-provider", "openrouter", "serve_the_fixture") => {
+        | ("connectors-catalog-provider", "main", "openrouter::serve_the_fixture") => {
             entry.helper = true;
             return entry;
         }
         (
             "connectors-catalog-provider",
-            "local_runtime",
-            "cli_journey::lifecycle::catalog_cli_read_recollects_expired_evidence_without_reentry",
+            "main",
+            "local_runtime::cli_journey::lifecycle::catalog_cli_read_recollects_expired_evidence_without_reentry",
         ) => Some((Timing, vec![CUSTODY, CLI])),
         (
             "connectors-catalog-provider",
-            "local_runtime",
-            "cli_journey::owner_guard::a_journey_that_panics_after_its_owner_started_leaves_no_owner_alive"
-            | "cli_journey::owner_guard::a_journey_owner_exits_when_the_process_it_is_tied_to_ends"
-            | "cli_journey::guarded_merge::catalog_cli_guarded_merge_applied_refused_and_lost_response_restart"
-            | "cli_journey::guarded_merge::catalog_cli_guarded_merge_revocation_finishes_admitted_audit"
-            | "cli_journey::guarded_merge::catalog_cli_recovers_abandoned_preparation_only_with_trusted_time"
-            | "cli_journey::guarded_merge::catalog_cli_background_recovery_waits_for_live_work_and_recovers_unkeyed_attempts"
-            | "cli_journey::guarded_merge::catalog_cli_background_recovers_revoked_removed_target_without_disclosure"
-            | "cli_journey::guarded_merge::custody_journey::a_create_that_times_out_after_receipt_is_unknown_and_never_sent_again"
-            | "cli_journey::guarded_merge::custody_journey::a_create_whose_operation_has_no_custody_target_is_refused_before_it_is_sent"
-            | "cli_journey::guarded_merge::custody_journey::a_created_token_custody_refuses_is_reported_by_its_hash_and_held_nowhere"
-            | "cli_journey::guarded_merge::custody_journey::a_created_token_is_held_as_a_new_connection_and_only_its_hash_is_returned"
-            | "cli_journey::guarded_merge::custody_journey::a_write_after_an_executable_only_change_is_validated_once_and_sent"
-            | "cli_journey::guarded_merge::custody_journey::security2_a_proof_issued_before_an_executable_only_change_authorizes_no_write"
-            | "cli_journey::guarded_merge::custody_journey::security2_a_write_whose_new_executable_answers_another_identity_sends_nothing"
-            | "cli_journey::revision_recovery::revalidate_replaces_the_adapter_process_of_an_earlier_entry"
-            | "cli_journey::revision_recovery::a_selection_only_change_leaves_the_connection_ready_and_serves_the_added_read"
-            | "cli_journey::revision_recovery::a_changed_ca_file_stales_the_connection_until_it_is_revalidated"
-            | "cli_journey::revision_recovery::a_replaced_executable_lists_ready_and_one_validation_follows_it"
-            | "cli_journey::revision_recovery::a_replaced_executable_answering_another_identity_changes_nothing"
-            | "cli_journey::revision_recovery::a_connection_saved_without_the_digest_keeps_the_revision_rule_until_revalidated"
-            | "cli_journey::revision_recovery::adv_the_added_read_succeeds_after_a_selection_only_change_without_revalidation"
-            | "cli_journey::revision_recovery::adv_a_read_under_a_replaced_executable_validates_once_and_is_served"
-            | "cli_journey::revision_recovery::adv2_a_stopped_instance_answers_description_unavailable_for_a_new_selection"
-            | "cli_journey::revision_recovery::revision_recovery_security::security_the_added_read_succeeds_after_a_selection_only_change_without_revalidation"
-            | "cli_journey::revision_recovery::revision_recovery_security::security_a_read_follows_an_executable_only_change_only_after_the_identity_answers"
-            | "cli_journey::revision_recovery::revision_recovery_security::security2_a_revoked_connection_starts_nothing_for_a_description"
-            | "cli_journey::revision_recovery::revision_recovery_security::security2_a_description_launch_does_not_resume_a_stopped_instance"
-            | "cli_journey::revision_recovery::revision_recovery_security::security2_operations_describe_starts_no_owner_without_a_current_connection"
-            | "cli_journey::revision_recovery_adversary::adversary_the_connection_left_by_a_changed_authentication_stays_revocable",
+            "main",
+            "local_runtime::cli_journey::owner_guard::a_journey_that_panics_after_its_owner_started_leaves_no_owner_alive"
+            | "local_runtime::cli_journey::owner_guard::a_journey_owner_exits_when_the_process_it_is_tied_to_ends"
+            | "local_runtime::cli_journey::guarded_merge::catalog_cli_guarded_merge_applied_refused_and_lost_response_restart"
+            | "local_runtime::cli_journey::guarded_merge::catalog_cli_guarded_merge_revocation_finishes_admitted_audit"
+            | "local_runtime::cli_journey::guarded_merge::catalog_cli_recovers_abandoned_preparation_only_with_trusted_time"
+            | "local_runtime::cli_journey::guarded_merge::catalog_cli_background_recovery_waits_for_live_work_and_recovers_unkeyed_attempts"
+            | "local_runtime::cli_journey::guarded_merge::catalog_cli_background_recovers_revoked_removed_target_without_disclosure"
+            | "local_runtime::cli_journey::guarded_merge::custody_journey::a_create_that_times_out_after_receipt_is_unknown_and_never_sent_again"
+            | "local_runtime::cli_journey::guarded_merge::custody_journey::a_create_whose_operation_has_no_custody_target_is_refused_before_it_is_sent"
+            | "local_runtime::cli_journey::guarded_merge::custody_journey::a_created_token_custody_refuses_is_reported_by_its_hash_and_held_nowhere"
+            | "local_runtime::cli_journey::guarded_merge::custody_journey::a_created_token_is_held_as_a_new_connection_and_only_its_hash_is_returned"
+            | "local_runtime::cli_journey::guarded_merge::custody_journey::a_write_after_an_executable_only_change_is_validated_once_and_sent"
+            | "local_runtime::cli_journey::guarded_merge::custody_journey::security2_a_proof_issued_before_an_executable_only_change_authorizes_no_write"
+            | "local_runtime::cli_journey::guarded_merge::custody_journey::security2_a_write_whose_new_executable_answers_another_identity_sends_nothing"
+            | "local_runtime::cli_journey::revision_recovery::revalidate_replaces_the_adapter_process_of_an_earlier_entry"
+            | "local_runtime::cli_journey::revision_recovery::a_selection_only_change_leaves_the_connection_ready_and_serves_the_added_read"
+            | "local_runtime::cli_journey::revision_recovery::a_changed_ca_file_stales_the_connection_until_it_is_revalidated"
+            | "local_runtime::cli_journey::revision_recovery::a_replaced_executable_lists_ready_and_one_validation_follows_it"
+            | "local_runtime::cli_journey::revision_recovery::a_replaced_executable_answering_another_identity_changes_nothing"
+            | "local_runtime::cli_journey::revision_recovery::a_connection_saved_without_the_digest_keeps_the_revision_rule_until_revalidated"
+            | "local_runtime::cli_journey::revision_recovery::adv_the_added_read_succeeds_after_a_selection_only_change_without_revalidation"
+            | "local_runtime::cli_journey::revision_recovery::adv_a_read_under_a_replaced_executable_validates_once_and_is_served"
+            | "local_runtime::cli_journey::revision_recovery::adv2_a_stopped_instance_answers_description_unavailable_for_a_new_selection"
+            | "local_runtime::cli_journey::revision_recovery::revision_recovery_security::security_the_added_read_succeeds_after_a_selection_only_change_without_revalidation"
+            | "local_runtime::cli_journey::revision_recovery::revision_recovery_security::security_a_read_follows_an_executable_only_change_only_after_the_identity_answers"
+            | "local_runtime::cli_journey::revision_recovery::revision_recovery_security::security2_a_revoked_connection_starts_nothing_for_a_description"
+            | "local_runtime::cli_journey::revision_recovery::revision_recovery_security::security2_a_description_launch_does_not_resume_a_stopped_instance"
+            | "local_runtime::cli_journey::revision_recovery::revision_recovery_security::security2_operations_describe_starts_no_owner_without_a_current_connection"
+            | "local_runtime::cli_journey::revision_recovery_adversary::adversary_the_connection_left_by_a_changed_authentication_stays_revocable",
         ) => Some((Disposable, vec![CUSTODY, CLI])),
         (
             "connectors-catalog-provider",
-            "local_runtime",
-            "cli_journey::guarded_merge::catalog_cli_failed_settlement_keeps_the_known_effect_and_recovers_conservatively"
-            | "cli_journey::guarded_merge::catalog_adversary_revoked_disclosure_of_an_applied_merge_never_answers_not_attempted",
+            "main",
+            "local_runtime::cli_journey::guarded_merge::catalog_cli_failed_settlement_keeps_the_known_effect_and_recovers_conservatively"
+            | "local_runtime::cli_journey::guarded_merge::catalog_adversary_revoked_disclosure_of_an_applied_merge_never_answers_not_attempted",
         ) => Some((Disposable, vec![CUSTODY, CLI, SECCOMP])),
         (
             "connectors-catalog-provider",
-            "local_runtime",
-            "cli_journey::gitlab_catalog_cli_reads_the_merge_request_feed_through_a_saved_connection"
-            | "cli_journey::adversary_u23_a_read_result_the_child_admitted_reaches_the_cli_through_the_owner"
-            | "cli_journey::basic_catalog_cli_refuses_a_credential_below_minimum_scopes"
-            | "cli_journey::adversary_basic_cli_wrong_token_is_unauthorized_and_malformed_is_invalid_input"
-            | "cli_journey::a_provider_refusal_reads_dispatch_and_a_host_refusal_reads_admission"
-            | "cli_journey::oauth_connect_journey"
-            | "cli_journey::oauth_repair_journey"
-            | "cli_journey::oauth2_grant_journey::oauth2_grant_connect_with_loopback_fixed_port"
-            | "cli_journey::oauth2_grant_journey::oauth2_grant_connect_with_pasted_code"
-            | "cli_journey::oauth2_grant_journey::oauth2_grant_connect_with_device_grant"
-            | "cli_journey::oauth2_grant_journey::oauth2_grant_reconnect_replaces_the_entry_on_the_same_connection"
-            | "cli_journey::oauth2_grant_journey::oauth2_grant_state_mismatch_stores_nothing"
-            | "cli_journey::oauth2_grant_journey::oauth2_grant_device_expired_stores_nothing"
-            | "cli_journey::oauth2_grant_journey::oauth2_grant_missing_required_scope_stores_nothing"
-            | "cli_journey::oauth2_grant_journey::token_journey::token_without_reveal_prints_no_token"
-            | "cli_journey::oauth2_grant_journey::token_journey::token_with_reveal_prints_only_the_token"
-            | "cli_journey::oauth2_grant_journey::token_journey::token_within_lead_time_refreshes_once"
-            | "cli_journey::oauth2_grant_journey::token_journey::token_on_a_stale_connection_refuses_with_repair_connection"
-            | "cli_journey::oauth2_grant_journey::token_journey::token_on_a_static_profile_is_forbidden"
-            | "cli_journey::oauth2_grant_journey::token_journey::library_access_token_matches_the_cli"
-            | "cli_journey::chatgpt_journey::chatgpt_connect_browser_journey"
-            | "cli_journey::chatgpt_journey::chatgpt_connect_device_journey"
-            | "cli_journey::chatgpt_journey::chatgpt_token_refreshes_with_json_and_rotates"
-            | "cli_journey::chatgpt_adversary::adversary_chatgpt_device_sign_in_refuses_an_interval_longer_than_the_window_before_any_poll"
-            | "cli_journey::chatgpt_adversary::adversary_chatgpt_device_sign_in_keeps_polling_at_a_normal_interval"
-            | "cli_journey::claude_subscription_journey::claude_connect_loopback_journey"
-            | "cli_journey::claude_subscription_journey::claude_connect_pasted_code_journey"
-            | "cli_journey::claude_subscription_journey::claude_token_refreshes_with_json"
-            | "cli_journey::reason_cli_adversary::a_provider_reason_reaches_the_cli_failure_json_and_a_credential_echo_does_not"
-            | "cli_journey::retry_after_cli::a_rate_limited_read_is_waited_for_once_or_states_its_delay_in_the_cli_json"
-            | "oauth2_refresh::oauth_invalid_grant_reports_repair"
-            | "oauth2_refresh::oauth_connect_refusal_does_not_say_repair"
-            | "oauth2_refresh::oauth_invalid_grant_makes_the_connection_stale_until_a_reconnect"
-            | "oauth2_refresh_adversary_pass2::adversary2_oauth_cached_bootstrap_round_trips_across_owner_restart"
-            | "derived_instance::a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_drafts"
-            | "cli_journey::invoke_definition::a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_without_asking"
-            | "cli_journey::invoke_definition::a_stored_credential_of_a_configured_instance_is_reused_without_a_token_prompt"
-            | "cli_journey::invoke_definition::a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offers_connect_fresh"
-            | "cli_journey::invoke_definition::adversary_reuse_race::adversary_reuse_a_source_revoked_while_its_copy_validates_is_not_published"
-            | "cli_journey::invoke_definition::a_definition_moved_to_another_host_connects_fresh_under_a_new_instance_id",
+            "main",
+            "local_runtime::cli_journey::gitlab_catalog_cli_reads_the_merge_request_feed_through_a_saved_connection"
+            | "local_runtime::cli_journey::adversary_u23_a_read_result_the_child_admitted_reaches_the_cli_through_the_owner"
+            | "local_runtime::cli_journey::basic_catalog_cli_refuses_a_credential_below_minimum_scopes"
+            | "local_runtime::cli_journey::adversary_basic_cli_wrong_token_is_unauthorized_and_malformed_is_invalid_input"
+            | "local_runtime::cli_journey::a_provider_refusal_reads_dispatch_and_a_host_refusal_reads_admission"
+            | "local_runtime::cli_journey::oauth_connect_journey"
+            | "local_runtime::cli_journey::oauth_repair_journey"
+            | "local_runtime::cli_journey::oauth2_grant_journey::oauth2_grant_connect_with_loopback_fixed_port"
+            | "local_runtime::cli_journey::oauth2_grant_journey::oauth2_grant_connect_with_pasted_code"
+            | "local_runtime::cli_journey::oauth2_grant_journey::oauth2_grant_connect_with_device_grant"
+            | "local_runtime::cli_journey::oauth2_grant_journey::oauth2_grant_reconnect_replaces_the_entry_on_the_same_connection"
+            | "local_runtime::cli_journey::oauth2_grant_journey::oauth2_grant_state_mismatch_stores_nothing"
+            | "local_runtime::cli_journey::oauth2_grant_journey::oauth2_grant_device_expired_stores_nothing"
+            | "local_runtime::cli_journey::oauth2_grant_journey::oauth2_grant_missing_required_scope_stores_nothing"
+            | "local_runtime::cli_journey::oauth2_grant_journey::token_journey::token_without_reveal_prints_no_token"
+            | "local_runtime::cli_journey::oauth2_grant_journey::token_journey::token_with_reveal_prints_only_the_token"
+            | "local_runtime::cli_journey::oauth2_grant_journey::token_journey::token_within_lead_time_refreshes_once"
+            | "local_runtime::cli_journey::oauth2_grant_journey::token_journey::token_on_a_stale_connection_refuses_with_repair_connection"
+            | "local_runtime::cli_journey::oauth2_grant_journey::token_journey::token_on_a_static_profile_is_forbidden"
+            | "local_runtime::cli_journey::oauth2_grant_journey::token_journey::library_access_token_matches_the_cli"
+            | "local_runtime::cli_journey::chatgpt_journey::chatgpt_connect_browser_journey"
+            | "local_runtime::cli_journey::chatgpt_journey::chatgpt_connect_device_journey"
+            | "local_runtime::cli_journey::chatgpt_journey::chatgpt_token_refreshes_with_json_and_rotates"
+            | "local_runtime::cli_journey::chatgpt_adversary::adversary_chatgpt_device_sign_in_refuses_an_interval_longer_than_the_window_before_any_poll"
+            | "local_runtime::cli_journey::chatgpt_adversary::adversary_chatgpt_device_sign_in_keeps_polling_at_a_normal_interval"
+            | "local_runtime::cli_journey::claude_subscription_journey::claude_connect_loopback_journey"
+            | "local_runtime::cli_journey::claude_subscription_journey::claude_connect_pasted_code_journey"
+            | "local_runtime::cli_journey::claude_subscription_journey::claude_token_refreshes_with_json"
+            | "local_runtime::cli_journey::reason_cli_adversary::a_provider_reason_reaches_the_cli_failure_json_and_a_credential_echo_does_not"
+            | "local_runtime::cli_journey::retry_after_cli::a_rate_limited_read_is_waited_for_once_or_states_its_delay_in_the_cli_json"
+            | "local_runtime::oauth2_refresh::oauth_invalid_grant_reports_repair"
+            | "local_runtime::oauth2_refresh::oauth_connect_refusal_does_not_say_repair"
+            | "local_runtime::oauth2_refresh::oauth_invalid_grant_makes_the_connection_stale_until_a_reconnect"
+            | "local_runtime::oauth2_refresh_adversary_pass2::adversary2_oauth_cached_bootstrap_round_trips_across_owner_restart"
+            | "local_runtime::derived_instance::a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_drafts"
+            | "local_runtime::cli_journey::invoke_definition::a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_without_asking"
+            | "local_runtime::cli_journey::invoke_definition::a_stored_credential_of_a_configured_instance_is_reused_without_a_token_prompt"
+            | "local_runtime::cli_journey::invoke_definition::a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offers_connect_fresh"
+            | "local_runtime::cli_journey::invoke_definition::adversary_reuse_race::adversary_reuse_a_source_revoked_while_its_copy_validates_is_not_published"
+            | "local_runtime::cli_journey::invoke_definition::a_definition_moved_to_another_host_connects_fresh_under_a_new_instance_id",
         ) => Some((Disposable, vec![CUSTODY, CLI])),
         (
             "connectors-catalog-provider",
-            "confluence_binding",
-            "a_v1_bound_connection_reads_the_v1_page_through_the_cli_and_rebinds_on_revalidation",
+            "main",
+            "confluence_binding::a_v1_bound_connection_reads_the_v1_page_through_the_cli_and_rebinds_on_revalidation",
         ) => Some((Disposable, vec![CUSTODY, CLI])),
         (
             "connectors-loki",
@@ -495,32 +497,32 @@ fn classify(suite: &Suite, name: &str) -> Entry {
         )
         | (
             "connectors-catalog-provider",
-            "jira_issue_writes_adversary",
-            "a_comment_whose_content_is_null_is_refused_before_any_request",
+            "main",
+            "jira_issue_writes_adversary::a_comment_whose_content_is_null_is_refused_before_any_request",
         )
         | (
             "connectors-catalog-provider",
-            "enum_date_time_adversary",
-            "adversary_declared_input_schema_lists_the_pinned_enum",
+            "main",
+            "enum_date_time_adversary::adversary_declared_input_schema_lists_the_pinned_enum",
         )
         | (
             "connectors-catalog-provider",
-            "slack_adversary",
-            "an_empty_user_or_email_sends_nothing",
+            "main",
+            "slack_adversary::an_empty_user_or_email_sends_nothing",
         ) => Some((Deferred, vec![])),
         // These fail on main 7c22ff3878 in the CI journeys container as well (probe PR 249,
         // run 43055896285), deferred by story:main-failing-ci-journeys (draft).
         (
             "connectors-catalog-provider",
-            "local_runtime",
-            "cli_journey::basic_catalog_cli_connects_by_file_and_stdin_and_refuses_by_code"
-            | "cli_journey::gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart"
-            | "cli_journey::lifecycle::catalog_cli_failed_repair_and_busy_stop_preserve_authority"
-            | "cli_journey::revision_recovery::a_changed_evidence_lifetime_recovers_with_a_new_connection_in_two_commands"
-            | "cli_journey::revision_recovery::no_next_action_after_a_revision_change_returns_to_an_earlier_refusal"
-            | "cli_journey::revision_recovery_adversary::adversary_a_changed_profile_id_names_the_path_that_recovers"
-            | "cli_journey::revision_recovery_adversary::adversary_a_lifetime_changed_and_reverted_leaves_the_first_connection_usable"
-            | "slack_approval::a_slack_bot_post_is_issued_the_approval_its_prepare_named_and_invoked_with_it",
+            "main",
+            "local_runtime::cli_journey::basic_catalog_cli_connects_by_file_and_stdin_and_refuses_by_code"
+            | "local_runtime::cli_journey::gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart"
+            | "local_runtime::cli_journey::lifecycle::catalog_cli_failed_repair_and_busy_stop_preserve_authority"
+            | "local_runtime::cli_journey::revision_recovery::a_changed_evidence_lifetime_recovers_with_a_new_connection_in_two_commands"
+            | "local_runtime::cli_journey::revision_recovery::no_next_action_after_a_revision_change_returns_to_an_earlier_refusal"
+            | "local_runtime::cli_journey::revision_recovery_adversary::adversary_a_changed_profile_id_names_the_path_that_recovers"
+            | "local_runtime::cli_journey::revision_recovery_adversary::adversary_a_lifetime_changed_and_reverted_leaves_the_first_connection_usable"
+            | "local_runtime::slack_approval::a_slack_bot_post_is_issued_the_approval_its_prepare_named_and_invoked_with_it",
         ) => Some((Deferred, vec![])),
         _ => None,
     };
@@ -1492,43 +1494,43 @@ mod tests {
         let deferred = [
             (
                 CATALOG,
-                "local_runtime",
-                "cli_journey::basic_catalog_cli_connects_by_file_and_stdin_and_refuses_by_code",
+                "main",
+                "local_runtime::cli_journey::basic_catalog_cli_connects_by_file_and_stdin_and_refuses_by_code",
             ),
             (
                 CATALOG,
-                "local_runtime",
-                "cli_journey::gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart",
+                "main",
+                "local_runtime::cli_journey::gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart",
             ),
             (
                 CATALOG,
-                "local_runtime",
-                "cli_journey::lifecycle::catalog_cli_failed_repair_and_busy_stop_preserve_authority",
+                "main",
+                "local_runtime::cli_journey::lifecycle::catalog_cli_failed_repair_and_busy_stop_preserve_authority",
             ),
             (
                 CATALOG,
-                "local_runtime",
-                "cli_journey::revision_recovery::a_changed_evidence_lifetime_recovers_with_a_new_connection_in_two_commands",
+                "main",
+                "local_runtime::cli_journey::revision_recovery::a_changed_evidence_lifetime_recovers_with_a_new_connection_in_two_commands",
             ),
             (
                 CATALOG,
-                "local_runtime",
-                "cli_journey::revision_recovery::no_next_action_after_a_revision_change_returns_to_an_earlier_refusal",
+                "main",
+                "local_runtime::cli_journey::revision_recovery::no_next_action_after_a_revision_change_returns_to_an_earlier_refusal",
             ),
             (
                 CATALOG,
-                "local_runtime",
-                "cli_journey::revision_recovery_adversary::adversary_a_changed_profile_id_names_the_path_that_recovers",
+                "main",
+                "local_runtime::cli_journey::revision_recovery_adversary::adversary_a_changed_profile_id_names_the_path_that_recovers",
             ),
             (
                 CATALOG,
-                "local_runtime",
-                "cli_journey::revision_recovery_adversary::adversary_a_lifetime_changed_and_reverted_leaves_the_first_connection_usable",
+                "main",
+                "local_runtime::cli_journey::revision_recovery_adversary::adversary_a_lifetime_changed_and_reverted_leaves_the_first_connection_usable",
             ),
             (
                 CATALOG,
-                "local_runtime",
-                "slack_approval::a_slack_bot_post_is_issued_the_approval_its_prepare_named_and_invoked_with_it",
+                "main",
+                "local_runtime::slack_approval::a_slack_bot_post_is_issued_the_approval_its_prepare_named_and_invoked_with_it",
             ),
             (
                 HOST,
@@ -1941,8 +1943,8 @@ fn selected_fixture() {{
         const WORKFLOW: &str = include_str!("../../../.github/workflows/rust-gate.yml");
         const JOURNEY: (&str, &str, &str) = (
             "connectors-catalog-provider",
-            "local_runtime",
-            "cli_journey::gitlab_catalog_cli_reads_the_merge_request_feed_through_a_saved_connection",
+            "main",
+            "local_runtime::cli_journey::gitlab_catalog_cli_reads_the_merge_request_feed_through_a_saved_connection",
         );
         fn options_of(command: &str) -> Option<Options> {
             let (_, args) = command.trim().split_once("connectors-build -- ")?;

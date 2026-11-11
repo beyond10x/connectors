@@ -44,8 +44,7 @@ mod chatgpt;
 mod claude_subscription;
 #[path = "local_runtime/cli_journey.rs"]
 mod cli_journey;
-#[path = "../../../crates/connectors-host/tests/fixtures/clock/server.rs"]
-mod clock_fixture;
+use crate::clock_fixture;
 #[path = "local_runtime/derived_instance.rs"]
 mod derived_instance;
 #[path = "local_runtime/github_app.rs"]

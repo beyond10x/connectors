@@ -10,7 +10,7 @@
 //! authority: one `AuthorizationServer` per profile record, and the
 //! `Acquisition`'s transitions.
 use super::*;
-use crate::oauth2_grant::{
+use crate::local_runtime::oauth2_grant::{
     Behaviour, GRANT_ACCESS, GRANT_EXTRA_SCOPE, GRANT_PROFILE, GRANT_SCOPE, GrantServer, Redirect,
     carries_grant_material, declaration, grant_config,
 };
@@ -360,13 +360,13 @@ fn oauth2_grant_connect_with_loopback_fixed_port() {
         .filter(|seen| seen.route == "/authorize")
         .collect();
     assert_eq!(consent.len(), 1);
-    let query = crate::oauth2_refresh::decode_form(consent[0].query.as_bytes());
+    let query = crate::local_runtime::oauth2_refresh::decode_form(consent[0].query.as_bytes());
     assert_eq!(
-        crate::oauth2_refresh::field(&query, "redirect_uri"),
+        crate::local_runtime::oauth2_refresh::field(&query, "redirect_uri"),
         Some(format!("http://127.0.0.1:{port}/callback").as_str())
     );
     assert_eq!(
-        crate::oauth2_refresh::field(&query, "code_challenge_method"),
+        crate::local_runtime::oauth2_refresh::field(&query, "code_challenge_method"),
         Some("S256")
     );
     // The owner validated the stored response with its access token.

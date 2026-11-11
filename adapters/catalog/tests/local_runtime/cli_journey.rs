@@ -1357,8 +1357,8 @@ fn adversary_u23_a_read_result_the_child_admitted_reaches_the_cli_through_the_ow
 /// printing the configuration, state directory, connection and this process's
 /// id, until `FIXTURE_STOP` (named in its output) exists or
 /// `GITLAB_FIXTURE_SECONDS` (default 300) pass. `CONNECTORS_TEST_CLI=<debug
-/// connectors> cargo test -p connectors-catalog-provider --test local_runtime --
-/// --ignored --nocapture serve_the_raw_file_fixture`.
+/// connectors> cargo test -p connectors-catalog-provider --test main --
+/// --ignored --nocapture local_runtime::cli_journey::serve_the_raw_file_fixture`.
 #[test]
 #[ignore = "serves the fixture for the guide's commands"]
 fn serve_the_raw_file_fixture() {

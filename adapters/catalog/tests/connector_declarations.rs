@@ -5,7 +5,7 @@
 //! hand-written configuration keeps the revision it had before declarations.
 #![cfg(unix)]
 
-mod hand_written;
+use crate::hand_written;
 
 use serde_json::{Map, Value, json};
 use std::{
