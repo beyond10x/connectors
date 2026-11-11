@@ -206,8 +206,7 @@ command does not run it.
 
 `--only-prerequisite` narrows the selected families to tests whose every
 prerequisite is one it names: `provider` (`CONNECTORS_TEST_CATALOG_PROVIDER`) or
-`cli` (`CONNECTORS_TEST_CLI`), both supplied by workspace compilation, or `custody`
-(the qualified Secret Service and `dbus-daemon`, which the job installs). A test with
+`cli` (`CONNECTORS_TEST_CLI`), both supplied by workspace compilation. A test with
 no prerequisite also qualifies. With `--required` an empty selection still refuses.
 The `repository gate` job of [`rust-gate.yml`](../.github/workflows/rust-gate.yml)
 runs, after the gate, on every pull request and push to `main`:
@@ -220,19 +219,6 @@ Its report names each selected test and its outcome; today these are the three
 tests of `apps/connectors/tests/definition_connect_question.rs` and
 `describe_of_a_definition_needs_no_connection` in
 `apps/connectors/tests/adversary_d218_u1.rs`.
-
-The `ignored CLI journeys` job of the same workflow runs on every pull request, in
-an Arch Linux container with the pinned `gnome-keyring` 50.0-1 package (the
-exact daemon [Secret Service custody](local-secret-service.md) qualifies):
-
-```sh
-cargo run --locked -p connectors-build -- ignored --required --only-prerequisite provider,cli,custody
-```
-
-A red journey, a missing prerequisite or an unclassified test fails the pull
-request. It leaves out the tests that need Chrome, the pre-handshake owner
-executable or seccomp `USER_NOTIF`; the job prints each selected test that did
-not pass.
 
 A test that a `cfg` keeps off a platform (`#[cfg(unix)]`, `#![cfg(unix)]`,
 `#[cfg(target_os = "linux")]` and the like) does not compile there, so no binary
