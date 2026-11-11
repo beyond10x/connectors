@@ -297,7 +297,12 @@ the content of a comment. Plain text or Markdown is not converted.
 - **`issue.edit`** takes `issueIdOrKey`, `updated_stamp` (the `fields.updated`
   of `issue.get`) and `body.fields` with at least one of `summary` (non-empty),
   `description` (ADF), `labels` (replacing the issue's labels), `priority` and
-  `assignee`, as Jira's `IssueUpdateDetails` defines them. `notifyUsers` is
+  `assignee`, as Jira's `IssueUpdateDetails` defines them. `issue.edit`
+  declares `body_null_clears`: a member given as `null` clears that field and
+  counts as the change, so `assignee: null` alone unassigns the issue, and the
+  `null` is sent as given. Elsewhere in this connector `null` counts as
+  missing: a required body key given as `null` is refused before any request.
+  `notifyUsers` is
   passed through; `overrideScreenSecurity`, `overrideEditableFlag`,
   `returnIssue` and `expand` are withheld. Jira's `409` is `conflict`, the
   write refused and never sent again. The read after the edit checks the key

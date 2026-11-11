@@ -432,6 +432,45 @@ fn the_edit_sends_notify_users_and_no_withheld_parameter() {
     );
 }
 
+/// story:required-body-key-refuses-null: `issue.edit` declares `body_null_clears`,
+/// so a `body_any_of` member given as JSON `null` alone (unassign, clear the
+/// description or the priority) counts as the one change and is sent with that
+/// `null` in the PUT body; a `null` beside another change is sent too.
+#[test]
+fn a_lone_null_edit_member_is_the_change_and_is_sent_as_null() {
+    for member in ["description", "priority", "assignee"] {
+        let mut input = edit_input(STAMP);
+        input["body"] = json!({"fields": {member: null}});
+        let (outcome, log) = run(
+            EDIT,
+            input,
+            vec![found(ISSUE)],
+            answer(204, None),
+            vec![found(ISSUE)],
+        );
+        assert_eq!(effect(&outcome), "applied", "{member}");
+        assert_eq!(
+            writes(&log)[0].3,
+            json!({"fields": {member: null}}),
+            "{member}"
+        );
+    }
+    let mut input = edit_input(STAMP);
+    input["body"]["fields"]["assignee"] = Value::Null;
+    let (outcome, log) = run(
+        EDIT,
+        input,
+        vec![found(ISSUE)],
+        answer(204, None),
+        vec![found(ISSUE)],
+    );
+    assert_eq!(effect(&outcome), "applied");
+    assert_eq!(
+        writes(&log)[0].3,
+        json!({"fields": {"summary": "Edited summary", "assignee": null}})
+    );
+}
+
 // ------------------------------------------------------------ stamp and conflict
 
 /// Any difference in the issue's key or `updated` stamp, the stamp differing

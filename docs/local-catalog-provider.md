@@ -997,9 +997,10 @@ The complete configuration used against the sandbox is
   range, while JSON Schema's `integer` also admits `3.0` or `1e2`, so such a
   value passes the declaration and is still refused.
   `body_required` is optional too: `["<key>", …]` names the closed body keys
-  that schema requires, and a body without one is refused as `invalid_input`
-  before any request and declared required (keys a guard reads are required
-  already). GitLab's note and reply type `body` as a string and require it; its
+  that schema requires, and a body without one, or giving one as JSON `null`,
+  is refused as `invalid_input` before any request and declared required, with
+  `null` excluded for a key typed by no `body_types` (keys a guard reads are
+  required already). A `null` counts as missing. GitLab's note and reply type `body` as a string and require it; its
   discussion resolve types `resolved` as a boolean. A key either names that
   `body_keys` does not admit (so either one without `body_keys`), a key
   `body_required` repeats, or a guard reading a path nested under a typed key
@@ -1045,9 +1046,19 @@ The complete configuration used against the sandbox is
   members the caller sends, such as Zendesk's ticket update of `group_id`,
   `tags`, `priority` or `type`. A body with none of them is refused as
   `invalid_input` before any request, and the declared input schema requires
-  one of them (`anyOf`). Fewer than two keys, a key `body_keys` does not admit,
-  a fixed or repeated key, or keys under more than one parent object are
-  refused when the selection loads.
+  one of them (`anyOf`). A key given as JSON `null` counts as missing, so a
+  body whose every named key is absent or `null` is refused, unless the
+  selection declares `body_null_clears`. Fewer than two keys, a key `body_keys`
+  does not admit, a fixed or repeated key, or keys under more than one parent
+  object are refused when the selection loads.
+- `body_null_clears` is optional, beside `body_any_of`: `true` declares that the
+  provider clears a field on JSON `null`, so a `body_any_of` key given as
+  `null` counts as the one change and is sent as `null`, such as Jira's
+  `issue.edit` unassigning an issue with `assignee: null`. The declared input
+  schema then requires only that one of the keys is present. Without it a
+  `null` key counts as missing; a `body_required` key given as `null` is
+  refused either way. `body_null_clears` without `body_any_of` is refused when
+  the selection loads.
 - `body_prefixes` is optional, beside `body_types`: `{"<key>": "<prefix>"}`
   fixes the start of a string the caller writes. The provider sends the prefix
   followed by the caller's value under that key, so the sent value always
@@ -1056,7 +1067,7 @@ The complete configuration used against the sandbox is
   body with a first line marking it a draft. A key `body_types` does not type as
   `string`, a fixed key or an empty prefix is refused when the selection loads.
   `body_keys`, `body_types`, `body_required`, `body_nonempty`, `body_fixed`,
-  `body_enums`, `body_any_of` and `body_prefixes` are modelled as
+  `body_enums`, `body_any_of`, `body_null_clears` and `body_prefixes` are modelled as
   `connectors_catalog.selection.ClosedBody` in `adapters/catalog/spec/ess`, and
   every shipped selection is checked against it.
 - `conflict_status` is optional, for a write: `409` or `412`, the status by
