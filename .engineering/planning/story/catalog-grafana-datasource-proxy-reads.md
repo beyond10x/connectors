@@ -2,14 +2,17 @@
 format: aep.planning-md/3
 id: story:catalog-grafana-datasource-proxy-reads
 kind: story
-status: draft
+status: active
 title: Prometheus and Loki reads through Grafana's data-source proxy, from the Grafana definition
 summary: Instant and range PromQL queries and Loki query_range through the Grafana service-account token, served from a catalog definition
 relations:
 - decomposes: epic:catalog-knowledge-sources
 - serves: vision:independent-contract-adapters
 - depends_on: story:catalog-grafana-reads
-revision: 3
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-11T00:01:00Z", actor: "human:timo", revision: 4}
+- {from: "proposed", to: "active", at: "2026-11-11T00:01:02Z", actor: "human:timo", revision: 5}
 ---
 ## Outcome
 

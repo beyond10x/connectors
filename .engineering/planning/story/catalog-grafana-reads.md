@@ -2,13 +2,16 @@
 format: aep.planning-md/3
 id: story:catalog-grafana-reads
 kind: story
-status: draft
+status: active
 title: Grafana alert rules, annotations and dashboard metadata through the catalog provider
 relations:
 - decomposes: epic:catalog-knowledge-sources
 - depends_on: story:catalog-slack-reads
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-11-11T00:00:58Z", actor: "human:timo", revision: 4}
+- {from: "proposed", to: "active", at: "2026-11-11T00:01:00Z", actor: "human:timo", revision: 5}
 ---
 ## Source
 
