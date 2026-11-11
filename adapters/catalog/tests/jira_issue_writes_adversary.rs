@@ -727,3 +727,49 @@ fn create_meta_fields_never_resolves_to_another_path() {
         }
     }
 }
+
+/// Adversary pass 2, story:required-body-key-refuses-null: the declared input
+/// schema of `issue.edit` and `prepare` agree on every body, with
+/// `body_null_clears` set. `body_any_of` lives under `fields`, so its `anyOf`
+/// sits on the `fields` object; a body without `fields` must still be refused
+/// by the schema as `prepare` refuses it.
+#[test]
+fn adversary_edit_schema_and_prepare_agree_on_every_body() {
+    let engine = engine();
+    let declared = engine.declarations(&[connectors_catalog_provider::Effect::Write]);
+    let schema = &declared
+        .iter()
+        .find(|operation| operation.id == EDIT)
+        .unwrap()
+        .input_schema;
+    let mut disagree = Vec::new();
+    for body in [
+        json!({}),
+        json!({"fields": {}}),
+        json!({"fields": null}),
+        json!({"fields": {"assignee": null}}),
+        json!({"fields": {"description": null, "priority": null}}),
+        json!({"fields": {"summary": null}}),
+        json!({"fields": {"labels": null}}),
+        json!({"fields": {"summary": ""}}),
+    ] {
+        let mut input = edit_input(STAMP);
+        input["body"] = body.clone();
+        let admitted = connectors_sdk::validate(schema, &input).is_ok();
+        let (outcome, _) = run(
+            EDIT,
+            input,
+            vec![found(ISSUE)],
+            answer(204, None),
+            vec![found(ISSUE)],
+        );
+        let prepared = effect(&outcome) != "not-attempted InvalidInput";
+        if admitted != prepared {
+            disagree.push(format!(
+                "body {body}: declared {admitted}, prepare {}",
+                effect(&outcome)
+            ));
+        }
+    }
+    assert_eq!(disagree, Vec::<String>::new());
+}
