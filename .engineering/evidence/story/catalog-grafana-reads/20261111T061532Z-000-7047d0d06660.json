@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-11T06:15:32Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-grafana-reads",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test -p connectors-catalog-provider --test grafana --test grafana_adversary --test grafana_security_review --test grafana_security_review_r2 --test bundle_drift --test connector_declarations --test definition_auth",
+    "reference": "baseline: reviewer cases 4 red (adversary 1, security r1 3), r2 1 red; treatment: 55 passed 0 failed, exit 0 (VERIFIED)"
+  }
+}

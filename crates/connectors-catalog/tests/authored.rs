@@ -67,6 +67,7 @@ fn equivalent() -> Operation {
                 repeated: false,
                 allowed: Vec::new(),
                 format: None,
+                pattern: None,
             },
             Parameter {
                 name: "page".into(),
@@ -76,6 +77,7 @@ fn equivalent() -> Operation {
                 repeated: false,
                 allowed: Vec::new(),
                 format: None,
+                pattern: None,
             },
         ],
         request_media_types: vec!["application/json".into()],
@@ -706,6 +708,7 @@ location = "header"
                 repeated: false,
                 allowed: Vec::new(),
                 format: None,
+                pattern: None,
             },
             Parameter {
                 name: "page".into(),
@@ -715,6 +718,7 @@ location = "header"
                 repeated: false,
                 allowed: Vec::new(),
                 format: None,
+                pattern: None,
             },
             Parameter {
                 name: "tenant".into(),
@@ -724,6 +728,7 @@ location = "header"
                 repeated: false,
                 allowed: Vec::new(),
                 format: None,
+                pattern: None,
             },
         ]
     );
