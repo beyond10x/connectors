@@ -1160,7 +1160,7 @@ pub enum FeedRule {
     UtcOffsets,
     /// `utc_offsets` needs `page`.
     UtcOffsetsPage,
-    /// `url`, `url_base` and `parent` are JSON pointers.
+    /// The fields that read a record, `id`, `records`, `revision`, `body.pointer`, `url`, `parent` and the rest, are JSON pointers.
     ItemPointer,
     /// The parameters a position names, `time`, `query.parameter` and
     /// `page.parameter`, are query parameters of the items' list operation,
@@ -1177,6 +1177,28 @@ pub enum FeedRule {
     /// A parameter the feed sends only on resume, `time`, `page.parameter` or
     /// the cursor's, is not one its operation requires.
     ParameterRequired,
+    /// The containers' list, the lookup and the items' list are GET operations.
+    OperationGet,
+    /// Each parameter an operation requires is one the feed sends on every
+    /// request: the page size, the container, the query, `query` keys and the
+    /// lookup's path parameter.
+    ParameterUnbound,
+    /// `profile` is 1 to 128 visible ASCII characters.
+    Profile,
+    /// The page-size cap, the items' style's `max`, is from 1 to 100.
+    MaxLimit,
+    /// `containers.kind_word` is present and 1 to 128 visible ASCII characters.
+    KindWord,
+    /// `capabilities` name each of deletions, kind, revision and visibility
+    /// with a word the engine knows, and claim only what the reader's feed
+    /// carries: no tombstones, a fixed kind word, no visibility map, and the
+    /// update time as the revision exactly when `items.revision` is
+    /// `items.updated_at`.
+    Capabilities,
+    /// `items.body.representation` is not empty.
+    BodyRepresentation,
+    /// A `url_parameter` is 1 to 128 visible ASCII characters.
+    UrlParameter,
 }
 
 impl FeedRule {
@@ -1197,6 +1219,14 @@ impl FeedRule {
             Self::OperationQuery => "feed_operation_query",
             Self::ParameterTwice => "feed_parameter_twice",
             Self::ParameterRequired => "feed_parameter_required",
+            Self::OperationGet => "feed_operation_get",
+            Self::ParameterUnbound => "feed_parameter_unbound",
+            Self::Profile => "feed_profile",
+            Self::MaxLimit => "feed_max_limit",
+            Self::KindWord => "feed_kind_word",
+            Self::Capabilities => "feed_capabilities",
+            Self::BodyRepresentation => "feed_body_representation",
+            Self::UrlParameter => "feed_url_parameter",
         }
     }
 
@@ -1214,7 +1244,7 @@ impl FeedRule {
                 "utc_offsets lies within -1439..1439 and least is not above greatest"
             }
             Self::UtcOffsetsPage => "utc_offsets needs page",
-            Self::ItemPointer => "url, url_base and parent are JSON pointers",
+            Self::ItemPointer => "every feed field that reads a record is a JSON pointer",
             Self::PositionParameter => {
                 "the parameters a position names are query parameters of items.list"
             }
@@ -1228,6 +1258,18 @@ impl FeedRule {
             Self::ParameterRequired => {
                 "a parameter sent only on resume is not one its operation requires"
             }
+            Self::OperationGet => "a feed operation is a GET",
+            Self::ParameterUnbound => {
+                "every parameter an operation requires is one the feed sends on every request"
+            }
+            Self::Profile => "profile is 1 to 128 visible ASCII characters",
+            Self::MaxLimit => "the page-size cap is from 1 to 100",
+            Self::KindWord => "containers.kind_word is 1 to 128 visible ASCII characters",
+            Self::Capabilities => {
+                "capabilities name deletions, kind, revision and visibility, each as a claim the feed supports"
+            }
+            Self::BodyRepresentation => "items.body.representation is not empty",
+            Self::UrlParameter => "a url_parameter is 1 to 128 visible ASCII characters",
         }
     }
 }
@@ -2645,17 +2687,147 @@ fn feed_rules(name: &str, datasource: &Datasource) -> Result<(), Refusal> {
         }
     }
     let items = &datasource.items;
+    let containers = &datasource.containers;
+    let optional = |value: &Option<String>| value.clone();
     for (field, value) in [
-        ("url", &items.url),
-        ("url_base", &items.url_base),
-        ("parent", &items.parent),
+        ("items.url", optional(&items.url)),
+        ("items.url_base", optional(&items.url_base)),
+        ("items.parent", optional(&items.parent)),
+        ("containers.records", optional(&containers.records)),
+        ("containers.id", Some(containers.id.clone())),
+        ("containers.name", optional(&containers.name)),
+        ("containers.cursor.next", optional(&cursor.next)),
+        ("containers.cursor.last", optional(&cursor.last)),
+        (
+            "containers.cursor.offset.complete.pointer",
+            cursor.offset.as_ref().map(|o| o.complete.pointer.clone()),
+        ),
+        ("items.records", optional(&items.records)),
+        ("items.id", Some(items.id.clone())),
+        ("items.revision", Some(items.revision.clone())),
+        ("items.created_at", Some(items.created_at.clone())),
+        ("items.updated_at", Some(items.updated_at.clone())),
+        ("items.body.pointer", Some(items.body.pointer.clone())),
+        (
+            "items.author.id",
+            items.author.as_ref().map(|a| a.id.clone()),
+        ),
+        (
+            "items.author.display_name",
+            items.author.as_ref().and_then(|a| a.display_name.clone()),
+        ),
+        (
+            "items.position.page.next",
+            position.page.as_ref().map(|p| p.next.clone()),
+        ),
     ] {
         if let Some(value) = value
-            && !is_pointer(value)
+            && !is_pointer(&value)
         {
             return Err(refuse(
                 FeedRule::ItemPointer,
-                format!("items.{field} `{value}` is not a JSON pointer"),
+                format!("{field} `{value}` is not a JSON pointer"),
+            ));
+        }
+    }
+    let visible = |text: &str| {
+        !text.is_empty() && text.len() <= 128 && text.bytes().all(|b| b.is_ascii_graphic())
+    };
+    if !visible(&datasource.profile) {
+        return Err(refuse(
+            FeedRule::Profile,
+            format!(
+                "profile `{}` is not 1 to 128 visible ASCII characters",
+                datasource.profile
+            ),
+        ));
+    }
+    match &containers.kind_word {
+        Some(word) if visible(word) => {}
+        Some(word) => {
+            return Err(refuse(
+                FeedRule::KindWord,
+                format!("containers.kind_word `{word}` is not 1 to 128 visible ASCII characters"),
+            ));
+        }
+        None => {
+            return Err(refuse(
+                FeedRule::KindWord,
+                "containers name no kind_word".to_owned(),
+            ));
+        }
+    }
+    for (field, value) in [
+        ("containers.cursor.url_parameter", &cursor.url_parameter),
+        (
+            "items.position.page.url_parameter",
+            &position.page.as_ref().and_then(|p| p.url_parameter.clone()),
+        ),
+    ] {
+        if let Some(value) = value
+            && !visible(value)
+        {
+            return Err(refuse(
+                FeedRule::UrlParameter,
+                format!("{field} `{value}` is not 1 to 128 visible ASCII characters"),
+            ));
+        }
+    }
+    if items.body.representation.is_empty() {
+        return Err(refuse(
+            FeedRule::BodyRepresentation,
+            "items.body.representation is empty".to_owned(),
+        ));
+    }
+    let claim = |capability: &str| -> Result<&str, Refusal> {
+        datasource
+            .capabilities
+            .get(capability)
+            .map(String::as_str)
+            .ok_or_else(|| {
+                refuse(
+                    FeedRule::Capabilities,
+                    format!("capabilities name no `{capability}`"),
+                )
+            })
+    };
+    if let Some(other) = datasource
+        .capabilities
+        .keys()
+        .find(|key| !["deletions", "kind", "revision", "visibility"].contains(&key.as_str()))
+    {
+        return Err(refuse(
+            FeedRule::Capabilities,
+            format!("capabilities name `{other}`, which is not a capability"),
+        ));
+    }
+    let update_time = items.revision == items.updated_at;
+    for (capability, supported, words) in [
+        ("deletions", "not-observed", ["observed", "not-observed"]),
+        ("kind", "fixed-word", ["provider-word", "fixed-word"]),
+        (
+            "revision",
+            if update_time { "update-time" } else { "opaque" },
+            ["opaque", "update-time"],
+        ),
+        ("visibility", "all-private", ["mapped", "all-private"]),
+    ] {
+        let claimed = claim(capability)?;
+        if !words.contains(&claimed) {
+            return Err(refuse(
+                FeedRule::Capabilities,
+                format!(
+                    "capabilities {capability} `{claimed}` is not one of {}",
+                    words.join(", ")
+                ),
+            ));
+        }
+        if claimed != supported {
+            return Err(refuse(
+                FeedRule::Capabilities,
+                format!(
+                    "capabilities claim {capability}: {claimed}, and the feed supports {capability}: {supported}"
+                ),
             ));
         }
     }
@@ -2689,6 +2861,23 @@ fn feed(
     let (_, lookup, _) = keyed(definition, inventory, name, &containers.lookup)?;
     let (items_operation, items_found, items_query) =
         keyed(definition, inventory, name, &items.list)?;
+    for (key, found) in [
+        (&containers.list, list),
+        (&containers.lookup, lookup),
+        (&items.list, items_found),
+    ] {
+        if found.method != "get" {
+            return Err(Refusal::Feed {
+                datasource: name.clone(),
+                rule: FeedRule::OperationGet,
+                detail: format!(
+                    "`{key}` is {} {}, not a GET",
+                    found.method.to_uppercase(),
+                    found.path
+                ),
+            });
+        }
+    }
     if items.position.query.is_some() {
         let path: Vec<&str> = items_found
             .parameters
@@ -2743,8 +2932,22 @@ fn feed(
     )?;
     let (items_limit, max_limit) =
         page_size(definition, name, &items.list, items_operation, &items_query)?;
+    if let Some(max) = max_limit
+        && !(1..=100).contains(&max)
+    {
+        return Err(Refusal::Feed {
+            datasource: name.clone(),
+            rule: FeedRule::MaxLimit,
+            detail: format!(
+                "the paging style of items.list `{}` has max {max}",
+                items.list
+            ),
+        });
+    }
     // What the engine's `bind` refuses of each operation: a parameter it does not take there,
-    // one bound twice, and a required one sent only on resume.
+    // one bound twice, a required one sent only on resume, and (after these) a required one the
+    // feed leaves unbound; "not a GET" is refused above. The base path the engine also holds a
+    // GET under is the instance's, which the reader does not know.
     let keys = |query: &Option<BTreeMap<String, String>>| -> Vec<(String, String)> {
         query
             .iter()
@@ -2855,7 +3058,7 @@ fn feed(
                 containers.cursor.parameter.clone(),
             )],
         ),
-        (&items.list, items_found, sometimes),
+        (&items.list, items_found, sometimes.clone()),
     ] {
         for (field, parameter) in resumed {
             if found
@@ -2870,6 +3073,42 @@ fn feed(
                     ),
                 ));
             }
+        }
+    }
+    let lookup_parameter = sole_path_parameter(name, &containers.lookup, lookup)?;
+    for (list_key, found, always) in [
+        (
+            &containers.list,
+            list,
+            containers_bound
+                .iter()
+                .filter(|(field, _)| field != "containers.cursor.parameter")
+                .map(|(_, parameter)| parameter.as_str())
+                .collect::<Vec<_>>(),
+        ),
+        (&containers.lookup, lookup, vec![lookup_parameter.as_str()]),
+        (
+            &items.list,
+            items_found,
+            items_bound
+                .iter()
+                .filter(|(field, _)| !sometimes.iter().any(|(sent, _)| sent == field))
+                .map(|(_, parameter)| parameter.as_str())
+                .collect(),
+        ),
+    ] {
+        if let Some(unbound) = found
+            .parameters
+            .iter()
+            .find(|parameter| parameter.required && !always.contains(&parameter.name.as_str()))
+        {
+            return Err(feed_refusal(
+                FeedRule::ParameterUnbound,
+                format!(
+                    "`{list_key}` requires `{}`, which the feed does not send on every request",
+                    unbound.name
+                ),
+            ));
         }
     }
     for (filter, values) in datasource.filters.iter().flatten() {
