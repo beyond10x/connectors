@@ -207,6 +207,67 @@ fn bounded_owner_refuses_semantic_and_non_network_effects_before_any_request() {
     }
 }
 
+/// The effects rule binds the bounded and projected read paths, not the plain
+/// `invoke` frame (story:owner-invoke-frame-effects-boundary). A same-uid client
+/// that sends `invoke` is held by the host configuration's grant and by the
+/// operation's read effect alone: `admit_invoke` never consults a declaration,
+/// so an operation declaring semantic or non-`network` effects is refused for
+/// that reason on the bounded path and not on `invoke`, whose own refusal of a
+/// write is `unsupported` by requirement, never by declared effects.
+#[test]
+fn plain_invoke_is_governed_by_grant_and_read_effect_not_declared_effects() {
+    let mut target = Target::new();
+    prepare(&mut target, false);
+    let call = json!({"connection":"connection","operation":"item.read",
+        "schema":target.schema,"revision":"desc-1"});
+    let document = br#"{"n":1}"#;
+    let base = crate::local::owner::admit_invoke(&target.paths, "fixture", &call, document)
+        .err()
+        .map(|error| error.code);
+    for (field, effects) in [
+        ("semantic_effects", json!(["human_visible"])),
+        ("semantic_effects", json!(["billable"])),
+        ("effects", json!(["network", "process"])),
+        ("effects", json!(["local_system"])),
+    ] {
+        let mut value = declaration(false);
+        value[field] = effects.clone();
+        assert!(
+            matches!(
+                resolve(&target, &Policy(value), budget(false)),
+                Err(Error {
+                    code: Code::Unsupported,
+                    ..
+                })
+            ),
+            "bounded path admitted {field} {effects}"
+        );
+        let invoked = crate::local::owner::admit_invoke(&target.paths, "fixture", &call, document)
+            .err()
+            .map(|error| error.code);
+        assert_eq!(invoked, base, "{field} {effects}");
+    }
+    // The fixture holds no connection, so admission ends at the connection and
+    // never reaches a declared effect.
+    assert_ne!(base, Some(Code::Unsupported));
+    // The boundary `invoke` does hold: a requirement whose effect is not a read.
+    let adapter = Config::load(&target.paths.config).unwrap().adapters["fixture"].clone();
+    let mut bootstrap = runtime::state::State::new(&target.paths.state)
+        .cached(&adapter.instance_id, &adapter.selection())
+        .unwrap()
+        .unwrap();
+    bootstrap.requirements[0].effect = runtime::Effect::Write;
+    runtime::state::State::new(&target.paths.state)
+        .remember(&adapter.selection(), &bootstrap)
+        .unwrap();
+    assert_eq!(
+        crate::local::owner::admit_invoke(&target.paths, "fixture", &call, document)
+            .unwrap_err()
+            .code,
+        Code::Unsupported
+    );
+}
+
 /// A bounded read of `target` under the implemented declaration: the
 /// resolution's refusal code, the served value and the provider request count.
 fn implemented_read(target: &Target) -> (Option<Code>, Value, usize) {
