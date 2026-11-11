@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:adapter-private-protocol-refusal-named
 kind: story
-status: active
+status: implemented
 title: An adapter refusing its private protocol is named, not unavailable
 relations:
 - serves: vision:independent-contract-adapters
@@ -12,10 +12,11 @@ scope:
   path: crates/connectors-host/src/local/runtime.rs
 - confidence: inferred
   path: ess/domains/cli.yaml
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:47Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:57:47Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:18:49Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":3}}}
 ---
 ## Observed
 

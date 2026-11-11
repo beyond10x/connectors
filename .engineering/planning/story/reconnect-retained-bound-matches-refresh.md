@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:reconnect-retained-bound-matches-refresh
 kind: story
-status: active
+status: implemented
 title: Reconnecting a refreshed OAuth2 connection is not refused capacity below the refresh retention bound
 tags:
 - cr-003
@@ -15,10 +15,11 @@ scope:
   path: crates/connectors-host/src/local/registry/lifecycle.rs
 - confidence: inferred
   path: docs/local-connection-registry.md
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-10T09:12:02Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-10T09:12:03Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:32Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Defect
 

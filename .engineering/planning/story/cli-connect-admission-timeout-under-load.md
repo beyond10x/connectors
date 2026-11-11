@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:cli-connect-admission-timeout-under-load
 kind: story
-status: active
+status: implemented
 title: connections connect times out at admission on a heavily loaded host
 relations:
 - serves: vision:independent-contract-adapters
@@ -12,10 +12,11 @@ scope:
   path: apps/connectors/src/local/definition.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/owner/transport.rs
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:53Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:57:53Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:18:58Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Defect
 

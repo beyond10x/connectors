@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:tests-stop-the-owners-they-start
 kind: story
-status: active
+status: implemented
 title: Tests stop every owner daemon they start
 relations:
 - serves: vision:independent-contract-adapters
@@ -10,10 +10,11 @@ relations:
 scope:
 - confidence: inferred
   path: apps/connectors/tests/support/mounted.rs
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:35Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:36Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:40Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Observed
 On 2026-10-14, after the wave gates, 123 `__connectors-owner` processes were still running with

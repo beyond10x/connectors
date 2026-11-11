@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:lease-early-recollection-relaunch-margin
 kind: story
-status: active
+status: implemented
 title: The hanging early recollection lease test holds on a loaded host
 tags:
 - from-finding
@@ -15,10 +15,11 @@ scope:
   path: apps/connectors/tests/connection_lease_adversary.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/owner/supervisor.rs
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:59:39Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:59:40Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:13Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Why
 

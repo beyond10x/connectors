@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:exec-plugin-busy-reaches-the-operator
 kind: story
-status: active
+status: implemented
 title: An exec plugin that cannot run tells the operator whether it is busy or missing
 relations:
 - serves: vision:independent-contract-adapters
@@ -13,10 +13,11 @@ scope:
   path: adapters/kubernetes/src/local.rs
 - confidence: cited
   path: crates/connectors-host/src/local/runtime.rs
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:02Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:03Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:10Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 
