@@ -108,7 +108,9 @@ jobs:
             sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
       - name: Run the ignored CLI journeys
-        run: cargo run --locked -p connectors-build -- ignored --required --only-prerequisite provider,cli,custody
+        run: |
+          install -d -m 700 /journeys
+          cargo run --locked -p connectors-build -- ignored --required --only-prerequisite provider,cli,custody --tmpdir /journeys
       - name: Name each journey that did not pass
         if: always()
         run: |
