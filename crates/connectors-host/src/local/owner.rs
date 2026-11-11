@@ -344,7 +344,7 @@ impl From<runtime::Failure> for Error {
             F::InvalidInput => Code::InvalidInput,
             F::Forbidden | F::ProviderForbidden => Code::Forbidden,
             F::NotFound => Code::NotFound,
-            F::Unavailable => Code::Unavailable,
+            F::Unavailable | F::PluginBusy => Code::Unavailable,
             F::Timeout | F::ProviderTimeout => Code::Timeout,
             F::Interrupted => Code::Interrupted,
             F::Capacity | F::ProviderCapacity => Code::Capacity,

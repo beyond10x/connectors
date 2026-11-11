@@ -77,6 +77,11 @@ pub enum Failure {
     UnsupportedPrivateProtocol,
     IncarnationMismatch,
     InvalidConfiguration,
+    /// A pinned exec plugin that exists could not be run because the system
+    /// holds it busy (`ExecutableFileBusy`): transient, unlike a missing one,
+    /// which stays `invalid_configuration`. Additive: a host that predates it
+    /// reads the reply as unreadable.
+    PluginBusy,
     Capacity,
     Unsupported,
     NotFound,

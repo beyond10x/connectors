@@ -80,7 +80,9 @@ that predates it refuses the reply as unreadable); the host projects their
 `connectors.cli.Failure.service_code`, with `code=service_failure`. In particular,
 provider `not_found`, `rate_limited` and `internal` must not become local selection
 `not_found` or generic unavailability. Admission failures keep their existing
-codes. No provider body, header or retry instruction enters the private control
+codes. `plugin_busy` (additive, like the others) is a Kubernetes exec plugin that
+exists but the system holds busy; the host projects it as `unavailable`, where a
+missing plugin stays `invalid_configuration`, and it carries no path or system text. No provider body, header or retry instruction enters the private control
 value, with two exceptions, both only on a failed `invoke`. The first is the
 optional `reason`: the
 upstream's own reason for the refusal in the admitted form
