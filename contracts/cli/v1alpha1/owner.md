@@ -115,11 +115,13 @@ owner's own build only. The owner ends the read's job when it reads a `cancel`
 naming the stream's own `request_id`, or when the stream closes, as it does when
 the caller's process exits. A `cancel` naming another `request_id` cancels
 nothing, and no frame on one stream reaches another stream's request. A job
-still queued is dropped unrun and frees its queue slot; one running ends its
-adapter process, so its provider call and credential read end with it, and the
-next job of the instance starts at once rather than at the read's budget. The
-cancelled read's answer, written to its own stream which the caller no longer
-reads, carries `interrupted`, and its audit records the failed read. A cancel
+still queued is dropped unrun when the instance's worker reaches it, and holds
+its queue slot until then; one running ends its adapter process, so its
+provider call and credential read end with it, and the next job of the instance
+starts at once rather than at the read's budget. A job cancelled while its
+adapter launches, or before it reads the credential, reads no credential. An
+adapter process a cancel ended leaves its instance `not_running`, not `failed`. The cancelled read's answer, written to its own stream which the
+caller no longer reads, carries `interrupted`, and its audit records the failed read. A cancel
 ends no other request, no write and no configuration.
 The actual socket peer must be the configured UID. No credential, source path,
 keyring tuple or continuation is part of ordinary control JSON. A capture admission
