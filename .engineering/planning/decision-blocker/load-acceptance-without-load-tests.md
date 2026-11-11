@@ -6,6 +6,7 @@ status: open
 title: A load-30 gate acceptance cannot run where load tests are forbidden
 relations:
 - blocks: story:host-gate-load-sensitivity-w3
+- blocks: story:gmail-attachment-read-flaky-under-load
 withholds: test_result
 revision: 1
 ---

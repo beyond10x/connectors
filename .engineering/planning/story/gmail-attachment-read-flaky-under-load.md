@@ -11,7 +11,7 @@ relations:
 scope:
 - confidence: cited
   path: adapters/catalog/tests/google_calendar_gmail_adversary_pass2.rs
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:29Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:30Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
@@ -63,3 +63,17 @@ body, or the child dying. The test does not capture the provider child's stderr 
 
 Next step: make the failure message carry the child's stderr and the underlying error kind. Then
 measure the 30 runs inside a loaded full-workspace run, the condition of the original failure.
+
+## Finding, 2026-11-11 (wave/load-and-flakes)
+
+Already fixed: f7de4e36dd0 (2026-10-09) names the cause. The fixture dropped the TLS stream right
+after `write_all`, so about 4 MiB of buffered ciphertext was lost and the client read a truncated
+body as `Unavailable`. The fixture now writes head and body, then `flush()` and `shutdown()`
+(close_notify), with `Content-Length` and `Connection: close`
+(adapters/catalog/tests/google_calendar_gmail_adversary_pass2.rs:513-520), so its answer is
+complete whatever the scheduling. The reported failure (82658e5e5, 2026-10-01) predates the fix;
+the fix commit reports 0 failures in 60 local runs.
+
+Open: "100 of 100 inside a parallel full workspace run" is a load run, which the shared
+workstation forbids: decision-blocker:load-acceptance-without-load-tests. A separate possible flake,
+`Child::spawn` timing out at its fixed 10 s deadline under CPU starvation, is outside this story.
