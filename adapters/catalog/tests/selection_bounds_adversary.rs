@@ -368,6 +368,7 @@ fn bounds_round_trip_and_unbounded_selections_serialise_as_before() {
                 "body_any_of",
                 "body_keys",
                 "body_nonempty",
+                "body_null_clears",
                 "body_types",
                 "conflict_status",
                 "withhold",

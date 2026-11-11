@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-validates-enum-and-date-time
 kind: story
-status: active
+status: implemented
 title: The catalog engine refuses values outside an enum or a date-time format
 relations:
 - serves: vision:independent-contract-adapters
@@ -42,10 +42,11 @@ scope:
   path: crates/connectors-catalog/tests/template.rs
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:52Z", actor: "human:operator", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:57:52Z", actor: "human:operator", revision: 5, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:18:56Z", actor: "human:operator", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":5}}}
 ---
 ## Observed
 

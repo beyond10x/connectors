@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:owner-errors-are-readable
 kind: story
-status: active
+status: implemented
 title: An owner failure behind outcome_unknown leaves a readable cause
 relations:
 - decomposes: epic:zero-open-issues-and-store-defects
@@ -12,10 +12,11 @@ scope:
   path: apps/connectors/src/local.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/owner/transport.rs
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:59:30Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:59:31Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:23Z", actor: "human:operator", revision: 7, decided_on: {"recorded":{"test_result":1,"review_outcome":5}}}
 ---
 ## Observed
 A CLI write whose owner channel fails for any reason (send or reply read) is reported as

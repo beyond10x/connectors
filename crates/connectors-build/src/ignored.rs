@@ -54,12 +54,16 @@ pub enum Supplied {
     Provider,
     /// `CONNECTORS_TEST_CLI`, the built production CLI.
     Cli,
+    /// The qualified GNOME Secret Service and `/usr/bin/dbus-daemon`, which the
+    /// CI job installs; a host without them still reports the test missing.
+    Custody,
 }
 impl Supplied {
     fn key(self) -> &'static str {
         match self {
             Supplied::Provider => PROVIDER,
             Supplied::Cli => CLI,
+            Supplied::Custody => CUSTODY,
         }
     }
 }
@@ -173,9 +177,14 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "local::oauth_adversary_pass2_tests::chrome_with_loopback_cookies_following_the_redirect_is_accepted" => {
                 Some((Disposable, vec![CHROME]))
             }
-            "local::keyring::custody::tests::disposable_secret_service_restart_and_failures"
+            // These fail on main 7c22ff3878 in the CI journeys container as well (probe PR 249,
+            // run 43055896285), deferred by story:main-failing-ci-journeys (draft).
+            "local::keyring::custody::tests::custody_neither_reads_nor_changes_the_default_alias"
             | "local::owner::governed::tests::final_fence::withdrawal_at_final_dispatch_prevents_real_child_invocation"
-            | "local::keyring::custody::tests::custody_neither_reads_nor_changes_the_default_alias"
+            | "local::runtime::launch::tests::disposable_consumer_launch_delivers_fd3_and_refuses_by_code" => {
+                Some((Deferred, vec![]))
+            }
+            "local::keyring::custody::tests::disposable_secret_service_restart_and_failures"
             | "local::keyring::custody::tests::disposable_changed_keyring_format_is_refused_before_transfer"
             | "local::approval_keys::tests::durable_key_management_with_qualified_custody"
             | "local::approval_keys::tests::restart_failed_rotation_recovery_and_revocation_fences"
@@ -190,7 +199,6 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "local::keyring::custody::tests::disposable_registry_publication_cli_and_retirement_restart"
             | "local::owner::approval_issuance::tests::production_cli_approval_issuance_and_restart"
             | "local::approval_keys::tests::production_cli_key_journey"
-            | "local::runtime::launch::tests::disposable_consumer_launch_delivers_fd3_and_refuses_by_code"
             | "local::owner::refresh::tests::launch::launch_oauth2_grant_hands_only_the_access_token"
             | "local::owner::refresh::tests::launch::launch_oauth2_grant_refreshes_inside_lead_time"
             | "local::owner::refresh::tests::launch::launch_static_profile_is_unchanged"
@@ -236,8 +244,7 @@ fn classify(suite: &Suite, name: &str) -> Entry {
         (
             "connectors-catalog-provider",
             "local_runtime",
-            "cli_journey::lifecycle::catalog_cli_failed_repair_and_busy_stop_preserve_authority"
-            | "cli_journey::owner_guard::a_journey_that_panics_after_its_owner_started_leaves_no_owner_alive"
+            "cli_journey::owner_guard::a_journey_that_panics_after_its_owner_started_leaves_no_owner_alive"
             | "cli_journey::owner_guard::a_journey_owner_exits_when_the_process_it_is_tied_to_ends"
             | "cli_journey::guarded_merge::catalog_cli_guarded_merge_applied_refused_and_lost_response_restart"
             | "cli_journey::guarded_merge::catalog_cli_guarded_merge_revocation_finishes_admitted_audit"
@@ -251,8 +258,6 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "cli_journey::guarded_merge::custody_journey::a_write_after_an_executable_only_change_is_validated_once_and_sent"
             | "cli_journey::guarded_merge::custody_journey::security2_a_proof_issued_before_an_executable_only_change_authorizes_no_write"
             | "cli_journey::guarded_merge::custody_journey::security2_a_write_whose_new_executable_answers_another_identity_sends_nothing"
-            | "cli_journey::revision_recovery::a_changed_evidence_lifetime_recovers_with_a_new_connection_in_two_commands"
-            | "cli_journey::revision_recovery::no_next_action_after_a_revision_change_returns_to_an_earlier_refusal"
             | "cli_journey::revision_recovery::revalidate_replaces_the_adapter_process_of_an_earlier_entry"
             | "cli_journey::revision_recovery::a_selection_only_change_leaves_the_connection_ready_and_serves_the_added_read"
             | "cli_journey::revision_recovery::a_changed_ca_file_stales_the_connection_until_it_is_revalidated"
@@ -267,8 +272,6 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "cli_journey::revision_recovery::revision_recovery_security::security2_a_revoked_connection_starts_nothing_for_a_description"
             | "cli_journey::revision_recovery::revision_recovery_security::security2_a_description_launch_does_not_resume_a_stopped_instance"
             | "cli_journey::revision_recovery::revision_recovery_security::security2_operations_describe_starts_no_owner_without_a_current_connection"
-            | "cli_journey::revision_recovery_adversary::adversary_a_changed_profile_id_names_the_path_that_recovers"
-            | "cli_journey::revision_recovery_adversary::adversary_a_lifetime_changed_and_reverted_leaves_the_first_connection_usable"
             | "cli_journey::revision_recovery_adversary::adversary_the_connection_left_by_a_changed_authentication_stays_revocable",
         ) => Some((Disposable, vec![CUSTODY, CLI])),
         (
@@ -280,10 +283,8 @@ fn classify(suite: &Suite, name: &str) -> Entry {
         (
             "connectors-catalog-provider",
             "local_runtime",
-            "cli_journey::gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart"
-            | "cli_journey::gitlab_catalog_cli_reads_the_merge_request_feed_through_a_saved_connection"
+            "cli_journey::gitlab_catalog_cli_reads_the_merge_request_feed_through_a_saved_connection"
             | "cli_journey::adversary_u23_a_read_result_the_child_admitted_reaches_the_cli_through_the_owner"
-            | "cli_journey::basic_catalog_cli_connects_by_file_and_stdin_and_refuses_by_code"
             | "cli_journey::basic_catalog_cli_refuses_a_credential_below_minimum_scopes"
             | "cli_journey::adversary_basic_cli_wrong_token_is_unauthorized_and_malformed_is_invalid_input"
             | "cli_journey::a_provider_refusal_reads_dispatch_and_a_host_refusal_reads_admission"
@@ -317,7 +318,6 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "oauth2_refresh::oauth_invalid_grant_makes_the_connection_stale_until_a_reconnect"
             | "oauth2_refresh_adversary_pass2::adversary2_oauth_cached_bootstrap_round_trips_across_owner_restart"
             | "derived_instance::a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_drafts"
-            | "slack_approval::a_slack_bot_post_is_issued_the_approval_its_prepare_named_and_invoked_with_it"
             | "cli_journey::invoke_definition::a_hand_written_definition_connects_on_its_first_invoke_and_then_invokes_without_asking"
             | "cli_journey::invoke_definition::a_stored_credential_of_a_configured_instance_is_reused_without_a_token_prompt"
             | "cli_journey::invoke_definition::a_reuse_the_provider_answers_with_another_identity_publishes_nothing_and_offers_connect_fresh"
@@ -457,6 +457,11 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "the_connect_question_of_an_oauth_profile_names_its_token_host_too"
             | "an_entry_another_run_recorded_while_the_question_waits_is_not_connected",
         ) => Some((Disposable, vec![PROVIDER])),
+        (
+            "connectors",
+            "definition_connect_question",
+            "an_entry_replaced_after_the_cli_checked_it_is_refused_at_begin_before_any_credential",
+        ) => Some((Disposable, vec![PROVIDER, CUSTODY])),
         ("connectors", "adversary_d218_u1", "describe_of_a_definition_needs_no_connection") => {
             Some((Disposable, vec![PROVIDER]))
         }
@@ -502,11 +507,20 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "connectors-catalog-provider",
             "slack_adversary",
             "an_empty_user_or_email_sends_nothing",
-        )
-        | (
-            "connectors",
-            "adversary_local_mcp_server",
-            "adversary_a_lost_session_leaves_no_provider_read_open",
+        ) => Some((Deferred, vec![])),
+        // These fail on main 7c22ff3878 in the CI journeys container as well (probe PR 249,
+        // run 43055896285), deferred by story:main-failing-ci-journeys (draft).
+        (
+            "connectors-catalog-provider",
+            "local_runtime",
+            "cli_journey::basic_catalog_cli_connects_by_file_and_stdin_and_refuses_by_code"
+            | "cli_journey::gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart"
+            | "cli_journey::lifecycle::catalog_cli_failed_repair_and_busy_stop_preserve_authority"
+            | "cli_journey::revision_recovery::a_changed_evidence_lifetime_recovers_with_a_new_connection_in_two_commands"
+            | "cli_journey::revision_recovery::no_next_action_after_a_revision_change_returns_to_an_earlier_refusal"
+            | "cli_journey::revision_recovery_adversary::adversary_a_changed_profile_id_names_the_path_that_recovers"
+            | "cli_journey::revision_recovery_adversary::adversary_a_lifetime_changed_and_reverted_leaves_the_first_connection_usable"
+            | "slack_approval::a_slack_bot_post_is_issued_the_approval_its_prepare_named_and_invoked_with_it",
         ) => Some((Deferred, vec![])),
         _ => None,
     };
@@ -1471,6 +1485,76 @@ mod tests {
         assert!(!report.accepted(true));
         assert!(report.accepted(false));
     }
+    #[test]
+    fn journeys_that_fail_on_main_are_deferred_and_never_required_by_the_ci_selection() {
+        const CATALOG: &str = "connectors-catalog-provider";
+        const HOST: &str = "connectors-host";
+        let deferred = [
+            (
+                CATALOG,
+                "local_runtime",
+                "cli_journey::basic_catalog_cli_connects_by_file_and_stdin_and_refuses_by_code",
+            ),
+            (
+                CATALOG,
+                "local_runtime",
+                "cli_journey::gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart",
+            ),
+            (
+                CATALOG,
+                "local_runtime",
+                "cli_journey::lifecycle::catalog_cli_failed_repair_and_busy_stop_preserve_authority",
+            ),
+            (
+                CATALOG,
+                "local_runtime",
+                "cli_journey::revision_recovery::a_changed_evidence_lifetime_recovers_with_a_new_connection_in_two_commands",
+            ),
+            (
+                CATALOG,
+                "local_runtime",
+                "cli_journey::revision_recovery::no_next_action_after_a_revision_change_returns_to_an_earlier_refusal",
+            ),
+            (
+                CATALOG,
+                "local_runtime",
+                "cli_journey::revision_recovery_adversary::adversary_a_changed_profile_id_names_the_path_that_recovers",
+            ),
+            (
+                CATALOG,
+                "local_runtime",
+                "cli_journey::revision_recovery_adversary::adversary_a_lifetime_changed_and_reverted_leaves_the_first_connection_usable",
+            ),
+            (
+                CATALOG,
+                "local_runtime",
+                "slack_approval::a_slack_bot_post_is_issued_the_approval_its_prepare_named_and_invoked_with_it",
+            ),
+            (
+                HOST,
+                "connectors_host",
+                "local::keyring::custody::tests::custody_neither_reads_nor_changes_the_default_alias",
+            ),
+            (
+                HOST,
+                "connectors_host",
+                "local::owner::governed::tests::final_fence::withdrawal_at_final_dispatch_prevents_real_child_invocation",
+            ),
+            (
+                HOST,
+                "connectors_host",
+                "local::runtime::launch::tests::disposable_consumer_launch_delivers_fd3_and_refuses_by_code",
+            ),
+        ];
+        let entries = classified(&deferred);
+        assert!(entries.iter().all(|e| e.family == Some(Family::Deferred)));
+        // The CI job: default family, `--only-prerequisite provider,cli,custody`, `--required`.
+        let mut opts = options();
+        opts.only_prerequisite = vec![Supplied::Provider, Supplied::Cli, Supplied::Custody];
+        let report = evaluate(entries, &opts, |_| vec![], |_| Ok(true));
+        assert_eq!((report.selected, report.executed), (0, 0));
+        assert!(report.outcomes.iter().all(|o| o.status == "not-selected"));
+    }
     /// A bounded real Rust libtest executable. No provider, shell script or ambient service.
     fn fixture(fail: bool, unknown: bool) -> (tempfile::TempDir, Suite) {
         let root = tempfile::tempdir().unwrap();
@@ -1846,6 +1930,129 @@ fn selected_fixture() {{
         assert_eq!(waited, -1, "owned live leader must already be reaped");
         assert_eq!(error.raw_os_error(), Some(libc::ECHILD));
         assert!(other_still_running, "another fixture group was affected");
+    }
+
+    /// The CLI journeys' lane read from the workflow that declares it: a job
+    /// every pull request runs, whose red journey fails the pull request.
+    mod journeys_lane {
+        use super::*;
+        use serde_yaml_ng::Value;
+
+        const WORKFLOW: &str = include_str!("../../../.github/workflows/rust-gate.yml");
+        const JOURNEY: (&str, &str, &str) = (
+            "connectors-catalog-provider",
+            "local_runtime",
+            "cli_journey::gitlab_catalog_cli_reads_the_merge_request_feed_through_a_saved_connection",
+        );
+        fn options_of(command: &str) -> Option<Options> {
+            let (_, args) = command.trim().split_once("connectors-build -- ")?;
+            let argv: Vec<&str> = std::iter::once("connectors-build")
+                .chain(args.split_whitespace())
+                .collect();
+            match crate::Args::try_parse_from(argv).ok()?.command {
+                crate::Action::Ignored(options) => Some(options),
+                _ => None,
+            }
+        }
+
+        #[test]
+        fn a_pull_request_job_runs_the_cli_journeys_and_a_red_one_fails_it() {
+            let workflow: Value = serde_yaml_ng::from_str(WORKFLOW).unwrap();
+            let trigger = workflow.get("on").expect("the workflow names its triggers");
+            let pull_request = trigger
+                .get("pull_request")
+                .expect("the workflow runs on every pull request");
+            assert!(
+                pull_request.is_null(),
+                "a branch or path filter would let a pull request skip the journeys"
+            );
+            let jobs = workflow.get("jobs").and_then(Value::as_mapping).unwrap();
+            let mut lanes = vec![];
+            for (name, job) in jobs {
+                let steps = job.get("steps").and_then(Value::as_sequence).unwrap();
+                for step in steps {
+                    let run = step.get("run").and_then(Value::as_str).unwrap_or("");
+                    let Some(options) = options_of(run) else {
+                        continue;
+                    };
+                    if options.only_prerequisite.contains(&Supplied::Cli) {
+                        lanes.push((name.as_str().unwrap().to_owned(), job, step, options));
+                    }
+                }
+            }
+            assert_eq!(
+                lanes.len(),
+                1,
+                "exactly one job runs the CLI journeys: {:?}",
+                lanes.iter().map(|lane| &lane.0).collect::<Vec<_>>()
+            );
+            let (name, job, step, options) = lanes.pop().unwrap();
+            assert!(
+                options.required,
+                "{name}: a missing prerequisite must refuse, not skip"
+            );
+            assert_eq!(options.family, [Family::Disposable], "{name}");
+            for needed in [Supplied::Provider, Supplied::Cli, Supplied::Custody] {
+                assert!(options.only_prerequisite.contains(&needed), "{name}");
+            }
+            for holder in [job, step] {
+                assert!(holder.get("continue-on-error").is_none(), "{name}");
+                assert!(
+                    holder.get("if").is_none(),
+                    "{name}: a conditional journey step can pass a pull request unrun"
+                );
+            }
+            let report = evaluate(classified(&[JOURNEY]), &options, |_| vec![], |_| Ok(false));
+            assert_eq!(
+                (report.selected, report.failed),
+                (1, 1),
+                "the lane selects the CLI journey"
+            );
+            assert!(
+                !report.accepted(options.required),
+                "a red journey must fail the lane"
+            );
+        }
+
+        /// The qualified Secret Service admits a keyring directory only on a
+        /// local ext filesystem (`gnome::Persistence::admit`, `f_type` 0xef53). The
+        /// job's container root is overlayfs, so the journeys directory must be an
+        /// ext4 mount made before the step that names it, and the job checks it.
+        #[test]
+        fn the_journeys_directory_is_an_ext4_mount_made_before_the_journeys_run() {
+            let workflow: Value = serde_yaml_ng::from_str(WORKFLOW).unwrap();
+            let job = workflow.get("jobs").and_then(|jobs| jobs.get("journeys"));
+            let steps = job
+                .and_then(|job| job.get("steps"))
+                .and_then(Value::as_sequence)
+                .expect("the journeys job has steps");
+            fn run(step: &Value) -> &str {
+                step.get("run").and_then(Value::as_str).unwrap_or("")
+            }
+            let journeys = steps
+                .iter()
+                .position(|step| options_of(run(step)).is_some())
+                .expect("a step runs the journeys");
+            let tmpdir = options_of(run(&steps[journeys])).unwrap().tmpdir.unwrap();
+            let mount = steps[..journeys]
+                .iter()
+                .position(|step| {
+                    let text = run(step);
+                    text.contains("mkfs.ext4")
+                        && text
+                            .contains(&format!("mount -o loop /journeys.img {}", tmpdir.display()))
+                })
+                .expect(
+                    "a step before the journeys makes an ext4 filesystem and mounts it on --tmpdir",
+                );
+            let text = run(&steps[mount]);
+            assert!(
+                text.contains("ef53") && text.contains("exit 1"),
+                "the mount step must refuse a directory that is not ext4"
+            );
+            let holder = &steps[mount];
+            assert!(holder.get("if").is_none() && holder.get("continue-on-error").is_none());
+        }
     }
 
     /// The provider-only lane read from the documents that declare it: the

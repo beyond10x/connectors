@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:authored-scenarios-known-failing
 kind: story
-status: active
+status: implemented
 title: The 34 authored ESS scenarios that fail when executed are triaged and pass
 relations:
 - informed_by: story:ess-connector-vocabulary-model
@@ -11,10 +11,11 @@ relations:
 scope:
 - confidence: inferred
   path: crates/connectors-build/src/gate.rs
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:59:34Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:59:34Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:18:51Z", actor: "human:operator", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Context
 

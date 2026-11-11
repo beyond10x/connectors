@@ -883,6 +883,25 @@ impl Child {
         input: &[u8],
         budget: ReadBudget,
     ) -> Result<Vec<u8>> {
+        self.invoke_bounded_until_cancelled(
+            operation, revision, partition, secret, input, budget, None,
+        )
+    }
+    /// [`Child::invoke_bounded`] that stops waiting for the answer once `cancel`
+    /// fails, checked at least every 250 ms: the child is then ended, so its
+    /// provider call and credential read end with it
+    /// (story:owner-cancels-a-bounded-read).
+    #[allow(clippy::too_many_arguments)]
+    pub fn invoke_bounded_until_cancelled(
+        &mut self,
+        operation: &str,
+        revision: &str,
+        partition: &str,
+        secret: &Secret,
+        input: &[u8],
+        budget: ReadBudget,
+        cancel: Option<&dyn Fn() -> Result<()>>,
+    ) -> Result<Vec<u8>> {
         if self.protocol != PrivateProtocol::V3 {
             return Err(Failure::Unsupported);
         }
@@ -927,7 +946,13 @@ impl Child {
             until,
         )
         .and_then(|_| {
-            channel::read::<Reply>(&mut self.channel, until, false, budget.result_bytes())
+            channel::read_with_cancel::<Reply>(
+                &mut self.channel,
+                until,
+                false,
+                budget.result_bytes(),
+                cancel,
+            )
         })
         .and_then(|frame| match frame.control {
             Reply::Success { request_id } if request_id == id => {

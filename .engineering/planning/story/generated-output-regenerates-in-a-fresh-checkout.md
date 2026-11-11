@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:generated-output-regenerates-in-a-fresh-checkout
 kind: story
-status: active
+status: implemented
 title: ESS-generated outputs regenerate in a fresh checkout with the command the gate names
 tags:
 - d298
@@ -16,10 +16,11 @@ scope:
   path: crates/connectors-build/src/service_metadata.rs
 - confidence: inferred
   path: docs/development.md
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:05Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:05Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:12Z", actor: "human:operator", revision: 7, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Problem
 

@@ -817,6 +817,8 @@ fn slack_derived_from_its_declaration_is_the_documented_bot_instance() {
 /// the index of every later page and no revision. It moved when the selection
 /// and the bundle gained the three data-source proxy reads and each proxy
 /// `uid` its pattern (story:catalog-grafana-datasource-proxy-reads).
+/// The Jira revisions moved again when `issue.edit` gained `body_null_clears`
+/// (story:required-body-key-refuses-null).
 #[test]
 fn documented_native_configurations_keep_their_revisions() {
     let pinned: BTreeMap<String, &str> = [
@@ -874,15 +876,15 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "13 catalog-jira.md",
-            "b96bb4436bc1296375bb6ed70790fb65ee18b067325fc344851c677f65cac6c9",
+            "0cfc0e55dd791de912e49d4a22a79b4d06a353c2ba19282737a9ca2e3c1171bf",
         ),
         (
             "14 catalog-jira.md",
-            "939aa4a3531aa1cee72ad9e36ad72911fda44ea3f3b726ca98d098cae979bf62",
+            "35926b20b288459ddcd4ffa3883b8a2ee6d182d768fe7445759baa0ccec3753d",
         ),
         (
             "15 catalog-jira.md",
-            "5a58ed45a06f82a7415b7c135b133850749ab45e87aeeca6be20c144084f8d2b",
+            "b53c9bb9c3529ef712146895a73232e9f358d2a8cc684665991a11fd546cc039",
         ),
         (
             "16 catalog-openrouter.md",

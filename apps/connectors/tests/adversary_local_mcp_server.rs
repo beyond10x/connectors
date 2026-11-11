@@ -55,6 +55,9 @@ const SLOW: &str = "999";
 /// The input whose answer the provider holds for 8 s: longer than local
 /// teardown (5 s), inside the declared 15 s provider budget.
 const STALL: &str = "998";
+/// The input whose answer the provider holds for 25 s: longer than the 20 s
+/// execution budget of a read.
+const HOLD: &str = "997";
 /// An input number no f64 holds: it reaches the provider and comes back as
 /// these digits only through lossless reads.
 const WIDE: &str = "1844674407370955161701";
@@ -259,6 +262,9 @@ impl Provider {
                             .to_owned();
                         if n == SLOW {
                             std::thread::sleep(Duration::from_secs(3));
+                        }
+                        if n == HOLD {
+                            std::thread::sleep(Duration::from_secs(25));
                         }
                         if n == STALL {
                             std::thread::sleep(Duration::from_secs(8));
@@ -979,6 +985,41 @@ fn adversary_a_cancelled_call_frees_its_slot_for_the_next_call() {
     peer.finish();
 }
 
+/// story:owner-cancels-a-bounded-read: the cancel reaches the owner, which ends
+/// the cancelled call's job. The owner runs one job at a time per instance, so
+/// the next call, a second job on the same instance, starts at once instead of
+/// waiting for the cancelled read's provider (25 s) or its budget (20 s); the
+/// owner starts the instance's adapter again for it.
+#[test]
+fn adversary_a_cancelled_call_releases_its_owner_job_before_its_budget() {
+    let served = Served::new();
+    let mut peer = Peer::start(&served, true);
+    let (tool, revision) = listed(&mut peer);
+    send_call(&mut peer, 2, &tool, HOLD, &revision);
+    let until = Instant::now() + Duration::from_secs(10);
+    while served.provider.requests() == 0 {
+        assert!(
+            Instant::now() < until,
+            "the read never reached the provider"
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    std::thread::sleep(Duration::from_millis(100));
+    peer.send(json!({"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":2}}));
+    let cancelled = Instant::now();
+    let reply = peer.call(3, tool.as_str().unwrap(), "1", &revision);
+    assert_eq!(
+        reply["result"]["structuredContent"]["status"], "success",
+        "{reply}"
+    );
+    assert!(
+        cancelled.elapsed() < Duration::from_secs(12),
+        "the call after a cancelled one waited {:?} for the cancelled read's owner job",
+        cancelled.elapsed()
+    );
+    peer.finish();
+}
+
 /// sessions § 4.1 and docs/local-mcp-stdio.md: stdin closed with a read in
 /// flight that the lease live at the close cannot carry (provider answers in
 /// 3 s, lease at most 1.9 s): no reply is written after the cutoff and the
@@ -1071,13 +1112,20 @@ fn adversary_legacy_window_admits_no_tool_request() {
 /// 5 s after stdin closed), the provider read it started must not still be
 /// held open by the owner side 8 s after dispatch.
 #[test]
-#[ignore = "deferred: the owner has no per-request cancel; story:owner-cancels-a-bounded-read"]
 fn adversary_a_lost_session_leaves_no_provider_read_open() {
     let served = Served::new();
     let mut peer = Peer::start(&served, true);
     let (tool, revision) = listed(&mut peer);
     send_call(&mut peer, 2, &tool, STALL, &revision);
     let dispatched = Instant::now();
+    let until = Instant::now() + Duration::from_secs(10);
+    while served.provider.requests() == 0 {
+        assert!(
+            Instant::now() < until,
+            "the read never reached the provider"
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
     std::thread::sleep(Duration::from_millis(100));
     let _ = peer.exit(false);
     let ended = dispatched.elapsed();

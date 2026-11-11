@@ -917,6 +917,7 @@ mod journey {
                 std::thread::sleep(Duration::from_millis(20));
             }
             let runtime = directory.join("runtime");
+            let keyring_stderr = (runtime.clone()).with_extension("stderr");
             let mut daemon = Owned(
                 quiet(Command::new("/usr/bin/gnome-keyring-daemon").args([
                     "--foreground",
@@ -925,6 +926,7 @@ mod journey {
                     "--control-directory",
                 ]))
                 .arg(&runtime)
+                .stderr(Stdio::from(std::fs::File::create(&keyring_stderr).unwrap()))
                 .env("HOME", directory.join("home"))
                 .env("XDG_DATA_HOME", directory.join("data"))
                 .env("XDG_RUNTIME_DIR", &runtime)
@@ -945,8 +947,16 @@ mod journey {
                 .unwrap();
             let until = Instant::now() + Duration::from_secs(10);
             while !keyring::custody::available_at(Some(&socket)) {
-                assert!(Instant::now() < until, "fixture custody unavailable");
-                assert!(daemon.0.try_wait().unwrap().is_none());
+                assert!(
+                    Instant::now() < until,
+                    "fixture custody unavailable; keyring stderr: {}",
+                    keyring_stderr_tail(&keyring_stderr)
+                );
+                assert!(
+                    daemon.0.try_wait().unwrap().is_none(),
+                    "fixture keyring daemon exited; its stderr: {}",
+                    keyring_stderr_tail(&keyring_stderr)
+                );
                 std::thread::sleep(Duration::from_millis(30));
             }
             Self {
@@ -1211,4 +1221,20 @@ fn a_v1_bound_connection_reads_the_v1_page_through_the_cli_and_rebinds_on_revali
     ));
     assert_eq!(page["result"]["body"], v2_page());
     assert_eq!(provider.take(), [V2_PAGE]);
+}
+
+/// The last lines the fixture's GNOME Keyring wrote to its standard error, for
+/// a failure message: the daemon's own words on why it never answered.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn keyring_stderr_tail(path: &std::path::Path) -> String {
+    match std::fs::read_to_string(path) {
+        Ok(text) if text.trim().is_empty() => {
+            format!("(empty: {} was written nothing)", path.display())
+        }
+        Ok(text) => {
+            let lines: Vec<&str> = text.lines().collect();
+            lines[lines.len().saturating_sub(20)..].join("\n")
+        }
+        Err(error) => format!("(unreadable: {}: {error})", path.display()),
+    }
 }

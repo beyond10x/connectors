@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:sql-wrapper-resolves-pg-catalog-first
 kind: story
-status: active
+status: implemented
 title: The PostgreSQL read wrapper calls pg_catalog functions and operators, never a public shadow
 tags:
 - cr-002
@@ -15,10 +15,11 @@ scope:
   path: adapters/sql/src/lib.rs
 - confidence: inferred
   path: adapters/sql/tests/catalogue_adversary_2.rs
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-10T09:12:01Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-10T09:12:01Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:39Z", actor: "human:operator", revision: 5, decided_on: {"recorded":{"test_result":1,"review_outcome":10}}}
 ---
 ## Defect
 

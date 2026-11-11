@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The owner contract now says what the plain `invoke` frame enforces: the grant, the description's
+  revision and schema, a read requirement, the input and the connection's admission. The effects
+  rule (a semantic effect or an effect other than `network` is `unsupported`) is not among them: it
+  binds only the bounded and projected governed reads, and a granted read declaring effects is
+  still served on `invoke`. The contract also names the `GovernedRead` frame without a projection
+  revision, which skips that rule for a same-uid raw-frame client. No behaviour changed
+  (story:owner-invoke-frame-effects-boundary).
+- A connect, repair, revalidation or read under a changed provider authority or profile
+  authentication answers `authentication_changed`, not `lifecycle_conflict`: only a new instance
+  id helps, and `check_configuration` says so. MCP clients still see `unavailable`
+  (story:configuration-change-error).
+- A definition whose feed the catalog engine would refuse when an instance starts is refused when
+  the definition loads, under a named rule (`feed_parameter_twice`, `feed_parameter_required`,
+  `feed_operation_query`, `feed_query_template`, `feed_operation_get`, `feed_parameter_unbound`,
+  `feed_item_pointer` and others)
+  (story:definition-reader-refuses-what-the-feed-engine-refuses).
+- A catalog write body whose required key, or `body_any_of` key, is given as `null` is refused
+  before any request: null counts as missing. A selection may declare `body_null_clears: true`
+  so a null `body_any_of` member is the change and is sent; Jira `issue.edit` does, so
+  `assignee`, `description` or `priority` given as null alone still unassigns or clears. A
+  nested `body_any_of` now requires its parent in the declared input schema. Jira's
+  configuration revision moves: a pinned `configuration_revision` must be copied again, and a
+  connected Jira instance is `pending` until `connections revalidate`
+  (story:required-body-key-refuses-null).
+
 ## 0.71.0 — 2026-11-11
 
 ### Added

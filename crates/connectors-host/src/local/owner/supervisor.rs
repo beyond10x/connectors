@@ -229,6 +229,20 @@ pub(super) enum Output {
     Document(Vec<u8>),
     Write(mutation::Delivery),
 }
+/// The cancellation of one request's read job, set by the exchange that holds
+/// the request (story:owner-cancels-a-bounded-read): it names that job alone, so
+/// no other request's job reads it.
+#[derive(Clone, Default)]
+pub(super) struct Cancel(Arc<AtomicBool>);
+impl Cancel {
+    #[cfg(unix)]
+    pub(super) fn cancel(&self) {
+        self.0.store(true, Ordering::SeqCst);
+    }
+    pub(super) fn cancelled(&self) -> bool {
+        self.0.load(Ordering::SeqCst)
+    }
+}
 struct Job {
     alias: String,
     adapter: Adapter,
@@ -238,6 +252,7 @@ struct Job {
     epoch: u64,
     queued: Option<JobQueued>,
     dispatch: Dispatch,
+    cancel: Option<Cancel>,
 }
 /// Whether a read job's worker dispatched it, decided once between the worker
 /// and the pool waiting on it: the worker marks it immediately before it
@@ -605,6 +620,17 @@ impl Pool {
         deadline: u64,
         flight: Option<Arc<Flight>>,
     ) -> Result<(mpsc::Receiver<Result<Output>>, Dispatch)> {
+        self.send_cancellable(alias, adapter, task, deadline, flight, None)
+    }
+    fn send_cancellable(
+        &self,
+        alias: &str,
+        adapter: &Adapter,
+        task: Task,
+        deadline: u64,
+        flight: Option<Arc<Flight>>,
+        cancel: Option<Cancel>,
+    ) -> Result<(mpsc::Receiver<Result<Output>>, Dispatch)> {
         let cutoff = task.until(deadline)?;
         let bounded_until = task.bounded_until()?;
         let (sender, control, queued) = self.admit(adapter, bounded_until)?;
@@ -642,6 +668,7 @@ impl Pool {
                 epoch: control.epoch,
                 queued: Some(queued),
                 dispatch: dispatch.clone(),
+                cancel,
             })))
             .map_err(|e| match e {
                 mpsc::TrySendError::Full(_) => Code::Capacity,
@@ -735,13 +762,28 @@ impl Pool {
     /// `Answer::Rerun`: its joiners then coalesce onto one fresh revalidation,
     /// the first to wake leading it and the rest joining it.
     pub fn run(&self, alias: &str, adapter: &Adapter, task: Task, deadline: u64) -> Result<Output> {
+        self.run_cancellable(alias, adapter, task, deadline, None)
+    }
+    /// [`Pool::run`] of a job that `cancel` ends: a read still queued is never
+    /// dispatched and is dropped unrun when its worker reaches it (it holds its
+    /// queue slot until then), one running stops its adapter
+    /// call and credential read, and the wait ends `interrupted` within 50 ms
+    /// (story:owner-cancels-a-bounded-read). Only a read job is cancellable.
+    pub(super) fn run_cancellable(
+        &self,
+        alias: &str,
+        adapter: &Adapter,
+        task: Task,
+        deadline: u64,
+        cancel: Option<Cancel>,
+    ) -> Result<Output> {
         let Task::Revalidate {
             connection,
             revision,
             ..
         } = &task
         else {
-            return self.run_job(alias, adapter, task, deadline);
+            return self.run_job(alias, adapter, task, deadline, cancel);
         };
         let key = (
             adapter.instance_id.clone(),
@@ -777,21 +819,43 @@ impl Pool {
             }
         }
     }
-    fn run_job(&self, alias: &str, adapter: &Adapter, task: Task, deadline: u64) -> Result<Output> {
+    fn run_job(
+        &self,
+        alias: &str,
+        adapter: &Adapter,
+        task: Task,
+        deadline: u64,
+        cancel: Option<Cancel>,
+    ) -> Result<Output> {
         let cutoff = task.until(deadline)?;
-        let (receiver, dispatch) = self.send(alias, adapter, task, deadline, None)?;
-        receiver
-            .recv_timeout(cutoff.saturating_duration_since(Instant::now()))
-            .map_err(|e| match e {
-                // A read its worker already dispatched: the request may have
-                // reached the provider, so its deadline is the provider's.
-                mpsc::RecvTimeoutError::Timeout if dispatch.abandon() => Error {
-                    origin: Origin::Provider,
-                    ..Error::from(Code::Timeout)
-                },
-                mpsc::RecvTimeoutError::Timeout => Code::Timeout.into(),
-                _ => Error::from(Code::Unavailable),
-            })?
+        let (receiver, dispatch) =
+            self.send_cancellable(alias, adapter, task, deadline, None, cancel.clone())?;
+        let waited = loop {
+            let slice = cutoff.saturating_duration_since(Instant::now());
+            let Some(cancel) = cancel.as_ref() else {
+                break receiver.recv_timeout(slice);
+            };
+            if cancel.cancelled() {
+                // Nothing is dispatched after this; a job the worker already
+                // dispatched ends by the cancel it reads.
+                dispatch.abandon();
+                return Err(Code::Interrupted.into());
+            }
+            match receiver.recv_timeout(slice.min(Duration::from_millis(50))) {
+                Err(mpsc::RecvTimeoutError::Timeout) if !slice.is_zero() => {}
+                other => break other,
+            }
+        };
+        waited.map_err(|e| match e {
+            // A read its worker already dispatched: the request may have
+            // reached the provider, so its deadline is the provider's.
+            mpsc::RecvTimeoutError::Timeout if dispatch.abandon() => Error {
+                origin: Origin::Provider,
+                ..Error::from(Code::Timeout)
+            },
+            mpsc::RecvTimeoutError::Timeout => Code::Timeout.into(),
+            _ => Error::from(Code::Unavailable),
+        })?
     }
     pub(super) fn recover(&self, batch: maintenance::Batch) -> Result<()> {
         let workers = self.workers.lock().map_err(|_| Code::Unavailable)?;
@@ -1040,6 +1104,10 @@ fn worker(
         // `busy` now covers this job; it is no longer queued.
         drop(job.queued.take());
         let result = (|| {
+            // A cancelled read is dropped here, unrun, and frees its slot.
+            if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
+                return Err(Code::Interrupted.into());
+            }
             // A read's recollection of the same connection and revision ran
             // while this revalidation was queued, and this one joined it.
             if let Some(answer) = job.reply.answered() {
@@ -1216,6 +1284,12 @@ fn worker(
             if child.is_none() {
                 child = Some(launch.run(job.deadline, bounded_until)?);
                 selection = current.selection();
+            }
+            // A read cancelled while its adapter launched goes no further:
+            // no recollection and no credential read follows the cancel
+            // (contracts/cli/v1alpha1/owner.md). The launched adapter stays.
+            if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
+                return Err(Code::Interrupted.into());
             }
             let execution_until = job.task.until(job.deadline)?;
             let active = child.as_mut().ok_or(Code::Unavailable)?;
@@ -1629,6 +1703,13 @@ fn worker(
                         registry.cancel_read(captured, connectors_sdk::now_ms())?;
                         return Err(Code::StaleDescription.into());
                     }
+                    // The last check before the stored credential is opened:
+                    // a read cancelled during its launch or recollection reads
+                    // none (contracts/cli/v1alpha1/owner.md).
+                    if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
+                        registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                        return Err(Code::Interrupted.into());
+                    }
                     let version = captured.version();
                     let selection = config.selection();
                     // A bounded read gives up its custody answer once its
@@ -1732,6 +1813,10 @@ fn worker(
                     }
                     // Refused once the pool stopped waiting and reported the
                     // host's own timeout: nothing is dispatched after that.
+                    if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
+                        registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                        return Err(Code::Interrupted.into());
+                    }
                     if let Err(error) = job.dispatch.begin() {
                         registry.cancel_read(captured, connectors_sdk::now_ms())?;
                         return Err(error);
@@ -1747,8 +1832,20 @@ fn worker(
                             .map_err(|_| runtime::Failure::Timeout)
                             .and_then(|until| budget.constrain(until))
                             .and_then(|budget| {
-                                active.invoke_bounded(
-                                    &operation, &revision, &partition, &material, &document, budget,
+                                let halted = || match job.cancel.as_ref() {
+                                    Some(cancel) if cancel.cancelled() => {
+                                        Err(runtime::Failure::Interrupted)
+                                    }
+                                    _ => Ok(()),
+                                };
+                                active.invoke_bounded_until_cancelled(
+                                    &operation,
+                                    &revision,
+                                    &partition,
+                                    &material,
+                                    &document,
+                                    budget,
+                                    Some(&halted),
                                 )
                             })
                             .map_err(runtime::Refusal::from)
@@ -1773,6 +1870,20 @@ fn worker(
                             deadline,
                         )
                     };
+                    // A cancel ended the adapter process on purpose, which is
+                    // not the unexpected termination `failed` names
+                    // (contracts/cli/v1alpha1/semantics.md, "restart =
+                    // never"): its record is cleared so the instance reads
+                    // `not_running` and the next job launches anew. A control
+                    // another start or stop moved on is left as it is.
+                    if job.cancel.as_ref().is_some_and(Cancel::cancelled)
+                        && matches!(&result, Err(refusal) if refusal.failure == runtime::Failure::Interrupted)
+                        && let Ok(mut guard) = control.lock()
+                        && guard.epoch == job.epoch
+                    {
+                        child = None;
+                        guard.child = None;
+                    }
                     // The provider refused the stored credential as unauthorized
                     // (a refresh token answered `invalid_grant`, a token or basic
                     // entry answered 401): the connection is Stale until a

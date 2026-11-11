@@ -134,6 +134,7 @@ fn select(id: &str, operation_id: &str, effect: Effect) -> Selection {
         body_fixed: BTreeMap::new(),
         body_enums: BTreeMap::new(),
         body_any_of: Vec::new(),
+        body_null_clears: false,
         body_prefixes: BTreeMap::new(),
         conflict_status: None,
         custody: None,
