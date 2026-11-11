@@ -61,11 +61,15 @@ fn open(path: &Path) -> std::io::Result<File> {
         options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
     }
     // `FILE_FLAG_OPEN_REPARSE_POINT`: a final reparse point is opened, not
-    // followed, and refused below.
+    // followed, and refused below. Append mode leaves out `FILE_WRITE_DATA` on
+    // Windows, which emptying the file needs, so the handle asks for
+    // `GENERIC_READ | GENERIC_WRITE` and the write seeks to the end itself.
     #[cfg(windows)]
     {
         use std::os::windows::fs::OpenOptionsExt;
-        options.custom_flags(0x0020_0000);
+        options
+            .custom_flags(0x0020_0000)
+            .access_mode(0x8000_0000 | 0x4000_0000);
     }
     let file = options.open(path)?;
     // The repository's own rule for a private file: a regular file of the
@@ -92,6 +96,9 @@ fn write_line(state: &Path, line: &str) {
         text.push_str(&format!("{} log emptied at {LIMIT} bytes\n", now()));
     }
     text.push_str(line);
+    if file.seek(SeekFrom::End(0)).is_err() {
+        return;
+    }
     let _ = file.write_all(text.as_bytes());
 }
 
