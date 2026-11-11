@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:definition-connect-begin-carries-selection
 kind: story
-status: active
+status: implemented
 title: A definition connect's Begin carries the selection its question was asked for
 summary: closes the window left after 439ed1a07 between the entry re-check and the owner Begin
 relations:
@@ -31,10 +31,11 @@ scope:
   path: crates/connectors-host/src/local/owner.rs
 - confidence: cited
   path: crates/connectors-host/src/local/owner/transport.rs
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:58Z", actor: "human:operator", revision: 5, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:57:58Z", actor: "human:operator", revision: 6, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T19:24:46Z", actor: "human:operator", revision: 7, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Outcome
 
