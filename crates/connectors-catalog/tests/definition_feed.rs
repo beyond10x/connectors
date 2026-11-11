@@ -888,3 +888,135 @@ mod a_template_the_engines_parser_refuses_is_refused {
         );
     }
 }
+
+// ---- the rest of what `Feed::new` and `bind` refuse at load ---------------------------------
+
+/// The GitLab definition with each `(from, to)` edit applied, lowered, refused by `rule`.
+fn gitlab_refused(edits: &[(&str, &str)], rule: &str, mentions: &str) {
+    let root = gitlab_root();
+    let text = edits
+        .iter()
+        .fold(GITLAB.to_owned(), |text, (from, to)| edit(&text, from, to));
+    assert_rule(
+        lower("gitlab", &text, root.path()),
+        rule,
+        "merge_requests",
+        mentions,
+    );
+}
+
+const CHANGED_PATHS: (&str, &str) = (
+    "merge_requests.list: {op: getApiV4ProjectsIdMergeRequests}",
+    "merge_requests.list: {op: getApiV4ProjectsIdRepositoryChangedPaths}",
+);
+
+#[test]
+fn a_lookup_leaving_a_required_parameter_unbound_is_refused() {
+    gitlab_refused(
+        &[(
+            "project.get: {op: getApiV4ProjectsId}",
+            "project.get: {op: getApiV4ProjectsIdRepositoryChangedPaths}",
+        )],
+        "feed_parameter_unbound",
+        "`from`",
+    );
+}
+
+#[test]
+fn an_items_list_leaving_a_required_parameter_unbound_is_refused() {
+    gitlab_refused(
+        &[
+            CHANGED_PATHS,
+            (
+                "query: {order_by: updated_at, sort: asc, state: all, scope: all}",
+                "query: {to: main}",
+            ),
+            (
+                "position: {time: updated_after}",
+                "position: {time: find_renames}",
+            ),
+            (
+                "    filters:\n      mine_open: {state: opened, scope: assigned_to_me}\n",
+                "",
+            ),
+        ],
+        "feed_parameter_unbound",
+        "`from`",
+    );
+}
+
+#[test]
+fn a_feed_operation_that_is_not_a_get_is_refused() {
+    gitlab_refused(
+        &[("lookup: project.get", "lookup: merge_request.create")],
+        "feed_operation_get",
+        "not a GET",
+    );
+}
+
+#[test]
+fn containers_without_a_kind_word_are_refused() {
+    gitlab_refused(
+        &[("      kind_word: project\n", "")],
+        "feed_kind_word",
+        "no kind_word",
+    );
+}
+
+#[test]
+fn a_capability_claim_the_feed_does_not_support_is_refused() {
+    gitlab_refused(
+        &[("revision: update-time", "revision: opaque")],
+        "feed_capabilities",
+        "revision: opaque",
+    );
+    gitlab_refused(
+        &[("deletions: not-observed", "deletions: observed")],
+        "feed_capabilities",
+        "deletions: observed",
+    );
+}
+
+#[test]
+fn a_profile_that_is_not_visible_ascii_is_refused() {
+    gitlab_refused(
+        &[(
+            "profile: gitlab-merge-requests/1",
+            "profile: gitlab merge requests",
+        )],
+        "feed_profile",
+        "profile",
+    );
+}
+
+#[test]
+fn a_page_size_cap_above_one_hundred_is_refused() {
+    gitlab_refused(
+        &[("limit: per_page, max: 100}", "limit: per_page, max: 500}")],
+        "feed_max_limit",
+        "max 500",
+    );
+}
+
+#[test]
+fn a_record_field_that_is_not_a_pointer_is_refused() {
+    for (from, to, mentions) in [
+        ("      id: /iid\n", "      id: iid\n", "items.id `iid`"),
+        (
+            "      revision: /updated_at\n",
+            "      revision: updated_at\n",
+            "items.revision",
+        ),
+    ] {
+        gitlab_refused(&[(from, to)], "feed_item_pointer", mentions);
+    }
+}
+
+#[test]
+fn a_body_without_a_representation_is_refused() {
+    gitlab_refused(
+        &[("representation: text/markdown", "representation: \"\"")],
+        "feed_body_representation",
+        "representation",
+    );
+}
