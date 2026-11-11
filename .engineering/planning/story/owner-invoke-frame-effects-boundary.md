@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:owner-invoke-frame-effects-boundary
 kind: story
-status: active
+status: implemented
 title: Decide whether the owner's plain Invoke frame holds the effects rule
 relations:
 - derived_from: review-result:wave-20261105b-u2-adversary
@@ -14,10 +14,11 @@ scope:
   path: crates/connectors-host/src/local/owner.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/owner/transport.rs
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:59:32Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:59:33Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T19:24:47Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 
 ## Why

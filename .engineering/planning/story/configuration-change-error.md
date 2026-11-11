@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:configuration-change-error
 kind: story
-status: active
+status: implemented
 title: A connect under a changed native configuration names the cause
 relations:
 - serves: vision:independent-contract-adapters
@@ -31,10 +31,11 @@ scope:
   path: docs/local-catalog-provider.md
 - confidence: inferred
   path: ess/domains/cli.yaml
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:55Z", actor: "human:timo", revision: 5, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:57:55Z", actor: "human:timo", revision: 6, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T19:24:45Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1,"review_outcome":2}}}
 ---
 ## Problem
 `register()` binds an instance id to one configuration revision (`crates/connectors-host/src/local/registry/lifecycle.rs:287-290`). A connect after any native-config change answers `lifecycle_conflict` / `retry_status`, which invites retries that cannot succeed.
