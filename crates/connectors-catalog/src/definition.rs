@@ -836,6 +836,10 @@ pub struct Operation {
     /// one, the engine's `body_any_of`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub body_any_of: Option<Vec<String>>,
+    /// Whether a `body_any_of` key given as `null` counts as the one change,
+    /// the engine's `body_null_clears`. Only `true`, beside `body_any_of`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body_null_clears: Option<bool>,
     /// The text sent before the caller's value of a `string` key of `body`,
     /// the engine's `body_prefixes`.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1551,6 +1555,8 @@ pub struct SelectionEntry {
     pub body_enums: BTreeMap<String, Vec<String>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub body_any_of: Vec<String>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub body_null_clears: bool,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub body_prefixes: BTreeMap<String, String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1589,6 +1595,7 @@ struct Body {
     fixed: BTreeMap<String, Value>,
     enums: BTreeMap<String, Vec<String>>,
     any_of: Vec<String>,
+    null_clears: bool,
     prefixes: BTreeMap<String, String>,
 }
 
@@ -1723,6 +1730,16 @@ fn body(key: &str, operation: &Operation) -> Result<Body, Refusal> {
             return Err(refuse("names keys under more than one parent".to_owned()));
         }
         body.any_of = any_of.clone();
+    }
+    match operation.body_null_clears {
+        None => {}
+        Some(true) if !body.any_of.is_empty() => body.null_clears = true,
+        Some(_) => {
+            return Err(Refusal::BodyAnyOf {
+                key: key.to_owned(),
+                detail: "is absent or body_null_clears is not `true`".to_owned(),
+            });
+        }
     }
     for (field, prefix) in operation.body_prefixes.iter().flatten() {
         if !body.sent_string(field)
@@ -3510,6 +3527,7 @@ pub fn select(
                 ("body", operation.body.is_some()),
                 ("body_enums", operation.body_enums.is_some()),
                 ("body_any_of", operation.body_any_of.is_some()),
+                ("body_null_clears", operation.body_null_clears.is_some()),
                 ("body_prefixes", operation.body_prefixes.is_some()),
             ]
             .iter()
@@ -3605,6 +3623,7 @@ pub fn select(
             body_fixed: declared_body.fixed,
             body_enums: declared_body.enums,
             body_any_of: declared_body.any_of,
+            body_null_clears: declared_body.null_clears,
             body_prefixes: declared_body.prefixes,
             conflict_status: operation.conflict_status,
             guard,

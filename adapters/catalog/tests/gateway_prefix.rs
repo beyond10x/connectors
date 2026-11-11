@@ -161,6 +161,8 @@ fn refusal(config: &Value) -> String {
 /// and the issue `feed`, and again when `issues.search` declared its `walk`.
 /// Every pair was re-pinned once more when the bundles were rebuilt to record
 /// each parameter's `enum` and `format: date-time`.
+/// The Jira pair moved once more when `issue.edit` declared `body_null_clears`
+/// (story:required-body-key-refuses-null).
 const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
@@ -171,8 +173,8 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "catalog-jira.md",
         "jira",
-        "d1fab467ba797bddde1c937b0afac45d05c1a719d7c9b24f80e52b349c3e2aa3",
-        "b96bb4436bc1296375bb6ed70790fb65ee18b067325fc344851c677f65cac6c9",
+        "69fb2d4257b9a038c1a759d914e4d32ef85fedbaf8bba3b0a79c12596e1f009a",
+        "0cfc0e55dd791de912e49d4a22a79b4d06a353c2ba19282737a9ca2e3c1171bf",
     ),
     // The Confluence guide declares an `access` probe since #102, which is part of
     // its configuration and so of its revision. Its pair moved again when its

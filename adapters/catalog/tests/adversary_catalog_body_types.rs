@@ -214,3 +214,39 @@ async fn a_null_body_any_of_member_does_not_count_as_the_one_change() {
         assert_eq!(prepared, admitted, "prepared, {input}");
     }
 }
+
+/// With `body_null_clears` a `body_any_of` member given as JSON `null` counts as
+/// the one change, in the schema and in `prepare` alike; a required key given
+/// as `null` is still refused; and `body_null_clears` without `body_any_of` is
+/// refused when the selection loads.
+#[tokio::test]
+async fn body_null_clears_lets_a_null_any_of_member_count_and_nothing_else() {
+    let selection = written(json!({
+        "id": "thing.create", "operation_id": "createThing", "effect": "write",
+        "body_keys": ["name", "free", "must"],
+        "body_required": ["must"],
+        "body_any_of": ["name", "free"],
+        "body_null_clears": true
+    }));
+    let engine = Engine::new(&things_bundle(), "/v1", &[selection]).unwrap();
+    for (body, admitted) in [
+        (json!({"must": 1, "name": null}), true),
+        (json!({"must": 1, "free": null}), true),
+        (json!({"must": 1, "name": null, "free": null}), true),
+        (json!({"must": 1, "name": "x"}), true),
+        (json!({"must": 1}), false),
+        (json!({"must": null, "name": "x"}), false),
+        (json!({"name": null}), false),
+    ] {
+        let input = json!({"body": body});
+        let (declared, prepared) = verdicts(&engine, &input).await;
+        assert_eq!(declared, admitted, "declared, {input}");
+        assert_eq!(prepared, admitted, "prepared, {input}");
+    }
+    let alone = written(json!({
+        "id": "thing.create", "operation_id": "createThing", "effect": "write",
+        "body_keys": ["name"],
+        "body_null_clears": true
+    }));
+    assert!(Engine::new(&things_bundle(), "/v1", &[alone]).is_err());
+}

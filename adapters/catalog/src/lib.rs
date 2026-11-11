@@ -712,6 +712,11 @@ pub struct Selection {
     /// write that changes whichever the caller sends. Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub body_any_of: Vec<String>,
+    /// Whether a `body_any_of` member given as JSON `null` counts as the one
+    /// change, because the provider clears a field on `null`. Without it a
+    /// `null` member counts as absent. Needs `body_any_of`. Omitted when false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub body_null_clears: bool,
     /// String keys whose sent value is the prefix followed by the caller's
     /// value, such as a draft reply's marker line. Omitted when empty.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -3563,6 +3568,7 @@ fn check_download(selection: &Selection, download: &Download) -> Result<()> {
         || !selection.body_fixed.is_empty()
         || !selection.body_enums.is_empty()
         || !selection.body_any_of.is_empty()
+        || selection.body_null_clears
         || !selection.body_prefixes.is_empty()
     {
         Some("beside members that bind a bundle operation")
