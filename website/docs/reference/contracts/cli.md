@@ -91,6 +91,7 @@ management wire payload or a persistent record.
 | `setup init` | local configuration writer | inputless Context → `SetupInitResult` | no / no |
 | `setup check` | local configuration inspector | inputless Context → `SetupCheckResult` | no / no |
 | `setup checkpoints-enable` | local metadata store, under the owner lifetime lock | `SetupCheckpointsEnableInput` → `SetupCheckpointsEnableResult` | no / no |
+| `setup custody-orphans` | Secret Service custody items, attributes only | `SetupCustodyOrphansInput` → `SetupCustodyOrphansResult` | no / no |
 | `setup owner-stop` | the running owner of the state directory, through its shutdown request (owner transport) | inputless Context → `SetupOwnerStopResult` | no / no |
 | `approvals clock-check` | configured clock inspector | `ApprovalClockCheckInput` → `ApprovalClockCheckResult` | no / no |
 | `approvals policy-status` | local policy inspector | `ApprovalPolicyStatusInput` → `ApprovalPolicyResult` | no / no |
@@ -467,7 +468,10 @@ A catalog entry no connector is derived for is no instance: naming it so
 `configuration_rule` `legacy_entry_unmigrated` and `next_action`
 `check_configuration`. A
 configuration in which two entries would answer to one connector and instance
-pair refuses the whole file, as does `default_instance` that is not
+pair refuses the whole file; a legacy entry and an instance that are known by
+one pair only once the entry's connector is derived are not such a pair, and
+selecting that name is `instance_ambiguous` (see [invoking an
+operation](#invoking-an-operation)). The file is also refused for a `default_instance` that is not
 `"<connector>/<instance>"` naming a configured instance, `default_instance`
 outside `connectors-local/5`, or `default_instance` beside `default_adapter`.
 
@@ -557,8 +561,11 @@ The endpoint must pass the configuration's own endpoint rule (non-empty, at
 most 2048 bytes, no whitespace or control character); otherwise the command is
 `invalid_input` with `field = endpoint` and nothing is written. So is
 `--endpoint` with no `<connector>/<instance>` named (`--adapter` or the default
-instance), and on an instance that carries the pins of a legacy entry, whose
-endpoint is its pinned selection's. A connector that declares no default
+instance), on an instance that carries the pins of a legacy entry, whose
+endpoint is its pinned selection's, and on a name a legacy `[adapters.<alias>]`
+entry holds (a table written beside it would make the name two entries, which
+selection refuses as `instance_ambiguous`): `setup migrate` moves the entry to
+an instance first. A connector that declares no default
 endpoint, selected on an instance that is not listed or is listed with neither
 `endpoint` nor pins, is `invalid_input` with `field = endpoint` when `--endpoint` is
 absent, before any credential is asked for.
@@ -754,18 +761,26 @@ echoed. A `[connectors]` instance and a recorded definition instance are named
 by their own names; a legacy `[adapters.<alias>]` entry by its alias, under the
 connector `setup migrate` derives for it, or under its implementation when that
 is not the catalog; a catalog entry no connector is derived for cannot be named
-here. A `[connectors]` instance wins over a legacy entry that derives the same
-names, as `--connector` and `--instance` select it, so each instance has one
-name. With the instance left out the connector's only instance is selected;
-`default_instance` is never consulted. A connector or instance not configured
-is `not_found` at `admission` naming `check_configuration`.
+here. A name a `[connectors]` instance and a legacy entry both derive is
+refused, never resolved to either: see `instance_ambiguous`. With the instance
+left out the connector's only instance is selected; `default_instance` is never
+consulted. A connector or instance not configured is `not_found` at `admission`
+naming `check_configuration`.
 
 `instance_ambiguous`: the target names a connector with several instances and
-no instance. It is a usage refusal at `arguments`, exit 2, `next_action = none`,
-and its `Failure.instances` lists every instance of that connector as
-`<connector>/<instance>`, sorted, so the caller can name one. Nothing was read
-beyond the configuration. A target that names its instance is never
-`instance_ambiguous`.
+no instance, or names one `<connector>/<instance>` that a `[connectors]`
+instance and a legacy `[adapters.<alias>]` entry both derive. It is a usage
+refusal at `arguments`, exit 2, `next_action = none`, and its
+`Failure.instances` lists, sorted, every instance of that connector as
+`<connector>/<instance>`, so the caller can name one; for a shared name it lists
+the two entries as `<connector>/<instance> (alias <alias>)`, each once (an
+instance that has no entry yet is listed as `<connector>/<instance>`). Nothing
+was read beyond the configuration, no credential is read and no request is
+sent. A target that names its instance is `instance_ambiguous` only for such a
+shared name. `--connector` with `--instance` and `default_instance` select by
+the same rule and give the same refusal. The operator removes or renames one of
+the two entries; `setup migrate` keeps the legacy entry as `instance_conflict`
+and does not resolve it. `instances list` lists both entries.
 
 Without `--connection` the instance's one `ready` connection is selected. When
 none is ready, its one usable connection is: `pending` only because its
@@ -1271,6 +1286,27 @@ Rollback is restoring the backup and running the previous release. Under
 `--output json` a refusal is one failure envelope on standard error, like every
 other command's.
 
+### Custody orphans
+
+`setup custody-orphans [--mode list|remove] [--authority ID]` works on the custody items in
+the Secret Service (`docs/local-secret-service.md`) whose `connectors.authority` is not the
+authority of the store in the selected state directory. The store must exist
+(`metadata_unavailable` otherwise). Item attributes are read, never a secret value.
+
+`list`, the default, answers `groups`, one row per authority and purpose with its item
+count, and a `notice` saying that a listed authority may belong to another store on this
+machine that the command cannot see. It deletes nothing.
+
+`remove` needs `--authority ID`, one authority id, and deletes only the items carrying it.
+Without `--authority`, with an id that is not a UUID, or with the selected store's own
+authority, it is `invalid_input` at `arguments` with `field` `authority`, and nothing is
+deleted. `list` with `--authority` is the same refusal. `removed` names each item deleted
+and `failed` each item whose delete failed, with its failure; neither is silent. When the
+deletes ran but could not be made durable, `removed` still names them and `failed` carries one
+row whose item is `synchronization`. An
+authority with no items answers empty `removed` and `failed`. An unavailable or locked
+Secret Service is `custody_unavailable`.
+
 ### Durable open checkpoints on an existing store
 
 `setup checkpoints-enable --confirm one-way` enables Entity Runtime durable open
@@ -1484,6 +1520,15 @@ start. The owner then closes its end and the runtime points the program's standa
 error at `/dev/null`: nothing the program writes once it can hold a credential is
 kept. Windows starts a program with no standard handles and keeps no start log.
 
+A program that does not speak the private protocol its entry selects
+(`private_protocol`) is named instead of `unavailable`: the start fails as
+`unsupported_private_protocol` at `readiness` with `next_action =
+check_configuration`, `private_protocol` the protocol asked for and
+`supported_private_protocols` the protocols the program answered that it speaks. A
+connect and `instances status` of that instance answer it, status with exit 1 instead
+of an observation. A program built before the refusal existed only exits, which stays
+`exited_before_handshake` under `unavailable`.
+
 ## 5. Protected entry and durable publication
 
 The Linux OS keyring binding selects the user's admitted Secret Service collection
@@ -1648,16 +1693,17 @@ never replay a possible write after interruption, timeout or lost response.
 | metadata authority unavailable | `metadata_unavailable` | 1 |
 | store written by a newer binary whose record model differs (its marker names a newer or an unorderable version), a store whose SQL level is above this binary's highest, or a store record carrying a field this binary's model does not declare; nothing read or written (`stage = admission`, `next_action = upgrade`, `store_version` and `binary_version` named) | `metadata_schema_newer` | 1 |
 | a non-guarded metadata write the store changed under (a concurrent commit); nothing was written (`stage = publication`, `next_action = retry_explicitly`). A guarded write keeps the guarded-write rule below: its mutation record, `next_action = retry_status` | `revision_conflict` | 1 |
-| metadata publication acknowledgement uncertain | `outcome_unknown` | 1 |
+| metadata publication acknowledgement uncertain, or an owner that failed or answered none (`owner_log` names its log and `owner_error` the code it logged, when it logged one) | `outcome_unknown` | 1 |
 | changed principal/account/target during repair (`next_action = revoke_connection`, [one connection per instance](#one-connection-per-instance)) | `identity_mismatch` | 1 |
 | stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`: run `connectors setup owner-stop`); `connections connect` on an instance that holds its connection, or while another connect of it is in flight ([one connection per instance](#one-connection-per-instance)) | `lifecycle_conflict` | 1 |
 | stale/foreign stop target | `incarnation_mismatch` | 1 |
 | wrong readiness identity/version/revision | `readiness_mismatch` | 1 |
+| a program that refused the private protocol the entry selects (`stage = readiness`, `next_action = check_configuration`, `private_protocol` named and `supported_private_protocols` where the program said; `instances status` of the instance answers it too) | `unsupported_private_protocol` | 1 |
 | running owner is a different executable build (`next_action = stop_owner`: run `connectors setup owner-stop`) | `owner_build_mismatch` | 1 |
 | no selected cached description | `description_unavailable` | 1 |
 | schema/descriptor changed | `stale_description` | 1 |
 | absent selected operation/connection | `not_found` | 1 |
-| `invoke` target naming a connector with several instances and no instance (`stage = arguments`, `next_action = none`, `instances` named; [invoking an operation](#invoking-an-operation)) | `instance_ambiguous` | 2 |
+| `invoke` target naming a connector with several instances and no instance, or a `<connector>/<instance>` a `[connectors]` instance and a legacy entry both derive, as does `--connector`/`--instance` or `default_instance` naming it (`stage = arguments`, `next_action = none`, `instances` named; [invoking an operation](#invoking-an-operation)) | `instance_ambiguous` | 2 |
 | `invoke` without `--connection` on an instance with no usable connection, several `ready`, or several usable and none `ready` (`stage = admission`, `connections` named; [invoking an operation](#invoking-an-operation)) | `connection_unresolved` | 1 |
 | `invoke` write without `--approval-file` (`stage = admission`, `next_action = none`, `approval_steps` named) | `approval_required` | 1 |
 | stale, expired or foreign list cursor (`stage = observation`, `next_action = retry_explicitly`) | `stale_cursor` | 1 |

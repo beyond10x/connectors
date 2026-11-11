@@ -83,8 +83,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.idempotency.ReservationStateConflict
-    fields:
-      state: Pending
   no_events:
   - connectors.idempotency.ResultExpired
 assert:

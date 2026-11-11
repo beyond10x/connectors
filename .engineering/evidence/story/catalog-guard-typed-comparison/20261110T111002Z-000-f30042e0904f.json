@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T11:10:02Z",
+  "actor": "human:operator",
+  "artifact": "story:catalog-guard-typed-comparison",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-guard-typed-adversary-1",
+    "reference": "wave builds run through cargo-unit.sh (wave lock, host slot, touch of the tree's tracked files); the wave gate re-runs every target on one tree",
+    "review": "review-result:wave-b-guard-typed-adversary-1",
+    "outcome": "fixed"
+  }
+}

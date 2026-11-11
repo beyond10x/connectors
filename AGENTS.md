@@ -252,9 +252,15 @@ earlier local-only Connectors publication boundary for these releases.
    page and `sha256sum -c SHA256SUMS` passes on the downloaded archives. On the
    same tag push its image job pushes `ghcr.io/beyond10x/connectors:<version>`
    (`linux/amd64`, `linux/arm64`) from the two Linux archives' binaries, and
-   refuses a version the registry already holds; the release is verified only when
-   `docker buildx imagetools inspect` of that tag lists both platforms under the
-   digest the job's summary names.
+   refuses a version the registry holds unless its `org.opencontainers.image.revision`
+   is the release commit (a rerun then pushes nothing and only checks the platforms);
+   the release is verified only when `docker buildx imagetools inspect` of that tag
+   lists both platforms under the digest the job's summary names. Precondition,
+   before the first push: the `connectors` container package grants this repository
+   Write under the package's "Manage Actions access"; without it the push fails
+   with `denied: permission_denied: write_package`. The checks live in
+   `deploy/images/connectors/check-image.sh`, which the pull-request path runs over
+   the captured 0.70.0 inspect output.
 
 v0.8.0–v0.11.0 were cut from a checkout with no GitHub remote and published by
 replaying its history onto the `next` branch with `git commit-tree`, so each of

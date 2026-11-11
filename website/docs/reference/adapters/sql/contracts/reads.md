@@ -37,7 +37,7 @@ Report truncation explicitly; no invented resumable cursor for a fresh SQL query
 [read profile](#read-profiles)'s keyset cursor follows a column the operator declared, and
 is a new read after a value, not a resumed one).
 Each request uses a fresh connection and read-only transaction, initialized with
-`search_path = public, pg_catalog`; qualify names in other schemas. Session settings
+`search_path = pg_catalog, public`; qualify names in other schemas. Session settings
 are not a substitute for the configured role's schema and function grants.
 No connection pool is claimed in this local profile. A configured CA bundle
 replaces public trust roots for SQL; empty bundles are refused.
@@ -309,7 +309,7 @@ The statement runs inside the derived table with positional aliases, which close
 own line on both engines (so a statement ending in a `--` comment cannot reach the
 aliases), ordered by one expression `E` of the ordering column and asking for one row past
 the limit; a continuation compares the cursor by the same expression:
-`… \n) AS result(c0,…) [WHERE E(result.c<k>) > E($<n+1>)] ORDER BY E(result.c<k>) LIMIT <limit+1>`
+`… \n) AS result(c0,…) [WHERE E(result.c<k>) OPERATOR(pg_catalog.>) E($<n+1>)] ORDER BY E(result.c<k>) LIMIT <limit+1>`
 on PostgreSQL and `… \n) AS result (c0,…) [WHERE E(c<k>) > E(?)] ORDER BY E(c<k>) LIMIT <limit+1>`
 on MySQL, where the cursor's value is bound after the statement's own parameters. `E` is
 chosen by the declared type and the column's native type when the statement is prepared,
@@ -317,7 +317,7 @@ before any row is read (`connectors_sql.profiles.KeysetOrdering`):
 
 | engine | declared type | native column | `E(x)` |
 |---|---|---|---|
-| PostgreSQL | `text`, `phone_number` | any | `x::text COLLATE "C"`: the returned text, by its bytes |
+| PostgreSQL | `text`, `phone_number` | any | `x::pg_catalog.text COLLATE pg_catalog."C"`: the returned text, by its bytes |
 | PostgreSQL | `integer` | `int2`, `int4`, `int8` | `x` |
 | PostgreSQL | `timestamp` | `timestamp`, `timestamptz` | `x` |
 | MySQL | `text`, `phone_number` | a text string (`CHAR`, `VARCHAR`, `TEXT`, `ENUM`, `SET`) | `CAST(CONVERT(x USING utf8mb4) AS BINARY)` |

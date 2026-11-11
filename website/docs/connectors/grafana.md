@@ -16,8 +16,7 @@ connector, instance, connection, auth profile and operation are those of the
 has the records, windows and refusals. To query a Loki or Prometheus data source through Grafana,
 use a [Loki](./loki.md) or [Prometheus](./prometheus.md) instance on the data source's proxy path.
 
-No declaration ships for it, so the instance is pinned: it names its executable, that
-executable's SHA-256 and the configuration revision the executable prints. Commands that need a
+It is a [pinned instance](../guides/pinned-instances.md). Commands that need a
 Grafana are shown without output.
 
 ## What it reads and writes
@@ -111,14 +110,7 @@ approval.
 ## Reconnect when the connection is Stale
 
 A revoked or expired token is reported as `unauthorized` when next used, and the connection turns
-`stale`. Publish a new token:
-
-```sh
-connectors --output json connections list --connector grafana --instance grafana \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector grafana --instance grafana \
-  --expected-revision "<revision from the list>" --credential-prompt
-```
+`stale`. Publish a new token. [Reconnect](../guides/reconnect-a-connection.md) `grafana/grafana` with `--credential-prompt`.
 
 Any token Grafana accepts is the same identity: use one instance per Grafana organization.
 

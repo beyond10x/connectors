@@ -333,6 +333,119 @@ pub fn problems(root: &Path, readme: &str) -> Result<Vec<String>> {
     Ok(problems)
 }
 
+/// The native executables' source directories under `adapters/`, by the first onboarding page
+/// their README row links (the catalog provider's rows are `(catalog provider)` and read
+/// `adapters/catalog`).
+const NATIVE: &[(&str, &str)] = &[
+    ("kubernetes", "kubernetes"),
+    ("postgres", "sql"),
+    ("tavily", "tavily"),
+    ("loki", "loki"),
+    ("grafana", "grafana"),
+    ("prometheus", "prometheus"),
+];
+
+/// The private protocols the sources under `directory` declare: `connectors-private/1` always,
+/// and `/2`, `/3` where the host's `Adapter` trait is implemented with `bootstrap_v2`,
+/// `bootstrap_v3` (the host refuses a protocol whose method an implementation does not give).
+fn declared_protocols(root: &Path, directory: &str) -> Result<(Vec<u8>, String)> {
+    fn sources(path: &Path, out: &mut String) -> Result<()> {
+        for entry in fs::read_dir(path).map_err(|error| format!("{}: {error}", path.display()))? {
+            let path = entry.map_err(|error| error.to_string())?.path();
+            if path.is_dir() {
+                sources(&path, out)?;
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                out.push_str(
+                    &fs::read_to_string(&path)
+                        .map_err(|error| format!("{}: {error}", path.display()))?,
+                );
+            }
+        }
+        Ok(())
+    }
+    let mut text = String::new();
+    sources(
+        &root.join("adapters").join(directory).join("src"),
+        &mut text,
+    )?;
+    let mut declared = vec![1];
+    for (version, method) in [(2, "fn bootstrap_v2("), (3, "fn bootstrap_v3(")] {
+        if text.contains(method) {
+            declared.push(version);
+        }
+    }
+    Ok((declared, text))
+}
+
+/// The executables whose highest protocol is given only when a feature is switched on, by
+/// source directory and the feature's name; the README cell says so and the source must name it.
+const CONDITIONAL: &[(&str, &str)] = &[("kubernetes", "pod_exec")];
+
+/// Where the README's support table disagrees with the protocols each executable declares
+/// (story:adapter-private-protocol-refusal-named): the table has a `Private protocol` column,
+/// and each row's cell is `1`, or `1-N` for the highest version its source
+/// directory declares ([`declared_protocols`]).
+pub fn private_protocol_problems(root: &Path, readme: &str) -> Result<Vec<String>> {
+    let lines: Vec<&str> = readme.lines().collect();
+    let Some(header) = lines.iter().position(|line| {
+        cells(line).is_some_and(|cells| cells.first().is_some_and(|first| *first == "Connector"))
+    }) else {
+        return Ok(Vec::new());
+    };
+    let Some(column) = cells(lines[header]).and_then(|cells| {
+        cells
+            .iter()
+            .position(|cell| cell.starts_with("Private protocol"))
+    }) else {
+        return Ok(vec![
+            "README.md: the support table has no `Private protocol` column".to_owned(),
+        ]);
+    };
+    let mut problems = Vec::new();
+    for cells in lines[header + 2..].iter().map_while(|line| cells(line)) {
+        let first = cells[0];
+        let directory = if first.contains("(catalog provider)") {
+            Some("catalog")
+        } else {
+            linked_pages(first).first().and_then(|stem| {
+                NATIVE
+                    .iter()
+                    .find(|(page, _)| page == stem)
+                    .map(|(_, directory)| *directory)
+            })
+        };
+        let name = link_text(first);
+        let Some(directory) = directory else {
+            problems.push(format!(
+                "README.md: the support table's connector \"{name}\" names no executable source directory under adapters/ (NATIVE in crates/connectors-docs/src/onboarding.rs)"
+            ));
+            continue;
+        };
+        let (versions, text) = declared_protocols(root, directory)?;
+        let highest = versions.last().copied().unwrap_or(1);
+        let mut expected = if highest == 1 {
+            "1".to_owned()
+        } else {
+            format!("1-{highest}")
+        };
+        if let Some((_, feature)) = CONDITIONAL.iter().find(|(dir, _)| *dir == directory) {
+            if !text.contains(feature) {
+                problems.push(format!(
+                    "README.md: adapters/{directory}/src never names `{feature}`, the condition of its highest private protocol"
+                ));
+            }
+            expected = format!("{expected} ({highest} with `{feature}`)");
+        }
+        let found = cells.get(column).copied().unwrap_or_default();
+        if found != expected {
+            problems.push(format!(
+                "README.md: the support table's connector \"{name}\" lists the private protocol {found:?}, but adapters/{directory}/src declares {expected}"
+            ));
+        }
+    }
+    Ok(problems)
+}
+
 /// A connector without a catalog declaration, written here by hand.
 pub struct Hand {
     /// The configured connector name.
@@ -849,6 +962,60 @@ mod tests {
                 .unwrap()
                 .starts_with("section 9 \"More\"")
         );
+    }
+
+    /// story:adapter-private-protocol-refusal-named: the README's private-protocol column is held
+    /// against what each executable's source declares, so a protocol added to or dropped from an
+    /// executable without the table fails here.
+    #[test]
+    fn the_support_tables_private_protocol_column_matches_the_declared_protocols() {
+        let root = crate::scratch("private-protocol");
+        let source = root.join("adapters/catalog/src");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("local.rs"), "fn bootstrap_v2(&self) {}\n").unwrap();
+        let table = |cell: &str| {
+            format!(
+                "| Connector | Binding | Private protocol (connectors-private/N) |\n|---|---|---|\n| [GitLab](https://beyond10x.github.io/connectors/docs/connectors/gitlab/) (catalog provider) | b | {cell} |\n"
+            )
+        };
+        assert_eq!(
+            private_protocol_problems(&root, &table("1-2")).unwrap(),
+            Vec::<String>::new()
+        );
+        let stale = private_protocol_problems(&root, &table("1")).unwrap();
+        assert_eq!(stale.len(), 1, "{stale:?}");
+        assert!(stale[0].contains("declares 1-2"), "{stale:?}");
+        // A protocol given only under a feature says so, and its source must name the feature.
+        let kubernetes = root.join("adapters/kubernetes/src");
+        fs::create_dir_all(&kubernetes).unwrap();
+        fs::write(kubernetes.join("local.rs"), "fn bootstrap_v2(&self) {}\n").unwrap();
+        let row = "| Connector | Binding | Private protocol (connectors-private/N) |\n|---|---|---|\n| [Kubernetes](https://beyond10x.github.io/connectors/docs/connectors/kubernetes/) | b | 1-2 (2 with `pod_exec`) |\n";
+        let unnamed = private_protocol_problems(&root, row).unwrap();
+        assert_eq!(unnamed.len(), 1, "{unnamed:?}");
+        assert!(unnamed[0].contains("never names `pod_exec`"), "{unnamed:?}");
+        fs::write(
+            kubernetes.join("local.rs"),
+            "fn bootstrap_v2(&self) {} // pod_exec\n",
+        )
+        .unwrap();
+        assert_eq!(
+            private_protocol_problems(&root, row).unwrap(),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            private_protocol_problems(&root, "| Connector | Binding |\n|---|---|\n| x | y |\n")
+                .unwrap(),
+            ["README.md: the support table has no `Private protocol` column"]
+        );
+    }
+
+    /// The repository's own README, against the repository's own sources.
+    #[test]
+    fn the_readmes_private_protocol_column_is_current() {
+        let root = repository_root();
+        let readme = fs::read_to_string(root.join("README.md")).unwrap();
+        let problems = private_protocol_problems(&root, &readme).unwrap();
+        assert!(problems.is_empty(), "{problems:#?}");
     }
 
     #[test]

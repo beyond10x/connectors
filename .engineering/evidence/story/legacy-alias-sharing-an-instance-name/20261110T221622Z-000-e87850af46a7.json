@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T22:16:22Z",
+  "actor": "human:operator",
+  "artifact": "story:legacy-alias-sharing-an-instance-name",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-alias-contract-adversary-2",
+    "reference": "F3 default_instance selecting a legacy entry through the Config::select fallback: draft story:default-instance-accepts-a-legacy-entrys-derived-name",
+    "review": "review-result:wave-b-alias-contract-adversary-2",
+    "outcome": "escalated"
+  }
+}

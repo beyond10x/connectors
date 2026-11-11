@@ -18,7 +18,7 @@ pub mod walk;
 
 use connectors_catalog::{
     bundle::Bundle,
-    inventory::{Location, Operation, ValueType},
+    inventory::{Format, Location, Operation, ValueType},
     template::{Supplied, Template},
 };
 use connectors_core::{Error, ErrorCode, Result};
@@ -57,7 +57,8 @@ pub enum Expectation {
 }
 
 /// One comparison: the value at `pointer` in an observed body must equal what
-/// `expect` resolves to, as text or, for a `boolean`, by JSON type.
+/// `expect` resolves to, as text or, for a `boolean` or an `input` naming a
+/// JSON boolean, by JSON type.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Check {
@@ -1053,6 +1054,48 @@ fn check_bound(name: &str, bound: &Bound, text: &str) -> Result<()> {
     Ok(())
 }
 
+/// Every value present must be one the pinned document allows its parameter:
+/// one of its `enum`, and an RFC 3339 date-time under `format: date-time`. A
+/// parameter that declares neither is not held to anything here, and an absent
+/// one is never refused. Checked on the value strings, the text each is sent
+/// as, before any request; a repeated parameter's declaration holds for each
+/// element.
+fn check_declared(operation: &Operation, values: &BTreeMap<String, Supplied>) -> Result<()> {
+    for parameter in &operation.parameters {
+        if parameter.allowed.is_empty() && parameter.format.is_none() {
+            continue;
+        }
+        // One scalar for a repeated parameter may be a comma-joined list of
+        // elements ([`Engine::parameter_values`]): each is held to the
+        // declaration, and the value is sent as given.
+        let texts: Vec<&str> = match values.get(&parameter.name) {
+            None => continue,
+            Some(Supplied::One(text))
+                if parameter.repeated && !parameter.allowed.iter().any(|a| a == text) =>
+            {
+                text.split(',').collect()
+            }
+            Some(Supplied::One(text)) => vec![text.as_str()],
+            Some(Supplied::Many(texts)) => texts.iter().map(String::as_str).collect(),
+        };
+        for text in texts {
+            if !parameter.allowed.is_empty() && !parameter.allowed.iter().any(|a| a == text) {
+                return Err(refuse(format!(
+                    "parameter `{}` is not one of the values its enum allows",
+                    parameter.name
+                )));
+            }
+            if parameter.format == Some(Format::DateTime) && feed::instant(text).is_none() {
+                return Err(refuse(format!(
+                    "parameter `{}` is not an RFC 3339 date-time",
+                    parameter.name
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Raw segments under the base path, and raw query pairs.
 type Request = (Vec<String>, Vec<(String, String)>);
 
@@ -1757,8 +1800,21 @@ impl Engine {
                 }
                 _ => Supplied::One(Self::element(parameter, value, true)?),
             };
+            // A required path or query parameter names something: an empty
+            // string is refused as an absent one is, before any request.
+            if parameter.required
+                && parameter.location != Location::Header
+                && parameter.location != Location::Cookie
+                && matches!(&supplied, Supplied::One(text) if text.is_empty())
+            {
+                return Err(refuse(format!(
+                    "parameter `{}` is required and empty",
+                    parameter.name
+                )));
+            }
             values.insert(parameter.name.clone(), supplied);
         }
+        check_declared(operation, &values)?;
         Ok(values)
     }
 
@@ -2010,11 +2066,13 @@ impl Engine {
                     .iter()
                     .map(|check| {
                         let value = match &check.expect {
-                            Expectation::Input(path) => Pinned::Text(
-                                reference(&input, path).and_then(scalar).ok_or_else(|| {
+                            Expectation::Input(path) => match reference(&input, path) {
+                                // A JSON boolean input compares by type, as `boolean` does.
+                                Some(Value::Bool(flag)) => Pinned::Boolean(*flag),
+                                given => Pinned::Text(given.and_then(scalar).ok_or_else(|| {
                                     refuse(format!("guard expects input `{path}`, which is absent"))
-                                })?,
-                            ),
+                                })?),
+                            },
                             Expectation::Literal(text) => Pinned::Text(text.clone()),
                             Expectation::Boolean(flag) => Pinned::Boolean(*flag),
                             Expectation::Present(_) => Pinned::Present,

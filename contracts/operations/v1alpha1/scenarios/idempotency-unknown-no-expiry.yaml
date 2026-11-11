@@ -106,8 +106,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.idempotency.ReservationStateConflict
-    fields:
-      state: Quarantined
   no_events:
   - connectors.idempotency.ResultExpired
 - at: '2026-09-08T09:00:06Z'
@@ -119,8 +117,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.idempotency.ReservationStateConflict
-    fields:
-      state: Quarantined
   no_events:
   - connectors.idempotency.ResultRetained
 assert:

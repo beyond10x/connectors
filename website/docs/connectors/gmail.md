@@ -10,14 +10,11 @@ connectors: "gmail"
 # Gmail
 
 The `gmail` connector of the provider Google is served by the catalog provider from the pinned
-Gmail API v1 document. The words connector, instance, connection and operation are those of the
-[README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+Gmail API v1 document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full Gmail guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-gmail.md)
 has every parameter, paging rule and refusal.
 
-Commands use `connectors` on your `PATH` with your own configuration. Outputs were produced in
-the repository's tree against a scratch configuration, whose `--config` and `--state-dir` are left
-out here. A command that needs a Google account is shown without output.
+[How these commands were run](../guides/first-read.md#examples).
 
 ## What it reads and writes
 
@@ -33,24 +30,9 @@ Every list returns one page per call.
 1. In the Google Cloud console, select or create a project and enable the Gmail API.
 2. Configure the OAuth consent screen and add the scopes this connector requests: `openid`,
    `https://www.googleapis.com/auth/gmail.readonly` and
-   `https://www.googleapis.com/auth/gmail.compose`. One instance per Google account requests every
-   scope its operations need, reads and writes alike.
-3. Under *Credentials*, create an OAuth client ID of type *Desktop app* and download its JSON.
-   Make it readable by you alone; the CLI refuses a credential file anyone else can read:
-
-   ```sh
-   chmod 600 ~/Downloads/client_secret_*.json
-   ```
-
-4. Choose the publishing status. Google expires the refresh token of an app in *Testing* seven
-   days after consent, so each connection then needs a reconnect every week, and every account
-   that connects must be listed as a test user. An app used only by its developer can be set to
-   *In production* without Google's verification
-   ([Google's exemption for personal use](https://support.google.com/cloud/answer/13464323)),
-   which lifts the seven-day expiry.
-
-The [Google OAuth guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-oauth.md)
-describes the client file and the consent flow in full.
+   `https://www.googleapis.com/auth/gmail.compose`.
+3. Create the OAuth client and choose the publishing status as in
+   [Google OAuth setup](../guides/google-oauth-setup.md).
 
 ## Enable the connector and add an instance
 
@@ -64,14 +46,6 @@ enabled = true
 
 [connectors.gmail.instances.private]
 description = "personal mailbox"
-```
-
-```sh
-connectors instances list | jq -c '.[] | arrays | .[]'
-```
-
-```json
-{"connector":"gmail","instance":"private","instance_id":"gmail.private","restart":"never","startup":"on-demand"}
 ```
 
 A second account is a second instance, such as `[connectors.gmail.instances.work]`, with a
@@ -93,9 +67,6 @@ Gmail scopes fails validation as insufficient scope.
 
 ## A first read
 
-A read takes the instance's one connection and its current schema and revision. Validation lasts
-60 seconds after connect; later, `connections revalidate` renews it without a credential.
-
 ```sh
 connectors invoke gmail/private users.getProfile \
   --input-json '{"userId":"me"}'
@@ -106,15 +77,10 @@ read and is `me`.
 
 ## A first guarded write
 
-Every write is a required-approval mutation. Once per instance, create its signing key with
-`connectors approvals key-init --connector gmail --instance private` and add an
-`[approval_clock]` table to the configuration
-([the approval clock](https://github.com/beyond10x/connectors/blob/main/docs/local-clock.md)).
-Then publish a policy naming the writes:
+Set up the [signing key and clock](../guides/guarded-write.md#once-per-instance), then publish this policy with `approvals policy-set`:
 
 ```sh
 printf '{"operations":["users.drafts.create","users.drafts.send"]}\n' > policy.json
-connectors approvals policy-set --connector gmail --instance private --input-file policy.json
 ```
 
 Create a draft. `draft.json` holds the whole message, RFC 5322 text encoded base64url:
@@ -123,30 +89,9 @@ Create a draft. `draft.json` holds the whole message, RFC 5322 text encoded base
 {"userId": "me", "body": {"message": {"raw": "<base64url RFC 5322 message>"}}}
 ```
 
-Take the connection, and the schema and revision of `users.drafts.create` from `invoke --describe`,
-prepare the approval, read the subject it names, issue the proof and invoke with it:
+[Prepare, issue and invoke](../guides/guarded-write.md#prepare-issue-and-invoke) `users.drafts.create` on `gmail/private` with `draft.json`, `--idempotency-key draft-1`.
 
-```sh
-connection=$(connectors --output json connections list --connector gmail --instance private \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json invoke gmail/private users.drafts.create --describe \
-  | jq -r .result.schema)
-revision=$(connectors --output json invoke gmail/private users.drafts.create --describe \
-  | jq -r .result.revision)
-connectors --output json approvals prepare --connector gmail --instance private \
-  --connection "$connection" --operation users.drafts.create \
-  --schema "$schema" --revision "$revision" --input-file draft.json
-connectors approvals clock-check --connector gmail --instance private
-connectors approvals issue --connector gmail --instance private \
-  --connection "$connection" --operation users.drafts.create \
-  --schema "$schema" --revision "$revision" --input-file draft.json \
-  --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-draft-1.json"
-connectors invoke gmail/private users.drafts.create \
-  --input-file draft.json --approval-file "$HOME/private/proof-draft-1.json" \
-  --idempotency-key draft-1
-```
-
-`$subject_sha256` is the `subject_sha256` of the prepare answer. The approval binds the whole
+The approval binds the whole
 input by digest, so decode `body.message.raw` and read it before approving. The answer carries the
 draft's `id` and `message.id`. Send it the same way with `users.drafts.send` and this input; a
 draft whose content changed since carries another `message.id`, and the send is refused with
@@ -159,17 +104,7 @@ nothing sent:
 ## Reconnect when the connection is Stale
 
 When Google stops honouring the refresh token (revoked, password changed, or the seven-day
-*Testing* expiry), an invoke answers `service_failure` with `next_action: repair_connection` and
-the connection turns `stale`. No retry renews it. Reconnect with the same client file and the
-same Google account:
-
-```sh
-connectors --output json connections list --connector gmail --instance private \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector gmail --instance private \
-  --expected-revision "<revision from the list>" \
-  --credential-file ~/Downloads/client_secret_1234.json
-```
+*Testing* expiry), the connection turns `stale`. [Reconnect](../guides/reconnect-a-connection.md) `gmail/private` with `--credential-file ~/Downloads/client_secret_1234.json`.
 
 Reconnect runs the consent again and replaces the token on the same connection. Another
 account's consent is refused as `identity_mismatch`, and the connection keeps its entry.
@@ -179,8 +114,7 @@ account's consent is refused as `identity_mismatch`, and the connection keeps it
 - Verified against a local HTTPS fixture only (`adapters/catalog/tests/google_gmail.rs`); no live
   mailbox has been read and no live draft created or sent.
 - An answer over 4 MiB is refused as `capacity`; a part over about 3 MiB cannot be read.
-- The provider does not walk pages; a read answered `429` is sent once more when time allows,
-  otherwise it is `rate_limited` with `retry_after_seconds`.
+- The provider does not walk pages; [a read answered `429` follows the shared rule](../guides/first-read.md#rate-limits).
 - The approval input is capped at 256 KiB, which bounds the size of a draft created under approval.
 - The send's preflight and its POST are two requests: a draft edited between them is sent as
   edited.

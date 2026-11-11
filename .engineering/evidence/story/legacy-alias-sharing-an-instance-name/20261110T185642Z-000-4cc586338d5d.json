@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T18:56:42Z",
+  "actor": "human:operator",
+  "artifact": "story:legacy-alias-sharing-an-instance-name",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-alias-contract-adversary-1",
+    "reference": "5b9131c73: connect --endpoint on a name a legacy entry holds is refused for endpoint before anything is written; connect_endpoint_adversary 11 passed",
+    "review": "review-result:wave-b-alias-contract-adversary-1",
+    "outcome": "fixed"
+  }
+}

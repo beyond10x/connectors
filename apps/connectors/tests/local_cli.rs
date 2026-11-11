@@ -14,6 +14,20 @@ use std::{
     process::{Command, Output},
 };
 
+/// A temporary root; where owners may run it stops them when it drops.
+#[cfg(unix)]
+type TempRoot = owner_start::reap::Root;
+#[cfg(unix)]
+fn tempdir() -> owner_start::reap::Root {
+    owner_start::reap::Root::new()
+}
+#[cfg(not(unix))]
+type TempRoot = tempfile::TempDir;
+#[cfg(not(unix))]
+fn tempdir() -> tempfile::TempDir {
+    tempfile::tempdir().unwrap()
+}
+
 /// A directory holding no executable. An entry's executable is an absolute local
 /// path (`contracts/cli/v1alpha1/semantics.md` §3), and on Windows an absolute path
 /// names its drive: `/not-installed` there is refused as `invalid_configuration`.
@@ -78,8 +92,8 @@ fn clock_configuration(original: &str, table: &str) -> String {
 }
 
 /// A set-up root whose `[approval_clock]` is `table`.
-fn clock_root(table: &str) -> tempfile::TempDir {
-    let root = tempfile::tempdir().unwrap();
+fn clock_root(table: &str) -> TempRoot {
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let original = fs::read_to_string(&config_path).unwrap();
@@ -95,6 +109,45 @@ fn clock_source(seed: u8, midpoint: u64, radius: u32) -> clock_fixture::Server {
         radius,
         ..Default::default()
     })
+}
+
+/// A source whose first answer comes `first` late, as a loopback fixture's does
+/// when a loaded runner schedules its thread late; later answers are prompt.
+fn slow_first_clock_source(
+    seed: u8,
+    midpoint: u64,
+    radius: u32,
+    first: std::time::Duration,
+) -> clock_fixture::Server {
+    let fixture = clock_fixture::Fixture {
+        seed,
+        midpoint,
+        radius,
+        ..Default::default()
+    };
+    clock_fixture::Server::spawn(Box::new(move |n, request| {
+        if n == 0 {
+            std::thread::sleep(first);
+        }
+        Some(fixture.reply(request))
+    }))
+}
+
+/// `source` once it has answered a request, so the check never waits on the
+/// fixture's first answer: the check's per-source wait is a fixed 2 s
+/// (`QUERY_TIMEOUT`), which a fixture's cold start on a loaded runner can pass.
+fn answering(source: clock_fixture::Server) -> clock_fixture::Server {
+    let socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    socket
+        .set_read_timeout(Some(std::time::Duration::from_secs(30)))
+        .unwrap();
+    let probe = clock_fixture::frame(&clock_fixture::message([(*b"NONC", vec![0u8; 32])]));
+    socket.send_to(&probe, &source.address).unwrap();
+    let mut reply = [0u8; 4096];
+    socket
+        .recv_from(&mut reply)
+        .expect("the fixture answers a probe");
+    source
 }
 
 /// `approvals clock-check` refused with `unavailable` at `stage = observation`;
@@ -115,6 +168,26 @@ fn clock_unavailable(root: &tempfile::TempDir) -> Value {
     assert_eq!(failure["stage"], "observation", "{error}");
     assert!(failure.get("clock_radius_ms").is_none(), "{error}");
     failure
+}
+
+/// `observation` brackets the time a source signed `truth` (Unix ms) said it
+/// was when it replied, once `elapsed` has passed since that reply.
+///
+/// The fixtures sign one fixed instant, but the check reports the time of its
+/// own reading: a source's lower bound is `truth - radius - 3 ms` plus the
+/// monotonic time since its reply, which exceeds the radius when the reading
+/// comes late. The true time at the reading is `truth` plus that same time, at
+/// most `elapsed`, the whole command's own measured wall time. So the lower
+/// bound may exceed `truth` by `elapsed`, and the upper bound may not fall
+/// below `truth`.
+fn assert_brackets(observation: &Value, truth: i64, elapsed: std::time::Duration) {
+    let elapsed = i64::try_from(elapsed.as_millis()).unwrap();
+    let (lower, upper) = (
+        observation["lower_unix_ms"].as_i64().unwrap(),
+        observation["upper_unix_ms"].as_i64().unwrap(),
+    );
+    assert!(lower <= truth + elapsed, "{lower} > {truth} + {elapsed}");
+    assert!(upper >= truth, "{upper} < {truth}");
 }
 
 /// Each line's `result`, in order.
@@ -178,7 +251,9 @@ fn clock_check_reports_each_source() {
         10_000,
         &[(&a.address, 7), (&liar.address, 8), (&b.address, 9)],
     ));
+    let started = std::time::Instant::now();
     let output = command(&root, &["approvals", "clock-check", "--adapter", "forge"]);
+    let elapsed = started.elapsed();
     let text = String::from_utf8_lossy(&output.stdout).into_owned();
     for leaked in ["ROUGHTIM", "midpoint", "nonce"] {
         assert!(!text.contains(leaked), "{leaked}: {text}");
@@ -186,8 +261,7 @@ fn clock_check_reports_each_source() {
     let view = success(&output);
     let observation = &view["observation"];
     let truth = i64::try_from(CLOCK_T * 1000).unwrap();
-    assert!(observation["lower_unix_ms"].as_i64().unwrap() <= truth);
-    assert!(observation["upper_unix_ms"].as_i64().unwrap() >= truth);
+    assert_brackets(observation, truth, elapsed);
     assert_eq!(
         observation["sources"],
         serde_json::json!([
@@ -196,6 +270,32 @@ fn clock_check_reports_each_source() {
             {"index": 2, "address": b.address, "result": "agreed", "radius_ms": 2000},
         ])
     );
+}
+
+/// A source that answers 1.2 s late holds the reading that long after the
+/// others replied, longer than the 1 s radius of the first: the reading's lower
+/// bound is then above the instant they signed, and still brackets the time.
+#[test]
+fn clock_check_brackets_the_time_when_a_source_answers_late() {
+    let late = std::time::Duration::from_millis(1200);
+    let (a, b) = (
+        clock_source(7, CLOCK_T, 1),
+        slow_first_clock_source(9, CLOCK_T, 2, late),
+    );
+    let root = clock_root(&clock_fixture::quorum_toml(
+        2,
+        10_000,
+        &[(&a.address, 7), (&b.address, 9)],
+    ));
+    let started = std::time::Instant::now();
+    let view = success(&command(
+        &root,
+        &["approvals", "clock-check", "--adapter", "forge"],
+    ));
+    let elapsed = started.elapsed();
+    assert!(elapsed >= late, "{elapsed:?}");
+    let truth = i64::try_from(CLOCK_T * 1000).unwrap();
+    assert_brackets(&view["observation"], truth, elapsed);
 }
 
 #[test]
@@ -223,7 +323,12 @@ fn clock_check_split_refusal() {
 
 #[test]
 fn clock_check_below_quorum_refusal() {
-    let good = clock_source(7, CLOCK_T, 1);
+    let good = answering(slow_first_clock_source(
+        7,
+        CLOCK_T,
+        1,
+        std::time::Duration::from_millis(2500),
+    ));
     let silent = clock_fixture::Server::silent();
     // Signed with seed 8, configured with seed 12's key.
     let wrong_key = clock_source(8, CLOCK_T, 1);
@@ -322,7 +427,7 @@ fn clock_check_legacy_format_refusal() {
 
 #[test]
 fn production_parser_initializes_and_inspects_across_processes() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     assert_eq!(
         success(&command(&root, &["setup", "init"]))["disposition"],
         "created"
@@ -363,7 +468,7 @@ fn setup_reports_the_build_platform_and_its_custody_backend() {
     } else {
         ("windows", "windows_credential_manager")
     };
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     assert_eq!(success(&command(&root, &["setup", "init"]))["os"], os);
     let check = success(&command(&root, &["setup", "check"]));
     assert_eq!(check["os"], os);
@@ -372,7 +477,7 @@ fn setup_reports_the_build_platform_and_its_custody_backend() {
 
 #[test]
 fn setup_init_admits_an_adapter_entry_that_selects_its_private_protocol() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
@@ -409,7 +514,7 @@ fn configured_entry(root: &tempfile::TempDir, format: &str, private_protocol: &s
 /// any owner starts, metadata opens or a credential is read.
 #[test]
 fn a_platform_binding_refuses_a_connect_with_no_protected_source() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     configured_entry(
         &root,
         "connectors-local/2",
@@ -448,7 +553,7 @@ fn a_private_protocol_that_contradicts_the_format_is_refused_naming_format_and_e
         ),
         ("connectors-local/2", ""),
     ] {
-        let root = tempfile::tempdir().unwrap();
+        let root = tempdir();
         configured_entry(&root, format, private_protocol);
         let output = command(&root, &["instances", "list"]);
         assert_eq!(output.status.code(), Some(2), "{format}");
@@ -465,7 +570,7 @@ fn a_private_protocol_that_contradicts_the_format_is_refused_naming_format_and_e
         );
     }
     // Any other invalid entry keeps the uncoordinated refusal.
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     configured_entry(
         &root,
         "connectors-local/2",
@@ -483,7 +588,7 @@ fn a_private_protocol_that_contradicts_the_format_is_refused_naming_format_and_e
 
 #[test]
 fn inventory_and_unavailable_status_never_launch_configured_executable() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
@@ -613,16 +718,32 @@ fn inventory_and_unavailable_status_never_launch_configured_executable() {
     }
 }
 
+/// story:tests-stop-the-owners-they-start: a test root stops the owners run
+/// under it when it drops, though the test let go of its handle on the owner.
+#[cfg(unix)]
+#[test]
+fn a_root_stops_the_owner_run_under_it() {
+    let root = tempdir();
+    success(&command(&root, &["setup", "init"]));
+    let path = root.path().to_owned();
+    let owner = owner_start::spawn(
+        std::path::Path::new(env!("CARGO_BIN_EXE_connectors")),
+        &path,
+    );
+    assert!(!owner_start::reap::owners_under(&path).is_empty());
+    // The test loses its handle on the owner, as a CLI-started owner has none.
+    std::mem::forget(owner);
+    drop(root);
+    assert_eq!(owner_start::reap::owners_under(&path), Vec::<i32>::new());
+}
+
 /// The test's own owner child; a failing assertion must not leave it serving.
 #[cfg(unix)]
 struct OwnerProcess(std::process::Child);
 #[cfg(unix)]
 impl Drop for OwnerProcess {
     fn drop(&mut self) {
-        if self.0.try_wait().ok().flatten().is_none() {
-            let _ = self.0.kill();
-            let _ = self.0.wait();
-        }
+        owner_start::reap::child(&mut self.0);
     }
 }
 
@@ -732,7 +853,7 @@ fn other_build(root: &tempfile::TempDir) -> std::path::PathBuf {
 #[cfg(unix)]
 #[test]
 fn a_cli_refuses_an_owner_running_a_different_build_and_leaves_it_running() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
@@ -870,7 +991,7 @@ fn setup_owner_stop_without_an_owner_answers_no_owner_and_starts_nothing() {
     assert_eq!(gone["disposition"], "no_owner", "{gone}");
     assert!(!state.join("owner.sock").exists(), "an owner was started");
 
-    let missing = tempfile::tempdir().unwrap();
+    let missing = tempdir();
     success(&command(&missing, &["setup", "init"]));
     fs::remove_dir_all(missing.path().join("state")).unwrap();
     let absent = stop(&missing);
@@ -950,8 +1071,8 @@ fn setup_owner_stop_refuses_an_owner_that_does_not_answer_and_never_signals_it()
 
 /// Config with one adapter whose executable is never launched by `instances status`.
 #[cfg(unix)]
-fn adversary_owner_root() -> tempfile::TempDir {
-    let root = tempfile::tempdir().unwrap();
+fn adversary_owner_root() -> TempRoot {
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
@@ -968,7 +1089,7 @@ fn adversary_owner_root() -> tempfile::TempDir {
 /// of `root` (same authority, same configuration path) while `root`'s socket
 /// path stays free for a relay.
 #[cfg(unix)]
-fn adversary2_owner_root(root: &tempfile::TempDir) -> tempfile::TempDir {
+fn adversary2_owner_root(root: &tempfile::TempDir) -> TempRoot {
     use std::os::unix::fs::DirBuilderExt;
     fn copy(from: &std::path::Path, to: &std::path::Path) {
         fs::DirBuilder::new().mode(0o700).create(to).unwrap();
@@ -982,7 +1103,7 @@ fn adversary2_owner_root(root: &tempfile::TempDir) -> tempfile::TempDir {
             }
         }
     }
-    let owner_root = tempfile::tempdir().unwrap();
+    let owner_root = tempdir();
     copy(&root.path().join("state"), &owner_root.path().join("state"));
     owner_root
 }
@@ -1247,7 +1368,7 @@ fn an_owner_answers_a_greeting_sent_after_the_connection_settled() {
 #[cfg(unix)]
 #[test]
 fn a_same_build_owner_at_its_client_limit_answers_capacity_not_another_build() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
@@ -1270,7 +1391,7 @@ fn a_same_build_owner_at_its_client_limit_answers_capacity_not_another_build() {
 
 #[test]
 fn protected_sources_are_not_consumed_before_configuration_admission() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     let output = command(
         &root,
         &[
@@ -1684,7 +1805,7 @@ fn a_connected_client_keeps_an_owner_past_its_idle_bound() {
 /// custody, which here names a Secret Service socket that does not exist.
 #[test]
 fn adversary_a_permitted_profile_with_no_protected_source_is_refused_before_the_owner() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     configured_entry(
         &root,
         "connectors-local/2",
@@ -1758,7 +1879,7 @@ fn start_failure_fixture() {
 #[cfg(unix)]
 #[test]
 fn instances_status_names_why_a_program_did_not_start() {
-    let root = tempfile::tempdir().unwrap();
+    let root = tempdir();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let program = std::env::current_exe().unwrap().canonicalize().unwrap();
@@ -1819,6 +1940,160 @@ fn instances_status_names_why_a_program_did_not_start() {
     let pinned = failed("pinned");
     assert_eq!(pinned["start_failure"], "digest", "{pinned}");
     assert!(pinned.get("start_exit_code").is_none(), "{pinned}");
+    let stopped = success(&command(&root, &["setup", "owner-stop"]));
+    assert_eq!(stopped["disposition"], "stopped", "{stopped}");
+}
+
+/// The program [`status_names_a_program_refusing_the_private_protocol`]
+/// configures: this test binary, re-entered through libtest's filter, serving
+/// descriptor three as an adapter that speaks only `connectors-private/1`.
+/// An ordinary run does nothing.
+#[cfg(unix)]
+#[test]
+fn private_protocol_one_only_fixture() {
+    use connectors_host::local::runtime::{Baseline, Bootstrap, Failure, Result};
+    struct One;
+    #[async_trait::async_trait]
+    impl connectors_host::local::runtime::Adapter for One {
+        fn bootstrap(&self) -> Bootstrap {
+            unreachable!("the host asks for another protocol")
+        }
+        async fn validate(&self, _: &str, _: connectors_sdk::Secret) -> Result<Baseline> {
+            Err(Failure::Unsupported)
+        }
+        async fn invoke(
+            &self,
+            _: &str,
+            _: &str,
+            _: connectors_sdk::Secret,
+            _: Value,
+        ) -> Result<Value> {
+            Err(Failure::Unsupported)
+        }
+    }
+    if !std::env::args().any(|argument| argument == "--connectors-private-fd") {
+        return;
+    }
+    let _ = connectors_host::local::runtime::serve(3, One);
+    std::process::exit(1);
+}
+
+/// story:adapter-private-protocol-refusal-named: `instances status` and the
+/// deprecated `adapters status` of an instance whose program refuses the
+/// private protocol its entry selects answer `unsupported_private_protocol`
+/// at `readiness`, naming the protocol asked for and those the program speaks,
+/// and exit 1, instead of a bare failed observation. Unix only: the owner is
+/// started the way the CLI starts it.
+#[cfg(unix)]
+#[test]
+fn status_names_a_program_refusing_the_private_protocol() {
+    let root = tempdir();
+    success(&command(&root, &["setup", "init"]));
+    let config_path = root.path().join("config/config.toml");
+    let program = std::env::current_exe().unwrap().canonicalize().unwrap();
+    let digest: String = ring::digest::digest(&ring::digest::SHA256, &fs::read(&program).unwrap())
+        .as_ref()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let path = serde_json::to_string(program.to_str().unwrap()).unwrap();
+    let config = fs::read_to_string(&config_path).unwrap()
+        + &format!(
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\nstartup='automatic'\nrestart='never'\n[adapters.forge.executable]\npath={path}\nsha256='{digest}'\nargs=['--exact','private_protocol_one_only_fixture','--']\n"
+        );
+    fs::write(&config_path, config).unwrap();
+    let _owner = start_owner(
+        std::path::Path::new(env!("CARGO_BIN_EXE_connectors")),
+        &root,
+    );
+    for group in ["instances", "adapters"] {
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        let error = loop {
+            let output = command(&root, &[group, "status", "--adapter", "forge"]);
+            if output.status.code() == Some(1) {
+                assert!(output.stdout.is_empty(), "{output:?}");
+                break serde_json::from_slice::<Value>(&output.stderr).unwrap();
+            }
+            assert!(
+                std::time::Instant::now() < until,
+                "{group} status never refused: {output:?}"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        };
+        let data = &error["error"]["data"];
+        assert_eq!(data["code"], "unsupported_private_protocol", "{error}");
+        assert_eq!(data["stage"], "readiness", "{error}");
+        assert_eq!(data["next_action"], "check_configuration", "{error}");
+        assert_eq!(data["private_protocol"], "connectors-private/2", "{error}");
+        assert_eq!(
+            data["supported_private_protocols"],
+            serde_json::json!(["connectors-private/1"]),
+            "{error}"
+        );
+    }
+    let stopped = success(&command(&root, &["setup", "owner-stop"]));
+    assert_eq!(stopped["disposition"], "stopped", "{stopped}");
+}
+
+/// Adversary, story:adapter-private-protocol-refusal-named. semantics.md: the refusal names
+/// "`private_protocol` the protocol asked for and `supported_private_protocols` the protocols the
+/// program answered that it speaks". The operator follows `next_action = check_configuration` and
+/// points the entry at `connectors-private/1`, which the program says it speaks, then asks
+/// `instances status` before anything starts the instance again. The status must not claim the
+/// program refused `connectors-private/1`: the protocol it was asked for, and refused, is
+/// `connectors-private/2`.
+#[cfg(unix)]
+#[test]
+fn adversary_status_after_reconfiguring_names_the_protocol_actually_refused() {
+    let root = tempdir();
+    success(&command(&root, &["setup", "init"]));
+    let config_path = root.path().join("config/config.toml");
+    let program = std::env::current_exe().unwrap().canonicalize().unwrap();
+    let digest: String = ring::digest::digest(&ring::digest::SHA256, &fs::read(&program).unwrap())
+        .as_ref()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let path = serde_json::to_string(program.to_str().unwrap()).unwrap();
+    let initial = fs::read_to_string(&config_path).unwrap();
+    let entry = |protocol: &str| {
+        format!(
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='{protocol}'\nstartup='automatic'\nrestart='never'\n[adapters.forge.executable]\npath={path}\nsha256='{digest}'\nargs=['--exact','private_protocol_one_only_fixture','--']\n"
+        )
+    };
+    fs::write(
+        &config_path,
+        initial.clone() + &entry("connectors-private/2"),
+    )
+    .unwrap();
+    let _owner = start_owner(
+        std::path::Path::new(env!("CARGO_BIN_EXE_connectors")),
+        &root,
+    );
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    loop {
+        let output = command(&root, &["instances", "status", "--adapter", "forge"]);
+        if output.status.code() == Some(1) {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < until,
+            "status never refused: {output:?}"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    fs::write(&config_path, initial + &entry("connectors-private/1")).unwrap();
+    let output = command(&root, &["instances", "status", "--adapter", "forge"]);
+    if output.status.code() == Some(1) {
+        let error = serde_json::from_slice::<Value>(&output.stderr).unwrap();
+        let data = &error["error"]["data"];
+        if data["code"] == "unsupported_private_protocol" {
+            assert_eq!(
+                data["private_protocol"], "connectors-private/2",
+                "the refusal names a protocol the program was never asked for: {error}"
+            );
+        }
+    }
     let stopped = success(&command(&root, &["setup", "owner-stop"]));
     assert_eq!(stopped["disposition"], "stopped", "{stopped}");
 }

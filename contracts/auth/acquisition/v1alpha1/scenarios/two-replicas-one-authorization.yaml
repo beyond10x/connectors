@@ -25,12 +25,12 @@ timeline:
   at: '2026-09-08T10:00:00Z'
 - command: connectors.refresh.ReserveRefresh
   input:
-    decision: source_unavailable
+    decision: source_reserved
     source_generation_id: 10000000-0000-4000-8000-000000000001
     owner: replica-b
     ownership_token: 20000000-0000-4000-8000-000000000002
     expected_binding_revision: binding-1
-  outcome: source-unavailable
+  outcome: source-reserved
   error:
     name: connectors.refresh.SourceUnavailable
     fields:
@@ -59,8 +59,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.refresh.RefreshStateConflict
-    fields:
-      state: Authorized
   no_events:
   - connectors.refresh.ExchangeAuthorized
   at: '2026-09-08T10:00:03Z'

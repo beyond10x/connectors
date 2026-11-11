@@ -80,8 +80,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.credential_evidence.AdmissionStateConflict
-    fields:
-      state: Refused
   no_events:
   - connectors.credential_evidence.GenerationDispatched
 - at: '2026-09-08T09:00:04Z'
@@ -92,8 +90,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.credential_evidence.AdmissionStateConflict
-    fields:
-      state: Refused
   no_events:
   - connectors.credential_evidence.GenerationAdmitted
 - at: '2026-09-08T09:00:05Z'
@@ -161,8 +157,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.credential_evidence.AdmissionStateConflict
-    fields:
-      state: Refused
   no_events:
   - connectors.credential_evidence.GenerationDispatched
 - at: '2026-09-08T09:00:09Z'
@@ -173,8 +167,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.credential_evidence.AdmissionStateConflict
-    fields:
-      state: Refused
   no_events:
   - connectors.credential_evidence.GenerationAdmitted
 - at: '2026-09-08T09:00:10Z'
@@ -244,8 +236,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.credential_evidence.AdmissionStateConflict
-    fields:
-      state: Refused
   no_events:
   - connectors.credential_evidence.GenerationDispatched
 - at: '2026-09-08T09:00:14Z'
@@ -256,8 +246,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.credential_evidence.AdmissionStateConflict
-    fields:
-      state: Refused
   no_events:
   - connectors.credential_evidence.GenerationAdmitted
 assert:

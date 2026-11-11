@@ -88,7 +88,44 @@ pub struct Authority {
     views: BTreeMap<String, View>,
     /// The IR's declared types, by name.
     types: Map<String, Value>,
+    /// The constant error payload each refusing outcome declares, by command and outcome.
+    refusal_payloads: BTreeMap<(String, String), BTreeMap<String, Node>>,
     identity: String,
+}
+
+/// The error payload a refusing outcome reports, where every field it fills is a literal
+/// (`payload:` on an error, ess/19). The Entity Runtime's refusal names its outcome and error and
+/// carries no payload, and the host never records a refused decision (`er.rs`
+/// `records_successful_owner_decision`). A literal payload is a function of the outcome alone, so
+/// the outcome the runtime chose determines it; an outcome filling a field from anything else is
+/// left out and its scenario fails rather than being answered from the specification.
+fn refusal_payloads(ir: &Value) -> BTreeMap<(String, String), BTreeMap<String, Node>> {
+    let mut payloads = BTreeMap::new();
+    for (command, declaration) in ir["commands"].as_object().into_iter().flatten() {
+        for outcome in declaration["outcomes"].as_array().into_iter().flatten() {
+            let (Some(name), Some(fields)) = (
+                outcome["name"].as_str(),
+                outcome["error_payload"].as_array(),
+            ) else {
+                continue;
+            };
+            let literal: Option<BTreeMap<String, Node>> = fields
+                .iter()
+                .map(|field| {
+                    let target = field["target"].as_str()?;
+                    if field["value"]["kind"] != "literal" {
+                        return None;
+                    }
+                    let value = field["value"]["value"].as_str()?;
+                    Some((target.to_owned(), Node::Text(value.to_owned())))
+                })
+                .collect();
+            if let Some(literal) = literal.filter(|literal| !literal.is_empty()) {
+                payloads.insert((command.clone(), name.to_owned()), literal);
+            }
+        }
+    }
+    payloads
 }
 
 /// The specification form of a stored value: a member whose declared type is a named optional
@@ -192,6 +229,7 @@ impl Authority {
             bindings,
             views,
             types,
+            refusal_payloads: refusal_payloads(&ir_json),
             identity: format!("sha256:{}", digest(DEFINITIONS)),
         })
     }
@@ -604,12 +642,17 @@ impl Target<'_> {
             }
         };
         match evaluation {
-            Evaluation::Refused(refusal) => Ok(SemanticCommandResult::took(took(
-                &refusal.outcome,
-            )?)
-            .with_error(DeclaredErrorValue::new(ErrorRef::new(name(
-                &refusal.error,
-            )?)))),
+            Evaluation::Refused(refusal) => {
+                let mut error = DeclaredErrorValue::new(ErrorRef::new(name(&refusal.error)?));
+                if let Some(fields) = self
+                    .authority
+                    .refusal_payloads
+                    .get(&(command.clone(), refusal.outcome.clone()))
+                {
+                    error.fields = fields.clone();
+                }
+                Ok(SemanticCommandResult::took(took(&refusal.outcome)?).with_error(error))
+            }
             Evaluation::Accepted(decision) => {
                 let outcome = decision
                     .record
@@ -1055,6 +1098,27 @@ mod tests {
                 );
             }
         }
+
+        // The pinned `ess` reads the emission itself. No report is written, so nothing is
+        // scored (exit 3 at the most); a refused manifest is exit 2 and names its file.
+        let ess = connectors_spec::toolchain::resolve(None).unwrap();
+        let collect = std::process::Command::new(ess)
+            .current_dir(&root)
+            .args(["verify", "conform", "mutate", "--collect"])
+            .arg(out.path())
+            .args(["--component", metadata_entities::COMPONENT])
+            .output()
+            .unwrap();
+        let text = format!(
+            "{}{}",
+            String::from_utf8_lossy(&collect.stdout),
+            String::from_utf8_lossy(&collect.stderr)
+        );
+        assert!(
+            !text.contains("manifest.json:") && collect.status.code() != Some(2),
+            "the pinned ess refuses the manifest ({:?}):\n{text}",
+            collect.status
+        );
     }
 
     /// `story:oauth2-refresh-metadata-authority`: the local metadata authority owns

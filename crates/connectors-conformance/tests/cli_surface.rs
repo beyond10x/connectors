@@ -102,6 +102,7 @@ fn the_selected_inventory_has_thirty_four_commands_and_explicit_runtime_obligati
         "setup init",
         "setup check",
         "setup checkpoints-enable",
+        "setup custody-orphans",
         "setup owner-stop",
         "setup migrate",
         "instances list",
@@ -1370,8 +1371,9 @@ fn no_alias_or_path_replaces_another_command() {
     }
     // story:connectors-do-short-invocation: `invoke` is one of the paths and
     // `operations invoke` is removed; `definitions install` (story:definitions-install)
-    // is the newest, 34 commands and 5 aliases.
-    assert_eq!(reached, 39);
+    // 34 commands and 5 aliases, and `setup custody-orphans`
+    // (story:custody-keeps-out-of-the-session-keyring) the newest.
+    assert_eq!(reached, 40);
     // What the check refuses, the generated tree would hide: an alias onto
     // `connections list` replaces that command without a word.
     let mut colliding = plan.clone();

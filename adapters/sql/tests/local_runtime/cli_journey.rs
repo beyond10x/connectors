@@ -739,7 +739,7 @@ fn postgres_cli_distinguishes_empty_truncated_capacity_and_timeout() {
         started.elapsed() < Duration::from_secs(30),
         "provider/CLI unchanged deadline exceeded"
     );
-    assert_eq!(pg.rows("SELECT current_setting('statement_timeout'), current_setting('lock_timeout'), current_setting('search_path'), current_setting('transaction_read_only')", json!([]), 1)["rows"], json!([["10s","2s","public, pg_catalog","on"]]));
+    assert_eq!(pg.rows("SELECT current_setting('statement_timeout'), current_setting('lock_timeout'), current_setting('search_path'), current_setting('transaction_read_only')", json!([]), 1)["rows"], json!([["10s","2s","pg_catalog, public","on"]]));
 }
 
 #[test]

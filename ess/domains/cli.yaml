@@ -707,7 +707,7 @@ types:
     variants: [usage, operational, interrupted]
   - name: connectors.cli.FailureCode
     kind: enum
-    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer, instance_ambiguous, connection_unresolved, digest_mismatch, unknown_format_version, unmet_feature, release_invalid]
+    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, unsupported_private_protocol, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer, instance_ambiguous, connection_unresolved, digest_mismatch, unknown_format_version, unmet_feature, release_invalid]
   - name: connectors.cli.FailureStage
     kind: enum
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop, installed_provider]
@@ -830,6 +830,14 @@ types:
       # enforced by the host and pinned by tests.
       - {name: configuration_bytes, type: "Optional<Integer>"}
       - {name: configuration_limit, type: "Optional<Integer>"}
+      # ESS-LIMIT: private_protocol and supported_private_protocols appear only on
+      # unsupported_private_protocol (story:adapter-private-protocol-refusal-named): the
+      # private protocol the instance's entry selects, which the program refused, and the
+      # protocols the program answered that it speaks (possibly none). As for instance_id
+      # above, ESS declares no invariant on a CLI type, so the presence rule is enforced by
+      # the host and pinned by tests.
+      - {name: private_protocol, type: "Optional<String>"}
+      - {name: supported_private_protocols, type: "Optional<List<String>>"}
       # ESS-LIMIT: store_version and binary_version appear together, only on
       # metadata_schema_newer (contracts/cli/v1alpha1/semantics.md). binary_version is
       # the refusing binary's release version; store_version is the release version the
@@ -882,6 +890,14 @@ types:
       # enforced by the host and pinned by tests.
       - {name: cause, type: "Optional<connectors.cli.FailureCause>"}
       - {name: attempts, type: "Optional<Integer>"}
+      # ESS-LIMIT: owner_log and owner_error appear only on `outcome_unknown` after an owner-side
+      # failure (contracts/cli/v1alpha1/owner.md, "Owner log"): owner_log is the path of the
+      # owner's bounded, owner-only log, owner_error the code of the newest line the owner logged for the
+      # command's own connection, a snake_case error code and absent when it logged none. As for
+      # instance_id above, ESS declares no invariant on a CLI type, so the presence rule is
+      # enforced by the host and pinned by tests.
+      - {name: owner_log, type: "Optional<String>"}
+      - {name: owner_error, type: "Optional<String>"}
       # ESS-LIMIT: feature appears only on `definitions install`'s unmet_feature: the first
       # feature, in the index's sorted order, that the release requires and this build does
       # not support. file appears only on its digest_mismatch: the path, relative to the
@@ -1279,6 +1295,54 @@ types:
       - {name: backup_path, type: "Optional<String>"}
       - {name: configuration, type: "String"}
       - {name: entries, type: "List<connectors.cli.MigrateEntry>"}
+  # `setup custody-orphans` (contracts/cli/v1alpha1/semantics.md §3, "Custody
+  # orphans") lists the Secret Service custody items the store of this state
+  # directory does not name, grouped by authority with each purpose and count;
+  # absent, the mode is list. `--mode remove --authority <id>` deletes the items
+  # of that one authority and refuses without --authority or for the store's own
+  # authority. Another store of this machine may hold a listed authority, which
+  # the command cannot see, so it never removes more than the one authority it is
+  # told. ess-cli/1 has no valueless switch source, so the mode is a value; the
+  # handler enforces that remove needs authority. Item attributes are read,
+  # never a secret value.
+  - name: connectors.cli.CustodyOrphansMode
+    kind: enum
+    variants: [list, remove]
+  - name: connectors.cli.SetupCustodyOrphansInput
+    kind: struct
+    fields:
+      - {name: mode, type: "Optional<connectors.cli.CustodyOrphansMode>"}
+      - {name: authority, type: "Optional<String>"}
+  - name: connectors.cli.CustodyOrphanGroup
+    kind: struct
+    fields:
+      - {name: authority, type: "String"}
+      - {name: purpose, type: "String"}
+      - {name: count, type: Integer}
+  - name: connectors.cli.CustodyOrphan
+    kind: struct
+    fields:
+      - {name: item, type: "String"}
+      - {name: purpose, type: "String"}
+      - {name: authority, type: "String"}
+      - {name: scope, type: "String"}
+      - {name: version, type: "String"}
+  - name: connectors.cli.CustodyOrphanFailure
+    kind: struct
+    fields:
+      - {name: item, type: "String"}
+      - {name: failure, type: "String"}
+  # groups is empty in remove mode; removed and failed are empty in list mode.
+  # removed names each item deleted and failed each item that could not be.
+  - name: connectors.cli.SetupCustodyOrphansResult
+    kind: struct
+    fields:
+      - {name: mode, type: "connectors.cli.CustodyOrphansMode"}
+      - {name: state_path, type: "String"}
+      - {name: groups, type: "List<connectors.cli.CustodyOrphanGroup>"}
+      - {name: notice, type: "String"}
+      - {name: removed, type: "List<connectors.cli.CustodyOrphan>"}
+      - {name: failed, type: "List<connectors.cli.CustodyOrphanFailure>"}
   # `connectors list` (story:cli-lists-available-connectors;
   # contracts/cli/v1alpha1/semantics.md §3, "Listing connectors"): one row per
   # connector this build ships a declaration for (connectors.declarations.Connector),
@@ -1856,7 +1920,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:1446, docs/local-connection-registry.md:222-223;
+    # contracts/cli/v1alpha1/semantics.md:1482, docs/local-connection-registry.md:222-223;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -2016,7 +2080,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1450) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:1486) and the host
     # removal path (er.rs:4747-4749) only expires Active cursors. The error name is
     # the decision; no source names one.
 

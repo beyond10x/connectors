@@ -1,6 +1,7 @@
 //! Owner-side composition for the production local CLI. Provider libraries never
 //! receive this authority, the metadata database, or a credential resolver.
 pub mod approval_issuance;
+pub mod diagnostics;
 mod governed;
 mod lifecycle;
 mod maintenance;
@@ -60,6 +61,7 @@ pub enum Code {
     Capacity,
     Unsupported,
     ReadinessMismatch,
+    UnsupportedPrivateProtocol,
     IncarnationMismatch,
     StaleDescription,
     StaleCursor,
@@ -197,6 +199,25 @@ pub struct Error {
     /// never the caller's value (contracts/cli/v1alpha1/semantics.md).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub field: Option<Argument>,
+    /// On `unsupported_private_protocol` only: the private protocol the
+    /// instance's entry selects and the program refused, and those it speaks
+    /// (`connectors.cli.Failure.private_protocol`). Boxed: it keeps this
+    /// error small.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol_refusal: Option<Box<ProtocolRefusal>>,
+}
+/// The owner's log and the last code it logged (`owner_log`, `owner_error` of the
+/// failure's data).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OwnerLog {
+    pub path: String,
+    pub code: Option<String>,
+}
+/// What an `unsupported_private_protocol` names.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProtocolRefusal {
+    pub private_protocol: String,
+    pub supported_private_protocols: Vec<String>,
 }
 impl From<Code> for Error {
     fn from(code: Code) -> Self {
@@ -217,6 +238,7 @@ impl From<Code> for Error {
             cause: None,
             attempts: None,
             field: None,
+            protocol_refusal: None,
         }
     }
 }
@@ -322,12 +344,13 @@ impl From<runtime::Failure> for Error {
             F::InvalidInput => Code::InvalidInput,
             F::Forbidden | F::ProviderForbidden => Code::Forbidden,
             F::NotFound => Code::NotFound,
-            F::Unavailable => Code::Unavailable,
+            F::Unavailable | F::PluginBusy => Code::Unavailable,
             F::Timeout | F::ProviderTimeout => Code::Timeout,
             F::Interrupted => Code::Interrupted,
             F::Capacity | F::ProviderCapacity => Code::Capacity,
             F::Unsupported => Code::Unsupported,
             F::ReadinessMismatch => Code::ReadinessMismatch,
+            F::UnsupportedPrivateProtocol => Code::UnsupportedPrivateProtocol,
             F::IncarnationMismatch => Code::IncarnationMismatch,
             F::StaleDescription => Code::StaleDescription,
             F::IdentityMismatch => Code::IdentityMismatch,
@@ -382,6 +405,7 @@ impl From<runtime::Failure> for Error {
             cause: None,
             attempts: None,
             field: None,
+            protocol_refusal: None,
         }
     }
 }

@@ -477,3 +477,10 @@ operation.
   time of its own before the invocation deadline, and otherwise returns it as a `rate_limited` refusal carrying that
   delay as `retry_after_seconds`
   ([Limits](local-catalog-provider.md#limits)).
+
+## Support-table summary
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> Jira Cloud platform REST v3 from the pinned OpenAPI document; profile `atlassian.basic` (account email and API token as HTTP basic), shared with Confluence; `issue.transition.run` guarded by the issue's current status and the open transition's target before the POST, and the target status after it; `issue.create`, `issue.comment.add` and `issue.link.add` read the project or issues first; `issue.edit` and `issue.delete` are refused as `conflict` unless the issue's `fields.updated` is the caller's stamp, and read again after; rich text is Atlassian Document Format sent as given; the writes are verified against fixtures only; live, only the API gateway form with a service-account token has run (`issues.search`, 2026-09-30); see [the Jira guide](docs/catalog-jira.md)

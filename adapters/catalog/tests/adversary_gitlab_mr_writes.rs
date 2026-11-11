@@ -312,3 +312,80 @@ async fn adversary_resolve_guard_holds_on_missing_values_empty_bodies_and_redire
         assert!(http.calls.lock().unwrap().is_empty(), "{operation} read");
     }
 }
+
+/// A guard compares by JSON type where it expects a boolean: a `/resolvable`
+/// that is the string `"true"` refuses before the write, and a `PUT` answer
+/// whose `/resolved` is the string `"true"` or `"false"`, a number or `null`
+/// for the requested boolean is reported as unknown, never applied.
+#[tokio::test]
+async fn a_resolve_guard_compares_booleans_by_json_type() {
+    let engine = engine();
+    for resolvable in [json!("true"), json!(1), json!(null), json!(false)] {
+        let mut answer = discussion(THREAD, json!(false));
+        answer["resolvable"] = resolvable.clone();
+        let http = reads(vec![json_answer(200, &answer)]);
+        let refused = engine
+            .prepare(
+                &http,
+                "fixture",
+                "merge_request.discussion.resolve",
+                resolve_input(json!(true)),
+            )
+            .await;
+        assert_eq!(
+            refused.err().map(|e| e.code),
+            Some(ErrorCode::Forbidden),
+            "/resolvable {resolvable}"
+        );
+    }
+    for (requested, answered) in [
+        (true, json!("true")),
+        (true, json!(1)),
+        (true, json!(null)),
+        (false, json!("false")),
+        (false, json!(0)),
+    ] {
+        let http = reads(vec![json_answer(200, &discussion(THREAD, json!(false)))]);
+        let prepared = engine
+            .prepare(
+                &http,
+                "fixture",
+                "merge_request.discussion.resolve",
+                resolve_input(json!(requested)),
+            )
+            .await
+            .unwrap();
+        let outcome = prepared
+            .execute(Box::new(Write {
+                sent: Arc::default(),
+                answer: json_answer(200, &discussion(THREAD, answered.clone())),
+            }))
+            .await;
+        assert!(
+            matches!(outcome, WriteOutcome::Unknown(_)),
+            "requested {requested}, answered {answered}"
+        );
+    }
+    for requested in [true, false] {
+        let http = reads(vec![json_answer(200, &discussion(THREAD, json!(false)))]);
+        let prepared = engine
+            .prepare(
+                &http,
+                "fixture",
+                "merge_request.discussion.resolve",
+                resolve_input(json!(requested)),
+            )
+            .await
+            .unwrap();
+        let outcome = prepared
+            .execute(Box::new(Write {
+                sent: Arc::default(),
+                answer: json_answer(200, &discussion(THREAD, json!(requested))),
+            }))
+            .await;
+        assert!(
+            matches!(outcome, WriteOutcome::Applied(_)),
+            "requested {requested}"
+        );
+    }
+}

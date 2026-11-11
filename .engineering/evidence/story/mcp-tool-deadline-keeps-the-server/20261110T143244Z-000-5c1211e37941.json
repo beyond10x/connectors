@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T14:32:44Z",
+  "actor": "human:operator",
+  "artifact": "story:mcp-tool-deadline-keeps-the-server",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-mcp-deadline-security-1",
+    "reference": "late success replaced by timeout is reachable for reads only; tools/call admits no write (local_mcp_server_write_refusal 8 passed)",
+    "review": "review-result:wave-b-mcp-deadline-security-1",
+    "outcome": "no-op"
+  }
+}

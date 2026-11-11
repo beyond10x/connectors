@@ -122,7 +122,9 @@ impl KeysetExpression {
     pub(crate) fn over(self, operand: &str) -> String {
         match self {
             KeysetExpression::Native => operand.to_owned(),
-            KeysetExpression::CCollatedText => format!("{operand}::text COLLATE \"C\""),
+            KeysetExpression::CCollatedText => {
+                format!("{operand}::pg_catalog.text COLLATE pg_catalog.\"C\"")
+            }
             KeysetExpression::ExactDecimal => format!("CAST({operand} AS DECIMAL(65,0))"),
             KeysetExpression::Datetime6 => format!("CAST({operand} AS DATETIME(6))"),
             KeysetExpression::Utf8mb4Bytes => {

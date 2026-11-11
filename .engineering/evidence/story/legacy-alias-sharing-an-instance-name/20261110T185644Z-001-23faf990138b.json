@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T18:56:44Z",
+  "actor": "human:operator",
+  "artifact": "story:legacy-alias-sharing-an-instance-name",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-alias-contract-adversary-1",
+    "reference": "5b9131c73: the (no entry) form is gone; an instance with no entry is listed as <connector>/<instance>, as the contract names",
+    "review": "review-result:wave-b-alias-contract-adversary-1",
+    "outcome": "fixed"
+  }
+}

@@ -15,8 +15,7 @@ connector, instance, connection and operation are those of the
 [full Prometheus guide](https://github.com/beyond10x/connectors/blob/main/adapters/prometheus/README.md)
 has the bounds and refusals.
 
-No declaration ships for it, so the instance is pinned: it names its executable, that
-executable's SHA-256 and the configuration revision the executable prints. Commands that need a
+It is a [pinned instance](../guides/pinned-instances.md). Commands that need a
 Prometheus are shown without output.
 
 ## What it reads and writes
@@ -104,14 +103,7 @@ The connector has no write, so nothing here needs an approval.
 ## Reconnect when the connection is Stale
 
 A token Prometheus refuses is reported as `unauthorized` when next used, and the connection turns
-`stale`. Publish a new token:
-
-```sh
-connectors --output json connections list --connector prometheus --instance metrics \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector prometheus --instance metrics \
-  --expected-revision "<revision from the list>" --credential-prompt
-```
+`stale`. Publish a new token. [Reconnect](../guides/reconnect-a-connection.md) `prometheus/metrics` with `--credential-prompt`.
 
 ## Limits
 

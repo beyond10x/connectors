@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T20:18:50Z",
+  "actor": "human:operator",
+  "artifact": "story:catalog-validates-enum-and-date-time",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-enum-date-adversary-1",
+    "reference": "F3 declared input schema lacks enum/format: draft story:catalog-declared-schema-publishes-enum-and-date-time; adversary case ignored naming it (43a027263c)",
+    "review": "review-result:wave-b-enum-date-adversary-1",
+    "outcome": "escalated"
+  }
+}

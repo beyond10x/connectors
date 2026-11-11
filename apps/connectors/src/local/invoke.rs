@@ -109,8 +109,9 @@ pub(super) fn unmigrated(config: &Config) -> Vec<String> {
 
 /// Every configured instance by the names `invoke` knows it by
 /// ([`entry_name`]). A catalog entry no connector is derived for has no name
-/// here. A `[connectors]` instance wins over a legacy entry that derives its
-/// names, as `Config::select` selects it, so each name is listed once.
+/// here. A legacy entry that derives the names of a `[connectors]` instance is
+/// listed beside it: the name is then held by two entries and [`select`]
+/// refuses it (story:legacy-alias-sharing-an-instance-name).
 fn named(config: &Config) -> Vec<Named> {
     let legacy = config.legacy_aliases();
     let mut named: Vec<Named> = config
@@ -144,25 +145,32 @@ fn named(config: &Config) -> Vec<Named> {
         let Some((connector, instance)) = entry_name(config, alias, &config.adapters[alias]) else {
             continue;
         };
-        if !named
-            .iter()
-            .any(|n| n.connector == connector && n.instance == instance)
-        {
-            named.push(Named {
-                connector,
-                instance,
-                alias: Some(alias.to_owned()),
-            });
-        }
+        named.push(Named {
+            connector,
+            instance,
+            alias: Some(alias.to_owned()),
+        });
     }
     named
 }
 
+/// Whether a legacy `[adapters.<alias>]` entry is known by `connector` and
+/// `instance` (story:legacy-alias-sharing-an-instance-name): an instance table
+/// written under that name would be a second entry of it.
+pub(super) fn held_by_legacy(config: &Config, connector: &str, instance: &str) -> bool {
+    config.legacy_aliases().into_iter().any(|alias| {
+        entry_name(config, alias, &config.adapters[alias])
+            .is_some_and(|(c, i)| c == connector && i == instance)
+    })
+}
+
 /// The connector and instance of every entry [`named`] lists, by alias: the
 /// instances `instances list` lists and `--connector`/`--instance` select,
-/// each name once. A legacy entry whose names a `[connectors]` instance holds
-/// is not among them, nor is a legacy catalog entry no connector is derived
-/// for (story:connectors-do-short-invocation).
+/// each entry once. A name a legacy entry and a `[connectors]` instance both
+/// derive is listed for both entries
+/// (story:legacy-alias-sharing-an-instance-name); a legacy catalog entry no
+/// connector is derived for is not among them
+/// (story:connectors-do-short-invocation).
 pub(super) fn instances(config: &Config) -> std::collections::BTreeMap<String, (String, String)> {
     named(config)
         .into_iter()
@@ -208,9 +216,25 @@ pub(super) fn select(
             None => Err(Unselected::NotFound),
         },
         several => {
+            // A name two entries hold (story:legacy-alias-sharing-an-instance-name)
+            // is listed once per entry, by alias; an instance that has no entry
+            // yet (it awaits a profile) has no alias and is listed by its name.
+            let shared = |n: &Named| {
+                several
+                    .iter()
+                    .filter(|m| m.connector == n.connector && m.instance == n.instance)
+                    .count()
+                    > 1
+            };
             let mut listed: Vec<String> = several
                 .iter()
-                .map(|n| format!("{}/{}", n.connector, n.instance))
+                .map(|n| {
+                    let name = format!("{}/{}", n.connector, n.instance);
+                    match (&n.alias, shared(n)) {
+                        (Some(alias), true) => format!("{name} (alias {alias})"),
+                        _ => name,
+                    }
+                })
                 .collect();
             listed.sort();
             Err(Unselected::Ambiguous(listed))
@@ -229,7 +253,7 @@ pub(super) fn names_unmigrated(config: &Config, connector: &str, instance: Optio
         })
 }
 
-fn unselected(refused: Unselected) -> HandlerReply {
+pub(super) fn unselected(refused: Unselected) -> HandlerReply {
     match refused {
         Unselected::Unmigrated => configuration_refusal(Refusal::Rule(Rule::LegacyEntryUnmigrated)),
         Unselected::Ambiguous(instances) => {
@@ -1489,5 +1513,75 @@ mod tests {
             "revision"
         );
         assert_eq!(unnamed(&json!({"operation":"op","input":"{}"})), "input");
+    }
+
+    /// A legacy catalog entry under `[adapters.private]` that derives the
+    /// connector `gmail`, beside the pinned instance `gmail/private`: both are
+    /// known by the names `gmail/private`.
+    #[cfg(unix)]
+    fn legacy_and_instance_sharing_names() -> Config {
+        use std::os::unix::fs::MetadataExt;
+        let uid = std::fs::metadata(".").unwrap().uid();
+        let entry = |table: &str, id: &str, args: &str| {
+            format!(
+                "[{table}]\ninstance_id='{id}'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[{table}.executable]\npath='/opt/connectors/bin/connectors-catalog'\nsha256='1111111111111111111111111111111111111111111111111111111111111111'\nargs={args}\n[{table}.permissions]\nprofiles=['google.oauth']\noperations=['users.messages.list']\n"
+            )
+        };
+        let instance = entry(
+            "connectors.gmail.instances.private",
+            "gmail-pinned",
+            "['--local-config','/etc/connectors/gmail.json']",
+        )
+        .replace(
+            "[connectors.gmail.instances.private]\n",
+            "[connectors.gmail.instances.private]\nalias='pinned'\n",
+        );
+        let text = format!(
+            "format='connectors-local/5'\nowner_uid={uid}\n{}[connectors.gmail]\nenabled=true\n{instance}",
+            entry(
+                "adapters.private",
+                "gmail-legacy",
+                "['--connector','gmail']"
+            )
+        );
+        Config::parse(&text).unwrap()
+    }
+
+    /// story:legacy-alias-sharing-an-instance-name: a target both a legacy
+    /// entry (by the connector `setup migrate` derives for it) and a
+    /// `[connectors]` instance are known by selects neither silently: it is
+    /// refused as ambiguous, naming both entries.
+    #[cfg(unix)]
+    #[test]
+    fn a_read_through_a_name_that_is_both_alias_and_instance_is_refused_as_ambiguous() {
+        let config = legacy_and_instance_sharing_names();
+        for instance in [Some("private"), None] {
+            let refused = select(&config, "gmail", instance).unwrap_err();
+            assert!(
+                matches!(&refused, Unselected::Ambiguous(names) if names.len() == 2),
+                "{instance:?}: {refused:?}"
+            );
+        }
+    }
+
+    /// The target is selected (`prepare_with`) before the operation's effect
+    /// is known and before an approval file is required or any provider is
+    /// called, so a write through the shared name is refused exactly as a read
+    /// is: `instance_ambiguous`, a usage error, nothing approved or sent.
+    #[cfg(unix)]
+    #[test]
+    fn a_write_through_such_a_name_stays_refused() {
+        let config = legacy_and_instance_sharing_names();
+        let refused = select(&config, "gmail", Some("private")).unwrap_err();
+        let Unselected::Ambiguous(names) = &refused else {
+            panic!("{refused:?}");
+        };
+        assert_eq!(names.len(), 2, "{names:?}");
+        let HandlerReply::UsageError { data, .. } = unselected(refused) else {
+            panic!("a usage error");
+        };
+        assert_eq!(data["code"], "instance_ambiguous");
+        assert_eq!(data["stage"], "arguments");
+        assert_eq!(data["next_action"], "none");
     }
 }

@@ -27,6 +27,11 @@ pub(super) struct Session {
     captured: Option<(owner::Capture, Secret)>,
     signals: Option<protected::Signals>,
     early: Option<(String, Context, owner::Error)>,
+    /// The entries of a shared name the selection refused before a protected
+    /// source was read (story:legacy-alias-sharing-an-instance-name): the
+    /// refusal is `instance_ambiguous` naming them, not the owner error that
+    /// stopped the acquisition.
+    ambiguous: Option<Vec<String>>,
     pub deadline: u64,
     pub approval_deadline: Instant,
     pub mutation_deadline: Option<owner::mutation::Deadline>,
@@ -107,6 +112,7 @@ impl Session {
             captured: None,
             signals: None,
             early: None,
+            ambiguous: None,
             deadline: 0,
             approval_deadline,
             mutation_deadline,
@@ -176,6 +182,27 @@ impl Session {
             }
             error
         };
+        // A name two entries hold is refused before the approval document is
+        // read (story:legacy-alias-sharing-an-instance-name): nothing beyond
+        // the configuration is read. Any other refusal is the command's own.
+        if approval && let Some(selection) = self.selection.as_ref() {
+            let shared = Paths::resolve(
+                selection.context.config.as_deref(),
+                selection.context.state_dir.as_deref(),
+            )
+            .ok()
+            .and_then(|paths| Config::load_at(&paths).ok())
+            .and_then(|config| {
+                match super::select::alias(&selection.selectors, &config) {
+                    Err(super::select::Refused::Ambiguous(instances)) => Some(instances),
+                    _ => None,
+                }
+            });
+            if let Some(instances) = shared {
+                self.ambiguous = Some(instances);
+                return Err(Code::InvalidInput.into());
+            }
+        }
         if approval || is_write {
             return match source {
                 ProtectedSource::DocumentFile(path) => protected::document_until(
@@ -217,7 +244,14 @@ impl Session {
         }
         let device = selection.selectors.get("device").and_then(Value::as_str) == Some("true");
         let text = |key| selection.selectors.get(key).and_then(Value::as_str);
-        let alias = super::select::alias_at(&selection.selectors, &paths)?;
+        let alias = match super::select::alias(&selection.selectors, &Config::load_at(&paths)?) {
+            Ok(alias) => alias,
+            Err(super::select::Refused::Ambiguous(instances)) => {
+                self.ambiguous = Some(instances);
+                return Err(Code::InvalidInput.into());
+            }
+            Err(refused) => return Err(refused.into()),
+        };
         let alias = alias.as_str();
         let connection = reconnected(&selection.callable, &paths, alias, text("connection"))?;
         owner::admit_capture(
@@ -377,7 +411,9 @@ impl Session {
             // Sources and DynamicValidator expose only generic errors. Render
             // the owner's closed failure through the same generated error shape
             // so admission refusals retain their actionable CLI semantics.
-            let reply = if matches!(callable.as_str(), "approval-prepare" | "approval-issue") {
+            let reply = if let Some(instances) = self.ambiguous.take() {
+                super::invoke::unselected(super::invoke::Unselected::Ambiguous(instances))
+            } else if matches!(callable.as_str(), "approval-prepare" | "approval-issue") {
                 super::approval_failure(error)
             } else if callable == "invoke" {
                 // Every `invalid_input` of `invoke` names its argument.

@@ -41,10 +41,16 @@ that owner's PID, verifies the executable digest, and requires the same mount an
 user namespaces and filesystem root. A dead owner cannot be replaced underneath
 an existing capability. There is no service activation, unlock, or prompt.
 
-Only the persistent `login` collection, addressed by its object path
-`/org/freedesktop/secrets/collection/login` and already unlocked, is selected. The
-desktop's `default` alias belongs to every other application on the machine:
-Connectors never reads, requires or changes it, and never suggests changing it. The binding derives its storage directory from the
+Only the collection behind the Secret Service `default` alias (`ReadAlias("default")`;
+`login` on a stock GNOME Keyring), already unlocked, receives writes. The alias is read, never
+set. Items already stored under `/org/freedesktop/secrets/collection/login` stay readable and
+deletable when the alias resolves elsewhere; nothing is moved. The collection name must be
+alphanumeric or `_`, and its file is `<name>.keyring`. `items_at`, `remove_authority_at` and
+`orphans_at` list and delete custody items by authority, reading attributes only. Test builds
+refuse to open the session bus's Secret Service: they panic naming
+`DBUS_SESSION_BUS_ADDRESS` (or the missing `secret_service_socket`) before any write. That guard covers
+the writers and the inventory; `inspect_at` and `available_at`, which `setup check` reaches, still open the
+session bus read-only in a test build and write nothing. The binding derives its storage directory from the
 verified daemon's bounded environment, using the audited HOME/XDG and legacy
 directory rules. It does not assume the client's environment matches the daemon's.
 The temporary environment buffer is zeroized without diagnostics. Duplicate or
@@ -128,10 +134,13 @@ private bus, encrypted keyring, fictional password and daemon processes beneath
 the task's `TMPDIR`. It never connects to the desktop keyring. Every owned child
 is killed and reaped on success or failure; temporary fixture files are removed
 after the children exit. The test is opt-in because it needs the exact qualified
-OS binary. Run it explicitly in addition to the repository gate:
+OS binary. Run it explicitly in addition to the repository gate. The journey binary is
+built with `--features connectors-host/test-support`: that build panics, naming
+`DBUS_SESSION_BUS_ADDRESS` or the missing `secret_service_socket`, before it writes the
+session bus's Secret Service. A release build has no such guard and never refuses a user:
 
 ```sh
-CARGO_BUILD_JOBS=2 cargo build --locked --offline -p connectors
+CARGO_BUILD_JOBS=2 cargo build --locked --offline -p connectors --features connectors-host/test-support
 export CONNECTORS_TEST_CLI="$CARGO_TARGET_DIR/debug/connectors"
 CARGO_BUILD_JOBS=2 cargo test --locked --offline -p connectors-host --lib \
   local::keyring -- --include-ignored --nocapture
@@ -153,8 +162,8 @@ in dated evidence receipts; an ignored test is not a passing runtime check.
 ## Threat model
 
 The adversary is anyone other than the configured owner user, plus a careless operator.
-Connectors writes the bytes, from a protected entry source, into the encrypted `login`
-collection; the textual empty-password form is refused. Any process of the same user that
+Connectors writes the bytes, from a protected entry source, into the encrypted collection behind the `default` alias (`login` on a stock GNOME Keyring); the textual empty-password form is refused. Items older versions wrote to `login` stay readable and deletable there.
+Any process of the same user that
 can reach the unlocked collection over the session bus, and root, can read the items:
 same-user compromise is outside the promise. Item attributes are scoped and verified, the
 writer refuses an existing version, and every storage component is admitted without

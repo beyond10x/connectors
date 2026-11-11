@@ -694,3 +694,10 @@ Select each of these exact names separately, using `--exact --ignored --nocaptur
 
 Retain each runner result and fixture cleanup outcome. A successful deterministic
 fixture run or a missing sandbox does not count as these real-provider cases.
+
+## Support-table summary
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> Kubernetes API, with namespace and resource-kind restrictions (`pods`, `services`, `deployments`, `endpointslices`, `replicasets`, `statefulsets`, `events`); namespaces are the configured ones, never the cluster list; saved bearer token through the local CLI. Helm release values and manifests are disclosed only as redacted projections. `pods.logs` (flag `pod_logs`) reads a bounded tail of one container's log; `contexts.list` lists the contexts of the one kubeconfig the local configuration names (`kubeconfig`), never credentials; `nodes.list` (flag `node_reads`) and `custom_resources.list` (the configured `custom_resources` collections) read one bounded page at a time; `pods.exec` (flag `pod_exec`) runs an argument vector in a named container, local CLI only, on private protocol two under approval, bounded in time and output, an unknown outcome never resent; verified against recorded answers and streams, see [the Kubernetes guide](docs/local-kubernetes-cli.md)

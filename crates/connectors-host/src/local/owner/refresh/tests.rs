@@ -526,12 +526,18 @@ fn concurrent_callers_share_one_exchange() {
     let before = connected.active();
     let refresher = connected.refresher("owner-one", &server);
     let start = Barrier::new(8);
+    // Every caller decided on `before`. The server holds the exchange for two
+    // seconds; a caller scheduled later than that on a loaded host would find
+    // the successor published and, refreshing the connection unconditionally,
+    // send an exchange of its own. That two-second window is the bound this
+    // test must not depend on, so each caller names the generation it decided
+    // on and is answered `Refreshed` once another is published.
     let outcomes = std::thread::scope(|scope| {
         let callers = (0..8)
             .map(|_| {
                 scope.spawn(|| {
                     start.wait();
-                    refresher.refresh_connection(&connected.connection)
+                    refresher.refresh_generation(&connected.connection, Some(&before.generation))
                 })
             })
             .collect::<Vec<_>>();
@@ -540,7 +546,11 @@ fn concurrent_callers_share_one_exchange() {
             .map(|caller| caller.join().unwrap().unwrap())
             .collect::<Vec<_>>()
     });
-    assert_eq!(outcomes, [Outcome::Refreshed; 8]);
+    assert_eq!(
+        outcomes,
+        [Outcome::Refreshed; 8],
+        "eight callers on one generation, the server holding the exchange 2 s"
+    );
     refreshed_request(&server);
     assert_eq!(connected.generations(), 2, "one published generation");
     let after = connected.active();

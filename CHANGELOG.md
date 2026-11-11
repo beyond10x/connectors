@@ -1,5 +1,82 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `connectors setup custody-orphans` lists the Secret Service items no store names.
+  `--mode remove --authority <id>` removes only that authority's items
+  (story:custody-keeps-out-of-the-session-keyring).
+- An owner writes its failures to `<state>/owner.log`: owner-only, bounded at 256 KiB, holding fixed
+  event names and error codes only. An `outcome_unknown` caused by an owner-side failure carries
+  `owner_log` and this connection's `owner_error` in its error data (story:owner-errors-are-readable).
+
+### Changed
+
+- A name that both a legacy `[connectors]` entry and an `[instances]` entry derive is refused as
+  `instance_ambiguous` at every selection (invoke, connect, approvals prepare and issue), naming both
+  entries. Before, it reached the instance silently. A name that only a legacy entry holds still
+  connects through its own pinned endpoint (story:legacy-alias-sharing-an-instance-name).
+- The catalog engine refuses some values as `invalid_input` before any request, for reads and
+  writes:
+  - a value outside a parameter's pinned `enum`, including one reached through a local schema
+    `$ref` and each element of a comma-joined repeated value
+    (story:catalog-validates-enum-and-date-time);
+  - a `format: date-time` value that is not RFC 3339 (story:catalog-validates-enum-and-date-time);
+  - a required path or query parameter given as an empty string
+    (story:required-parameter-refuses-empty).
+- An adapter program that refuses the private protocol it is asked for is reported as
+  `unsupported_private_protocol`, with the protocol asked and the ones it supports, instead of
+  `unavailable` (story:adapter-private-protocol-refusal-named).
+- A Kubernetes exec credential plugin that is busy now answers `unavailable` with `retry_status`.
+  A missing plugin still answers `invalid_configuration` (story:exec-plugin-busy-reaches-the-operator).
+- Custody writes behind the Secret Service default alias. A test build refuses the session bus
+  before any write (story:custody-keeps-out-of-the-session-keyring).
+- A command without a deadline of its own counts the 60 s owner startup bound from the launch
+  (story:cli-connect-admission-timeout-under-load).
+- Documentation:
+  - provider pages share five guides under `website/docs/guides/`
+    (story:docs-provider-pages-shared-guides);
+  - contract and model pages sit in one Specification category, with no URL moved
+    (story:docs-specification-sidebar);
+  - the README is back under its size limit (story:readme-back-under-its-size-limit).
+
+### Fixed
+
+- The PostgreSQL read session resolves `pg_catalog` first and the wrapper names `pg_catalog`
+  objects, so no object another principal creates in `public` runs as the reader or defeats the
+  size guard (story:sql-wrapper-resolves-pg-catalog-first).
+- A reconnect checks retained material versions against the refresh bound of 64, not 8
+  (story:reconnect-retained-bound-matches-refresh).
+- Only unreleased read uses count against the 1,000-use bound (story:read-use-bound-counts-live-reads).
+- An MCP tool list or call past its deadline answers `timeout`, and the session continues
+  (story:mcp-tool-deadline-keeps-the-server).
+- One busy instance no longer stalls the pool's idle checks of every other instance
+  (story:pool-idle-checks-wait-outside-the-pool-lock).
+- A guard input that resolves to a JSON boolean compares by JSON type
+  (story:catalog-guard-typed-comparison).
+- A closed body with an all-digit pointer segment, or with a key in both `body_enums` and
+  `body_prefixes`, is refused when its selection loads (story:closed-body-load-refuses-ambiguous-pointers).
+- A definition import keeps hand-written profiles in the shared auth library file
+  (story:definition-import-merges-shared-auth).
+- The catalog contract classifies an over-bound response body as `capacity`
+  (story:catalog-oversized-body-one-classification).
+- The owner's bounded read refuses a generic realization whose schemas are not inline
+  (story:owner-bounded-generic-read-inline-schemas).
+- The Slack file-read checks compare the request path exactly (story:slack-file-read-checks-exact-path).
+- The SQL query text and parameters are bounded in characters, as the descriptor states
+  (story:sql-length-units).
+- A Tavily crawl whose `response_time` reaches the timeout sent is reported `complete: false` with
+  `provider_partial` (story:tavily-crawl-cut-short-is-not-complete).
+- Generated outputs (service metadata, CLI binding, MCP bindings) regenerate in a fresh checkout
+  (story:generated-output-regenerates-in-a-fresh-checkout).
+- The live acceptance runner no longer needs the removed `serve` command
+  (story:live-acceptance-without-serve).
+- The release image job's platform check tolerates the registry's inspect padding
+  (story:release-image-platform-check-tolerates-padding).
+- The Slack move guide enables the five writes the shipped selection carries
+  (story:slack-move-names-four-writes).
+
 ## 0.70.0 — 2026-11-10
 
 ### Added

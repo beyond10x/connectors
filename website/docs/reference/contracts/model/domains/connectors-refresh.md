@@ -23,7 +23,7 @@ Proposed host-owned durable authorization of one rotating refresh per credential
 
 ### `AuthorizationDecision`
 
-`connectors.refresh.AuthorizationDecision` is one of `allow`, `ownership_conflict` and `source_unavailable`.
+`connectors.refresh.AuthorizationDecision` is one of `allow`, `ownership_conflict`, `source_binding_changed` and `source_revoked`.
 
 ### `OwnershipRefusalReason`
 
@@ -35,7 +35,7 @@ Proposed host-owned durable authorization of one rotating refresh per credential
 
 ### `PublicationDecision`
 
-`connectors.refresh.PublicationDecision` is one of `allow`, `ownership_conflict` and `publication_refused`.
+`connectors.refresh.PublicationDecision` is one of `allow`, `ownership_conflict`, `publication_binding_changed`, `publication_revoked`, `publication_evidence_invalid` and `publication_candidate_unavailable`.
 
 ### `PublicationRefusalReason`
 
@@ -47,7 +47,7 @@ Proposed host-owned durable authorization of one rotating refresh per credential
 
 ### `ReservationDecision`
 
-`connectors.refresh.ReservationDecision` is one of `allow` and `source_unavailable`.
+`connectors.refresh.ReservationDecision` is one of `allow`, `source_reserved`, `source_exchange_authorized`, `source_binding_changed` and `source_revoked`.
 
 ### `ResponseDecision`
 
@@ -220,13 +220,15 @@ It takes:
 - `owner` — `String`
 - `ownership_token` — `connectors.refresh.OwnershipToken`
 
-It has four outcomes.
+It has five outcomes.
 
 **`authorized`** — Taken when `decision == allow` holds of the input. It moves a `connectors.refresh.RefreshAttempt` from `Reserved` to `Authorized`, along the declared move `authorize`. The instance is the one named by the input field `attempt_id`. It emits `connectors.refresh.ExchangeAuthorized`. A test reaches it by constructing an input that satisfies that condition.
 
 **`ownership-conflict`** — Taken when `decision == ownership_conflict` holds of the input. No entity in this specification changes. It reports `connectors.refresh.OwnershipConflict`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
 
-**`source-unavailable`** — The default branch, taken when no other outcome's condition matched. No entity in this specification changes. It reports `connectors.refresh.SourceUnavailable`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies no other outcome's condition.
+**`source-binding-changed`** — Taken when `decision == source_binding_changed` holds of the input. No entity in this specification changes. It reports `connectors.refresh.SourceUnavailable`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
+
+**`source-revoked`** — Taken when `decision == source_revoked` holds of the input. No entity in this specification changes. It reports `connectors.refresh.SourceUnavailable`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
 
 **`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Authorized`, `Discarded`, `Fenced`, `Published`, `Recovering`, `Released`, `ResponseStored` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
 
@@ -270,13 +272,19 @@ It takes:
 - `ownership_token` — `connectors.refresh.OwnershipToken`
 - `candidate_generation_id` — `connectors.credentials.CredentialGenerationId`
 
-It has four outcomes.
+It has seven outcomes.
 
 **`published`** — Taken when `decision == allow` holds of the input. It moves a `connectors.refresh.RefreshAttempt` from `Recovering` and `ResponseStored` to `Published`, along the declared move `publish`. The instance is the one named by the input field `attempt_id`. It emits `connectors.refresh.RefreshPublished`. A test reaches it by constructing an input that satisfies that condition.
 
 **`ownership-conflict`** — Taken when `decision == ownership_conflict` holds of the input. No entity in this specification changes. It reports `connectors.refresh.OwnershipConflict`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
 
-**`publication-refused`** — The default branch, taken when no other outcome's condition matched. No entity in this specification changes. It reports `connectors.refresh.PublicationRefused`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies no other outcome's condition.
+**`publication-binding-changed`** — Taken when `decision == publication_binding_changed` holds of the input. No entity in this specification changes. It reports `connectors.refresh.PublicationRefused`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
+
+**`publication-revoked`** — Taken when `decision == publication_revoked` holds of the input. No entity in this specification changes. It reports `connectors.refresh.PublicationRefused`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
+
+**`publication-evidence-invalid`** — Taken when `decision == publication_evidence_invalid` holds of the input. No entity in this specification changes. It reports `connectors.refresh.PublicationRefused`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
+
+**`publication-candidate-unavailable`** — Taken when `decision == publication_candidate_unavailable` holds of the input. No entity in this specification changes. It reports `connectors.refresh.PublicationRefused`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
 
 **`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.refresh.RefreshAttempt` in `Authorized`, `Discarded`, `Fenced`, `Published`, `Released`, `Reserved` and `Uncertain`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.refresh.RefreshStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
 
@@ -338,11 +346,17 @@ It takes:
 - `ownership_token` — `connectors.refresh.OwnershipToken`
 - `expected_binding_revision` — `String`
 
-It has two outcomes.
+It has five outcomes.
 
 **`reserved`** — Taken when `decision == allow` holds of the input. It creates a `connectors.refresh.RefreshAttempt`, which starts in `Reserved`. The new instance's identity is published as `attempt_id` on `connectors.refresh.RefreshReserved`. It emits `connectors.refresh.RefreshReserved`. It sets `source_generation_id` from `input.source_generation_id`, `initial_owner` from `input.owner`, `initial_ownership_token` from `input.ownership_token`, `expected_binding_revision` from `input.expected_binding_revision` and `candidate_generation_id` cleared. A test reaches it by constructing an input that satisfies that condition.
 
-**`source-unavailable`** — The default branch, taken when no other outcome's condition matched. No entity in this specification changes. It reports `connectors.refresh.SourceUnavailable`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies no other outcome's condition.
+**`source-reserved`** — Taken when `decision == source_reserved` holds of the input. No entity in this specification changes. It reports `connectors.refresh.SourceUnavailable`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
+
+**`source-exchange-authorized`** — Taken when `decision == source_exchange_authorized` holds of the input. No entity in this specification changes. It reports `connectors.refresh.SourceUnavailable`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
+
+**`source-binding-changed`** — Taken when `decision == source_binding_changed` holds of the input. No entity in this specification changes. It reports `connectors.refresh.SourceUnavailable`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
+
+**`source-revoked`** — Taken when `decision == source_revoked` holds of the input. No entity in this specification changes. It reports `connectors.refresh.SourceUnavailable`, carrying `reason`. It emits nothing. A test reaches it by constructing an input that satisfies that condition.
 
 ### `StoreResponse`
 
@@ -496,7 +510,7 @@ It carries:
 
 - `reason` — `connectors.refresh.PublicationRefusalReason`
 
-Reported by `connectors.refresh.PublishRefresh` on its `publication-refused` outcome.
+Reported by `connectors.refresh.PublishRefresh` on its `publication-binding-changed`, `publication-revoked`, `publication-evidence-invalid` and `publication-candidate-unavailable` outcomes.
 
 ### `RefreshStateConflict`
 
@@ -526,11 +540,11 @@ It carries:
 
 - `reason` — `connectors.refresh.SourceRefusalReason`
 
-Reported by `connectors.refresh.AuthorizeExchange` on its `source-unavailable` outcome.
+Reported by `connectors.refresh.AuthorizeExchange` on its `source-binding-changed` and `source-revoked` outcomes.
 
-Reported by `connectors.refresh.ReserveRefresh` on its `source-unavailable` outcome.
+Reported by `connectors.refresh.ReserveRefresh` on its `source-reserved`, `source-exchange-authorized`, `source-binding-changed` and `source-revoked` outcomes.
 
 
 ---
 
-Generated from connectors v1 · model digest `0de4870a1cb489f044ae4068af326e278c2b0fa5ce96d73520387fd7184f4f7c` · contract digest `slice-sha256/2:8d243c54697d170c86b2f5656bff74644855718a4cb6ebcb66dc0b3705744115`. Do not edit this file; change the specification and regenerate it with `ess generate`.
+Generated from connectors v1 · model digest `a7d02eef33c05448ed14200ecbf6b892d645c09f17b07469a09b4e073f95ed8b` · contract digest `slice-sha256/2:deeca6e40aedf32eb98d6b42cd01de55a16a4e99ebd399e5b82e5b35422f9c44`. Do not edit this file; change the specification and regenerate it with `ess generate`.

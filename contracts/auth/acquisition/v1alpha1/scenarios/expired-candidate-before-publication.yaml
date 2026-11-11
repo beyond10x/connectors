@@ -48,13 +48,13 @@ timeline:
   at: '2026-09-08T10:00:02Z'
 - command: connectors.refresh.PublishRefresh
   input:
-    decision: publication_refused
+    decision: publication_evidence_invalid
     attempt_id:
       $instance: refresh
     owner: replica-a
     ownership_token: 20000000-0000-4000-8000-000000000001
     candidate_generation_id: 10000000-0000-4000-8000-000000000002
-  outcome: publication-refused
+  outcome: publication-evidence-invalid
   error:
     name: connectors.refresh.PublicationRefused
     fields:

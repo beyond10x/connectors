@@ -10,14 +10,11 @@ connectors: "hubspot"
 # HubSpot
 
 The `hubspot` connector of the provider HubSpot is served by the catalog provider from the pinned
-HubSpot CRM Objects `2026-09` document. The words connector, instance, connection and operation
-are those of the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+HubSpot CRM Objects `2026-09` document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full HubSpot guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-hubspot.md)
 has every parameter and refusal.
 
-Commands use `connectors` on your `PATH` with your own configuration. Outputs were produced in
-the repository's tree against a scratch configuration, whose `--config` and `--state-dir` are left
-out here. A command that needs a HubSpot account is shown without output.
+[How these commands were run](../guides/first-read.md#examples).
 
 ## What it reads and writes
 
@@ -46,14 +43,6 @@ enabled = true
 [connectors.hubspot.instances.work]
 ```
 
-```sh
-connectors instances list | jq -c '.[] | arrays | .[]'
-```
-
-```json
-{"connector":"hubspot","instance":"work","instance_id":"hubspot.work","restart":"never","startup":"on-demand"}
-```
-
 ## Connect
 
 Put `{"token": "<private app access token>"}` in an owner-only file, then:
@@ -79,15 +68,8 @@ The connector has no write, so nothing here needs an approval.
 ## Reconnect when the connection is Stale
 
 A token HubSpot refuses (the private app's token was rotated or deleted) makes the connection
-`stale`, and an invoke answers `next_action: repair_connection`. Publish the new token on the
-same connection:
-
-```sh
-connectors --output json connections list --connector hubspot --instance work \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector hubspot --instance work \
-  --expected-revision "<revision from the list>" --credential-file ~/private/hubspot.json
-```
+`stale`. Publish the new token on the
+same connection. [Reconnect](../guides/reconnect-a-connection.md) `hubspot/work` with `--credential-file ~/private/hubspot.json`.
 
 ## Limits
 

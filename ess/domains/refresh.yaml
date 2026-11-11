@@ -25,18 +25,19 @@ types:
   # tickets or caller assertions. The coordinator derives them while holding the
   # same atomic metadata operation that applies the selected outcome. ESS does
   # not derive them from another entity, a clock or the network.
+  # A refusing decision names its reason: the error an outcome reports carries it.
   - name: connectors.refresh.ReservationDecision
     kind: enum
-    variants: [allow, source_unavailable]
+    variants: [allow, source_reserved, source_exchange_authorized, source_binding_changed, source_revoked]
   - name: connectors.refresh.AuthorizationDecision
     kind: enum
-    variants: [allow, ownership_conflict, source_unavailable]
+    variants: [allow, ownership_conflict, source_binding_changed, source_revoked]
   - name: connectors.refresh.ResponseDecision
     kind: enum
     variants: [allow, ownership_conflict]
   - name: connectors.refresh.PublicationDecision
     kind: enum
-    variants: [allow, ownership_conflict, publication_refused]
+    variants: [allow, ownership_conflict, publication_binding_changed, publication_revoked, publication_evidence_invalid, publication_candidate_unavailable]
 
 entities:
   - name: connectors.refresh.RefreshAttempt
@@ -128,8 +129,30 @@ commands:
         payload:
           connectors.refresh.RefreshReserved:
             attempt_id: {generated: true}
-      - name: source-unavailable
+      - name: source-reserved
+        when: decision == source_reserved
         error: connectors.refresh.SourceUnavailable
+        payload:
+          connectors.refresh.SourceUnavailable:
+            reason: reserved
+      - name: source-exchange-authorized
+        when: decision == source_exchange_authorized
+        error: connectors.refresh.SourceUnavailable
+        payload:
+          connectors.refresh.SourceUnavailable:
+            reason: exchange_already_authorized
+      - name: source-binding-changed
+        when: decision == source_binding_changed
+        error: connectors.refresh.SourceUnavailable
+        payload:
+          connectors.refresh.SourceUnavailable:
+            reason: binding_changed
+      - name: source-revoked
+        when: decision == source_revoked
+        error: connectors.refresh.SourceUnavailable
+        payload:
+          connectors.refresh.SourceUnavailable:
+            reason: revoked
   - name: connectors.refresh.AuthorizeExchange
     # Persist authorization and consume the source's one-send authority BEFORE
     # any possible provider call, invalidating source-generation admissions in
@@ -152,8 +175,21 @@ commands:
       - name: ownership-conflict
         when: decision == ownership_conflict
         error: connectors.refresh.OwnershipConflict
-      - name: source-unavailable
+        payload:
+          connectors.refresh.OwnershipConflict:
+            reason: stale_owner
+      - name: source-binding-changed
+        when: decision == source_binding_changed
         error: connectors.refresh.SourceUnavailable
+        payload:
+          connectors.refresh.SourceUnavailable:
+            reason: binding_changed
+      - name: source-revoked
+        when: decision == source_revoked
+        error: connectors.refresh.SourceUnavailable
+        payload:
+          connectors.refresh.SourceUnavailable:
+            reason: revoked
       - name: wrong-state
         wrong_state: true
         error: connectors.refresh.RefreshStateConflict
@@ -196,6 +232,9 @@ commands:
             candidate_generation_id: input.candidate_generation_id
       - name: ownership-conflict
         error: connectors.refresh.OwnershipConflict
+        payload:
+          connectors.refresh.OwnershipConflict:
+            reason: stale_owner
       - name: wrong-state
         wrong_state: true
         error: connectors.refresh.RefreshStateConflict
@@ -280,8 +319,33 @@ commands:
       - name: ownership-conflict
         when: decision == ownership_conflict
         error: connectors.refresh.OwnershipConflict
-      - name: publication-refused
+        payload:
+          connectors.refresh.OwnershipConflict:
+            reason: stale_owner
+      - name: publication-binding-changed
+        when: decision == publication_binding_changed
         error: connectors.refresh.PublicationRefused
+        payload:
+          connectors.refresh.PublicationRefused:
+            reason: binding_changed
+      - name: publication-revoked
+        when: decision == publication_revoked
+        error: connectors.refresh.PublicationRefused
+        payload:
+          connectors.refresh.PublicationRefused:
+            reason: revoked
+      - name: publication-evidence-invalid
+        when: decision == publication_evidence_invalid
+        error: connectors.refresh.PublicationRefused
+        payload:
+          connectors.refresh.PublicationRefused:
+            reason: evidence_invalid
+      - name: publication-candidate-unavailable
+        when: decision == publication_candidate_unavailable
+        error: connectors.refresh.PublicationRefused
+        payload:
+          connectors.refresh.PublicationRefused:
+            reason: candidate_unavailable
       - name: wrong-state
         wrong_state: true
         error: connectors.refresh.RefreshStateConflict

@@ -15,7 +15,7 @@ scope:
   path: apps/connectors/tests/connection_lease_adversary.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/owner/supervisor.rs
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:59:39Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:59:40Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
@@ -49,3 +49,11 @@ two is a decision for the story's owner; the test's assertion is not weakened.
 Pre-existing, filed as a draft by the 2026-11-06 wave (approval-record:connectors-wave-2026-11-06-lease-test-route,
 approval-record:connectors-wave-2026-11-06-lease-test-measure). No wave takes it before every planned wave is
 delivered.
+
+## Wave status
+
+Merged 8caba7717f (commit 07d2443042), 2026-11-10. Decision (wave coordinator): the fixture route, not an owner launch margin.
+
+- Change: `LIFETIME_MS` 20 000 → 60 000 in `apps/connectors/tests/connection_lease_adversary.rs`, same proportions, assertion unchanged; the doc comment states the margin it depends on. `supervisor.rs` untouched.
+- Measured on the shared host, unpinned, normal nice, test binary run directly, base and change interleaved, load average 37.7 to 96.2: base 16 of 20 (one `timeout` at `admission` after 30.55 s, three `not_granted` at `admission` after 8.0 to 9.3 s, all with 0 dispatched reads); change 20 of 20. `connection_lease_adversary` 7 passed.
+- Not held: pinned to one CPU with four busy workers at nice 19, the change passed 10 of 20 (20 000: 2 of 3 failed; 40 000: 3 of 6 passed), failing at admission after about 18 to 20 s, before the evidence ran out; that cause was not confirmed. A likely factor is the 10 s cap on the launch's executable capture (`crates/connectors-host/src/local/runtime/process.rs`), which a longer lifetime does not move.

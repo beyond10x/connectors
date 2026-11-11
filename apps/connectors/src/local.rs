@@ -15,6 +15,7 @@ mod approvals;
 mod checkpoints;
 mod connections;
 mod cursor;
+mod custody_orphans;
 mod declarations;
 mod definition;
 mod dialects;
@@ -382,7 +383,9 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         StaleCursor => ("observation", "retry_explicitly", false),
         Interrupted => ("protected_entry", "retry_status", false),
         Unsupported => ("admission", "none", false),
-        ReadinessMismatch => ("readiness", "check_configuration", false),
+        ReadinessMismatch | UnsupportedPrivateProtocol => {
+            ("readiness", "check_configuration", false)
+        }
         IncarnationMismatch => ("stop", "retry_status", false),
         StaleDescription | DescriptionUnavailable => ("observation", "refresh_description", false),
         ServiceFailure => ("dispatch", "retry_explicitly", false),
@@ -415,11 +418,23 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
     if let Some(service_code) = error.service_code {
         data["service_code"] = json!(service_code);
     }
+    if let Some(log) = owner::diagnostics::observed(error.code) {
+        data["owner_log"] = json!(log.path);
+        if let Some(code) = log.code {
+            data["owner_error"] = json!(code);
+        }
+    }
     if let Some(service_reason) = error.service_reason {
         data["service_reason"] = json!(service_reason);
     }
     if let Some(retry_after_seconds) = error.retry_after_seconds {
         data["retry_after_seconds"] = json!(retry_after_seconds);
+    }
+    if error.code == UnsupportedPrivateProtocol
+        && let Some(refusal) = error.protocol_refusal
+    {
+        data["private_protocol"] = json!(refusal.private_protocol);
+        data["supported_private_protocols"] = json!(refusal.supported_private_protocols);
     }
     if error.clock_format_retired && error.code == InvalidConfiguration {
         data["configuration_rule"] = json!(Rule::ApprovalClockFormatRetired.as_str());
@@ -658,6 +673,9 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
     if call.callable == "setup-checkpoints-enable" {
         return checkpoints::execute(call, &paths);
     }
+    if call.callable == "setup-custody-orphans" {
+        return custody_orphans::execute(call, &paths);
+    }
     if call.callable == "setup-owner-stop" {
         return owner_stop::execute(&paths);
     }
@@ -741,10 +759,10 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
         let request = cursor::Request::parse(&call.input).map_err(refused)?;
         // Each instance by its connector and instance only; a legacy catalog
         // entry no connector is derived for is no instance and is named in
-        // `unmigrated` (story:connectors-do-short-invocation). Each name is
-        // listed once, for the entry `invoke` and `--connector`/`--instance`
-        // select by it: a `[connectors]` instance over a legacy entry that
-        // derives the same names (`invoke::instances`).
+        // `unmigrated` (story:connectors-do-short-invocation). Each entry is
+        // listed once; a name a `[connectors]` instance and a legacy entry both
+        // derive is listed for both, and selecting it is refused
+        // (story:legacy-alias-sharing-an-instance-name, `invoke::instances`).
         let instances = invoke::instances(&config);
         let listed = config
             .adapters

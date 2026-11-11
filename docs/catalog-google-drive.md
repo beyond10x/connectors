@@ -301,3 +301,10 @@ connections of the old pair with `connections revoke` and remove their entries.
   the earlier revision must be issued again. Adding `rate_limit_reasons`
   changed the selection set, and so the configuration revision of a Drive
   instance.
+
+## Support-table summary
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> Drive API v3 from the pinned Discovery document projected to OpenAPI; profile `google.oauth`, one instance per Google account consenting to `drive.readonly` and `drive.file`; metadata writes only, no upload: `files.update` guarded by a preflight `files.get` whose `version` must equal the input's, `files.create` and `files.copy` unguarded; verified against a local fixture only, see [the Drive guide](docs/catalog-google-drive.md)

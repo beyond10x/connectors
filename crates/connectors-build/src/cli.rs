@@ -8,6 +8,33 @@ use super::Result;
 
 pub fn run(root: &Path, ess: &Path, check: bool) -> Result<()> {
     connectors_spec::toolchain::check(ess)?;
+    if !check {
+        super::ownership::adopt_existing(
+            root,
+            ess,
+            &super::ownership::Family {
+                destination: OUTPUT,
+                owner: "cli-binding",
+                sources: &["ess", "apps/connectors/spec"],
+            },
+            &|source, out| generate(source, ess, out.as_os_str(), false),
+        )?;
+    }
+    generate(root, ess, OUTPUT.as_ref(), check)?;
+    let schemas = generate_schemas(root, ess)?;
+    let types = schemas.path().join("schemas/schema/types");
+    validate_values(root, &types)?;
+    validate_wire_vectors(root, &types)?;
+    println!(
+        "CLI contract fixture {}; custody and lifecycle runtime conformance remain obligations",
+        if check { "matches" } else { "generated" }
+    );
+    Ok(())
+}
+
+const OUTPUT: &str = "apps/connectors-cli-contract";
+
+fn generate(root: &Path, ess: &Path, out: &std::ffi::OsStr, check: bool) -> Result<()> {
     let mut command = Command::new(ess);
     command.current_dir(root).args([
         "generate",
@@ -17,8 +44,8 @@ pub fn run(root: &Path, ess: &Path, check: bool) -> Result<()> {
         "--binding",
         "apps/connectors/spec/cli.yaml",
         "--out",
-        "apps/connectors-cli-contract",
     ]);
+    command.arg(out);
     if check {
         command.arg("--check");
     }
@@ -26,14 +53,6 @@ pub fn run(root: &Path, ess: &Path, check: bool) -> Result<()> {
     if !status.success() {
         return Err(format!("ESS CLI generation failed: {status}").into());
     }
-    let schemas = generate_schemas(root, ess)?;
-    let types = schemas.path().join("schemas/schema/types");
-    validate_values(root, &types)?;
-    validate_wire_vectors(root, &types)?;
-    println!(
-        "CLI contract fixture {}; custody and lifecycle runtime conformance remain obligations",
-        if check { "matches" } else { "generated" }
-    );
     Ok(())
 }
 

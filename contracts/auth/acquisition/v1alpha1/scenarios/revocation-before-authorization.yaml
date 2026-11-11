@@ -22,11 +22,11 @@ timeline:
   - at: 2026-09-08T10:00:01Z
     command: connectors.refresh.AuthorizeExchange
     input:
-      decision: source_unavailable
+      decision: source_revoked
       attempt_id: {$instance: refresh}
       owner: replica-a
       ownership_token: 20000000-0000-4000-8000-000000000001
-    outcome: source-unavailable
+    outcome: source-revoked
     error:
       name: connectors.refresh.SourceUnavailable
       fields: {reason: revoked}
@@ -47,17 +47,16 @@ timeline:
     outcome: wrong-state
     error:
       name: connectors.refresh.RefreshStateConflict
-      fields: {state: Fenced}
     no_events: [connectors.refresh.ExchangeAuthorized]
   - at: 2026-09-08T10:00:04Z
     command: connectors.refresh.ReserveRefresh
     input:
-      decision: source_unavailable
+      decision: source_revoked
       source_generation_id: 10000000-0000-4000-8000-000000000001
       owner: replica-b
       ownership_token: 20000000-0000-4000-8000-000000000002
       expected_binding_revision: binding-1
-    outcome: source-unavailable
+    outcome: source-revoked
     error:
       name: connectors.refresh.SourceUnavailable
       fields: {reason: revoked}

@@ -3,6 +3,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 import path from 'node:path';
 import type {LoadContext, Plugin, PluginConfig, RouteConfig} from '@docusaurus/types';
 import {withProductSite} from '@beyond10x/docs-system/product-site';
+import {sidebarItemsGenerator} from './sidebar-items';
 
 // Pages under docs/reference/contracts/, docs/reference/adapters/*/contracts/ and
 // docs/reference/adapters/*/model/, docs/reference/cli.md, docs/reference/crates.md,
@@ -48,6 +49,7 @@ const config: Config = {
           path: 'docs',
           routeBasePath: 'docs',
           sidebarPath: './sidebars.ts',
+          sidebarItemsGenerator,
           editUrl: 'https://github.com/beyond10x/connectors/tree/main/website/',
         },
         blog: false,

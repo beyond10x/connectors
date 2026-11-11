@@ -191,6 +191,7 @@ pub fn check(root: &Path, files: &[PathBuf], options: Options) -> Result<Vec<Str
         );
         if role == Role::Readme {
             found.extend(crate::onboarding::problems(&root, &text)?);
+            found.extend(crate::onboarding::private_protocol_problems(&root, &text)?);
         }
     }
     Ok(found)

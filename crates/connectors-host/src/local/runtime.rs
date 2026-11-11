@@ -11,7 +11,7 @@ mod writes;
 pub use bounded::ReadBudget;
 pub use process::{
     Child, PreparedInvocation, START_LOG_LIMIT, START_LOGS, StartError, StartFailure,
-    start_log_name,
+    SupportedProtocols, start_log_name,
 };
 pub use server::{Adapter, serve};
 pub use writes::{Created, PreparedWrite, WriteEffect, WriteResult};
@@ -41,6 +41,12 @@ impl PrivateProtocol {
             Self::V3 => BOUNDED_READ_VERSION,
         }
     }
+    /// The protocol a version string names, if this host knows it.
+    pub fn parse(version: &str) -> Option<Self> {
+        [Self::V1, Self::V2, Self::V3]
+            .into_iter()
+            .find(|protocol| protocol.as_str() == version)
+    }
 }
 pub const SECRET_LIMIT: usize = 65536;
 pub const INPUT_LIMIT: usize = 1024 * 1024;
@@ -65,8 +71,17 @@ pub enum Failure {
     Interrupted,
     Protocol,
     ReadinessMismatch,
+    /// The program refused the private protocol its entry selects, by its own
+    /// `refused` reply; additive, so a host that predates it reads the reply as
+    /// unreadable (story:adapter-private-protocol-refusal-named).
+    UnsupportedPrivateProtocol,
     IncarnationMismatch,
     InvalidConfiguration,
+    /// A pinned exec plugin that exists could not be run because the system
+    /// holds it busy (`ExecutableFileBusy`): transient, unlike a missing one,
+    /// which stays `invalid_configuration`. Additive: a host that predates it
+    /// reads the reply as unreadable.
+    PluginBusy,
     Capacity,
     Unsupported,
     NotFound,
@@ -982,6 +997,14 @@ enum Reply {
     },
     Stopped {
         request_id: String,
+    },
+    /// The answer to a `hello` asking for a private protocol the program does
+    /// not speak: the version asked for and those it speaks. Additive; sent
+    /// instead of `ready`, so no bootstrap or credential follows
+    /// (story:adapter-private-protocol-refusal-named).
+    Refused {
+        version: String,
+        supported: Vec<String>,
     },
     Failed {
         request_id: String,

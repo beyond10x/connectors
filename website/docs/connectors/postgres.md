@@ -11,15 +11,11 @@ readme_row: "SQL"
 # PostgreSQL
 
 The `postgres` connector is served by its own executable, `connectors-sql`, which also serves
-[MySQL](./mysql.md); the README's support table lists both as SQL. The words connector,
-instance, connection and operation are those of the
-[README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+[MySQL](./mysql.md); the README's support table lists both as SQL. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full PostgreSQL guide](https://github.com/beyond10x/connectors/blob/main/docs/local-postgres-cli.md)
 has every bound and refusal.
 
-No declaration ships for it, so the instance is pinned: it names its executable, that
-executable's SHA-256 and the configuration revision the executable prints for your native file.
-Commands that need a database are shown without output.
+It is a [pinned instance](../guides/pinned-instances.md). Commands that need a database are shown without output.
 
 ## What it reads and writes
 
@@ -116,15 +112,7 @@ an approval.
 
 ## Reconnect when the connection is Stale
 
-A rotated or expired password makes the connection `stale` when it is next used, and an invoke
-answers `next_action: repair_connection`. Publish the new password for the same role:
-
-```sh
-connectors --output json connections list --connector postgres --instance warehouse \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector postgres --instance warehouse \
-  --expected-revision "<revision from the list>" --credential-prompt
-```
+A rotated or expired password makes the connection `stale` when it is next used. Publish the new password for the same role. [Reconnect](../guides/reconnect-a-connection.md) `postgres/warehouse` with `--credential-prompt`.
 
 A failed reconnect keeps the still-valid saved password.
 
