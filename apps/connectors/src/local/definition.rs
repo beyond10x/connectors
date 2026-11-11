@@ -986,6 +986,22 @@ fn reuse(
         .ok_or_else(|| owner::Code::OutcomeUnknown.into())
 }
 
+/// A test build's hook for the window between [`connect`]'s last check of the
+/// entry and its `Begin`: the bytes of the file the environment names replace
+/// the instances file, as another run recording over the entry would. A release
+/// build compiles no hook.
+#[cfg(debug_assertions)]
+fn replace_entry_before_begin(paths: &Paths) {
+    if let Some(source) = std::env::var_os("CONNECTORS_TEST_REPLACE_ENTRY_BEFORE_BEGIN") {
+        let target = paths
+            .state
+            .join(connectors_host::local::definitions::DIRECTORY)
+            .join(connectors_host::local::definitions::ENTRIES);
+        std::fs::write(target, std::fs::read(source).expect("replacement entries"))
+            .expect("replaced entries");
+    }
+}
+
 /// `connections connect` of the instance under `profile`, with its protected
 /// entry from the terminal, or from `file` (an OAuth client file becomes the
 /// entry by consent, as for `connections connect --credential-file`; an
@@ -1012,8 +1028,10 @@ fn connect(
     if read_only && file.is_some() {
         return Err(usage());
     }
+    #[cfg(debug_assertions)]
+    replace_entry_before_begin(paths);
     let capture = owner::Client::connect(paths, true)
-        .and_then(|client| client.begin(alias, Some(profile.to_owned()), None, None))
+        .and_then(|client| client.begin_selected(alias, profile.to_owned(), adapter.selection()))
         .map_err(refused)?;
     let connected = if read_only {
         capture.complete_mounted()
@@ -1057,7 +1075,7 @@ fn connect(
 /// A description that cannot be launched for because the connection is not
 /// current under the recorded entry answers what a read on that connection
 /// answers ([`Registry::admit_read`] against the binding the provider
-/// reported): an authority or profile change is today's `lifecycle_conflict`,
+/// reported): an authority or profile change is `authentication_changed`,
 /// and nothing is asked.
 fn described(
     paths: &Paths,

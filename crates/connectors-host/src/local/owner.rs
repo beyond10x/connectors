@@ -26,8 +26,8 @@ use std::{
 #[cfg(test)]
 pub(crate) use transport::bound_allocator;
 pub use transport::{
-    Capture, Client, OwnerStop, WriteClient, enable_checkpoints, serve, serve_with_read_policy,
-    stop_owner,
+    Capture, Client, OwnerStop, ReadClient, WriteClient, enable_checkpoints, serve,
+    serve_with_read_policy, stop_owner,
 };
 
 const VERSION: &str = "connectors-owner/1";
@@ -50,6 +50,11 @@ pub enum Code {
     Forbidden,
     NotFound,
     LifecycleConflict,
+    /// The provider authority or the profile's authentication changed under
+    /// the configuration: connect, repair and revalidate under this instance id
+    /// are refused, and only a new instance id admits a connection
+    /// (`registry::Failure::AuthenticationChanged`).
+    AuthenticationChanged,
     Revoked,
     NotGranted,
     ConnectionNotReady,
@@ -299,6 +304,7 @@ impl From<registry::Failure> for Error {
         let reconnect = matches!(e, F::BindingChanged | F::UpgradeIdentityMismatch);
         let mut error = Error::from(match e {
             F::BindingChanged => Code::LifecycleConflict,
+            F::AuthenticationChanged => Code::AuthenticationChanged,
             F::MetadataUnavailable => Code::MetadataUnavailable,
             F::MetadataSchemaNewer(_) => Code::MetadataSchemaNewer,
             F::ConcurrentRevision => Code::RevisionConflict,
@@ -307,7 +313,6 @@ impl From<registry::Failure> for Error {
             F::Conflict
             | F::UpgradeRequired
             | F::ExecutableChanged
-            | F::AuthenticationChanged
             | F::InstanceConnected
             | F::InstanceConnectionChanged => Code::LifecycleConflict,
             F::Revoked => Code::Revoked,
@@ -1283,6 +1288,12 @@ enum Request {
         /// Omitted when false, so every other request keeps its bytes.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         grant: bool,
+        /// The executable selection digest of the entry the caller checked
+        /// (`Adapter::selection`); the owner refuses `revision_conflict` when the
+        /// entry it loads selects otherwise. Omitted when the caller asked no
+        /// question of an entry, so every other request keeps its bytes.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        expected_selection: Option<String>,
     },
     Complete,
     /// story:invoke-definition-reuse-credential: a new connection of `adapter`

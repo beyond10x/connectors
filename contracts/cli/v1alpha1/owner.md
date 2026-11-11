@@ -104,6 +104,51 @@ without a reply. No command replaces that owner by itself: the user runs
 the next admitted command starts one from the current build. The private
 shutdown request stays accepted across builds so that command, and a lifecycle
 harness, can stop it.
+
+A bounded read of the local MCP server (story:owner-cancels-a-bounded-read) is
+cancellable under its own greeting, `connectors-owner/3`; `connectors-owner/1`
+and `/2` keep their requests, replies and timing. A `/3` stream carries one
+`read` frame (the bounded read's request with a `request_id`, a valid
+identifier the caller chose) and then, if the caller gives the read up, one
+`cancel` frame naming that `request_id`; both are served to a caller of the
+owner's own build only. The owner ends the read's job when it reads a `cancel`
+naming the stream's own `request_id`, or when the stream closes, as it does when
+the caller's process exits. A `cancel` naming another `request_id` cancels
+nothing, and no frame on one stream reaches another stream's request. A job
+still queued is dropped unrun when the instance's worker reaches it, and holds
+its queue slot until then; one running ends its adapter process, so its
+provider call and credential read end with it, and the next job of the instance
+starts at once rather than at the read's budget. A job cancelled while its
+adapter launches, or before it reads the credential, reads no credential. An
+adapter process a cancel ended leaves its instance `not_running`, not `failed`. The cancelled read's answer, written to its own stream which the
+caller no longer reads, carries `interrupted`, and its audit records the failed read. A cancel
+ends no other request, no write and no configuration.
+
+The owner's effects rule binds only the bounded read and the projected governed
+read (story:owner-invoke-frame-effects-boundary). Both resolve the operation's
+projected metadata and refuse, `unsupported` before any provider request, an
+operation that declares a semantic effect or an effect other than `network`: the
+MCP projection offers an agent only such reads. A `read` frame that carries its
+projection revision reaches no wider set. A `GovernedRead` frame that omits
+`projection_revision` selects no projection, so it skips the projection's policy
+admission and the effects rule and dispatches what the projected read refuses;
+only a same-uid raw-frame client reaches it, as `Client::governed_read` has test
+callers only.
+
+The plain `invoke` frame is not a boundary against a same-uid client for that
+rule, and the owner does not read operation metadata there. What it enforces
+(`admit_invoke`) is, in order: an operation the description does not expose is
+`not_found`, one the configuration does not grant (operation or profile) is
+`forbidden`, a stale description revision or schema is `stale_description`, an
+operation whose requirement is not a read is `unsupported`, an input that is
+invalid or does not satisfy the operation's schema is `invalid_input`, a
+connection that is not visible, revoked, not ready or without the operation's
+scopes is refused by its own code, and unavailable custody is
+`custody_unavailable`. The effects rule is not among them. A write never reaches
+the `invoke` frame: `connectors invoke` sends it over the write frames, where its
+approval and idempotency key govern it. A configured, granted, connected read
+that declares effects is therefore served on `invoke`.
+
 The actual socket peer must be the configured UID. No credential, source path,
 keyring tuple or continuation is part of ordinary control JSON. A capture admission
 returns only the profile, acquisition reference and original 300-second expiry.
@@ -162,6 +207,18 @@ read (`revoked`, `lifecycle_conflict`). A refused dispatch cancels the read use.
 that acquisition; a lost acknowledgement is `outcome_unknown` with the acquisition
 to follow. The CLI never receives, prints or logs the material, and the source
 connection's record is not written by any step but its read use.
+
+A `begin` request of a definition's connect
+(story:definition-connect-begin-carries-selection) carries
+`"expected_selection"`, the executable selection digest of the instance's entry
+as the CLI checked it when it asked the connect question. The owner compares it
+with the entry it loads, before any admission, custody check or capture, and
+refuses a difference as `revision_conflict`: an entry another run recorded
+between the question and the request is never connected under. The field is
+omitted by every other `begin`, whose bytes are unchanged. The CLI sends a
+`begin` with `"expected_selection"` only to an owner of its own build (its
+`same_build()` check); an owner treats the field as optional and answers
+callers of any build, so the field needs no protocol version.
 
 A command run while an owner of its own build runs for the state directory reads
 the store through that owner instead of opening it. The owner answers a `cached`

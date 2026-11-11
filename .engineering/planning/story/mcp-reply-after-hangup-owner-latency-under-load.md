@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:mcp-reply-after-hangup-owner-latency-under-load
 kind: story
-status: active
+status: implemented
 title: A call at the owner when stdin closes can miss the live lease on a loaded host
 relations:
 - serves: vision:independent-contract-adapters
@@ -10,10 +10,11 @@ relations:
 scope:
 - confidence: inferred
   path: apps/connectors/tests/local_mcp_server.rs
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:33Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:34Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:18Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Observation
 

@@ -68,7 +68,31 @@ fn own_image() -> std::io::Result<Vec<u8>> {
     std::fs::read(std::env::current_exe()?)
 }
 pub struct WriteClient(Client);
+pub struct ReadClient(Client);
 const WRITE_VERSION: &str = "connectors-owner/2";
+const CANCEL_VERSION: &str = "connectors-owner/3";
+/// The frames of a `connectors-owner/3` stream: one `read`, then optionally
+/// one `cancel` naming it, on the same stream
+/// (story:owner-cancels-a-bounded-read). The owner ends the read's job on a
+/// `cancel` that names the stream's own `request_id`, or when the stream
+/// closes; a `cancel` naming any other request cancels nothing.
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum CancellableRequest {
+    Read {
+        request_id: String,
+        adapter: String,
+        connection: String,
+        operation: String,
+        schema: String,
+        revision: String,
+        projection_revision: String,
+        budget: runtime::ReadBudget,
+    },
+    Cancel {
+        request_id: String,
+    },
+}
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct WriteRequest {
@@ -571,7 +595,19 @@ impl Client {
         connection: Option<String>,
         expected_revision: Option<String>,
     ) -> Result<Capture> {
-        self.begin_capture(adapter, profile, connection, expected_revision, false)
+        self.begin_capture(adapter, profile, connection, expected_revision, false, None)
+    }
+    /// As [`Client::begin`] of a profile, for the entry whose selection digest
+    /// is `selection`: the owner refuses `revision_conflict` before any
+    /// admission when the instance's entry selects otherwise
+    /// (story:definition-connect-begin-carries-selection).
+    pub fn begin_selected(
+        self,
+        adapter: &str,
+        profile: String,
+        selection: String,
+    ) -> Result<Capture> {
+        self.begin_capture(adapter, Some(profile), None, None, false, Some(selection))
     }
     /// Begins the capture of a caller that holds no protected source and runs
     /// the profile's OAuth2 grant itself: the owner begins it only for an
@@ -584,7 +620,7 @@ impl Client {
         connection: Option<String>,
         expected_revision: Option<String>,
     ) -> Result<Capture> {
-        self.begin_capture(adapter, profile, connection, expected_revision, true)
+        self.begin_capture(adapter, profile, connection, expected_revision, true, None)
     }
     fn begin_capture(
         mut self,
@@ -593,6 +629,7 @@ impl Client {
         connection: Option<String>,
         expected_revision: Option<String>,
         grant: bool,
+        expected_selection: Option<String>,
     ) -> Result<Capture> {
         self.same_build()?;
         let deadline = Instant::now() + Duration::from_secs(40);
@@ -604,6 +641,7 @@ impl Client {
                 connection,
                 expected_revision,
                 grant,
+                expected_selection,
             },
             None,
             &[],
@@ -1144,6 +1182,105 @@ impl Client {
             Reply::Failed { error } if frame.document.is_empty() => Ok(Err(error)),
             _ => Err(Code::Unavailable.into()),
         }
+    }
+}
+impl ReadClient {
+    /// [`Client::connect_until`] under `connectors-owner/3`, which carries a
+    /// bounded read's cancellation.
+    pub fn connect_until(paths: &Paths, start: bool, deadline: Instant) -> Result<Self> {
+        let client = Client::connect_version(paths, start, CANCEL_VERSION, deadline, None)?;
+        approval_issuance::check(deadline)?;
+        client.same_build()?;
+        Ok(Self(client))
+    }
+    /// The owner incarnation this client's greeting named.
+    #[must_use]
+    pub fn host_incarnation(&self) -> &str {
+        &self.0.host_incarnation
+    }
+    /// [`Client::bounded_projected_read`] that `cancelled` ends: once it
+    /// answers true (checked at least every 250 ms) the owner is sent a cancel
+    /// naming this request, the call returns `interrupted` and its stream
+    /// closes, so the owner stops the read's adapter call and credential read
+    /// (story:owner-cancels-a-bounded-read). A client that exits without a
+    /// cancel closes the stream, which the owner reads as the same cancel.
+    pub fn bounded_projected_read(
+        self,
+        adapter: &str,
+        request: &approval_issuance::Request<'_>,
+        projection_revision: &str,
+        budget: runtime::ReadBudget,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<Vec<u8>> {
+        let mut client = self.0;
+        client.same_build()?;
+        crate::local::protected::cancellation()?;
+        let until = budget.until()?;
+        if request.input.len() > budget.input_bytes() {
+            return Err(Code::InvalidInput.into());
+        }
+        let request_id = uuid::Uuid::new_v4().to_string();
+        channel::write(
+            &mut client.stream,
+            &CancellableRequest::Read {
+                request_id: request_id.clone(),
+                adapter: adapter.into(),
+                connection: request.connection.into(),
+                operation: request.operation.into(),
+                schema: request.schema.into(),
+                revision: request.revision.into(),
+                projection_revision: projection_revision.into(),
+                budget,
+            },
+            None,
+            request.input.as_bytes(),
+            until,
+        )?;
+        let stopped = std::cell::Cell::new(false);
+        let frame = channel::read_with_cancel::<Reply>(
+            &mut client.stream,
+            until,
+            false,
+            runtime::RESULT_LIMIT,
+            Some(&|| {
+                crate::local::protected::cancellation()
+                    .map_err(|_| runtime::Failure::Interrupted)?;
+                if cancelled() {
+                    stopped.set(true);
+                    return Err(runtime::Failure::Interrupted);
+                }
+                Ok(())
+            }),
+        );
+        let frame = match frame {
+            Ok(frame) => frame,
+            Err(failure) => {
+                if stopped.get() {
+                    let _ = channel::write(
+                        &mut client.stream,
+                        &CancellableRequest::Cancel { request_id },
+                        None,
+                        &[],
+                        Instant::now() + Duration::from_secs(1),
+                    );
+                    return Err(Code::Interrupted.into());
+                }
+                return Err(failure.into());
+            }
+        };
+        let bytes = match frame.control {
+            Reply::Success => {
+                connectors_core::json::decode(&frame.document, 68)
+                    .map_err(|_| Code::Unavailable)?;
+                frame.document
+            }
+            Reply::Failed { error } if frame.document.is_empty() => return Err(error),
+            _ => return Err(Code::Unavailable.into()),
+        };
+        if bytes.len() > budget.result_bytes() {
+            return Err(Code::Capacity.into());
+        }
+        Ok(bytes)
     }
 }
 impl WriteClient {
@@ -2107,7 +2244,7 @@ fn exchange(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     else {
         return Err(Code::InvalidInput.into());
     };
-    if (version != VERSION && version != WRITE_VERSION)
+    if (version != VERSION && version != WRITE_VERSION && version != CANCEL_VERSION)
         || uuid::Uuid::parse_str(&challenge).is_err()
         || configuration != owner.paths.config
         || authority != owner.authority
@@ -2134,6 +2271,9 @@ fn exchange(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     )?;
     if version == WRITE_VERSION {
         return exchange_write(owner, stream);
+    }
+    if version == CANCEL_VERSION {
+        return exchange_cancellable(owner, stream, same_build);
     }
     let frame = channel::read::<Request>(
         stream,
@@ -2256,6 +2396,144 @@ fn issue_access_token(
 /// The furthest an issue's deadline may lie: a refresh it waits for may take
 /// the token endpoint's own time beside another caller's.
 const ISSUE_DEADLINE_MS: u64 = 120_000;
+/// A `connectors-owner/3` exchange: one bounded projected read, served as a
+/// `BoundedRead` is, that its caller can cancel
+/// (story:owner-cancels-a-bounded-read). The stream is the request's own: a
+/// `cancel` naming its `request_id`, or the stream closing (the caller is gone),
+/// cancels the read's job, and nothing a caller does on its stream reaches any
+/// other request. The reply is written by the budget's original cutoff.
+fn exchange_cancellable(
+    owner: &Owner,
+    stream: &mut channel::Stream,
+    same_build: bool,
+) -> Result<()> {
+    let frame = channel::read::<CancellableRequest>(
+        stream,
+        Instant::now() + Duration::from_secs(10),
+        false,
+        runtime::INPUT_LIMIT,
+    )?;
+    let CancellableRequest::Read {
+        request_id,
+        adapter,
+        connection,
+        operation,
+        schema,
+        revision,
+        projection_revision,
+        budget,
+    } = frame.control
+    else {
+        return Err(Code::InvalidInput.into());
+    };
+    if !same_build {
+        return Err(Code::ReadinessMismatch.into());
+    }
+    if !connectors_core::valid_id(&request_id) {
+        return Err(Code::InvalidInput.into());
+    }
+    let until = budget.until()?;
+    let cancel = supervisor::Cancel::default();
+    let finished = Arc::new(AtomicBool::new(false));
+    let watcher = watch_cancel(stream, request_id, until, &cancel, &finished)?;
+    let result = governed_action(
+        owner,
+        Request::BoundedRead {
+            adapter,
+            connection,
+            operation,
+            schema,
+            revision,
+            projection_revision,
+            budget,
+        },
+        frame.document,
+        Some(&cancel),
+    );
+    let (reply, document) = match result
+        .and_then(|value| serde_json::to_vec(&value).map_err(|_| Error::from(Code::Unavailable)))
+    {
+        Ok(document) => (Reply::Success, document),
+        Err(error) => {
+            diagnostics::record(&owner.paths.state, "request failed", error.code);
+            (Reply::Failed { error }, Vec::new())
+        }
+    };
+    let written = channel::write_within(
+        stream,
+        &reply,
+        None,
+        &document,
+        until,
+        runtime::RESULT_LIMIT,
+    );
+    finished.store(true, Ordering::SeqCst);
+    let _ = watcher.join();
+    written?;
+    Ok(())
+}
+/// Reads the stream of a `connectors-owner/3` read for its cancellation until
+/// `finished` or `until`: a `cancel` naming `request_id`, any other frame, or
+/// the stream failing or closing cancels `cancel`. A `cancel` naming another
+/// request is ignored.
+#[cfg(unix)]
+fn watch_cancel(
+    stream: &channel::Stream,
+    request_id: String,
+    until: Instant,
+    cancel: &supervisor::Cancel,
+    finished: &Arc<AtomicBool>,
+) -> Result<std::thread::JoinHandle<()>> {
+    let mut reader = stream.try_clone().map_err(|_| Code::Unavailable)?;
+    let (cancel, finished) = (cancel.clone(), finished.clone());
+    std::thread::Builder::new()
+        .name("connectors-local-cancel".into())
+        .spawn(move || {
+            let ended = || {
+                if finished.load(Ordering::SeqCst) {
+                    Err(runtime::Failure::Interrupted)
+                } else {
+                    Ok(())
+                }
+            };
+            loop {
+                match channel::read_with_cancel::<CancellableRequest>(
+                    &mut reader,
+                    until,
+                    false,
+                    0,
+                    Some(&ended),
+                ) {
+                    Ok(frame) => match frame.control {
+                        CancellableRequest::Cancel { request_id: named } if named != request_id => {
+                        }
+                        _ => {
+                            cancel.cancel();
+                            return;
+                        }
+                    },
+                    Err(_) => {
+                        if !finished.load(Ordering::SeqCst) {
+                            cancel.cancel();
+                        }
+                        return;
+                    }
+                }
+            }
+        })
+        .map_err(|_| Code::Unavailable.into())
+}
+/// Only a Unix owner serves a bounded read.
+#[cfg(not(unix))]
+fn watch_cancel(
+    _: &channel::Stream,
+    _: String,
+    _: Instant,
+    _: &supervisor::Cancel,
+    _: &Arc<AtomicBool>,
+) -> Result<std::thread::JoinHandle<()>> {
+    Err(Code::Unsupported.into())
+}
 fn exchange_write(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     let frame = channel::read::<WriteRequest>(
         stream,
@@ -2499,7 +2777,7 @@ fn action_value(
         &request,
         Request::GovernedRead { .. } | Request::BoundedRead { .. }
     ) {
-        return governed_action(owner, request, document);
+        return governed_action(owner, request, document, None);
     }
     let alias = match &request {
         Request::Begin { adapter, .. }
@@ -2568,10 +2846,14 @@ fn action_value(
             connection,
             expected_revision,
             grant,
+            expected_selection,
             ..
         } => {
             if !document.is_empty() {
                 return Err(Code::InvalidInput.into());
+            }
+            if expected_selection.is_some_and(|expected| expected != adapter.selection()) {
+                return Err(Code::RevisionConflict.into());
             }
             let registry = registry::Registry::with_system_clock(&owner.paths.state);
             let profile = match (&connection, &expected_revision, profile) {
@@ -2930,7 +3212,12 @@ fn action_value(
 /// around the instance's serialized worker, which admits it again against
 /// current configuration and policy before it dispatches. A bounded read keeps
 /// its budget's original cutoff for every wait.
-fn governed_action(owner: &Owner, request: Request, document: Vec<u8>) -> Result<Value> {
+fn governed_action(
+    owner: &Owner,
+    request: Request,
+    document: Vec<u8>,
+    cancel: Option<&supervisor::Cancel>,
+) -> Result<Value> {
     use supervisor::{Output, Task};
     let (alias, connection, operation, schema, revision, projection_revision, budget, deadline_ms) =
         match request {
@@ -2995,7 +3282,7 @@ fn governed_action(owner: &Owner, request: Request, document: Vec<u8>) -> Result
         revision: &revision,
         input,
     };
-    let dispatch = |adapter: &Adapter| match owner.pool.run(
+    let dispatch = |adapter: &Adapter| match owner.pool.run_cancellable(
         &alias,
         adapter,
         Task::Invoke {
@@ -3009,6 +3296,7 @@ fn governed_action(owner: &Owner, request: Request, document: Vec<u8>) -> Result
             budget,
         },
         deadline_ms,
+        cancel.cloned(),
     )? {
         Output::Document(bytes) => Ok(bytes),
         _ => Err(Code::Unavailable.into()),
@@ -3347,6 +3635,124 @@ mod admission_tests;
 #[cfg(all(test, unix))]
 mod governed_client_tests {
     use super::*;
+
+    fn watched(
+        server: &UnixStream,
+    ) -> (
+        supervisor::Cancel,
+        Arc<AtomicBool>,
+        std::thread::JoinHandle<()>,
+    ) {
+        let cancel = supervisor::Cancel::default();
+        let finished = Arc::new(AtomicBool::new(false));
+        let watcher = watch_cancel(
+            server,
+            "own".into(),
+            Instant::now() + Duration::from_secs(20),
+            &cancel,
+            &finished,
+        )
+        .unwrap();
+        (cancel, finished, watcher)
+    }
+    fn cancelled(cancel: &supervisor::Cancel, within: Duration) -> bool {
+        let until = Instant::now() + within;
+        while Instant::now() < until {
+            if cancel.cancelled() {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        cancel.cancelled()
+    }
+    fn say(stream: &mut UnixStream, request: &CancellableRequest) {
+        channel::write(
+            stream,
+            request,
+            None,
+            &[],
+            Instant::now() + Duration::from_secs(2),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn a_cancel_cancels_only_the_request_it_names() {
+        let (mut client, server) = UnixStream::pair().unwrap();
+        let (cancel, finished, watcher) = watched(&server);
+        say(
+            &mut client,
+            &CancellableRequest::Cancel {
+                request_id: "another".into(),
+            },
+        );
+        assert!(!cancelled(&cancel, Duration::from_millis(600)));
+        say(
+            &mut client,
+            &CancellableRequest::Cancel {
+                request_id: "own".into(),
+            },
+        );
+        assert!(cancelled(&cancel, Duration::from_secs(2)));
+        finished.store(true, Ordering::SeqCst);
+        watcher.join().unwrap();
+    }
+
+    #[test]
+    fn a_closed_stream_cancels_and_a_finished_read_does_not() {
+        let (client, server) = UnixStream::pair().unwrap();
+        let (cancel, _finished, watcher) = watched(&server);
+        drop(client);
+        assert!(cancelled(&cancel, Duration::from_secs(2)));
+        watcher.join().unwrap();
+        let (client, server) = UnixStream::pair().unwrap();
+        let (cancel, finished, watcher) = watched(&server);
+        finished.store(true, Ordering::SeqCst);
+        watcher.join().unwrap();
+        drop(client);
+        assert!(!cancel.cancelled());
+    }
+
+    #[test]
+    fn a_read_the_caller_cancels_sends_a_cancel_naming_it_and_closes() {
+        let (client, mut peer) = UnixStream::pair().unwrap();
+        let budget = runtime::ReadBudget::start(20000, 15000, 65536, 4194304).unwrap();
+        let serving = std::thread::spawn(move || {
+            let until = Instant::now() + Duration::from_secs(5);
+            let read =
+                channel::read::<CancellableRequest>(&mut peer, until, false, runtime::INPUT_LIMIT)
+                    .unwrap();
+            let CancellableRequest::Read { request_id, .. } = read.control else {
+                panic!("a read first");
+            };
+            let cancel = channel::read::<CancellableRequest>(&mut peer, until, false, 0).unwrap();
+            let CancellableRequest::Cancel { request_id: named } = cancel.control else {
+                panic!("a cancel second");
+            };
+            assert_eq!(named, request_id);
+        });
+        let request = approval_issuance::Request {
+            connection: "connection",
+            operation: "read",
+            schema: "schema",
+            revision: "revision",
+            input: "{}",
+        };
+        let started = Instant::now();
+        let error = ReadClient(Client {
+            stream: client,
+            host_incarnation: "host".into(),
+            authority: "authority".into(),
+            owner_build: Some(own_build().unwrap().into()),
+        })
+        .bounded_projected_read("fixture", &request, "projection", budget, &|| {
+            started.elapsed() > Duration::from_millis(300)
+        })
+        .unwrap_err();
+        assert_eq!(error.code, Code::Interrupted);
+        assert!(started.elapsed() < Duration::from_secs(2));
+        serving.join().unwrap();
+    }
 
     #[test]
     fn bounded_socket_preserves_original_budget_and_lossless_response() {

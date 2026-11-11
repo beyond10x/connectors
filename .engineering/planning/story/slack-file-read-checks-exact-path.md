@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:slack-file-read-checks-exact-path
 kind: story
-status: active
+status: implemented
 title: Slack file-read tests compare the request path exactly
 tags:
 - from-finding
@@ -10,10 +10,11 @@ relations:
 - informed_by: review-result:wave-a-http-empty-query-adversary-1
 - decomposes: epic:zero-open-issues-and-store-defects
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-10T08:52:32Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-10T08:52:33Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:35Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Defect
 

@@ -142,7 +142,7 @@ fn every_shipped_guard_is_a_value_of_the_catalog_guard_model() {
 
 #[test]
 fn every_shipped_closed_body_is_a_value_of_the_catalog_selection_model() {
-    const MEMBERS: [&str; 8] = [
+    const MEMBERS: [&str; 9] = [
         "body_keys",
         "body_types",
         "body_required",
@@ -150,6 +150,7 @@ fn every_shipped_closed_body_is_a_value_of_the_catalog_selection_model() {
         "body_fixed",
         "body_enums",
         "body_any_of",
+        "body_null_clears",
         "body_prefixes",
     ];
     let schema = compiled("connectors_catalog.selection.ClosedBody");

@@ -224,7 +224,6 @@ fn delete_input(stamp: &str) -> Value {
 /// "required" as "the key is present", so `null` passes and a comment of
 /// `{"type":"doc","version":1,"content":null}` is sent to Jira.
 #[test]
-#[ignore = "story:required-body-key-refuses-null: the engine admits null for a required untyped key today (adversary_catalog_body_types.rs:113)"]
 fn a_comment_whose_content_is_null_is_refused_before_any_request() {
     let mut input = comment_input();
     input["body"]["body"]["content"] = Value::Null;
@@ -430,6 +429,45 @@ fn the_edit_sends_notify_users_and_no_withheld_parameter() {
                 Value::Null
             ),
         ]
+    );
+}
+
+/// story:required-body-key-refuses-null: `issue.edit` declares `body_null_clears`,
+/// so a `body_any_of` member given as JSON `null` alone (unassign, clear the
+/// description or the priority) counts as the one change and is sent with that
+/// `null` in the PUT body; a `null` beside another change is sent too.
+#[test]
+fn a_lone_null_edit_member_is_the_change_and_is_sent_as_null() {
+    for member in ["description", "priority", "assignee"] {
+        let mut input = edit_input(STAMP);
+        input["body"] = json!({"fields": {member: null}});
+        let (outcome, log) = run(
+            EDIT,
+            input,
+            vec![found(ISSUE)],
+            answer(204, None),
+            vec![found(ISSUE)],
+        );
+        assert_eq!(effect(&outcome), "applied", "{member}");
+        assert_eq!(
+            writes(&log)[0].3,
+            json!({"fields": {member: null}}),
+            "{member}"
+        );
+    }
+    let mut input = edit_input(STAMP);
+    input["body"]["fields"]["assignee"] = Value::Null;
+    let (outcome, log) = run(
+        EDIT,
+        input,
+        vec![found(ISSUE)],
+        answer(204, None),
+        vec![found(ISSUE)],
+    );
+    assert_eq!(effect(&outcome), "applied");
+    assert_eq!(
+        writes(&log)[0].3,
+        json!({"fields": {"summary": "Edited summary", "assignee": null}})
     );
 }
 
@@ -688,4 +726,50 @@ fn create_meta_fields_never_resolves_to_another_path() {
             assert_eq!(sent, [(segments, "startAt=0&maxResults=200".to_owned())]);
         }
     }
+}
+
+/// Adversary pass 2, story:required-body-key-refuses-null: the declared input
+/// schema of `issue.edit` and `prepare` agree on every body, with
+/// `body_null_clears` set. `body_any_of` lives under `fields`, so its `anyOf`
+/// sits on the `fields` object; a body without `fields` must still be refused
+/// by the schema as `prepare` refuses it.
+#[test]
+fn adversary_edit_schema_and_prepare_agree_on_every_body() {
+    let engine = engine();
+    let declared = engine.declarations(&[connectors_catalog_provider::Effect::Write]);
+    let schema = &declared
+        .iter()
+        .find(|operation| operation.id == EDIT)
+        .unwrap()
+        .input_schema;
+    let mut disagree = Vec::new();
+    for body in [
+        json!({}),
+        json!({"fields": {}}),
+        json!({"fields": null}),
+        json!({"fields": {"assignee": null}}),
+        json!({"fields": {"description": null, "priority": null}}),
+        json!({"fields": {"summary": null}}),
+        json!({"fields": {"labels": null}}),
+        json!({"fields": {"summary": ""}}),
+    ] {
+        let mut input = edit_input(STAMP);
+        input["body"] = body.clone();
+        let admitted = connectors_sdk::validate(schema, &input).is_ok();
+        let (outcome, _) = run(
+            EDIT,
+            input,
+            vec![found(ISSUE)],
+            answer(204, None),
+            vec![found(ISSUE)],
+        );
+        let prepared = effect(&outcome) != "not-attempted InvalidInput";
+        if admitted != prepared {
+            disagree.push(format!(
+                "body {body}: declared {admitted}, prepare {}",
+                effect(&outcome)
+            ));
+        }
+    }
+    assert_eq!(disagree, Vec::<String>::new());
 }

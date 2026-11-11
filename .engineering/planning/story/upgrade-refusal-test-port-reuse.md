@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:upgrade-refusal-test-port-reuse
 kind: story
-status: active
+status: implemented
 title: The upgrade refusal test does not race port reuse
 relations:
 - serves: vision:independent-contract-adapters
@@ -10,10 +10,11 @@ relations:
 scope:
 - confidence: inferred
   path: crates/connectors-host/tests/upgrade_adversary.rs
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:38Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:38Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:41Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Observed
 `crates/connectors-host/tests/upgrade_adversary.rs:386`

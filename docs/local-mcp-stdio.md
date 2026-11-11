@@ -65,6 +65,14 @@ effects. Missing or incompatible declarations, disabled exposures and ungranted
 operations are omitted. Metadata-policy failure refuses the list. Listing never
 probes a credential or invokes the provider.
 
+The owner holds the effects rule itself on the bounded and projected governed
+reads: a declared semantic effect, or an effect other than `network`, is
+`unsupported` before any provider request. The owner's plain `invoke` frame,
+which carries only reads, does not read that metadata: it enforces the host
+configuration's grant and the read's admission, not the effects rule. A write
+takes the write frames, under its approval
+([owner](../contracts/cli/v1alpha1/owner.md)).
+
 ```console
 connectors --config /absolute/config.toml --state-dir /absolute/state server --transport stdio
 ```
@@ -147,9 +155,10 @@ request's deadline loses the session.
 Cancellation suppresses the matching reply, does not replay a call and frees the
 request slot at once, so the next list or call is admitted. A reply already partly
 written when its cancellation arrives is finished rather than cut off, and the
-session stays usable. The owner has no cancellation of its own: owner work that
-a cancelled call already started runs out within its original deadline. While two
-cancelled calls' owner work is still running, a new list or call is refused with
+session stays usable. The cancel reaches the owner: a call already at the owner is
+cancelled there by name (the owner protocol `connectors-owner/3`), which stops its
+provider call and credential read and frees its instance's job at once. While two
+cancelled calls' owner work is still ending, a new list or call is refused with
 `capacity`.
 
 Closing standard input ends the session (`remote_hangup`), and local admission
@@ -161,8 +170,9 @@ at the close, which is not renewed; the process then exits successfully. A reply
 lease cannot carry is discarded and the exit is unsuccessful. Loss during partial
 output terminates the process. Local worker teardown, cancelled calls included,
 finishes within five seconds of the terminal, and unjoined work is not recorded
-as released. Owner work still running then is not cancelled either: it runs out
-at the owner within its own deadline, after the process has exited. These
+as released. The owner cancels work whose caller's stream closes, so a read
+still running at the owner when the process exits is cancelled there, not left
+to run out its deadline. These
 guarantees make no claim about remote rollback.
 
 ## Verification boundary

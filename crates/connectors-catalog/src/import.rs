@@ -240,6 +240,8 @@ struct ShippedOperation {
     #[serde(default)]
     body_any_of: Vec<String>,
     #[serde(default)]
+    body_null_clears: bool,
+    #[serde(default)]
     body_prefixes: BTreeMap<String, String>,
     #[serde(default)]
     conflict_status: Option<u16>,
@@ -1308,6 +1310,7 @@ fn body_notation(shipped: &ShippedOperation) -> Result<Option<IndexMap<String, S
             || !shipped.body_fixed.is_empty()
             || !shipped.body_enums.is_empty()
             || !shipped.body_any_of.is_empty()
+            || shipped.body_null_clears
             || !shipped.body_prefixes.is_empty();
         return if any {
             Err(refused("body fields without body_keys".to_owned()))
@@ -2158,6 +2161,7 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
             body: body_notation(operation)?,
             body_enums: in_body_order(operation, &operation.body_enums),
             body_any_of: (!operation.body_any_of.is_empty()).then(|| operation.body_any_of.clone()),
+            body_null_clears: operation.body_null_clears.then_some(true),
             body_prefixes: in_body_order(operation, &operation.body_prefixes),
             conflict_status: operation.conflict_status,
             guard,

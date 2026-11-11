@@ -535,6 +535,7 @@ fn the_issue_writes_are_shipped_as_reviewed() {
                    "body_nonempty": ["/fields/summary"],
                    "body_any_of": ["/fields/summary", "/fields/description", "/fields/labels",
                                    "/fields/priority", "/fields/assignee"],
+                   "body_null_clears": true,
                    "conflict_status": 409,
                    "guard": {"preflight": {"operation_id": "getIssue",
                                            "values": {"issueIdOrKey": "issueIdOrKey"},

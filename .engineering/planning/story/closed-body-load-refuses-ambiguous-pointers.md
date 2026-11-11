@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:closed-body-load-refuses-ambiguous-pointers
 kind: story
-status: active
+status: implemented
 title: A closed body naming an array index or an enum beside a prefix is refused when its selection loads
 summary: Two closed-body shapes load today and send a value the selection does not declare
 relations:
@@ -15,10 +15,11 @@ scope:
   path: adapters/catalog/tests/nested_closed_body.rs
 - confidence: cited
   path: crates/connectors-catalog/src/definition.rs
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:54Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:57:54Z", actor: "human:timo", revision: 5, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:01Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

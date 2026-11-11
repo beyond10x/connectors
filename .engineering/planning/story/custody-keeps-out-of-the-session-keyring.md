@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:custody-keeps-out-of-the-session-keyring
 kind: story
-status: active
+status: implemented
 title: Custody keeps out of the operator's session keyring
 summary: Tests never write the session keyring, removing a store deletes its items, the collection is the default alias
 relations:
@@ -11,10 +11,11 @@ relations:
 scope:
 - confidence: inferred
   path: crates/connectors-custody/src/secret_service/mod.rs
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:57:57Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:57:57Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T06:19:05Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":5}}}
 ---
 ## Outcome
 
