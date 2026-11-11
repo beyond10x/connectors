@@ -110,7 +110,7 @@ async fn adversary_integer_typed_key_admits_only_integer_literals_the_schema_can
 async fn adversary_typed_and_required_keys_agree_between_schema_and_prepare_on_boundaries() {
     let engine = typed();
     for (body, admitted) in [
-        (json!({"count": -5, "free": null}), true),
+        (json!({"count": -5, "free": null}), false),
         (json!({"count": i64::MIN, "free": 0}), true),
         (json!({"count": u64::MAX, "free": 0}), true),
         (
@@ -185,4 +185,32 @@ fn adversary_load_time_edges_of_body_types_and_body_required() {
         json!({"type": "object", "properties": {"count": {"type": "integer"}},
                "required": ["count"], "additionalProperties": false})
     );
+}
+
+/// A `body_any_of` member given as JSON `null` is not the one change the
+/// selection requires: schema and `prepare` refuse a body whose only member is
+/// `null`, and admit one that carries another member beside it.
+#[tokio::test]
+async fn a_null_body_any_of_member_does_not_count_as_the_one_change() {
+    let selection = written(json!({
+        "id": "thing.create", "operation_id": "createThing", "effect": "write",
+        "body_keys": ["name", "free"],
+        "body_any_of": ["name", "free"]
+    }));
+    let engine = Engine::new(&things_bundle(), "/v1", &[selection]).unwrap();
+    for (body, admitted) in [
+        (json!({"name": "x"}), true),
+        (json!({"free": 1}), true),
+        (json!({"name": "x", "free": null}), true),
+        (json!({"name": null, "free": 1}), true),
+        (json!({"name": null}), false),
+        (json!({"free": null}), false),
+        (json!({"name": null, "free": null}), false),
+        (json!({}), false),
+    ] {
+        let input = json!({"body": body});
+        let (declared, prepared) = verdicts(&engine, &input).await;
+        assert_eq!(declared, admitted, "declared, {input}");
+        assert_eq!(prepared, admitted, "prepared, {input}");
+    }
 }

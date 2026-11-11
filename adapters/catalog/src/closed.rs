@@ -414,7 +414,11 @@ impl Closed {
     /// before anything is sent.
     pub(crate) fn check(&self, body: &Value) -> Result<()> {
         self.shape(body, &mut Vec::new())?;
-        if let Some(path) = self.required.iter().find(|path| at(body, path).is_none()) {
+        if let Some(path) = self
+            .required
+            .iter()
+            .find(|path| at(body, path).is_none_or(Value::is_null))
+        {
             return Err(refuse(format!(
                 "body lacks the required key `{}`",
                 self.name(path)
@@ -448,7 +452,12 @@ impl Closed {
                 self.name(path)
             )));
         }
-        if !self.any_of.is_empty() && self.any_of.iter().all(|path| at(body, path).is_none()) {
+        if !self.any_of.is_empty()
+            && self
+                .any_of
+                .iter()
+                .all(|path| at(body, path).is_none_or(Value::is_null))
+        {
             let names: Vec<&str> = self.any_of.iter().map(|path| self.name(path)).collect();
             return Err(refuse(format!(
                 "body carries none of `{}`, one of which its selection requires",
@@ -522,7 +531,13 @@ impl Closed {
             object["anyOf"] = self
                 .any_of
                 .iter()
-                .map(|path| json!({"required": [path[at.len()]]}))
+                .map(|path| {
+                    let segment = &path[at.len()];
+                    json!({
+                        "required": [segment],
+                        "properties": {segment: {"not": {"type": "null"}}}
+                    })
+                })
                 .collect();
         }
         object
@@ -543,6 +558,8 @@ impl Closed {
             schema
         } else if self.scalars.contains(key) {
             declared_type(None)
+        } else if self.required.contains(key) {
+            json!({"not": {"type": "null"}})
         } else {
             json!({})
         }

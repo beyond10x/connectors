@@ -278,11 +278,17 @@ fn pointer_keys_declare_nested_closed_objects_without_the_fixed_values() {
     );
     // The guard reads the stamp, so it is required where it lives.
     assert_eq!(ticket["required"], json!(["updated_stamp"]));
-    // At least one of the four changes.
+    // At least one of the four changes, each given as a value other than `null`.
+    let member =
+        |name: &str| json!({"required": [name], "properties": {name: {"not": {"type": "null"}}}});
     assert_eq!(
         ticket["anyOf"],
-        json!([{"required": ["group_id"]}, {"required": ["tags"]},
-               {"required": ["priority"]}, {"required": ["type"]}])
+        json!([
+            member("group_id"),
+            member("tags"),
+            member("priority"),
+            member("type")
+        ])
     );
 
     let body = declared("ticket.draft_reply");
