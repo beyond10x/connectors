@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.71.0 — 2026-11-11
 
 ### Added
 
@@ -106,6 +106,13 @@
   (story:release-image-platform-check-tolerates-padding).
 - The Slack move guide enables the five writes the shipped selection carries
   (story:slack-move-names-four-writes).
+
+### Compatibility
+
+- No migration. A name that both a legacy `[connectors]` entry and an `[instances]` entry
+  derive is now refused as `instance_ambiguous`; rename one of the two entries. The Grafana
+  catalog selection, the amendment `pattern` and `catalog.allowed_values` are additions; a
+  bundle or configuration without them loads as before.
 
 ### Limitations
 
