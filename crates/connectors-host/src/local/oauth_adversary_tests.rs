@@ -122,6 +122,7 @@ fn start() -> Flow {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(std::fs::File::create(&stderr).unwrap());
+    super::parent_death::bind(&mut command);
     // Windows has no sessions to detach the fixture into.
     #[cfg(unix)]
     // SAFETY: setsid is async-signal-safe and touches only the child.

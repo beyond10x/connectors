@@ -2206,6 +2206,93 @@ executable: None,
         }
     }
 
+    #[cfg(target_os = "linux")]
+    const OWNER_STAND_IN: &str = "CONNECTORS_TEST_OWNER_STAND_IN_PID_FILE";
+
+    /// Run as the harness that stands in for an owner: it starts an adapter as
+    /// the owner does, publishes the adapter's pid and waits. An ordinary run
+    /// does nothing.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn owner_stand_in_fixture() {
+        use std::os::fd::AsRawFd;
+        let Some(file) = std::env::var_os(OWNER_STAND_IN).map(std::path::PathBuf::from) else {
+            return;
+        };
+        let child = fixture_child("fixture-mode-json");
+        std::fs::write(
+            file.with_extension("fd"),
+            child.channel.as_raw_fd().to_string(),
+        )
+        .unwrap();
+        crate::local::parent_death::fixture::publish(&file, child.process.id());
+        std::thread::sleep(Duration::from_secs(60));
+        drop(child);
+    }
+
+    /// `parent_death_kill` (story:test-children-die-with-their-parent): an
+    /// owner killed without running any `Drop` leaves none of its adapters.
+    /// The killed owner's end of the adapter's channel would end the adapter
+    /// when it closes (`an_adapter_exits_when_the_owner_end_of_its_channel_closes`),
+    /// so the case first takes its own duplicate of that end from the harness
+    /// (`pidfd_getfd`) and holds it open: only the death signal can end the
+    /// adapter then.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_killed_owner_leaves_no_adapter_running() {
+        use crate::local::parent_death::fixture::{
+            Harness, Reaper, kill_harness_and_expect_gone, pid_in,
+        };
+        use std::os::fd::FromRawFd;
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join("adapter.pid");
+        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+        command
+            .args([
+                "--exact",
+                "local::runtime::process::tests::owner_stand_in_fixture",
+                "--nocapture",
+            ])
+            .env(OWNER_STAND_IN, &file)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        let mut harness = Harness::start(command);
+        let adapter = pid_in(&file, &mut harness.0);
+        let _reaper = Reaper(adapter);
+        let channel: i32 = std::fs::read_to_string(file.with_extension("fd"))
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+        // SAFETY: pidfd_open takes the id of the harness this case started.
+        let pidfd = unsafe { libc::syscall(libc::SYS_pidfd_open, harness.0.id(), 0) } as i32;
+        assert!(
+            pidfd >= 0,
+            "pidfd_open: {}",
+            std::io::Error::last_os_error()
+        );
+        // SAFETY: the successful call returned a new descriptor this case owns.
+        let pidfd = unsafe { std::os::fd::OwnedFd::from_raw_fd(pidfd) };
+        // SAFETY: pidfd_getfd copies the harness's descriptor into this process.
+        let held = unsafe {
+            libc::syscall(
+                libc::SYS_pidfd_getfd,
+                std::os::fd::AsRawFd::as_raw_fd(&pidfd),
+                channel,
+                0,
+            )
+        } as i32;
+        assert!(
+            held >= 0,
+            "pidfd_getfd: {}",
+            std::io::Error::last_os_error()
+        );
+        // SAFETY: the successful call returned a new descriptor this case owns.
+        let _held = unsafe { std::os::fd::OwnedFd::from_raw_fd(held) };
+        kill_harness_and_expect_gone(&mut harness.0, adapter);
+    }
+
     /// `exact_process_signal`: `child_reap_lock`, through the owner's stop
     /// handle: it reports the child exited and signals nothing once the
     /// child that owns the process has reaped it.
