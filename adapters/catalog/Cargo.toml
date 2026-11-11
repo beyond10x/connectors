@@ -15,6 +15,10 @@ service = ["dep:connectors-host", "dep:connectors-oauth2", "dep:connectors-custo
 name = "main"
 path = "tests/main.rs"
 
+[[test]]
+name = "derived_instance_adversary"
+path = "tests/derived_instance_adversary.rs"
+
 [[bin]]
 name = "connectors-catalog-provider"
 path = "src/main.rs"

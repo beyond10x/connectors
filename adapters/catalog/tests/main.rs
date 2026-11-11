@@ -1,6 +1,8 @@
 //! The catalog provider's integration tests, built into one test binary.
 //! Each file is a module named by its stem, so a test's name is the file's
 //! stem followed by the path it had when the file was its own binary.
+//! derived_instance_adversary.rs is its own `[[test]]`: it sets an environment
+//! variable for the whole process, which no suite beside it may see.
 
 mod hand_written;
 
@@ -11,6 +13,7 @@ mod adversary_catalog_body_types;
 mod adversary_credential_pass1;
 mod adversary_git_relay;
 mod adversary_gitlab_mr_writes;
+mod adversary_one_binary;
 mod binary_adversary;
 mod binary_responses;
 mod body_keys_adversary;
@@ -27,7 +30,6 @@ mod credential_revision_security;
 mod definition_auth;
 mod definition_feed_engine_adversary;
 mod definition_published_features_adversary;
-mod derived_instance_adversary;
 mod engine;
 mod engine_adversary;
 mod engine_adversary_pass2;
@@ -126,8 +128,10 @@ mod write_postflight_present_adversary;
 mod write_postflight_present_adversary_2;
 mod zendesk;
 
-/// `autotests = false` leaves a file here that this one does not declare unbuilt
-/// and unrun, with nothing to say so.
+/// `autotests = false` leaves a file here that is neither a module of this one nor
+/// a `[[test]]` of Cargo.toml unbuilt and unrun, with nothing to say so. So is a
+/// `tests/<directory>/main.rs`, which cargo would otherwise have built as a target.
+/// A `mod` line behind a `cfg` counts as declared: the scan reads no `cfg`.
 mod declared {
     use std::{collections::BTreeSet, fs, path::Path};
 
@@ -137,17 +141,30 @@ mod declared {
             .lines()
             .filter_map(|line| line.strip_prefix("mod ")?.strip_suffix(';'))
             .collect();
-        let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
-        let undeclared: Vec<String> = fs::read_dir(directory)
-            .unwrap()
-            .map(|entry| entry.unwrap().path())
-            .filter(|path| path.extension().is_some_and(|extension| extension == "rs"))
-            .filter_map(|path| Some(path.file_stem()?.to_str()?.to_owned()))
-            .filter(|stem| stem != "main" && !declared.contains(stem.as_str()))
-            .collect();
+        let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let targets = fs::read_to_string(manifest.join("Cargo.toml")).unwrap();
+        let target = |path: &str| targets.contains(&format!("path = \"{path}\""));
+        let mut files = 0;
+        let mut undeclared = Vec::new();
+        for entry in fs::read_dir(manifest.join("tests")).unwrap() {
+            let path = entry.unwrap().path();
+            let name = path.file_name().unwrap().to_str().unwrap().to_owned();
+            if path.is_dir() {
+                if path.join("main.rs").is_file() && !target(&format!("tests/{name}/main.rs")) {
+                    undeclared.push(format!("{name}/main.rs"));
+                }
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                files += 1;
+                let stem = path.file_stem().unwrap().to_str().unwrap();
+                if stem != "main" && !declared.contains(stem) && !target(&format!("tests/{name}")) {
+                    undeclared.push(name);
+                }
+            }
+        }
+        assert!(files > 1, "the scan found {files} files in tests/");
         assert!(
             undeclared.is_empty(),
-            "test files main.rs does not declare: {undeclared:?}"
+            "test files main.rs does not declare and Cargo.toml does not name: {undeclared:?}"
         );
     }
 }
