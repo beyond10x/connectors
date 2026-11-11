@@ -764,7 +764,8 @@ impl Pool {
         self.run_cancellable(alias, adapter, task, deadline, None)
     }
     /// [`Pool::run`] of a job that `cancel` ends: a read still queued is never
-    /// dispatched and frees its queue slot unrun, one running stops its adapter
+    /// dispatched and is dropped unrun when its worker reaches it (it holds its
+    /// queue slot until then), one running stops its adapter
     /// call and credential read, and the wait ends `interrupted` within 50 ms
     /// (story:owner-cancels-a-bounded-read). Only a read job is cancellable.
     pub(super) fn run_cancellable(
@@ -1102,7 +1103,7 @@ fn worker(
         // `busy` now covers this job; it is no longer queued.
         drop(job.queued.take());
         let result = (|| {
-            // A cancelled read frees its slot here, unrun.
+            // A cancelled read is dropped here, unrun, and frees its slot.
             if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
                 return Err(Code::Interrupted.into());
             }
@@ -1282,6 +1283,12 @@ fn worker(
             if child.is_none() {
                 child = Some(launch.run(job.deadline, bounded_until)?);
                 selection = current.selection();
+            }
+            // A read cancelled while its adapter launched goes no further:
+            // no recollection and no credential read follows the cancel
+            // (contracts/cli/v1alpha1/owner.md). The launched adapter stays.
+            if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
+                return Err(Code::Interrupted.into());
             }
             let execution_until = job.task.until(job.deadline)?;
             let active = child.as_mut().ok_or(Code::Unavailable)?;
@@ -1695,6 +1702,13 @@ fn worker(
                         registry.cancel_read(captured, connectors_sdk::now_ms())?;
                         return Err(Code::StaleDescription.into());
                     }
+                    // The last check before the stored credential is opened:
+                    // a read cancelled during its launch or recollection reads
+                    // none (contracts/cli/v1alpha1/owner.md).
+                    if job.cancel.as_ref().is_some_and(Cancel::cancelled) {
+                        registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                        return Err(Code::Interrupted.into());
+                    }
                     let version = captured.version();
                     let selection = config.selection();
                     // A bounded read gives up its custody answer once its
@@ -1855,6 +1869,20 @@ fn worker(
                             deadline,
                         )
                     };
+                    // A cancel ended the adapter process on purpose, which is
+                    // not the unexpected termination `failed` names
+                    // (contracts/cli/v1alpha1/semantics.md, "restart =
+                    // never"): its record is cleared so the instance reads
+                    // `not_running` and the next job launches anew. A control
+                    // another start or stop moved on is left as it is.
+                    if job.cancel.as_ref().is_some_and(Cancel::cancelled)
+                        && matches!(&result, Err(refusal) if refusal.failure == runtime::Failure::Interrupted)
+                        && let Ok(mut guard) = control.lock()
+                        && guard.epoch == job.epoch
+                    {
+                        child = None;
+                        guard.child = None;
+                    }
                     // The provider refused the stored credential as unauthorized
                     // (a refresh token answered `invalid_grant`, a token or basic
                     // entry answered 401): the connection is Stale until a
