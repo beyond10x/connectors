@@ -415,6 +415,9 @@ impl Local {
 fn exec_failure(value: exec_credential::Refusal) -> Failure {
     use exec_credential::Refusal;
     match value {
+        Refusal::PluginUnavailable(Some(std::io::ErrorKind::ExecutableFileBusy)) => {
+            Failure::PluginBusy
+        }
         Refusal::DigestMismatch | Refusal::PluginUnavailable(_) | Refusal::KubeconfigMismatch => {
             Failure::InvalidConfiguration
         }

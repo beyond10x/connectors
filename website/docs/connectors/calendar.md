@@ -10,14 +10,11 @@ connectors: "calendar"
 # Google Calendar
 
 The `calendar` connector of the provider Google is served by the catalog provider from the pinned
-Calendar API v3 document. The words connector, instance, connection and operation are those of
-the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+Calendar API v3 document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full Calendar guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-calendar.md)
 has every parameter, paging rule and refusal.
 
-Commands use `connectors` on your `PATH` with your own configuration. Outputs were produced in
-the repository's tree against a scratch configuration, whose `--config` and `--state-dir` are left
-out here. A command that needs a Google account is shown without output.
+[How these commands were run](../guides/first-read.md#examples).
 
 ## What it reads and writes
 
@@ -33,15 +30,9 @@ write names `sendUpdates` (`all`, `externalOnly` or `none`), which decides whom 
 1. In the Google Cloud console, select or create a project and enable the Google Calendar API.
 2. Configure the OAuth consent screen and add the scopes this connector requests: `openid`,
    `https://www.googleapis.com/auth/calendar.readonly` and
-   `https://www.googleapis.com/auth/calendar.events`. One instance per Google account requests
-   every scope its operations need, reads and writes alike.
-3. Under *Credentials*, create an OAuth client ID of type *Desktop app*, download its JSON and
-   make it readable by you alone (`chmod 600`).
-4. Choose the publishing status. Google expires the refresh token of an app in *Testing* seven
-   days after consent, and every account that connects must be a test user. An app used only by
-   its developer can be set to *In production* without Google's verification
-   ([Google's exemption for personal use](https://support.google.com/cloud/answer/13464323)),
-   which lifts the seven-day expiry.
+   `https://www.googleapis.com/auth/calendar.events`.
+3. Create the OAuth client and choose the publishing status as in
+   [Google OAuth setup](../guides/google-oauth-setup.md).
 
 ## Enable the connector and add an instance
 
@@ -54,14 +45,6 @@ enabled = true
 
 The instance uses Calendar's default endpoint, `https://www.googleapis.com/calendar/v3`, and pins
 nothing.
-
-```sh
-connectors instances list | jq -c '.[] | arrays | .[]'
-```
-
-```json
-{"connector":"calendar","instance":"private","instance_id":"calendar.private","restart":"never","startup":"on-demand"}
-```
 
 ## Connect
 
@@ -85,14 +68,10 @@ send it as `syncToken` to read only what changed since.
 
 ## A first guarded write
 
-Once per instance, create the signing key (`connectors approvals key-init --connector calendar
---instance private`) and add an `[approval_clock]` table to the configuration
-([the approval clock](https://github.com/beyond10x/connectors/blob/main/docs/local-clock.md)).
-Publish a policy naming the writes:
+Set up the [signing key and clock](../guides/guarded-write.md#once-per-instance), then publish this policy with `approvals policy-set`:
 
 ```sh
 printf '{"operations":["events.insert","events.patch","events.delete"]}\n' > policy.json
-connectors approvals policy-set --connector calendar --instance private --input-file policy.json
 ```
 
 Move an event. Read it with `events.get` and pin its `etag` in `move.json`:
@@ -102,45 +81,14 @@ Move an event. Read it with `events.get` and pin its `etag` in `move.json`:
  "body": {"start": {"dateTime": "2026-10-20T10:00:00Z"}, "end": {"dateTime": "2026-10-20T10:30:00Z"}}}
 ```
 
-Take the connection, and the schema and revision of `events.patch` from `invoke --describe`, then
-prepare, issue and invoke:
-
-```sh
-connection=$(connectors --output json connections list --connector calendar --instance private \
-  | jq -r '.result.connections[0].connection')
-schema=$(connectors --output json invoke calendar/private events.patch --describe \
-  | jq -r .result.schema)
-revision=$(connectors --output json invoke calendar/private events.patch --describe \
-  | jq -r .result.revision)
-connectors --output json approvals prepare --connector calendar --instance private \
-  --connection "$connection" --operation events.patch \
-  --schema "$schema" --revision "$revision" --input-file move.json
-connectors approvals clock-check --connector calendar --instance private
-connectors approvals issue --connector calendar --instance private \
-  --connection "$connection" --operation events.patch \
-  --schema "$schema" --revision "$revision" --input-file move.json \
-  --approve-subject "$subject_sha256" --proof-output "$HOME/private/proof-move-1.json"
-connectors invoke calendar/private events.patch \
-  --input-file move.json --approval-file "$HOME/private/proof-move-1.json" \
-  --idempotency-key move-1
-```
+[Prepare, issue and invoke](../guides/guarded-write.md#prepare-issue-and-invoke) `events.patch` on `calendar/private` with `move.json`, `--idempotency-key move-1`.
 
 The approval binds the whole input, `sendUpdates` included: a proof for `none` does not permit
 the same write with `all`. An event changed since you read it is refused before the PATCH.
 
 ## Reconnect when the connection is Stale
 
-When Google stops honouring the refresh token, an invoke answers `next_action:
-repair_connection` and the connection turns `stale`. Reconnect with the same client file and the
-same Google account:
-
-```sh
-connectors --output json connections list --connector calendar --instance private \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector calendar --instance private \
-  --expected-revision "<revision from the list>" \
-  --credential-file ~/Downloads/client_secret_1234.json
-```
+Google no longer honours the refresh token and the connection turns `stale`. [Reconnect](../guides/reconnect-a-connection.md) `calendar/private` with `--credential-file ~/Downloads/client_secret_1234.json`.
 
 ## Limits
 
@@ -149,5 +97,4 @@ connectors connections reconnect --connector calendar --instance private \
 - The engine checks only that `sendUpdates` is present, not its value: check it before approving.
 - The `etag` pin is checked before the write only; Google offers no precondition on it.
 - `events.insert` carries no guard: the same input approved twice makes two events.
-- The provider does not walk pages; a read answered `429` or a quota `403` is `rate_limited` with
-  `retry_after_seconds` when the retry does not fit.
+- The provider does not walk pages; [a read answered `429` follows the shared rule](../guides/first-read.md#rate-limits).

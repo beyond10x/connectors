@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T18:23:57Z",
+  "actor": "human:timo",
+  "artifact": "story:custody-keeps-out-of-the-session-keyring",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-custody-keyring-security-1",
+    "reference": "e8991556f: Removal carries the synchronization failure with every deleted item; a_failed_barrier_still_names_the_deleted_items passes on the private daemon",
+    "review": "review-result:wave-b-custody-keyring-security-1",
+    "outcome": "fixed"
+  }
+}

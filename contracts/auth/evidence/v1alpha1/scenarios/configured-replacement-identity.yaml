@@ -37,7 +37,6 @@ timeline:
     outcome: wrong-state
     error:
       name: connectors.credential_evidence.AdmissionStateConflict
-      fields: {state: Refused}
     no_events: [connectors.credential_evidence.GenerationDispatched]
 assert:
   - view: connectors.credential_evidence.AdmissionStates

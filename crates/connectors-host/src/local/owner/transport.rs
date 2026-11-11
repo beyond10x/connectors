@@ -271,6 +271,8 @@ impl Client {
         start_bound: Option<Duration>,
     ) -> Result<Self> {
         let directory = fs::directory(&paths.state, false, true)?;
+        // What the owner logs from here on is what a failure names.
+        diagnostics::watch(&paths.state);
         // The pipe name's salt, published by the first caller and refused by
         // name when it is not owner-only.
         #[cfg(windows)]
@@ -323,14 +325,21 @@ impl Client {
                     // Held to the end of this block: the owner measures its build
                     // before it answers the greeting (or never will), and only
                     // then may its launch copy go.
-                    let (stream, mut process, launched) = spawn(paths, &lock, wait)?;
+                    //
+                    // The launch (reading and sealing the executable, then the
+                    // exec) is part of that start: a command without a
+                    // deadline of its own counts the startup bound from here,
+                    // not 10 seconds that a loaded host spends on the launch
+                    // alone (story:cli-connect-admission-timeout-under-load).
+                    let started = Instant::now();
+                    let launch = start_bound.map_or(wait, |bound| wait.max(started + bound));
+                    let (stream, mut process, launched) = spawn(paths, &lock, launch)?;
                     // The owner verifies the whole store before it answers, so
                     // its greeting takes longer as the store grows. A command
                     // without a deadline of its own waits for it up to the
                     // startup bound, not the 10 seconds it allows a running
                     // owner (story:owner-start-outlasts-a-fixed-bound).
-                    let greeting =
-                        start_bound.map_or(wait, |bound| wait.max(Instant::now() + bound));
+                    let greeting = launch;
                     let result = Self::greet(
                         stream,
                         paths,
@@ -511,6 +520,7 @@ impl Client {
             return Ok(Err(error.into()));
         }
         let challenge = uuid::Uuid::new_v4().to_string();
+        diagnostics::identify(&challenge);
         if let Err(error) = channel::write(
             &mut stream,
             &Request::Hello {
@@ -1442,6 +1452,12 @@ fn lock(directory: &File) -> Result<File> {
 /// large store (tests/owner_slow_start.rs).
 #[cfg(debug_assertions)]
 const START_DELAY: &str = "CONNECTORS_TEST_OWNER_START_DELAY_MS";
+/// The environment variable a test build's CLI waits on, in milliseconds,
+/// between reading its executable and sealing the copy the owner runs from: a
+/// stand-in for the time a loaded host spends launching an owner
+/// (tests/owner_slow_start.rs).
+#[cfg(all(unix, debug_assertions))]
+const LAUNCH_DELAY: &str = "CONNECTORS_TEST_OWNER_LAUNCH_DELAY_MS";
 /// What a started owner's caller holds until the owner has answered its
 /// greeting. On macOS that is the owner's launch copy: the owner measures its
 /// build from the file at its running executable's path
@@ -1474,6 +1490,13 @@ fn spawn(
         sha256: hash,
         args: Vec::new(),
     };
+    #[cfg(debug_assertions)]
+    if let Some(delay) = std::env::var(LAUNCH_DELAY)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+    {
+        std::thread::sleep(Duration::from_millis(delay));
+    }
     let executable = selection.capture(deadline)?;
     let (parent, child) = UnixStream::pair().map_err(|_| Code::Unavailable)?;
     // Put source fds beyond the destination slots before fork.
@@ -1524,6 +1547,9 @@ fn spawn(
         "CONNECTORS_TEST_OAUTH_FOLLOW",
         START_DELAY,
         crate::local::metadata::VERIFICATION_LOG,
+        crate::local::registry::ACQUISITION_MS,
+        crate::local::registry::PUBLICATION_FAILS_ONCE,
+        crate::local::registry::PUBLICATION_REPLY_LOST_ONCE,
     ] {
         if let Some(value) = std::env::var_os(name) {
             command.env(name, value);
@@ -1606,6 +1632,8 @@ pub fn serve_with_read_policy(paths: Paths, read_policy: Arc<dyn ReadPolicy>) ->
     let build = own_build()?;
     let config = Config::load(&paths.config)?;
     let directory = fs::directory(&paths.state, false, true)?;
+    // Only into a state directory admitted private.
+    diagnostics::log_panics(paths.state.clone());
     let metadata = Metadata::start_owner(&paths.state)?;
     // A test build waits here as long as a large store's verification takes.
     #[cfg(debug_assertions)]
@@ -2051,7 +2079,9 @@ fn handle(owner: Arc<Owner>, mut stream: channel::Stream) -> Result<()> {
     if std::thread::Builder::new()
         .name("connectors-local-request".into())
         .spawn(move || {
-            let _ = exchange(&owner, &mut stream);
+            if let Err(error) = exchange(&owner, &mut stream) {
+                diagnostics::record(&owner.paths.state, "exchange ended", error.code);
+            }
             // Closed before it stops counting: an owner that retires once no
             // client is counted finds no pipe instance of this one still open.
             drop(stream);
@@ -2084,6 +2114,8 @@ fn exchange(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     {
         return Err(Code::ReadinessMismatch.into());
     }
+    // From here the owner's lines for this exchange carry the client's challenge.
+    diagnostics::serving(&challenge);
     let same_build = build.as_deref() == Some(owner.build);
     channel::write(
         stream,
@@ -2139,7 +2171,10 @@ fn exchange(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     let shutdown = shutdown && result.is_ok();
     let (reply, document) = match result {
         Ok(answered) => (Reply::Success, answered.document()?),
-        Err(error) => (Reply::Failed { error }, Vec::new()),
+        Err(error) => {
+            diagnostics::record(&owner.paths.state, "request failed", error.code);
+            (Reply::Failed { error }, Vec::new())
+        }
     };
     let written = channel::write_within(
         stream,
@@ -2245,7 +2280,10 @@ fn exchange_write(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
             }
             (WriteReply::Done, document)
         }
-        Err(error) => (WriteReply::Failed { error }, Vec::new()),
+        Err(error) => {
+            diagnostics::record(&owner.paths.state, "write failed", error.code);
+            (WriteReply::Failed { error }, Vec::new())
+        }
     };
     // A terminal response may report a known effect even if metadata work used
     // the last budget. This bounded delivery grace grants no native dispatch.

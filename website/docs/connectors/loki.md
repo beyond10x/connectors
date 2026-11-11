@@ -9,14 +9,11 @@ connectors: "loki"
 
 # Loki
 
-The `loki` connector is served by its own executable, `connectors-loki`. The words connector,
-instance, connection and operation are those of the
-[README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+The `loki` connector is served by its own executable, `connectors-loki`. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
 [full Loki guide](https://github.com/beyond10x/connectors/blob/main/adapters/loki/README.md) has
 the profiles, bounds and refusals.
 
-No declaration ships for it, so the instance is pinned: it names its executable, that
-executable's SHA-256 and the configuration revision the executable prints. Commands that need a
+It is a [pinned instance](../guides/pinned-instances.md). Commands that need a
 Loki deployment are shown without output.
 
 ## What it reads and writes
@@ -97,8 +94,6 @@ connectors invoke loki/logs logs.query_range \
   --input-json '{"query":"{app=\"api\"} |= \"error\"","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000","limit":100}'
 ```
 
-Validation lasts 60 seconds; a scheduled caller runs `connections revalidate` before reading.
-
 ## A first guarded write
 
 The connector has no write, so nothing here needs an approval.
@@ -106,14 +101,7 @@ The connector has no write, so nothing here needs an approval.
 ## Reconnect when the connection is Stale
 
 A token the deployment no longer accepts is reported as `unauthorized` when next used, and the
-connection turns `stale`. Publish a new token:
-
-```sh
-connectors --output json connections list --connector loki --instance logs \
-  | jq -c '[.result.connections[] | {connection, revision, state}]'
-connectors connections reconnect --connector loki --instance logs \
-  --expected-revision "<revision from the list>" --credential-prompt
-```
+connection turns `stale`. Publish a new token. [Reconnect](../guides/reconnect-a-connection.md) `loki/logs` with `--credential-prompt`.
 
 Any token the deployment accepts is the same identity: reconnect only with a token of the same
 tenant.

@@ -28,8 +28,8 @@ replacement process. A startup socket carries a fresh challenge, owner incarnati
 and metadata authority before the parent releases startup ownership. The daemon
 keeps the inherited lock and owns its children after the launching CLI exits.
 An owner that refuses to start or to keep serving exits with status 1 and writes
-only its refusal code to standard error (`connectors owner: "<code>"`), which
-the launching CLI discards.
+its refusal code to standard error (`connectors owner: "<code>"`), which the
+launching CLI discards, and to the owner log (below).
 Once it starts admitting requests, that lock is retained until kernel process
 exit even on early return or unwinding. Recovery runs between jobs on a retained
 worker, or under the supervisor's worker-creation lock with no live worker for
@@ -129,7 +129,9 @@ An owner verifies the whole store before it answers its startup greeting, so its
 start takes longer as the store grows. A read on `invoke` that starts
 the owner waits for its greeting up to the read's own 30 seconds. A command without a
 deadline of its own reaches a running owner within 10 seconds and waits for the
-greeting of an owner it started up to 60 seconds from that start, and for an
+greeting of an owner it started up to 60 seconds from that start, which counts
+the time the command spends launching the owner (reading and sealing its own
+executable) and not only the owner's wait to answer, and for an
 owner another process is starting up to 60 seconds from when it found it
 starting. A caller that stops waiting with `timeout` leaves the owner it started
 to finish its start, and the next command reaches it; a caller that fails
@@ -291,6 +293,29 @@ onto one fresh revalidation instead: the first of them leads it and runs the
 identity probe, the others join that one and answer its answer, each within its
 own deadline. A revalidation at another expected
 revision, or of another connection, never joins.
+
+## Owner log
+
+The owner's standard streams are discarded, so it writes what failed to the
+owner log, `owner.log` in the state directory: one line per failed request, per
+connection its exchange ended on, per refusal to start and per panic, each
+naming a fixed event and the owner's error code (`code=<code>`), or a panic's
+source location. A line never carries text from a request, a provider or a
+credential. The file is created owner-only (mode `0600` on Unix; on Windows it
+takes the access list of the owner-only state directory). A file already at
+that name is written only if it is a private regular file of the current user
+with one link (the rule of every private file here), and no reparse point or
+symbolic link is followed. The log is bounded to 262144 bytes: a line that would pass the bound empties the file first, and the
+first line then says so. The CLI never prints it.
+
+An `outcome_unknown` after the owner failed names that log as `owner_log` and
+the code of the newest line the owner logged for this command's own
+connection (each line carries the challenge of the connection it served) as
+`owner_error`; a newest line without a code, a panic, gives none, and no other
+connection's line is read. Without a log or such a code the data carries no
+such field.
+`owner_error` is the owner's code, not a promise about the effect: the status
+of the write still decides it ([semantics](semantics.md)).
 
 ## Stopping an owner
 

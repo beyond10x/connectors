@@ -151,6 +151,82 @@ pub struct Parameter {
     /// parameter that is not repeated serialises as it did before.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub repeated: bool,
+    /// The values the document's `enum` allows, as the text each is sent as:
+    /// recorded only when every member is a string, an integer or a boolean
+    /// (a `null` member is a nullable marker, not a value). For a repeated
+    /// parameter, the values of each element. Omitted when empty, so a
+    /// parameter without an `enum` serialises as it did before.
+    #[serde(rename = "enum", default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed: Vec<String>,
+    /// The `format` the document declares on a string value, recorded only
+    /// for `date-time`. Omitted when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<Format>,
+}
+
+/// A `format` of a string parameter this model records and a reader may hold
+/// a value to. Every other format is not recorded.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Format {
+    /// An RFC 3339 `date-time`.
+    #[serde(rename = "date-time")]
+    DateTime,
+}
+
+/// The schema a local schema reference names, or the schema itself when it
+/// holds none; `None` when the reference leaves the document, names nothing or
+/// chains past [`PARAMETER_REF_HOPS`].
+fn resolve_schema<'a>(document: &'a Value, schema: &'a Value) -> Option<&'a Value> {
+    let mut current = schema;
+    for _ in 0..=PARAMETER_REF_HOPS {
+        let Some(reference) = current.get("$ref") else {
+            return Some(current);
+        };
+        let target = reference
+            .as_str()
+            .and_then(|r| r.strip_prefix("#/components/schemas/"))
+            .filter(|name| !name.is_empty() && !name.contains('/'))?;
+        // RFC 6901: `~1` is `/` and `~0` is `~`, unescaped in that order.
+        let name = target.replace("~1", "/").replace("~0", "~");
+        current = document
+            .get("components")
+            .and_then(|c| c.get("schemas"))
+            .and_then(|s| s.get(&name))?;
+    }
+    None
+}
+
+/// What a value schema constrains beyond its type: the `enum` it lists and a
+/// `format` of `date-time` on a string.
+/// A local `#/components/schemas/<name>` reference is followed, through further
+/// such references, as far as [`PARAMETER_REF_HOPS`]; one that names nothing, or
+/// loops, constrains nothing.
+fn constraints(document: &Value, schema: Option<&Value>) -> (Vec<String>, Option<Format>) {
+    let Some(schema) = schema.and_then(|schema| resolve_schema(document, schema)) else {
+        return (Vec::new(), None);
+    };
+    let members = schema.get("enum").and_then(Value::as_array);
+    let allowed = members
+        .map(|members| {
+            members
+                .iter()
+                .filter(|member| !member.is_null())
+                .map(|member| match member {
+                    Value::String(text) => Some(text.clone()),
+                    Value::Number(number) if number.is_i64() || number.is_u64() => {
+                        Some(number.to_string())
+                    }
+                    Value::Bool(flag) => Some(flag.to_string()),
+                    _ => None,
+                })
+                .collect::<Option<Vec<String>>>()
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+    let format = (single_type(schema) == Some("string")
+        && schema.get("format").and_then(Value::as_str) == Some("date-time"))
+    .then_some(Format::DateTime);
+    (allowed, format)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -301,7 +377,11 @@ type Expansion = (Vec<Parameter>, Option<String>);
 /// ([`deep_object_schema`]). `None` when it is not a `deepObject`; an error
 /// when it is one this pass does not expand, which is then named and sent as
 /// one value as given.
-fn deep_object(parameter: &Value, name: &str) -> Option<Result<Expansion, String>> {
+fn deep_object(
+    document: &Value,
+    parameter: &Value,
+    name: &str,
+) -> Option<Result<Expansion, String>> {
     if parameter.get("style").and_then(Value::as_str) != Some("deepObject") {
         return None;
     }
@@ -341,12 +421,15 @@ fn deep_object(parameter: &Value, name: &str) -> Option<Result<Expansion, String
         let Some(value_type) = ValueType::of_schema(&properties[property]) else {
             return Some(refused());
         };
+        let (allowed, format) = constraints(document, Some(&properties[property]));
         out.push(Parameter {
             name: format!("{name}[{property}]"),
             location: Location::Query,
             required: whole && required.contains(&property.as_str()),
             value_type: Some(value_type),
             repeated: false,
+            allowed,
+            format,
         });
     }
     Some(Ok((out, gap)))
@@ -384,7 +467,7 @@ fn parameters(
                     let shape = array.then(|| array_shape(parameter, name));
                     let repeated = matches!(shape, Some(Ok(())));
                     let deep = if location == Location::Query {
-                        deep_object(parameter, name)
+                        deep_object(document, parameter, name)
                     } else {
                         None
                     };
@@ -400,6 +483,14 @@ fn parameters(
                     } else {
                         ValueType::declared(parameter)
                     };
+                    let (allowed, format) = constraints(
+                        document,
+                        if repeated {
+                            schema.and_then(|s| s.get("items"))
+                        } else {
+                            schema
+                        },
+                    );
                     out.push((
                         Parameter {
                             name: name.to_owned(),
@@ -410,6 +501,8 @@ fn parameters(
                                 .unwrap_or(false),
                             value_type,
                             repeated,
+                            allowed,
+                            format,
                         },
                         shape.and_then(Result::err).or(deep_gap),
                         expansion,

@@ -27,6 +27,7 @@ mod live_read_loop;
 mod mcp;
 mod metadata_conformance;
 mod metadata_entities;
+mod ownership;
 mod platform_gated;
 mod release_binaries;
 mod service_metadata;

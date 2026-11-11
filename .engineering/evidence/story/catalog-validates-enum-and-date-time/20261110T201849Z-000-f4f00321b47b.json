@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T20:18:49Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-validates-enum-and-date-time",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-enum-date-adversary-1",
+    "reference": "F2 comma-joined repeated value: each element checked against the enum; adversary comma case passes (43a027263c)",
+    "review": "review-result:wave-b-enum-date-adversary-1",
+    "outcome": "fixed"
+  }
+}

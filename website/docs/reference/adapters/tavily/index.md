@@ -24,8 +24,8 @@ the local CLI; fetch has been exercised against a local fake server only.
 ## Access and limits
 
 The credential profile `tavily.api-key` holds the API key in Secret Service custody; it is
-checked with `GET /usage`, which spends no search credit. Tavily exposes no account identifier,
-so two keys are not told apart. Every read spends Tavily credits, and nothing is cached.
+checked with `GET /usage`, which spends no search credit. The [Tavily connector page](../../../connectors/tavily.md#limits)
+states the account-identifier limit. Every read spends Tavily credits, and nothing is cached.
 
 The repository's [local Tavily guide](https://github.com/beyond10x/connectors/blob/main/docs/local-tavily.md)
 covers the native configuration, connecting with the key on stdin, invoking each operation and

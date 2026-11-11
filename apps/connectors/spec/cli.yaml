@@ -75,6 +75,11 @@ callables:
     input: connectors.cli.SetupCheckpointsEnableInput
     result: connectors.cli.SetupCheckpointsEnableResult
     errors: {failure: connectors.cli.Failure}
+  setup-custody-orphans:
+    target: {kind: local, owner: connectors.cli, action: setup-custody-orphans}
+    input: connectors.cli.SetupCustodyOrphansInput
+    result: connectors.cli.SetupCustodyOrphansResult
+    errors: {failure: connectors.cli.Failure}
   setup-owner-stop:
     target: {kind: local, owner: connectors.cli, action: setup-owner-stop}
     input: null
@@ -362,6 +367,15 @@ commands:
     arguments:
       - field: confirm
         source: {kind: option, long: confirm}
+  - path: [setup, custody-orphans]
+    aliases: []
+    callable: setup-custody-orphans
+    about: List the custody items in the Secret Service that the store of this state directory does not name, grouped by authority; another store of this machine may hold a listed authority; --mode remove --authority ID deletes the items of that one authority and nothing else
+    arguments:
+      - field: mode
+        source: {kind: option, long: mode}
+      - field: authority
+        source: {kind: option, long: authority}
   - path: [setup, owner-stop]
     aliases: []
     callable: setup-owner-stop

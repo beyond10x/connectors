@@ -137,6 +137,13 @@ does not shorten them. The supervisor renews the lease while the session is
 ready, so a read that outlasts one lease, or a reply the client drains slowly, is
 still answered. An unrenewed lease still ends the session at its expiry.
 
+A list or call that reaches its own deadline before the owner answers (the
+owner is busy, or the store is held) is answered with the `timeout` refusal,
+written within a short grace after the deadline, and the session continues: the
+next request is admitted as usual. A request's timeout does not end the session.
+A client that leaves a reply unread for longer than that grace (2 s) past its
+request's deadline loses the session.
+
 Cancellation suppresses the matching reply, does not replay a call and frees the
 request slot at once, so the next list or call is admitted. A reply already partly
 written when its cancellation arrives is finished rather than cut off, and the
@@ -179,3 +186,23 @@ cargo test --locked --offline -p connectors --test local_mcp_server
 No scenario is ignored; the file compiles on Linux only. These process bindings
 cover the read-tools subset of the AEP acceptance scenarios; they are not a
 complete ESS runtime conformance report, independent review or full MCP release.
+
+## Recorded Claude Code session
+
+A headless Claude Code session listed a Jira instance's reads through it and
+called its search tool. The `--mcp-config` entry that ran named a capturing wrapper, which ran
+`connectors` with the same arguments in a bubblewrap sandbox
+(`{"type":"stdio","command":"CAPTURE_WRAPPER","args":["--config","/srv/connectors/config.toml","--state-dir","/srv/connectors/state","server","--transport","stdio"],"env":{"RIG_CAPTURE":"CAPTURE_DIR"}}`);
+the user form names `connectors` itself
+(`{"type":"stdio","command":"connectors","args":["--config","CONFIG","--state-dir","STATE_DIR","server","--transport","stdio"]}`).
+`claude mcp add --scope project connectors -- connectors --config CONFIG --state-dir STATE_DIR server --transport stdio`
+was recorded once, with Claude Code 2.1.318 in an empty project directory, `CONFIG` being
+`/srv/connectors/config.toml` and `STATE_DIR` `/srv/connectors/state`. It printed
+`Added stdio MCP server connectors with command: connectors --config /srv/connectors/config.toml --state-dir /srv/connectors/state server --transport stdio to project config`
+and `File modified: PROJECT_DIR/.mcp.json`, `PROJECT_DIR` standing for the project directory,
+and wrote `.mcp.json`, the project-scope file Claude Code reads:
+`{"mcpServers":{"connectors":{"type":"stdio","command":"connectors","args":["--config","/srv/connectors/config.toml","--state-dir","/srv/connectors/state","server","--transport","stdio"],"env":{}}}}`,
+the user form on those paths with an empty `env`
+(`apps/connectors/tests/fixtures/claude-code/mcp-add.json`).
+The recorded session is replayed against the server in every `cargo test` on Linux
+(`apps/connectors/tests/claude_mcp_journey.rs`). 

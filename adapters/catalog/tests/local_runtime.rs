@@ -842,6 +842,12 @@ fn raw_answer(route: &str, path: &str) -> Option<(&'static str, Vec<u8>)> {
             "text/plain",
             vec![b'a'; connectors_core::RESPONSE_LIMIT + 1],
         )),
+        _ if route == "/api/v4/projects/org%2Fhuge/languages" => {
+            let mut body = br#"{"Rust":"#.to_vec();
+            body.resize(connectors_core::RESPONSE_LIMIT, b' ');
+            body.extend_from_slice(b"1}");
+            Some(("application/json", body))
+        }
         _ if route == "/api/v4/projects/org%2Fproject/languages" => Some((
             "application/json",
             serde_json::to_vec(&fixture_languages()).unwrap(),
@@ -1433,6 +1439,47 @@ fn raw_file_text_and_project_languages_through_the_child() {
         provider.calls.lock().unwrap().last().unwrap(),
         "/api/v4/projects/org%2Fproject/languages"
     );
+}
+
+/// story:catalog-oversized-body-one-classification: a JSON body over the
+/// 4 MiB provider response bound is refused `capacity` through the real child
+/// and the HTTPS fixture, as the transport and the shared model
+/// (`connectors.transport.TextBodyOutcome`) classify it, and the catalog
+/// contract names that one classification wherever it speaks of the bound:
+/// never `UpstreamProtocol`.
+#[test]
+fn an_over_bound_json_body_is_refused_capacity_in_transport_and_contract() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let error = invoke(
+        &mut child,
+        "project.languages",
+        "one",
+        &token(true),
+        json!({"id": "org/huge"}),
+    )
+    .unwrap_err();
+    assert_eq!(error, Failure::Capacity);
+    let contract = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../contracts/catalog/v1alpha1/semantics.md"),
+    )
+    .unwrap();
+    let rows: Vec<&str> = contract
+        .lines()
+        .filter(|line| {
+            let line = line.to_ascii_lowercase();
+            line.contains("oversize")
+                || line.contains("too large to fit")
+                || line.contains("exceeds the total response budget")
+        })
+        .collect();
+    assert!(!rows.is_empty(), "the contract names the over-bound body");
+    for row in rows {
+        assert!(
+            !row.contains("UpstreamProtocol"),
+            "an over-bound body is `Capacity`, not `UpstreamProtocol`: {row}"
+        );
+    }
 }
 
 #[test]

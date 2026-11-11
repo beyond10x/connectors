@@ -459,7 +459,7 @@ accompany rows of strings or JSON null. Exact numeric, array, timestamp, and JSO
 representations are preserved without numeric coercion. Parameters are text or null
 and PostgreSQL resolves their types. Use explicit SQL casts where inference needs
 help. The database role's grants govern accessible schemas and functions. Each request
-opens a fresh connection and read-only transaction, initialized with `search_path = public, pg_catalog`;
+opens a fresh connection and read-only transaction, initialized with `search_path = pg_catalog, public`;
 qualify tables in other schemas (for example `reporting.sales`). There is no pool in
 this bounded local profile. Fresh connections resolve the current credential each
 time and discard session state; connection setup therefore contributes to latency.

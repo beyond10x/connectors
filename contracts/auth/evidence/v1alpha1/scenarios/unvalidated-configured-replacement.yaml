@@ -70,8 +70,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.credential_evidence.AdmissionStateConflict
-    fields:
-      state: Refused
   no_events:
   - connectors.credential_evidence.GenerationDispatched
 - at: '2026-09-08T09:00:03Z'
@@ -131,8 +129,6 @@ timeline:
   outcome: wrong-state
   error:
     name: connectors.credential_evidence.AdmissionStateConflict
-    fields:
-      state: Refused
   no_events:
   - connectors.credential_evidence.GenerationDispatched
 assert:

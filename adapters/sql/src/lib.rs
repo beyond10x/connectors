@@ -89,7 +89,7 @@ impl Engine {
 /// engine, so a statement that returns no rows, such as any write, is refused
 /// before it is executed.
 pub const MAX_COLUMNS: usize = 256;
-const POSTGRESQL_SESSION: &str = "SET LOCAL statement_timeout = '10s'; SET LOCAL lock_timeout = '2s'; SET LOCAL search_path = public, pg_catalog";
+const POSTGRESQL_SESSION: &str = "SET LOCAL statement_timeout = '10s'; SET LOCAL lock_timeout = '2s'; SET LOCAL search_path = pg_catalog, public";
 /// `schema.list` on PostgreSQL: the column metadata of one schema of the
 /// connected database visible to the configured role.
 const POSTGRESQL_SCHEMA_QUERY: &str = "SELECT table_schema, table_name, column_name, data_type, udt_name, is_nullable, ordinal_position FROM information_schema.columns WHERE table_schema = $1 ORDER BY table_name, ordinal_position";
@@ -363,10 +363,14 @@ impl Sql {
 
     async fn query(&self, args: Query) -> Result<Value> {
         if args.query.is_empty()
-            || args.query.len() > 8192
+            || args.query.chars().count() > 8192
             || args.parameters.len() > 64
             || !(1..=1000).contains(&args.limit)
-            || args.parameters.iter().flatten().any(|p| p.len() > 8192)
+            || args
+                .parameters
+                .iter()
+                .flatten()
+                .any(|p| p.chars().count() > 8192)
         {
             return Err(Error::invalid(
                 "query, parameters or row limit exceed bounds",
@@ -464,14 +468,16 @@ impl Sql {
             .collect::<Vec<_>>();
         let casts = aliases
             .iter()
-            .map(|c| format!("result.{c}::text"))
+            .map(|c| format!("result.{c}::pg_catalog.text"))
             .collect::<Vec<_>>()
             .join(",");
         let size = aliases
             .iter()
-            .map(|c| format!("COALESCE(octet_length(result.{c}::text),0)::bigint"))
+            .map(|c| {
+                format!("COALESCE(pg_catalog.octet_length(result.{c}::pg_catalog.text),0)::bigint")
+            })
             .collect::<Vec<_>>()
-            .join("+");
+            .join(" OPERATOR(pg_catalog.+) ");
         // A keyset page orders by one expression of its column and continues after
         // the cursor compared by that same expression, the cursor bound after the
         // statement's own parameters (a native comparison takes the column's type).
@@ -483,7 +489,7 @@ impl Sql {
                 if let Some(after) = &keyset.after {
                     parameters.push(Some(after.clone()));
                     let cursor = expression.over(&format!("${}", parameters.len()));
-                    clause = format!(" WHERE {column} > {cursor}");
+                    clause = format!(" WHERE {column} OPERATOR(pg_catalog.>) {cursor}");
                 }
                 format!(
                     "{clause} ORDER BY {column} LIMIT {}",
@@ -497,7 +503,7 @@ impl Sql {
         // The derived table closes on its own line, so a trailing `--` comment in the
         // caller's statement cannot reach the aliases, the keyset or LIMIT.
         let wrapped = format!(
-            "SELECT CASE WHEN ({size}) > {} THEN NULL::text[] ELSE ARRAY[{casts}] END FROM ({query}\n) AS result({}){keyset}",
+            "SELECT CASE WHEN ({size}) OPERATOR(pg_catalog.>) {} THEN NULL::pg_catalog.text[] ELSE ARRAY[{casts}] END FROM ({query}\n) AS result({}){keyset}",
             connectors_core::RESPONSE_LIMIT,
             aliases.join(",")
         );

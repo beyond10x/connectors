@@ -146,7 +146,7 @@ when it is next used.
 
 Every invocation opens its own session and its own **read-only transaction**,
 then sets `statement_timeout = '10s'`, `lock_timeout = '2s'` and
-`search_path = public, pg_catalog` for that transaction only. One prepared
+`search_path = pg_catalog, public` for that transaction only. One prepared
 statement runs, with parameters bound positionally — values are never
 interpolated into the text.
 

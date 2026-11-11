@@ -57,7 +57,6 @@ timeline:
     outcome: wrong-state
     error:
       name: connectors.mutations.AttemptStateConflict
-      fields: {state: Aborted}
     no_events: [connectors.mutations.DispatchOpened]
 
   - at: 2026-09-08T09:00:03Z
@@ -69,7 +68,6 @@ timeline:
     outcome: wrong-state
     error:
       name: connectors.mutations.AttemptStateConflict
-      fields: {state: Aborted}
     no_events: [connectors.mutations.AttemptCompleted]
 
 assert:

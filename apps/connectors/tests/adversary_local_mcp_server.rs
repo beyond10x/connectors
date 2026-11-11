@@ -399,6 +399,11 @@ impl Served {
     /// Write the companion: each of [`EXPOSED`] as a tool, enabled when
     /// `enabled`, except `disabled`, which never is.
     fn exposures(&self, enabled: bool) {
+        self.exposures_within(enabled, 120_000);
+    }
+
+    /// [`Served::exposures`] with the request budget `request_milliseconds`.
+    fn exposures_within(&self, enabled: bool, request_milliseconds: u64) {
         let exposures: Vec<Value> = EXPOSED
             .iter()
             .map(|operation| {
@@ -409,7 +414,7 @@ impl Served {
         private(
             &self.container.path(COMPANION),
             json!({"format":"connectors-mcp-local/1","limits":{"frame_octets":1048576,"response_octets":33554432,
-                "concurrent_requests":1,"request_milliseconds":120000},"exposures":exposures})
+                "concurrent_requests":1,"request_milliseconds":request_milliseconds},"exposures":exposures})
             .to_string(),
         );
     }
@@ -1144,6 +1149,61 @@ fn adversary_a_long_read_with_the_store_held_is_answered_and_the_session_stays_r
         "{reply}"
     );
     assert!(peer.request(3, "ping", json!({})).get("result").is_some());
+    peer.finish();
+}
+
+/// story:mcp-tool-deadline-keeps-the-server (CR-001). A list whose owner does
+/// not answer within `request_milliseconds` (the store lock is held, so the
+/// owner's authority read waits on it) is refused `timeout` at its own
+/// deadline, and the session goes on: the same server then answers the next
+/// list once the store is free.
+#[test]
+fn adversary_a_request_past_its_deadline_answers_timeout_and_the_session_continues() {
+    let served = Served::new();
+    // Warm the owner under the default budget: a cold owner start inside the
+    // 2 s budget below would end the server at startup, not at the deadline.
+    let mut warm = Peer::start(&served, true);
+    assert!(warm.request(1, "ping", json!({})).get("result").is_some());
+    served.exposures_within(true, 2000);
+    // The server's startup is bounded by the same 2 s, so on a loaded host it
+    // can end before it answers its first ping; that is not what is measured
+    // here, so such a start is retried (a session that answered and then
+    // ended is not).
+    let mut peer = None;
+    for _ in 0..5 {
+        let mut candidate = Peer::start(&served, true);
+        let ping = json!({"jsonrpc":"2.0","id":1,"method":"ping","params":{"_meta":meta()}});
+        let _ = candidate
+            .child
+            .stdin
+            .as_mut()
+            .unwrap()
+            .write_all(format!("{ping}\n").as_bytes());
+        if let Ok(Ok(reply)) = candidate.frames.recv_timeout(Duration::from_secs(15))
+            && reply.get("result").is_some()
+        {
+            peer = Some(candidate);
+            break;
+        }
+    }
+    let mut peer = peer.expect("the server never started within 2 s in 5 tries");
+    let lock = hold_store(&served);
+    let held = peer.request(2, "tools/list", json!({}));
+    assert_eq!(
+        held["error"]["data"]["error"]["code"], "timeout",
+        "the held list was not refused timeout: {held}"
+    );
+    let status = peer.child.try_wait().unwrap();
+    if status.is_some() {
+        let stderr = peer.errors.take().unwrap().join().unwrap();
+        panic!(
+            "the session ended at a request's deadline: {status:?}, stderr {}",
+            String::from_utf8_lossy(&stderr)
+        );
+    }
+    drop(lock);
+    let next = peer.request(3, "tools/list", json!({}));
+    assert!(next.get("result").is_some(), "{next}");
     peer.finish();
 }
 

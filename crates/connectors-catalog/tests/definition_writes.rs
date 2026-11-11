@@ -593,3 +593,37 @@ fn a_mismatch_outside_the_vocabulary_is_refused_as_malformed() {
         other => panic!("refused as {other:?}"),
     }
 }
+
+#[test]
+fn a_body_key_with_an_array_index_segment_is_refused() {
+    let root = zendesk_root();
+    let text = ZENDESK
+        .replace("/ticket/tags: string_list", "/ticket/tags/0: string")
+        .replace(
+            "body_any_of: [/ticket/group_id, /ticket/tags, ",
+            "body_any_of: [/ticket/group_id, /ticket/tags/0, ",
+        );
+    match lower("zendesk", &text, root.path()).refusal() {
+        Refusal::BodyType { key, field, .. } => {
+            assert_eq!(key, "ticket.update");
+            assert_eq!(field, "/ticket/tags/0");
+        }
+        other => panic!("refused as {other:?}"),
+    }
+}
+
+#[test]
+fn a_body_enum_and_a_body_prefix_on_one_key_are_refused() {
+    let root = zendesk_root();
+    let text = ZENDESK.replace(
+        "    body_enums: {/ticket/priority:",
+        "    body_prefixes: {/ticket/priority: X}\n    body_enums: {/ticket/priority:",
+    );
+    match lower("zendesk", &text, root.path()).refusal() {
+        Refusal::BodyPrefix { key, field } => {
+            assert_eq!(key, "ticket.update");
+            assert_eq!(field, "/ticket/priority");
+        }
+        other => panic!("refused as {other:?}"),
+    }
+}

@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T11:10:00Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-guard-typed-comparison",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-guard-typed-adversary-1",
+    "reference": "story:guard-number-inputs-compare-by-type",
+    "review": "review-result:wave-b-guard-typed-adversary-1",
+    "outcome": "escalated"
+  }
+}

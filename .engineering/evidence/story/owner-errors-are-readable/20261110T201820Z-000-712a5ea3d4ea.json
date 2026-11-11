@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T20:18:20Z",
+  "actor": "human:timo",
+  "artifact": "story:owner-errors-are-readable",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-owner-errors-security-1",
+    "reference": "F1 owner_error from another connection: lines carry conn=<greeting challenge>, last_code reads only this connection's newest line; owner_log_security 5 passed (9df01f9724)",
+    "review": "review-result:wave-b-owner-errors-security-1",
+    "outcome": "fixed"
+  }
+}

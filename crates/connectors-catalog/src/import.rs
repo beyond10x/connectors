@@ -26,7 +26,9 @@
 //!   documentation does not configure it;
 //! - a profile id configured for more than one definition is shared: what all
 //!   of them agree on goes into `auth/<prefix>.yaml` (the id up to its first
-//!   `.`), and each definition `use`s it and gives the rest;
+//!   `.`), and each definition `use`s it and gives the rest. An existing
+//!   `auth/<prefix>.yaml` is merged, not replaced: the shipped profiles win and
+//!   the profiles the import does not ship stay;
 //! - URL, retrieval date and license come from the README beside the source.
 //!
 //! Choices the notation leaves open are made the same way every time: a paging
@@ -1912,6 +1914,24 @@ fn write_file(path: &Path, bytes: &[u8], written: &mut Vec<PathBuf>) -> Result<(
     Ok(())
 }
 
+/// The profiles an `auth/<library>.yaml` already holds, none when there is no
+/// such file. A file that is not a library is a failure: it is never overwritten.
+fn existing_library(path: &Path) -> Result<IndexMap<String, Auth>, Failure> {
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(IndexMap::new()),
+        Err(error) => return Err(Failure::Unreadable(format!("{}: {error}", path.display()))),
+    };
+    serde_yaml_ng::from_slice::<AuthLibrary>(&bytes)
+        .map(|library| library.profiles)
+        .map_err(|error| {
+            Failure::Malformed(format!(
+                "{}: not an auth library, so the import does not overwrite it: {error}",
+                path.display()
+            ))
+        })
+}
+
 /// Import one shipped selection. See the module documentation for what is
 /// taken from where.
 pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
@@ -2304,19 +2324,16 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
     let definition_path = root.join("connectors").join(format!("{name}.yaml"));
     write_file(&definition_path, text.as_bytes(), &mut written)?;
     for library in &used_libraries {
-        let profiles: IndexMap<String, Auth> = libraries[library]
-            .iter()
-            .map(|(id, profile)| (id.clone(), profile.clone()))
-            .collect();
+        let path = root.join("auth").join(format!("{library}.yaml"));
+        let mut profiles = existing_library(&path)?;
+        for (id, profile) in &libraries[library] {
+            profiles.insert(id.clone(), profile.clone());
+        }
         let text = yaml(&AuthLibrary {
             schema: AuthLibraryId::V1,
             profiles,
         })?;
-        write_file(
-            &root.join("auth").join(format!("{library}.yaml")),
-            text.as_bytes(),
-            &mut written,
-        )?;
+        write_file(&path, text.as_bytes(), &mut written)?;
     }
     for file in &vendored {
         write_file(

@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-10T14:32:40Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-tool-deadline-keeps-the-server",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wave-b-mcp-deadline-adversary-1",
+    "reference": "late-success replacement kept: MCP tools/call admits only reads (local_mcp_server_write_refusal 8 passed), so no applied write outcome can be replaced",
+    "review": "review-result:wave-b-mcp-deadline-adversary-1",
+    "outcome": "no-op"
+  }
+}

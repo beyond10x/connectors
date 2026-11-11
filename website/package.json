@@ -15,6 +15,7 @@
     "test:examples": "cd .. && cargo test --locked --offline --manifest-path website/examples/realization/Cargo.toml --target-dir website/.cache/demo/target",
     "test:browser": "node tests/smoke.mjs",
     "test:ui": "node tests/overhaul.mjs",
+    "test:sidebar": "node tests/sidebar.mjs",
     "audit:public": "cd .. && cargo run --locked -p connectors-build -- docs-audit"
   },
   "dependencies": {

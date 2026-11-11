@@ -490,3 +490,10 @@ connectors --output json connections revalidate --adapter router \
    issuer or policy yet; an existing policy is republished with `--expected-revision`,
    because a changed configuration, descriptor or executable invalidates it. Then
    create as above.
+
+## Support-table summary
+
+The README's support table gives this connector one
+short line; this is its full summary, as the README carried it:
+
+> OpenRouter API from the pinned OpenAPI document; management key as `Authorization: Bearer` from keyring custody, profile `openrouter.api-key`; two pinned instances, since no OpenRouter connector declaration ships; `key.create` is an unguarded required-approval write whose created key is held in custody as a new connection of a second instance and never returned; one page per call; verified against a local fixture only, see [the OpenRouter guide](docs/catalog-openrouter.md)

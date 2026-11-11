@@ -117,7 +117,18 @@ fn connect(selectors: &Value, context: &Context) -> Result<(), HandlerReply> {
         (Some(_), None) => Err(argument("endpoint")),
         (Some(endpoint), Some(_)) if !endpoint_admitted(endpoint) => Err(argument("endpoint")),
         (Some(endpoint), Some((connector, instance))) => {
-            write(&paths()?, connector, instance, endpoint)
+            let paths = paths()?;
+            // A legacy entry's endpoint is among its own pins, as a pinned
+            // instance's is: writing an instance table beside it would make
+            // the name two entries (story:legacy-alias-sharing-an-instance-name).
+            // Refused before the file is touched; `setup migrate` moves the
+            // entry to an instance first.
+            if Config::read(&paths.config)
+                .is_ok_and(|config| super::invoke::held_by_legacy(&config, connector, instance))
+            {
+                return Err(argument("endpoint"));
+            }
+            write(&paths, connector, instance, endpoint)
         }
         (None, Some((connector, instance))) => required(&paths()?, connector, instance),
         (None, None) => Ok(()),
@@ -132,6 +143,13 @@ fn required(paths: &Paths, connector: &str, instance: &str) -> Result<(), Handle
         declaration["connector_id"] == connector && declaration.get("default_endpoint").is_none()
     });
     if !needs {
+        return Ok(());
+    }
+    // A name only a legacy entry holds is that entry, whose pinned selection
+    // carries its endpoint, as it does under `--adapter`.
+    if Config::read(&paths.config)
+        .is_ok_and(|config| super::invoke::held_by_legacy(&config, connector, instance))
+    {
         return Ok(());
     }
     let Ok((text, _)) = read(paths) else {
