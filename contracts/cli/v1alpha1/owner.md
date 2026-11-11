@@ -104,6 +104,23 @@ without a reply. No command replaces that owner by itself: the user runs
 the next admitted command starts one from the current build. The private
 shutdown request stays accepted across builds so that command, and a lifecycle
 harness, can stop it.
+
+A bounded read of the local MCP server (story:owner-cancels-a-bounded-read) is
+cancellable under its own greeting, `connectors-owner/3`; `connectors-owner/1`
+and `/2` keep their requests, replies and timing. A `/3` stream carries one
+`read` frame (the bounded read's request with a `request_id`, a valid
+identifier the caller chose) and then, if the caller gives the read up, one
+`cancel` frame naming that `request_id`; both are served to a caller of the
+owner's own build only. The owner ends the read's job when it reads a `cancel`
+naming the stream's own `request_id`, or when the stream closes, as it does when
+the caller's process exits. A `cancel` naming another `request_id` cancels
+nothing, and no frame on one stream reaches another stream's request. A job
+still queued is dropped unrun and frees its queue slot; one running ends its
+adapter process, so its provider call and credential read end with it, and the
+next job of the instance starts at once rather than at the read's budget. The
+cancelled read's answer, written to its own stream which the caller no longer
+reads, carries `interrupted`, and its audit records the failed read. A cancel
+ends no other request, no write and no configuration.
 The actual socket peer must be the configured UID. No credential, source path,
 keyring tuple or continuation is part of ordinary control JSON. A capture admission
 returns only the profile, acquisition reference and original 300-second expiry.
@@ -170,9 +187,10 @@ as the CLI checked it when it asked the connect question. The owner compares it
 with the entry it loads, before any admission, custody check or capture, and
 refuses a difference as `revision_conflict`: an entry another run recorded
 between the question and the request is never connected under. The field is
-omitted by every other `begin`, whose bytes are unchanged, and an owner reads
-the request only from a caller of its own build (`build` above), so the field
-needs no protocol version.
+omitted by every other `begin`, whose bytes are unchanged. The CLI sends a
+`begin` with `"expected_selection"` only to an owner of its own build (its
+`same_build()` check); an owner treats the field as optional and answers
+callers of any build, so the field needs no protocol version.
 
 A command run while an owner of its own build runs for the state directory reads
 the store through that owner instead of opening it. The owner answers a `cached`

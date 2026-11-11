@@ -26,8 +26,8 @@ use std::{
 #[cfg(test)]
 pub(crate) use transport::bound_allocator;
 pub use transport::{
-    Capture, Client, OwnerStop, WriteClient, enable_checkpoints, serve, serve_with_read_policy,
-    stop_owner,
+    Capture, Client, OwnerStop, ReadClient, WriteClient, enable_checkpoints, serve,
+    serve_with_read_policy, stop_owner,
 };
 
 const VERSION: &str = "connectors-owner/1";

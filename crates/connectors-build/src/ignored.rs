@@ -511,11 +511,6 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "connectors-catalog-provider",
             "slack_adversary",
             "an_empty_user_or_email_sends_nothing",
-        )
-        | (
-            "connectors",
-            "adversary_local_mcp_server",
-            "adversary_a_lost_session_leaves_no_provider_read_open",
         ) => Some((Deferred, vec![])),
         _ => None,
     };
