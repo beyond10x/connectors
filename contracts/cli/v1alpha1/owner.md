@@ -123,6 +123,23 @@ adapter launches, or before it reads the credential, reads no credential. An
 adapter process a cancel ended leaves its instance `not_running`, not `failed`. The cancelled read's answer, written to its own stream which the
 caller no longer reads, carries `interrupted`, and its audit records the failed read. A cancel
 ends no other request, no write and no configuration.
+
+The owner's effects rule binds only the bounded read and the projected governed
+read (story:owner-invoke-frame-effects-boundary). Both resolve the operation's
+projected metadata and refuse, `unsupported` before any provider request, an
+operation that declares a semantic effect or an effect other than `network`: the
+MCP projection offers an agent only such reads, and a caller that sends one of
+those frames directly reaches no wider set. The plain `invoke` frame is not a
+boundary against a same-uid client for that rule, and the owner does not read
+operation metadata there. It is governed by the host configuration's grant
+alone: an operation the description does not expose is `not_found`, one the
+configuration does not grant (operation or profile) is `forbidden`, a stale
+revision or schema is `stale_description`, and an operation whose requirement is
+not a read is `unsupported`. A write never reaches the `invoke` frame; it takes
+the write frames, where its approval (and idempotency key) govern it. A
+configured, granted read that declares effects is therefore served on `invoke`
+(`connectors invoke`), as the user who owns the configuration may read what it
+grants.
 The actual socket peer must be the configured UID. No credential, source path,
 keyring tuple or continuation is part of ordinary control JSON. A capture admission
 returns only the profile, acquisition reference and original 300-second expiry.

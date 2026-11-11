@@ -65,6 +65,13 @@ effects. Missing or incompatible declarations, disabled exposures and ungranted
 operations are omitted. Metadata-policy failure refuses the list. Listing never
 probes a credential or invokes the provider.
 
+The owner holds the effects rule itself on the bounded and projected governed
+reads: a declared semantic effect, or an effect other than `network`, is
+`unsupported` before any provider request. The owner's plain `invoke` frame
+(`connectors invoke`) does not read that metadata; the host configuration's
+grant, and for a write its approval, alone govern it
+([owner](../contracts/cli/v1alpha1/owner.md)).
+
 ```console
 connectors --config /absolute/config.toml --state-dir /absolute/state server --transport stdio
 ```

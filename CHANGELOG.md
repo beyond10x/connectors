@@ -4,6 +4,11 @@
 
 ### Changed
 
+- The owner contract now says what governs the plain `invoke` frame: the host configuration's
+  grant alone, a write by its approval on the write frames. The effects rule (a semantic effect or
+  an effect other than `network` is `unsupported`) binds only the bounded and projected governed
+  reads; a granted read declaring effects is still served on `invoke`. No behaviour changed
+  (story:owner-invoke-frame-effects-boundary).
 - A connect, repair, revalidation or read under a changed provider authority or profile
   authentication answers `authentication_changed`, not `lifecycle_conflict`: only a new instance
   id helps, and `check_configuration` says so. MCP clients still see `unavailable`
