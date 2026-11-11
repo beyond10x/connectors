@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:definition-reader-refuses-what-the-feed-engine-refuses
 kind: story
-status: active
+status: implemented
 title: The definition reader refuses every feed the catalog engine refuses at load
 relations:
 - decomposes: epic:zero-open-issues-and-store-defects
@@ -12,10 +12,11 @@ scope:
   path: adapters/catalog/src/feed.rs
 - confidence: inferred
   path: crates/connectors-catalog/src/definition.rs
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:59:23Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:59:24Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T19:24:45Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Outcome
 

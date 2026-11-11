@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:required-body-key-refuses-null
 kind: story
-status: active
+status: implemented
 title: A required body key sent as null is refused before any request
 relations:
 - serves: vision:independent-contract-adapters
@@ -15,10 +15,11 @@ scope:
   path: adapters/catalog/tests/adversary_catalog_body_types.rs
 - confidence: cited
   path: adapters/catalog/tests/jira_issue_writes_adversary.rs
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:22Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:23Z", actor: "human:timo", revision: 5, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T19:24:44Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":2}}}
 ---
 ## Outcome
 
