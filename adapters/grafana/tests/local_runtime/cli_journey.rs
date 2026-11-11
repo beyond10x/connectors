@@ -164,6 +164,7 @@ impl Custody {
         self.epoch += 1;
         let runtime = self.directory.join(format!("r{}", self.epoch));
         filesystem::directory(&runtime, true, true).unwrap();
+        let keyring_stderr = (runtime.clone()).with_extension("stderr");
         let mut daemon = OwnedProcess(
             Command::new("/usr/bin/gnome-keyring-daemon")
                 .args([
@@ -184,7 +185,7 @@ impl Custody {
                 )
                 .stdin(Stdio::piped())
                 .stdout(Stdio::null())
-                .stderr(Stdio::null())
+                .stderr(Stdio::from(std::fs::File::create(&keyring_stderr).unwrap()))
                 .spawn()
                 .unwrap(),
         );
@@ -200,7 +201,8 @@ impl Custody {
         while !keyring::custody::available_at(Some(&self.socket)) {
             assert!(
                 Instant::now() < until,
-                "qualified private fixture custody unavailable"
+                "qualified private fixture custody unavailable; keyring stderr: {}",
+                keyring_stderr_tail(&keyring_stderr)
             );
             assert!(
                 self.daemon
@@ -209,7 +211,9 @@ impl Custody {
                     .0
                     .try_wait()
                     .unwrap()
-                    .is_none()
+                    .is_none(),
+                "fixture keyring daemon exited; its stderr: {}",
+                keyring_stderr_tail(&keyring_stderr)
             );
             std::thread::sleep(Duration::from_millis(30));
         }
@@ -707,4 +711,19 @@ fn journey(provider: &Provider, custody: &mut dyn JourneyCustody, cli: &Cli) {
             .skip(1)
             .all(|c| c.method == "GET" && c.authorization == format!("Bearer {TOKEN_ONE}"))
     );
+}
+
+/// The last lines the fixture's GNOME Keyring wrote to its standard error, for
+/// a failure message: the daemon's own words on why it never answered.
+fn keyring_stderr_tail(path: &std::path::Path) -> String {
+    match std::fs::read_to_string(path) {
+        Ok(text) if text.trim().is_empty() => {
+            format!("(empty: {} was written nothing)", path.display())
+        }
+        Ok(text) => {
+            let lines: Vec<&str> = text.lines().collect();
+            lines[lines.len().saturating_sub(20)..].join("\n")
+        }
+        Err(error) => format!("(unreadable: {}: {error})", path.display()),
+    }
 }
