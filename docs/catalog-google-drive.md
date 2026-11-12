@@ -1,10 +1,10 @@
 # Google Drive through the catalog provider
 
 The catalog provider reads Google Drive — the signed-in user, file metadata,
-exported document text and the change feed — and creates, changes and copies
+an uploaded file's content, exported document text and the change feed — and creates, changes and copies
 file metadata, from the pinned Google Drive API v3 Discovery document. Nothing
 here is Drive-specific code: the Discovery document is projected into OpenAPI,
-the projection is compiled into a bundle, a reviewed selection set exposes six
+the projection is compiled into a bundle, a reviewed selection set exposes seven
 reads and three guarded metadata writes ([Writes](#writes)), and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Connection, approval and invocation work as described there; this page
@@ -49,9 +49,10 @@ run would not reproduce byte for byte.
 ## The shipped selection set
 
 [`adapters/catalog/providers/google-drive/operations.json`](../adapters/catalog/providers/google-drive/operations.json)
-exposes six reads, each `effect: read`, and three writes, each `effect: write`
+exposes seven reads, each `effect: read`, and three writes, each `effect: write`
 ([Writes](#writes)).
-A selection id is the Discovery method id without its `drive.` prefix.
+A selection id is the Discovery method id without its `drive.` prefix, except `files.getMedia`,
+which is `drive.files.get` sent with `alt=media`.
 `adapters/catalog/tests/google_drive.rs` pins this exact id list, each id's
 effect, Discovery id, method and path, and the update's guard, so a renamed or
 dropped id, or a method that moved, fails the gate. The bundle refuses at load any `operation_id` the projection lacks.
@@ -65,6 +66,7 @@ end of a walk are in it.
 | `about.get` | `drive.about.get` | `GET /drive/v3/about` with `fields` | single item | n/a | none |
 | `files.list` | `drive.files.list` | `GET /drive/v3/files` with `q` | `pageToken`, `pageSize` | `nextPageToken` absent | a `q` term such as `modifiedTime > '<RFC 3339>'`; the change feed is `changes.list` |
 | `files.get` | `drive.files.get` | `GET /drive/v3/files/{fileId}` | single item | n/a | none; deltas come from `changes.list` |
+| `files.getMedia` | `drive.files.get` | `GET /drive/v3/files/{fileId}` with `alt=media` | single item | n/a | none; deltas come from `changes.list` |
 | `files.export` | `drive.files.export` | `GET /drive/v3/files/{fileId}/export` with `mimeType` (required) | single item | n/a | none; deltas come from `changes.list` |
 | `changes.getStartPageToken` | `drive.changes.getStartPageToken` | `GET /drive/v3/changes/startPageToken` | single item | n/a | returns `startPageToken`, the first baseline |
 | `changes.list` | `drive.changes.list` | `GET /drive/v3/changes` with `pageToken` (required) | `pageToken`, `pageSize` | `newStartPageToken` present | from the baseline in `pageToken` to `newStartPageToken`, the next baseline |
@@ -86,9 +88,38 @@ end of a walk are in it.
   `newStartPageToken` for `changes.list` (for example
   `nextPageToken,newStartPageToken,changes`). Without them the first page looks
   like the last, and a delta walk ends with no new baseline.
-- **`files.get`** reads metadata only. The media download (`alt=media`) is not
-  projected, so `alt` is refused before any request; use `files.export` for the
-  text of a Google Workspace document.
+- **`files.get`** reads metadata only. The selection withholds `alt`, so a
+  caller cannot turn it into a download: `alt` is refused before any request. Use
+  `files.getMedia` for an uploaded file and `files.export` for the text of a
+  Google Workspace document.
+- **`files.getMedia`** reads an uploaded file's content, such as a PDF: the same
+  Discovery method as `files.get`, sent with `alt=media` fixed, which the caller
+  cannot change. Its input is `fileId`, and `supportsAllDrives` for a file on a
+  shared drive; `fields`, `acknowledgeAbuse`, `includeLabels`,
+  `includePermissionsForView` and `supportsTeamDrives` are withheld, so each is
+  refused before any request (the malware acknowledgement is never sent). The
+  projection carries `alt` only on the methods that support media download, as
+  `json` or `media`. The answer is the engine's binary read, as for Jira and Slack
+  attachments: `body` holds `media_type` (Drive's `Content-Type`), `length`,
+  `sha256` and `content_base64`. It needs only the read scope `drive.readonly`;
+  the projection lists it among the scopes of `files.get`, and the
+  fixture grants nothing else. A file over 2 MiB
+  (`connectors_catalog_provider::BINARY_LIMIT`) is refused as `capacity`, never
+  truncated. The provider's refusal carries the file's size in bytes as its
+  admitted reason, with the limit: for a file the transport lets through
+  (2 MiB to 4 MiB) the engine names the size it read, and for a larger one the
+  transport refuses the answer (`connectors_core::RESPONSE_LIMIT`, 4 MiB) before
+  reading it and names the `Content-Length` Drive declared. That reason crosses
+  the private protocol only; the `Failure` the `connectors` CLI prints for a
+  `capacity` refusal carries no reason (a reason rides only beside a
+  `service_code` or on the provider's own `forbidden`), so read `size` with
+  `files.get` to learn how large a refused file is. A Google Docs, Sheets or
+  Slides file has no bytes to download: Drive answers `403`
+  (`fileNotDownloadable`), which is refused as `forbidden` with the admitted
+  reason "A Google Docs, Sheets or Slides file has no bytes to download; read it
+  with `files.export`", the engine's fixed text in place of Drive's own, which
+  sits in a nested member no reason is read from. The selection does not follow
+  a redirect, because it admits no host besides Drive's own.
 - **`files.export`** takes the file's `fileId` and the target `mimeType`, such as
   `text/plain`. The projection declares its answer `application/octet-stream`,
   so the selection declares `response: text` and the body is returned as a JSON
@@ -207,7 +238,7 @@ One instance per Google account reads and writes. Its consent requests
 `https://www.googleapis.com/auth/drive.file`, and the connection's
 `minimum_scopes` are both Drive scopes, so an entry consented for one of them
 alone fails validation as insufficient scope. The read scope lets its reads and
-each update's preflight see every file.
+each update's preflight see every file; `files.getMedia` needs no more than it.
 
 Add to the host configuration (`~/.config/connectors/config.toml`, format
 `connectors-local/5`):
@@ -220,7 +251,7 @@ enabled = true
 ```
 
 The `drive` connector's default endpoint is
-`https://www.googleapis.com/drive/v3`. The bundle, the nine operations, the
+`https://www.googleapis.com/drive/v3`. The bundle, the ten operations, the
 profile and the provider executable are derived from the shipped connector:
 
 ```console
@@ -271,9 +302,12 @@ connections of the old pair with `connections revoke` and remove their entries.
   configuration with the fixture as API and token host, one token exchange, the exact request of each
   read with the exchanged bearer, the returned body as JSON (the export as
   text), a two-page walk of `files.list` to a page without `nextPageToken` and of
-  `changes.list` to `newStartPageToken`, and the `pageSize` bounds. No live Drive
-  account has been read; live evidence belongs to
-  `story:catalog-google-live-deck-read`.
+  `changes.list` to `newStartPageToken`, and the `pageSize` bounds. The media
+  read is verified the same way: a PDF fixture read as bytes under the read
+  scope alone, a file over the binary read limit refused as capacity, and a
+  Google Docs file refused as forbidden by the fixture's `403`, none of it
+  against Drive itself. No live Drive account has been read; live evidence
+  belongs to `story:catalog-google-live-deck-read`.
 - The writes are verified against the same fixture through a private protocol
   two child, not through the CLI: the exact request and body of each write, the
   update's one preflight, a stale `version` refused with no PATCH sent, an
@@ -300,7 +334,11 @@ connections of the old pair with `connections revoke` and remove their entries.
   input schemas, and so the descriptor revision; an approval policy bound to
   the earlier revision must be issued again. Adding `rate_limit_reasons`
   changed the selection set, and so the configuration revision of a Drive
-  instance.
+  instance; so did `files.getMedia`, and the bundle now carries `alt` on
+  `drive.files.get`, so a pinned `configuration_revision` is copied again.
+- `files.getMedia` reads at most 2 MiB. A larger file is refused, not read in
+  part, and no ranged read is offered. A redirect in Drive's answer is refused as
+  forbidden, because the selection admits no host besides Drive's own.
 
 ## Support-table summary
 

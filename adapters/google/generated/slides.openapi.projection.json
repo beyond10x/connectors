@@ -45,7 +45,7 @@
     "slides.presentations.pages.get",
     "slides.presentations.pages.getThumbnail"
   ],
-  "projector": "discovery-openapi/1",
+  "projector": "discovery-openapi/2",
   "rewritten_paths": [
     {
       "discovery_path": "v1/presentations/{+presentationId}",

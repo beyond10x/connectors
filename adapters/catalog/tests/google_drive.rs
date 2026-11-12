@@ -92,6 +92,10 @@ const SHIPPED: [(&str, &str, &str); 6] = [
     ("files.get", "drive.files.get", "/drive/v3/files/{fileId}"),
     ("files.list", "drive.files.list", "/drive/v3/files"),
 ];
+/// The media read: `drive.files.get` sent with `alt=media`, so its id is not
+/// a Discovery method id. `getMedia` follows the camel case of
+/// `changes.getStartPageToken`.
+const MEDIA: &str = "files.getMedia";
 /// The shipped writes: id, Discovery method id, method and recorded path.
 const WRITES: [(&str, &str, &str, &str); 3] = [
     (
@@ -133,6 +137,9 @@ fn committed_bundle() -> bundle::Bundle {
     bundle::load(&root().join("generated/bundles"), PROVIDER).unwrap()
 }
 
+/// Six reads are one Discovery method each, named as it is; the seventh,
+/// `files.getMedia`, is `drive.files.get` with `alt=media` and so has a name of
+/// its own ([`MEDIA`]). The test name is cited by the status page.
 #[test]
 fn shipped_drive_selections_are_the_six_reads_and_three_writes() {
     let selections = shipped();
@@ -148,11 +155,13 @@ fn shipped_drive_selections_are_the_six_reads_and_three_writes() {
         ids.sort();
         ids
     };
-    let reads: Vec<&str> = SHIPPED.iter().map(|(id, _, _)| *id).collect();
+    let mut reads: Vec<&str> = SHIPPED.iter().map(|(id, _, _)| *id).collect();
+    reads.push(MEDIA);
+    reads.sort();
     let writes: Vec<&str> = WRITES.iter().map(|(id, _, _, _)| *id).collect();
     assert_eq!(ids(&[Effect::Read]), reads);
     assert_eq!(ids(&[Effect::Write]), writes);
-    assert_eq!(selections.len(), SHIPPED.len() + WRITES.len());
+    assert_eq!(selections.len(), SHIPPED.len() + 1 + WRITES.len());
     for (id, operation_id, method, path) in WRITES {
         let selection = selections.iter().find(|s| s.id == id).unwrap();
         assert_eq!(selection.operation_id, operation_id, "`{id}`");
@@ -249,9 +258,65 @@ fn shipped_drive_selections_are_the_six_reads_and_three_writes() {
     }
     // Only the export reads its body as text; the projection declares it
     // `application/octet-stream`, which the engine would otherwise parse as JSON.
+    // Only the media read answers bytes.
     for selection in &selections {
         let text = selection.response == Some(ResponseKind::Text);
         assert_eq!(text, selection.id == "files.export", "`{}`", selection.id);
+        let binary = selection.response == Some(ResponseKind::Binary);
+        assert_eq!(binary, selection.id == MEDIA, "`{}`", selection.id);
+    }
+}
+
+/// The uploaded file's content: `drive.files.get` sent with `alt=media`, a
+/// binary read bounded as every binary read is, and under the read scope
+/// every other Drive read uses.
+#[test]
+fn files_get_media_is_a_bounded_binary_read_of_files_get_under_the_read_scope() {
+    let selections = shipped();
+    let selection = selections.iter().find(|s| s.id == MEDIA).unwrap();
+    assert_eq!(selection.operation_id, "drive.files.get");
+    assert_eq!(selection.effect, Effect::Read);
+    assert_eq!(selection.response, Some(ResponseKind::Binary));
+    let binary = selection.binary.as_ref().unwrap();
+    assert_eq!(binary.max_bytes, connectors_catalog_provider::BINARY_LIMIT);
+    assert!(binary.hosts.is_empty(), "{:?}", binary.hosts);
+    assert_eq!(
+        selection.query_fixed,
+        [("alt".to_owned(), "media".to_owned())].into()
+    );
+    let description = selection.description.as_deref().unwrap();
+    assert!(
+        description.contains("files.export") && description.contains("Google Docs"),
+        "{description}"
+    );
+    // The metadata read cannot be turned into a download by the caller.
+    let metadata = selections.iter().find(|s| s.id == "files.get").unwrap();
+    assert!(metadata.withhold.contains(&"alt".to_owned()));
+    // The projected operation lists the read-only scope among those it takes.
+    let projected: Value =
+        serde_json::from_slice(&fs::read(root().join(PROJECTED)).unwrap()).unwrap();
+    let scopes = &projected["paths"]["/files/{fileId}"]["get"]["x-google-scopes"];
+    assert!(
+        scopes
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|scope| scope == DRIVE_SCOPE),
+        "{scopes}"
+    );
+    let engine = Engine::new(&committed_bundle(), BASE, &selections).unwrap();
+    let declaration = engine
+        .declarations(&[Effect::Read])
+        .into_iter()
+        .find(|d| d.id == MEDIA)
+        .unwrap();
+    assert_eq!(declaration.input_schema["required"], json!(["fileId"]));
+    let properties = declaration.input_schema["properties"].as_object().unwrap();
+    for sent in ["fileId", "supportsAllDrives"] {
+        assert!(properties.contains_key(sent), "`{sent}`");
+    }
+    for refused in ["alt", "fields", "acknowledgeAbuse"] {
+        assert!(!properties.contains_key(refused), "`{refused}`");
     }
 }
 
@@ -405,6 +470,34 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
                 && row.contains(deltas)
         });
         assert!(paged, "no row states the paging of `{id}`");
+    }
+}
+
+/// The guide cites the media read with its request, its bytes and its bound,
+/// and says where a Google Docs file is read instead.
+#[test]
+fn guide_cites_the_media_read_its_bound_and_the_google_docs_exception() {
+    let guide = fs::read_to_string(root().join("../../docs/catalog-google-drive.md")).unwrap();
+    let rows: Vec<&str> = guide.lines().filter(|l| l.starts_with('|')).collect();
+    assert!(
+        rows.iter()
+            .any(|row| row.starts_with(&format!("| `{MEDIA}` "))
+                && row.contains("`drive.files.get`")
+                && row.contains("`GET /drive/v3/files/{fileId}` with `alt=media`")),
+        "no row cites `{MEDIA}`"
+    );
+    let paragraph = guide
+        .split("\n- **")
+        .find(|item| item.starts_with(&format!("`{MEDIA}`")))
+        .unwrap_or_else(|| panic!("no item explains `{MEDIA}`"));
+    for stated in [
+        "2 MiB",
+        "capacity",
+        "Google Docs",
+        "`files.export`",
+        "`drive.readonly`",
+    ] {
+        assert!(paragraph.contains(stated), "the item lacks {stated}");
     }
 }
 
@@ -573,12 +666,44 @@ fn change(file_id: &str, time: &str) -> Value {
 /// The bytes `files.export` answers, as `text/plain`.
 const EXPORTED: &str = "Fixture document\nsecond line, exported as plain text\n";
 
+/// An uploaded PDF's bytes, which are not UTF-8: only a binary read answers them.
+const PDF: &[u8] = b"%PDF-1.4\n%\xE2\xE3\xCF\xD3\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n";
+/// The one file the fixture refuses to download, as Drive does a Google Docs
+/// file asked for with `alt=media`.
+const GOOGLE_DOC_MEDIA: &str = "/drive/v3/files/fixture-doc-1?alt=media";
+/// Drive's own 403 answer to that request.
+fn not_downloadable() -> Value {
+    json!({"error": {"code": 403,
+        "message": "Only files with binary content can be downloaded. Use Export with Docs Editors files.",
+        "errors": [{"message": "Only files with binary content can be downloaded. Use Export with Docs Editors files.",
+                    "domain": "global", "reason": "fileNotDownloadable",
+                    "location": "alt", "locationType": "parameter"}]}})
+}
+/// The size of the file `fixture-large-pdf-1`: one byte over the binary read limit.
+fn large() -> usize {
+    connectors_catalog_provider::BINARY_LIMIT as usize + 1
+}
+
+/// The size of the file `fixture-huge-pdf-1`: one byte over the transport's
+/// response limit, which refuses it before the engine sees it.
+fn huge() -> usize {
+    connectors_core::RESPONSE_LIMIT + 1
+}
+
 /// The recorded Drive answers the fixture serves, keyed by route and paging
 /// position: a status, a content type and a body. `None` for anything else,
 /// which the fixture answers 404.
 fn answer(target: &str) -> Option<(&'static str, Vec<u8>)> {
     let (route, query) = target.split_once('?').unwrap_or((target, ""));
     let has = |pair: &str| query.split('&').any(|p| p == pair);
+    if has("alt=media") {
+        return match route {
+            "/drive/v3/files/fixture-pdf-1" => Some(("application/pdf", PDF.to_vec())),
+            "/drive/v3/files/fixture-large-pdf-1" => Some(("application/pdf", vec![b'%'; large()])),
+            "/drive/v3/files/fixture-huge-pdf-1" => Some(("application/pdf", vec![b'%'; huge()])),
+            _ => None,
+        };
+    }
     let json_body = |value: Value| Some(("application/json", serde_json::to_vec(&value).unwrap()));
     if route == "/drive/v3/files/fixture-doc-1/export" && has("mimeType=text%2Fplain") {
         return Some(("text/plain; charset=utf-8", EXPORTED.as_bytes().to_vec()));
@@ -772,6 +897,11 @@ impl Provider {
                         let written = write_answer(&method, &target, &body)
                             .map(|value| ("application/json", serde_json::to_vec(&value).unwrap()));
                         match (method.as_str(), answer(&target), written) {
+                            ("GET", _, _) if target == GOOGLE_DOC_MEDIA => (
+                                403,
+                                "application/json",
+                                serde_json::to_vec(&not_downloadable()).unwrap(),
+                            ),
                             ("GET", Some((content_type, body)), _) => (200, content_type, body),
                             ("POST" | "PATCH", _, Some((content_type, body))) => {
                                 (200, content_type, body)
@@ -1023,6 +1153,162 @@ fn files_get_refuses_a_media_download() {
     );
     assert!(matches!(outcome, Err(Failure::InvalidInput)), "{outcome:?}");
     assert!(provider.api_targets().is_empty(), "a request was sent");
+}
+
+/// An uploaded PDF is read as bytes: the request is `files/{fileId}` with
+/// `alt=media`, sent with the read-scope bearer, and the answer is the media
+/// type, length, SHA-256 and base64 of the bytes, as every binary read answers.
+#[test]
+fn files_get_media_reads_an_uploaded_pdf_as_bytes() {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let result = invoke(&mut child, MEDIA, json!({"fileId": "fixture-pdf-1"}));
+    let expected = "/drive/v3/files/fixture-pdf-1?alt=media";
+    assert_eq!(provider.api_targets(), [expected]);
+    let (method, _, authorization) = provider
+        .requests()
+        .into_iter()
+        .rfind(|(_, target, _)| target == expected)
+        .unwrap();
+    assert_eq!(method, "GET");
+    assert_eq!(
+        authorization.as_deref(),
+        Some(&*format!("Bearer {ACCESS_TOKEN}"))
+    );
+    assert_eq!(result["status"], 200);
+    assert_eq!(result["body"]["media_type"], "application/pdf");
+    assert_eq!(result["body"]["length"], PDF.len());
+    assert_eq!(result["body"]["sha256"], hex::encode(Sha256::digest(PDF)));
+    assert_eq!(
+        STANDARD
+            .decode(result["body"]["content_base64"].as_str().unwrap())
+            .unwrap(),
+        PDF
+    );
+    assert_eq!(result["provenance"]["resource"], "/drive/v3/files/{fileId}");
+}
+
+/// The caller cannot change what the media read asks for: `alt`, `fields` and
+/// the malware acknowledgement are refused before any request.
+#[test]
+fn files_get_media_refuses_the_parameters_that_change_what_it_downloads() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for extra in [
+        json!({"alt": "json"}),
+        json!({"fields": "id"}),
+        json!({"acknowledgeAbuse": true}),
+    ] {
+        let mut input = json!({"fileId": "fixture-pdf-1"});
+        input
+            .as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        let outcome = attempt(&mut child, MEDIA, &input);
+        assert!(matches!(outcome, Err(Failure::InvalidInput)), "{outcome:?}");
+    }
+    assert!(provider.api_targets().is_empty(), "a request was sent");
+}
+
+/// A file over the binary read limit is refused as capacity, not truncated.
+#[test]
+fn files_get_media_refuses_a_file_over_the_binary_read_limit() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let outcome = attempt(&mut child, MEDIA, &json!({"fileId": "fixture-large-pdf-1"}));
+    assert!(matches!(outcome, Err(Failure::Capacity)), "{outcome:?}");
+}
+
+/// A file over the transport's own 4 MiB response limit is refused before it
+/// is read, and the caller's refusal names the size Drive declared.
+#[test]
+fn files_get_media_names_the_size_of_a_file_over_the_transport_limit() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let refusal = adversary_explained(&mut child, MEDIA, &json!({"fileId": "fixture-huge-pdf-1"}))
+        .unwrap_err();
+    assert!(matches!(refusal.failure, Failure::Capacity), "{refusal:?}");
+    let size = huge().to_string();
+    assert!(
+        refusal.reason.as_deref().is_some_and(|r| r.contains(&size)),
+        "the refusal does not name the size {size}: {refusal:?}"
+    );
+}
+
+/// A Google Docs file has no bytes to download: Drive answers 403, which is
+/// refused as forbidden.
+#[test]
+fn files_get_media_refuses_a_google_docs_file() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let outcome = attempt(&mut child, MEDIA, &json!({"fileId": "fixture-doc-1"}));
+    assert!(
+        matches!(outcome, Err(Failure::ProviderForbidden)),
+        "{outcome:?}"
+    );
+    assert_eq!(provider.api_targets(), [GOOGLE_DOC_MEDIA]);
+}
+
+/// What the child reduces to a code, the engine says in words: the oversized
+/// file is refused naming its size and the limit, and the Google Docs
+/// refusal is Drive's, the declaration being what points to `files.export`.
+#[tokio::test]
+async fn files_get_media_names_the_size_it_refuses_and_points_google_docs_to_files_export() {
+    use connectors_core::ErrorCode;
+    use connectors_sdk::{AuthenticatedHttp, HttpResponse};
+    struct Drive(u16, Vec<u8>);
+    #[async_trait::async_trait]
+    impl AuthenticatedHttp for Drive {
+        async fn get(
+            &self,
+            _path: &[&str],
+            query: &[(&str, String)],
+        ) -> connectors_core::Result<HttpResponse> {
+            assert_eq!(query, [("alt", "media".to_owned())]);
+            Ok(HttpResponse {
+                status: self.0,
+                headers: [("content-type".to_owned(), "application/pdf".to_owned())].into(),
+                body: self.1.clone(),
+            })
+        }
+    }
+    let selections = shipped();
+    let engine = Engine::new(&committed_bundle(), BASE, &selections).unwrap();
+    let read = |port: Drive| {
+        let engine = &engine;
+        async move {
+            engine
+                .read(
+                    &port,
+                    "fixture-google-drive",
+                    MEDIA,
+                    json!({"fileId": "f1"}),
+                )
+                .await
+        }
+    };
+    let error = read(Drive(200, vec![b'%'; large()])).await.unwrap_err();
+    assert_eq!(error.code, ErrorCode::Capacity);
+    assert!(
+        error.message.contains(&format!("{} bytes", large())) && error.message.contains("2097152"),
+        "{}",
+        error.message
+    );
+    let error = read(Drive(403, serde_json::to_vec(&not_downloadable()).unwrap()))
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::Forbidden);
+    let selection = selections.iter().find(|s| s.id == MEDIA).unwrap();
+    assert!(
+        selection
+            .description
+            .as_deref()
+            .unwrap()
+            .contains("refused as forbidden: read it with files.export"),
+        "{:?}",
+        selection.description
+    );
 }
 
 /// `changes.list` needs a `pageToken`; without one nothing is sent.
@@ -1574,4 +1860,62 @@ fn a_drive_write_approval_for_a_different_body_is_refused() {
             );
         }
     }
+}
+
+/// Adversary: the dispatched read's refusal as the caller receives it through
+/// the private protocol, with its reason (`Child::invoke_explained`).
+fn adversary_explained(
+    child: &mut Child,
+    operation: &str,
+    input: &Value,
+) -> Result<Vec<u8>, connectors_host::local::runtime::Refusal> {
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    child.invoke_explained(
+        operation,
+        &revision,
+        "one",
+        &secret(),
+        &serde_json::to_vec(input).unwrap(),
+        connectors_sdk::now_ms() + 30_000,
+    )
+}
+
+/// Adversary (acceptance): "refused above the binary read limit with the file
+/// size named". The caller of the Drive instance receives the refusal through
+/// the private protocol; the size must reach it there, not only in the
+/// engine's own error message.
+#[test]
+fn adversary_files_get_media_refusal_names_the_file_size_to_the_caller() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let refusal = adversary_explained(&mut child, MEDIA, &json!({"fileId": "fixture-large-pdf-1"}))
+        .unwrap_err();
+    assert!(matches!(refusal.failure, Failure::Capacity), "{refusal:?}");
+    let size = large().to_string();
+    assert!(
+        refusal.reason.as_deref().is_some_and(|r| r.contains(&size)),
+        "the caller's refusal does not name the file size {size}: {refusal:?}"
+    );
+}
+
+/// Adversary (acceptance): a Google Docs file is refused "pointing to
+/// files.export". The caller's refusal must say so; a bare `provider_forbidden`
+/// is indistinguishable from a file the user may not open.
+#[test]
+fn adversary_files_get_media_refusal_of_a_google_docs_file_points_the_caller_to_files_export() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let refusal =
+        adversary_explained(&mut child, MEDIA, &json!({"fileId": "fixture-doc-1"})).unwrap_err();
+    assert!(
+        matches!(refusal.failure, Failure::ProviderForbidden),
+        "{refusal:?}"
+    );
+    assert!(
+        refusal
+            .reason
+            .as_deref()
+            .is_some_and(|r| r.contains("files.export") || r.contains("Export")),
+        "the caller's refusal does not point to files.export: {refusal:?}"
+    );
 }

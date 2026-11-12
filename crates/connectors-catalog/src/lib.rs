@@ -123,7 +123,7 @@ pub struct Derivation {
     /// derived from a Discovery document keeps its bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discovery_revision: Option<String>,
-    /// `discovery-openapi/1` or `swagger2-openapi/2`.
+    /// `discovery-openapi/2` or `swagger2-openapi/2`.
     pub projector: String,
 }
 

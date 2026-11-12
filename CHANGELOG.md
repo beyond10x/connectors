@@ -13,6 +13,18 @@
   scopes for this set (deals, companies, line items and owners read; no contacts scope). Reads
   only. The HubSpot configuration revision moves: a pinned `configuration_revision` must be
   copied again (story:hubspot-owners-and-line-items).
+- Drive `files.getMedia` reads an uploaded file's content, such as a PDF, under the read-only
+  Drive scope: `drive.files.get` with `alt=media`, answered as base64 with its media type, length
+  and SHA-256, and refused as `capacity` above 2 MiB; the provider's refusal names the size
+  (also of a file over the transport's 4 MiB limit, from its `Content-Length`). A Google Docs,
+  Sheets or Slides file is refused as forbidden, with a reason pointing to `files.export`. The
+  Discovery projector is now
+  `discovery-openapi/2`: it projects `alt` (`json` or `media`) on a method that supports media
+  download and answers JSON, and a definition lowered from a Discovery source withholds `alt` on
+  every selection that does not fix it, so a Drive definition written before this keeps `files.get`
+  metadata-only. The Calendar, Drive, Gmail and Slides bundles record the new projector,
+  so those four connectors' configuration revisions move: a pinned `configuration_revision` must be
+  copied again (story:drive-file-content-read).
 
 ### Changed
 

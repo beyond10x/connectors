@@ -72,6 +72,7 @@ mod google_calendar_gmail_adversary_pass2;
 mod google_calendar_writes_adversary;
 mod google_calendar_writes_adversary_pass2;
 mod google_drive;
+mod google_drive_media_adversary;
 mod google_drive_writes_adversary;
 mod google_drive_writes_adversary_pass2;
 mod google_gmail;

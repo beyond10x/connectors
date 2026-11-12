@@ -224,6 +224,8 @@ struct ShippedOperation {
     #[serde(default)]
     custody: Option<Custody>,
     #[serde(default)]
+    query_fixed: Option<IndexMap<String, String>>,
+    #[serde(default)]
     envelope: Option<Envelope>,
     #[serde(default)]
     body_keys: Vec<String>,
@@ -2165,7 +2167,10 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
             body_prefixes: in_body_order(operation, &operation.body_prefixes),
             conflict_status: operation.conflict_status,
             guard,
-            query_fixed: None,
+            query_fixed: operation
+                .query_fixed
+                .clone()
+                .filter(|fixed| !fixed.is_empty()),
             query_folds: None,
             embedded_text: None,
             rate_limit_headers: None,

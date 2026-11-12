@@ -23,7 +23,15 @@ operations:
     description: List files matching the search query q, one page per call; the walk follows nextPageToken as pageToken and ends on a page without it; that end condition holds only if fields, when given, includes nextPageToken, so include it (for example nextPageToken,files(id,name))
   files.get:
     op: drive.files.get
-    description: Read one file's metadata by fileId; its content is not downloaded here (use files.export for Google Workspace documents)
+    withhold: [alt]
+    description: Read one file's metadata by fileId; its content is not downloaded here (use files.getMedia for an uploaded file such as a PDF, files.export for a Google Workspace document)
+  files.getMedia:
+    op: drive.files.get
+    response: binary
+    binary: {max_bytes: 2097152}
+    query_fixed: {alt: media}
+    withhold: [acknowledgeAbuse, fields, includeLabels, includePermissionsForView, supportsTeamDrives]
+    description: "Read one uploaded file's content, such as a PDF, by fileId (files.get with alt=media); answers the bytes in base64 with their media_type, length and sha256, refused as capacity above 2 MiB, naming the size of a file the transport 4 MiB limit lets through, and under the read-only Drive scope; a Google Docs, Sheets or Slides file has no bytes to download and is refused as forbidden: read it with files.export; supportsAllDrives, when given, reaches a shared-drive file"
   files.export:
     op: drive.files.export
     response: text

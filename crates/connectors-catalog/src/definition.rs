@@ -3463,6 +3463,7 @@ pub fn select(
     {
         check_rate_limit_headers("defaults", headers)?;
     }
+    let discovery = matches!(definition.source.document(), Ok((SourceKind::Discovery, _)));
     let mut operations = Vec::new();
     for (key, operation) in &definition.operations {
         let carried = carried(definition, operation);
@@ -3603,6 +3604,24 @@ pub fn select(
             check_embedded_text(key, embedded, found)?;
         }
         check_fixed_query(key, operation, found, &bounds, &carried)?;
+        let mut withhold = carried.withhold.clone();
+        // The projector (`discovery-openapi/2`) gives a media-download method
+        // an `alt` parameter. A selection that does not fix it never takes it
+        // from the caller, so a definition written before the projector
+        // projected it keeps its metadata read metadata-only.
+        if discovery
+            && query.contains(&crate::discovery::MEDIA_PARAMETER)
+            && !withhold
+                .iter()
+                .any(|name| name == crate::discovery::MEDIA_PARAMETER)
+            && !operation
+                .query_fixed
+                .iter()
+                .flatten()
+                .any(|(name, _)| name == crate::discovery::MEDIA_PARAMETER)
+        {
+            withhold.push(crate::discovery::MEDIA_PARAMETER.to_owned());
+        }
         let guard = operation
             .guard
             .as_ref()
@@ -3625,7 +3644,7 @@ pub fn select(
             envelope: carried.envelope,
             bounds,
             required: carried.required,
-            withhold: carried.withhold,
+            withhold,
             credential: carried.credential,
             rate_limit_reasons: carried.rate_limit_reasons,
             refusal_texts: carried.refusal_texts,

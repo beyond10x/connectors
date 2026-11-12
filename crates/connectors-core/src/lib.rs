@@ -50,7 +50,9 @@ pub struct Error {
     pub upstream_answer: bool,
     /// In-process only: the upstream's own bounded, redacted reason for its
     /// answer, as [`reason::from_body`] admits it. Never on the wire, and never
-    /// in `message`; only the local private adapter route forwards it.
+    /// in `message`; only the local private adapter route forwards it. A
+    /// capacity refusal the adapter raises itself may carry the size it
+    /// refused, as its one reason.
     #[serde(skip)]
     pub upstream_reason: Option<String>,
 }

@@ -1,5 +1,5 @@
 {
-  "projector": "discovery-openapi/1",
+  "projector": "discovery-openapi/2",
   "discovery_revision": "20260101",
   "method_count": 1,
   "operations": ["fixture.things.create"],

@@ -174,6 +174,15 @@ mod failure_tests {
                 .with_upstream_reason(Some(scope.into())),
         );
         assert_eq!(raised.reason, None);
+        // A response over its bound is the adapter's own capacity refusal; the
+        // size it names is the one reason such a refusal carries.
+        let size = "binary response of 2097153 bytes exceeds max_bytes of 2097152";
+        let capacity = Refusal::from_provider(
+            connectors_core::Error::new(ErrorCode::Capacity, "private-provider-message")
+                .with_upstream_reason(Some(size.into())),
+        );
+        assert_eq!(capacity.failure, Failure::Capacity);
+        assert_eq!(capacity.reason.as_deref(), Some(size));
         assert_eq!(
             Error::from(Refusal::from(Failure::Protocol)).service_reason,
             None
@@ -397,12 +406,13 @@ impl From<Failure> for Refusal {
 }
 impl Refusal {
     /// [`Failure::from_provider`], keeping the reason only of an upstream's
-    /// own answer, and the delay only of its rate-limit answer.
+    /// own answer, or of a capacity refusal (a response over its bound, whose
+    /// reason names the size), and the delay only of its rate-limit answer.
     pub fn from_provider(error: connectors_core::Error) -> Self {
         let reason = error
             .upstream_reason
             .as_deref()
-            .filter(|_| error.upstream_answer)
+            .filter(|_| error.upstream_answer || error.code == ErrorCode::Capacity)
             .and_then(connectors_core::reason::admit);
         // Only the provider's own rate-limit answer names a delay.
         let retry_after_seconds = error

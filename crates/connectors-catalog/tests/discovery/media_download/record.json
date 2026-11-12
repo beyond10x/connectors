@@ -1,0 +1,11 @@
+{
+  "projector": "discovery-openapi/2",
+  "discovery_revision": "20260101",
+  "method_count": 2,
+  "operations": ["fixture.things.get", "fixture.things.list"],
+  "excluded_methods": [],
+  "rewritten_paths": [],
+  "excluded_parameters": [],
+  "excluded_upload_paths": [],
+  "ignored_keys": []
+}

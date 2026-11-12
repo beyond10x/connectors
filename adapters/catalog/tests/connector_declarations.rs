@@ -848,27 +848,27 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "05 catalog-google-calendar.md",
-            "6cb9c703e94cf6388f3098b9d0b659cd98d845353cd41a413834d858e9991c30",
+            "21f28863253c2e15af454dfb8c47030a73ab7ce2b6169f0c1d06849b9753e681",
         ),
         (
             "06 catalog-google-calendar.md",
-            "9521fb9b33ce11339d7e302f48ad9507317d1f2e4f2d2ac4ab9c5f43afc72d68",
+            "c5f570fdbdb699c897682491a05a2d529d20b72ec793d08b7679cf21bb3c1b65",
         ),
         (
             "07 catalog-google-drive.md",
-            "186ed90d3663ae6e16e433d0a4ba51dd8ab2b7a0cfa781f5e44888a31a9a50b7",
+            "e75bbfd16d0fc1e1e25dfa2f1aea46b3710d2ac0ae2353b3544be88098234e01",
         ),
         (
             "08 catalog-google-drive.md",
-            "c51d25463f7ac27819e4038e185628f0b2eac2e4f581c988d38a044ef37a55df",
+            "9d0a6ec64bb117a05d74a2caf06e18ac1d9864559450e88d9b156392db8c583c",
         ),
         (
             "09 catalog-google-gmail.md",
-            "82216e47194b9a94e167f15c39b7c01497593274fbde536c90f053a18316152e",
+            "540402e036de353590995a034b2dcb1ae491a37379bfa4f56532e74c765780c1",
         ),
         (
             "10 catalog-google-slides.md",
-            "3ba7cb1ade963d628b80a9a4330f36501ccfc24cde08bdfe613565c3ec8f6d4c",
+            "6ded40ea130bebef82c4c795fdd8c5440c1890d032c9a0572c3f01e667549d33",
         ),
         (
             "11 catalog-grafana.md",

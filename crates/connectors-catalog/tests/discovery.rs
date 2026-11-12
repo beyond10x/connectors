@@ -186,6 +186,33 @@ fn discovery_rule_no_response() {
 }
 
 #[test]
+fn discovery_rule_media_download() {
+    rule("media_download");
+}
+
+#[test]
+fn discovery_projects_alt_only_where_the_pinned_documents_serve_media() {
+    let mut media = Vec::new();
+    for (api, file) in PINNED {
+        let openapi: Value = serde_json::from_slice(&projected(api, file).openapi).unwrap();
+        for item in openapi["paths"].as_object().unwrap().values() {
+            for operation in item.as_object().unwrap().values() {
+                let carries = operation["parameters"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .any(|parameter| parameter["name"] == "alt");
+                if carries {
+                    media.push(operation["operationId"].as_str().unwrap().to_owned());
+                }
+            }
+        }
+    }
+    media.sort();
+    assert_eq!(media, ["drive.files.get", "drive.revisions.get"]);
+}
+
+#[test]
 fn discovery_rule_media_upload() {
     rule("media_upload");
 }
