@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:host-gate-load-sensitivity-w3
 kind: story
-status: active
+status: implemented
 title: Three more host and adapter tests bound their own waits
 relations:
 - serves: vision:independent-contract-adapters
@@ -14,15 +14,18 @@ scope:
   path: crates/connectors-host/src/local/owner/approval_issuance/tests.rs
 - confidence: inferred
   path: crates/connectors-host/tests/service.rs
-revision: 8
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:30Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:31Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-11T22:12:55Z", actor: "human:operator", revision: 10, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Acceptance
 
-Each test below passes the full gate on a host at load average 30 or more, with every wall-clock
-bound it waits on set by the test:
+Changed by the operator on 2026-11-11 (decision-blocker:load-acceptance-without-load-tests, option A): no
+load run on the shared workstation. Each test below bounds every wall-clock wait it makes, shown by
+reading the code and, where a failure mode exists, by a deterministic seam that fails without the
+guard:
 
 - `local::owner::approval_issuance::tests::clock_exchange_precedes_leases_and_policy_is_rechecked_after_network`
   (`crates/connectors-host/src/local/owner/approval_issuance/tests.rs:497`)

@@ -2,12 +2,15 @@
 format: aep.planning-md/3
 id: decision-blocker:load-acceptance-without-load-tests
 kind: decision-blocker
-status: open
+status: cleared
 title: A load-30 gate acceptance cannot run where load tests are forbidden
 relations:
 - blocks: story:host-gate-load-sensitivity-w3
+- blocks: story:gmail-attachment-read-flaky-under-load
 withholds: test_result
-revision: 1
+revision: 2
+transitions:
+- {from: "open", to: "cleared", at: "2026-11-11T22:12:54Z", actor: "human:operator", revision: 2}
 ---
 ## Question
 
