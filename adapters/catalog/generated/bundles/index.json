@@ -83,9 +83,9 @@
     {
       "provider": "hubspot",
       "file_name": "hubspot.bundle.json",
-      "bundle_sha256": "d4d2b0e1adf9208a2b3e93022ae9ec25f6b13b0a2579d73f0129d54384ec1e86",
+      "bundle_sha256": "6ce3dfc45972c7ce4aba5e499df9beb9bb6c0fc492b06793b1d5f6dc18046d1f",
       "source_sha256": "1cb7ca32e7a9ff224838f8c1f02a99104e509d651fc2524dfd16f77fdc9be9f9",
-      "operations": 11,
+      "operations": 13,
       "unsupported": 0
     },
     {

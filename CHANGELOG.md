@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added
+
+- The `hubspot` connector reads owners: `owners.list` (paged by `after`, `email` and `archived`
+  filters) and `owner.get`, so the `hubspot_owner_id` a deal or company carries becomes a name,
+  email and teams. Both come from HubSpot's published Crm Owners `2026-09` document, vendored
+  under `adapters/hubspot/upstream/` with its digest, and enter the one-source HubSpot bundle as
+  cited amendments that a test holds equal to that document. Deals, companies and line items
+  through `objects.list` and `object.get` are covered by a fixture test, and the guide names the
+  scopes for this set (deals, companies, line items and owners read; no contacts scope). Reads
+  only. The HubSpot configuration revision moves: a pinned `configuration_revision` must be
+  copied again (story:hubspot-owners-and-line-items).
+
 ### Changed
 
 - On Linux a catalog provider that a derivation, `--print-profiles` or the installed-provider check

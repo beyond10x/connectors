@@ -369,8 +369,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "HubSpot CRM",
-        "One object type's records, paged, and one record by id; exercised against local fixtures only.",
-        "adapters/catalog/tests/hubspot.rs::shipped_hubspot_selections_are_exactly_the_two_reads",
+        "One object type's records, paged, one record by id, and the account's owners, paged or by id; exercised against local fixtures only.",
+        "adapters/catalog/tests/hubspot.rs::shipped_hubspot_selections_are_exactly_the_four_reads",
         "/docs/reference/adapters/catalog",
     ),
     shipped(

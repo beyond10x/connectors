@@ -5,5 +5,12 @@
     "sha256": "1cb7ca32e7a9ff224838f8c1f02a99104e509d651fc2524dfd16f77fdc9be9f9",
     "bytes": 203904,
     "archive": "vendor/crm-objects-2026-09.json.gz"
+  },
+  {
+    "file": "crm-owners-2026-09.json",
+    "url": "https://raw.githubusercontent.com/HubSpot/HubSpot-public-api-spec-collection/55d9bcaaf1c208516f11a33aa43fb6bba7aac823/PublicApiSpecs/CRM/Crm%20Owners/Rollouts/146888/2026-09/crmOwners.json",
+    "sha256": "f7bd5bb7859a3f822d0b3d9b148321620b25393f319a1a7d800eb04d73eff7e3",
+    "bytes": 16389,
+    "archive": "vendor/crm-owners-2026-09.json.gz"
   }
 ]

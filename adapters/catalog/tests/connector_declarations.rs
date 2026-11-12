@@ -819,6 +819,10 @@ fn slack_derived_from_its_declaration_is_the_documented_bot_instance() {
 /// `uid` its pattern (story:catalog-grafana-datasource-proxy-reads).
 /// The Jira revisions moved again when `issue.edit` gained `body_null_clears`
 /// (story:required-body-key-refuses-null).
+/// The HubSpot guide's pin (`f22df2fc…` to `8968cae8…`) moved when the bundle
+/// gained the two owner reads from the Owners document, as cited amendments
+/// bound to the CRM Objects digest, and the selection gained `owners.list`
+/// (with its walk) and `owner.get` (story:hubspot-owners-and-line-items).
 #[test]
 fn documented_native_configurations_keep_their_revisions() {
     let pinned: BTreeMap<String, &str> = [
@@ -872,7 +876,7 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "12 catalog-hubspot.md",
-            "f22df2fc89858454b75fc46c55187aa467458a05c8fd0d476cf052dd73e70fe9",
+            "8968cae86a853651f69e6b4eee869e6b7a68264089ca85fd6cb105ca2c7b945d",
         ),
         (
             "13 catalog-jira.md",

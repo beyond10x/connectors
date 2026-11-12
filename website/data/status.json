@@ -284,7 +284,7 @@
     },
     {
       "area": "Catalog provider",
-      "detail": "One object type's records, paged, and one record by id; exercised against local fixtures only.",
+      "detail": "One object type's records, paged, one record by id, and the account's owners, paged or by id; exercised against local fixtures only.",
       "href": "/docs/reference/adapters/catalog",
       "label": "HubSpot CRM",
       "status": "shipped"

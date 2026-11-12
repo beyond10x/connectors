@@ -1,10 +1,11 @@
 # HubSpot CRM through the catalog provider
 
 The catalog provider reads HubSpot CRM records (contacts, companies, deals,
-tickets and every other object type an account has) from the pinned HubSpot CRM
-Objects `2026-09` OpenAPI document. Nothing here is HubSpot-specific code: the
-pinned document is compiled into a bundle, a reviewed selection set exposes two
-reads, and the engine described in
+line items, tickets and every other object type an account has) from the
+pinned HubSpot CRM Objects `2026-09` OpenAPI document, and the account's owners
+from the pinned Crm Owners `2026-09` document. Nothing here is HubSpot-specific
+code: the pinned documents are compiled into a bundle, a reviewed selection set
+exposes four reads, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Connection and invocation work as described there; this page configures the
 `hubspot` connector and covers what differs for HubSpot. Connector, instance
@@ -20,39 +21,70 @@ retrieved on 2026-09-30 from HubSpot's public specification collection,
 `55d9bcaaf1c208516f11a33aa43fb6bba7aac823`, path
 `PublicApiSpecs/CRM/Objects/Rollouts/424/2026-09/objects.json`. Its server is
 `https://api.hubapi.com` with no path, so the bundle records each operation's
-path as written. The bundle is built with:
+path as written.
+
+HubSpot publishes owners as a separate document. The pinned Owners source is
+[`adapters/hubspot/upstream/crm-owners-2026-09.json`](../adapters/hubspot/upstream/README.md),
+SHA-256 `f7bd5bb7859a3f822d0b3d9b148321620b25393f319a1a7d800eb04d73eff7e3`,
+retrieved on 2026-11-12 from the same collection and commit, path
+`PublicApiSpecs/CRM/Crm Owners/Rollouts/146888/2026-09/crmOwners.json`. It
+declares two reads and the same server. A bundle has one source, so the two
+owner reads enter it through cited amendments,
+[`hubspot-owners.amendments.json`](../adapters/hubspot/upstream/hubspot-owners.amendments.json),
+bound to the CRM Objects digest; each entry carries the Owners document's own
+`operationId`, path and parameters, and `adapters/catalog/tests/hubspot.rs`
+holds each equal to that document. The bundle is built with:
 
 ```sh
 cargo run --locked -p connectors-build -- catalog \
   --provider hubspot \
   --source adapters/hubspot/upstream/crm-objects-2026-09.json \
   --directory adapters/catalog/generated/bundles \
-  --auth-profile hubspot.private-app
+  --auth-profile hubspot.private-app \
+  --amendments adapters/hubspot/upstream/hubspot-owners.amendments.json
 ```
 
-It carries all 11 operations of the pinned document, none unsupported, and
-`adapters/catalog/tests/bundle_drift.rs` refuses a committed bundle or index a
-fresh run would not reproduce byte for byte.
+It carries the 11 operations of the CRM Objects document and the two owner
+reads, none unsupported, and `adapters/catalog/tests/bundle_drift.rs` refuses a
+committed bundle or index a fresh run would not reproduce byte for byte.
 
 ## The shipped selection set
 
 [`adapters/catalog/providers/hubspot/operations.json`](../adapters/catalog/providers/hubspot/operations.json)
-exposes two reads and nothing else. Each is `effect: read`; there are no
+exposes four reads and nothing else. Each is `effect: read`; there are no
 writes. `adapters/catalog/tests/hubspot.rs` pins this exact id list and each
-id's `operationId` and path in the pinned document, so a renamed or dropped id,
-or a source operation that moved, fails the gate. The bundle refuses at load any
-`operation_id` the pinned document lacks.
+id's `operationId` and path in the bundle, so a renamed or dropped id, or a
+source operation that moved, fails the gate. The bundle refuses at load any
+`operation_id` it lacks.
 
-The pinned document's `operationId`s are long generated strings; the table
+The pinned documents' `operationId`s are long generated strings; the table
 names the path, and `operations.json` carries the exact ids.
 
 | id | request | paging parameters | end condition | time filter or deltas |
 |---|---|---|---|---|
 | `objects.list` | `GET /crm/objects/2026-09/{objectType}` | `after`, `limit` | `paging.next` absent | none; the document offers an updated-since filter only on search, a POST that cannot ship as a read yet |
 | `object.get` | `GET /crm/objects/2026-09/{objectType}/{objectId}` | single item | n/a | none |
+| `owners.list` | `GET /crm/owners/2026-09` | `after`, `limit` | `paging.next` absent | none |
+| `owner.get` | `GET /crm/owners/2026-09/{ownerId}` | single item | n/a | none |
 
-- **`objectType`** is `contacts`, `companies`, `deals`, `tickets` or any other
-  object type the account has, including a custom object's type id.
+- **`objectType`** is `contacts`, `companies`, `deals`, `line_items`,
+  `tickets` or any other object type the account has, including a custom
+  object's type id. `adapters/catalog/tests/hubspot.rs` reads deals, companies
+  and line items through these two reads against a fixture.
+- **Owners.** A deal, a company or any other record names its owner by id in
+  the `hubspot_owner_id` property, which `objects.list` and `object.get` return
+  only when asked for it in `properties`. Send that value as `ownerId` of
+  `owner.get`: the answer carries `email`, `firstName`, `lastName`, `teams`,
+  `type` (`PERSON` or `QUEUE`) and `userId`. `idProperty` is `id` (the default)
+  or `userId`. `owners.list` takes `email` to find one, `archived` and `limit`
+  (the document's default is 100), and pages like `objects.list`.
+- **Deactivated owners.** A user who was deactivated is an archived owner, and
+  old deals and companies often still carry that user's id. The pinned Owners
+  document says `archived` is "whether to return only results that have been
+  archived" (default `false`), so read such an owner with
+  `{"ownerId": "<id>", "archived": true}`, and list them with `archived: true`
+  on `owners.list`; the document does not say the plain read returns them, and
+  no live account has confirmed either way.
 - **Following a page.** Send the first page without `after`. The pinned
   document says the cursor "will be returned as the `paging.next.after` JSON
   property of a paged response containing more results". For the next page,
@@ -76,9 +108,15 @@ accepted by name; one it does not declare is refused before any request.
 
 A HubSpot private-app access token, sent as `Authorization: Bearer <token>`,
 under the profile `hubspot.private-app`. Create the private app in the HubSpot
-account's settings and grant it the read scopes of the object types you read
-(`crm.objects.contacts.read`, `crm.objects.companies.read`,
-`crm.objects.deals.read`, …). The pinned document names this scheme
+account's settings and grant it the read scopes of what you read. For deals,
+companies, line items and owners that is exactly four:
+`crm.objects.deals.read`, `crm.objects.companies.read`,
+`crm.objects.line_items.read` and `crm.objects.owners.read`. No contacts scope
+is needed for them; add `crm.objects.contacts.read` only to read contacts, and
+the matching `…read` scope of any other object type. A property HubSpot marks
+sensitive needs the `…sensitive.read.v2` scope of its type as well. Grant no
+`…write` scope: the connector has no write, and a read-only token is the
+guardrail. The pinned CRM Objects document names this scheme
 `private_apps`; HubSpot's private-app guide
 (<https://developers.hubspot.com/docs/apps/legacy-apps/private-apps/overview>, read
 2026-09-30) sends the token as `Authorization: Bearer [YOUR_TOKEN]`. That guide files
@@ -105,7 +143,7 @@ enabled = true
 [connectors.hubspot.instances.work]
 ```
 
-The bundle, both reads, the profile and the provider executable are derived
+The bundle, the four reads, the profile and the provider executable are derived
 from the shipped connector:
 
 ```console
@@ -130,8 +168,13 @@ revision; the pinned form it writes is described in
 
 - Verified against a local HTTPS fixture only
   (`adapters/catalog/tests/hubspot.rs`): the exact request of each read and the
-  bearer header, the returned body as JSON, a two-page walk to a page without
-  `paging.next`, and the identity read. No live HubSpot account has been read.
+  bearer header, the returned body as JSON, a two-page walk of each list to a
+  page without `paging.next`, deals, companies and line items read with the
+  owner each carries, and the identity read. No live HubSpot account has been
+  read; the scopes above are those the pinned documents name for these reads.
+- Owners are read through the CRM Objects bundle's amendments, not from a
+  bundle of their own: the Owners document's response schema is not part of the
+  bundle, so the answer is HubSpot's JSON as sent.
 - No time filter: `objects.list` walks every record of a type. Search
   (`POST /crm/objects/2026-09/{objectType}/search`, which filters by
   `hs_lastmodifieddate`) and batch read are POST operations, and the engine

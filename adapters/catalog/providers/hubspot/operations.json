@@ -7,6 +7,12 @@
      "walk": {"parameter": "after", "next": "/paging/next/after", "records": "/results",
               "ends": [{"name": "no_next_page", "absent": "/paging/next"}]}},
     {"id": "object.get", "operation_id": "get-/crm/objects/2026-09/{objectType}/{objectId}_/crm/objects/2026-03/{objectType}/{objectId}", "effect": "read",
-     "description": "Read one record by objectType and objectId; properties and associations are comma-separated lists"}
+     "description": "Read one record by objectType and objectId; properties and associations are comma-separated lists"},
+    {"id": "owners.list", "operation_id": "get-/crm/owners/2026-09_/crm/owners/v3", "effect": "read",
+     "description": "List the account's owners (the users and queues a hubspot_owner_id names), with name, email and teams, one page per call; the walk sends paging.next.after as after and ends on a page without paging.next",
+     "walk": {"parameter": "after", "next": "/paging/next/after", "records": "/results",
+              "ends": [{"name": "no_next_page", "absent": "/paging/next"}]}},
+    {"id": "owner.get", "operation_id": "get-/crm/owners/2026-09/{ownerId}_getById", "effect": "read",
+     "description": "Read one owner by the id a record's hubspot_owner_id carries (or by userId with idProperty userId); answers name, email and teams"}
   ]
 }

@@ -164,9 +164,13 @@ const OPSGENIE_UNSUPPORTED: usize = 76;
 
 /// The cited amendments applied to a provider's pinned source, relative to this
 /// crate. A provider absent here is built from its source as written.
-const AMENDMENTS: [(&str, &str); 5] = [
+const AMENDMENTS: [(&str, &str); 6] = [
     ("gitlab", "../gitlab/upstream/openapi_v3.amendments.json"),
     ("grafana", "../grafana/upstream/grafana.amendments.json"),
+    (
+        "hubspot",
+        "../hubspot/upstream/hubspot-owners.amendments.json",
+    ),
     ("opsgenie", "../opsgenie/upstream/opsgenie.amendments.json"),
     ("slack", "../slack/upstream/slack-web.amendments.json"),
     (
