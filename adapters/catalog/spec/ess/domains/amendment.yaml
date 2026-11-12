@@ -91,7 +91,10 @@ types:
   # declares and a name declared twice in one location. `pattern`, when present, is a regular
   # expression from `^` to `$` of at most 256 bytes that all of every value must match, checked by
   # the engine before any request as `\A(?:pattern)\z`, such as Grafana's data-source `uid`
-  # alphabet; the pipeline refuses one that does not compile on its own or in that form.
+  # alphabet; the pipeline refuses one that does not compile on its own or in that form. `enum`,
+  # when present, lists the values the vendor's document allows, as the text each is sent as,
+  # such as HubSpot's owner `idProperty` (`id` or `userId`); the engine refuses any other value
+  # before a request, as it does for an `enum` read from a document.
   - name: connectors_catalog.amendment.OperationParameter
     kind: struct
     fields:
@@ -101,6 +104,7 @@ types:
       - {name: type, type: "Optional<connectors_catalog.amendment.ValueType>"}
       - {name: repeated, type: "Optional<Boolean>"}
       - {name: pattern, type: "Optional<String>"}
+      - {name: enum, type: "Optional<List<String>>"}
     invariants:
       - name.count >= 1
       - any: [{not: {location: path}}, {required: true}]
