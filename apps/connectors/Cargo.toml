@@ -40,7 +40,7 @@ zeroize.workspace = true
 toml = "1.1"
 connectors-host = { workspace = true, features = ["test-support"] }
 
-[target.'cfg(target_os = "linux")'.dependencies]
+[target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 # These test binaries are also the stand-in catalog provider the CLI starts

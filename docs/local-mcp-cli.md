@@ -1,6 +1,6 @@
 # MCP through the local CLI: selected intent
 
-**Inbound read-only tools run on Linux.** Use the [production stdio guide](local-mcp-stdio.md)
+**Inbound read-only tools are shown to run on Linux; macOS and Windows are built, not yet shown serving.** Use the [production stdio guide](local-mcp-stdio.md)
 for supported declarations, configuration, calls and limitations. This document
 retains the broader selected intent; resources, prompts, mutations and outbound
 MCP remain unfinished, and MCP stays deferred.

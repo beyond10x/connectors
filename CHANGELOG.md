@@ -61,6 +61,17 @@
   shipped Gmail, Calendar and Drive declarations again instead of refusing every import. A
   `default_profile` naming none of the profiles is refused as `malformed`
   (story:google-read-only-profiles-and-company-domain).
+- `connectors server --transport stdio` is built for macOS and Windows, not only Linux. Its data
+  lease runs on the clock that counts across sleep, as it did on `CLOCK_BOOTTIME`: macOS
+  `CLOCK_MONOTONIC_RAW` against `CLOCK_UPTIME_RAW`, Windows `QueryInterruptTimePrecise` against
+  `QueryUnbiasedInterruptTimePrecise`, the local clock's own pairs, now pinned by a test on each
+  platform. On Windows the standard handles are served through a reader and a writer thread; a
+  reply goes to the writer as one frame and the loop waits for its completion, and a write is
+  counted only once made. The macOS and Windows host jobs run the launch contract, the lease
+  timers, the console tests and a serving scenario (launch, initialize, list, one call) against
+  each platform's own credential store, with their counts checked. That scenario has passed on
+  Linux only so far, so serving on macOS and Windows is not yet shown; the other end-to-end
+  scenarios stay on Linux, against the mounted custody binding (story:mcp-stdio-on-macos-and-windows).
 - On Linux a catalog provider that a derivation, `--print-profiles` or the installed-provider check
   starts for its printed output now ends when the process that started it is killed, as an adapter
   already did (`PR_SET_PDEATHSIG`, SIGKILL, set before exec). Test processes that wait on a

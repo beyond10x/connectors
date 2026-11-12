@@ -63,7 +63,7 @@ pub(super) struct Halt {
     pub admission_closed: Arc<AtomicBool>,
     /// The session's standard input, asked at admission whether its peer
     /// has closed it.
-    pub input: std::os::fd::RawFd,
+    pub input: super::console::Hangup,
 }
 impl Halt {
     fn cancelled(&self) -> Result<(), Value> {
@@ -78,24 +78,12 @@ impl Halt {
         // The serve loop closes admission when it reads the end of file, which
         // a loaded host can delay past this worker's first owner call; the
         // input's own hangup does not wait for that read (sessions § 4.1).
-        if self.admission_closed.load(Ordering::SeqCst) || hung_up(self.input) {
+        if self.admission_closed.load(Ordering::SeqCst) || self.input.hung_up() {
             Err(refusal("unavailable"))
         } else {
             Ok(())
         }
     }
-}
-/// Whether `input`'s peer has closed it, buffered input or not. A poll that
-/// fails answers no, which leaves the end of file to the serve loop.
-fn hung_up(input: std::os::fd::RawFd) -> bool {
-    let mut poll = libc::pollfd {
-        fd: input,
-        events: libc::POLLIN,
-        revents: 0,
-    };
-    // SAFETY: poll names one live entry and does not wait.
-    let ready = unsafe { libc::poll(&mut poll, 1, 0) };
-    ready > 0 && poll.revents & libc::POLLHUP != 0
 }
 fn client(paths: &Paths, host: Option<&str>, until: Instant) -> Result<owner::Client, Value> {
     let client = owner::Client::connect_until(paths, host.is_none(), until).map_err(owner_error)?;
@@ -799,7 +787,7 @@ fn response_schema(result: Value) -> Value {
             {"properties":{"status":{"const":"error"}},"required":["error"],"not":{"required":["result"]}}],"additionalProperties":false})
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
@@ -816,7 +804,7 @@ mod tests {
         Halt {
             cancelled: Arc::new(AtomicBool::new(false)),
             admission_closed: Arc::new(AtomicBool::new(false)),
-            input: input.as_raw_fd(),
+            input: super::super::console::Hangup::of(input.as_raw_fd()),
         }
     }
 

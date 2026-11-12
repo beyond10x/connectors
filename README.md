@@ -281,11 +281,11 @@ for a container with no keyring, which refuses OAuth refresh and approval signin
 ([§5.2](contracts/auth/custody/v1alpha1/semantics.md#52-the-read-only-mounted-secret-binding),
 [guide](docs/local-mounted-secret-custody.md)); on macOS the login keychain; on Windows the
 Credential Manager. Kubernetes and SQL also run as separate Rust services, which advertise no
-writes; writes run only through the local CLI under approval. On Linux,
-`connectors server --transport stdio` is a local MCP server that offers admitted read-only
-operations as tools through the same owner and custody ([guide](docs/local-mcp-stdio.md)); it
-offers no resources, prompts, writes or outbound MCP, and on macOS and Windows it exits with
-`mcp_unavailable`. A headless Claude Code session listed a Jira instance's reads through it and called its
+writes; writes run only through the local CLI under approval.
+On Linux, `connectors server --transport stdio` is a local MCP server that offers admitted
+read-only operations as tools through the same owner and custody ([guide](docs/local-mcp-stdio.md));
+it offers no resources, prompts, writes or outbound MCP. It is built for macOS and Windows, where a
+serving scenario in CI has not yet passed ([guide](docs/local-mcp-stdio.md)). A headless Claude Code session listed a Jira instance's reads through it and called its
 search tool; the recorded entries, `claude mcp add` output and replay test are in the
 [guide](docs/local-mcp-stdio.md#recorded-claude-code-session). Reading
 from an MCP server as a connector is not implemented; the two decision blockers on its

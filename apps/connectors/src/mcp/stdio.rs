@@ -1,7 +1,7 @@
-//! The stdio serve loop: nonblocking standard descriptors polled with a short
-//! finite wait, and a data lease on the boot clock. Linux only: the lease
-//! clock is `CLOCK_BOOTTIME` (`session.rs`).
-use super::*;
+//! The stdio serve loop: standard descriptors stepped with a short finite wait
+//! (`console.rs`), and a data lease on a clock that counts across sleep
+//! (`session.rs`).
+use super::{console::Console, *};
 use connectors_mcp::{
     framing::LineDecoder,
     protocol::{self, Route},
@@ -20,26 +20,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-struct Nonblocking {
-    fd: i32,
-    flags: i32,
-}
-impl Nonblocking {
-    fn new(fd: i32) -> io::Result<Self> {
-        // SAFETY: fcntl validates this process's standard descriptor.
-        let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
-        if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
-            return Err(io::Error::last_os_error());
-        }
-        Ok(Self { fd, flags })
-    }
-}
-impl Drop for Nonblocking {
-    fn drop(&mut self) {
-        // SAFETY: restore only the flags read from this descriptor.
-        unsafe { libc::fcntl(self.fd, libc::F_SETFL, self.flags) };
-    }
-}
 struct Output {
     id: Option<Value>,
     bytes: Vec<u8>,
@@ -121,8 +101,8 @@ pub(super) fn serve(
     let host = snapshot.host.clone();
     let mut session = super::session::Session::admit(&paths, &snapshot)?;
     let paths = Arc::new(paths);
-    let _input = Nonblocking::new(0).map_err(|_| Code::Unavailable)?;
-    let _output = Nonblocking::new(1).map_err(|_| Code::Unavailable)?;
+    let mut console = Console::open().map_err(|_| Code::Unavailable)?;
+    let input_closed = console.hangup();
     let mut decoder = LineDecoder::new(frame_limit).map_err(|_| Code::InvalidConfiguration)?;
     let mut protocol = protocol::Protocol::default();
     let mut queue = VecDeque::<Output>::new();
@@ -177,22 +157,19 @@ pub(super) fn serve(
                     return Err(Code::Timeout.into());
                 }
                 session.permit("stdout")?;
-                let bytes = &output.bytes[output.offset..];
-                // SAFETY: bytes is live for the bounded, nonblocking write.
-                let written =
-                    unsafe { libc::write(1, bytes.as_ptr().cast(), bytes.len().min(4096)) };
-                if written > 0 {
-                    output.offset += written as usize;
-                    if output.offset == output.bytes.len() {
-                        queue.pop_front();
+                match console.write(&output.bytes[output.offset..]) {
+                    Ok(written) => {
+                        output.offset += written;
+                        if output.offset == output.bytes.len() {
+                            queue.pop_front();
+                        }
                     }
-                } else if written == 0
-                    || !matches!(
-                        io::Error::last_os_error().kind(),
-                        io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted
-                    )
-                {
-                    return Err(Code::Unavailable.into());
+                    Err(error)
+                        if matches!(
+                            error.kind(),
+                            io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted
+                        ) => {}
+                    Err(_) => return Err(Code::Unavailable.into()),
                 }
             }
             if closing && queue.is_empty() {
@@ -207,38 +184,25 @@ pub(super) fn serve(
                 return Err(Code::Timeout.into());
             }
             let reading = !closing && !hangup;
-            let mut polls = [
-                libc::pollfd {
-                    fd: if reading { 0 } else { -1 },
-                    events: libc::POLLIN,
-                    revents: 0,
-                },
-                libc::pollfd {
-                    fd: 1,
-                    events: if queue.is_empty() { 0 } else { libc::POLLOUT },
-                    revents: 0,
-                },
-            ];
-            // SAFETY: polls names a live two-entry array, with a short finite wait.
-            if unsafe { libc::poll(polls.as_mut_ptr(), 2, 10) } < 0 {
-                if io::Error::last_os_error().kind() == io::ErrorKind::Interrupted {
-                    continue;
-                }
-                return Err(Code::Unavailable.into());
-            }
-            if polls
-                .iter()
-                .any(|p| p.revents & (libc::POLLERR | libc::POLLNVAL) != 0)
-            {
-                return Err(Code::Unavailable.into());
-            }
-            if !reading || polls[0].revents & (libc::POLLIN | libc::POLLHUP) == 0 {
-                continue;
+            match console.wait(reading, !queue.is_empty()) {
+                Ok(true) => {}
+                Ok(false) => continue,
+                Err(_) => return Err(Code::Unavailable.into()),
             }
             session.permit("stdin")?;
             let mut bytes = [0u8; 4096];
-            // SAFETY: bytes is a live writable buffer for this nonblocking read.
-            let read = unsafe { libc::read(0, bytes.as_mut_ptr().cast(), bytes.len()) };
+            let read = match console.read(&mut bytes) {
+                Ok(read) => read,
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted
+                    ) =>
+                {
+                    continue;
+                }
+                Err(_) => return Err(Code::Unavailable.into()),
+            };
             if read == 0 {
                 // The graceful shutdown signal (server semantics § 3.5). A
                 // partial frame is discarded; complete ones were already read.
@@ -251,16 +215,7 @@ pub(super) fn serve(
                 hangup = true;
                 continue;
             }
-            if read < 0 {
-                if matches!(
-                    io::Error::last_os_error().kind(),
-                    io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted
-                ) {
-                    continue;
-                }
-                return Err(Code::Unavailable.into());
-            }
-            let mut pending = &bytes[..read as usize];
+            let mut pending = &bytes[..read];
             while !pending.is_empty() {
                 session.permit("stdin")?;
                 let until = *frame_until.get_or_insert_with(|| Instant::now() + request_time);
@@ -300,7 +255,13 @@ pub(super) fn serve(
                             // being written finishes, so stdout never holds a
                             // cut-off frame: that race is expected, not an
                             // error, and the session stays `Ready` (§ 3.4).
-                            queue.retain(|q| q.id.as_ref() != Some(cancelled) || q.offset > 0);
+                            let begun = console.write_begun();
+                            let mut front = true;
+                            queue.retain(|q| {
+                                let started = q.offset > 0 || (front && begun);
+                                front = false;
+                                q.id.as_ref() != Some(cancelled) || started
+                            });
                         }
                     }
                     Ok(Route::Reply { result, close }) => {
@@ -330,7 +291,7 @@ pub(super) fn serve(
                         let halt = super::projection::Halt {
                             cancelled: cancelled.clone(),
                             admission_closed: admission_closed.clone(),
-                            input: 0,
+                            input: input_closed.clone(),
                         };
                         let paths = paths.clone();
                         let host = host.clone();
