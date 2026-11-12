@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-12T01:24:57Z",
+  "actor": "human:timo",
+  "artifact": "story:tavily-crawl-cut-short-is-not-complete",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/actions/runs/43130070095/job/130891724033",
+    "reference": "66c17e69526854c4c10a3effe5f40adb0975d7a7"
+  }
+}
