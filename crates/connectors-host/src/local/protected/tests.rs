@@ -687,3 +687,153 @@ fn macos_stdin_admits_an_anonymous_pipe_and_a_private_file_and_refuses_a_named_f
     drop(writer);
     assert_eq!(run(Stdio::from(reader), None), "refused InvalidInput");
 }
+
+fn fields(names: &[&str]) -> Vec<EntryField> {
+    names
+        .iter()
+        .map(|name| EntryField {
+            name: (*name).into(),
+            label: "Fictional credential".into(),
+            max_bytes: 64,
+        })
+        .collect()
+}
+
+fn from_environment(
+    name: &str,
+    value: Option<&str>,
+    fields: &[EntryField],
+) -> std::result::Result<Secret, VariableRefused> {
+    environment_with(name, |_| value.map(Into::into), fields)
+}
+
+#[test]
+fn an_environment_variable_holding_a_bare_value_is_the_one_entry_field() {
+    let secret = from_environment(
+        "FICTIONAL_TOKEN",
+        Some("fictional-bare"),
+        &fields(&["token"]),
+    )
+    .unwrap();
+    assert_eq!(secret.0, br#"{"token":"fictional-bare"}"#);
+}
+
+#[test]
+fn an_environment_variable_holding_a_json_object_is_the_entry() {
+    let object = r#"{"client_id":"fictional-id","client_secret":"fictional-secret"}"#;
+    let two = fields(&["client_id", "client_secret"]);
+    assert_eq!(
+        from_environment("FICTIONAL_TOKEN", Some(object), &two)
+            .unwrap()
+            .0,
+        object.as_bytes()
+    );
+    let one = r#"{"token":"fictional-object"}"#;
+    assert_eq!(
+        from_environment("FICTIONAL_TOKEN", Some(one), &fields(&["token"]))
+            .unwrap()
+            .0,
+        one.as_bytes()
+    );
+}
+
+#[test]
+fn a_bare_value_for_a_profile_of_several_entry_fields_is_refused_naming_the_variable() {
+    let error = from_environment(
+        "FICTIONAL_TOKEN",
+        Some("fictional-bare-sentinel"),
+        &fields(&["client_id", "client_secret"]),
+    )
+    .err()
+    .unwrap();
+    assert_eq!(
+        Error::from(error.clone()).code,
+        Code::ProtectedEntryUnavailable
+    );
+    assert_eq!(error.variable(), Some("FICTIONAL_TOKEN"));
+    assert!(!format!("{error:?}").contains("fictional-bare-sentinel"));
+}
+
+#[test]
+fn an_unset_empty_or_oversized_variable_is_refused_naming_only_the_variable() {
+    let one = fields(&["token"]);
+    let oversized = "x".repeat(65537);
+    let beyond_the_field = "y".repeat(65);
+    for value in [
+        None,
+        Some(""),
+        Some(oversized.as_str()),
+        Some(beyond_the_field.as_str()),
+    ] {
+        let error = from_environment("FICTIONAL_TOKEN", value, &one)
+            .err()
+            .unwrap();
+        assert_eq!(
+            Error::from(error.clone()).code,
+            Code::ProtectedEntryUnavailable
+        );
+        assert_eq!(error.variable(), Some("FICTIONAL_TOKEN"));
+        let shown = format!("{error:?}");
+        assert!(
+            !shown.contains("xxxx") && !shown.contains("yyyy"),
+            "{shown}"
+        );
+    }
+}
+
+#[test]
+fn a_name_that_is_not_a_variable_name_is_refused_and_never_named() {
+    let one = fields(&["token"]);
+    for name in [
+        "",
+        "has space",
+        "a=b",
+        "with\0nul",
+        "9starts",
+        &"A".repeat(129),
+    ] {
+        let error = from_environment(name, Some("fictional-bare"), &one)
+            .err()
+            .unwrap();
+        assert_eq!(
+            Error::from(error.clone()).code,
+            Code::ProtectedEntryUnavailable,
+            "{name:?}"
+        );
+        assert_eq!(error.variable(), None, "{name:?}");
+    }
+}
+
+/// Adversary (story:credential-from-environment-variable): a credential given
+/// where the variable's name belongs is never named. A token of letters,
+/// digits and underscores is a portable shell name, so syntax alone names it;
+/// a variable name the refusal may echo is upper case (POSIX, Base
+/// Definitions 8.1), which no mixed-case token is.
+#[test]
+fn adversary_a_token_shaped_word_where_the_name_belongs_is_never_named() {
+    let one = fields(&["token"]);
+    for name in [
+        // Split so no secret scanner reads a fictional sentinel as a key.
+        concat!("sk_", "live_51FictionalSentinelAbcDef0123456789"),
+        concat!("ghp", "_FictionalSentinel0123456789abcdefABCDEF"),
+        "fictional_lower_case_sentinel",
+    ] {
+        let error = from_environment(name, None, &one).err().unwrap();
+        assert_eq!(error.variable(), None, "{name:?} was named");
+    }
+}
+
+/// Adversary (story:credential-from-environment-variable): a bare value ending
+/// in a line break is the value without it, as `--credential-prompt` ends a
+/// field at the line break; the JSON form already ignores it.
+#[test]
+fn adversary_a_bare_value_ending_in_a_line_break_is_the_value_without_it() {
+    for value in ["fictional-bare\n", "fictional-bare\r\n"] {
+        let secret = from_environment("FICTIONAL_TOKEN", Some(value), &fields(&["token"])).unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&secret.0),
+            r#"{"token":"fictional-bare"}"#,
+            "{value:?}"
+        );
+    }
+}

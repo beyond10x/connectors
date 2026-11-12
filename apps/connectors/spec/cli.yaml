@@ -495,6 +495,8 @@ commands:
         source: {kind: option, long: device}
       - field: credential_document
         source: {kind: protected, file: credential-file, stdin: credential-stdin, hidden_tty: credential-prompt}
+      - field: credential_env
+        source: {kind: option, long: credential-env}
       - field: target
         source: {kind: positional, index: 1}
       - field: endpoint
@@ -518,6 +520,8 @@ commands:
         source: {kind: option, long: device}
       - field: credential_document
         source: {kind: protected, file: credential-file, stdin: credential-stdin, hidden_tty: credential-prompt}
+      - field: credential_env
+        source: {kind: option, long: credential-env}
   - path: [connections, status]
     aliases: []
     callable: connections-status

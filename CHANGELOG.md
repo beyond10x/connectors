@@ -25,6 +25,14 @@
   metadata-only. The Calendar, Drive, Gmail and Slides bundles record the new projector,
   so those four connectors' configuration revisions move: a pinned `configuration_revision` must be
   copied again (story:drive-file-content-read).
+- `connections connect` and `reconnect` take `--credential-env <NAME>`, exclusive with the other
+  credential inputs: the credential is read from that environment variable, so
+  `op run --env-file <f> -- connectors connections connect hubspot/work --profile hubspot.private-app --credential-env HUBSPOT_TOKEN`
+  passes a secret manager's value to one command. A profile of one entry field takes the bare
+  value; any other takes the JSON object the other inputs take. An unset, empty or oversized
+  variable is `protected_entry_unavailable` naming the variable (`environment_variable`) and never
+  its value; a word that is no upper case variable name is refused unechoed, with the rule in
+  `environment_variable_rule`, and one trailing line break of a bare value is dropped (story:credential-from-environment-variable).
 
 ### Changed
 

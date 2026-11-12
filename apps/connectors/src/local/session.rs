@@ -15,6 +15,16 @@ use std::{
 };
 
 const MARKER: &str = "connectors-admitted-private-capture/1";
+
+/// A source's refusal as the capture's: it names the acquisition, and an
+/// `invalid_input` from the source is `protected_entry_unavailable`.
+fn source_refused(capture: &owner::Capture, mut error: owner::Error) -> owner::Error {
+    error.acquisition = Some(capture.acquisition.clone());
+    if error.code == Code::InvalidInput {
+        error.code = Code::ProtectedEntryUnavailable;
+    }
+    error
+}
 pub(super) type Shared = Rc<RefCell<Session>>;
 
 struct Selection {
@@ -32,6 +42,8 @@ pub(super) struct Session {
     /// refusal is `instance_ambiguous` naming them, not the owner error that
     /// stopped the acquisition.
     ambiguous: Option<Vec<String>>,
+    /// The environment variable a refused `--credential-env` named.
+    variable: Option<protected::VariableRefused>,
     pub deadline: u64,
     pub approval_deadline: Instant,
     pub mutation_deadline: Option<owner::mutation::Deadline>,
@@ -91,6 +103,7 @@ impl Session {
                 "device",
                 "target",
                 "endpoint",
+                "credential_env",
             ] {
                 if let Ok(Some(value)) = leaf.try_get_one::<String>(&format!("field:{field}")) {
                     selectors[field] = json!(value);
@@ -113,6 +126,7 @@ impl Session {
             signals: None,
             early: None,
             ambiguous: None,
+            variable: None,
             deadline: 0,
             approval_deadline,
             mutation_deadline,
@@ -225,6 +239,50 @@ impl Session {
             ProtectedSource::DocumentStdin => return protected::document(None),
             _ => {}
         }
+        // `--credential-env` stands beside no other credential input; the
+        // refusal comes before the source is read.
+        if self
+            .selection
+            .as_ref()
+            .is_some_and(|s| s.selectors.get("credential_env").is_some())
+        {
+            return Err(Code::InvalidInput.into());
+        }
+        let (capture, device, grant) = self.begin_capture()?;
+        let granted = |document: Secret| -> owner::Result<Secret> {
+            if grant {
+                super::dialects::granted(&capture, Some(document), device)
+            } else {
+                Ok(document)
+            }
+        };
+        let result = match source {
+            // Google's client file under an OAuth-acquired profile becomes the
+            // entry by consent; every other file is submitted as it is.
+            ProtectedSource::File(path) => {
+                protected::file(&path, capture.expires_at_ms).and_then(|document| {
+                    if grant {
+                        granted(document)
+                    } else {
+                        oauth::entry(&capture.profile, document, capture.expires_at_ms)
+                    }
+                })
+            }
+            ProtectedSource::Stdin => protected::stdin(capture.expires_at_ms).and_then(granted),
+            ProtectedSource::HiddenTty => {
+                protected::terminal(&capture.profile.fields, capture.expires_at_ms)
+                    .and_then(granted)
+            }
+            _ => unreachable!(),
+        };
+        let secret = result.map_err(|error| source_refused(&capture, error))?;
+        self.captured = Some((capture, secret));
+        Ok(MARKER.into())
+    }
+    /// The selection's capture, begun with the owner once the selection is
+    /// admitted: the capture, whether `--device` was given, and whether the
+    /// profile is an `oauth2_grant`.
+    fn begin_capture(&mut self) -> owner::Result<(owner::Capture, bool, bool)> {
         let selection = self.selection.as_ref().ok_or(Code::InvalidInput)?;
         if !matches!(
             selection.callable.as_str(),
@@ -271,46 +329,62 @@ impl Session {
         // with which its grant runs here; `--device` names that grant's flow and
         // belongs to no other profile.
         let grant = capture.profile.grant().is_some();
-        let granted = |document: Secret| -> owner::Result<Secret> {
-            if grant {
-                super::dialects::granted(&capture, Some(document), device)
-            } else {
-                Ok(document)
-            }
-        };
         if device && !grant {
             let mut error = owner::Error::from(Code::InvalidInput);
             error.acquisition = Some(capture.acquisition.clone());
             return Err(error);
         }
-        let result = match source {
-            // Google's client file under an OAuth-acquired profile becomes the
-            // entry by consent; every other file is submitted as it is.
-            ProtectedSource::File(path) => {
-                protected::file(&path, capture.expires_at_ms).and_then(|document| {
-                    if grant {
-                        granted(document)
-                    } else {
-                        oauth::entry(&capture.profile, document, capture.expires_at_ms)
-                    }
-                })
-            }
-            ProtectedSource::Stdin => protected::stdin(capture.expires_at_ms).and_then(granted),
-            ProtectedSource::HiddenTty => {
-                protected::terminal(&capture.profile.fields, capture.expires_at_ms)
-                    .and_then(granted)
-            }
-            _ => unreachable!(),
+        Ok((capture, device, grant))
+    }
+    /// An environment credential's refusal as the owner's error, keeping the
+    /// variable it names for the failure's data (`take_variable`).
+    fn refuse(&mut self, refused: protected::VariableRefused) -> owner::Error {
+        self.variable = Some(refused.clone());
+        refused.into()
+    }
+    /// The variable the last refusal named, never a value.
+    pub fn take_variable(&mut self) -> Option<protected::VariableRefused> {
+        self.variable.take()
+    }
+    /// `connections connect` or `reconnect` with `--credential-env <NAME>`: the
+    /// variable is read here, once, and its value goes only to the capture. A
+    /// bare value is the entry of a profile of one entry field; any other
+    /// profile takes the JSON object the other sources take.
+    pub fn complete_from_environment(&mut self, call: &Invocation<'_>) -> owner::Result<Value> {
+        self.signals()?;
+        let selection = self.selection.as_ref().ok_or(Code::InvalidInput)?;
+        let name = selection
+            .selectors
+            .get("credential_env")
+            .and_then(Value::as_str)
+            .ok_or(Code::InvalidInput)?
+            .to_owned();
+        if call.callable != selection.callable
+            || call.context != selection.context
+            || call.input.get("credential_env") != selection.selectors.get("credential_env")
+        {
+            return Err(Code::InvalidInput.into());
+        }
+        let paths = Paths::resolve(
+            call.context.config.as_deref(),
+            call.context.state_dir.as_deref(),
+        )?;
+        if Config::load(&paths.config)?.selection().read_only() {
+            return Err(Code::InvalidInput.into());
+        }
+        // Read before the owner is reached: an unset or unusable variable
+        // starts nothing and leaves no acquisition behind.
+        let value = protected::environment(&name).map_err(|refused| self.refuse(refused))?;
+        let (capture, device, grant) = self.begin_capture()?;
+        let entry = protected::environment_entry(&name, value, &capture.profile.fields)
+            .map_err(|refused| source_refused(&capture, self.refuse(refused)))?;
+        let entry = if grant {
+            super::dialects::granted(&capture, Some(entry), device)
+                .map_err(|error| source_refused(&capture, error))?
+        } else {
+            entry
         };
-        let secret = result.map_err(|mut error| {
-            error.acquisition = Some(capture.acquisition.clone());
-            if error.code == Code::InvalidInput {
-                error.code = Code::ProtectedEntryUnavailable;
-            }
-            error
-        })?;
-        self.captured = Some((capture, secret));
-        Ok(MARKER.into())
+        capture.complete(&entry)
     }
     /// `connections connect` or `reconnect` with no protected source. Under the
     /// read-only `mounted_secret` binding the owner reads the item

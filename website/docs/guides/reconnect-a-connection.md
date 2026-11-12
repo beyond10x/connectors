@@ -33,7 +33,8 @@ connectors connections reconnect --connector <connector> --instance <instance> \
 ```
 
 The credential option is the one that connected the instance: `--credential-prompt`,
-`--credential-file <owner-only file>` or `--credential-stdin`. For a Google connector it is the
+`--credential-file <owner-only file>`, `--credential-stdin` or `--credential-env <NAME>`, which
+reads the credential from an environment variable. For a Google connector it is the
 same client file, and the consent runs again; for a sign-in connector (ChatGPT, Claude) it signs in
 again, by browser or with `--device`.
 

@@ -159,6 +159,22 @@ connectors connections connect --connector hubspot --instance work \
   --profile hubspot.private-app --credential-file ~/private/hubspot.json
 ```
 
+The token may come from an environment variable instead, which `op run` sets for one
+command (`hubspot.env` holds `HUBSPOT_TOKEN=op://<vault>/<item>/<field>`); the variable holds the
+bare token, and its value is read by the process and never printed:
+
+```sh
+op run --env-file hubspot.env -- connectors connections connect hubspot/work \
+  --profile hubspot.private-app --credential-env HUBSPOT_TOKEN
+```
+
+An unset, empty or oversized variable is refused naming the variable only
+(`protected_entry_unavailable`, `environment_variable`). A name is upper case letters,
+digits and underscores; any other word given in its place is refused without being repeated
+(`environment_variable_rule` says what a name is). A bare value may end in one line break,
+which is dropped. `--credential-env` stands beside no other credential input; for a profile of several entry fields the variable holds the
+JSON object the other inputs take.
+
 An installation configured before connectors were declared converts its
 entries with `connectors setup migrate`, which keeps each instance id and
 revision; the pinned form it writes is described in

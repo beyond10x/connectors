@@ -141,6 +141,134 @@ pub fn file(path: &Path, deadline: u64) -> Result<Secret> {
     private(&file)?;
     read(file, 65536, deadline)
 }
+/// The longest a credential read from an environment variable is.
+const ENVIRONMENT_LIMIT: usize = 65536;
+/// The longest an environment variable's name is that a refusal will name.
+const VARIABLE_NAME_LIMIT: usize = 128;
+
+/// Whether `name` is a plain environment variable name. Only such a word is
+/// ever read or named: a word that is not one may be a credential given where
+/// the name belongs, and is refused without being echoed.
+fn variable_name(name: &str) -> bool {
+    name.len() <= VARIABLE_NAME_LIMIT
+        && name
+            .bytes()
+            .next()
+            .is_some_and(|b| b.is_ascii_uppercase() || b == b'_')
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_')
+}
+
+/// What a refusal says of a word that is not a variable name, in place of the
+/// word: the rule, never the word.
+pub const VARIABLE_NAME_RULE: &str = "an environment variable name is upper case letters, digits and underscores, and does not start with a digit";
+
+/// An environment credential refused. It names the variable when that is a
+/// variable name, never a value. It is a `protected_entry_unavailable`; the
+/// name travels beside the error, which stays small.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VariableRefused(Option<String>);
+impl VariableRefused {
+    /// The variable the refusal names.
+    #[must_use]
+    pub fn variable(&self) -> Option<&str> {
+        self.0.as_deref()
+    }
+    /// The rule a word that is no variable name broke, said without the word.
+    #[must_use]
+    pub fn rule(&self) -> Option<&'static str> {
+        self.0.is_none().then_some(VARIABLE_NAME_RULE)
+    }
+}
+impl From<VariableRefused> for Error {
+    fn from(_: VariableRefused) -> Self {
+        Code::ProtectedEntryUnavailable.into()
+    }
+}
+
+/// The refusal naming the variable `name`, when it is one.
+fn variable_refused(name: &str) -> VariableRefused {
+    VariableRefused(variable_name(name).then(|| name.to_owned()))
+}
+
+/// The credential environment variable `name` holds, read once and bounded.
+/// Unset, empty, oversized and non-UTF-8 values are refused as
+/// `protected_entry_unavailable` naming the variable and nothing of its value.
+pub fn environment(name: &str) -> std::result::Result<Secret, VariableRefused> {
+    environment_value(name, |name| std::env::var_os(name))
+}
+
+fn environment_value(
+    name: &str,
+    lookup: impl FnOnce(&str) -> Option<std::ffi::OsString>,
+) -> std::result::Result<Secret, VariableRefused> {
+    if !variable_name(name) {
+        return Err(variable_refused(name));
+    }
+    let value = Secret(
+        lookup(name)
+            .ok_or_else(|| variable_refused(name))?
+            .into_encoded_bytes(),
+    );
+    if value.0.is_empty()
+        || value.0.len() > ENVIRONMENT_LIMIT
+        || std::str::from_utf8(&value.0).is_err()
+    {
+        return Err(variable_refused(name));
+    }
+    Ok(value)
+}
+
+/// The entry the variable `name` submits under a profile of `fields`: its
+/// value when that is the JSON object the other sources take, else, for a
+/// profile of one entry field, the object naming that field with the value.
+/// A bare value for any other profile is refused naming the variable.
+pub fn environment_entry(
+    name: &str,
+    value: Secret,
+    fields: &[EntryField],
+) -> std::result::Result<Secret, VariableRefused> {
+    let text = std::str::from_utf8(&value.0).map_err(|_| variable_refused(name))?;
+    let object = text.trim_start().starts_with('{')
+        && serde_json::from_str::<serde::de::IgnoredAny>(text).is_ok();
+    if object {
+        return Ok(value);
+    }
+    // A bare value ends at its line break, as `--credential-prompt` ends a
+    // field there: one trailing `\n` or `\r\n` is not part of it.
+    let text = match text.strip_suffix('\n') {
+        Some(line) => line.strip_suffix('\r').unwrap_or(line),
+        None => text,
+    };
+    if text.is_empty() {
+        return Err(variable_refused(name));
+    }
+    let [field] = fields else {
+        return Err(variable_refused(name));
+    };
+    if !connectors_core::valid_id(&field.name) || text.len() > field.max_bytes as usize {
+        return Err(variable_refused(name));
+    }
+    let mut document = Secret(Vec::with_capacity(ENVIRONMENT_LIMIT));
+    append(&mut document, b"{").map_err(|_| variable_refused(name))?;
+    serde_json::to_writer(Bounded(&mut document), &field.name)
+        .map_err(|_| variable_refused(name))?;
+    append(&mut document, b":").map_err(|_| variable_refused(name))?;
+    serde_json::to_writer(Bounded(&mut document), text).map_err(|_| variable_refused(name))?;
+    append(&mut document, b"}").map_err(|_| variable_refused(name))?;
+    Ok(document)
+}
+
+#[cfg(test)]
+fn environment_with(
+    name: &str,
+    lookup: impl FnOnce(&str) -> Option<std::ffi::OsString>,
+    fields: &[EntryField],
+) -> std::result::Result<Secret, VariableRefused> {
+    environment_entry(name, environment_value(name, lookup)?, fields)
+}
+
 /// Bounded protected proof acquisition under the invocation's original budget.
 /// Only an owner-private regular file is admitted; buffers zeroize on all exits.
 pub fn file_until(path: &Path, until: std::time::Instant, limit: usize) -> Result<Secret> {

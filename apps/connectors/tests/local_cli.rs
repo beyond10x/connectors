@@ -544,6 +544,176 @@ fn a_platform_binding_refuses_a_connect_with_no_protected_source() {
     );
 }
 
+const ENV_SENTINEL: &str = "fictional-env-credential-sentinel";
+
+/// `connections connect` with `--credential-env`, the variable set as given.
+fn connect_with_env(root: &tempfile::TempDir, extra: &[&str], value: Option<&str>) -> Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_connectors"));
+    command
+        .args(["--output", "json", "--config"])
+        .arg(root.path().join("config/config.toml"))
+        .arg("--state-dir")
+        .arg(root.path().join("state"))
+        .args([
+            "connections",
+            "connect",
+            "--adapter",
+            "forge",
+            "--profile",
+            "token",
+        ])
+        .args(extra)
+        .env_remove("FICTIONAL_CONNECT_TOKEN")
+        .stdin(std::process::Stdio::null());
+    if let Some(value) = value {
+        command.env("FICTIONAL_CONNECT_TOKEN", value);
+    }
+    command.output().unwrap()
+}
+
+fn refused(output: &Output) -> Value {
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    assert!(output.stdout.is_empty());
+    for stream in [&output.stdout, &output.stderr] {
+        assert!(
+            !String::from_utf8_lossy(stream).contains(ENV_SENTINEL),
+            "the value reached the output"
+        );
+    }
+    let error: Value = serde_json::from_slice(&output.stderr).unwrap();
+    error["error"]["data"].clone()
+}
+
+/// An unset, empty or oversized variable is `protected_entry_unavailable`
+/// naming the variable and nothing of its value; the refusal stands before
+/// any owner starts or metadata opens.
+#[test]
+fn an_unset_empty_or_oversized_credential_variable_is_refused_naming_only_the_variable() {
+    let root = tempdir();
+    configured_entry(
+        &root,
+        "connectors-local/2",
+        "private_protocol='connectors-private/2'\n",
+    );
+    let oversized = format!("{ENV_SENTINEL}{}", "x".repeat(70_000));
+    for value in [None, Some(""), Some(oversized.as_str())] {
+        let output = connect_with_env(
+            &root,
+            &["--credential-env", "FICTIONAL_CONNECT_TOKEN"],
+            value,
+        );
+        let data = refused(&output);
+        assert_eq!(data["code"], "protected_entry_unavailable", "{data}");
+        assert_eq!(data["stage"], "protected_entry", "{data}");
+        assert_eq!(data["next_action"], "select_protected_source", "{data}");
+        assert_eq!(data["environment_variable"], "FICTIONAL_CONNECT_TOKEN");
+    }
+}
+
+/// A word that is no variable name, such as a credential given where the name
+/// belongs, is refused and never echoed.
+#[test]
+fn a_credential_given_where_the_variable_name_belongs_is_refused_unechoed() {
+    let root = tempdir();
+    configured_entry(
+        &root,
+        "connectors-local/2",
+        "private_protocol='connectors-private/2'\n",
+    );
+    let given = format!("{ENV_SENTINEL}!");
+    let output = connect_with_env(&root, &["--credential-env", &given], Some("v"));
+    let data = refused(&output);
+    assert_eq!(data["code"], "protected_entry_unavailable", "{data}");
+    assert!(data.get("environment_variable").is_none(), "{data}");
+    let rule = data["environment_variable_rule"].as_str().expect("{data}");
+    assert!(rule.contains("upper case"), "{data}");
+    assert!(!data.to_string().contains(ENV_SENTINEL), "{data}");
+    // A lower case word is no name either, however innocent it looks.
+    let output = connect_with_env(&root, &["--credential-env", "hubspot_token"], Some("v"));
+    let data = refused(&output);
+    assert!(data.get("environment_variable").is_none(), "{data}");
+    assert!(!data.to_string().contains("hubspot_token"), "{data}");
+    assert!(data["environment_variable_rule"].is_string(), "{data}");
+}
+
+/// `--credential-env` stands beside no other credential input: the refusal
+/// comes before stdin or a file is read.
+#[test]
+fn a_credential_variable_beside_another_credential_input_is_refused() {
+    let root = tempdir();
+    configured_entry(
+        &root,
+        "connectors-local/2",
+        "private_protocol='connectors-private/2'\n",
+    );
+    for other in [
+        &["--credential-stdin"][..],
+        &["--credential-file", "/not-a-file"],
+        &["--credential-prompt"],
+    ] {
+        let mut args = vec!["--credential-env", "FICTIONAL_CONNECT_TOKEN"];
+        args.extend_from_slice(other);
+        let output = connect_with_env(&root, &args, Some(ENV_SENTINEL));
+        let data = refused(&output);
+        assert_eq!(data["code"], "invalid_input", "{other:?}: {data}");
+    }
+}
+
+/// A set variable names a credential the platform custody then stores or
+/// refuses; whichever follows, nothing it holds reaches the output.
+#[test]
+fn a_set_credential_variable_never_reaches_the_output() {
+    let root = tempdir();
+    configured_entry(
+        &root,
+        "connectors-local/2",
+        "private_protocol='connectors-private/2'\n",
+    );
+    let output = connect_with_env(
+        &root,
+        &["--credential-env", "FICTIONAL_CONNECT_TOKEN"],
+        Some(ENV_SENTINEL),
+    );
+    assert!(!output.status.success(), "{output:?}");
+    for stream in [&output.stdout, &output.stderr] {
+        assert!(!String::from_utf8_lossy(stream).contains(ENV_SENTINEL));
+    }
+}
+
+/// Adversary (story:credential-from-environment-variable): the read-only
+/// `mounted_secret` binding takes no protected source, `--credential-env`
+/// included: `invalid_input` before the variable is read, naming no variable.
+#[cfg(target_os = "linux")]
+#[test]
+fn adversary_the_mounted_binding_refuses_a_credential_variable_unread() {
+    let root = tempdir();
+    configured_entry(
+        &root,
+        "connectors-local/4",
+        "private_protocol='connectors-private/2'\n",
+    );
+    let config_path = root.path().join("config/config.toml");
+    let config = fs::read_to_string(&config_path).unwrap();
+    let custody = root.path().join("custody");
+    fs::create_dir_all(&custody).unwrap();
+    fs::write(
+        &config_path,
+        format!(
+            "{config}\n[custody]\nbinding='mounted_secret'\ndirectory='{}'\n",
+            custody.display()
+        ),
+    )
+    .unwrap();
+    let output = connect_with_env(
+        &root,
+        &["--credential-env", "FICTIONAL_CONNECT_TOKEN"],
+        Some(ENV_SENTINEL),
+    );
+    let data = refused(&output);
+    assert_eq!(data["code"], "invalid_input", "{data}");
+    assert!(data.get("environment_variable").is_none(), "{data}");
+}
+
 #[test]
 fn a_private_protocol_that_contradicts_the_format_is_refused_naming_format_and_entry() {
     for (format, private_protocol) in [
