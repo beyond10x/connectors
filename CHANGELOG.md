@@ -46,6 +46,13 @@
   refresh profile with an ID-token identity refuses it at load. Instances made from a
   connectors-definitions file cannot yet state it
   (story:google-read-only-profiles-and-company-domain).
+- A connectors-definitions file may mark an auth profile `read_only: true` and name the profile of
+  an instance that names none at its top level as `default_profile`. Both lower into the connector
+  declaration where the catalog provider reads them, so a read-only profile of a definition offers
+  no write, as a shipped one does, and `connectors-build definition import` reads them from the
+  shipped Gmail, Calendar and Drive declarations again instead of refusing every import. A
+  `default_profile` naming none of the profiles is refused as `malformed`
+  (story:google-read-only-profiles-and-company-domain).
 - On Linux a catalog provider that a derivation, `--print-profiles` or the installed-provider check
   starts for its printed output now ends when the process that started it is killed, as an adapter
   already did (`PR_SET_PDEATHSIG`, SIGKILL, set before exec). Test processes that wait on a

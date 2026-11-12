@@ -246,6 +246,10 @@ pub struct Auth {
     pub account_label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identity: Option<AuthIdentity>,
+    /// The profile offers the selection's reads only: the catalog provider
+    /// offers an instance on it no write. Lowered only when true.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub read_only: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scopes: Option<AuthScopes>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -891,6 +895,10 @@ pub struct ProviderDefinition {
     pub base_url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub config: Option<IndexMap<String, ConfigField>>,
+    /// The profile of an instance that names none, one of `auth`; it may
+    /// differ from the one marked `default: true`, which the bundle records.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_profile: Option<String>,
     pub auth: IndexMap<String, Auth>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub paging: Option<IndexMap<String, PagingStyle>>,
@@ -2003,6 +2011,7 @@ pub fn merged(base: &Auth, over: &Auth) -> Auth {
         label: pick(&over.label, &base.label),
         account_label: pick(&over.account_label, &base.account_label),
         identity,
+        read_only: over.read_only.or(base.read_only),
         scopes: over.scopes.clone().or_else(|| base.scopes.clone()),
         access: over.access.clone().or_else(|| base.access.clone()),
         evidence_lifetime_ms: over.evidence_lifetime_ms.or(base.evidence_lifetime_ms),
@@ -2264,6 +2273,9 @@ fn profile_block(id: &str, profile: &Auth, base_url: &str) -> Result<Fields, Ref
     }
     block.push(field("label", text(label)));
     block.push(field("identity", Node::Inline(probe)));
+    if profile.read_only == Some(true) {
+        block.push(field("read_only", Node::Flag(true)));
+    }
     let scopes = profile.scopes.as_ref();
     if let Some(scopes) = scopes {
         match (&scopes.path, &scopes.pointer) {
@@ -2444,6 +2456,14 @@ fn declaration(
         head.push(field("api_path", Node::Text(path)));
     }
     head.push(field("selection", Node::Text(selection)));
+    if let Some(id) = &definition.default_profile {
+        if !profiles.contains_key(id) {
+            return Err(Refusal::Malformed(format!(
+                "default_profile `{id}` is not one of the auth profiles"
+            )));
+        }
+        head.push(field("default_profile", text(id)));
+    }
     let mut blocks = Vec::new();
     for (id, profile) in &profiles {
         blocks.push(format!(

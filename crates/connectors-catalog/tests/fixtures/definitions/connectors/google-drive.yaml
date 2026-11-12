@@ -5,9 +5,16 @@ source:
   sha256: 50a01d9b5134f16b4782098bcc6694aa4edf810993432022aba49237b5c83048
   projection: drive.openapi.json
 base_url: https://www.googleapis.com/drive/v3
+default_profile: google.oauth.readonly
 auth:
+  google.oauth.readonly:
+    use: google
+    scopes:
+      minimum: ["https://www.googleapis.com/auth/drive.readonly"]
+      requested: [openid, "https://www.googleapis.com/auth/drive.readonly"]
   google.oauth:
     use: google
+    default: true
     scopes:
       minimum: ["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive.readonly"]
       requested: [openid, "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive.readonly"]

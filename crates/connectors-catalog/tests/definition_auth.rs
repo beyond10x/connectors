@@ -505,3 +505,89 @@ fn a_definition_with_scheme_github_app_lowers() {
         }
     }
 }
+
+/// story:google-read-only-profiles-and-company-domain. A profile marked
+/// `read_only: true` lowers with `"read_only": true` after its identity, where
+/// the catalog provider reads it and offers an instance on that profile no write
+/// of the selection. `default_profile` names the profile an instance that names
+/// none takes and lowers after `selection`; `default: true` still names the
+/// profile the bundle records. Unstated, neither is written, so every other
+/// declaration keeps its bytes.
+#[test]
+fn a_read_only_profile_and_the_instance_default_lower_where_the_catalog_provider_reads_them() {
+    let root = root();
+    let text = JIRA
+        .replace("auth:\n", "default_profile: atlassian.bearer\nauth:\n")
+        .replace(
+            "atlassian.bearer: {use: atlassian,",
+            "atlassian.bearer: {use: atlassian, read_only: true,",
+        );
+    let lowering = lower("jira", &text, root.path());
+    assert_eq!(
+        Lowering::json(&lowering.lowered().bundle)["auth_profile"],
+        "atlassian.basic"
+    );
+    assert_eq!(
+        lowering.declaration()["default_profile"],
+        "atlassian.bearer"
+    );
+    assert_eq!(lowering.profile("atlassian.bearer")["read_only"], true);
+    assert_eq!(lowering.profile("atlassian.basic").get("read_only"), None);
+    let written = declaration_text(&lowering);
+    assert!(
+        written.contains(
+            "\"selection\": \"operations.json\",\n  \"default_profile\": \"atlassian.bearer\",\n  \"profiles\": ["
+        ),
+        "{written}"
+    );
+    let lines: Vec<&str> = written.lines().map(str::trim).collect();
+    let at = lines
+        .iter()
+        .position(|line| line.starts_with("\"read_only\""))
+        .unwrap();
+    assert_eq!(lines[at], "\"read_only\": true", "{written}");
+    assert!(lines[at - 1].starts_with("\"identity\": "), "{written}");
+
+    // Unstated, the declaration says neither.
+    let unstated = lower("jira", JIRA, root.path());
+    assert_eq!(unstated.declaration().get("default_profile"), None);
+    for id in ["atlassian.basic", "atlassian.bearer"] {
+        assert_eq!(unstated.profile(id).get("read_only"), None, "{id}");
+    }
+
+    // A shared profile may be read-only; a connector's `read_only: false`
+    // replaces it, and false is never written.
+    std::fs::write(
+        root.path().join("auth/atlassian.yaml"),
+        ATLASSIAN.replace(
+            "atlassian.bearer: {scheme: bearer,",
+            "atlassian.bearer: {scheme: bearer, read_only: true,",
+        ),
+    )
+    .unwrap();
+    let shared = lower("jira", JIRA, root.path());
+    assert_eq!(shared.profile("atlassian.bearer")["read_only"], true);
+    let replaced = lower(
+        "jira",
+        &JIRA.replace(
+            "atlassian.bearer: {use: atlassian,",
+            "atlassian.bearer: {use: atlassian, read_only: false,",
+        ),
+        root.path(),
+    );
+    assert_eq!(replaced.profile("atlassian.bearer").get("read_only"), None);
+}
+
+/// A `default_profile` that names none of the definition's profiles is refused.
+#[test]
+fn an_instance_default_naming_no_profile_is_refused() {
+    let root = root();
+    let text = JIRA.replace("auth:\n", "default_profile: atlassian.oauth\nauth:\n");
+    match lower("jira", &text, root.path()).refusal() {
+        Refusal::Malformed(detail) => {
+            assert!(detail.contains("default_profile"), "{detail}");
+            assert!(detail.contains("atlassian.oauth"), "{detail}");
+        }
+        other => panic!("refused as {other:?}"),
+    }
+}

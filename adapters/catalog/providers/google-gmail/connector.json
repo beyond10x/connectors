@@ -16,9 +16,7 @@
       "label": "Google refresh token",
       "identity": {"source": "id_token", "kind": "google.user"},
       "read_only": true,
-      "minimum_scopes": [
-        "https://www.googleapis.com/auth/gmail.readonly"
-      ],
+      "minimum_scopes": ["https://www.googleapis.com/auth/gmail.readonly"],
       "token_url": "https://oauth2.googleapis.com/token",
       "authorize_url": "https://accounts.google.com/o/oauth2/auth",
       "requested_scopes": [

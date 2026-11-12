@@ -423,6 +423,8 @@ struct DocumentedAuth {
     label: String,
     identity: DocumentedIdentity,
     #[serde(default)]
+    read_only: bool,
+    #[serde(default)]
     scopes: Option<DocumentedScopes>,
     #[serde(default)]
     access: Option<DocumentedAccess>,
@@ -485,6 +487,9 @@ struct Declared {
     #[serde(default)]
     api_path: Option<String>,
     selection: String,
+    /// The profile of an instance that names none.
+    #[serde(default)]
+    default_profile: Option<String>,
     profiles: Vec<DocumentedAuth>,
 }
 
@@ -561,6 +566,7 @@ fn documented_profile(block: &DocumentedAuth) -> Result<Auth, Failure> {
             kind: Some(block.identity.kind.clone()),
             subject: block.identity.subject_pointer.clone(),
         }),
+        read_only: block.read_only.then_some(true),
         scopes: has_scopes.then_some(scopes),
         access: block.access.as_ref().map(|access| AuthAccess {
             path: access.path.clone(),
@@ -701,6 +707,9 @@ struct Configured {
     base: BTreeMap<String, String>,
     /// Definition name → the profile the bundle records.
     default: BTreeMap<String, String>,
+    /// Definition name → the profile of an instance that names none, where
+    /// the declaration names one.
+    instance_default: BTreeMap<String, String>,
     /// Definition name → its connector id, where the declaration names one
     /// other than the definition name.
     id: BTreeMap<String, String>,
@@ -763,6 +772,9 @@ fn declare(configured: &mut Configured, name: &str, declared: Declared) -> Resul
     if declared.connector_id != name {
         configured.id.insert(name.to_owned(), declared.connector_id);
     }
+    if let Some(profile) = declared.default_profile {
+        configured.instance_default.insert(name.to_owned(), profile);
+    }
     configured.base.insert(name.to_owned(), base);
     configured.profiles.insert(name.to_owned(), profiles);
     Ok(())
@@ -803,6 +815,7 @@ fn configured(connectors: &Path) -> Result<Configured, Failure> {
         profiles: BTreeMap::new(),
         base: BTreeMap::new(),
         default: BTreeMap::new(),
+        instance_default: BTreeMap::new(),
         id: BTreeMap::new(),
         defaults: BTreeMap::new(),
         grants: BTreeMap::new(),
@@ -897,6 +910,7 @@ fn common(a: &Auth, b: &Auth) -> Auth {
         label: same(&a.label, &b.label),
         account_label: same(&a.account_label, &b.account_label),
         identity,
+        read_only: same(&a.read_only, &b.read_only),
         scopes: same(&a.scopes, &b.scopes),
         access: same(&a.access, &b.access),
         evidence_lifetime_ms: same(&a.evidence_lifetime_ms, &b.evidence_lifetime_ms),
@@ -936,6 +950,7 @@ fn over(full: &Auth, base: &Auth) -> Auth {
         label: unless_same(&full.label, &base.label),
         account_label: unless_same(&full.account_label, &base.account_label),
         identity,
+        read_only: unless_same(&full.read_only, &base.read_only),
         scopes: unless_same(&full.scopes, &base.scopes),
         access: unless_same(&full.access, &base.access),
         evidence_lifetime_ms: unless_same(&full.evidence_lifetime_ms, &base.evidence_lifetime_ms),
@@ -2216,6 +2231,7 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
         },
         base_url,
         config: (!config.is_empty()).then_some(config),
+        default_profile: configured.instance_default.get(&name).cloned(),
         auth,
         paging: (!paging.is_empty()).then_some(paging),
         defaults,
