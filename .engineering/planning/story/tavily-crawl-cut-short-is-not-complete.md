@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:tavily-crawl-cut-short-is-not-complete
 kind: story
-status: active
+status: implemented
 title: A Tavily crawl cut short by its timeout is not reported complete
 tags:
 - from-finding
@@ -10,10 +10,11 @@ relations:
 - informed_by: review-result:wave-a-websearch-deadline-adversary-1
 - decomposes: epic:zero-open-issues-and-store-defects
 - serves: vision:independent-contract-adapters
-revision: 5
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-10T08:52:34Z", actor: "human:operator", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-10T08:52:35Z", actor: "human:operator", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
+- {from: "active", to: "implemented", at: "2026-11-12T15:04:47Z", actor: "human:operator", revision: 7, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Defect
 
@@ -26,9 +27,12 @@ cuts a crawl short has not been observed.
 
 ## Acceptance
 
-- Tavily's answer to a crawl cut short by its `timeout` is observed (recorded fixture or documented
-  upstream behaviour), and a crawl ended that way is not reported `complete: true`; a protocol test
-  pins it.
+Changed by the operator on 2026-11-12 (option A): a cut-short answer could not be produced live; four
+live crawls at the least `timeout` Tavily accepts (10) ended at 0.09 to 8.0 s.
+
+- A crawl whose `response_time` is at or past the `timeout` the adapter sent is not reported
+  `complete: true`, on the documented meaning of `timeout`; the protocol test
+  `a_crawl_that_ran_to_its_timeout_is_partial_and_incomplete` pins it.
 
 ## Wave status
 
