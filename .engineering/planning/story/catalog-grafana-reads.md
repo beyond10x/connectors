@@ -8,7 +8,7 @@ relations:
 - decomposes: epic:catalog-knowledge-sources
 - depends_on: story:catalog-slack-reads
 - serves: vision:independent-contract-adapters
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-11T00:00:58Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-11-11T00:01:00Z", actor: "human:timo", revision: 5}
@@ -35,10 +35,10 @@ out of scope: too large for the corpus (consumer's assessment).
 
 Alert firing history, where needed, is read as `annotations.list` with `type=alert`.
 
-`datasources.list` was added on 2026-11-10 from an Assembly requirement: Assembly shows which
+`datasources.list` was added on 2026-11-10 from a downstream consumer's requirement: the consumer shows which
 environments' Prometheus and Loki data sources a connection reaches.
 
-The definition file holds no write operation (requirement confirmed by Assembly).
+The definition file holds no write operation (requirement confirmed by a downstream consumer).
 
 ## Shared surfaces
 
@@ -78,3 +78,4 @@ Additional acceptance:
 - A served instance started from the definition file, with a mounted service-account token,
   describes exactly the five reads above and answers one of them against a recorded fixture.
 - The definition passes the lowerer at the pinned definitions release with no warning.
+

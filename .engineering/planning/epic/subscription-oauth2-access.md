@@ -8,7 +8,7 @@ summary: Provider-neutral OAuth2 grants, rotating refresh in custody and a verb 
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: architecture-decision-record:oauth-material-as-static-entry
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-25T21:11:57Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-25T21:11:57Z", actor: "human:timo", revision: 5}
@@ -23,7 +23,7 @@ consumer launch. No command prints a token unless the caller asks for it by name
 
 ## Operator request
 
-Timo, 2026-10-25, relayed by the directing session (verbatim): "it must be possible in connectors lib, to
+the operator, 2026-10-25, relayed by the directing session (verbatim): "it must be possible in connectors lib, to
 do a regular oauth2 thing, for anthropic claude code AND for codex/chatgpt. this way a token and refresh
 token would be stored in connectors, and by using connectors lib/sdk or CLI we would be able to get an
 always up-to-date (refreshed) token to be used".
@@ -92,3 +92,4 @@ Decision: `architecture-decision-record:oauth2-grants-and-access-token-issue`.
 
 Live login against either provider; registering client ids; hosted (server) deployments; routing catalog
 operations through a subscription token; the coordinator's trusted UI channel of `auth.acquisition`.
+

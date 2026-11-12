@@ -6,11 +6,11 @@ status: draft
 title: The served catalog provider's memory does not grow without bound under repeated full syncs
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 ---
 ## Report
 
-From a downstream deployment (session assembly-dev, 2026-11-11 UTC, read with kubectl and the
+From a downstream deployment (a downstream consumer, 2026-11-11 UTC, read with kubectl and the
 caller's log): image `ghcr.io/beyond10x/connectors:0.70.0`, one container serving a GitLab
 instance, memory limit 3Gi, request 1536Mi.
 
@@ -39,7 +39,7 @@ Not determined downstream: which operation holds the memory, response sizes, par
 - No flag or environment variable bounds a body, cache or memory; the serve path reads only
   `RUST_LOG` and `--config`. No metrics or heap-profile endpoint.
 
-## Second measurement, 2026-11-11 (assembly-dev, `kubectl top pod`, one sample per 20 s)
+## Second measurement, 2026-11-11 (a downstream consumer, `kubectl top pod`, one sample per 20 s)
 
 Same container, no restart since the 21:59:09Z kill.
 
@@ -60,4 +60,5 @@ reads in flight; no run with `MALLOC_ARENA_MAX=2` (needs a downstream chart valu
   workstation): RSS after N repeated full syncs of a fixed tree is measured, and the cause is named
   (allocator retention or a held allocation).
 - After the fix, RSS after 10 repeated syncs stays within a stated bound of RSS after the first.
+
 

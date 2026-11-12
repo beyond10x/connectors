@@ -10,7 +10,7 @@ relations:
 - decides: story:program-start-failure-reason
 - decides: story:provider-programs-run-on-macos
 - decides: story:kubernetes-exec-plugin-on-macos
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "approved", at: "2026-11-02T07:27:31Z", actor: "human:timo", revision: 2, executor: "agent:connectors-d370", correlation: "connectors-d370-wave"}
 ---
@@ -34,17 +34,17 @@ https://github.com/beyond10x/connectors/issues/234.
 ## Approval
 
 The orchestrator session, 2026-11-02, item D370, under the grant of the workspace instructions
-(decisions.md row D370): "Approved under the grant ... Timo asked for this (\"help him, use the b10x
+(decisions.md row D370): "Approved under the grant ... The operator asked for this (\"help him, use the b10x
 chef session to fix if needed\", relayed by the brain session)." Scope: "fixes for 1 and 2; the
 start-failure reason surfaced (instances status and/or a log file path); macOS (aarch64-apple-darwin)
 prebuilt binaries for connectors-grafana, -prometheus, -loki, -kubernetes in the release workflow and
 a macOS CI job running those programs' tests ...; README updates; eks exec-plugin credential path on
-macOS. Scope inside D370 is decided; no Timo decision needed."
+macOS. Scope inside D370 is decided; no the operator decision needed."
 
 Later in the same item, 2026-11-02: "Folding the connectors-local/2 init/migrate fix into item 2:
 approved. Also in scope: setup check tests the catalog provider runs ..., and the item-2 error
 names the provider failure instead of invalid_input on endpoint. Signing/notarization of macOS
-binaries is out of this wave (needs an Apple developer account = credentials/spend, Timo's);
+binaries is out of this wave (needs an Apple developer account = credentials/spend, the operator's);
 document the xattr step in the README instead."
 
 ## Diagnosis at open
@@ -82,3 +82,4 @@ document the xattr step in the README instead."
   end under the 60G stop. The touched crates and the drift checks are green (u24.sh, u24b.sh), and
   CI runs the full gate on the pull request (workspace rule: where the full suite does not fit the
   disk budget). The orchestrator, 2026-11-02: "D391: skip the local full gate."
+

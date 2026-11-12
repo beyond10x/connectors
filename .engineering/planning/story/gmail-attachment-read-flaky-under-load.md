@@ -11,7 +11,7 @@ relations:
 scope:
 - confidence: cited
   path: adapters/catalog/tests/google_calendar_gmail_adversary_pass2.rs
-revision: 8
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:29Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:30Z", actor: "human:timo", revision: 4, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
@@ -33,7 +33,7 @@ deadline, the fixture server or the child under parallel test load has not been 
 
 ## Acceptance
 
-Changed by Timo on 2026-11-11 (decision-blocker:load-acceptance-without-load-tests, option A): no
+Changed by the operator on 2026-11-11 (decision-blocker:load-acceptance-without-load-tests, option A): no
 load run on the shared workstation.
 
 - The cause of `Unavailable` for the 3 MiB read under load is named with a reproduction, or the test's
@@ -80,3 +80,4 @@ the fix commit reports 0 failures in 60 local runs.
 Open: "100 of 100 inside a parallel full workspace run" is a load run, which the shared
 workstation forbids: decision-blocker:load-acceptance-without-load-tests. A separate possible flake,
 `Child::spawn` timing out at its fixed 10 s deadline under CPU starvation, is outside this story.
+

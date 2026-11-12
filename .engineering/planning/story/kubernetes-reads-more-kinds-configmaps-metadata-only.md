@@ -7,9 +7,9 @@ title: Kubernetes resource reads cover daemonsets, jobs, cronjobs, HPAs, ingress
 summary: Six more resources.list/get kinds; configmaps never return data or binaryData
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 ---
-Requested by Assembly (assembly-dev session), 2026-11-10.
+Requested by a downstream consumer, 2026-11-10.
 
 ## Outcome
 
@@ -54,7 +54,7 @@ dispatch both read that closed set.
   `kubectl.kubernetes.io/last-applied-configuration` annotation can repeat the whole `data`. The
   safe default drops that one annotation; the test should pin whichever is decided.
 
-## Consumer preference (Assembly, 2026-11-11)
+## Consumer preference (downstream consumer, 2026-11-11)
 
 This is the consumer's preference, not a decision. The ambiguity above stays open for the
 operator.
@@ -66,3 +66,4 @@ operator.
   - labels and the remaining annotations;
   - the key names and their sizes;
   - the timestamps.
+

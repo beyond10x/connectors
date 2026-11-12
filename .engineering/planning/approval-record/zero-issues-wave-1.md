@@ -44,7 +44,7 @@ relations:
 - decides: story:tests-stop-the-owners-they-start
 - decides: story:upgrade-refusal-test-port-reuse
 - decides: story:websearch-contract-states-host-deadline
-revision: 1
+revision: 2
 ---
 ## Which stop
 
@@ -53,7 +53,7 @@ The stage-1 proposal of wave 1 of the plan in `epic:zero-open-issues-and-store-d
 
 ## Why it is bypassed: non-interactive
 
-The coordinator is a sub-agent dispatch with no operator turn; its brief (operator Timo, 2026-11-09)
+The coordinator is a sub-agent dispatch with no operator turn; its brief (the operator, 2026-11-09)
 says: "The operator's goal is the acceptance of these stories and the approval of each wave." Goal,
 verbatim: "zero remaining issues on github, all bugs fixed from planning store".
 
@@ -82,3 +82,4 @@ from it to `main`. No tag, no version bump, no release.
 ## What the operator would have been asked
 
 Approve wave 1 as listed, at two concurrent units.
+

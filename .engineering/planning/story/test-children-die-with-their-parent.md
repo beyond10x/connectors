@@ -7,7 +7,7 @@ title: A killed test leaves no owner, adapter or keyring running
 relations:
 - decomposes: epic:zero-open-issues-and-store-defects
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-11T19:51:16Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-11-11T19:51:17Z", actor: "human:timo", revision: 3}
@@ -16,7 +16,7 @@ transitions:
 
 Test fixtures and owners are reaped only in `Drop` (crates/connectors-host reap.rs and the fixture
 copies). A test process killed with SIGKILL, or a build slot timeout, runs no `Drop`, so its owner,
-adapter and keyring children keep running; on 2026-11-11 Timo saw orphaned connectors processes at
+adapter and keyring children keep running; on 2026-11-11 the operator saw orphaned connectors processes at
 100% CPU on the shared workstation.
 
 ## Outcome
@@ -30,3 +30,4 @@ process behind.
 - A test that starts an owner and an adapter through the usual fixture, then SIGKILLs its own
   harness process, finds within 2 s that no process of that fixture remains.
 - The non-Linux paths are unchanged and still build (macOS and Windows CI lints).
+

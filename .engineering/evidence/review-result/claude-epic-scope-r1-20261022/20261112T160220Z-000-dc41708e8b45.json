@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-12T16:02:20Z",
+  "actor": "human:operator",
+  "artifact": "review-result:claude-epic-scope-r1-20261022",
+  "kind": "review-result",
+  "revision": 2,
+  "change": {
+    "change": "redaction",
+    "literal_sha256": "a7529be7d5e7dda854b74b422f6e61dcd347308d8c8d6e39a60688a80e05167e",
+    "literal_chars": 9,
+    "replacement": "the operator said",
+    "count": 1,
+    "reason": "public repository: no personal names"
+  }
+}

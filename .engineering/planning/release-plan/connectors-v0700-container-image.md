@@ -8,13 +8,13 @@ tags:
 - zero-open-issues
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 ---
 ## Outcome
 
 Minor release 0.70.0, cut from `main` at 23b9f1bc4 (PR 244, wave A of
 epic:zero-open-issues-and-store-defects). The operator approved it on 2026-11-10: "A: tag now from
-main (23b9f1bc4). Unblocks assembly-dev today; the defect wave goes into the following release."
+main (23b9f1bc4). Unblocks the downstream consumer today; the defect wave goes into the following release."
 
 - Each release tag publishes `ghcr.io/beyond10x/connectors:<version>` for `linux/amd64` and
   `linux/arm64`; 0.70.0 is the first tag whose push runs that image job.
@@ -63,3 +63,4 @@ The container image has no story; it reached `main` from branch `build/container
   upstream-blocker:definitions-lack-agent-projections.
 - No story moves with this record. Package-registry, website deployment and Atlas registration
   are outside a release (AGENTS.md, Cutting a release).
+

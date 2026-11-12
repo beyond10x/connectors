@@ -6,7 +6,7 @@ status: cleared
 title: 'Anthropic''s terms forbid third-party storage of Claude.ai tokens: build the Claude subscription profile or not'
 relations:
 - blocks: story:claude-subscription-connector
-revision: 3
+revision: 4
 transitions:
 - {from: "open", to: "cleared", at: "2026-10-25T21:11:18Z", actor: "human:timo", revision: 3}
 ---
@@ -26,7 +26,7 @@ sign-in to a Claude account must complete through Anthropic's own flow." and "An
 to take measures to enforce these restrictions and may do so without prior notice." The same page permits
 "an end user from signing in to the unmodified Claude Code binary with their own Claude subscription".
 
-The request (Timo, 2026-10-25, verbatim) names Claude Code: "for anthropic claude code AND for
+The request (the operator, 2026-10-25, verbatim) names Claude Code: "for anthropic claude code AND for
 codex/chatgpt".
 
 ## Options
@@ -43,7 +43,7 @@ Decider: operator
 
 ## Decision
 
-Decided 2026-10-25 by the operator, Timo, relayed verbatim with its date by the directing session
+Decided 2026-10-25 by the operator, relayed verbatim with its date by the directing session
 `b10x-chef-orchestrator`: the request "it must be possible in connectors lib, to do a regular oauth2 thing,
 for anthropic claude code AND for codex/chatgpt. this way a token and refresh token would be stored in
 connectors" and, on being asked again, "We made the decission long ago already, I am sick of having to
@@ -53,3 +53,4 @@ re-decide over and over again".
 guide quotes the terms verbatim with their URL and the date read; no client id is shipped by default
 (`oauth2_client_id` is configuration). The operator accepted the enforcement risk the terms name by
 asking for it.
+

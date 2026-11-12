@@ -6,13 +6,13 @@ status: accepted
 title: OAuth2 grants keep their tokens in custody, the owner refreshes rotating grants and issues access tokens to local callers
 relations:
 - decides: epic:subscription-oauth2-access
-revision: 4
+revision: 5
 transitions:
 - {from: "proposed", to: "accepted", at: "2026-10-25T21:11:17Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"review_outcome":1}}}
 ---
 ## Context
 
-Timo, 2026-10-25 (verbatim, relayed by the directing session): "it must be possible in connectors lib, to
+the operator, 2026-10-25 (verbatim, relayed by the directing session): "it must be possible in connectors lib, to
 do a regular oauth2 thing, for anthropic claude code AND for codex/chatgpt. this way a token and refresh
 token would be stored in connectors, and by using connectors lib/sdk or CLI we would be able to get an
 always up-to-date (refreshed) token to be used".
@@ -64,7 +64,7 @@ and Claude Code keeps the old one only when the response omits it (Claude Code 2
 
 ## Acceptance
 
-Accepted 2026-10-25 on two statements of the operator, Timo, both relayed verbatim with their date by the
+Accepted 2026-10-25 on two statements of the operator, both relayed verbatim with their date by the
 directing session `b10x-chef-orchestrator`:
 
 - 2026-10-25, the request: "it must be possible in connectors lib, to do a regular oauth2 thing, for
@@ -73,3 +73,4 @@ directing session `b10x-chef-orchestrator`:
   (refreshed) token to be used".
 - 2026-10-25, on being asked again: "We made the decission long ago already, I am sick of having to
   re-decide over and over again".
+

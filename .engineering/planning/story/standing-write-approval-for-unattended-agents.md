@@ -35,7 +35,7 @@ scope:
   path: ess/domains/standing_approvals.yaml
 - confidence: cited
   path: ess/system.yaml
-revision: 23
+revision: 24
 ---
 ## Outcome
 
@@ -48,7 +48,7 @@ needs this. Until it lands, that agent runs in per-send approval mode.
 
 ## Decided
 
-decision-blocker:standing-write-approval-mode, option A (Timo, 2026-10-22). The bounds:
+decision-blocker:standing-write-approval-mode, option A (the operator, 2026-10-22). The bounds:
 - The operator grants a standing approval explicitly; nothing grants one by default.
 - Its scope is exact: connector instance, operation and target (for Slack, a channel id).
 - It has an expiry (`not_after`) and can be revoked before it.
@@ -148,3 +148,4 @@ listener; "no request" is the listener's request count staying 0:
   jail, where the grant file is replaced directly. Whether a Kubernetes Secret update reaches a
   running pod is that story's observation. This story adds a standing-grant section to
   `docs/local-container.md` that names the observation as inferred until that story records it.
+

@@ -14,7 +14,7 @@ scope:
   path: crates/connectors-host/src/local/owner/approval_issuance/tests.rs
 - confidence: inferred
   path: crates/connectors-host/tests/service.rs
-revision: 10
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-09T21:58:30Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-09T21:58:31Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
@@ -22,7 +22,7 @@ transitions:
 ---
 ## Acceptance
 
-Changed by Timo on 2026-11-11 (decision-blocker:load-acceptance-without-load-tests, option A): no
+Changed by the operator on 2026-11-11 (decision-blocker:load-acceptance-without-load-tests, option A): no
 load run on the shared workstation. Each test below bounds every wall-clock wait it makes, shown by
 reading the code and, where a failure mode exists, by a deterministic seam that fails without the
 guard:
@@ -79,5 +79,6 @@ Single runs, one thread, all passed: the three above, `federation_refreshes_atom
 Open: `federation_refreshes_atomically…` waits on the client's hard-coded 20 s request and 5 s
 connect timeouts (crates/connectors-client/src/lib.rs:42-43) and the server's 20 s
 (server.rs:466); bounding them from the test needs a product knob. The acceptance line "passes the
-full gate at load 30 or more" cannot be observed on the shared workstation, where Timo forbids load
+full gate at load 30 or more" cannot be observed on the shared workstation, where the operator forbids load
 tests: decision-blocker:load-acceptance-without-load-tests.
+

@@ -8,7 +8,7 @@ summary: Download Connectors, connect Slack and Jira, and use them from Claude t
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: epic:mcp-contracts
-revision: 6
+revision: 7
 ---
 ## Outcome
 
@@ -21,7 +21,7 @@ A person downloads Connectors, connects Slack and Jira, and works with them from
 
 ## Operator request
 
-Timo, 2026-10-22 (relayed by the orchestrator, verbatim excerpts):
+the operator, 2026-10-22 (relayed by the orchestrator, verbatim excerpts):
 
 - "make it a story around connectors and how to use it together with Claude in the most
   meaningful way."
@@ -109,3 +109,4 @@ The epic is complete when, on one release cut through `AGENTS.md` § Cutting a r
   (`adapters/mcp/contracts/server/v1alpha1/`); this epic changes none of them, except through
   story:standing-write-approval-for-unattended-agents, which adds a standing approval mode.
 - Windows binaries stay with `epic:local-cli-on-macos-and-windows`.
+

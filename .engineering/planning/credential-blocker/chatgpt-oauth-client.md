@@ -6,7 +6,7 @@ status: cleared
 title: No registered OAuth client id for the ChatGPT sign-in
 relations:
 - blocks: story:chatgpt-subscription-connector
-revision: 3
+revision: 4
 transitions:
 - {from: "open", to: "cleared", at: "2026-10-25T21:11:18Z", actor: "human:timo", revision: 3}
 ---
@@ -35,7 +35,7 @@ live connection waits on it.
 
 ## Decision
 
-Decided 2026-10-25 by the operator, Timo, relayed verbatim with its date by the directing session
+Decided 2026-10-25 by the operator, relayed verbatim with its date by the directing session
 `b10x-chef-orchestrator`: the request "it must be possible in connectors lib, to do a regular oauth2 thing,
 for anthropic claude code AND for codex/chatgpt. this way a token and refresh token would be stored in
 connectors" and, on being asked again, "We made the decission long ago already, I am sick of having to
@@ -44,3 +44,4 @@ re-decide over and over again".
 The client id is the instance's configuration (`oauth2_client_id`), set by the operator for their own use;
 none is committed. The story is implemented and tested against a fake server; registering a Sign in with
 ChatGPT client stays open to the operator and blocks nothing in this repository.
+

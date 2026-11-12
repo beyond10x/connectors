@@ -6,7 +6,7 @@ status: cleared
 title: May a Kubernetes Secret read return a value, and under what rule?
 relations:
 - blocks: story:parity-kubernetes-secret-read
-revision: 3
+revision: 4
 transitions:
 - {from: "open", to: "cleared", at: "2026-10-23T13:45:54Z", actor: "human:timo", revision: 3}
 ---
@@ -34,6 +34,7 @@ this is cleared.
 
 Cleared on 2026-10-23 by the directing session `b10x-chef-orchestrator`, under its grant in the operator's workspace instructions:
 
-> decision: decision-blocker:kubernetes-secret-disclosure -> A (metadata only: name, namespace, type, keys, byte lengths, never a value). Reason: it discloses nothing and is your own default on silence. Clear the blocker with this answer quoted in your store and build story:parity-kubernetes-secret-read as A when it is next in your item. B (values) is not decided and needs Timo; do not build it.
+> decision: decision-blocker:kubernetes-secret-disclosure -> A (metadata only: name, namespace, type, keys, byte lengths, never a value). Reason: it discloses nothing and is your own default on silence. Clear the blocker with this answer quoted in your store and build story:parity-kubernetes-secret-read as A when it is next in your item. B (values) is not decided and needs the operator; do not build it.
 
 story:parity-kubernetes-secret-read is built as A. B stays undecided and needs the operator's word; C is not chosen.
+

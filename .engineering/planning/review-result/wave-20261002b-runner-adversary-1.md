@@ -6,7 +6,7 @@ status: active
 title: Ignored-suite runner adversary, pass 1
 relations:
 - reviews: story:ignored-suites-have-a-runner
-revision: 1
+revision: 2
 ---
 unit: ignored-suites-have-a-runner; cb26b-runner working tree on b3ddded7618b5a4a23fe74dbec739e0938ecc296; ignored.rs sha256 fdce9d4b16462fcfa6be086f76e8c3b7c646298bc6dd3fff1a78e1fec9a3bb1f
 verdict: NEEDS-CHANGE
@@ -400,8 +400,8 @@ Severity: blocker for this runner unit's claimed bounded fixture lifecycle. The 
 
 6. Outside-worktree paths
 
-- `$HOME/.cache/cb26b-runner-adversary` — created task-owned parent, user timo, mode 700; retained.
-- `$HOME/.cache/cb26b-runner-adversary/tmp` — approved task-owned TMPDIR, user timo, mode 700; retained and empty after all test runs. Dynamically named tempfile children and their compiled Rust fixtures/logs were removed by TempDir drop. Exact ephemeral basenames were not retained; the report does not claim otherwise.
+- `$HOME/.cache/cb26b-runner-adversary` — created task-owned parent, the session user, mode 700; retained.
+- `$HOME/.cache/cb26b-runner-adversary/tmp` — approved task-owned TMPDIR, the session user, mode 700; retained and empty after all test runs. Dynamically named tempfile children and their compiled Rust fixtures/logs were removed by TempDir drop. Exact ephemeral basenames were not retained; the report does not claim otherwise.
 
 Compiler output stays in this worktree's existing target directory; no shared CARGO_TARGET_DIR was set. Tool-managed worktree lease and sccache state were used. The coordinator owns retained directory cleanup.
 

@@ -24,7 +24,7 @@ scope:
   path: crates/connectors-oauth2
 - confidence: cited
   path: ess/domains/oauth2.yaml
-revision: 9
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-25T21:11:56Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":2}}}
 - {from: "proposed", to: "active", at: "2026-10-25T21:11:57Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":2}}}
@@ -35,7 +35,7 @@ transitions:
 A catalog connector declares the Claude subscription sign-in as an `oauth2_grant` profile, so the operator
 connects their own Claude plan once and a caller gets a current access token with `connections token`.
 Built for the operator's own single-user use: `decision-blocker:claude-subscription-terms`, option B
-(Timo, 2026-10-25). The profile ships no client id; `oauth2_client_id` is the instance's configuration.
+(the operator, 2026-10-25). The profile ships no client id; `oauth2_client_id` is the instance's configuration.
 
 ## Provider facts
 
@@ -85,3 +85,4 @@ sign-in to a Claude account must complete through Anthropic's own flow." The sam
 ## Out of scope
 
 Shipping a default client id (`oauth2_client_id` is configuration); operations against `api.anthropic.com`; a live login.
+

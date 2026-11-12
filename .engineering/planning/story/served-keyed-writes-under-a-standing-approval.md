@@ -9,7 +9,7 @@ relations:
 - serves: vision:independent-contract-adapters
 - implements: story:standing-write-approval-for-unattended-agents
 - depends_on: story:served-instance-admits-a-service-account-token
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-30T03:14:35Z", actor: "human:timo", revision: 2, executor: "agent:conn-d243-c1", correlation: "wave-d243-c1"}
 - {from: "proposed", to: "active", at: "2026-10-30T03:14:35Z", actor: "human:timo", revision: 3, executor: "agent:conn-d243-c1", correlation: "wave-d243-c1"}
@@ -31,7 +31,7 @@ Wave D243-C1, unit C3. Depends on C2 (the admitted principal).
 
 ## Decided
 
-- `decision-blocker:standing-write-approval-mode`, option A (Timo, 2026-10-22): explicit grant,
+- `decision-blocker:standing-write-approval-mode`, option A (the operator, 2026-10-22): explicit grant,
   exact scope (instance, operation, target), expiry, revocation, rate cap, grant id recorded with
   every write.
 - Served placement (wave D243-C1): the grant is part of the instance's mounted configuration, a
@@ -156,3 +156,4 @@ Not done (follow-up candidates):
 - loom's service transport sends unkeyed writes through `Client::invoke_v1alpha2`; it needs
   `invoke_v1alpha2_keyed` before it can use a host with standing grants.
 - Local CLI placement stays in story:standing-write-approval-for-unattended-agents.
+

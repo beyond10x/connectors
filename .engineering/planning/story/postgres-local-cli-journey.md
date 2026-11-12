@@ -18,7 +18,7 @@ scope:
   path: apps/connectors
 - confidence: cited
   path: docs
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-11T17:31:52Z", actor: "agent:cv2-gitlab", revision: 3, decided_on: {"recorded":{"test_result":2}}, imported: true}
 - {from: "proposed", to: "active", at: "2026-09-11T17:31:56Z", actor: "agent:cv2-gitlab", revision: 4, decided_on: {"recorded":{"test_result":2}}, imported: true}
@@ -53,7 +53,7 @@ Excluded: MySQL, which the initiative places in the remaining-provider phase; an
 
 `adapters/sql/src/main.rs` supports only the federated `--config` service mode, so the adapter is unreachable from the local CLI today. That gap is what this story closes.
 
-A disposable local PostgreSQL instance is required for runtime acceptance. Whether one can be started on this host without Timo's hands is unestablished; if it cannot, the story stays open on that evidence the same way the Kubernetes journey stays open on cluster evidence.
+A disposable local PostgreSQL instance is required for runtime acceptance. Whether one can be started on this host without the operator's hands is unestablished; if it cannot, the story stays open on that evidence the same way the Kubernetes journey stays open on cluster evidence.
 
 ## Current runtime evidence, 2026-10-02
 
@@ -65,3 +65,4 @@ No additional lifecycle move is made: historical implemented status is retained,
 and this one journey does not close the broader provider initiative. Kubernetes
 per-operation authorization coverage, workload logs/exec/mutations/tunnels and Helm
 are not proven. Its fixture pod was Pending under node disk pressure.
+

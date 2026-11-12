@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-12T16:02:21Z",
+  "actor": "human:operator",
+  "artifact": "review-result:wave-20261002b-runner-adversary-1",
+  "kind": "review-result",
+  "revision": 2,
+  "change": {
+    "change": "redaction",
+    "literal_sha256": "8424c9238302245e3655a8217aa09cc4abef4c55484d3ebd830831d43a12f7ab",
+    "literal_chars": 9,
+    "replacement": "the session user",
+    "count": 2,
+    "reason": "public repository: no personal names"
+  }
+}

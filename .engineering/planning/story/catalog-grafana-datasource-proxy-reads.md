@@ -9,7 +9,7 @@ relations:
 - decomposes: epic:catalog-knowledge-sources
 - serves: vision:independent-contract-adapters
 - depends_on: story:catalog-grafana-reads
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-11T00:01:00Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-11-11T00:01:02Z", actor: "human:timo", revision: 5}
@@ -26,7 +26,7 @@ The route is a catalog definition: `connectors/grafana.yaml` in `beyond10x/conne
 Serving the native adapters (`adapters/grafana`, the Prometheus and Loki adapters) is not the
 route.
 
-The definition file holds no write operation (requirement confirmed by Assembly).
+The definition file holds no write operation (requirement confirmed by a downstream consumer).
 
 ## Operations (read-only)
 
@@ -64,7 +64,8 @@ The definition file holds no write operation (requirement confirmed by Assembly)
 
 ## Decisions
 
-- `uid` (resolved 2026-11-10 from an Assembly requirement): a caller input, validated against an
+- `uid` (resolved 2026-11-10 from a downstream consumer's requirement): a caller input, validated against an
   optional allow-list in the instance configuration; an empty list admits every data source the
   token can read. Reason: a central Grafana has one data source per environment, so a fixed
   `uid` would mean one instance per environment.
+

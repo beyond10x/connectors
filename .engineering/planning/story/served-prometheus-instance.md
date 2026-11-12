@@ -9,9 +9,9 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:served-kubernetes-authenticates-in-cluster
 - informed_by: story:served-kubernetes-admits-service-account-tokens
-revision: 1
+revision: 2
 ---
-Requested by Assembly (assembly-dev session), 2026-11-11. Why: the cluster in question has no
+Requested by a downstream consumer, 2026-11-11. Why: the cluster in question has no
 Grafana, so the Grafana data-source proxy route (story:catalog-grafana-datasource-proxy-reads)
 cannot reach its data.
 
@@ -76,3 +76,4 @@ token. No credential-free profile is asked for. `prometheus.bearer` is proved as
 - **Caller admission by TokenReview:** whether `ServiceConfigV3` admission (as in
   story:served-kubernetes-admits-service-account-tokens) belongs in this story's scope instead of
   the static caller token is an open question for the operator.
+

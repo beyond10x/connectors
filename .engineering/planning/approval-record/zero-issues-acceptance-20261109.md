@@ -64,7 +64,7 @@ relations:
 - decides: story:readme-back-under-its-size-limit
 - decides: story:slack-move-names-four-writes
 - decides: story:websearch-contract-states-host-deadline
-revision: 1
+revision: 2
 ---
 ## The stop
 
@@ -75,7 +75,7 @@ and a coordinator never does it on its own.
 ## Why it is bypassed: non-interactive
 
 The run is a sub-agent dispatch with no operator turn; the coordinator's brief says a Stop hook holds
-the session until the goal is met. The brief (operator Timo, 2026-11-09) states: "The operator's goal
+the session until the goal is met. The brief (the operator, 2026-11-09) states: "The operator's goal
 is the acceptance of these stories and the approval of each wave."
 
 Goal, verbatim: "zero remaining issues on github, all bugs fixed from planning store".
@@ -102,3 +102,4 @@ Method, verbatim: "use /planning and /wave and /worktree:managing-worktrees - bu
 1. Are these 56 the bugs you mean, or only the stories that were filed as defects of shipped
    behaviour (34), or fewer?
 2. Do you accept them as written, including the 22 borderline ones?
+

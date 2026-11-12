@@ -10,7 +10,7 @@ relations:
 - informed_by: review-result:wave-a-websearch-deadline-adversary-1
 - decomposes: epic:zero-open-issues-and-store-defects
 - serves: vision:independent-contract-adapters
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-10T08:52:34Z", actor: "human:timo", revision: 2, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
 - {from: "proposed", to: "active", at: "2026-11-10T08:52:35Z", actor: "human:timo", revision: 3, executor: "agent:connectors-zero-issues", correlation: "connectors-zero-issues"}
@@ -49,7 +49,7 @@ Status on 2026-11-10: partly delivered in the single defect wave (merge 5d76bbad
   crawl that Tavily ends just before the timeout would not be caught.
 
 
-## Live crawls, 2026-11-11 (Timo's yes, decision 2 option A)
+## Live crawls, 2026-11-11 (the operator's yes, decision 2 option A)
 
 Tavily accepts no `timeout` under 10 (`adapters/tavily/src/lib.rs:28`), so the crawls used 10, not
 2. Neither reached it:
@@ -61,3 +61,4 @@ Tavily accepts no `timeout` under 10 (`adapters/tavily/src/lib.rs:28`), so the c
 
 Four live crawls so far ended at 0.09 to 8.0 s, all under the 10 s `timeout`. A cut-short answer is
 still not observed.
+

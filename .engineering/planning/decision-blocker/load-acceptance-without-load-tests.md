@@ -8,18 +8,19 @@ relations:
 - blocks: story:host-gate-load-sensitivity-w3
 - blocks: story:gmail-attachment-read-flaky-under-load
 withholds: test_result
-revision: 2
+revision: 3
 transitions:
 - {from: "open", to: "cleared", at: "2026-11-11T22:12:54Z", actor: "human:timo", revision: 2}
 ---
 ## Question
 
 story:host-gate-load-sensitivity-w3 accepts on "each named test passes the full gate at load 30 or
-more". Timo forbids load tests on the shared workstation (relayed by session brain, 2026-11-11),
+more". The operator forbids load tests on the shared workstation (relayed by the planning session, 2026-11-11),
 and no other host is named for it.
 
 ## What would clear it
 
 One of: a host or CI runner where the gate may run under load 30, or a changed acceptance line
 (for example, each named test bounds every wait it makes, shown by reading and a deterministic
-seam), decided by Timo.
+seam), decided by the operator.
+
