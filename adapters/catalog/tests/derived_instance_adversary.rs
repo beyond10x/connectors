@@ -78,9 +78,13 @@ impl Installation {
 }
 
 /// Control: the setup below derives a Gmail instance from the real provider,
-/// writes included, so a refusal elsewhere is about that connector.
+/// so a refusal elsewhere is about that connector. Named alone, the instance
+/// is on Gmail's read-only default profile and offers no write; naming
+/// `google.oauth` offers the writes
+/// (story:google-read-only-profiles-and-company-domain).
 #[test]
-fn control_a_gmail_instance_named_alone_derives_from_the_real_provider() {
+fn control_a_gmail_instance_derives_from_the_real_provider_read_only_unless_it_names_google_oauth()
+{
     let installation = Installation::real();
     let config = installation
         .read("[connectors.gmail]\nenabled=true\n[connectors.gmail.instances.private]\n")
@@ -91,6 +95,18 @@ fn control_a_gmail_instance_named_alone_derives_from_the_real_provider() {
         entry.executable.sha256,
         hex::encode(Sha256::digest(fs::read(installation.provider()).unwrap()))
     );
+    assert!(
+        entry.permissions.operations.contains("users.messages.list")
+            && !entry.permissions.operations.contains("users.drafts.send"),
+        "{:?}",
+        entry.permissions.operations
+    );
+    let config = installation
+        .read(
+            "[connectors.gmail]\nenabled=true\n[connectors.gmail.instances.private]\nprofile = \"google.oauth\"\n",
+        )
+        .expect("the real provider derives gmail.private under google.oauth");
+    let entry = &config.adapters["gmail.private"];
     assert!(
         entry.permissions.operations.contains("users.drafts.send"),
         "{:?}",
