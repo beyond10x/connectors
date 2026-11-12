@@ -297,6 +297,40 @@ mod failure_tests {
         assert_eq!(admitted(None, &secret), None);
     }
 
+    /// story:google-read-only-profiles-and-company-domain: a failed validation
+    /// also keeps the exact form of an account-domain refusal, whatever the
+    /// names hold, and drops one that is any other text or echoes the credential.
+    #[test]
+    fn a_failed_validation_keeps_an_account_domain_refusal_by_its_shape() {
+        let secret = connectors_sdk::Secret(
+            br#"{"client_id":"fixture-client-id.apps.example.test","client_secret":"fixture-secret-one"}"#
+                .to_vec(),
+        );
+        let admitted_domains = ["corp.test".to_owned()];
+        let kept = connectors_core::reason::domain_refusal(
+            Some("branch2026.example.org"),
+            &admitted_domains,
+        );
+        assert_eq!(admitted_validation(kept.clone(), &secret), kept);
+        assert_eq!(admitted(kept.clone(), &secret), None);
+        for dropped in [
+            "the account's domain fixture-secret-one.test is not an admitted domain; admitted: corp.test",
+            "the account's domain x.test is not an admitted domain; admitted: corp.test and branch2026.example.org",
+            "Bearer abc",
+        ] {
+            assert_eq!(
+                admitted_validation(Some(dropped.to_owned()), &secret),
+                None,
+                "{dropped}"
+            );
+        }
+        assert_eq!(
+            admitted_validation(Some("Unauthorized; scope does not match".into()), &secret)
+                .as_deref(),
+            Some("Unauthorized; scope does not match")
+        );
+    }
+
     #[test]
     fn a_provider_refusal_keeps_its_code_and_names_the_provider_as_origin() {
         use crate::local::owner::{Code, Error, Origin};
@@ -437,6 +471,26 @@ pub(crate) fn admitted_delay(seconds: Option<u64>) -> Option<u64> {
 /// Anything else is dropped; the failure itself still stands.
 pub(crate) fn admitted(reason: Option<String>, secret: &connectors_sdk::Secret) -> Option<String> {
     reason.filter(|reason| {
+        connectors_core::reason::admit(reason).as_deref() == Some(reason.as_str())
+            && !connectors_core::reason::carries_credential(reason, &secret.0)
+    })
+}
+
+/// [`admitted`] for the reason of a failed validation, which may also be the
+/// exact form of an account-domain refusal
+/// ([`connectors_core::reason::is_domain_refusal`]): host names in fixed
+/// words, which `admit` cannot keep when a name holds a digit or is long. It
+/// still holds no piece of the credential document, except of a value that is
+/// itself a dotted host name
+/// ([`connectors_core::reason::domain_refusal_carries_credential`]).
+pub(crate) fn admitted_validation(
+    reason: Option<String>,
+    secret: &connectors_sdk::Secret,
+) -> Option<String> {
+    reason.filter(|reason| {
+        if connectors_core::reason::is_domain_refusal(reason) {
+            return !connectors_core::reason::domain_refusal_carries_credential(reason, &secret.0);
+        }
         connectors_core::reason::admit(reason).as_deref() == Some(reason.as_str())
             && !connectors_core::reason::carries_credential(reason, &secret.0)
     })

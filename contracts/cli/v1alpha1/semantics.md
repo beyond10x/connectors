@@ -1825,6 +1825,27 @@ otherwise, and absent unless every rule below holds:
   character boundary and then back to its last whole space-separated word; one
   whose first word does not fit is withheld.
 
+One more reason is admitted, on a validation refused with
+`code = insufficient_scope` alone: the refusal of an account whose Workspace
+domain (the `hd` claim of its identity assertion) is not among the domains the
+instance admits (`allowed_domains`). It is not read from a response body and
+the rules above do not apply to it, since they withhold a domain that holds a
+digit or is long. The host accepts it only in its exact form: `the account's
+domain <domain> is not an admitted domain`, where `<domain>` is the claim as
+given and only when it already is a company domain (below); or, for a claim
+that is not one, lower-case or not, `the account's domain is not an admitted
+domain`, naming nothing; or, for an account with no claim, `the account has no
+hd claim, so it is not a Workspace account of an admitted domain`. Then
+`; admitted: ` and one to eight distinct company domains separated by `, `, in
+at most 2560 bytes. A company domain is the one rule `allowed_domains` applies
+to each entry: lower-case ASCII, at most 253 bytes, at least two dot-separated
+labels, each of 1 to 63 bytes of `a-z`, `0-9` and `-` that neither starts nor
+ends with `-`. The host still withholds the reason when it holds a piece of any
+string value of the protected document, except the top-level `client_id` member
+of a JSON object, a public identifier that a company domain may share bytes
+with; a client secret or refresh token is matched whatever its shape. Any
+other text beside that code is held to the rules above.
+
 The reason is text for a person reading why the provider refused, such as the
 missing token scope behind an `unauthorized`. It never decides `code`, `stage`
 or `next_action`, and a client must not parse it. A guarded write's failure,

@@ -166,8 +166,9 @@ connection and descriptor revision, not the input
 (`crates/connectors-host/src/local/owner/approval_issuance.rs`). Read the input
 file itself before approving — the whole input, not only the members the table
 names: its query parameters and `body` decide what the write does. Writes run on
-the same instance as the reads, whose consent requests the write scope; see
-[The write scope](#the-write-scope).
+the same instance as the reads, whose consent requests the write scope; the
+instance names the profile `google.oauth` for that, because the default
+profile is read-only. See [The write scope](#the-write-scope).
 
 | id | Discovery id | request | guard | beyond naming and describing a file |
 |---|---|---|---|---|
@@ -233,7 +234,8 @@ answer's `id_token` (`identity.source: id_token`). The consent address,
 `https://accounts.google.com/o/oauth2/auth`, is handed to the host for
 obtaining the entry by consent; the provider never calls it.
 
-One instance per Google account reads and writes. Its consent requests
+One instance per Google account reads and writes when it names the
+profile `google.oauth`. Its consent requests
 `openid`, `https://www.googleapis.com/auth/drive.readonly` and
 `https://www.googleapis.com/auth/drive.file`, and the connection's
 `minimum_scopes` are both Drive scopes, so an entry consented for one of them
@@ -248,6 +250,7 @@ Add to the host configuration (`~/.config/connectors/config.toml`, format
 enabled = true
 
 [connectors.drive.instances.private]
+profile = "google.oauth"
 ```
 
 The `drive` connector's default endpoint is
@@ -277,6 +280,38 @@ That is Google's stated scope semantics, not a behaviour this repository has
 verified: no live Drive file has been written, and whether a token holding both
 scopes may, for example, copy any readable file or create a file in a folder the
 app did not create is not known here.
+
+### Read-only by default
+
+An instance that names no profile uses `google.oauth.readonly`: its consent
+requests `openid` and `https://www.googleapis.com/auth/drive.readonly` only, the connection's `minimum_scopes` are that
+one scope, and the instance offers none of the writes. A write needs the
+instance to name `profile = "google.oauth"`, which requests both scopes as
+above; connect it (or reconnect it) under that profile. A read-only instance
+describes none of the writes and refuses an invoke of one, so no approval is
+ever asked for one.
+
+A connection is bound to the profile it was saved under and is never rebound. One
+saved before the default existed is under `google.oauth`: an instance that names no
+profile does not revalidate or read it. Name `profile = "google.oauth"` to keep it (the
+instance keeps its configuration revision), or `connections revoke` it and
+`connections connect` again under the read-only default.
+
+### Admit only a company's accounts
+
+An instance may state `allowed_domains`, one to eight lower-case domains such as
+`allowed_domains = ["example.org"]`, valid only with the Google profiles. The
+host passes each as `--allowed-domain` to the provider. On connect, reconnect
+and revalidation the provider reads the `hd` claim of the `id_token` Google
+returned, after its `iss`, `aud`, `sub` and `exp` checks and before any
+credential is stored, and refuses the account as `insufficient_scope` unless
+`hd` equals one of the domains. The refusal names the account's domain and the
+admitted ones; an account with no `hd` claim, such as a consumer account, is
+refused the same way. `hd` is Google's assertion of the Workspace domain; the
+provider reads the token without verifying its signature, as OpenID Connect
+Core 3.1.3.7 allows for a token received directly from the token endpoint over
+TLS. The list is part of the credential revision, so changing it needs a
+reconnect.
 
 ### Moving from read and write entries
 

@@ -28,6 +28,24 @@
 
 ### Changed
 
+- The Gmail, Calendar and Drive connectors now declare a read-only auth profile,
+  `google.oauth.readonly`, beside `google.oauth`, and it is their default: it requests `openid` and
+  the one `.readonly` scope, requires only that scope, and offers none of the writes, so even the
+  private protocol describes no write on it. A connection is bound to the profile it was saved
+  under and is never rebound to another, so a connection saved under `google.oauth` is not
+  revalidated or read by an instance that names no profile. To keep it, name
+  `profile = "google.oauth"` in the instance (and `--profile google.oauth` on connect): the
+  instance keeps its configuration revision and the connection works as before. To go read-only,
+  `connections revoke` the old connection and `connections connect` again under the default
+  profile. Slides is unchanged, and a connector declaration may name a `default_profile`. An instance of a Google
+  connector may also state `allowed_domains` (one to eight lower-case domains), which the host
+  passes as `--allowed-domain`: a connect, reconnect or revalidation compares the `hd` claim of
+  the ID token with the list before any credential is stored and refuses another domain, or an
+  account with no `hd`, as `insufficient_scope`, with a reason naming the account's domain and the
+  admitted ones. The list is part of the credential revision, and a profile that is not an OAuth
+  refresh profile with an ID-token identity refuses it at load. Instances made from a
+  connectors-definitions file cannot yet state it
+  (story:google-read-only-profiles-and-company-domain).
 - On Linux a catalog provider that a derivation, `--print-profiles` or the installed-provider check
   starts for its printed output now ends when the process that started it is killed, as an adapter
   already did (`PR_SET_PDEATHSIG`, SIGKILL, set before exec). Test processes that wait on a

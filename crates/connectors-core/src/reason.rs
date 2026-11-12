@@ -87,6 +87,122 @@ pub fn admit(text: &str) -> Option<String> {
     (!kept.is_empty()).then(|| kept.to_owned())
 }
 
+/// The most bytes a domain refusal holds: one account domain and eight admitted
+/// domains of 253 bytes each, with the words around them.
+pub const DOMAIN_LIMIT: usize = 2560;
+/// The most company domains an instance admits (`allowed_domains`).
+pub const COMPANY_DOMAINS: usize = 8;
+const DOMAIN_ACCOUNT: &str = "the account's domain ";
+const DOMAIN_NOT_ADMITTED: &str = " is not an admitted domain";
+const DOMAIN_SEPARATOR: &str = "; admitted: ";
+const DOMAIN_UNNAMED: &str = "the account's domain is not an admitted domain";
+const DOMAIN_ABSENT: &str =
+    "the account has no hd claim, so it is not a Workspace account of an admitted domain";
+
+/// Whether `text` is a company domain: a lower-case ASCII bare host name of at
+/// most 253 bytes and at least two dot-separated labels, each of 1 to 63 bytes
+/// of letters, digits and hyphens that neither starts nor ends with a hyphen.
+/// A scheme, a path, a wildcard, an `@` or a space is no host name.
+pub fn company_domain(text: &str) -> bool {
+    let label = |label: &str| {
+        (1..=63).contains(&label.len())
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+            && label
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+    };
+    text.len() <= 253 && text.split('.').count() >= 2 && text.split('.').all(label)
+}
+
+/// Whether `domains` is a usable list of the company domains an instance
+/// admits (`allowed_domains`, matched against the `hd` claim of a Google
+/// account's `id_token`): 1 to [`COMPANY_DOMAINS`] distinct [`company_domain`]s.
+/// The host's configuration, the provider and the host's check of a
+/// [`domain_refusal`] all apply this one rule.
+pub fn company_domains_admitted(domains: &[String]) -> bool {
+    (1..=COMPANY_DOMAINS).contains(&domains.len())
+        && domains
+            .iter()
+            .enumerate()
+            .all(|(index, domain)| company_domain(domain) && !domains[..index].contains(domain))
+}
+
+/// The refusal of an account whose Workspace domain is not one of `admitted`
+/// (a list [`company_domains_admitted`] accepts), in the one form
+/// [`is_domain_refusal`] accepts. `account` is the domain the account's
+/// identity assertion named, `None` when it named none. It is shown only when
+/// it already is a [`company_domain`], lower-case as given; any other claim
+/// takes the unnamed form, which says only that its domain is not admitted.
+/// `None` when `admitted` is not a usable list.
+///
+/// [`admit`] withholds a word of 16 bytes or more that holds a digit, a run of
+/// 32 or more, and any word that reads like a credential marker, so it cannot
+/// carry a domain such as `branch2026.example.org`. A domain is a name the
+/// instance's own configuration or the identity provider's assertion states,
+/// never a credential, so this form is checked by its exact shape instead:
+/// domains only, in fixed words.
+pub fn domain_refusal(account: Option<&str>, admitted: &[String]) -> Option<String> {
+    if !company_domains_admitted(admitted) {
+        return None;
+    }
+    let head = match account {
+        Some(domain) if company_domain(domain) => {
+            format!("{DOMAIN_ACCOUNT}{domain}{DOMAIN_NOT_ADMITTED}")
+        }
+        Some(_) => DOMAIN_UNNAMED.to_owned(),
+        None => DOMAIN_ABSENT.to_owned(),
+    };
+    Some(format!("{head}{DOMAIN_SEPARATOR}{}", admitted.join(", ")))
+}
+
+/// [`carries_credential`] for a [`domain_refusal`]: the one member of the
+/// document that is a public name, the OAuth `client_id` of a top-level JSON
+/// object, is not matched, because a domain the refusal names (a company whose
+/// client id carries its project's domain) may share eight bytes with it. Every
+/// other value, a client secret and a refresh token included whatever its
+/// shape, is matched as before.
+pub fn domain_refusal_carries_credential(reason: &str, document: &[u8]) -> bool {
+    let parsed = serde_json::from_slice::<Value>(document);
+    let mut values = Vec::new();
+    let mut named = false;
+    if let Ok(value) = &parsed {
+        strings(value, &mut values);
+        if let Value::Object(members) = value
+            && let Some(Value::String(client_id)) = members.get("client_id")
+        {
+            let at = values
+                .iter()
+                .position(|value| *value == client_id.as_bytes());
+            named = at.is_some();
+            if let Some(at) = at {
+                values.remove(at);
+            }
+        }
+    }
+    if values.is_empty() && !named {
+        values.push(document);
+    }
+    values.into_iter().any(|value| carries_value(reason, value))
+}
+
+/// Whether `text` is exactly a [`domain_refusal`]: a host that does not trust
+/// the child to have built it checks it with this, in place of [`admit`].
+pub fn is_domain_refusal(text: &str) -> bool {
+    if text.len() > DOMAIN_LIMIT {
+        return false;
+    }
+    let Some((head, list)) = text.split_once(DOMAIN_SEPARATOR) else {
+        return false;
+    };
+    let named = head
+        .strip_prefix(DOMAIN_ACCOUNT)
+        .and_then(|rest| rest.strip_suffix(DOMAIN_NOT_ADMITTED))
+        .is_some_and(company_domain);
+    let domains: Vec<String> = list.split(", ").map(str::to_owned).collect();
+    (named || head == DOMAIN_UNNAMED || head == DOMAIN_ABSENT) && company_domains_admitted(&domains)
+}
+
 /// Whether `reason` holds any piece of the credential `document`: of every
 /// string value in it when it is JSON with at least one string, otherwise of
 /// the whole document; see [`carries_value`].

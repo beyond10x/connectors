@@ -1589,6 +1589,7 @@ mod reuse_tests {
             instance_id: None,
             derived: false,
             profile: None,
+            allowed_domains: Vec::new(),
             awaiting_profile: None,
         }
     }

@@ -93,6 +93,8 @@ is not already in admitted form or holds any piece of the protected document the
 host sent for that call. The reason never decides the failure's code. A failed
 `validate` may carry a `reason` beside `insufficient_scope` only, admitted the
 same way: the answers that refused each [alternative binding](#alternative-bindings).
+The one other form it may take is the account-domain refusal of
+[semantics](semantics.md), which the host accepts by its exact shape.
 A failed reply to anything else (a `validate` with another code, a write's
 prepare, commit or cancel) that carries a `reason` is a malformed reply, refused
 as a protocol failure like any other. A host that predates the field
