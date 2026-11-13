@@ -1352,13 +1352,21 @@ fn adversary_a_connection_saved_before_the_read_only_default_is_kept_or_replaced
     }
 
     let flat = |text: String| text.split_whitespace().collect::<Vec<_>>().join(" ");
-    let changelog = flat(fs::read_to_string(root_path("../../CHANGELOG.md")).unwrap());
-    let unreleased = changelog
-        .split("## Unreleased")
-        .nth(1)
-        .and_then(|rest| rest.split("## 0.").next())
-        .unwrap();
-    let mut pages = vec![("CHANGELOG".to_owned(), unreleased.to_owned())];
+    // The entry lives in the section, `## Unreleased` or `## <version> — <date>`,
+    // that introduced the read-only default: the oldest one naming its profile.
+    // Sections are newest first, so a later release mentioning it is skipped.
+    let changelog = fs::read_to_string(root_path("../../CHANGELOG.md")).unwrap();
+    let introduced = changelog
+        .split("\n## ")
+        .skip(1)
+        .filter(|section| {
+            section.starts_with("Unreleased") || section.starts_with(|c: char| c.is_ascii_digit())
+        })
+        .filter(|section| section.contains(READ_ONLY_PROFILE))
+        .last()
+        .map(|section| flat(section.to_owned()))
+        .expect("no CHANGELOG section introduces the read-only default");
+    let mut pages = vec![("CHANGELOG".to_owned(), introduced)];
     for page in [
         "docs/catalog-google-gmail.md",
         "docs/catalog-google-calendar.md",

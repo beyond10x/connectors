@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:credential-from-environment-variable
 kind: story
-status: active
+status: implemented
 title: A connection's credential is read from an environment variable, for op run
 relations:
 - decomposes: epic:business-teams-google-and-hubspot
 - serves: vision:independent-contract-adapters
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-12T16:07:28Z", actor: "human:operator", revision: 2}
 - {from: "proposed", to: "active", at: "2026-11-12T16:07:29Z", actor: "human:operator", revision: 3}
+- {from: "active", to: "implemented", at: "2026-11-13T07:29:38Z", actor: "human:operator", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Need
 

@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-13T05:09:26Z",
+  "actor": "human:operator",
+  "artifact": "story:credential-from-environment-variable",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/actions/runs/43363104226/job/131681005806",
+    "reference": "1ec1fd7fa41ae37d5ce645165f03996f3bd121a0"
+  }
+}

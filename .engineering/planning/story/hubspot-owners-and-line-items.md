@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:hubspot-owners-and-line-items
 kind: story
-status: active
+status: implemented
 title: HubSpot owners and line items are read for finance
 relations:
 - decomposes: epic:business-teams-google-and-hubspot
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-12T16:07:27Z", actor: "human:operator", revision: 2}
 - {from: "proposed", to: "active", at: "2026-11-12T16:07:27Z", actor: "human:operator", revision: 3}
+- {from: "active", to: "implemented", at: "2026-11-13T07:29:37Z", actor: "human:operator", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Need
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.72.0 — 2026-11-13
 
 ### Added
 
@@ -101,6 +101,27 @@
   configuration revision moves: a pinned `configuration_revision` must be copied again, and a
   connected Jira instance is `pending` until `connections revalidate`
   (story:required-body-key-refuses-null).
+
+### Compatibility
+
+- A Gmail, Calendar or Drive instance that names no profile now connects under the read-only
+  profile `google.oauth.readonly` and offers no write. An instance that writes names
+  `profile = "google.oauth"`; an existing connection under `google.oauth` keeps working only
+  when the instance names that profile, otherwise revoke and connect again.
+- The Calendar, Drive, Gmail, Slides and HubSpot configuration revisions move: a pinned
+  `configuration_revision` must be copied again.
+- connectors-definitions files that use `read_only`, `default_profile`, Drive `files.getMedia`
+  or the HubSpot owners amendment need this release; 0.71.0 refuses them as unknown fields.
+
+### Limitations
+
+- The stdio MCP server serves a session on Linux and macOS. On Windows it is built and its
+  launch contract is tested, but the serving scenario has not yet passed in CI
+  (story:mcp-stdio-on-macos-and-windows stays open).
+- Bash completion of `--credential-env` offers file names, as `--profile` does
+  (story:cli-option-value-hint, draft).
+- A served write whose guard answers not-ok sends nothing but is answered `outcome_unknown`
+  (story:served-guard-refusal-is-a-refusal, draft).
 
 ## 0.71.0 — 2026-11-11
 
