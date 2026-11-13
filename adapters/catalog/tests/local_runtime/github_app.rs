@@ -927,7 +927,8 @@ fn a_github_app_configuration_outside_its_shape_is_refused() {
 }
 
 /// GitHub refuses a request without a `User-Agent`: the exchange and the
-/// operation both name this build, `connectors/<version>`.
+/// operation both name this build and the project's public repository,
+/// `connectors/<version> (https://github.com/beyond10x/connectors)`.
 #[test]
 fn the_exchange_and_the_operation_carry_the_connectors_user_agent() {
     let github = GitHub::new();
@@ -941,7 +942,10 @@ fn the_exchange_and_the_operation_carry_the_connectors_user_agent() {
             .collect::<Vec<_>>(),
         [EXCHANGE_ROUTE, PROJECT_ROUTE]
     );
-    let expected = format!("connectors/{}", env!("CARGO_PKG_VERSION"));
+    let expected = format!(
+        "connectors/{} (https://github.com/beyond10x/connectors)",
+        env!("CARGO_PKG_VERSION")
+    );
     for seen in requests {
         assert_eq!(
             seen.user_agent.as_deref(),
