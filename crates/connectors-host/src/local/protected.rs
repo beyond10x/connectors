@@ -260,7 +260,7 @@ pub fn environment_entry(
     Ok(document)
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 fn environment_with(
     name: &str,
     lookup: impl FnOnce(&str) -> Option<std::ffi::OsString>,
