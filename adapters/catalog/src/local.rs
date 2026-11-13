@@ -443,6 +443,13 @@ struct Declaration {
     /// absolute path without a trailing `/`; absent, the endpoint is `api_base`.
     #[serde(default)]
     api_path: Option<String>,
+    /// The base URL's path that ends in a configured variable (`/{accountId}`),
+    /// which a lowered definition dropped from the bundle's paths: the
+    /// endpoint's path fills it and is the request prefix in front of them
+    /// (`connectors_catalog::definition::endpoint_prefix`). Never beside
+    /// `api_path`.
+    #[serde(default)]
+    endpoint_path: Option<String>,
     /// The selection file beside the declaration; every operation in it is
     /// available on every instance.
     selection: String,
@@ -589,9 +596,19 @@ fn instance_configuration(
     // An endpoint that is already the API base is refused, not doubled. A
     // relative-root install (`https://example.com/code`) serves the API under
     // its root, which is then a request prefix in front of the bundle's paths.
-    let (api_base, request_prefix) = match declaration.api_path.as_deref() {
-        None => (endpoint.clone(), None),
-        Some(path) => {
+    // An endpoint that names the account an `endpoint_path` stands for is the
+    // API base, and its path that prefix; one that names none is refused.
+    let (api_base, request_prefix) = match (
+        declaration.api_path.as_deref(),
+        declaration.endpoint_path.as_deref(),
+    ) {
+        (None, None) => (endpoint.clone(), None),
+        (None, Some(template)) => {
+            let prefix = connectors_catalog::definition::endpoint_prefix(template, &endpoint)
+                .ok_or(Failure::InvalidConfiguration)?;
+            (endpoint.clone(), Some(prefix))
+        }
+        (Some(path), None) => {
             let host = endpoint.trim_end_matches('/');
             if !path.starts_with('/') || path.ends_with('/') || host.ends_with(path) {
                 return Err(Failure::InvalidConfiguration);
@@ -599,6 +616,7 @@ fn instance_configuration(
             let root = url_path(host).filter(|root| root != "/");
             (format!("{host}{path}"), root)
         }
+        (Some(_), Some(_)) => return Err(Failure::InvalidConfiguration),
     };
     let mut profiles = declaration.profiles;
     // The default names a declared profile, or the declaration is refused.
@@ -3383,6 +3401,200 @@ mod tests {
             assert_eq!(probed, expected, "{connector}");
             assert_eq!(targets.lock().unwrap().len(), expected.len(), "{connector}");
             assert!(validated.is_ok(), "{connector}: {:?}", validated.err());
+        });
+    }
+
+    /// story:catalog-path-prefix-from-config: a lowered definition whose
+    /// `base_url` ends in the configured `/{accountId}`, as Basecamp's does.
+    /// An instance whose endpoint names the account sends the identity read
+    /// and every operation under that account, and no operation takes
+    /// `accountId` from the caller. An endpoint without the account is
+    /// refused before anything is sent. Synthetic source, loopback fixture.
+    #[test]
+    fn an_endpoint_path_fills_the_leading_parameter_the_lowering_dropped() {
+        use std::io::Write as _;
+        let directory = tempfile::tempdir().unwrap();
+        let account = json!({"name": "accountId", "in": "path", "required": true,
+            "schema": {"type": "string", "pattern": "^[0-9]+$"}});
+        let ok = json!({"200": {"description": "ok", "content": {"application/json":
+            {"schema": {"type": "object"}}}}});
+        let source = serde_json::to_vec(&json!({
+            "openapi": "3.1.0",
+            "info": {"title": "Fixture projects", "version": "1"},
+            "paths": {
+                "/{accountId}/projects.json": {"get": {"operationId": "ListProjects",
+                    "summary": "List projects", "parameters": [account], "responses": ok}},
+                "/{accountId}/my/profile.json": {"get": {"operationId": "GetMyProfile",
+                    "summary": "Who holds the token", "parameters": [account],
+                    "responses": ok}}
+            }
+        }))
+        .unwrap();
+        let root = directory.path().join("definitions");
+        fs::create_dir_all(root.join("upstream/projects")).unwrap();
+        fs::create_dir_all(root.join("connectors")).unwrap();
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        encoder.write_all(&source).unwrap();
+        fs::write(
+            root.join("upstream/projects/openapi.json.gz"),
+            encoder.finish().unwrap(),
+        )
+        .unwrap();
+        let file = root.join("connectors/projects.yaml");
+        fs::write(
+            &file,
+            format!(
+                "schema: urn:beyond10x:connectors-definition:1\n\
+                 source:\n  openapi: upstream/projects/openapi.json.gz\n  sha256: {}\n\
+                 base_url: https://3.example.com/{{accountId}}\n\
+                 config:\n  accountId: {{type: string}}\n\
+                 auth:\n  projects.token: {{scheme: bearer, label: Fixture token, \
+                 identity: {{path: my/profile.json, kind: projects.person, subject: /id}}}}\n\
+                 operations:\n  projects.list: {{op: ListProjects}}\n",
+                hex::encode(Sha256::digest(&source))
+            ),
+        )
+        .unwrap();
+        let scratch = directory.path().join("scratch");
+        fs::create_dir_all(&scratch).unwrap();
+        let out = directory.path().join("out");
+        let lowered =
+            connectors_catalog::definition::lower(&connectors_catalog::definition::Request {
+                definition: &file,
+                root: &root,
+                out: &out,
+                scratch: &scratch,
+            })
+            .expect("the definition lowers");
+        let declaration = || -> Declaration {
+            connectors_core::read_json(&fs::read(&lowered.connector).unwrap())
+                .expect("the lowered declaration reads")
+        };
+        let instance = |endpoint: &str| -> Result<(Configuration, Sources)> {
+            let config = instance_configuration(
+                declaration(),
+                &Instance {
+                    connector: "projects",
+                    name: "work",
+                    instance_id: None,
+                    endpoint: Some(endpoint),
+                    profile: None,
+                    allowed_domains: None,
+                },
+            )?;
+            let selection = read_selection_file(&lowered.operations, &config.provider)?;
+            let bundle = bundle::load(&out, &config.provider).map_err(Failure::from_service)?;
+            Ok((
+                config,
+                Sources {
+                    bundle,
+                    bundle_sha256: None,
+                    selection: Some(selection),
+                },
+            ))
+        };
+        for bare in ["https://3.example.com", "https://3.example.com/"] {
+            assert_eq!(
+                instance(bare).err(),
+                Some(Failure::InvalidConfiguration),
+                "{bare}"
+            );
+        }
+
+        let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+        let ca = directory.path().join("ca.pem");
+        fs::write(&ca, cert.cert.pem()).unwrap();
+        fs::set_permissions(&ca, fs::Permissions::from_mode(0o600)).unwrap();
+        let tls = rustls::ServerConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_no_client_auth()
+        .with_single_cert(
+            vec![cert.cert.der().clone()],
+            PrivatePkcs8KeyDer::from(cert.signing_key.serialize_der()).into(),
+        )
+        .unwrap();
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let port = listener.local_addr().unwrap().port();
+            let acceptor = TlsAcceptor::from(Arc::new(tls));
+            let targets = Arc::new(Mutex::new(Vec::<String>::new()));
+            let seen = targets.clone();
+            let server = tokio::spawn(async move {
+                while let Ok((stream, _)) = listener.accept().await {
+                    let Ok(mut stream) = acceptor.accept(stream).await else {
+                        continue;
+                    };
+                    let mut head = Vec::new();
+                    while !head.ends_with(b"\r\n\r\n") && head.len() < 8192 {
+                        match stream.read_u8().await {
+                            Ok(byte) => head.push(byte),
+                            Err(_) => break,
+                        }
+                    }
+                    let head = String::from_utf8_lossy(&head).into_owned();
+                    let target = head.split_whitespace().nth(1).unwrap_or_default();
+                    seen.lock().unwrap().push(target.to_owned());
+                    let (status, body) = match target {
+                        "/12345/my/profile.json" => (200, json!({"id": 7})),
+                        "/12345/projects.json" => (200, json!({"projects": []})),
+                        _ => (404, json!({"error": "not found"})),
+                    };
+                    let body = serde_json::to_vec(&body).unwrap();
+                    let reply = format!(
+                        "HTTP/1.1 {status} fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        body.len()
+                    );
+                    let _ = stream.write_all(reply.as_bytes()).await;
+                    let _ = stream.write_all(&body).await;
+                    let _ = stream.flush().await;
+                }
+            });
+            let endpoint = format!("https://localhost:{port}/12345");
+            let (mut config, sources) = instance(&endpoint).expect("the instance is configured");
+            assert_eq!(config.api_base, endpoint);
+            config.ca_file = Some(ca.clone());
+            let local = match Local::configure(config, Some(sources)) {
+                Ok(local) => local,
+                Err(failure) => panic!("the instance loads: {failure:?}"),
+            };
+            let declared = local.engine.declarations(&[Effect::Read]);
+            let [list] = &declared[..] else {
+                panic!("one read is declared: {declared:?}");
+            };
+            assert!(
+                list.input_schema["properties"].get("accountId").is_none()
+                    && !list.input_schema.to_string().contains("accountId"),
+                "{}",
+                list.input_schema
+            );
+            let document = || Secret(br#"{"token":"fixture-token"}"#.to_vec());
+            let validated = local.validate("projects.token", document()).await;
+            assert!(validated.is_ok(), "{:?}", validated.err());
+            let read = local
+                .invoke("projects.list", "work", document(), json!({}))
+                .await;
+            let refused = local
+                .invoke(
+                    "projects.list",
+                    "work",
+                    document(),
+                    json!({"accountId": "999"}),
+                )
+                .await;
+            server.abort();
+            assert_eq!(read.expect("the read is answered")["status"], 200);
+            assert_eq!(refused.err(), Some(Failure::InvalidInput));
+            assert_eq!(
+                *targets.lock().unwrap(),
+                ["/12345/my/profile.json", "/12345/projects.json"]
+            );
         });
     }
 }

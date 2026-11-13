@@ -646,12 +646,22 @@ fn native_configuration(
         .map(|rest| "https://".len() + rest.find('/').unwrap_or(rest.len()))
         .ok_or_else(usage)?;
     let (origin, root_path) = endpoint.split_at(origin_end);
-    let (api_base, request_prefix) = match declaration["api_path"].as_str() {
-        None => (endpoint.to_owned(), None),
-        Some(path) => (
+    // An `endpoint_path` is the base URL's path the lowering dropped from the
+    // bundle's paths, which the endpoint's path fills.
+    let (api_base, request_prefix) = match (
+        declaration["api_path"].as_str(),
+        declaration["endpoint_path"].as_str(),
+    ) {
+        (None, None) => (endpoint.to_owned(), None),
+        (None, Some(template)) => (
+            endpoint.to_owned(),
+            Some(lowering::endpoint_prefix(template, endpoint).ok_or_else(usage)?),
+        ),
+        (Some(path), None) => (
             format!("{endpoint}{path}"),
             (!root_path.is_empty() && root_path != "/").then(|| root_path.to_owned()),
         ),
+        (Some(_), Some(_)) => return Err(usage()),
     };
     let profile_id = match parsed.auth.len() {
         1 => parsed.auth.keys().next().cloned(),
@@ -1299,5 +1309,59 @@ operations:
             connect_question("gitlab", "definition", "https://gitlab.com/api/v4/", None),
             "No connection for gitlab/definition. Connect now to https://gitlab.com/api/v4/? [y/N] "
         );
+    }
+
+    /// story:catalog-path-prefix-from-config: a file whose `base_url` ends in
+    /// the configured `/{accountId}` runs with the default account as the
+    /// request prefix in front of the lowered paths, which no longer carry it.
+    #[test]
+    fn a_defaulted_account_path_is_the_request_prefix() {
+        use std::io::Write as _;
+        let source = br#"{"openapi":"3.1.0","info":{"title":"Fixture projects","version":"1"},
+"paths":{"/{accountId}/projects.json":{"get":{"operationId":"ListProjects",
+"parameters":[{"name":"accountId","in":"path","required":true,"schema":{"type":"string"}}],
+"responses":{"200":{"description":"ok"}}}}}}"#;
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(root.path().join("upstream/projects")).unwrap();
+        std::fs::create_dir_all(root.path().join("connectors")).unwrap();
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        encoder.write_all(source).unwrap();
+        std::fs::write(
+            root.path().join("upstream/projects/openapi.json.gz"),
+            encoder.finish().unwrap(),
+        )
+        .unwrap();
+        let text = format!(
+            "schema: urn:beyond10x:connectors-definition:1\n\
+             source:\n  openapi: upstream/projects/openapi.json.gz\n  sha256: {}\n\
+             base_url: https://3.example.com/{{accountId}}\n\
+             config:\n  accountId: {{type: string, default: \"12345\"}}\n\
+             auth:\n  projects.token: {{scheme: bearer, label: Fixture token, \
+             identity: {{path: my/profile.json, kind: projects.person, subject: /id}}}}\n\
+             operations:\n  projects.list: {{op: ListProjects}}\n",
+            hex::encode(Sha256::digest(source))
+        );
+        let file = root.path().join("connectors/projects.yaml");
+        std::fs::write(&file, &text).unwrap();
+        let work = tempfile::tempdir().unwrap();
+        let staging = work.path().join("staging");
+        let scratch = work.path().join("scratch");
+        std::fs::create_dir_all(&scratch).unwrap();
+        let lowered = lowering::lower(&lowering::Request {
+            definition: &file,
+            root: root.path(),
+            out: &staging,
+            scratch: &scratch,
+        })
+        .expect("the definition lowers");
+        let entry = work.path().join("entry");
+        let parsed = lowering::parse(text.as_bytes()).unwrap();
+        let Ok(native) = native_configuration(&parsed, &lowered, &staging, &entry, "projects")
+        else {
+            panic!("the native configuration is written");
+        };
+        let native: Value = serde_json::from_slice(&native).unwrap();
+        assert_eq!(native["api_base"], "https://3.example.com/12345");
+        assert_eq!(native["request_prefix"], "/12345");
     }
 }
