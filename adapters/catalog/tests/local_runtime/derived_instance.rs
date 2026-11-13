@@ -28,8 +28,8 @@ use std::{
 
 /// Set in the re-executed test process that runs inside the namespaces.
 const INSIDE: &str = "CONNECTORS_TEST_DERIVED_GMAIL_NAMESPACES";
-const READS: &str = "local_runtime::derived_instance::a_gmail_instance_configured_by_name_alone_connects_once_read_only_and_reads";
-const WRITES: &str = "local_runtime::derived_instance::a_gmail_instance_naming_google_oauth_connects_once_and_reads_and_writes_drafts";
+const READS_NAME: &str = "local_runtime::derived_instance::a_gmail_instance_configured_by_name_alone_connects_once_read_only_and_reads";
+const WRITES_NAME: &str = "local_runtime::derived_instance::a_gmail_instance_naming_google_oauth_connects_once_and_reads_and_writes_drafts";
 const HOSTS: [&str; 3] = [
     "gmail.googleapis.com",
     "oauth2.googleapis.com",
@@ -90,7 +90,7 @@ fn carries_material(haystack: &[u8]) -> bool {
 #[ignore = "requires built debug production CLI, qualified disposable Secret Service and unprivileged user namespaces"]
 fn a_gmail_instance_configured_by_name_alone_connects_once_read_only_and_reads() {
     let Some(base) = std::env::var_os(INSIDE) else {
-        return outside(READS);
+        return outside(READS_NAME);
     };
     let fixture = Gmail::new(Path::new(&base));
     let journey = Journey::new(&fixture, "");
@@ -189,7 +189,7 @@ fn consent_scopes(consent: &Request) -> BTreeSet<String> {
 #[ignore = "requires built debug production CLI, qualified disposable Secret Service and unprivileged user namespaces"]
 fn a_gmail_instance_naming_google_oauth_connects_once_and_reads_and_writes_drafts() {
     let Some(base) = std::env::var_os(INSIDE) else {
-        return outside(WRITES);
+        return outside(WRITES_NAME);
     };
     let fixture = Gmail::new(Path::new(&base));
     let journey = Journey::new(&fixture, "profile = \"google.oauth\"\n");

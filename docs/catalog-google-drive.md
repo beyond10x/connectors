@@ -101,8 +101,9 @@ end of a walk are in it.
   projection carries `alt` only on the methods that support media download, as
   `json` or `media`. The answer is the engine's binary read, as for Jira and Slack
   attachments: `body` holds `media_type` (Drive's `Content-Type`), `length`,
-  `sha256` and `content_base64`. It needs only the read scope `drive.readonly`;
-  the projection lists it among the scopes of `files.get`, and the
+  the SHA-256 digest of the bytes and `content_base64`. It needs only the read
+  scope `drive.readonly`; the projection lists it among the scopes of
+  `files.get`, and the
   fixture grants nothing else. A file over 2 MiB
   (`connectors_catalog_provider::BINARY_LIMIT`) is refused as `capacity`, never
   truncated. The provider's refusal carries the file's size in bytes as its
@@ -370,7 +371,8 @@ connections of the old pair with `connections revoke` and remove their entries.
   the earlier revision must be issued again. Adding `rate_limit_reasons`
   changed the selection set, and so the configuration revision of a Drive
   instance; so did `files.getMedia`, and the bundle now carries `alt` on
-  `drive.files.get`, so a pinned `configuration_revision` is copied again.
+  `drive.files.get`, so an instance pinned to the earlier configuration
+  revision copies the new one.
 - `files.getMedia` reads at most 2 MiB. A larger file is refused, not read in
   part, and no ranged read is offered. A redirect in Drive's answer is refused as
   forbidden, because the selection admits no host besides Drive's own.
