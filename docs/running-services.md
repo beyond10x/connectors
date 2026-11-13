@@ -445,8 +445,8 @@ docker run --rm --entrypoint /usr/local/bin/connectors-kubernetes "ghcr.io/beyon
 ```
 
 ```text
-connectors-catalog-provider 0.71.0
-connectors-kubernetes 0.71.0
+connectors-catalog-provider 0.72.0
+connectors-kubernetes 0.72.0
 ```
 
 The image carries no configuration and no credential. Mount the configuration file, give the
