@@ -342,3 +342,6 @@ covers the connect question, credential reuse, the cache and a file moved to ano
   members.
 - **A host without a default.** A `base_url` variable without a `default` lowers, but
   `--definition` cannot invoke it.
+- **A `User-Agent` of its own.** Every request, the token exchanges included, carries
+  `User-Agent: connectors/<version> (https://github.com/beyond10x/connectors)`, which names the
+  client and a contact, as Basecamp requires. A definition cannot set or replace it.

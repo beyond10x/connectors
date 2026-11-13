@@ -80,6 +80,8 @@ fn dropped() -> Reply {
 struct Shared {
     replies: Mutex<VecDeque<Reply>>,
     requests: Mutex<Vec<Vec<u8>>>,
+    /// The head of every request read, in the same order.
+    heads: Mutex<Vec<String>>,
     delay: Duration,
     stop: AtomicBool,
 }
@@ -117,6 +119,7 @@ impl Server {
         let shared = Arc::new(Shared {
             replies: Mutex::new(replies.into()),
             requests: Mutex::new(Vec::new()),
+            heads: Mutex::new(Vec::new()),
             delay,
             stop: AtomicBool::new(false),
         });
@@ -141,6 +144,11 @@ impl Server {
 
     fn url(&self) -> String {
         format!("https://localhost:{}/token", self.port)
+    }
+
+    /// The head of every request the server read.
+    fn heads(&self) -> Vec<String> {
+        self.shared.heads.lock().unwrap().clone()
     }
 
     /// The form fields of every request the server read.
@@ -194,6 +202,7 @@ fn serve(stream: TcpStream, tls: &Arc<rustls::ServerConfig>, shared: &Shared) {
         return;
     }
     shared.requests.lock().unwrap().push(body);
+    shared.heads.lock().unwrap().push(head);
     std::thread::sleep(shared.delay);
     let reply = shared
         .replies
@@ -514,6 +523,29 @@ fn rotating_refresh_publishes_a_new_generation() {
     assert_eq!(attempt.source_generation, before.generation);
     assert_eq!(attempt.candidate_generation, Some(after.generation));
     assert_eq!(commands, [RESERVE, AUTHORIZE, STORE, PUBLISH]);
+}
+
+/// The refresh exchange goes through the transport of every grant request
+/// (`oauth2_grant::Https`) and names this build and the project's public
+/// repository as its `User-Agent`, once, as every other provider request does.
+#[test]
+fn the_grant_transport_carries_the_connectors_user_agent() {
+    let server = Server::start(vec![token(Some(ROTATED), Some("read"))]);
+    let connected = Connected::new(&server, "rotating", &["read"]);
+    let outcome = connected
+        .refresher("owner-one", &server)
+        .refresh_connection(&connected.connection)
+        .unwrap();
+    assert_eq!(outcome, Outcome::Refreshed);
+    let expected = format!(
+        "user-agent: connectors/{} (https://github.com/beyond10x/connectors)\r\n",
+        env!("CARGO_PKG_VERSION")
+    );
+    let heads = server.heads();
+    assert_eq!(heads.len(), 1, "the server saw one request");
+    let lower = heads[0].to_ascii_lowercase();
+    assert_eq!(lower.matches("user-agent:").count(), 1, "{}", heads[0]);
+    assert!(lower.contains(&expected), "{}", heads[0]);
 }
 
 #[test]

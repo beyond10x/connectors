@@ -34,10 +34,12 @@ nonsecret header on a native port, `ScopedHttp::with_fixed_header`
 ## Implemented: the client's `User-Agent`
 
 Every request a port makes, the credential-free form and assertion exchanges included, carries
-`User-Agent: connectors/<version>`, set by the transport's HTTP client; some providers refuse a
-request without one (GitHub's REST API). Neither a port's credential header nor a fixed header
-may take that name, each refused as `invalid_input` at composition, so no configuration or
-definition replaces it.
+`User-Agent: connectors/<version> (https://github.com/beyond10x/connectors)`, set by the
+transport's HTTP client; the grant and refresh requests of an `oauth2_grant` profile carry the
+same value. Some providers refuse a request without one (GitHub's REST API), and some refuse one
+that names no contact (Basecamp); the parenthesised address is that contact. Neither a port's
+credential header nor a fixed header may take that name, each refused as `invalid_input` at
+composition, so no configuration or definition replaces it.
 
 What stays proposed: operator-declared `http.extra_headers`, more than one header,
 case-variant duplicate detection across several declared headers, and the mediated-parent

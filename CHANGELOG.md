@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Every provider now sees `User-Agent: connectors/<version> (https://github.com/beyond10x/connectors)`
+  instead of `connectors/<version>`: every request of every connector, the token, form and
+  assertion exchanges, the requests of an `oauth2_grant` profile's grant and refresh, and a
+  WebSocket upgrade. Basecamp refuses a request whose `User-Agent` names no contact. Before, the
+  grant and refresh requests of an `oauth2_grant` profile carried no `User-Agent`. A definition or
+  configuration still cannot set or replace the header, and no definition, bundle or
+  configuration revision changes. The git relay keeps its own `git/connectors-<version>`
+  (story:user-agent-names-the-project).
+
 ## 0.72.0 — 2026-11-13
 
 ### Added

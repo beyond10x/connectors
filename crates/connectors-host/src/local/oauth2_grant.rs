@@ -45,7 +45,8 @@ pub const ENTRY_LIMIT: usize = connectors_custody::MAX_BYTES;
 /// How often a wait looks at the person's interruption.
 const SLICE: Duration = Duration::from_millis(50);
 
-/// The HTTPS transport of every grant request: no proxy, no redirect, no
+/// The HTTPS transport of every grant request: the `User-Agent` of every
+/// provider request, no proxy, no redirect, no
 /// retry, 5 s to connect and 15 s per request, the platform trust roots unless
 /// `trust` replaces them, and at most [`Request::limit`]` + 1` body bytes read.
 /// The request body is handed to the client in a buffer that is zeroized when
@@ -64,6 +65,7 @@ impl Https {
         // reqwest carries no crypto provider of its own; ring is the one this workspace selects.
         let _ = rustls::crypto::ring::default_provider().install_default();
         let mut builder = reqwest::Client::builder()
+            .user_agent(crate::http::USER_AGENT)
             .no_proxy()
             .https_only(true)
             .redirect(reqwest::redirect::Policy::none())
