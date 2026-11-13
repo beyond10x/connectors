@@ -49,6 +49,8 @@ const OTHER_PRINCIPAL: &str = "system:serviceaccount:agents:other-agent";
 const REVIEW_PATH: &str = "/apis/authentication.k8s.io/v1/tokenreviews";
 /// The repository the instance relays, and one the forge has that it does not.
 const OWNER: &str = "fixture-org";
+/// The group a GitLab-shaped forge holds the same repositories under.
+const GROUP: &str = "fixture-group";
 const PROJECT: &str = "project";
 const OTHER: &str = "other";
 /// The identity a configured `commit_identity` admits.
@@ -91,6 +93,7 @@ struct Forge {
     seen: Arc<Mutex<Vec<Seen>>>,
     /// When set, a receive-pack request is applied and its answer dropped.
     drop_push_answers: Arc<AtomicBool>,
+    shape: Shape,
     stop: Option<oneshot::Sender<()>>,
     thread: Option<std::thread::JoinHandle<()>>,
 }
@@ -100,6 +103,51 @@ fn basic() -> String {
         "Basic {}",
         STANDARD.encode(format!("x-access-token:{TOKEN}"))
     )
+}
+
+/// The user and password of an `Authorization: Basic` value.
+fn basic_pair(authorization: &str) -> Option<(String, String)> {
+    let encoded = authorization.strip_prefix("Basic ")?;
+    let decoded = String::from_utf8(STANDARD.decode(encoded).ok()?).ok()?;
+    let (user, password) = decoded.split_once(':')?;
+    Some((user.to_owned(), password.to_owned()))
+}
+
+/// How the forge names a repository and admits its token.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Shape {
+    /// `/<owner>/<repo>.git`, admitting `x-access-token` and the token, as
+    /// GitHub admits an installation token.
+    GitHub,
+    /// `/<group>/<project>.git`, admitting a personal access token as the
+    /// basic password under any non-blank user, as GitLab admits one over
+    /// HTTP (`oauth2` is one such user; GitLab reads it for an OAuth token).
+    GitLab,
+}
+
+impl Shape {
+    fn namespace(self) -> &'static str {
+        match self {
+            Self::GitHub => OWNER,
+            Self::GitLab => GROUP,
+        }
+    }
+
+    fn admits(self, authorization: Option<&str>) -> bool {
+        match self {
+            Self::GitHub => authorization == Some(basic().as_str()),
+            Self::GitLab => authorization
+                .and_then(basic_pair)
+                .is_some_and(|(user, password)| !user.trim().is_empty() && password == TOKEN),
+        }
+    }
+
+    fn realm(self) -> &'static str {
+        match self {
+            Self::GitHub => "forge",
+            Self::GitLab => "GitLab",
+        }
+    }
 }
 
 fn review_answer(token: &str, audiences: &[String]) -> Value {
@@ -120,7 +168,7 @@ fn review_answer(token: &str, audiences: &[String]) -> Value {
 }
 
 impl Forge {
-    fn new() -> Self {
+    fn shaped(shape: Shape) -> Self {
         let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
         let pem = cert.cert.pem();
         let tls = rustls::ServerConfig::builder_with_provider(Arc::new(
@@ -143,6 +191,7 @@ impl Forge {
             seen.clone(),
             drop_push_answers.clone(),
             root.path().to_owned(),
+            shape,
         );
         let thread = std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -176,6 +225,7 @@ impl Forge {
             root,
             seen,
             drop_push_answers,
+            shape,
             stop: Some(stop),
             thread: Some(thread),
         };
@@ -188,7 +238,7 @@ impl Forge {
         format!("https://localhost:{}", self.port)
     }
 
-    /// The bare repository `<root>/<OWNER>/<name>.git`, with one commit on
+    /// The bare repository `<root>/<namespace>/<name>.git`, with one commit on
     /// `main`.
     fn repository(&self, name: &str) {
         let bare = self.bare(name);
@@ -208,7 +258,10 @@ impl Forge {
     }
 
     fn bare(&self, name: &str) -> PathBuf {
-        self.root.path().join(OWNER).join(format!("{name}.git"))
+        self.root
+            .path()
+            .join(self.shape.namespace())
+            .join(format!("{name}.git"))
     }
 
     /// The object id of `reference` in the forge's repository, if any.
@@ -246,12 +299,12 @@ impl Drop for Forge {
     }
 }
 
-type Shared = (Arc<Mutex<Vec<Seen>>>, Arc<AtomicBool>, PathBuf);
+type Shared = (Arc<Mutex<Vec<Seen>>>, Arc<AtomicBool>, PathBuf, Shape);
 
 /// One request on one connection, answered with `Connection: close`.
 async fn serve(
     stream: tokio_rustls::server::TlsStream<tokio::net::TcpStream>,
-    (seen, drop_push_answers, root): Shared,
+    (seen, drop_push_answers, root, shape): Shared,
 ) -> std::io::Result<()> {
     let mut stream = AsyncBufReader::new(stream);
     let mut head = Vec::new();
@@ -334,11 +387,12 @@ async fn serve(
         out.write_all(&answer).await?;
         return out.shutdown().await;
     }
-    if authorization.as_deref() != Some(basic().as_str()) {
-        out.write_all(
-            b"HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"forge\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
-        )
-        .await?;
+    if !shape.admits(authorization.as_deref()) {
+        let refusal = format!(
+            "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"{}\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            shape.realm()
+        );
+        out.write_all(refusal.as_bytes()).await?;
         return out.shutdown().await;
     }
     let mut backend = tokio::process::Command::new("git");
@@ -556,6 +610,8 @@ struct Served {
     child: Option<Child>,
     base: String,
     log: Arc<Mutex<String>>,
+    /// The forge's owner or group of every relayed repository.
+    namespace: &'static str,
 }
 
 impl Served {
@@ -626,6 +682,7 @@ impl Served {
             child: None,
             base: String::new(),
             log: Arc::default(),
+            namespace: forge.shape.namespace(),
         };
         served.spawn();
         served
@@ -697,7 +754,7 @@ impl Served {
     }
 
     fn url(&self, repository: &str) -> String {
-        format!("{}/git/{OWNER}/{repository}.git", self.base)
+        format!("{}/git/{}/{repository}.git", self.base, self.namespace)
     }
 }
 
@@ -714,14 +771,18 @@ fn relay_config(forge: &Forge) -> Value {
     json!({
         "upstream": forge.endpoint(),
         "ca_file": "/srv/ca.pem",
-        "repositories": [format!("{OWNER}/{PROJECT}")],
+        "repositories": [format!("{}/{PROJECT}", forge.shape.namespace())],
         "ref_prefixes": ["agent/"],
         "work_directory": "/srv/work",
     })
 }
 
 fn started(git: impl FnOnce(&mut Value)) -> (Forge, Served) {
-    let forge = Forge::new();
+    started_as(Shape::GitHub, git)
+}
+
+fn started_as(shape: Shape, git: impl FnOnce(&mut Value)) -> (Forge, Served) {
+    let forge = Forge::shaped(shape);
     let mut config = relay_config(&forge);
     git(&mut config);
     let served = Served::start(&forge, config);
@@ -886,6 +947,110 @@ fn a_ref_delete_or_a_tag_push_is_refused_with_no_upstream_request() {
     assert_eq!(forge.pushes(), 1, "no refused push reached the forge");
     assert_eq!(forge.head(PROJECT, "refs/heads/agent/keep"), Some(commit));
     assert_eq!(forge.head(PROJECT, "refs/tags/v1"), None);
+}
+
+/// Against a GitLab-shaped forge the relay reaches `/<group>/<project>.git`
+/// with the mounted `gitlab.pat` token as the HTTP basic password under the
+/// user `x-access-token`, which GitLab admits for a personal access token
+/// (any non-blank user). A clone and a fetch bring the forge's commits, a push
+/// under `ref_prefixes` is applied once, and a tag push is refused with no
+/// forge request but the advertisement.
+#[test]
+fn a_gitlab_forge_is_cloned_fetched_and_pushed_with_the_pat_as_the_basic_password() {
+    let (forge, served) = started_as(Shape::GitLab, |_| {});
+    let client = Client::new(Some(AGENT_TOKEN));
+    client.cloned(&served.url(PROJECT));
+    assert_eq!(
+        git(&client.work(), &["rev-parse", "HEAD"]),
+        forge.head(PROJECT, "main").unwrap()
+    );
+
+    let seed = forge.root.path().join(format!("seed-{PROJECT}"));
+    fs::write(seed.join("NEWS.md"), "news\n").unwrap();
+    git(&seed, &["add", "NEWS.md"]);
+    git(&seed, &["commit", "--quiet", "-m", "news"]);
+    git(
+        &seed,
+        &[
+            "push",
+            "--quiet",
+            forge.bare(PROJECT).to_str().unwrap(),
+            "main",
+        ],
+    );
+    let output = client.run(&client.work(), &["fetch", "--quiet", "origin"], &[]);
+    assert!(output.status.success(), "fetch: {}", stderr(&output));
+    assert_eq!(
+        git(&client.work(), &["rev-parse", "origin/main"]),
+        forge.head(PROJECT, "main").unwrap()
+    );
+    assert_eq!(forge.pushes(), 0);
+
+    git(
+        &client.work(),
+        &["reset", "--quiet", "--hard", "origin/main"],
+    );
+    let commit = client.commit("change.md", b"change\n", ME, ME);
+    let output = client.push("HEAD:refs/heads/agent/release");
+    assert!(
+        output.status.success(),
+        "push: {}\n{}",
+        both(&output),
+        served.log()
+    );
+    assert_eq!(
+        forge.head(PROJECT, "refs/heads/agent/release"),
+        Some(commit)
+    );
+    assert_eq!(forge.pushes(), 1);
+    assert!(served.log().contains("outcome=applied"), "{}", served.log());
+
+    git(&client.work(), &["tag", "v1"]);
+    let before = forge.git_seen().len();
+    let output = client.push("refs/tags/v1");
+    assert!(!output.status.success(), "a tag was pushed");
+    assert!(
+        both(&output).contains("does not push tags"),
+        "{}",
+        both(&output)
+    );
+    let after: Vec<_> = forge.git_seen().into_iter().skip(before).collect();
+    assert!(
+        after
+            .iter()
+            .all(|seen| seen.method == "GET" && seen.query == "service=git-receive-pack"),
+        "{after:?}"
+    );
+    assert_eq!(forge.pushes(), 1, "the refused tag push reached the forge");
+    assert_eq!(forge.head(PROJECT, "refs/tags/v1"), None);
+
+    let seen = forge.git_seen();
+    for path in ["/info/refs", "/git-upload-pack", "/git-receive-pack"] {
+        assert!(
+            seen.iter().any(|seen| seen.path.ends_with(path)),
+            "no {path}: {seen:?}"
+        );
+    }
+    for seen in &seen {
+        assert!(
+            seen.path.starts_with(&format!("/{GROUP}/{PROJECT}.git/")),
+            "{seen:?}"
+        );
+        assert_eq!(
+            seen.authorization.as_deref().and_then(basic_pair),
+            Some(("x-access-token".to_owned(), TOKEN.to_owned())),
+            "{} {}",
+            seen.method,
+            seen.path
+        );
+    }
+    for seen in forge.seen() {
+        let authorization = seen.authorization.unwrap_or_default();
+        assert!(
+            !authorization.contains(AGENT_TOKEN) && !authorization.contains(OTHER_TOKEN),
+            "a projected token reached the forge"
+        );
+    }
 }
 
 /// With `commit_identity` configured, a new commit by another author or

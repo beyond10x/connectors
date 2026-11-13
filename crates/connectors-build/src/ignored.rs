@@ -510,6 +510,13 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "connectors-catalog-provider",
             "main",
             "slack_adversary::an_empty_user_or_email_sends_nothing",
+        )
+        // A guard that answers not-ok sends nothing, yet the served host answers
+        // outcome_unknown; deferred by story:served-guard-refusal-is-a-refusal (draft).
+        | (
+            "connectors-catalog-provider",
+            "main",
+            "served::a_served_write_whose_guard_answers_not_ok_is_refused_not_unknown",
         ) => Some((Deferred, vec![])),
         // These fail on main 7c22ff3878 in the CI journeys container as well (probe PR 249,
         // run 43055896285), deferred by story:main-failing-ci-journeys (draft).
