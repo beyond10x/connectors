@@ -62,8 +62,10 @@ OAuth or refresh for an MCP server is implemented.
 As a connector, not available: reading from an MCP server is not implemented.
 
 As a local MCP server, on Linux, connectors offers admitted read-only operations of a configured
-instance as tools, with no resources, prompts, writes or outbound MCP; on macOS and Windows it
-exits with `mcp_unavailable`. The instance needs a connection, and beside the configuration the
+instance as tools, with no resources, prompts, writes or outbound MCP. The macOS and Windows builds
+compile and run their lease-clock and launch tests in CI, with a serving scenario against each
+platform's own credential store; that scenario has passed on Linux only so far, so serving on macOS
+and Windows is not yet shown. The instance needs a connection, and beside the configuration the
 tools it exposes (`CONFIG.mcp-stdio.json`) and the declarations of their operations
 (`CONFIG.operation-curation.json`), as the
 [stdio guide](https://github.com/beyond10x/connectors/blob/main/docs/local-mcp-stdio.md) shows.
@@ -115,7 +117,7 @@ standard input and output. Its answer listed DEMO-1, DEMO-2 and DEMO-3, each wit
 
 The session's frames are replayed against the server by
 [`claude_mcp_journey.rs`](https://github.com/beyond10x/connectors/blob/main/apps/connectors/tests/claude_mcp_journey.rs)
-in every `cargo test` on Linux. The client opened with `server/discover` on `2026-07-28`, answered:
+in every `cargo test` on Linux, where the mounted custody binding it runs against exists. The client opened with `server/discover` on `2026-07-28`, answered:
 
 ```json
 {"id":"server-discover-probe-1","jsonrpc":"2.0","result":{"_meta":{"io.modelcontextprotocol/serverInfo":{"name":"connectors","version":"0.66.0"}},"cacheScope":"private","capabilities":{"tools":{}},"resultType":"complete","supportedVersions":["2026-07-28","2025-11-25"],"ttlMs":0}}
@@ -197,6 +199,7 @@ uses the instance's own connection; reconnect it as that connector's page says.
   on outbound stdio process ownership, are cleared in the planning store (2026-10-06 and
   2026-10-03); the contracts epic is still a draft.
 - The local MCP server serves one instance and one connection per process, with one request at
-  a time, on Linux only.
+  a time. It is shown serving on Linux only; the macOS and Windows jobs run a serving scenario
+  that has not yet passed there.
 - The recorded session read a local fixture site, not a live Jira; its replay serves the same
   instance description and answers from a fixture, not the catalog provider's HTTPS transport.

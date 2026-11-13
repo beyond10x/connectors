@@ -51,6 +51,11 @@ fn frame(control: &Value) -> Vec<u8> {
 }
 
 fn read_control(stream: &mut UnixStream) -> Value {
+    read_frame(stream).0
+}
+
+/// A request's control and the protected bytes and document that follow it.
+fn read_frame(stream: &mut UnixStream) -> (Value, Vec<u8>) {
     let mut sizes = [0u8; 12];
     stream.read_exact(&mut sizes).unwrap();
     let size = |at: usize| u32::from_be_bytes(sizes[at..at + 4].try_into().unwrap()) as usize;
@@ -58,7 +63,7 @@ fn read_control(stream: &mut UnixStream) -> Value {
     stream.read_exact(&mut control).unwrap();
     let mut rest = vec![0; size(4) + size(8)];
     stream.read_exact(&mut rest).unwrap();
-    serde_json::from_slice(&control).unwrap()
+    (serde_json::from_slice(&control).unwrap(), rest)
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -128,6 +133,17 @@ fn stand_in(
 /// Listens on `paths`' owner socket as an owner whose executable digest is
 /// `build`, for exactly one client connection.
 fn serve(paths: &Paths, build: String, answer: Answer) -> std::thread::JoinHandle<Vec<String>> {
+    serve_recording(paths, build, answer, None)
+}
+
+/// [`serve`], leaving the protected bytes of the `complete` request in
+/// `entry`.
+fn serve_recording(
+    paths: &Paths,
+    build: String,
+    answer: Answer,
+    entry: Option<std::sync::Arc<std::sync::Mutex<Vec<u8>>>>,
+) -> std::thread::JoinHandle<Vec<String>> {
     let socket = paths.state.join("owner.sock");
     let listener = sockets::bind(&paths.state, "owner.sock");
     fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
@@ -147,9 +163,12 @@ fn serve(paths: &Paths, build: String, answer: Answer) -> std::thread::JoinHandl
             .unwrap();
         let mut seen = Vec::new();
         loop {
-            let request = read_control(&mut stream);
+            let (request, protected) = read_frame(&mut stream);
             let kind = request["kind"].as_str().unwrap().to_owned();
             seen.push(kind.clone());
+            if let (Some(entry), "complete") = (&entry, kind.as_str()) {
+                *entry.lock().unwrap() = protected;
+            }
             if kind == "begin" {
                 stream
                     .write_all(&frame(&json!({
@@ -339,8 +358,13 @@ struct Cli {
 
 impl Cli {
     fn run(&self, args: &[&str]) -> Output {
+        self.run_with(args, &[])
+    }
+
+    fn run_with(&self, args: &[&str], environment: &[(&str, &str)]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_connectors"))
             .env_clear()
+            .envs(environment.iter().copied())
             .args(["--output", "json", "--config"])
             .arg(&self.paths.config)
             .arg("--state-dir")
@@ -601,6 +625,86 @@ fn a_revalidation_the_owner_definitely_fails_reports_dispatch_at_the_cli() {
             (&json!("dispatch"), &json!("retry_explicitly")),
             "{data}"
         );
+    }
+}
+
+/// story:credential-from-environment-variable. The value of the variable that
+/// `--credential-env` names is what the owner's `complete` request carries as
+/// the capture's entry: a bare value wrapped as the one entry field of the
+/// profile, a JSON object as it is. The stand-in owner answers a definite
+/// failure, and neither value reaches the CLI's output.
+#[test]
+#[ignore = "requires dbus-daemon and gnome-keyring-daemon"]
+fn a_credential_variable_reaches_the_owners_capture_as_its_entry() {
+    const VARIABLE: &str = "FICTIONAL_OWNER_ENTRY";
+    let root = tempfile::tempdir().unwrap();
+    let custody = Custody::new(root.path());
+    let cli = Cli {
+        paths: Paths {
+            config: root.path().join("cli/config.toml"),
+            state: root.path().join("cli/state"),
+        },
+    };
+    assert!(cli.run(&["setup", "init"]).status.success());
+    private(
+        &cli.paths.config,
+        format!(
+            "format='connectors-local/1'\nowner_uid={}\nsecret_service_socket={}\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\n[adapters.forge.permissions]\nprofiles=['fixture.basic']\noperations=[]\n[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            connectors_host::local::filesystem::uid(),
+            serde_json::to_string(custody.socket.to_str().unwrap()).unwrap(),
+            "a".repeat(64),
+        )
+        .as_bytes(),
+    );
+    // The CLI greets with its own executable's digest.
+    let image = fs::read(env!("CARGO_BIN_EXE_connectors")).unwrap();
+    let build = hex(ring::digest::digest(&ring::digest::SHA256, &image).as_ref());
+    for (value, entry) in [
+        (
+            "fictional-bare-owner-value",
+            r#"{"token":"fictional-bare-owner-value"}"#,
+        ),
+        (
+            r#"{"token":"fictional-object-owner-value"}"#,
+            r#"{"token":"fictional-object-owner-value"}"#,
+        ),
+    ] {
+        let recorded = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let owner = serve_recording(
+            &cli.paths,
+            build.clone(),
+            Answer::Failed(Code::Unavailable),
+            Some(recorded.clone()),
+        );
+        let refused = cli.run_with(
+            &[
+                "connections",
+                "connect",
+                "--adapter",
+                "forge",
+                "--profile",
+                "fixture.basic",
+                "--credential-env",
+                VARIABLE,
+            ],
+            &[(VARIABLE, value)],
+        );
+        assert_eq!(owner.join().unwrap(), ["begin", "complete"], "{refused:?}");
+        fs::remove_file(cli.paths.state.join("owner.sock")).unwrap();
+        assert_eq!(
+            String::from_utf8(recorded.lock().unwrap().clone()).unwrap(),
+            entry,
+            "the owner's entry is the variable's value"
+        );
+        assert_eq!(refused.status.code(), Some(1), "{refused:?}");
+        for stream in [&refused.stdout, &refused.stderr] {
+            let text = String::from_utf8_lossy(stream);
+            assert!(
+                !text.contains("fictional-bare-owner-value")
+                    && !text.contains("fictional-object-owner-value"),
+                "the value reached the output"
+            );
+        }
     }
 }
 

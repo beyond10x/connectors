@@ -870,6 +870,17 @@ types:
       - {name: clock_refusal, type: "Optional<connectors.clock.Refusal>"}
       - {name: clock_sources, type: "Optional<List<connectors.clock.SourceReport>>"}
       - {name: field, type: "Optional<String>"}
+      # ESS-LIMIT: environment_variable appears only on `protected_entry_unavailable` from a
+      # `--credential-env` source whose variable is unset, empty, larger than a credential may
+      # be, or holds a value the profile cannot take: the variable's name, upper case letters,
+      # digits and underscores not starting with a digit, at most 128 bytes, never its value.
+      # A word that is no such name, which may be a credential given where the name belongs,
+      # is refused without being named: environment_variable_rule then says what a name is,
+      # and environment_variable is absent. As for instance_id above, ESS declares no
+      # invariant on a CLI type, so the presence rules are enforced by the host and pinned by
+      # tests.
+      - {name: environment_variable, type: "Optional<String>"}
+      - {name: environment_variable_rule, type: "Optional<String>"}
       # ESS-LIMIT: instances appears only on `instance_ambiguous` (story:connectors-do-short-invocation):
       # every configured instance of the connector an `invoke` target named without an
       # instance, each `<connector>/<instance>`, sorted. connections appears only on
@@ -1510,6 +1521,11 @@ types:
       - {name: profile, type: "String"}
       - {name: device, type: "Optional<Boolean>"}
       - {name: credential_document, type: "Optional<String>"}
+      # credential_env is the NAME of an environment variable holding the credential, never
+      # the credential: the host reads the variable itself and stands beside no other
+      # protected source. The generated binding has no environment member of a protected
+      # source, so this is an ordinary option and the host enforces the exclusion.
+      - {name: credential_env, type: "Optional<String>"}
       - {name: target, type: "Optional<String>"}
       - {name: endpoint, type: "Optional<String>"}
   - name: connectors.cli.ConnectionConnectResult
@@ -1529,6 +1545,8 @@ types:
       - {name: expected_revision, type: "String"}
       - {name: device, type: "Optional<Boolean>"}
       - {name: credential_document, type: "Optional<String>"}
+      # credential_env is as on connectors.cli.ConnectionConnectInput.
+      - {name: credential_env, type: "Optional<String>"}
   - name: connectors.cli.ConnectionReconnectResult
     kind: struct
     fields:

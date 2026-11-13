@@ -278,7 +278,7 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Local runtime",
         "Local MCP server for Claude Code",
-        "On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*).",
+        "On Linux, connectors server --transport stdio offers one instance's admitted reads as read-only MCP tools; a recorded Claude Code session that lists the eleven reads of a Jira instance and calls its search tool is replayed against it (the recorded session *unreleased*). The macOS and Windows builds of the server compile and their lease clocks have unit tests in the macOS and Windows CI jobs, which also run a serving scenario against each platform's own credential store; that scenario has passed on Linux only so far, so serving on macOS and Windows is not yet shown.",
         "apps/connectors/tests/claude_mcp_journey.rs::claude_code_session_is_answered",
         "/docs/connectors/mcp",
     ),

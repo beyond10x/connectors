@@ -400,6 +400,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -1041,6 +1053,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -1647,6 +1671,18 @@
                             "stored",
                             "failed"
                           ]
+                        }
+                      },
+                      "environment_variable": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "environment_variable_rule": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
                         }
                       },
                       "feature": {
@@ -2262,6 +2298,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -2881,6 +2929,18 @@
                           ]
                         }
                       },
+                      "environment_variable": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "environment_variable_rule": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
                       "feature": {
                         "kind": "optional",
                         "of": {
@@ -3494,6 +3554,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -4143,6 +4215,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -4777,6 +4861,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -5429,6 +5525,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -6077,6 +6185,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -6729,6 +6849,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -7377,6 +7509,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -8029,6 +8173,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -8671,6 +8827,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -9331,6 +9499,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -9978,6 +10158,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -10810,6 +11002,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -11157,6 +11361,12 @@
               }
             },
             "credential_document": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "credential_env": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -11543,6 +11753,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -12253,6 +12475,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -12866,6 +13100,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -13554,6 +13800,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -13907,6 +14165,12 @@
               }
             },
             "credential_document": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "credential_env": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -14281,6 +14545,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -15008,6 +15284,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -15636,6 +15924,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -16420,6 +16720,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -17044,6 +17356,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -17634,6 +17958,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -18250,6 +18586,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -19042,6 +19390,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -19692,6 +20052,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -20361,6 +20733,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -21014,6 +21398,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -21616,6 +22012,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -22277,6 +22685,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -22865,6 +23285,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -23643,6 +24075,18 @@
                   ]
                 }
               },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "feature": {
                 "kind": "optional",
                 "of": {
@@ -24226,6 +24670,18 @@
                     "stored",
                     "failed"
                   ]
+                }
+              },
+              "environment_variable": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "environment_variable_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "feature": {
@@ -25124,6 +25580,13 @@
           }
         },
         {
+          "field": "credential_env",
+          "source": {
+            "kind": "option",
+            "long": "credential-env"
+          }
+        },
+        {
           "field": "target",
           "source": {
             "kind": "positional",
@@ -25340,6 +25803,13 @@
             "file": "credential-file",
             "stdin": "credential-stdin",
             "hidden_tty": "credential-prompt"
+          }
+        },
+        {
+          "field": "credential_env",
+          "source": {
+            "kind": "option",
+            "long": "credential-env"
           }
         }
       ]

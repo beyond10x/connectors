@@ -60,6 +60,22 @@ connectors connections connect --connector hubspot --instance work \
   --profile hubspot.private-app --credential-file ~/private/hubspot.json
 ```
 
+A token kept in a secret manager can come from an environment variable instead.
+`--credential-env` names the variable; it holds the bare token, and the value never appears on the
+command line or in any output. With 1Password, `op run` sets the variable for this one command
+only (`hubspot.env` holds `HUBSPOT_TOKEN=op://<vault>/<item>/<field>`):
+
+```sh
+op run --env-file hubspot.env -- connectors connections connect hubspot/work \
+  --profile hubspot.private-app --credential-env HUBSPOT_TOKEN
+```
+
+An unset, empty or oversized variable is refused naming the variable, never its value. The
+name is upper case letters, digits and underscores (`HUBSPOT_TOKEN`); any other word given there
+is refused without being repeated, so a token pasted in its place is not echoed, and the refusal
+says what a name is. A bare value may end in one line break, which is dropped.
+`--credential-env` stands beside no other credential input.
+
 ## A first read
 
 ```sh

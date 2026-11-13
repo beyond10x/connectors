@@ -40,6 +40,9 @@ pub const GROUPS: [(&str, &str); 6] = [
 pub const ADAPTER_HELP: &str =
     "Deprecated: the alias of a configured entry; select with --connector and --instance";
 
+/// The `--credential-env` option's help (story:credential-from-environment-variable).
+pub const CREDENTIAL_ENV_HELP: &str = "The name of an environment variable holding the credential: the bare value for a profile of one entry field, else the JSON object the other inputs take; beside no other credential input; the value is never printed, as in `op run --env-file <f> -- connectors connections connect hubspot/work --profile hubspot.private-app --credential-env HUBSPOT_TOKEN`";
+
 /// The help of the `invoke` arguments (story:connectors-do-short-invocation;
 /// `contracts/cli/v1alpha1/semantics.md` §3, "Invoking an operation").
 pub const INVOKE_HELP: [(&str, &str); 19] = [
@@ -174,6 +177,8 @@ fn node(
     let mut command = command.mut_args(|arg: Arg| {
         if arg.get_id() == "field:adapter" {
             arg.value_name("ALIAS").help(ADAPTER_HELP)
+        } else if arg.get_id() == "field:credential_env" {
+            arg.value_name("NAME").help(CREDENTIAL_ENV_HELP)
         } else if path == ["invoke"] {
             invoke_arg(arg)
         } else {

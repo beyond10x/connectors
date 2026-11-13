@@ -63,15 +63,10 @@ pub(crate) fn run(args: Vec<OsString>) -> i32 {
     }
 }
 
-#[cfg(target_os = "linux")]
+/// The data lease runs on the platform's clock that counts across sleep
+/// (`session.rs`); a valid launch whose clock does not qualify is refused
+/// before any protocol byte, like any unavailable server.
 fn serve(paths: Paths) -> Result<(), ()> {
     let signals = connectors_host::local::protected::Signals::install().map_err(|_| ())?;
     super::stdio::serve(paths, &signals).map_err(|_| ())
-}
-
-/// The stdio server's data lease runs on Linux's boot clock; elsewhere a valid
-/// launch is refused before any protocol byte, like any unavailable server.
-#[cfg(not(target_os = "linux"))]
-fn serve(_paths: Paths) -> Result<(), ()> {
-    Err(())
 }

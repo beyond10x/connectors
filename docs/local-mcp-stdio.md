@@ -7,10 +7,16 @@ custody, audited metadata and bounded read dispatch. Resources, prompts,
 subscriptions, mutations and outbound MCP are not implemented by this entry.
 The full inbound runtime story remains active.
 
-The entry runs on Linux only: its local lease is measured on `CLOCK_BOOTTIME`
-(below). On macOS and Windows a valid launch exits 1 with the stderr diagnostic
-`mcp_unavailable` before any protocol byte; `--help` still prints the launch
-grammar.
+The entry is shown to serve on Linux. On macOS and Windows it is built for the
+platform: its local lease is measured on that platform's clock that counts
+across sleep (below), the clock and launch-contract tests run in those CI jobs,
+and the serving scenario `mcp_stdio_serves` is wired into them against the
+platform's own credential store. That scenario has passed on Linux only so far;
+no serving run on macOS or Windows is recorded here, and cross-target
+`cargo check` is all that has been run for the Windows console threads and the
+platform stores' use by the owner. A launch whose clock does not qualify, like
+any launch whose owner is unavailable, exits 1 with the stderr diagnostic
+`mcp_unavailable` before any protocol byte.
 
 ## Configure and launch
 
@@ -125,9 +131,22 @@ the `initialize` response and `notifications/initialized` only `ping` is answere
 
 The supervisor issues and checks its own lease on one correlated local timeline.
 A startup wall-time value labels that timeline; it is not independent UTC evidence.
-Elapsed time uses Linux `CLOCK_BOOTTIME`; a bracketed `CLOCK_MONOTONIC` comparison
-refuses suspend/clock discontinuity before more data is sent. The clock resolution
-and sample bracket must each fit 1 ms, with 2 ms observation uncertainty.
+Elapsed time uses the platform's clock that counts the time the machine sleeps,
+and a bracketed comparison with the clock that does not refuses suspend/clock
+discontinuity before more data is sent:
+
+| Platform | Counts sleep | Excludes sleep |
+|---|---|---|
+| Linux | `CLOCK_BOOTTIME` | `CLOCK_MONOTONIC` |
+| macOS | `CLOCK_MONOTONIC_RAW` (`mach_continuous_time`) | `CLOCK_UPTIME_RAW` (`mach_absolute_time`) |
+| Windows | `QueryInterruptTimePrecise` | `QueryUnbiasedInterruptTimePrecise` |
+
+The pairs are the local clock's ([local clock](local-clock.md)): each reads one
+unadjusted time base, so their offset moves only by time asleep. Darwin's
+`CLOCK_MONOTONIC` and Windows' `QueryInterruptTime` are not used: the first is
+frequency-adjusted, the second advances only at each timer interrupt, about
+15.6 ms. The clock resolution and sample bracket must each fit 1 ms, with 2 ms
+observation uncertainty.
 
 Configuration must supply a valid `roughtime-quorum/1` `approval_clock` table with
 the existing explicit deployment rate assumption (at most 10,000 ppm); the retired
@@ -193,7 +212,19 @@ owner, and stopped-process lease expiry:
 cargo test --locked --offline -p connectors --test local_mcp_server
 ```
 
-No scenario is ignored; the file compiles on Linux only. These process bindings
+No scenario is ignored; the file compiles on Linux only, because its scenarios
+run the owner against the read-only `mounted_secret` binding in a jail. The
+launch contract that needs no custody binding (`--help`, an invalid launch, an
+unavailable owner) is `apps/connectors/tests/mcp_stdio_launch.rs`, which runs on
+every platform, with the clock's own tests in `connectors-host` and the console's
+thread tests (`mcp::console::threaded`, which run on Linux too). One serving
+scenario is not gated to Linux: `apps/connectors/tests/mcp_stdio_serves.rs`
+launches the server, initializes, lists tools and answers one call, with the
+credential stored in the platform's own custody (the disposable Secret Service
+fixture on Linux, the login keychain on macOS, the Credential Manager on
+Windows). It is `#[ignore]`d because it writes to a real store, and the macOS and
+Windows jobs run it with `-- --ignored` and check `1 passed`. It has run on
+Linux only. These process bindings
 cover the read-tools subset of the AEP acceptance scenarios; they are not a
 complete ESS runtime conformance report, independent review or full MCP release.
 

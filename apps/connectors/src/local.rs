@@ -230,11 +230,33 @@ impl LocalHandler {
                 .get("credential_document")
                 .is_none_or(Value::is_null)
             {
-                session.complete_without_source(call)
+                if call.input.get("credential_env").is_some() {
+                    session.complete_from_environment(call)
+                } else {
+                    session.complete_without_source(call)
+                }
             } else {
                 session.complete(call)
             }
-            .map_err(|error| connect_failure(call.callable, error))
+            .map_err(|error| {
+                let mut reply = connect_failure(call.callable, error);
+                // The variable an environment credential's refusal names.
+                // A word that is no variable name is described by its rule,
+                // never echoed.
+                if let (
+                    Some(refused),
+                    HandlerReply::Error { data, .. } | HandlerReply::UsageError { data, .. },
+                ) = (session.take_variable(), &mut reply)
+                {
+                    if let Some(variable) = refused.variable() {
+                        data["environment_variable"] = json!(variable);
+                    }
+                    if let Some(rule) = refused.rule() {
+                        data["environment_variable_rule"] = json!(rule);
+                    }
+                }
+                reply
+            })
         } else if matches!(
             call.callable,
             "approval-policy-status"

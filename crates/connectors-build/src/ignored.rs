@@ -442,7 +442,13 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "a_revalidation_the_owner_definitely_fails_reports_dispatch_at_the_cli"
             | "a_revalidation_after_a_configuration_change_reaches_the_owner_without_a_cached_description"
             | "an_adapter_identity_mismatch_during_an_upgrade_names_a_new_connection"
-            | "an_adapter_identity_mismatch_outside_an_upgrade_names_a_repair",
+            | "an_adapter_identity_mismatch_outside_an_upgrade_names_a_repair"
+            | "a_credential_variable_reaches_the_owners_capture_as_its_entry",
+        )
+        | (
+            "connectors",
+            "mcp_stdio_serves",
+            "the_stdio_server_serves_a_session_and_answers_a_call",
         ) => Some((Disposable, vec![CUSTODY])),
         (
             "connectors",

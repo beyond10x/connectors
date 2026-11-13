@@ -326,6 +326,7 @@ connectors connections connect [OPTIONS] --profile <field:profile> [field:target
 | `--credential-file <source:credential_document:file>` | no | none | any |  |
 | `--credential-stdin` | no | `false` | any |  |
 | `--credential-prompt` | no | `false` | any |  |
+| `--credential-env <NAME>` | no | none | any | The name of an environment variable holding the credential: the bare value for a profile of one entry field, else the JSON object the other inputs take; beside no other credential input; the value is never printed, as in `op run --env-file <f> -- connectors connections connect hubspot/work --profile hubspot.private-app --credential-env HUBSPOT_TOKEN` |
 | `<field:target>` | no | none | any |  |
 | `--endpoint <field:endpoint>` | no | none | any |  |
 
@@ -396,6 +397,7 @@ connectors connections reconnect [OPTIONS] --expected-revision <field:expected_r
 | `--credential-file <source:credential_document:file>` | no | none | any |  |
 | `--credential-stdin` | no | `false` | any |  |
 | `--credential-prompt` | no | `false` | any |  |
+| `--credential-env <NAME>` | no | none | any | The name of an environment variable holding the credential: the bare value for a profile of one entry field, else the JSON object the other inputs take; beside no other credential input; the value is never printed, as in `op run --env-file <f> -- connectors connections connect hubspot/work --profile hubspot.private-app --credential-env HUBSPOT_TOKEN` |
 
 ## `connectors connections repair`
 
@@ -416,6 +418,7 @@ connectors connections repair [OPTIONS] --expected-revision <field:expected_revi
 | `--credential-file <source:credential_document:file>` | no | none | any |  |
 | `--credential-stdin` | no | `false` | any |  |
 | `--credential-prompt` | no | `false` | any |  |
+| `--credential-env <NAME>` | no | none | any | The name of an environment variable holding the credential: the bare value for a profile of one entry field, else the JSON object the other inputs take; beside no other credential input; the value is never printed, as in `op run --env-file <f> -- connectors connections connect hubspot/work --profile hubspot.private-app --credential-env HUBSPOT_TOKEN` |
 
 ## `connectors connections revalidate`
 
