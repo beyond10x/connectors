@@ -451,6 +451,13 @@ fn every_refusal_has_a_distinct_name() {
         }
         .name(),
         Refusal::UndeclaredVariable(String::new()).name(),
+        Refusal::OutsideBasePath {
+            key: String::new(),
+            op: String::new(),
+            path: String::new(),
+            base: String::new(),
+        }
+        .name(),
         Refusal::SourceOutsideRoot(String::new()).name(),
         Refusal::SourceNotGzip(String::new()).name(),
         Refusal::SourceTooLarge(String::new()).name(),

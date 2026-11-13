@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added
+
+- A definition whose `base_url` path ends in a variable its `config` declares, such as Basecamp's
+  `https://3.basecampapi.com/{accountId}`, lowers each operation under that path without it: the
+  lowerer drops the path and its parameter, so no caller passes `accountId`, and the instance's
+  endpoint (`https://3.basecampapi.com/12345`) or the variable's default names the account. The
+  declaration records the path as `endpoint_path`, and the catalog provider refuses an instance
+  whose endpoint has no such path. An operation or guard read the definition reaches whose path
+  does not start with it is refused as `outside_base_path`; a variable `config` does not declare
+  is still `undeclared_variable`. No other definition, bundle, declaration or configuration
+  revision changes (story:catalog-path-prefix-from-config).
+
 ### Changed
 
 - Every provider now sees `User-Agent: connectors/<version> (https://github.com/beyond10x/connectors)`

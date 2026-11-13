@@ -994,6 +994,17 @@ pub enum Refusal {
     AuthLifetime { key: String, value: u64 },
     /// A `{variable}` in `base_url` or an OAuth URL that `config` does not declare.
     UndeclaredVariable(String),
+    /// An operation the definition reaches, by an `op` or a guard read, whose
+    /// path does not start with the path of a `base_url` that ends in a
+    /// variable `config` declares, or names one of its variables again. The
+    /// instance endpoint's path stands for that path ([`base_path`]), so the
+    /// operation would be sent under it.
+    OutsideBasePath {
+        key: String,
+        op: String,
+        path: String,
+        base: String,
+    },
     /// Profile ids that do not all start with one provider id and a `.`.
     ProviderId(String),
     /// A source that names other than one document, or a projection where
@@ -1114,6 +1125,7 @@ impl Refusal {
             Self::AuthMisplaced { .. } => "auth_misplaced",
             Self::AuthLifetime { .. } => "auth_lifetime",
             Self::UndeclaredVariable(_) => "undeclared_variable",
+            Self::OutsideBasePath { .. } => "outside_base_path",
             Self::ProviderId(_) => "provider_id",
             Self::SourceKind(_) => "source_kind",
             Self::SourceOutsideRoot(_) => "source_outside_root",
@@ -1329,6 +1341,15 @@ impl std::fmt::Display for Refusal {
             Self::UndeclaredVariable(variable) => write!(
                 f,
                 "{name}: URL variable `{variable}` is not declared in config"
+            ),
+            Self::OutsideBasePath {
+                key,
+                op,
+                path,
+                base,
+            } => write!(
+                f,
+                "{name}: operation `{key}` reaches `{op}` at `{path}`, which is not under the base URL's path `{base}`"
             ),
             Self::SourceHashMismatch { expected, actual } => write!(
                 f,
@@ -2354,8 +2375,10 @@ fn profile_block(id: &str, profile: &Auth, base_url: &str) -> Result<Fields, Ref
 
 /// The declaration's `default_endpoint` and `api_path`. When the host of
 /// `base_url` is one variable, users know the host and not the API under it, so
-/// the endpoint is the origin and the path under it is `api_path`. The endpoint
-/// is a default only when `config` defaults every variable in it.
+/// the endpoint is the origin and the path under it is `api_path`, unless the
+/// path ends in a configured variable ([`base_path`]), which the endpoint
+/// names. The endpoint is a default only when `config` defaults every variable
+/// in it.
 fn endpoint(definition: &ProviderDefinition) -> Result<(Option<String>, Option<String>), Refusal> {
     let base = definition.base_url.as_str();
     let (scheme, rest) = base
@@ -2364,7 +2387,8 @@ fn endpoint(definition: &ProviderDefinition) -> Result<(Option<String>, Option<S
     let (authority, path) = rest.find('/').map_or((rest, ""), |at| rest.split_at(at));
     let one_variable =
         authority.starts_with('{') && authority.ends_with('}') && variables(authority)?.len() == 1;
-    let api_path = (one_variable && !path.is_empty()).then(|| path.to_owned());
+    let api_path = (one_variable && !path.is_empty() && base_path(definition)?.is_none())
+        .then(|| path.to_owned());
     let mut resolved = match api_path {
         Some(_) => format!("{scheme}://{authority}"),
         None => base.to_owned(),
@@ -2381,6 +2405,121 @@ fn endpoint(definition: &ProviderDefinition) -> Result<(Option<String>, Option<S
         resolved = resolved.replace(&format!("{{{variable}}}"), default);
     }
     Ok((Some(resolved), api_path))
+}
+
+/// The path of `base_url` when its last segment is one variable `config`
+/// declares, as `/{accountId}` of `https://3.basecampapi.com/{accountId}`, and
+/// the variables that path names. Every operation such a definition reaches
+/// starts with it; the lowering drops it ([`strip_base_path`]) and the
+/// instance endpoint's path fills it. A variable `config` does not declare is
+/// refused by [`declaration`] as [`Refusal::UndeclaredVariable`] first.
+fn base_path(definition: &ProviderDefinition) -> Result<Option<(&str, Vec<&str>)>, Refusal> {
+    let Some((_, rest)) = definition.base_url.split_once("://") else {
+        return Ok(None);
+    };
+    let Some(path) = rest.find('/').map(|at| &rest[at..]) else {
+        return Ok(None);
+    };
+    let last = path.rsplit('/').next().unwrap_or_default();
+    let declared = |variable: &str| {
+        definition
+            .config
+            .as_ref()
+            .is_some_and(|config| config.contains_key(variable))
+    };
+    match variables(last)?[..] {
+        [variable] if last == format!("{{{variable}}}") && declared(variable) => {
+            Ok(Some((path, variables(path)?)))
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Drop the base path ([`base_path`]) and the path parameters it names from
+/// every operation of `inventory` that starts with it, so no caller passes
+/// them. Every operation the definition reaches, by an `op` or by a guard
+/// read, must start with it and not name its variables again, or the
+/// definition is refused as [`Refusal::OutsideBasePath`]. An operation it does
+/// not reach is left as it is when it does not start with the path.
+fn strip_base_path(
+    definition: &ProviderDefinition,
+    inventory: &mut crate::inventory::Inventory,
+) -> Result<(), Refusal> {
+    let Some((base, names)) = base_path(definition)? else {
+        return Ok(());
+    };
+    let under = |path: &str| -> Option<String> {
+        let rest = path.strip_prefix(base)?.strip_prefix('/')?;
+        (!rest.is_empty()
+            && !names
+                .iter()
+                .any(|name| rest.contains(&format!("{{{name}}}"))))
+        .then(|| format!("/{rest}"))
+    };
+    let mut reached: Vec<(&str, &str)> = Vec::new();
+    for (key, operation) in &definition.operations {
+        reached.extend(operation.op.as_deref().map(|op| (key.as_str(), op)));
+        let Some(guard) = &operation.guard else {
+            continue;
+        };
+        let reads = std::iter::once(&guard.before.read)
+            .chain(guard.also.iter().flatten().map(|before| &before.read))
+            .chain(
+                guard
+                    .after
+                    .as_ref()
+                    .and_then(|after| after.read.as_ref())
+                    .map(|read| &read.read),
+            );
+        for read in reads {
+            let op = definition
+                .operations
+                .get(read)
+                .and_then(|local| local.op.as_deref())
+                .unwrap_or(read);
+            reached.push((key, op));
+        }
+    }
+    for (key, op) in reached {
+        if let Some(found) = inventory.operations.iter().find(|candidate| {
+            candidate.operation_id.as_deref() == Some(op) && under(&candidate.path).is_none()
+        }) {
+            return Err(Refusal::OutsideBasePath {
+                key: key.to_owned(),
+                op: op.to_owned(),
+                path: found.path.clone(),
+                base: base.to_owned(),
+            });
+        }
+    }
+    for operation in &mut inventory.operations {
+        if let Some(path) = under(&operation.path) {
+            operation.path = path;
+            operation.parameters.retain(|parameter| {
+                parameter.location != crate::inventory::Location::Path
+                    || !names.contains(&parameter.name.as_str())
+            });
+        }
+    }
+    Ok(())
+}
+
+/// The request prefix an instance endpoint gives a declaration's
+/// `endpoint_path`, the base path the lowering dropped ([`base_path`]): the
+/// endpoint's path without a trailing `/`, when it has the template's
+/// segments, each literal one as written and each `{variable}` one not empty.
+/// Otherwise `None`, and the instance is refused: an endpoint without that
+/// path would send every operation outside it.
+pub fn endpoint_prefix(template: &str, endpoint: &str) -> Option<String> {
+    let rest = endpoint.split_once("://")?.1;
+    let path = rest.find('/').map_or("", |at| &rest[at..]);
+    let path = path.strip_suffix('/').unwrap_or(path);
+    let given: Vec<&str> = path.split('/').skip(1).collect();
+    let wanted: Vec<&str> = template.strip_prefix('/')?.split('/').collect();
+    let fills = |(given, wanted): (&&str, &&str)| {
+        !given.is_empty() && (given == wanted || (wanted.starts_with('{') && wanted.ends_with('}')))
+    };
+    (given.len() == wanted.len() && given.iter().zip(&wanted).all(fills)).then(|| path.to_owned())
 }
 
 /// The name of the selection file in the catalog's provider directory, which
@@ -2454,6 +2593,9 @@ fn declaration(
     }
     if let Some(path) = api_path {
         head.push(field("api_path", Node::Text(path)));
+    }
+    if let Some((path, _)) = base_path(definition)? {
+        head.push(field("endpoint_path", text(path)));
     }
     head.push(field("selection", Node::Text(selection)));
     if let Some(id) = &definition.default_profile {
@@ -4099,8 +4241,9 @@ pub fn lower(request: &Request<'_>) -> Result<Lowered, Refusal> {
             projection.openapi().to_vec()
         }
     };
-    let bundle =
+    let mut bundle =
         bundle::load(&bundles, provider).map_err(|error| Refusal::Pipeline(error.to_string()))?;
+    strip_base_path(&definition, &mut bundle.inventory)?;
     let document = crate::parse_document(&openapi)
         .map_err(|refusal| Refusal::Pipeline(refusal.reason().to_owned()))?;
 
