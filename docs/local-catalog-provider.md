@@ -838,6 +838,26 @@ The complete configuration used against the sandbox is
   name that is empty or not an HTTP token, or the same name twice without
   regard to case, is refused when the selection loads. The member is modelled
   as `connectors_catalog.selection.QuotaHeaders` in `adapters/catalog/spec/ess`.
+- `link_next` is optional, for a read answering JSON: `true` answers the
+  `Link` response header's `rel="next"` URL (RFC 8288; the relation type in
+  any case, among the types a `rel` lists) as the read's `next`, beside
+  `status`, `body` and `provenance`, for a provider that names the next page
+  only there, such as Basecamp. A page without `rel="next"` answers no `next`.
+  The URL is answered only when it is an absolute `https` URL whose scheme,
+  host and port are the instance's API base's and whose path has every
+  segment of the API base's path, the request prefix and an account path
+  included, and at least one more, with no `.` or `..` segment, plain or
+  percent-encoded, no `\`, whitespace or control character, and at most
+  16 KiB. Any other `rel="next"`, two different ones, or a `Link` header that
+  is not a list of `<URL>` links with parameters refuses the read as
+  `upstream_protocol`, naming no part of the URL. No other header and no
+  other relation is read, and a read without the member reads no `Link`
+  header at all. The provider answers the URL and never requests it: a caller
+  walks the list by sending its page parameter to the same operation.
+  `link_next` on a write, a `download`, a `binary`, an `embedded_text`, a
+  `response` other than `json` or a read the bundle declares as text is
+  refused when the selection loads. The member is modelled as
+  `connectors_catalog.selection.ReadLinkNext` in `adapters/catalog/spec/ess`.
 - `query_fixed` is optional, for a read: `{"<query parameter>": "<value>"}`
   fixes query parameters the source declares to one string each. The provider
   sends exactly that value under that name on every request; the parameter is

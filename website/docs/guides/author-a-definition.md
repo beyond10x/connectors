@@ -211,6 +211,19 @@ says more than the document's summary, which is the description otherwise.
 - `withhold: [<parameter>]` keeps a parameter of the document away from the caller.
 - `paging`: when more than one style of the file's `paging` matches an operation, it names one
   (`ambiguous_paging` otherwise).
+- `link_next: true` on a paging style, such as `pages: {request: page, link_next: true}`, is for
+  an API that names the next page only in the `Link` response header, as Basecamp does. Every
+  read that takes the style answers that header's `rel="next"` URL as `next`, beside `status`,
+  `body` and `provenance`, and the lowered selection carries `link_next: true` for it. A page
+  without `rel="next"` answers no `next`: it is the last page. A caller walks the list by sending
+  the `page` of the `next` URL (the style's `request`) to the same operation. The URL is
+  answered only when its scheme, host and port are the instance endpoint's and its path lies
+  under the endpoint's path, the account path included (`https://3.basecampapi.com/12345/…` for
+  the endpoint `https://3.basecampapi.com/12345`); any other `rel="next"`, a relative one or
+  two different ones refuse the read as `upstream_protocol`. No other header and no other
+  relation reaches the caller. A style with `link_next` names no `next`, and a write or a read
+  that does not answer JSON (`response: text` or `binary`, `binary`, `embedded_text`, or a
+  source operation that answers only text) that takes it is refused as `malformed`.
 
 ### A write: body and guard
 

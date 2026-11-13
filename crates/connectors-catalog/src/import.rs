@@ -1500,6 +1500,7 @@ fn styles(
             PagingStyle {
                 request: None,
                 next: None,
+                link_next: None,
                 limit: Some(parameter.clone()),
                 max: Some(max),
                 total: None,
@@ -1516,6 +1517,7 @@ fn styles(
                 PagingStyle {
                     request: None,
                     next: None,
+                    link_next: None,
                     limit: Some((*parameter).to_owned()),
                     max: None,
                     total: None,

@@ -3597,4 +3597,260 @@ mod tests {
             );
         });
     }
+
+    /// story:catalog-link-header-next-page: a lowered definition whose paging
+    /// style sets `link_next`, as Basecamp's lists page by the `Link` header's
+    /// `rel="next"`, on an instance whose endpoint names account 12345. The
+    /// first page answers its `rel="next"` as `next` and no other header; the
+    /// walk sends that URL's `page`, and the last page, without `rel="next"`,
+    /// answers no `next`, so the walk ends there. A `rel="next"` on another
+    /// host, port or account is refused as `protocol`. Synthetic source,
+    /// loopback fixture.
+    #[test]
+    fn a_link_next_list_is_walked_to_its_last_page_on_the_instance_origin_alone() {
+        use std::io::Write as _;
+        let directory = tempfile::tempdir().unwrap();
+        let account = json!({"name": "accountId", "in": "path", "required": true,
+            "schema": {"type": "string", "pattern": "^[0-9]+$"}});
+        let page = json!({"name": "page", "in": "query", "schema": {"type": "integer"}});
+        let ok = json!({"200": {"description": "ok", "content": {"application/json":
+            {"schema": {}}}}});
+        let source = serde_json::to_vec(&json!({
+            "openapi": "3.1.0",
+            "info": {"title": "Fixture projects", "version": "1"},
+            "paths": {
+                "/{accountId}/projects.json": {"get": {"operationId": "ListProjects",
+                    "summary": "List projects", "parameters": [account, page], "responses": ok}},
+                "/{accountId}/my/profile.json": {"get": {"operationId": "GetMyProfile",
+                    "summary": "Who holds the token", "parameters": [account],
+                    "responses": ok}}
+            }
+        }))
+        .unwrap();
+        let root = directory.path().join("definitions");
+        fs::create_dir_all(root.join("upstream/projects")).unwrap();
+        fs::create_dir_all(root.join("connectors")).unwrap();
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        encoder.write_all(&source).unwrap();
+        fs::write(
+            root.join("upstream/projects/openapi.json.gz"),
+            encoder.finish().unwrap(),
+        )
+        .unwrap();
+        let file = root.join("connectors/projects.yaml");
+        fs::write(
+            &file,
+            format!(
+                "schema: urn:beyond10x:connectors-definition:1\n\
+                 source:\n  openapi: upstream/projects/openapi.json.gz\n  sha256: {}\n\
+                 base_url: https://3.example.com/{{accountId}}\n\
+                 config:\n  accountId: {{type: string}}\n\
+                 auth:\n  projects.token: {{scheme: bearer, label: Fixture token, \
+                 identity: {{path: my/profile.json, kind: projects.person, subject: /id}}}}\n\
+                 paging:\n  pages: {{request: page, link_next: true}}\n\
+                 operations:\n  projects.list: {{op: ListProjects}}\n",
+                hex::encode(Sha256::digest(&source))
+            ),
+        )
+        .unwrap();
+        let scratch = directory.path().join("scratch");
+        fs::create_dir_all(&scratch).unwrap();
+        let out = directory.path().join("out");
+        let lowered =
+            connectors_catalog::definition::lower(&connectors_catalog::definition::Request {
+                definition: &file,
+                root: &root,
+                out: &out,
+                scratch: &scratch,
+            })
+            .expect("the definition lowers");
+        let declaration: Declaration =
+            connectors_core::read_json(&fs::read(&lowered.connector).unwrap())
+                .expect("the lowered declaration reads");
+
+        let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+        let ca = directory.path().join("ca.pem");
+        fs::write(&ca, cert.cert.pem()).unwrap();
+        fs::set_permissions(&ca, fs::Permissions::from_mode(0o600)).unwrap();
+        let tls = rustls::ServerConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_no_client_auth()
+        .with_single_cert(
+            vec![cert.cert.der().clone()],
+            PrivatePkcs8KeyDer::from(cert.signing_key.serialize_der()).into(),
+        )
+        .unwrap();
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let port = listener.local_addr().unwrap().port();
+            let acceptor = TlsAcceptor::from(Arc::new(tls));
+            let targets = Arc::new(Mutex::new(Vec::<String>::new()));
+            let seen = targets.clone();
+            let server = tokio::spawn(async move {
+                let here = format!("https://localhost:{port}");
+                while let Ok((stream, _)) = listener.accept().await {
+                    let Ok(mut stream) = acceptor.accept(stream).await else {
+                        continue;
+                    };
+                    let mut head = Vec::new();
+                    while !head.ends_with(b"\r\n\r\n") && head.len() < 8192 {
+                        match stream.read_u8().await {
+                            Ok(byte) => head.push(byte),
+                            Err(_) => break,
+                        }
+                    }
+                    let head = String::from_utf8_lossy(&head).into_owned();
+                    let target = head.split_whitespace().nth(1).unwrap_or_default();
+                    seen.lock().unwrap().push(target.to_owned());
+                    // Page 1 links page 2 and the last page; page 2 is the last.
+                    // Pages 3 to 5 name a next page off the instance.
+                    let link = match target {
+                        "/12345/projects.json" => Some(format!(
+                            "<{here}/12345/projects.json?page=2>; rel=\"next\", \
+                             <{here}/12345/projects.json?page=2>; rel=\"last\""
+                        )),
+                        "/12345/projects.json?page=3" => Some(
+                            "<https://projects.example.net/12345/projects.json?page=4>; rel=\"next\""
+                                .to_owned(),
+                        ),
+                        "/12345/projects.json?page=4" => Some(format!(
+                            "<{here}/99999/projects.json?page=5>; rel=\"next\""
+                        )),
+                        "/12345/projects.json?page=5" => Some(format!(
+                            "<https://localhost:{}/12345/projects.json?page=6>; rel=\"next\"",
+                            port.wrapping_add(1)
+                        )),
+                        _ => None,
+                    };
+                    let (status, body) = match target {
+                        "/12345/my/profile.json" => (200, json!({"id": 7})),
+                        "/12345/projects.json" => (200, json!([{"id": 1}, {"id": 2}])),
+                        target if target.starts_with("/12345/projects.json?page=") => {
+                            (200, json!([{"id": 3}]))
+                        }
+                        _ => (404, json!({"error": "not found"})),
+                    };
+                    let body = serde_json::to_vec(&body).unwrap();
+                    let link = link.map(|link| format!("Link: {link}\r\n")).unwrap_or_default();
+                    let reply = format!(
+                        "HTTP/1.1 {status} fixture\r\nContent-Type: application/json\r\n{link}\
+                         X-Fixture-Header: fixture-header-value\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        body.len()
+                    );
+                    let _ = stream.write_all(reply.as_bytes()).await;
+                    let _ = stream.write_all(&body).await;
+                    let _ = stream.flush().await;
+                }
+            });
+            let endpoint = format!("https://localhost:{port}/12345");
+            let mut config = instance_configuration(
+                declaration,
+                &Instance {
+                    connector: "projects",
+                    name: "work",
+                    instance_id: None,
+                    endpoint: Some(&endpoint),
+                    profile: None,
+                    allowed_domains: None,
+                },
+            )
+            .expect("the instance is configured");
+            let selection = read_selection_file(&lowered.operations, &config.provider)
+                .expect("the lowered selection reads");
+            let bundle = bundle::load(&out, &config.provider).expect("the bundle loads");
+            config.ca_file = Some(ca.clone());
+            let local = match Local::configure(
+                config,
+                Some(Sources {
+                    bundle,
+                    bundle_sha256: None,
+                    selection: Some(selection),
+                }),
+            ) {
+                Ok(local) => local,
+                Err(failure) => panic!("the instance loads: {failure:?}"),
+            };
+            let document = || Secret(br#"{"token":"fixture-token"}"#.to_vec());
+            let validated = local.validate("projects.token", document()).await;
+            assert!(validated.is_ok(), "{:?}", validated.err());
+
+            // The walk: each page sends the `page` of the `next` the page
+            // before answered, until a page answers none.
+            let mut answers = Vec::new();
+            let mut input = json!({});
+            loop {
+                let answer = local
+                    .invoke("projects.list", "work", document(), input.clone())
+                    .await
+                    .expect("a page is answered");
+                let Some(next) = answer.get("next").and_then(Value::as_str) else {
+                    answers.push(answer);
+                    break;
+                };
+                let page: u64 = next
+                    .split_once("?page=")
+                    .and_then(|(_, page)| page.parse().ok())
+                    .expect("the next URL names its page");
+                input = json!({"page": page});
+                answers.push(answer);
+                assert!(answers.len() < 5, "the walk does not end: {answers:?}");
+            }
+            let [first, last] = &answers[..] else {
+                panic!("the walk reads two pages: {answers:?}");
+            };
+            let keys = |answer: &Value| -> Vec<String> {
+                answer.as_object().unwrap().keys().cloned().collect()
+            };
+            assert_eq!(keys(first), ["body", "next", "provenance", "status"]);
+            assert_eq!(
+                first["next"],
+                format!("https://localhost:{port}/12345/projects.json?page=2")
+            );
+            assert_eq!(keys(last), ["body", "provenance", "status"]);
+            for answer in &answers {
+                assert!(
+                    !answer.to_string().contains("fixture-header-value"),
+                    "{answer}"
+                );
+            }
+
+            let mut refused = Vec::new();
+            for page in [3, 4, 5] {
+                refused.push(
+                    local
+                        .invoke("projects.list", "work", document(), json!({"page": page}))
+                        .await
+                        .err(),
+                );
+            }
+            server.abort();
+            assert_eq!(
+                refused,
+                [
+                    Some(Failure::Protocol),
+                    Some(Failure::Protocol),
+                    Some(Failure::Protocol)
+                ],
+                "another host, another account and another port are refused"
+            );
+            assert_eq!(
+                *targets.lock().unwrap(),
+                [
+                    "/12345/my/profile.json",
+                    "/12345/projects.json",
+                    "/12345/projects.json?page=2",
+                    "/12345/projects.json?page=3",
+                    "/12345/projects.json?page=4",
+                    "/12345/projects.json?page=5",
+                ]
+            );
+        });
+    }
 }

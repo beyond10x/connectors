@@ -13,6 +13,17 @@
   does not start with it is refused as `outside_base_path`; a variable `config` does not declare
   is still `undeclared_variable`. No other definition, bundle, declaration or configuration
   revision changes (story:catalog-path-prefix-from-config).
+- A definition's paging style can set `link_next: true` for an API that names the next page only
+  in the `Link` response header, as Basecamp does. Every read that takes the style answers that
+  header's `rel="next"` URL as `next`, beside `status`, `body` and `provenance`, and a page
+  without `rel="next"` answers none, so a caller's walk ends there. The URL is answered only on
+  the instance's own origin (scheme, host and port) and under its endpoint's path, the account
+  path included; a `rel="next"` on another host, port, scheme or account, a relative one or two
+  different ones refuse the read as `upstream_protocol`. No other response header reaches a
+  caller. The selection member is `link_next`, the catalog provider refuses it on a write and on
+  a read that does not answer JSON, and `connectors definitions install` admits a release whose
+  `features` name `link_next`. No other definition, bundle, selection or configuration revision
+  changes (story:catalog-link-header-next-page).
 
 ### Changed
 

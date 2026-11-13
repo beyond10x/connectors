@@ -32,10 +32,11 @@ pub const EVIDENCE_LIFETIME_MS: u64 = 300_000;
 pub const OPERATIONS_FORMAT: &str = "connectors-catalog-operations/1";
 /// The optional definition members this lowerer reads that a connectors-definitions
 /// release names in its index's `features`, sorted: the members connectors-definitions
-/// 0.3.0 and later declare. `connectors definitions install` admits exactly these
-/// (D247); a test that links both crates holds the two lists equal.
+/// 0.3.0 and later declare, and `link_next`. `connectors definitions install` admits
+/// exactly these (D247); a test that links both crates holds the two lists equal.
 pub const READ_FEATURES: &[&str] = &[
     "embedded_text",
+    "link_next",
     "query_fixed",
     "query_folds",
     "rate_limit_headers",
@@ -295,7 +296,11 @@ pub enum Effect {
 /// say where a walk reads its next position and its end; the runtime owns the
 /// walk itself. A style matches an operation that has its `request` query
 /// parameter, or, without `request`, its `limit` one, unless the operation
-/// withholds that parameter.
+/// withholds that parameter. `link_next: true` says the next page is the
+/// `Link` response header's `rel="next"` URL: every read that takes the style
+/// carries `link_next` to its selection, and the catalog provider answers that
+/// URL as the read's `next`. It names no `next`, and no write or read that
+/// does not answer JSON takes it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PagingStyle {
@@ -303,6 +308,8 @@ pub struct PagingStyle {
     pub request: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub link_next: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1609,6 +1616,9 @@ pub struct SelectionEntry {
     pub embedded_text: Option<EmbeddedText>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rate_limit_headers: Option<RateLimitHeaders>,
+    /// The read takes a paging style with `link_next: true`.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub link_next: bool,
 }
 
 /// The `connectors-catalog-operations/1` file a definition lowers to.
@@ -3625,6 +3635,14 @@ pub fn select(
     {
         check_rate_limit_headers("defaults", headers)?;
     }
+    // `link_next` is where a style's next page is; a style does not say it twice.
+    for (name, style) in definition.paging.iter().flatten() {
+        if style.link_next == Some(true) && style.next.is_some() {
+            return Err(Refusal::Malformed(format!(
+                "paging style `{name}` names both `next` and link_next, which is its next page"
+            )));
+        }
+    }
     let discovery = matches!(definition.source.document(), Ok((SourceKind::Discovery, _)));
     let mut operations = Vec::new();
     for (key, operation) in &definition.operations {
@@ -3668,13 +3686,15 @@ pub fn select(
         };
         let query = found.map(query_of).unwrap_or_default();
         let mut bounds = BTreeMap::new();
-        if let Some((_, style)) = paging_style(
+        let style = paging_style(
             key,
             operation,
             definition.paging.as_ref(),
             &query,
             &carried.withhold,
-        )? && let (Some(limit), Some(max)) = (&style.limit, style.max)
+        )?;
+        if let Some((_, style)) = style
+            && let (Some(limit), Some(max)) = (&style.limit, style.max)
             && query.contains(&limit.as_str())
         {
             bounds.insert(
@@ -3766,6 +3786,44 @@ pub fn select(
             check_embedded_text(key, embedded, found)?;
         }
         check_fixed_query(key, operation, found, &bounds, &carried)?;
+        // The engine answers a `rel="next"` only on a read answering JSON, which
+        // it decides as here: by `response`, else by the source's 2xx answers.
+        let link_next = match style {
+            Some((name, style)) if style.link_next == Some(true) => {
+                let answers: Vec<&String> = found
+                    .iter()
+                    .flat_map(|found| found.responses.iter())
+                    .filter(|response| response.status.starts_with('2'))
+                    .flat_map(|response| response.media_types.iter())
+                    .collect();
+                let text = match carried.response {
+                    Some(kind) => kind != ResponseKind::Json,
+                    None => {
+                        !answers.is_empty()
+                            && answers.iter().all(|media| media.starts_with("text/"))
+                    }
+                };
+                let what = if effect != Effect::Read {
+                    Some("a write")
+                } else if text
+                    || carried.binary.is_some()
+                    || carried.download.is_some()
+                    || operation.embedded_text.is_some()
+                {
+                    Some("a read that does not answer JSON")
+                } else {
+                    None
+                };
+                if let Some(what) = what {
+                    return Err(Refusal::Malformed(format!(
+                        "operation `{key}` takes paging style `{name}`, whose link_next only a \
+                         read answering JSON reads, and is {what}"
+                    )));
+                }
+                true
+            }
+            _ => false,
+        };
         let mut withhold = carried.withhold.clone();
         // The projector (`discovery-openapi/2`) gives a media-download method
         // an `alt` parameter. A selection that does not fix it never takes it
@@ -3836,6 +3894,7 @@ pub fn select(
                 .collect(),
             embedded_text: operation.embedded_text.clone(),
             rate_limit_headers: carried.rate_limit_headers,
+            link_next,
         });
     }
     check_references(definition, inventory)?;

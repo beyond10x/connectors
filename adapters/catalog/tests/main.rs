@@ -101,6 +101,7 @@ mod jira_issue_writes;
 mod jira_issue_writes_adversary;
 mod jira_transition_run;
 mod jira_write_postflight_present;
+mod link_next;
 mod local_runtime;
 mod nested_closed_body;
 mod openrouter;

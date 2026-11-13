@@ -27,7 +27,7 @@ types:
   # name any other is refused as unmet_feature, naming the first such feature.
   - name: connectors.definitions_install.Feature
     kind: enum
-    variants: [embedded_text, query_fixed, query_folds, rate_limit_headers]
+    variants: [embedded_text, link_next, query_fixed, query_folds, rate_limit_headers]
   # Lower-case hexadecimal SHA-256, as the index writes it. The 64-character length
   # is checked by the installer, not declared (see artifact_provenance.Sha256Hex).
   - name: connectors.definitions_install.HexDigest

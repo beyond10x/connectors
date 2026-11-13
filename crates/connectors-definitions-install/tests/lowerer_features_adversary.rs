@@ -3,7 +3,8 @@
 //! definition, which writes `rate_limit_headers` only under `defaults`: a lowerer
 //! that read it there and dropped it on an operation would pass. Here every
 //! member install admits is written on an operation alone, with no defaults, and
-//! must reach that operation's entry as written.
+//! must reach that operation's entry as written; `link_next`, a paging style's
+//! member, reaches each read that takes the style.
 #![cfg(unix)]
 use connectors_catalog::definition::{self, Request};
 use serde_json::{Value, json};
@@ -24,6 +25,8 @@ auth:
     scheme: bearer
     label: GitHub token
     identity: {path: user, kind: github.user, subject: /id}
+paging:
+  pages: {request: page, link_next: true}
 operations:
   user.me:
     op: users/get-authenticated
@@ -71,6 +74,7 @@ fn each_admitted_feature_written_on_an_operation_reaches_that_operation() {
             "readme.raw",
             json!({"content": "/content", "encoding": "/encoding", "max_bytes": 64}),
         ),
+        ("link_next", "issues.assigned", json!(true)),
         (
             "query_fixed",
             "issues.assigned",

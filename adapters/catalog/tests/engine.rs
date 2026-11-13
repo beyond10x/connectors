@@ -143,6 +143,7 @@ fn select(id: &str, operation_id: &str, effect: Effect) -> Selection {
         embedded_text: None,
         rate_limit_headers: None,
         walk: None,
+        link_next: false,
     }
 }
 fn mr_guard(values: &[(&str, &str)], preflight: Vec<Check>, postflight: Vec<Check>) -> Guard {

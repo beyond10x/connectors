@@ -360,3 +360,19 @@ types:
     kind: struct
     fields:
       - {name: rate_limit_headers, type: "Optional<connectors_catalog.selection.RateLimitHeaders>"}
+
+  # The member of a read selection that answers the `Link` response header's `rel="next"` URL
+  # (RFC 8288) as the read's `next`, beside `status`, `body` and `provenance`, for a provider that
+  # names its next page only there, such as Basecamp; `false` is as if unstated. A page without
+  # `rel="next"` answers no `next`. The URL is answered only when it is an absolute `https` URL
+  # whose scheme, host and port are the instance's API base's and whose path lies under the API
+  # base's path, the request prefix included, by at least one segment, with no dot segment; any
+  # other `rel="next"`, two different ones or a `Link` header that is no list of links refuses the
+  # read as `upstream_protocol`. No other header and no other relation is read; a read without the
+  # member reads no `Link` header. What the engine refuses when the selection loads (the member on
+  # a write or a read that does not answer JSON) is stated in the owner and pinned by the engine's
+  # tests (`adapters/catalog/tests/link_next.rs`).
+  - name: connectors_catalog.selection.ReadLinkNext
+    kind: struct
+    fields:
+      - {name: link_next, type: "Optional<Boolean>"}

@@ -771,6 +771,16 @@ pub struct Selection {
         deserialize_with = "present_walk"
     )]
     pub walk: Option<walk::Walk>,
+    /// The `Link` response header's `rel="next"` URL answered as the read's
+    /// `next`, beside `status`, `body` and `provenance`, when it lies under
+    /// the instance's API base ([`Engine::with_link_origin`]): the same
+    /// scheme, host and port, and a path under the base's path, the request
+    /// prefix included. A `rel="next"` anywhere else is refused as
+    /// `upstream_protocol`; a page without one answers no `next`. No other
+    /// header, and no other relation, is read. Only on a read answering JSON.
+    /// Omitted when false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub link_next: bool,
 }
 
 /// The JSON type of a closed body key (`connectors_catalog.selection.BodyType`),
@@ -1150,6 +1160,10 @@ pub struct Engine {
     /// Each guarded selection's probe, keyed by the selection id.
     probes: BTreeMap<String, Probe>,
     feed: Option<feed::Feed>,
+    /// The instance's API base a `link_next` read's `rel="next"` must lie
+    /// under ([`Engine::with_link_origin`]); without one, every such URL is
+    /// refused.
+    link_base: Option<String>,
 }
 
 /// One request, bound and ready to be sent exactly once.
@@ -1242,6 +1256,7 @@ impl Engine {
                     selection.id
                 )));
             }
+            check_link_next(selection)?;
             check_binary(selection)?;
             check_envelope(selection)?;
             check_refusal_texts(selection)?;
@@ -1681,6 +1696,15 @@ impl Engine {
                 declaration.input_schema[walk::KEYWORD] =
                     serde_json::to_value(walk).map_err(|_| Error::internal())?;
             }
+            if selection.link_next {
+                if text {
+                    return Err(refuse(format!(
+                        "selection `{}` declares link_next on a read that does not answer JSON",
+                        selection.id
+                    )));
+                }
+                declaration.output_schema["properties"]["next"] = json!({"type": "string"});
+            }
             exposed.push(Exposed {
                 selection: selection.clone(),
                 closed,
@@ -1700,16 +1724,20 @@ impl Engine {
             downloads,
             probes,
             feed,
+            link_base: None,
         })
     }
 
     /// The engine with the feed's root-relative item links resolved under the origin of
-    /// `api_base`, the instance's `https` API base, where the declaration names no `url_base`;
-    /// without a feed it is unchanged. A base with no hostname origin (an IP literal in
-    /// brackets, say) leaves those links `null` and is never a refusal; the `Result` keeps the
-    /// builder chain of [`Engine::with_feed`].
+    /// `api_base`, the instance's `https` API base, where the declaration names no `url_base`,
+    /// and with a `link_next` read's `rel="next"` held under `api_base`; without
+    /// a feed or a `link_next` read it is unchanged. A base with no hostname origin (an IP
+    /// literal in brackets, say) leaves those links `null` and refuses every `rel="next"`; it
+    /// never refuses the engine, and the `Result` keeps the builder chain of
+    /// [`Engine::with_feed`].
     pub fn with_link_origin(mut self, api_base: &str) -> Result<Self> {
         self.feed = self.feed.take().map(|feed| feed.with_link_origin(api_base));
+        self.link_base = Some(api_base.to_owned());
         Ok(self)
     }
 
@@ -1947,11 +1975,19 @@ impl Engine {
             Some(embedded) => embedded_text(embedded, &body)?,
             None => body,
         };
-        Ok(json!({
+        let mut answer = json!({
             "status": response.status,
             "body": body,
             "provenance": provenance(instance, &exposed.operation.path, &self.source_revision),
-        }))
+        });
+        // Only a `link_next` read reads a header of its answer, and only the
+        // one `rel="next"` target of `Link`.
+        if exposed.selection.link_next
+            && let Some(next) = next_link(&response, self.link_base.as_deref())?
+        {
+            answer["next"] = Value::String(next);
+        }
+        Ok(answer)
     }
 
     /// A `download`: the caller's `url`, held to an origin the selection reaches
@@ -2530,6 +2566,160 @@ fn write_method(method: &str) -> Option<WriteMethod> {
 fn path_within(path: &str, base: &[String]) -> bool {
     let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
     segments.len() > base.len() && segments.iter().zip(base).all(|(s, b)| *s == b)
+}
+
+/// The longest `rel="next"` URL a `link_next` read answers.
+const NEXT_LINK_BYTES: usize = feed::WATERMARK_BYTES;
+
+/// A `link_next` read's next page: the `rel="next"` target of the answer's
+/// `Link` header (RFC 8288), `None` when the header, or the relation, is
+/// absent. Nothing else of the answer's headers is read. The target is held
+/// to `base`, the instance's API base ([`under_base`]); a target anywhere
+/// else, two different targets, a header that is not a list of links, and any
+/// target at all where no base is known are refused as `upstream_protocol`,
+/// in words that repeat no part of the URL.
+fn next_link(response: &HttpResponse, base: Option<&str>) -> Result<Option<String>> {
+    let refused = |what: &str| {
+        Error::new(
+            ErrorCode::UpstreamProtocol,
+            format!("provider answered a next page link {what}"),
+        )
+    };
+    let mut found: Option<&str> = None;
+    for (_, value) in response
+        .headers
+        .iter()
+        .filter(|(name, _)| name.eq_ignore_ascii_case("link"))
+    {
+        let links = links(value).ok_or_else(|| refused("in a Link header it cannot read"))?;
+        for (target, next) in links {
+            if !next {
+                continue;
+            }
+            match found {
+                Some(earlier) if earlier != target => {
+                    return Err(refused("twice, to two different pages"));
+                }
+                _ => found = Some(target),
+            }
+        }
+    }
+    let Some(target) = found else {
+        return Ok(None);
+    };
+    if target.len() > NEXT_LINK_BYTES || !base.is_some_and(|base| under_base(target, base)) {
+        return Err(refused("outside the instance's API base"));
+    }
+    Ok(Some(target.to_owned()))
+}
+
+/// A token character (RFC 9110 §5.6.2).
+fn token_char(c: char) -> bool {
+    c.is_ascii_alphanumeric() || "!#$%&'*+-.^_`|~".contains(c)
+}
+
+/// The link-values of one `Link` field value (RFC 8288 §3), each its target
+/// and whether its `rel` names the relation type `next` among the
+/// space-separated types it lists, in any case. `None` for a value that is not
+/// a comma-separated list of `<target>`, each followed by `;`-separated
+/// parameters of a token name and an optional token or quoted-string value.
+fn links(value: &str) -> Option<Vec<(&str, bool)>> {
+    let blank = [' ', '\t'];
+    let mut found = Vec::new();
+    let mut rest = value;
+    loop {
+        rest = rest.trim_start_matches([' ', '\t', ',']);
+        if rest.is_empty() {
+            return Some(found);
+        }
+        let inner = rest.strip_prefix('<')?;
+        let close = inner.find('>')?;
+        let target = &inner[..close];
+        rest = &inner[close + 1..];
+        let mut next = false;
+        loop {
+            rest = rest.trim_start_matches(blank);
+            match rest.chars().next() {
+                None | Some(',') => break,
+                Some(';') => rest = rest[1..].trim_start_matches(blank),
+                Some(_) => return None,
+            }
+            let end = rest.find(|c| !token_char(c)).unwrap_or(rest.len());
+            if end == 0 {
+                return None;
+            }
+            let name = &rest[..end];
+            rest = rest[end..].trim_start_matches(blank);
+            let mut parameter = String::new();
+            if let Some(after) = rest.strip_prefix('=') {
+                rest = after.trim_start_matches(blank);
+                if let Some(quoted) = rest.strip_prefix('"') {
+                    let mut chars = quoted.char_indices();
+                    let mut closed = None;
+                    while let Some((at, c)) = chars.next() {
+                        match c {
+                            '\\' => parameter.push(chars.next()?.1),
+                            '"' => {
+                                closed = Some(at);
+                                break;
+                            }
+                            c => parameter.push(c),
+                        }
+                    }
+                    rest = &quoted[closed? + 1..];
+                } else {
+                    let end = rest.find(|c| !token_char(c)).unwrap_or(rest.len());
+                    parameter.push_str(&rest[..end]);
+                    rest = &rest[end..];
+                }
+            }
+            if name.eq_ignore_ascii_case("rel")
+                && parameter
+                    .split_ascii_whitespace()
+                    .any(|kind| kind.eq_ignore_ascii_case("next"))
+            {
+                next = true;
+            }
+        }
+        found.push((target, next));
+    }
+}
+
+/// Whether `url` lies under `base`, an instance's API base: an absolute
+/// `https` URL of the same origin ([`origin`]: host in any case, port 443 as
+/// none) whose path has every segment of the base's path, the request prefix
+/// and an account path included, and at least one more ([`path_within`]),
+/// with no `.` or `..` segment, plain or percent-encoded, and no `\`,
+/// whitespace or control character anywhere.
+fn under_base(url: &str, base: &str) -> bool {
+    if url
+        .chars()
+        .any(|c| c == '\\' || c.is_whitespace() || c.is_control())
+    {
+        return false;
+    }
+    let (Some(at), Some(home)) = (origin(url), origin(base)) else {
+        return false;
+    };
+    // `origin` has read both as `https://` and an authority.
+    let path = |text: &str| -> String {
+        let rest = &text["https://".len()..];
+        let rest = &rest[rest.find(['/', '?', '#']).unwrap_or(rest.len())..];
+        rest[..rest.find(['?', '#']).unwrap_or(rest.len())].to_owned()
+    };
+    let base_segments: Vec<String> = path(base)
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .map(str::to_owned)
+        .collect();
+    let target = path(url);
+    let dotted = |segment: &str| {
+        matches!(
+            segment.to_ascii_lowercase().replace("%2e", ".").as_str(),
+            "." | ".."
+        )
+    };
+    at == home && !target.split('/').any(dotted) && path_within(&target, &base_segments)
 }
 
 /// Whether a read's 2xx body is text. The selection's reviewed exception wins;
@@ -3457,6 +3647,32 @@ fn check_walk(selection: &Selection) -> Result<()> {
         return refused("declares a walk on a read that does not answer JSON".into());
     }
     walk.check().or_else(refused)
+}
+
+/// `link_next` is a read's, of an answer in JSON. A read the bundle declares as
+/// text is refused where that is known, as a walk on one is.
+fn check_link_next(selection: &Selection) -> Result<()> {
+    if !selection.link_next {
+        return Ok(());
+    }
+    let problem = if selection.effect != Effect::Read {
+        "on a write"
+    } else if selection.download.is_some()
+        || selection.binary.is_some()
+        || selection.embedded_text.is_some()
+        || matches!(
+            selection.response,
+            Some(ResponseKind::Binary | ResponseKind::Text)
+        )
+    {
+        "on a read that does not answer JSON"
+    } else {
+        return Ok(());
+    };
+    Err(refuse(format!(
+        "selection `{}` declares link_next {problem}",
+        selection.id
+    )))
 }
 
 /// The walk's `parameter`, `query` and `first_only` name query parameters of
