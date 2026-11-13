@@ -923,16 +923,21 @@ fn recorded(target: &str) -> Value {
 }
 
 /// An unsigned JWT as the token answer's `id_token`.
-fn id_token() -> String {
+/// The claims of a Workspace account whose `hd` claim is `hd`; a personal
+/// account, which Google gives no `hd`, is `None`.
+fn id_token_of(hd: Option<&str>) -> String {
     use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
     let part = |value: &Value| URL_SAFE_NO_PAD.encode(serde_json::to_vec(value).unwrap());
+    let mut claims = json!({"iss": "https://accounts.google.com", "aud": CLIENT_ID,
+        "azp": CLIENT_ID, "sub": "110000000000000000004", "iat": 1,
+        "exp": 4_000_000_000_u64});
+    if let Some(hd) = hd {
+        claims["hd"] = json!(hd);
+    }
     format!(
         "{}.{}.{}",
         part(&json!({"alg": "RS256", "typ": "JWT", "kid": "fixture"})),
-        part(
-            &json!({"iss": "https://accounts.google.com", "aud": CLIENT_ID, "azp": CLIENT_ID,
-                     "sub": "110000000000000000004", "iat": 1, "exp": 4_000_000_000_u64})
-        ),
+        part(&claims),
         URL_SAFE_NO_PAD.encode(b"fixture-signature")
     )
 }
@@ -960,7 +965,12 @@ impl Provider {
         Self::with(legacy_write_config(), COMPOSE_SCOPE)
     }
     /// `config` against the fixture, whose token route grants `granted`.
-    fn with(mut config: Value, granted: &'static str) -> Self {
+    fn with(config: Value, granted: &'static str) -> Self {
+        Self::with_account(config, granted, None)
+    }
+    /// `config` against the fixture, whose token route grants `granted` to
+    /// the account whose `id_token` carries `hd`.
+    fn with_account(mut config: Value, granted: &'static str, hd: Option<&'static str>) -> Self {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
@@ -1047,7 +1057,7 @@ impl Provider {
                                     "access_token": ACCESS_TOKEN, "token_type": "Bearer",
                                     "expires_in": 3600,
                                     "scope": format!("openid {granted}"),
-                                    "id_token": id_token()}),
+                                    "id_token": id_token_of(hd)}),
                             )
                         } else {
                             (400, json!({"error": "invalid_grant"}))
@@ -2050,5 +2060,183 @@ fn a_legacy_write_instance_starts_a_fresh_acquisition() {
     assert!(
         registry.begin(&widened, now + 2).is_err(),
         "the read instance reconfigured for writes started a second acquisition"
+    );
+}
+
+/// The guide's read configuration admitting only `domains`
+/// (`allowed_domains`, story:google-read-only-profiles-and-company-domain).
+fn domain_config(domains: &[&str]) -> Value {
+    let mut config = documented_config();
+    config["allowed_domains"] = json!(domains);
+    config
+}
+
+/// An instance that admits company domains validates the account whose
+/// `id_token` `hd` claim is one of them, whatever the claim's case, and the
+/// baseline names that account.
+#[test]
+fn an_account_of_an_admitted_domain_validates() {
+    let deadline = || connectors_sdk::now_ms() + 30_000;
+    for hd in ["corp.test", "Other.Test"] {
+        let provider = Provider::with_account(
+            domain_config(&["corp.test", "other.test"]),
+            GMAIL_SCOPE,
+            Some(hd),
+        );
+        let mut child = Child::spawn(&provider.selection()).unwrap();
+        let baseline = child
+            .validate(PROFILE, &secret(), deadline())
+            .unwrap_or_else(|failure| panic!("`{hd}` was refused: {failure:?}"));
+        assert_eq!(baseline.identity.subject, "110000000000000000004");
+    }
+}
+
+/// An account whose `hd` is not an admitted domain, whose `hd` only ends in
+/// one, and one with no `hd` (a personal account) are each refused before the
+/// connection holds anything, and the refusal names the admitted domains and
+/// the domain it found. Without `allowed_domains` an account with no `hd`
+/// still validates, as it did.
+#[test]
+fn an_account_outside_the_admitted_domains_is_refused_naming_them() {
+    let deadline = || connectors_sdk::now_ms() + 30_000;
+    for (hd, found) in [
+        (Some("other.test"), "other.test"),
+        (Some("sub.corp.test"), "sub.corp.test"),
+        (Some("corp.test.evil.test"), "corp.test.evil.test"),
+        (None, "no hd claim"),
+    ] {
+        let provider = Provider::with_account(domain_config(&["corp.test"]), GMAIL_SCOPE, hd);
+        let mut child = Child::spawn(&provider.selection()).unwrap();
+        let Err(refusal) = child.validate_explained(PROFILE, &secret(), deadline()) else {
+            panic!("{hd:?} was admitted");
+        };
+        assert_eq!(refusal.failure, Failure::InsufficientScope, "{hd:?}");
+        let reason = refusal.reason.unwrap_or_default();
+        assert!(reason.contains("corp.test"), "{hd:?}: {reason}");
+        assert!(reason.contains(found), "{hd:?}: {reason}");
+        assert_eq!(
+            provider.api_targets(),
+            Vec::<String>::new(),
+            "{hd:?}: the Gmail API was reached"
+        );
+    }
+    let provider = Provider::with_account(documented_config(), GMAIL_SCOPE, None);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    child.validate(PROFILE, &secret(), deadline()).unwrap();
+}
+
+/// The domain list is part of the connection's credential side: an instance
+/// that admits other domains has another credential revision, so a credential
+/// validated under the old list is validated again.
+#[test]
+fn the_admitted_domains_are_part_of_the_credential_revision() {
+    let revision = |config: Value| {
+        let scratch = tempfile::tempdir().unwrap();
+        let directory = scratch.path().join("private");
+        filesystem::directory(&directory, true, true).unwrap();
+        let mut config = config;
+        config["bundle_directory"] = json!(root_path("generated/bundles"));
+        config["operations_file"] = json!(root_path("providers/google-gmail/operations.json"));
+        let path = directory.join("catalog.json");
+        private(&path, &serde_json::to_vec(&config).unwrap());
+        let bootstrap = print_bootstrap(&path);
+        (
+            bootstrap.credential_revision.clone(),
+            bootstrap.configuration_revision.clone(),
+        )
+    };
+    let open = revision(documented_config());
+    let one = revision(domain_config(&["corp.test"]));
+    let two = revision(domain_config(&["corp.test", "other.test"]));
+    assert_ne!(open, one);
+    assert_ne!(one, two);
+    assert_ne!(open.0, one.0, "the credential revision ignored the domains");
+}
+
+/// A domain list that cannot be enforced is refused when the configuration
+/// loads: an entry that is not a bare lowercase host name, an empty list, a
+/// repeated entry.
+#[test]
+fn an_unusable_domain_list_is_refused_at_load() {
+    let scratch = tempfile::tempdir().unwrap();
+    let directory = scratch.path().join("private");
+    filesystem::directory(&directory, true, true).unwrap();
+    let loads = |config: Value| {
+        let mut config = config;
+        config["bundle_directory"] = json!(root_path("generated/bundles"));
+        config["operations_file"] = json!(root_path("providers/google-gmail/operations.json"));
+        let path = directory.join("catalog.json");
+        private(&path, &serde_json::to_vec(&config).unwrap());
+        Command::new(env!("CARGO_BIN_EXE_connectors-catalog-provider"))
+            .arg("--local-config")
+            .arg(&path)
+            .arg("--print-local-bootstrap")
+            .output()
+            .unwrap()
+            .status
+            .success()
+    };
+    assert!(loads(domain_config(&["corp.test"])));
+    for bad in [
+        json!([]),
+        json!([""]),
+        json!(["corp.test", "corp.test"]),
+        json!(["*.corp.test"]),
+        json!(["@corp.test"]),
+        json!(["https://corp.test"]),
+        json!(["corp.test/"]),
+        json!([" corp.test"]),
+        json!(["example"]),
+    ] {
+        let mut config = documented_config();
+        config["allowed_domains"] = bad.clone();
+        assert!(!loads(config), "{bad} loaded");
+    }
+}
+
+/// Adversary (story:google-read-only-profiles-and-company-domain): the
+/// acceptance asks a refusal to name the domain. An account of a company
+/// domain that holds a digit, such as `branch2026.example.org`, is a plain
+/// host name like any other, and its refusal names it and the admitted one.
+#[test]
+fn adversary_a_refusal_names_an_account_domain_holding_a_digit() {
+    let deadline = connectors_sdk::now_ms() + 30_000;
+    let provider = Provider::with_account(
+        domain_config(&["corp.test"]),
+        GMAIL_SCOPE,
+        Some("branch2026.example.org"),
+    );
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let Err(refusal) = child.validate_explained(PROFILE, &secret(), deadline) else {
+        panic!("branch2026.example.org was admitted");
+    };
+    assert_eq!(refusal.failure, Failure::InsufficientScope);
+    let reason = refusal.reason.unwrap_or_default();
+    assert!(
+        reason.contains("branch2026.example.org") && reason.contains("corp.test"),
+        "the refusal names neither domain: {reason:?}"
+    );
+}
+
+/// Adversary (story:google-read-only-profiles-and-company-domain): an
+/// admitted domain of 34 bytes, which `allowed_domains` accepts, is named in
+/// the refusal of an account of another domain.
+#[test]
+fn adversary_a_refusal_names_a_long_admitted_domain() {
+    let deadline = connectors_sdk::now_ms() + 30_000;
+    let provider = Provider::with_account(
+        domain_config(&["engineering-department.example.org"]),
+        GMAIL_SCOPE,
+        Some("other.test"),
+    );
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let Err(refusal) = child.validate_explained(PROFILE, &secret(), deadline) else {
+        panic!("other.test was admitted");
+    };
+    assert_eq!(refusal.failure, Failure::InsufficientScope);
+    let reason = refusal.reason.unwrap_or_default();
+    assert!(
+        reason.contains("other.test") && reason.contains("engineering-department.example.org"),
+        "the refusal names neither domain: {reason:?}"
     );
 }

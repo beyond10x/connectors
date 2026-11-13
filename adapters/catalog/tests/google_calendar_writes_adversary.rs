@@ -407,8 +407,8 @@ async fn patch_warns_that_a_truncated_guest_list_replaces_every_guest() {
 /// Every Google configuration of the Calendar guide names one authorization
 /// endpoint, `https://accounts.google.com/o/oauth2/auth`: the profile the
 /// `calendar` connector declares, which the guide's instance uses and names,
-/// and the read and the write configuration the guide showed before connectors
-/// were declared (`hand_written`).
+/// and the read, the write and the read-only configuration the guide showed
+/// before connectors were declared or the read-only profile was (`hand_written`).
 #[test]
 fn every_google_guide_names_one_authorize_url() {
     const AUTHORIZE: &str = "https://accounts.google.com/o/oauth2/auth";
@@ -419,8 +419,8 @@ fn every_google_guide_names_one_authorize_url() {
     }
     assert_eq!(
         urls.len(),
-        2,
-        "the read and the write configuration: {urls:?}"
+        3,
+        "the read, the write and the read-only configuration: {urls:?}"
     );
     let declaration: Value = serde_json::from_slice(
         &fs::read(root().join("providers/google-calendar/connector.json")).unwrap(),

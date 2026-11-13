@@ -46,7 +46,15 @@ enabled = true
 
 [connectors.gmail.instances.private]
 description = "personal mailbox"
+profile = "google.oauth"
 ```
+
+An instance that names no profile is read-only: it uses `google.oauth.readonly`, requests
+`https://www.googleapis.com/auth/gmail.readonly` alone and offers no draft write. The `profile = "google.oauth"` above
+adds the write scope; connect it with `--profile google.oauth`. A connection saved before this default is under `google.oauth` and is never rebound: keep that profile named to keep it, or `connections revoke` it and connect again. To admit only a company's accounts,
+add `allowed_domains = ["example.org"]` to the table (one to eight domains): a connect, reconnect or
+revalidation whose Google account has another domain, or none, is refused as `insufficient_scope`
+before anything is stored.
 
 A second account is a second instance, such as `[connectors.gmail.instances.work]`, with a
 consent of its own.
@@ -63,7 +71,8 @@ connectors connections connect --connector gmail --instance private \
 ```
 
 Over SSH, forward the port the consent address names. A consent granting only one of the two
-Gmail scopes fails validation as insufficient scope.
+Gmail scopes fails validation as insufficient scope. A read-only instance asks for the
+`gmail.readonly` scope alone.
 
 ## A first read
 

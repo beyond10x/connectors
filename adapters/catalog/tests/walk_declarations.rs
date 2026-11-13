@@ -116,7 +116,12 @@ const WALKS: [(&str, &str, &str, &[&str]); 10] = [
             "users.list",
         ],
     ),
-    ("hubspot", "hubspot", "operations.json", &["objects.list"]),
+    (
+        "hubspot",
+        "hubspot",
+        "operations.json",
+        &["objects.list", "owners.list"],
+    ),
 ];
 
 /// Each shipped walk loads, and the operation's admitted description carries it unchanged under

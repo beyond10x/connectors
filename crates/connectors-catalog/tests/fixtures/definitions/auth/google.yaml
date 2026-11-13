@@ -6,3 +6,10 @@ profiles:
     identity: {source: id_token, kind: google.user}
     token_url: https://oauth2.googleapis.com/token
     authorize_url: https://accounts.google.com/o/oauth2/auth
+  google.oauth.readonly:
+    scheme: oauth2_refresh
+    label: Google refresh token
+    identity: {source: id_token, kind: google.user}
+    read_only: true
+    token_url: https://oauth2.googleapis.com/token
+    authorize_url: https://accounts.google.com/o/oauth2/auth

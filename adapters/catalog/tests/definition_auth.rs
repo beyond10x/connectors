@@ -115,7 +115,7 @@ fn every_lowered_auth_profile_loads_in_the_catalog_provider() {
             loaded += 1;
         }
     }
-    assert_eq!(loaded, 18, "every profile of every definition is loaded");
+    assert_eq!(loaded, 21, "every profile of every definition is loaded");
 }
 
 /// A definition's `evidence_lifetime_ms` reaches the profile the provider

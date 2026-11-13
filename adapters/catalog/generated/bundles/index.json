@@ -43,7 +43,7 @@
     {
       "provider": "google-calendar",
       "file_name": "google-calendar.bundle.json",
-      "bundle_sha256": "ae14c55ba8b3b8aefe682e2581056da2dbf4233ffbad5fd107d0b6601056c559",
+      "bundle_sha256": "ac90d9128fd74b71bd62b7323c69e61d9baac6123df1087e0dd98027326e05d7",
       "source_sha256": "da2ed3007e673653867fa77910886b9680053c378e420910b982aed98ff0f5ac",
       "operations": 38,
       "unsupported": 0
@@ -51,15 +51,15 @@
     {
       "provider": "google-drive",
       "file_name": "google-drive.bundle.json",
-      "bundle_sha256": "597d216b74cdb448eb6263bcd8b613577a7745077cc0e8ca9628d593005dc171",
-      "source_sha256": "571c8d820490b340459d29fa532b1d814406ba00c7d5d97f83d9b4e362cbea8b",
+      "bundle_sha256": "51d3e52c79235c2d44df331d17a34b16ced557bed07b385b8565bd82febfca4a",
+      "source_sha256": "b5b6620c1a507db3a810ca363cd7653b3b9c4779419000ccc6e03febd63525df",
       "operations": 64,
       "unsupported": 0
     },
     {
       "provider": "google-gmail",
       "file_name": "google-gmail.bundle.json",
-      "bundle_sha256": "ca1f7b3d0ce5191372ec78272d86c8b441b51c8759016237016da3b77f38f8cb",
+      "bundle_sha256": "b0f332024a8060fb72ed3cb1b811590ff50289220d26a83b45aa5a489247498d",
       "source_sha256": "91763efcd436a426b8e2c48465e2caadbcb52d2b6c4498e174d35be217b71b71",
       "operations": 78,
       "unsupported": 0
@@ -67,7 +67,7 @@
     {
       "provider": "google-slides",
       "file_name": "google-slides.bundle.json",
-      "bundle_sha256": "96cb8ed65571b6b592d3d4ba8d946ceb578306d9de7dbaca13408fe77413c3b0",
+      "bundle_sha256": "33cf2a96abacbfbc7705c6c77c8850acbaa36a696f2a01e578668bf659cd6b4a",
       "source_sha256": "0ff83829831cbba4aaa7f364cf25697c75e7eb33df48ceec1492f19b1882c46e",
       "operations": 5,
       "unsupported": 0
@@ -83,9 +83,9 @@
     {
       "provider": "hubspot",
       "file_name": "hubspot.bundle.json",
-      "bundle_sha256": "d4d2b0e1adf9208a2b3e93022ae9ec25f6b13b0a2579d73f0129d54384ec1e86",
+      "bundle_sha256": "6ce3dfc45972c7ce4aba5e499df9beb9bb6c0fc492b06793b1d5f6dc18046d1f",
       "source_sha256": "1cb7ca32e7a9ff224838f8c1f02a99104e509d651fc2524dfd16f77fdc9be9f9",
-      "operations": 11,
+      "operations": 13,
       "unsupported": 0
     },
     {

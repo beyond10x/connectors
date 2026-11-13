@@ -257,6 +257,12 @@ struct AuthConfig {
     access: Option<AccessProbe>,
     #[serde(default)]
     minimum_scopes: BTreeSet<String>,
+    /// The profile offers the selection's reads only: an instance on it
+    /// describes no write, whatever the selection holds, so its consent need
+    /// ask for no write scope. Omitted when false, so existing configuration
+    /// revisions hold.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    read_only: bool,
     #[serde(default = "default_evidence_lifetime")]
     evidence_lifetime_ms: u64,
     // The four OAuth fields below belong to the OAuth schemes only and are
@@ -325,6 +331,14 @@ struct Configuration {
     /// same. Omitted when absent, so existing configuration revisions hold.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     oauth2_client_id: Option<String>,
+    /// The company domains of the accounts this instance admits: an account
+    /// whose `id_token` `hd` claim is not one of them, or has none, is refused
+    /// when its credential is validated, which connect and reconnect do before
+    /// anything is stored. Only an `oauth2_refresh` profile that names its
+    /// holder by `id_token` may state it. Omitted when absent, so existing
+    /// configuration revisions hold.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    allowed_domains: Option<Vec<String>>,
 }
 
 /// One origin a connection admits besides its API base
@@ -435,6 +449,10 @@ struct Declaration {
     /// The profiles an instance may use. A `token_url` that starts with `/` is
     /// on the instance endpoint's origin.
     profiles: Vec<AuthConfig>,
+    /// The profile of an instance that names none, one of `profiles`. Without
+    /// it, an instance of a connector with several profiles must name one.
+    #[serde(default)]
+    default_profile: Option<String>,
 }
 
 /// The declarations, their selections and the bundles they run on, as
@@ -453,8 +471,12 @@ pub struct Instance<'a> {
     /// `<connector>.<name>` (story:migrate-writes-the-short-instance-form).
     pub instance_id: Option<&'a str>,
     pub endpoint: Option<&'a str>,
-    /// Required when the connector declares more than one profile.
+    /// Required when the connector declares more than one profile and no
+    /// default.
     pub profile: Option<&'a str>,
+    /// The company domains the instance admits (`--allowed-domain`); `None`
+    /// admits every account.
+    pub allowed_domains: Option<&'a [String]>,
 }
 
 /// The bundle and selection a configuration runs on.
@@ -579,7 +601,15 @@ fn instance_configuration(
         }
     };
     let mut profiles = declaration.profiles;
-    let mut auth = match instance.profile {
+    // The default names a declared profile, or the declaration is refused.
+    if declaration
+        .default_profile
+        .as_deref()
+        .is_some_and(|id| !profiles.iter().any(|profile| profile.profile == id))
+    {
+        return Err(Failure::InvalidConfiguration);
+    }
+    let mut auth = match instance.profile.or(declaration.default_profile.as_deref()) {
         Some(id) => profiles
             .iter()
             .position(|profile| profile.profile == id)
@@ -607,6 +637,7 @@ fn instance_configuration(
         operations_file: None,
         bindings: None,
         oauth2_client_id: None,
+        allowed_domains: instance.allowed_domains.map(<[String]>::to_vec),
     })
 }
 
@@ -1108,6 +1139,10 @@ struct IdClaims {
     /// Seconds since the epoch; refused when further ahead than the skew.
     #[serde(default)]
     iat: Option<u64>,
+    /// The hosted domain of a Google Workspace account. A personal account has
+    /// none; a value that is not a string is no domain.
+    #[serde(default)]
+    hd: Option<Value>,
 }
 /// How far an `id_token` may claim to be issued ahead of this clock.
 const ISSUED_AT_SKEW_S: u64 = 5 * 60;
@@ -1299,13 +1334,14 @@ impl OAuth {
                 .flatten(),
         })
     }
-    /// The subject and granted scopes of a fresh exchange: from its `id_token`,
-    /// or from the token host's `tokeninfo` when the endpoint returned none.
+    /// The subject, granted scopes and hosted domain of a fresh exchange: from
+    /// its `id_token`, or from the token host's `tokeninfo` when the endpoint
+    /// returned none, which names no hosted domain.
     async fn identity(
         &self,
         entry: &OAuthEntry,
         exchanged: &Exchanged,
-    ) -> Result<(String, String)> {
+    ) -> Result<(String, String, Option<String>)> {
         if let Some(id_token) = &exchanged.id_token {
             // The token came straight from the token endpoint over verified TLS,
             // which OpenID Connect Core 3.1.3.7 accepts in place of checking its
@@ -1325,9 +1361,15 @@ impl OAuth {
             {
                 return Err(Failure::Protocol);
             }
+            let hosted = claims
+                .hd
+                .as_ref()
+                .and_then(Value::as_str)
+                .map(str::to_owned);
             return Ok((
                 claims.sub,
                 exchanged.scope.clone().ok_or(Failure::Protocol)?,
+                hosted,
             ));
         }
         let mut query = [("access_token", String::from(exchanged.access.as_str()))];
@@ -1348,7 +1390,7 @@ impl OAuth {
         if info.aud.as_bytes() != entry.client_id.as_bytes() {
             return Err(Failure::Protocol);
         }
-        Ok((info.sub, info.scope))
+        Ok((info.sub, info.scope, None))
     }
 }
 /// The payload of a compact JWS, read without its signature.
@@ -1488,6 +1530,9 @@ pub struct Local {
     steps: Vec<Step>,
     instance: String,
     auth: AuthConfig,
+    /// The company domains an `id_token` must name in its `hd` claim; empty
+    /// admits every account.
+    allowed_domains: Vec<String>,
     oauth: Option<Arc<OAuth>>,
 }
 
@@ -1560,6 +1605,7 @@ impl Local {
             instance_id: None,
             endpoint,
             profile,
+            allowed_domains: None,
         };
         let config = instance_configuration(declaration, &instance)?;
         let selection = read_selection_file(&lowered.operations, &config.provider)?;
@@ -1596,6 +1642,15 @@ impl Local {
             if !usable_declaration(declaration) {
                 return Err(Failure::InvalidConfiguration);
             }
+        }
+        // A domain list is enforced on the `hd` claim of an `id_token`, so a
+        // profile that reads none cannot state one: it would be ignored.
+        if config.allowed_domains.as_ref().is_some_and(|domains| {
+            !connectors_host::local::config::company_domains_admitted(domains)
+                || config.auth.scheme != Scheme::OAuth2Refresh
+                || config.auth.identity.source != IdentitySource::IdToken
+        }) {
+            return Err(Failure::InvalidConfiguration);
         }
         let identity = &config.auth.identity;
         if config.format != FORMAT
@@ -1762,6 +1817,11 @@ impl Local {
         if let Some(selection) = selection {
             operations.extend(selection.operations);
             feed = selection.feed;
+        }
+        // A read-only profile describes the reads of the selection and nothing
+        // else: no write is declared, so none is offered over any protocol.
+        if config.auth.read_only {
+            operations.retain(|selection| selection.effect == Effect::Read);
         }
         let base = connectors_host::http::canonical_base(&config.api_base)
             .map_err(Failure::from_service)?;
@@ -1982,6 +2042,10 @@ impl Local {
         if let Some(prefix) = &config.request_prefix {
             effective["request_prefix"] = json!(prefix);
         }
+        // Present only when stated, so a configuration without it keeps its revision.
+        if let Some(domains) = &config.allowed_domains {
+            effective["allowed_domains"] = json!(domains);
+        }
         // Present only when declared, so a configuration without hosts keeps its revision.
         if !config.hosts.is_empty() {
             effective["hosts"] =
@@ -2129,7 +2193,15 @@ impl Local {
             "auth": effective["auth"],
             "profile_revision": profile.revision,
         });
-        for key in ["token_ca_digest", "request_prefix", "hosts"] {
+        // The admitted domains decide which credentials the connection takes,
+        // so another list is another credential side: a credential validated
+        // under the old one is validated again.
+        for key in [
+            "token_ca_digest",
+            "request_prefix",
+            "hosts",
+            "allowed_domains",
+        ] {
             if let Some(value) = effective.get(key) {
                 credential_side[key] = value.clone();
             }
@@ -2243,6 +2315,7 @@ impl Local {
             steps,
             instance: config.instance,
             auth: config.auth,
+            allowed_domains: config.allowed_domains.unwrap_or_default(),
             oauth: token_client,
         })
     }
@@ -2410,6 +2483,32 @@ impl Local {
             }
         };
         Ok((credential, None))
+    }
+    /// The refusal of an account whose hosted domain `hosted` (the `hd` claim
+    /// of its `id_token`) is not one of the admitted domains, compared without
+    /// regard to case and as a whole name, never as a suffix; an account with
+    /// none is refused too. `None` when every account is admitted or this one is.
+    /// The refusal is `insufficient_scope`, the one failure whose reason
+    /// reaches the caller, and names the admitted domains and what was found
+    /// (`connectors_core::reason::domain_refusal`).
+    fn domain_refusal(&self, hosted: Option<&str>) -> Option<runtime::Refusal> {
+        if self.allowed_domains.is_empty() {
+            return None;
+        }
+        if hosted.is_some_and(|hosted| {
+            self.allowed_domains
+                .iter()
+                .any(|domain| domain.eq_ignore_ascii_case(hosted))
+        }) {
+            return None;
+        }
+        // `reason::admit` withholds a domain holding a digit and a long one, so
+        // the refusal takes the one form the host checks by its exact shape.
+        Some(runtime::Refusal {
+            failure: Failure::InsufficientScope,
+            reason: connectors_core::reason::domain_refusal(hosted, &self.allowed_domains),
+            retry_after_seconds: None,
+        })
     }
     fn baseline(
         &self,
@@ -2621,9 +2720,15 @@ impl Local {
             let exchanged = oauth.exchange(&grant).await?;
             let baseline = match (self.auth.identity.source, &grant) {
                 (IdentitySource::IdToken, Grant::Refresh(entry)) => {
-                    let (subject, scope) = oauth.identity(entry, &exchanged).await?;
+                    let (subject, scope, hosted) = oauth.identity(entry, &exchanged).await?;
                     if subject.is_empty() || subject.len() > 256 {
                         return Err(Failure::Protocol.into());
+                    }
+                    // Before the access token is cached and before the host
+                    // stores anything: an account outside the admitted domains
+                    // holds no connection.
+                    if let Some(refusal) = self.domain_refusal(hosted.as_deref()) {
+                        return Err(refusal);
                     }
                     let granted = scope_set(&scope)?;
                     if !self.auth.minimum_scopes.is_subset(&granted) {
@@ -3261,6 +3366,7 @@ mod tests {
                 instance_id: None,
                 endpoint: Some(&endpoint),
                 profile: Some(&auth.profile),
+                allowed_domains: None,
             })
             .unwrap();
             assert_eq!(config.api_base, format!("{endpoint}{api_path}"), "{connector}");

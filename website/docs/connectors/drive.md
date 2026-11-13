@@ -1,7 +1,7 @@
 ---
 title: Google Drive
 sidebar_position: 3
-description: Read Google Drive file metadata, exports and the change feed, and create, update and copy file metadata under approval.
+description: Read Google Drive file metadata, uploaded file content, exports and the change feed, and create, update and copy file metadata under approval.
 lede: One Drive instance per Google account reads files and the change feed and writes file metadata under approval; it never uploads content.
 source: docs/catalog-google-drive.md, docs/catalog-google-oauth.md, adapters/catalog/providers/google-drive/connector.json, adapters/catalog/providers/google-drive/operations.json, adapters/catalog/tests/google_drive.rs
 connectors: "drive"
@@ -20,7 +20,13 @@ has every parameter, paging rule and refusal.
 
 | Reads | Writes |
 |---|---|
-| `about.get`, `files.list`, `files.get`, `files.export`, `changes.getStartPageToken`, `changes.list` | `files.create` and `files.copy`, unguarded; `files.update`, guarded: it reads the file first and writes nothing unless its `version` is the one you pinned |
+| `about.get`, `files.list`, `files.get`, `files.getMedia`, `files.export`, `changes.getStartPageToken`, `changes.list` | `files.create` and `files.copy`, unguarded; `files.update`, guarded: it reads the file first and writes nothing unless its `version` is the one you pinned |
+
+`files.getMedia` reads an uploaded file's content, such as a PDF, under the read-only Drive scope.
+It answers the bytes as base64 with their media type, length and SHA-256, and refuses a file over
+2 MiB as `capacity`; the printed refusal carries no size, so read `size` with `files.get` to learn
+it. A Google Docs, Sheets or Slides file has no bytes to download and is refused as forbidden, with
+a reason telling you to read it with `files.export`.
 
 The writes carry metadata only; no write uploads file content. A metadata write can still move,
 trash, lock or re-share a file, so read the whole input before approving.
@@ -41,7 +47,15 @@ trash, lock or re-share a file, so read the whole input before approving.
 enabled = true
 
 [connectors.drive.instances.private]
+profile = "google.oauth"
 ```
+
+An instance that names no profile is read-only: it uses `google.oauth.readonly`, requests
+`https://www.googleapis.com/auth/drive.readonly` alone and offers no file write. The `profile = "google.oauth"` above
+adds the write scope; connect it with `--profile google.oauth`. A connection saved before this default is under `google.oauth` and is never rebound: keep that profile named to keep it, or `connections revoke` it and connect again. To admit only a company's accounts,
+add `allowed_domains = ["example.org"]` to the table (one to eight domains): a connect, reconnect or
+revalidation whose Google account has another domain, or none, is refused as `insufficient_scope`
+before anything is stored.
 
 The instance uses Drive's default endpoint, `https://www.googleapis.com/drive/v3`, and pins
 nothing: everything else comes from the declaration shipped with `connectors-catalog-provider`.
@@ -65,6 +79,12 @@ connectors invoke drive/private files.list \
 ```
 
 Follow `nextPageToken` as `pageToken` until a page has none.
+
+Read an uploaded file's content with `files.getMedia`:
+
+```sh
+connectors invoke drive/private files.getMedia --input-json '{"fileId":"<id>"}'
+```
 
 ## A first guarded write
 

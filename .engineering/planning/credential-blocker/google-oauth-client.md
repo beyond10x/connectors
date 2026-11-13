@@ -6,6 +6,7 @@ status: open
 title: No Google OAuth desktop client exists for the operator's account
 relations:
 - blocks: story:catalog-google-live-deck-read
+- blocks: story:guide-google-and-hubspot-for-business-teams
 revision: 2
 ---
 ## What is missing

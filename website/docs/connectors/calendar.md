@@ -41,7 +41,15 @@ write names `sendUpdates` (`all`, `externalOnly` or `none`), which decides whom 
 enabled = true
 
 [connectors.calendar.instances.private]
+profile = "google.oauth"
 ```
+
+An instance that names no profile is read-only: it uses `google.oauth.readonly`, requests
+`https://www.googleapis.com/auth/calendar.readonly` alone and offers no event write. The `profile = "google.oauth"` above
+adds the write scope; connect it with `--profile google.oauth`. A connection saved before this default is under `google.oauth` and is never rebound: keep that profile named to keep it, or `connections revoke` it and connect again. To admit only a company's accounts,
+add `allowed_domains = ["example.org"]` to the table (one to eight domains): a connect, reconnect or
+revalidation whose Google account has another domain, or none, is refused as `insufficient_scope`
+before anything is stored.
 
 The instance uses Calendar's default endpoint, `https://www.googleapis.com/calendar/v3`, and pins
 nothing.

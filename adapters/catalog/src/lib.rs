@@ -2550,6 +2550,27 @@ fn expects_text(selection: &Selection, operation: &Operation) -> bool {
     }
 }
 
+/// What a caller is told when Drive refuses a download of a file that has no
+/// bytes (`error.errors[].reason` is `fileNotDownloadable`, as for a Google
+/// Docs, Sheets or Slides file). Drive's own text sits in a nested member,
+/// which `connectors_core::reason` never reads; this fixed text is admitted in
+/// its place and points to the read that does answer such a file.
+const NOT_DOWNLOADABLE: &str =
+    "A Google Docs, Sheets or Slides file has no bytes to download; read it with files.export";
+
+/// The reason a `403` body carries for a refused download, as
+/// [`NOT_DOWNLOADABLE`], when it names `fileNotDownloadable` in
+/// `error.errors[].reason`; `None` for any other body.
+fn download_refusal(body: &[u8]) -> Option<String> {
+    let body: Value = connectors_core::read_json(body).ok()?;
+    body.pointer("/error/errors")?
+        .as_array()?
+        .iter()
+        .any(|e| e.get("reason").and_then(Value::as_str) == Some("fileNotDownloadable"))
+        .then(|| connectors_core::reason::admit(NOT_DOWNLOADABLE))
+        .flatten()
+}
+
 /// Whether a `403` body names one of the selection's rate-limit reasons, in
 /// `error.errors[].reason` or in `error.status` (the two places Google's JSON
 /// error answers carry one). A body that is not JSON, or carries the reason
@@ -2591,9 +2612,14 @@ fn read_body(response: &HttpResponse, text: bool, rate_limit_reasons: &[String])
         // Only the body's admitted reason travels on, beside the code, and on
         // a `429` the delay its `Retry-After` names; the body itself, and every
         // other header, stays here.
+        let reason = connectors_core::reason::from_body(&response.body).or_else(|| {
+            (response.status == 403)
+                .then(|| download_refusal(&response.body))
+                .flatten()
+        });
         let mut error = Error::new(code, "provider refused the request")
             .answered()
-            .with_upstream_reason(connectors_core::reason::from_body(&response.body));
+            .with_upstream_reason(reason);
         if response.status == 429 {
             error.retry_after_seconds = retry_after_header(response);
         }
@@ -3803,13 +3829,14 @@ async fn read_binary(
     }
     let length = response.body.len() as u64;
     if length > binary.max_bytes {
-        return Err(Error::new(
-            ErrorCode::Capacity,
-            format!(
-                "binary response of {length} bytes exceeds max_bytes of {}",
-                binary.max_bytes
-            ),
-        ));
+        let message = format!(
+            "binary response of {length} bytes exceeds max_bytes of {}",
+            binary.max_bytes
+        );
+        // The adapter's own limit, not the upstream's answer: the size is the
+        // reason a caller sees beside `capacity`.
+        return Err(Error::new(ErrorCode::Capacity, &message)
+            .with_upstream_reason(connectors_core::reason::admit(&message)));
     }
     Ok((response.status, binary_body(&response)?))
 }

@@ -168,7 +168,8 @@ then sent by id, so the approval to send binds a message the issuer has read.
 existed as a draft, bound only by the digest of its own input.
 
 They run on the same instance as the reads, whose consent requests the compose
-scope; see [Authentication](#authentication). Both are required-approval
+scope; the instance names the profile `google.oauth` for that, because the
+default profile is read-only. See [Authentication](#authentication). Both are required-approval
 mutations, like every catalog write: name them in the instance's approval
 policy, and invoke each with a proof issued for its exact input, as the
 [guarded merge guide](local-gitlab-merge.md) walks through for GitLab. The
@@ -247,7 +248,8 @@ answer's `id_token` (`identity.source: id_token`). The consent address is
 a downloaded client file, which the client-file connect compares byte for byte;
 the provider never calls it.
 
-One instance per Google account reads and writes. Its consent requests these
+One instance per Google account reads and writes when it names the
+profile `google.oauth`. Its consent requests these
 scopes:
 
 | scope | what it covers |
@@ -271,6 +273,7 @@ enabled = true
 
 [connectors.gmail.instances.private]
 description = "personal mailbox"
+profile = "google.oauth"
 ```
 
 The `gmail` connector's default endpoint is `https://gmail.googleapis.com`.
@@ -293,6 +296,38 @@ connectors connections connect --connector gmail --instance private \
 A second account is a second instance, such as `[connectors.gmail.instances.work]`,
 with a consent of its own. Each instance is its own consent: `gmail.private`
 and `drive.private` are two.
+
+### Read-only by default
+
+An instance that names no profile uses `google.oauth.readonly`: its consent
+requests `openid` and `https://www.googleapis.com/auth/gmail.readonly` only, the connection's `minimum_scopes` are that
+one scope, and the instance offers none of the writes. A write needs the
+instance to name `profile = "google.oauth"`, which requests both scopes as
+above; connect it (or reconnect it) under that profile. A read-only instance
+describes none of the writes and refuses an invoke of one, so no approval is
+ever asked for one.
+
+A connection is bound to the profile it was saved under and is never rebound. One
+saved before the default existed is under `google.oauth`: an instance that names no
+profile does not revalidate or read it. Name `profile = "google.oauth"` to keep it (the
+instance keeps its configuration revision), or `connections revoke` it and
+`connections connect` again under the read-only default.
+
+### Admit only a company's accounts
+
+An instance may state `allowed_domains`, one to eight lower-case domains such as
+`allowed_domains = ["example.org"]`, valid only with the Google profiles. The
+host passes each as `--allowed-domain` to the provider. On connect, reconnect
+and revalidation the provider reads the `hd` claim of the `id_token` Google
+returned, after its `iss`, `aud`, `sub` and `exp` checks and before any
+credential is stored, and refuses the account as `insufficient_scope` unless
+`hd` equals one of the domains. The refusal names the account's domain and the
+admitted ones; an account with no `hd` claim, such as a consumer account, is
+refused the same way. `hd` is Google's assertion of the Workspace domain; the
+provider reads the token without verifying its signature, as OpenID Connect
+Core 3.1.3.7 allows for a token received directly from the token endpoint over
+TLS. The list is part of the credential revision, so changing it needs a
+reconnect.
 
 ### Moving from read and write entries
 

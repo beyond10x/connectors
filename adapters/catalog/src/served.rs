@@ -405,6 +405,7 @@ impl Catalog {
                 instance_id: None,
                 endpoint: endpoint.as_deref(),
                 profile: profile.as_deref(),
+                allowed_domains: None,
             })
             .map_err(|failure| refused("the connector instance cannot be configured", failure)),
             Self {

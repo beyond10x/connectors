@@ -101,6 +101,29 @@ A file that is not Google's installed-client JSON, such as an entry already
 holding `{client_id, client_secret, refresh_token}`, is submitted unchanged, as
 for every other profile.
 
+## Read-only profiles and company domains
+
+`gmail`, `drive` and `calendar` declare two profiles each. The default,
+`google.oauth.readonly`, requests `openid` and the connector's `.readonly` scope
+and offers no write. `google.oauth` adds the scope its writes need; an instance
+names it with `profile = "google.oauth"` in its configuration table, and
+`connections connect --profile google.oauth` connects it. A refresh token
+granted only the read-only scope fails `google.oauth`'s validation as
+`insufficient_scope`. Slides keeps its one profile. A connection is bound to the
+profile it was saved under and is never rebound: one saved under `google.oauth`
+needs the instance to name that profile to keep working, or a `connections revoke`
+and a new connect under the read-only default.
+
+An instance may restrict the accounts that can connect with `allowed_domains`,
+one to eight lower-case domains such as `["example.org"]`. When the connect,
+the reconnect or a revalidation reads the `id_token`, the provider compares its
+`hd` claim with the list, before anything is stored, and refuses a mismatch,
+or an account with no `hd`, as `insufficient_scope`; the reason names the
+account's domain and the admitted ones. The check reads `hd` from a token
+received directly from Google's token endpoint over TLS without verifying its
+signature, as OpenID Connect Core 3.1.3.7 allows, and it narrows who may
+connect; it is not an authorization of what that account can read.
+
 ## Reconnect
 
 When Google stops honouring the refresh token (it was revoked, the account's

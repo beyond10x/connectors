@@ -2,8 +2,57 @@
 
 ## Unreleased
 
+### Added
+
+- The `hubspot` connector reads owners: `owners.list` (paged by `after`, `email` and `archived`
+  filters) and `owner.get`, so the `hubspot_owner_id` a deal or company carries becomes a name,
+  email and teams. Both come from HubSpot's published Crm Owners `2026-09` document, vendored
+  under `adapters/hubspot/upstream/` with its digest, and enter the one-source HubSpot bundle as
+  cited amendments that a test holds equal to that document. Deals, companies and line items
+  through `objects.list` and `object.get` are covered by a fixture test, and the guide names the
+  scopes for this set (deals, companies, line items and owners read; no contacts scope). Reads
+  only. The HubSpot configuration revision moves: a pinned `configuration_revision` must be
+  copied again (story:hubspot-owners-and-line-items).
+- Drive `files.getMedia` reads an uploaded file's content, such as a PDF, under the read-only
+  Drive scope: `drive.files.get` with `alt=media`, answered as base64 with its media type, length
+  and SHA-256, and refused as `capacity` above 2 MiB; the provider's refusal names the size
+  (also of a file over the transport's 4 MiB limit, from its `Content-Length`). A Google Docs,
+  Sheets or Slides file is refused as forbidden, with a reason pointing to `files.export`. The
+  Discovery projector is now
+  `discovery-openapi/2`: it projects `alt` (`json` or `media`) on a method that supports media
+  download and answers JSON, and a definition lowered from a Discovery source withholds `alt` on
+  every selection that does not fix it, so a Drive definition written before this keeps `files.get`
+  metadata-only. The Calendar, Drive, Gmail and Slides bundles record the new projector,
+  so those four connectors' configuration revisions move: a pinned `configuration_revision` must be
+  copied again (story:drive-file-content-read).
+
 ### Changed
 
+- The Gmail, Calendar and Drive connectors now declare a read-only auth profile,
+  `google.oauth.readonly`, beside `google.oauth`, and it is their default: it requests `openid` and
+  the one `.readonly` scope, requires only that scope, and offers none of the writes, so even the
+  private protocol describes no write on it. A connection is bound to the profile it was saved
+  under and is never rebound to another, so a connection saved under `google.oauth` is not
+  revalidated or read by an instance that names no profile. To keep it, name
+  `profile = "google.oauth"` in the instance (and `--profile google.oauth` on connect): the
+  instance keeps its configuration revision and the connection works as before. To go read-only,
+  `connections revoke` the old connection and `connections connect` again under the default
+  profile. Slides is unchanged, and a connector declaration may name a `default_profile`. An instance of a Google
+  connector may also state `allowed_domains` (one to eight lower-case domains), which the host
+  passes as `--allowed-domain`: a connect, reconnect or revalidation compares the `hd` claim of
+  the ID token with the list before any credential is stored and refuses another domain, or an
+  account with no `hd`, as `insufficient_scope`, with a reason naming the account's domain and the
+  admitted ones. The list is part of the credential revision, and a profile that is not an OAuth
+  refresh profile with an ID-token identity refuses it at load. Instances made from a
+  connectors-definitions file cannot yet state it
+  (story:google-read-only-profiles-and-company-domain).
+- A connectors-definitions file may mark an auth profile `read_only: true` and name the profile of
+  an instance that names none at its top level as `default_profile`. Both lower into the connector
+  declaration where the catalog provider reads them, so a read-only profile of a definition offers
+  no write, as a shipped one does, and `connectors-build definition import` reads them from the
+  shipped Gmail, Calendar and Drive declarations again instead of refusing every import. A
+  `default_profile` naming none of the profiles is refused as `malformed`
+  (story:google-read-only-profiles-and-company-domain).
 - On Linux a catalog provider that a derivation, `--print-profiles` or the installed-provider check
   starts for its printed output now ends when the process that started it is killed, as an adapter
   already did (`PR_SET_PDEATHSIG`, SIGKILL, set before exec). Test processes that wait on a

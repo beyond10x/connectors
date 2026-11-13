@@ -31,11 +31,11 @@
 //! | `request.parameterName` | ignored, listed |
 //! | `response.$ref` | `200` `application/json` → `#/components/schemas/<name>` |
 //! | no `response` | `200` with no content, or `application/octet-stream` when `supportsMediaDownload` |
-//! | `supportsMediaDownload` beside a `response` | ignored, listed: the media form needs `alt=media`, which is excluded |
+//! | `supportsMediaDownload` beside a `response` | with a document `alt`, the method carries `alt` (below) and the key is consumed; without one, ignored, listed |
 //! | `supportsMediaUpload` / `mediaUpload` | the metadata path is projected as above; each upload protocol path is excluded and listed; `mediaUpload.accept`, `maxSize` and `protocols.*.multipart` are ignored, listed; upload paths are recorded only for a projected method; media upload with no protocol is refused |
 //! | `useMediaDownloadService`, `supportsSubscription`, `parameterOrder`, `flatPath` | ignored, listed |
 //! | `scopes` | `x-google-scopes` on the operation; each must be declared in `auth`; no `securitySchemes` |
-//! | document `parameters` | `fields` projected on every operation; `$.xgafv`, `access_token`, `alt`, `callback`, `key`, `oauth_token`, `prettyPrint`, `quotaUser`, `uploadType`, `upload_protocol`, `userIp` excluded and listed; a method parameter of any of those twelve names is refused |
+//! | document `parameters` | `fields` projected on every operation; `$.xgafv`, `access_token`, `alt`, `callback`, `key`, `oauth_token`, `prettyPrint`, `quotaUser`, `uploadType`, `upload_protocol`, `userIp` excluded and listed (`alt` is not listed when a projected method carries it, as below); a method parameter of any of those twelve names is refused; `alt` is also projected, as the enum of its `json` and `media` values with their descriptions (default as written), on each method with `supportsMediaDownload` true beside a `response`, the one place the media form of a download is asked for, and only when the document's `alt` holds both values |
 //! | `schemas` | `components.schemas`, the key as the name (`id` must equal it) |
 //! | schema `type` `any` | `{}` |
 //! | `integer` (`int32`, `uint32`), `number` (`double`, `float`), `boolean` | kept, with `format` |
@@ -63,7 +63,7 @@ use std::collections::{BTreeMap, BTreeSet};
 /// The input format a derivation names.
 pub const FORMAT: &str = "google-discovery/v1";
 /// This projector, versioned: a change to any row is a new version.
-pub const PROJECTOR: &str = "discovery-openapi/1";
+pub const PROJECTOR: &str = "discovery-openapi/2";
 /// The OpenAPI version every projection declares.
 pub const OPENAPI: &str = "3.0.3";
 /// OpenAPI requires a description on every response; Discovery gives none.
@@ -86,6 +86,12 @@ pub const EXCLUDED_PARAMETERS: [&str; 11] = [
 ];
 /// The one document parameter every operation carries.
 pub const PROJECTED_PARAMETER: &str = "fields";
+/// The document parameter that selects the media form of a download, carried
+/// only by a method that supports media download and answers JSON, limited to
+/// the formats that method can answer.
+pub const MEDIA_PARAMETER: &str = "alt";
+/// The values of [`MEDIA_PARAMETER`] kept: the metadata and the media form.
+const MEDIA_FORMATS: [&str; 2] = ["json", "media"];
 
 const DOCUMENT_KEYS: [&str; 15] = [
     "kind",
@@ -246,7 +252,7 @@ impl From<Refusal> for connectors_core::Error {
 }
 
 /// A method the projection names instead of projecting. The one reason under
-/// `discovery-openapi/1`: its path differs from a projected path only in
+/// `discovery-openapi/2`: its path differs from a projected path only in
 /// template names, which OpenAPI 3.0.3 does not admit (see `select`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -771,6 +777,38 @@ fn parameter(name: &str, value: &Value, pointer: &str) -> Result<Parameter> {
     })
 }
 
+/// The document's `alt`, kept to [`MEDIA_FORMATS`], each value with its
+/// description; `None` unless the document gives it as an enum that holds
+/// both, as a document with no media download does not.
+fn media_formats(mut value: Value) -> Option<Value> {
+    let schema = &mut value["schema"];
+    let values: Vec<String> = schema["enum"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|v| v.as_str().map(str::to_owned))
+        .collect();
+    if !MEDIA_FORMATS.iter().all(|f| values.iter().any(|v| v == f)) {
+        return None;
+    }
+    let keep = |index: usize| MEDIA_FORMATS.contains(&values[index].as_str());
+    let formats: Vec<&String> = values
+        .iter()
+        .filter(|v| MEDIA_FORMATS.contains(&v.as_str()))
+        .collect();
+    schema["enum"] = json!(formats);
+    if let Some(descriptions) = schema["x-google-enum-descriptions"].as_array() {
+        let kept: Vec<Value> = descriptions
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| keep(*index))
+            .map(|(_, description)| description.clone())
+            .collect();
+        schema["x-google-enum-descriptions"] = Value::Array(kept);
+    }
+    Some(value)
+}
+
 /// A schema reference, resolved against the document's schema names.
 fn reference(value: &Value, pointer: &str, names: &BTreeSet<String>) -> Result<Value> {
     let Some(name) = value.as_str() else {
@@ -1081,6 +1119,8 @@ struct Walk<'a> {
     names: &'a BTreeSet<String>,
     scopes: &'a BTreeSet<String>,
     fields: Option<&'a Value>,
+    /// The projected `alt`, when the document declares one.
+    media: Option<&'a Value>,
     candidates: Vec<Candidate>,
     /// Operation id → the pointer of its method.
     ids: BTreeMap<String, String>,
@@ -1287,6 +1327,14 @@ fn method(value: &Value, pointer: &str, walk: &mut Walk<'_>) -> Result<()> {
     if let Some(fields) = walk.fields {
         query.push((PROJECTED_PARAMETER.to_owned(), fields.clone()));
     }
+    let download = boolean(map, "supportsMediaDownload", pointer)?;
+    let media = match walk.media {
+        Some(media) if download == Some(true) && map.contains_key("response") => Some(media),
+        _ => None,
+    };
+    if let Some(media) = media {
+        query.push((MEDIA_PARAMETER.to_owned(), media.clone()));
+    }
     query.sort_by(|a, b| a.0.cmp(&b.0));
     parameters.extend(query.into_iter().map(|(_, value)| value));
 
@@ -1316,7 +1364,6 @@ fn method(value: &Value, pointer: &str, walk: &mut Walk<'_>) -> Result<()> {
         );
     }
 
-    let download = boolean(map, "supportsMediaDownload", pointer)?;
     let response = match map.get("response") {
         Some(response) => {
             let at = child(pointer, "response");
@@ -1326,7 +1373,7 @@ fn method(value: &Value, pointer: &str, walk: &mut Walk<'_>) -> Result<()> {
                 return invalid(&at, "a response without `$ref`");
             };
             let target = reference(target, &child(&at, "$ref"), walk.names)?;
-            if download.is_some() {
+            if download.is_some() && media.is_none() {
                 walk.ignored.insert(child(pointer, "supportsMediaDownload"));
             }
             json!({
@@ -1553,6 +1600,7 @@ pub fn project(bytes: &[u8]) -> std::result::Result<Projection, Refusal> {
 
     let mut excluded_parameters = Vec::new();
     let mut fields = None;
+    let mut media = None;
     if let Some(parameters) = document.get("parameters") {
         for (name, value) in object(parameters, "/parameters")? {
             let here = child("/parameters", name);
@@ -1563,6 +1611,9 @@ pub fn project(bytes: &[u8]) -> std::result::Result<Projection, Refusal> {
             if name == PROJECTED_PARAMETER {
                 fields = Some(projected.value);
             } else if EXCLUDED_PARAMETERS.contains(&name.as_str()) {
+                if name == MEDIA_PARAMETER {
+                    media = media_formats(projected.value);
+                }
                 excluded_parameters.push(name.clone());
             } else {
                 return invalid(
@@ -1578,6 +1629,7 @@ pub fn project(bytes: &[u8]) -> std::result::Result<Projection, Refusal> {
         names: &names,
         scopes: &scopes,
         fields: fields.as_ref(),
+        media: media.as_ref(),
         candidates: Vec::new(),
         ids: BTreeMap::new(),
         method_count: 0,
@@ -1586,6 +1638,21 @@ pub fn project(bytes: &[u8]) -> std::result::Result<Projection, Refusal> {
     resource(document, "", &mut walk)?;
     let (paths, operations, excluded_methods, rewritten_paths, excluded_upload_paths) =
         select(walk.candidates)?;
+    // `excluded_parameters` names the document parameters no operation
+    // carries: `alt` is not one when a projected method carries it.
+    let carried = paths.values().flat_map(Map::values).any(|operation| {
+        operation
+            .get("parameters")
+            .and_then(Value::as_array)
+            .is_some_and(|parameters| {
+                parameters
+                    .iter()
+                    .any(|parameter| parameter.get("name") == Some(&json!(MEDIA_PARAMETER)))
+            })
+    });
+    if carried {
+        excluded_parameters.retain(|name| name != MEDIA_PARAMETER);
+    }
 
     let mut openapi = Map::new();
     openapi.insert("openapi".into(), json!(OPENAPI));

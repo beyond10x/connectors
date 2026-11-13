@@ -155,3 +155,94 @@ fn a_reason_carrying_the_requests_own_credential_is_withheld() {
     ));
     assert!(!reason::carries_credential("Scope does not match", b""));
 }
+
+fn domains(list: &[&str]) -> Vec<String> {
+    list.iter().map(|domain| (*domain).to_owned()).collect()
+}
+
+/// story:google-read-only-profiles-and-company-domain: a domain refusal names
+/// the account's domain and the admitted ones whatever they hold, which `admit`
+/// would withhold (a digit in a long word, a run of 32 bytes, a credential
+/// word), and the host accepts exactly that form and no other text.
+#[test]
+fn a_domain_refusal_names_every_domain_and_is_checked_by_its_shape() {
+    for (account, admitted) in [
+        (Some("branch2026.example.org"), vec!["corp.test"]),
+        (
+            Some("other.test"),
+            vec!["engineering-department.example.org"],
+        ),
+        (
+            Some("secret.example.org"),
+            vec!["password.example.org", "b.test"],
+        ),
+    ] {
+        let admitted = domains(&admitted);
+        let text = reason::domain_refusal(account, &admitted).unwrap();
+        assert!(reason::is_domain_refusal(&text), "{text}");
+        assert!(text.contains(account.unwrap()), "{text}");
+        for domain in &admitted {
+            assert!(text.contains(domain.as_str()), "{text}");
+        }
+    }
+    let text = reason::domain_refusal(Some("branch2026.example.org"), &domains(&["corp.test"]));
+    assert_eq!(reason::admit(text.as_deref().unwrap()), None);
+
+    let none = reason::domain_refusal(None, &domains(&["corp.test"])).unwrap();
+    assert!(reason::is_domain_refusal(&none) && none.contains("no hd claim"));
+    let upper = reason::domain_refusal(Some("Other.test"), &domains(&["corp.test"])).unwrap();
+    assert!(reason::is_domain_refusal(&upper) && !upper.to_lowercase().contains("other.test"));
+    let odd = reason::domain_refusal(Some("a b@c"), &domains(&["corp.test"])).unwrap();
+    assert!(reason::is_domain_refusal(&odd) && !odd.contains("a b@c"));
+
+    let nine: Vec<String> = (0..9).map(|n| format!("d{n}.test")).collect();
+    for bad in [
+        domains(&[]),
+        domains(&["Corp.test"]),
+        domains(&["localhost"]),
+        domains(&["corp.test", "corp.test"]),
+        domains(&["-a-.test"]),
+        domains(&["a b"]),
+        nine,
+    ] {
+        assert_eq!(reason::domain_refusal(None, &bad), None, "{bad:?}");
+    }
+    for forged in [
+        "Bearer abc; admitted: corp.test",
+        "the account's domain x.test is not an admitted domain; admitted: ",
+        "the account's domain x@y.test is not an admitted domain; admitted: corp.test",
+        "the account's domain x.test is not an admitted domain; admitted: corp.test, ",
+        "the account's domain x.test is not an admitted domain; admitted: corp.test and more",
+        "the account's domain x.test is not an admitted domain; admitted: corp.test; admitted: b.test",
+        "the account's domain x.test is not an admitted domain",
+    ] {
+        assert!(!reason::is_domain_refusal(forged), "{forged}");
+    }
+    let long = format!(
+        "the account's domain {} is not an admitted domain; admitted: corp.test",
+        "a".repeat(2600)
+    );
+    assert!(!reason::is_domain_refusal(&long));
+}
+
+/// A domain refusal is withheld when it echoes a credential value, except a
+/// value that is itself a dotted host name (an OAuth client id), which a
+/// company domain may share eight bytes with.
+#[test]
+fn a_domain_refusal_may_share_bytes_with_a_client_id_but_not_with_a_secret() {
+    let text =
+        reason::domain_refusal(Some("branch2026.example.org"), &domains(&["corp.test"])).unwrap();
+    let document = br#"{"client_id":"fixture-client-id.apps.example.test","client_secret":"fixture-client-secret-gmail"}"#;
+    assert!(reason::carries_credential(&text, document));
+    assert!(!reason::domain_refusal_carries_credential(&text, document));
+
+    let leaking = reason::domain_refusal(
+        Some("zxcvbnmasdfghjkl.example.org"),
+        &domains(&["corp.test"]),
+    )
+    .unwrap();
+    let document = br#"{"client_id":"a.example.org","client_secret":"zxcvbnmasdfghjkl"}"#;
+    assert!(reason::domain_refusal_carries_credential(
+        &leaking, document
+    ));
+}

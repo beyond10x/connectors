@@ -32,9 +32,15 @@ struct Args {
     /// The instance's API base, in place of the connector's default endpoint.
     #[arg(long, requires = "connector")]
     endpoint: Option<String>,
-    /// The auth profile, when the connector declares more than one.
+    /// The auth profile, when the connector declares more than one and no
+    /// default.
     #[arg(long, requires = "connector")]
     profile: Option<String>,
+    /// A company domain the instance admits, matched against the `hd` claim
+    /// of the account's `id_token`; repeat it for each domain. Without it
+    /// every account is admitted.
+    #[arg(long = "allowed-domain", requires = "connector")]
+    allowed_domain: Vec<String>,
     /// Print the independently computed bootstrap and configuration revision.
     #[arg(long, conflicts_with = "connectors_private_fd")]
     print_local_bootstrap: bool,
@@ -80,6 +86,8 @@ fn main() {
                 instance_id: args.instance_id.as_deref(),
                 endpoint: args.endpoint.as_deref(),
                 profile: args.profile.as_deref(),
+                allowed_domains: (!args.allowed_domain.is_empty())
+                    .then_some(args.allowed_domain.as_slice()),
             })?,
             _ => return Err(connectors_host::local::runtime::Failure::InvalidInput),
         };

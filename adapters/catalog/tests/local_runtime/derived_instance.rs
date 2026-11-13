@@ -1,9 +1,12 @@
 //! story:connector-instance-derived-fields, its acceptance: with a
 //! configuration whose only Gmail lines are `[connectors.gmail]` with
 //! `enabled = true` and an empty `[connectors.gmail.instances.private]`, one
-//! `connections connect` yields one connection under which a Gmail read,
-//! `users.drafts.create` and `users.drafts.send`, each write with its approval
-//! proof, succeed.
+//! `connections connect` yields one connection under which a Gmail read
+//! succeeds. Such an instance is on Gmail's read-only default profile
+//! (story:google-read-only-profiles-and-company-domain), so its consent asks
+//! for the read scope alone and it offers no write. An instance that adds only
+//! `profile = "google.oauth"` connects once and its read, `users.drafts.create`
+//! and `users.drafts.send`, each write with its approval proof, succeed.
 //!
 //! The instance names no endpoint, no trust root and no token URL, so the
 //! provider the host derives talks to Gmail's own hosts. The journey runs in
@@ -25,7 +28,8 @@ use std::{
 
 /// Set in the re-executed test process that runs inside the namespaces.
 const INSIDE: &str = "CONNECTORS_TEST_DERIVED_GMAIL_NAMESPACES";
-const NAME: &str = "local_runtime::derived_instance::a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_drafts";
+const READS_NAME: &str = "local_runtime::derived_instance::a_gmail_instance_configured_by_name_alone_connects_once_read_only_and_reads";
+const WRITES_NAME: &str = "local_runtime::derived_instance::a_gmail_instance_naming_google_oauth_connects_once_and_reads_and_writes_drafts";
 const HOSTS: [&str; 3] = [
     "gmail.googleapis.com",
     "oauth2.googleapis.com",
@@ -84,12 +88,111 @@ fn carries_material(haystack: &[u8]) -> bool {
 
 #[test]
 #[ignore = "requires built debug production CLI, qualified disposable Secret Service and unprivileged user namespaces"]
-fn a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_drafts() {
+fn a_gmail_instance_configured_by_name_alone_connects_once_read_only_and_reads() {
     let Some(base) = std::env::var_os(INSIDE) else {
-        return outside();
+        return outside(READS_NAME);
     };
     let fixture = Gmail::new(Path::new(&base));
-    let journey = Journey::new(&fixture);
+    let journey = Journey::new(&fixture, "");
+
+    // One connect under the instance's default profile, which asks for the
+    // read scope alone.
+    let connect = success(
+        journey.follow(
+            &[
+                &["connections", "connect"][..],
+                SELECTION,
+                &[
+                    "--profile",
+                    "google.oauth.readonly",
+                    "--credential-file",
+                    journey.client_file.to_str().unwrap(),
+                ],
+            ]
+            .concat(),
+        ),
+    );
+    let connected = connect["connection"].clone();
+    assert_eq!(connected["summary"]["state"], "ready", "{connected}");
+    let connection = connected["summary"]["connection"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let consents = fixture.routes("accounts.google.com", "/o/oauth2/auth");
+    assert_eq!(consents.len(), 1, "consent was requested once");
+    assert_eq!(
+        consent_scopes(&consents[0]),
+        ["openid", READONLY_SCOPE].map(str::to_owned).into()
+    );
+
+    // A Gmail read on that connection, at Gmail's own host.
+    let listed = journey.invoke(
+        &connection,
+        "users.messages.list",
+        json!({"userId": "me"}),
+        &[],
+    );
+    assert_eq!(
+        success(listed)["result"]["body"]["messages"][0]["id"],
+        "fixture-message-1"
+    );
+
+    // No write is offered: the instance describes neither draft write.
+    for operation in ["users.drafts.create", "users.drafts.send"] {
+        let described = journey.cli_output(
+            &[
+                &["operations", "describe"][..],
+                SELECTION,
+                &["--operation", operation],
+            ]
+            .concat(),
+        );
+        assert!(!described.status.success(), "{operation} is described");
+        let refused: Value = serde_json::from_slice(&described.stderr).unwrap();
+        assert_eq!(refused["error"]["data"]["code"], "not_found", "{refused}");
+    }
+
+    let listed = success(journey.cli_output(&[&["connections", "list"][..], SELECTION].concat()));
+    assert_eq!(
+        listed["connections"].as_array().unwrap().len(),
+        1,
+        "{listed}"
+    );
+    for result in [&connect, &listed] {
+        assert!(names_the_instance(result) > 0, "{result}");
+    }
+    for request in fixture.requests() {
+        assert!(HOSTS.contains(&request.host.as_str()), "{}", request.host);
+    }
+    assert!(fixture.posts().is_empty(), "a write was sent");
+    let gmail = fixture
+        .requests()
+        .into_iter()
+        .filter(|request| request.host == "gmail.googleapis.com")
+        .count();
+    assert_eq!(gmail, 1, "the read");
+}
+
+/// The scopes the consent request `consent` asks for.
+fn consent_scopes(consent: &Request) -> BTreeSet<String> {
+    super::oauth2_refresh::field(
+        &super::oauth2_refresh::decode_form(consent.query.as_bytes()),
+        "scope",
+    )
+    .unwrap()
+    .split(' ')
+    .map(str::to_owned)
+    .collect()
+}
+
+#[test]
+#[ignore = "requires built debug production CLI, qualified disposable Secret Service and unprivileged user namespaces"]
+fn a_gmail_instance_naming_google_oauth_connects_once_and_reads_and_writes_drafts() {
+    let Some(base) = std::env::var_os(INSIDE) else {
+        return outside(WRITES_NAME);
+    };
+    let fixture = Gmail::new(Path::new(&base));
+    let journey = Journey::new(&fixture, "profile = \"google.oauth\"\n");
 
     // One connect: consent at accounts.google.com, the code exchanged at
     // oauth2.googleapis.com, and the stored triple validated by a refresh.
@@ -116,16 +219,8 @@ fn a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_
         .to_owned();
     let consents = fixture.routes("accounts.google.com", "/o/oauth2/auth");
     assert_eq!(consents.len(), 1, "consent was requested once");
-    let scopes: BTreeSet<String> = super::oauth2_refresh::field(
-        &super::oauth2_refresh::decode_form(consents[0].query.as_bytes()),
-        "scope",
-    )
-    .unwrap()
-    .split(' ')
-    .map(str::to_owned)
-    .collect();
     assert_eq!(
-        scopes,
+        consent_scopes(&consents[0]),
         ["openid", COMPOSE_SCOPE, READONLY_SCOPE]
             .map(str::to_owned)
             .into()
@@ -240,9 +335,9 @@ fn a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_
     );
 }
 
-/// Outside the namespaces: run this test again inside them ([`reenter`]).
-fn outside() {
-    let output = reenter(INSIDE, NAME);
+/// Outside the namespaces: run the test `name` again inside them ([`reenter`]).
+fn outside(name: &str) {
+    let output = reenter(INSIDE, name);
     assert!(!carries_material(&output.stdout) && !carries_material(&output.stderr));
 }
 
@@ -703,7 +798,8 @@ fn id_token() -> String {
 }
 
 /// The CLI, its catalog provider beside it, custody, an approval clock, and
-/// the configuration that names the Gmail instance and nothing else of it.
+/// the configuration that names the Gmail instance and, in `instance`, the
+/// lines of its table, nothing else of it.
 struct Journey {
     // Dropped in this order: the owner stops before custody and the clock.
     cli: PathBuf,
@@ -717,7 +813,7 @@ struct Journey {
 }
 
 impl Journey {
-    fn new(fixture: &Gmail) -> Self {
+    fn new(fixture: &Gmail, instance: &str) -> Self {
         let root = PathBuf::from(WORK);
         filesystem::directory(&root.join("private"), true, true).unwrap();
         let cli = root.join("bin/connectors");
@@ -766,7 +862,7 @@ impl Journey {
         private(
             &journey.config,
             format!(
-                "format='connectors-local/5'\nowner_uid={}\nsecret_service_socket={}\n{clock}\n[connectors.gmail]\nenabled = true\n\n[connectors.gmail.instances.private]\n",
+                "format='connectors-local/5'\nowner_uid={}\nsecret_service_socket={}\n{clock}\n[connectors.gmail]\nenabled = true\n\n[connectors.gmail.instances.private]\n{instance}",
                 filesystem::uid(),
                 serde_json::to_string(journey._custody.socket.to_str().unwrap()).unwrap(),
             )

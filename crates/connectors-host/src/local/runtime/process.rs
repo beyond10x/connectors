@@ -672,7 +672,7 @@ impl Child {
             {
                 Err(Refusal {
                     failure: code,
-                    reason: super::admitted(reason, secret),
+                    reason: super::admitted_validation(reason, secret),
                     retry_after_seconds: None,
                 })
             }

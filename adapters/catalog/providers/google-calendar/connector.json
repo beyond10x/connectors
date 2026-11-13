@@ -6,7 +6,24 @@
   "catalog_provider": "google-calendar",
   "default_endpoint": "https://www.googleapis.com/calendar/v3",
   "selection": "operations.json",
+  "default_profile": "google.oauth.readonly",
   "profiles": [
+    {
+      "profile": "google.oauth.readonly",
+      "scheme": "oauth2_refresh",
+      "header": "Authorization",
+      "bearer": true,
+      "label": "Google refresh token",
+      "identity": {"source": "id_token", "kind": "google.user"},
+      "read_only": true,
+      "minimum_scopes": ["https://www.googleapis.com/auth/calendar.readonly"],
+      "token_url": "https://oauth2.googleapis.com/token",
+      "authorize_url": "https://accounts.google.com/o/oauth2/auth",
+      "requested_scopes": [
+        "openid",
+        "https://www.googleapis.com/auth/calendar.readonly"
+      ]
+    },
     {
       "profile": "google.oauth",
       "scheme": "oauth2_refresh",

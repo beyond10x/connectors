@@ -142,6 +142,13 @@ profile has:
   that belongs to no user.
 - `scopes` (optional): a read and pointer that list the granted scopes, and the `minimum` the
   connection must hold.
+- `read_only: true` (optional): an instance on the profile is offered the selection's reads and
+  none of its writes.
+
+The profile marked `default: true` is the one the bundle records. With more than one profile, an
+instance names the one it takes, unless the file names one at its top level as
+`default_profile: <profile id>`, such as a read-only profile beside a write-capable one. A
+`default_profile` that names none of the file's profiles is refused as `malformed`.
 
 An OAuth profile is `scheme: oauth2_refresh`, with `authorize_url` and `token_url`, or
 `scheme: oauth2_client_credentials`, with `token_url` only. Take both URLs from the vendor's own

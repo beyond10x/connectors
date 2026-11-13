@@ -12,8 +12,10 @@ The Gmail, Calendar, Drive and Slides pages under [Connectors](../connectors/ind
 list their own API and scopes. The client and the publishing status are the same for all of them.
 
 1. In the Google Cloud console, select or create a project, enable the connector's API, and
-   configure the OAuth consent screen with the scopes its page lists. One instance per Google
-   account requests every scope its operations need, reads and writes alike.
+   configure the OAuth consent screen with the scopes its page lists. An instance that names
+   no profile is read-only and requests only the `.readonly` scope; one that names
+   `profile = "google.oauth"` requests every scope its operations need, reads and writes alike. An
+   instance can admit only a company's accounts with `allowed_domains`.
 2. Under *Credentials*, create an OAuth client ID of type *Desktop app* and download its JSON.
    One client file serves every Google connector. Make it readable by you alone; the CLI refuses a
    credential file anyone else can read:
