@@ -2,16 +2,17 @@
 format: aep.planning-md/3
 id: story:catalog-path-prefix-from-config
 kind: story
-status: active
+status: implemented
 title: A definition's base URL configuration fills a leading path parameter
 summary: A declared leading /{v} of every operation is taken from the base URL, not from the caller
 relations:
 - serves: vision:independent-contract-adapters
 - blocks: story:catalog-basecamp
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-13T10:50:30Z", actor: "human:operator", revision: 2}
 - {from: "proposed", to: "active", at: "2026-11-13T10:50:30Z", actor: "human:operator", revision: 3}
+- {from: "active", to: "implemented", at: "2026-11-14T01:30:43Z", actor: "human:operator", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 # A definition's base URL configuration fills a leading path parameter
 
