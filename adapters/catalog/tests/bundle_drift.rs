@@ -4,7 +4,9 @@
 //! named here fails rather than going unchecked. A source projected from a
 //! pinned Google Discovery or Swagger 2.0 document is itself regenerated from
 //! that document first, with its projection record, and must match byte for
-//! byte too.
+//! byte too. A bundle that is the lowering of a committed definition
+//! ([`LOWERED`]) is lowered again from that definition into the same fresh
+//! directory, so the whole index is still compared.
 use connectors_catalog::{bundle, derived, pipeline};
 use std::path::Path;
 
@@ -179,6 +181,58 @@ const AMENDMENTS: [(&str, &str); 6] = [
     ),
 ];
 
+/// The providers whose committed bundle is the lowering of a committed
+/// definition rather than a pipeline run over the source alone: the
+/// definition (`crates/connectors-catalog/tests/fixtures/definitions/`, the
+/// copy of the definitions repository's file), the pinned source it names, and
+/// the unsupported-operation count, relative to this crate. Basecamp's
+/// `base_url` ends in the configured `/{accountId}`, which the lowering drops
+/// from every path with its parameter (`connectors_catalog::definition`), so
+/// the pipeline's own bundle, which keeps them, is not the one the provider
+/// serves. Its 300 operations are all represented, no gap.
+const LOWERED: [(&str, &str, &str, usize); 1] = [(
+    "basecamp",
+    "../../crates/connectors-catalog/tests/fixtures/definitions/connectors/basecamp.yaml",
+    "../basecamp/upstream/openapi.json",
+    0,
+)];
+
+/// Lower the committed definition at `definition` over the pinned source at
+/// `source`, gzipped into a definitions root of its own as the definitions
+/// repository vendors it, into the bundle directory `out`.
+fn lower_committed(definition: &str, source: &str, out: &Path) -> bundle::Entry {
+    use std::io::Write as _;
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let work = tempfile::tempdir().unwrap();
+    let definitions = work.path().join("definitions");
+    let file = definitions.join("connectors").join(
+        Path::new(definition)
+            .file_name()
+            .expect("a definition file name"),
+    );
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    std::fs::copy(root.join(definition), &file).unwrap();
+    let parsed = connectors_catalog::definition::parse(&std::fs::read(&file).unwrap()).unwrap();
+    let (_, vendored) = parsed.source.document().unwrap();
+    let vendored = definitions.join(vendored);
+    std::fs::create_dir_all(vendored.parent().unwrap()).unwrap();
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
+    encoder
+        .write_all(&std::fs::read(root.join(source)).unwrap())
+        .unwrap();
+    std::fs::write(&vendored, encoder.finish().unwrap()).unwrap();
+    let scratch = work.path().join("scratch");
+    std::fs::create_dir_all(&scratch).unwrap();
+    connectors_catalog::definition::lower(&connectors_catalog::definition::Request {
+        definition: &file,
+        root: &definitions,
+        out,
+        scratch: &scratch,
+    })
+    .unwrap_or_else(|refusal| panic!("{definition} lowers: {refusal}"))
+    .entry
+}
+
 /// The committed projection at `source` and its record beside it are exactly
 /// what projecting the pinned document at `from` produces now, with the
 /// projector its content names (Discovery or Swagger 2.0).
@@ -215,6 +269,7 @@ fn every_committed_bundle_matches_a_fresh_pipeline_run() {
     let mut named: Vec<&str> = SOURCES
         .iter()
         .map(|(provider, _, _, _, _)| *provider)
+        .chain(LOWERED.iter().map(|(provider, _, _, _)| *provider))
         .collect();
     named.sort();
     assert_eq!(
@@ -222,6 +277,17 @@ fn every_committed_bundle_matches_a_fresh_pipeline_run() {
         "every indexed provider needs its pinned source here"
     );
     let temp = tempfile::tempdir().unwrap();
+    for (provider, definition, source, unsupported) in LOWERED {
+        let entry = lower_committed(definition, source, temp.path());
+        assert_eq!(entry.provider, provider);
+        assert_eq!(entry.unsupported, unsupported, "`{provider}`");
+        let file_name = format!("{provider}.bundle.json");
+        assert!(
+            std::fs::read(temp.path().join(&file_name)).unwrap()
+                == std::fs::read(committed.join(&file_name)).unwrap(),
+            "committed `{provider}` bundle drifted from the lowering of its definition"
+        );
+    }
     for (provider, source, derived_from, auth_profile, unsupported) in SOURCES {
         let source = root.join(source);
         let amendments = AMENDMENTS

@@ -62,7 +62,7 @@ fn every_lowered_auth_profile_loads_in_the_catalog_provider() {
         .filter(|path| path.extension().is_some_and(|e| e == "yaml"))
         .collect();
     files.sort();
-    assert_eq!(files.len(), 16, "one definition per shipped selection");
+    assert_eq!(files.len(), 17, "one definition per shipped selection");
     let mut loaded = 0;
     for file in &files {
         let name = file.file_stem().unwrap().to_str().unwrap();
@@ -97,7 +97,7 @@ fn every_lowered_auth_profile_loads_in_the_catalog_provider() {
                     block[url] = json!(filled(&template, &parsed));
                 }
             }
-            let config = json!({
+            let mut config = json!({
                 "format": "connectors-catalog-local/2",
                 "instance": "definition-check",
                 "provider": catalog,
@@ -106,6 +106,11 @@ fn every_lowered_auth_profile_loads_in_the_catalog_provider() {
                 "auth": block,
                 "operations_file": root_path(&format!("providers/{catalog}/{selection}")),
             });
+            // A base URL ending in a configured variable (`endpoint_path`) is the
+            // request prefix the lowering dropped from the bundle's paths.
+            if let Some(template) = declaration["endpoint_path"].as_str() {
+                config["request_prefix"] = json!(filled(template, &parsed));
+            }
             let output = print_bootstrap(&config);
             assert!(
                 output.status.success(),
@@ -115,7 +120,7 @@ fn every_lowered_auth_profile_loads_in_the_catalog_provider() {
             loaded += 1;
         }
     }
-    assert_eq!(loaded, 21, "every profile of every definition is loaded");
+    assert_eq!(loaded, 22, "every profile of every definition is loaded");
 }
 
 /// A definition's `evidence_lifetime_ms` reaches the profile the provider

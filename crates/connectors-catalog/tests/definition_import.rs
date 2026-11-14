@@ -121,6 +121,13 @@ const GRANTS: &[(&str, &str)] = &[
     ("claude-subscription", "claude-subscription/operations.json"),
 ];
 
+/// The shipped selections that are the lowering of a committed definition the
+/// importer cannot write, by definition name: Basecamp's paging style says
+/// `link_next` and its `base_url` ends in the configured `/{accountId}`, and
+/// the importer reconstructs neither. Each is held by its own case below
+/// (`basecamp_is_the_lowering_of_its_committed_definition`).
+const LOWERED: &[(&str, &str)] = &[("basecamp", "basecamp/operations.json")];
+
 fn shipped(name: &str) -> &'static Shipped {
     SHIPPED.iter().find(|s| s.name == name).unwrap()
 }
@@ -360,6 +367,7 @@ macro_rules! connectors {
             files.sort();
             let mut covered: Vec<String> = SHIPPED.iter().map(|s| s.selection.to_owned()).collect();
             covered.extend(GRANTS.iter().map(|(_, selection)| (*selection).to_owned()));
+            covered.extend(LOWERED.iter().map(|(_, selection)| (*selection).to_owned()));
             covered.sort();
             assert_eq!(files, covered);
             for name in names {
@@ -386,6 +394,97 @@ connectors! {
     slack_round_trips, slack_is_committed => "slack";
     slack_user_round_trips, slack_user_is_committed => "slack-user";
     zendesk_round_trips, zendesk_is_committed => "zendesk";
+}
+
+/// Basecamp's committed definition, over the pinned source gzipped as the
+/// definitions repository vendors it, lowers to the committed bundle and
+/// declaration byte for byte and to the shipped selection as a JSON value; its
+/// upstream README names the source digest the definition pins. The importer
+/// cannot write it, and refuses rather than writing an approximation.
+#[test]
+fn basecamp_is_the_lowering_of_its_committed_definition() {
+    use std::io::Write as _;
+    let (name, selection) = LOWERED[0];
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("definitions");
+    let file = root.join(format!("connectors/{name}.yaml"));
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    std::fs::copy(fixtures().join(format!("connectors/{name}.yaml")), &file).unwrap();
+    let source =
+        std::fs::read(repository().join("adapters/basecamp/upstream/openapi.json")).unwrap();
+    let digest = {
+        use sha2::Digest as _;
+        hex::encode(sha2::Sha256::digest(&source))
+    };
+    let parsed = definition::parse(&std::fs::read(&file).unwrap()).unwrap();
+    assert_eq!(parsed.source.sha256, digest);
+    let readme =
+        std::fs::read_to_string(fixtures().join(format!("upstream/{name}/README.md"))).unwrap();
+    assert!(readme.contains(&digest), "the README names the digest");
+    let vendored = root.join(format!("upstream/{name}/openapi.json.gz"));
+    std::fs::create_dir_all(vendored.parent().unwrap()).unwrap();
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
+    encoder.write_all(&source).unwrap();
+    std::fs::write(&vendored, encoder.finish().unwrap()).unwrap();
+    let out = temp.path().join("out");
+    let scratch = temp.path().join("scratch");
+    std::fs::create_dir_all(&scratch).unwrap();
+    let lowered = definition::lower(&definition::Request {
+        definition: &file,
+        root: &root,
+        out: &out,
+        scratch: &scratch,
+    })
+    .unwrap_or_else(|refusal| panic!("`{name}` lowers: {refusal}"));
+    assert_eq!(lowered.provider, name);
+    assert!(
+        std::fs::read(&lowered.bundle).unwrap()
+            == std::fs::read(repository().join(format!(
+                "adapters/catalog/generated/bundles/{name}.bundle.json"
+            )))
+            .unwrap(),
+        "`{name}`: the lowered bundle differs from the committed one"
+    );
+    let written: Value =
+        serde_json::from_slice(&std::fs::read(&lowered.operations).unwrap()).unwrap();
+    let shipped: Value = serde_json::from_slice(
+        &std::fs::read(
+            repository()
+                .join("adapters/catalog/providers")
+                .join(selection),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(written, shipped, "`{name}`: the whole selection");
+    let declaration =
+        repository().join(format!("adapters/catalog/providers/{name}/connector.json"));
+    assert!(
+        std::fs::read(&lowered.connector).unwrap() == std::fs::read(&declaration).unwrap(),
+        "`{name}`: the lowered connector.json differs from the committed one"
+    );
+
+    let target = temp.path().join("imported");
+    std::fs::create_dir_all(&target).unwrap();
+    let refused = import::import(&import::Request {
+        connectors: &repository(),
+        catalog: name,
+        selection: None,
+        definitions: &target,
+        name: None,
+    })
+    .expect_err("the importer cannot write a link_next definition");
+    assert!(
+        matches!(
+            refused,
+            import::Failure::Unexpressible { .. } | import::Failure::NotFound(_)
+        ),
+        "{refused:?}"
+    );
+    assert!(
+        !target.join(format!("connectors/{name}.yaml")).exists(),
+        "a refused import writes nothing"
+    );
 }
 
 /// Importing twice into the same root writes the same bytes.

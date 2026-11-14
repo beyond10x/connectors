@@ -375,6 +375,13 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Catalog provider",
+        "Basecamp projects, messages, comments and to-dos",
+        "Thirteen reads from Basecamp's pinned OpenAPI document under the account the instance endpoint names, lists paged by the Link header's rel=next, with a personal access token as Authorization: Bearer; no write; verified against a local fixture only (*unreleased*).",
+        "adapters/catalog/tests/basecamp.rs::shipped_basecamp_selections_are_exactly_the_thirteen_reads",
+        "/docs/reference/adapters/catalog",
+    ),
+    shipped(
+        "Catalog provider",
         "Zendesk Support",
         "Tickets, users and organizations changed since a start time, one of each by id, and a ticket's comments, with OAuth client credentials or an API token; a ticket update, a private note and a draft reply behind an approval, refused as a conflict when the ticket changed since it was read.",
         "adapters/catalog/tests/zendesk.rs::shipped_zendesk_selections_are_the_seven_reads_and_three_writes",

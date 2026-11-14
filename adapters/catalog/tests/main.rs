@@ -14,6 +14,7 @@ mod adversary_credential_pass1;
 mod adversary_git_relay;
 mod adversary_gitlab_mr_writes;
 mod adversary_one_binary;
+mod basecamp;
 mod binary_adversary;
 mod binary_responses;
 mod body_keys_adversary;

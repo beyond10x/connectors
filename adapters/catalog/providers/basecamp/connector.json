@@ -1,0 +1,18 @@
+{
+  "format": "connectors-catalog-connector/1",
+  "connector_id": "basecamp",
+  "provider_id": "basecamp",
+  "adapter_id": "catalog",
+  "catalog_provider": "basecamp",
+  "endpoint_path": "/{accountId}",
+  "selection": "operations.json",
+  "profiles": [
+    {
+      "profile": "basecamp.pat",
+      "header": "Authorization",
+      "bearer": true,
+      "label": "Basecamp personal access token",
+      "identity": {"path": "my/profile.json", "kind": "basecamp.person", "subject_pointer": "/id"}
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "format": "connectors-catalog-operations/1",
+  "provider": "basecamp",
+  "operations": [
+    {
+      "id": "projects.list",
+      "operation_id": "ListProjects",
+      "effect": "read",
+      "description": "List the projects the token's person can see, active unless status is archived or trashed, one page per call; next is the following page's URL, send its page, and a page without next is the last",
+      "link_next": true
+    },
+    {
+      "id": "project.get",
+      "operation_id": "GetProject",
+      "effect": "read",
+      "description": "Read one project by projectId, with its dock, which names the id of its message board, to-do set and other tools"
+    },
+    {
+      "id": "project.people.list",
+      "operation_id": "ListProjectPeople",
+      "effect": "read",
+      "description": "List the active people on one project, one page per call; next is the following page's URL, send its page, and a page without next is the last",
+      "link_next": true
+    },
+    {
+      "id": "message_board.get",
+      "operation_id": "GetMessageBoard",
+      "effect": "read",
+      "description": "Read one message board by boardId, the id the project's dock names for message_board"
+    },
+    {
+      "id": "messages.list",
+      "operation_id": "ListMessages",
+      "effect": "read",
+      "description": "List the messages of one message board, ordered by sort (created_at or updated_at) and direction (asc or desc), one page per call; next is the following page's URL, send its page, and a page without next is the last",
+      "link_next": true
+    },
+    {
+      "id": "message.get",
+      "operation_id": "GetMessage",
+      "effect": "read",
+      "description": "Read one message by messageId, its subject and its content as HTML"
+    },
+    {
+      "id": "comments.list",
+      "operation_id": "ListComments",
+      "effect": "read",
+      "description": "List the comments on one recording, such as a message, a to-do or a to-do list, by its id as recordingId, one page per call; next is the following page's URL, send its page, and a page without next is the last",
+      "link_next": true
+    },
+    {
+      "id": "comment.get",
+      "operation_id": "GetComment",
+      "effect": "read",
+      "description": "Read one comment by commentId, its content as HTML and the recording it is on as parent"
+    },
+    {
+      "id": "todoset.get",
+      "operation_id": "GetTodoset",
+      "effect": "read",
+      "description": "Read one to-do set by todosetId, the id the project's dock names for todoset, with its to-do list count and completion"
+    },
+    {
+      "id": "todolists.list",
+      "operation_id": "ListTodolists",
+      "effect": "read",
+      "description": "List the to-do lists of one to-do set, active unless status is archived or trashed, one page per call; next is the following page's URL, send its page, and a page without next is the last",
+      "link_next": true
+    },
+    {
+      "id": "todolist.get",
+      "operation_id": "GetTodolistOrGroup",
+      "effect": "read",
+      "description": "Read one to-do list, or one group of a to-do list, by id"
+    },
+    {
+      "id": "todos.list",
+      "operation_id": "ListTodos",
+      "effect": "read",
+      "description": "List the to-dos of one to-do list, pending ones unless completed is true, active unless status is archived or trashed, one page per call; next is the following page's URL, send its page, and a page without next is the last",
+      "link_next": true
+    },
+    {
+      "id": "todo.get",
+      "operation_id": "GetTodo",
+      "effect": "read",
+      "description": "Read one to-do by todoId, its content, assignees, due date and whether it is completed"
+    }
+  ]
+}

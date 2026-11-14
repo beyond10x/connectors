@@ -24,6 +24,19 @@
   a read that does not answer JSON, and `connectors definitions install` admits a release whose
   `features` name `link_next`. No other definition, bundle, selection or configuration revision
   changes (story:catalog-link-header-next-page).
+- The catalog provider serves Basecamp as the connector `basecamp`, thirteen reads and no write:
+  `projects.list`, `project.get`, `project.people.list`, `message_board.get`, `messages.list`,
+  `message.get`, `comments.list`, `comment.get`, `todoset.get`, `todolists.list`,
+  `todolist.get`, `todos.list` and `todo.get`. Source: Basecamp's OpenAPI 3.1 document from
+  `basecamp/basecamp-sdk` (MIT), vendored unmodified under `adapters/basecamp/upstream/`. The
+  bundle, selection and declaration are the lowering of the definition `connectors/basecamp.yaml`
+  (base URL `https://3.basecampapi.com/{accountId}`, a paging style with `link_next`), so the
+  instance's endpoint names the account (`endpoint = "https://3.basecampapi.com/<account id>"`),
+  no read takes `accountId`, and every list answers the `Link` header's next page as `next`. One
+  profile, `basecamp.pat`: a personal access token as `Authorization: Bearer`, its person under
+  the account (`my/profile.json`) as the identity. Verified against a local HTTPS stand-in only;
+  `docs/catalog-basecamp.md` and the website page say first that such a token is read-write at
+  Basecamp although only reads are offered (story:catalog-basecamp).
 
 ### Changed
 

@@ -1,0 +1,53 @@
+schema: urn:beyond10x:connectors-definition:1
+source:
+  openapi: upstream/basecamp/openapi.json.gz
+  sha256: 6f309fd546710c53747ff546e0459083fd565902df07932aed49d9ba1a2603bb
+base_url: https://3.basecampapi.com/{accountId}
+config: {accountId: {type: string}}
+auth:
+  basecamp.pat:
+    scheme: bearer
+    label: Basecamp personal access token
+    identity: {path: my/profile.json, kind: basecamp.person, subject: /id}
+paging:
+  pages: {request: page, link_next: true}
+operations:
+  projects.list:
+    op: ListProjects
+    description: List the projects the token's person can see, active unless status is archived or trashed, one page per call; next is the following page's URL, send its page, and a page without next is the last
+  project.get:
+    op: GetProject
+    description: Read one project by projectId, with its dock, which names the id of its message board, to-do set and other tools
+  project.people.list:
+    op: ListProjectPeople
+    description: List the active people on one project, one page per call; next is the following page's URL, send its page, and a page without next is the last
+  message_board.get:
+    op: GetMessageBoard
+    description: Read one message board by boardId, the id the project's dock names for message_board
+  messages.list:
+    op: ListMessages
+    description: List the messages of one message board, ordered by sort (created_at or updated_at) and direction (asc or desc), one page per call; next is the following page's URL, send its page, and a page without next is the last
+  message.get:
+    op: GetMessage
+    description: Read one message by messageId, its subject and its content as HTML
+  comments.list:
+    op: ListComments
+    description: List the comments on one recording, such as a message, a to-do or a to-do list, by its id as recordingId, one page per call; next is the following page's URL, send its page, and a page without next is the last
+  comment.get:
+    op: GetComment
+    description: Read one comment by commentId, its content as HTML and the recording it is on as parent
+  todoset.get:
+    op: GetTodoset
+    description: Read one to-do set by todosetId, the id the project's dock names for todoset, with its to-do list count and completion
+  todolists.list:
+    op: ListTodolists
+    description: List the to-do lists of one to-do set, active unless status is archived or trashed, one page per call; next is the following page's URL, send its page, and a page without next is the last
+  todolist.get:
+    op: GetTodolistOrGroup
+    description: Read one to-do list, or one group of a to-do list, by id
+  todos.list:
+    op: ListTodos
+    description: List the to-dos of one to-do list, pending ones unless completed is true, active unless status is archived or trashed, one page per call; next is the following page's URL, send its page, and a page without next is the last
+  todo.get:
+    op: GetTodo
+    description: Read one to-do by todoId, its content, assignees, due date and whether it is completed

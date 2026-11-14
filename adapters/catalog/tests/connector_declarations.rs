@@ -268,6 +268,7 @@ fn every_catalog_provider_but_openrouter_ships_one_declaration() {
     assert_eq!(
         connectors,
         [
+            "basecamp",
             "calendar",
             "chatgpt",
             "claude-subscription",
@@ -304,10 +305,16 @@ fn declared_profiles_are_the_documented_ones_with_every_scope() {
     let documented = documented();
     let mut seen = BTreeSet::new();
     for (page, config) in &documented {
-        if config.get("request_prefix").is_some() {
+        let provider = config["provider"].as_str().unwrap();
+        // A declaration whose `endpoint_path` the endpoint fills (Basecamp's
+        // account) derives a `request_prefix`, so its documented
+        // configuration carries one too.
+        let fills_endpoint_path = declarations
+            .get(provider)
+            .is_some_and(|declaration| declaration.get("endpoint_path").is_some());
+        if config.get("request_prefix").is_some() && !fills_endpoint_path {
             continue;
         }
-        let provider = config["provider"].as_str().unwrap();
         let Some(declaration) = declarations.get(provider) else {
             assert!(
                 UNDECLARED.contains(&provider),
@@ -412,13 +419,14 @@ fn every_declared_profile_derives_what_its_hand_written_configuration_derives() 
                     .find(|config| {
                         config["provider"] == directory.as_str()
                             && config["auth"]["profile"] == id
-                            && config.get("request_prefix").is_none()
+                            && (config.get("request_prefix").is_none()
+                                || declaration.get("endpoint_path").is_some())
                     })
                     .and_then(|config| config["api_base"].as_str())
                     .unwrap_or_else(|| panic!("{directory}: no documented endpoint"))
                     .to_owned(),
             };
-            let hand = json!({
+            let mut hand = json!({
                 "format": "connectors-catalog-local/2",
                 "instance": format!("{connector}.fixture"),
                 "provider": directory,
@@ -433,6 +441,13 @@ fn every_declared_profile_derives_what_its_hand_written_configuration_derives() 
                     declaration["selection"].as_str().unwrap()
                 ),
             });
+            // The endpoint's path names what `endpoint_path` stands for, and is
+            // the request prefix in front of the bundle's paths.
+            if declaration.get("endpoint_path").is_some() {
+                let rest = endpoint.strip_prefix("https://").unwrap();
+                let path = &rest[rest.find('/').expect("an endpoint with a path")..];
+                hand["request_prefix"] = json!(path.trim_end_matches('/'));
+            }
             let expected = legacy(&hand);
             let mut args = vec![
                 "--connector",
@@ -450,11 +465,11 @@ fn every_declared_profile_derives_what_its_hand_written_configuration_derives() 
             checked.push(format!("{connector} {id}"));
         }
     }
-    // Thirteen connectors, Slack's since 0.63.1, Zendesk with two profiles and Gmail,
-    // Calendar and Drive with two each (a read-only one and a write-capable one): a lane that
-    // finds no declaration checks nothing and must not pass. ChatGPT's one profile and Claude's
-    // two are refused.
-    assert_eq!(checked.len(), 17, "{checked:?}");
+    // Fourteen connectors, Slack's since 0.63.1 and Basecamp's, whose endpoint names the
+    // account, Zendesk with two profiles and Gmail, Calendar and Drive with two each (a
+    // read-only one and a write-capable one): a lane that finds no declaration checks nothing
+    // and must not pass. ChatGPT's one profile and Claude's two are refused.
+    assert_eq!(checked.len(), 18, "{checked:?}");
     assert_eq!(
         refused,
         [
@@ -867,119 +882,125 @@ fn slack_derived_from_its_declaration_is_the_documented_bot_instance() {
 /// (story:google-read-only-profiles-and-company-domain).
 /// The Calendar, Drive, Gmail and Slides revisions moved when the Discovery
 /// projector became `discovery-openapi/2` (story:drive-file-content-read).
+/// The Basecamp guide's pin is new with its selection (story:catalog-basecamp);
+/// it moved the index of every later page and no revision.
 #[test]
 fn documented_native_configurations_keep_their_revisions() {
     let pinned: BTreeMap<String, &str> = [
         (
-            "00 catalog-confluence.md",
-            "f241ef1b2fbe206c2059021881e3158f6d4f8c0b14d55458b601481ebb07b508",
+            "00 catalog-basecamp.md",
+            "25293c693e1accbc446b11a41c103744fdad1c39fd3d008457ce99c30b2d2797",
         ),
         (
             "01 catalog-confluence.md",
-            "cf2b9b88cde553a08d9655804d782d95f71b410053200beb825d06aacb82cd16",
-        ),
-        (
-            "02 catalog-confluence.md",
-            "fd76431c0eee380736f69fb23bd2ce11c9e61a9e060c57d472de100e93ba7eb1",
-        ),
-        (
-            "03 catalog-confluence.md",
-            "85991fe70f2ecb22220c8e59153aad2f3a7bc6dafc1b3e2870dafb4cba02455b",
-        ),
-        (
-            "04 catalog-confluence.md",
             "f241ef1b2fbe206c2059021881e3158f6d4f8c0b14d55458b601481ebb07b508",
         ),
         (
-            "05 catalog-google-calendar.md",
-            "21f28863253c2e15af454dfb8c47030a73ab7ce2b6169f0c1d06849b9753e681",
+            "02 catalog-confluence.md",
+            "cf2b9b88cde553a08d9655804d782d95f71b410053200beb825d06aacb82cd16",
+        ),
+        (
+            "03 catalog-confluence.md",
+            "fd76431c0eee380736f69fb23bd2ce11c9e61a9e060c57d472de100e93ba7eb1",
+        ),
+        (
+            "04 catalog-confluence.md",
+            "85991fe70f2ecb22220c8e59153aad2f3a7bc6dafc1b3e2870dafb4cba02455b",
+        ),
+        (
+            "05 catalog-confluence.md",
+            "f241ef1b2fbe206c2059021881e3158f6d4f8c0b14d55458b601481ebb07b508",
         ),
         (
             "06 catalog-google-calendar.md",
-            "c5f570fdbdb699c897682491a05a2d529d20b72ec793d08b7679cf21bb3c1b65",
+            "21f28863253c2e15af454dfb8c47030a73ab7ce2b6169f0c1d06849b9753e681",
         ),
         (
             "07 catalog-google-calendar.md",
+            "c5f570fdbdb699c897682491a05a2d529d20b72ec793d08b7679cf21bb3c1b65",
+        ),
+        (
+            "08 catalog-google-calendar.md",
             "fd44078e33997b4f12b5ba087d9744362682363da103ff37c867ba06f1de801a",
         ),
         (
-            "08 catalog-google-drive.md",
+            "09 catalog-google-drive.md",
             "e75bbfd16d0fc1e1e25dfa2f1aea46b3710d2ac0ae2353b3544be88098234e01",
         ),
         (
-            "09 catalog-google-drive.md",
+            "10 catalog-google-drive.md",
             "9d0a6ec64bb117a05d74a2caf06e18ac1d9864559450e88d9b156392db8c583c",
         ),
         (
-            "10 catalog-google-drive.md",
+            "11 catalog-google-drive.md",
             "cd83db10d3e1a08f44eb577a541004f454d247b595a7f5b0c13aab2da6cdcf0f",
         ),
         (
-            "11 catalog-google-gmail.md",
+            "12 catalog-google-gmail.md",
             "540402e036de353590995a034b2dcb1ae491a37379bfa4f56532e74c765780c1",
         ),
         (
-            "12 catalog-google-gmail.md",
+            "13 catalog-google-gmail.md",
             "e30ab8646cd261edbfe24ceb49433f0a2d6afe584457c366c2bfe842bb770c7b",
         ),
         (
-            "13 catalog-google-slides.md",
+            "14 catalog-google-slides.md",
             "6ded40ea130bebef82c4c795fdd8c5440c1890d032c9a0572c3f01e667549d33",
         ),
         (
-            "14 catalog-grafana.md",
+            "15 catalog-grafana.md",
             "cd3a3ef9f85e05a990f6d8754e7aa2c5a190b71f0f629bec840b0d713b6dc948",
         ),
         (
-            "15 catalog-hubspot.md",
+            "16 catalog-hubspot.md",
             "8968cae86a853651f69e6b4eee869e6b7a68264089ca85fd6cb105ca2c7b945d",
         ),
         (
-            "16 catalog-jira.md",
+            "17 catalog-jira.md",
             "0cfc0e55dd791de912e49d4a22a79b4d06a353c2ba19282737a9ca2e3c1171bf",
         ),
         (
-            "17 catalog-jira.md",
+            "18 catalog-jira.md",
             "35926b20b288459ddcd4ffa3883b8a2ee6d182d768fe7445759baa0ccec3753d",
         ),
         (
-            "18 catalog-jira.md",
+            "19 catalog-jira.md",
             "b53c9bb9c3529ef712146895a73232e9f358d2a8cc684665991a11fd546cc039",
         ),
         (
-            "19 catalog-openrouter.md",
+            "20 catalog-openrouter.md",
             "7426f67e0bae66733ee6e8c6ecc6f602d85a3cb79a43d8058f54f90224a8a731",
         ),
         (
-            "20 catalog-openrouter.md",
+            "21 catalog-openrouter.md",
             "6472c864700269c252a6040a05397e3370fccd7bce155098ce25916b16ffa7bc",
         ),
         (
-            "21 catalog-opsgenie.md",
+            "22 catalog-opsgenie.md",
             "2429e78e18775efb337892511a61756edf2e2027ef3f76dda50c3b850e95ed1e",
         ),
         (
-            "22 catalog-runpod.md",
+            "23 catalog-runpod.md",
             "d07cd9583fdd53e294e6c535ecdc665b8fff85191d55d0cf875bdca5ae0138bc",
         ),
         (
-            "23 catalog-slack.md",
+            "24 catalog-slack.md",
             "e7220d48c9c68cfbb78e363d2a6ea5d4ce3e2595c4baad8f86492b02b010f79b",
         ),
         (
-            "24 catalog-slack.md",
+            "25 catalog-slack.md",
             "abe8a377d7f6cc4e17df36e888e4df0c4a55cfad753b4eb1b1039ac2509a1009",
         ),
         (
-            "25 catalog-zendesk.md",
+            "26 catalog-zendesk.md",
             "d14dae6d913cda517f992e5890521b8d481be0900acbff4807476d3a42387a50",
         ),
         (
-            "26 catalog-zendesk.md",
+            "27 catalog-zendesk.md",
             "181d0a89b6bb91e32d9666157c053594794e9841946c42598e7bffd9e9bcca2a",
         ),
         (
-            "27 local-catalog-provider.md",
+            "28 local-catalog-provider.md",
             "e4b752f75723b2de2c968185cf72fd3701158f8b991c16cb197c47695f5965bd",
         ),
     ]
