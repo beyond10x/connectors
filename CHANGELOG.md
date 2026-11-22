@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.73.0 — 2026-11-14
 
 ### Added
 
@@ -24,6 +24,21 @@
   configuration still cannot set or replace the header, and no definition, bundle or
   configuration revision changes. The git relay keeps its own `git/connectors-<version>`
   (story:user-agent-names-the-project).
+
+### Compatibility
+
+- Every provider sees the new `User-Agent`. A provider, proxy or allow-list that matched the
+  exact old value `connectors/<version>` must match the new one.
+
+### Limitations
+
+- The definition importer does not yet accept a declaration's `endpoint_path`: a provider
+  directory lowered from a base URL that ends in a config variable is refused on import as an
+  unknown field. No shipped definition has such a base URL
+  (story:definition-import-accepts-endpoint-path, draft).
+- The stdio MCP server serves a session on Linux and macOS. On Windows it is built and its
+  launch contract is tested, but the serving scenario has not yet passed in CI
+  (story:mcp-stdio-on-macos-and-windows stays open).
 
 ## 0.72.0 — 2026-11-13
 

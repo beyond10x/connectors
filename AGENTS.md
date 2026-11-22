@@ -145,16 +145,7 @@ in `.local/tmp` older than the running task is deletable without asking (measure
 Keep unrelated worktrees' build outputs separate. Do not refresh vendor inputs during normal
 builds or edit generated output around a refusal.
 
-On the operator's shared build host, this repository's own Cargo builds use a compile cache of
-their own, so a new worktree does not recompile every dependency: `RUSTC_WRAPPER=sccache`,
-`SCCACHE_DIR=~/.cache/sccache/connectors`, `SCCACHE_SERVER_PORT=4301` and
-`SCCACHE_CACHE_SIZE=2G`. The server on port 4301 serves this repository only; never the default
-port 4226, never a wrapper set globally. Set them in the build's environment, not in a committed
-Cargo configuration, and keep the caller's `TMPDIR` short (the server binds its startup socket
-there).
-Never leave `RUSTC_WRAPPER` unset for `connectors-build gate`: a host-wide `rustc-wrapper` then
-applies, and on 2026-10-31 the gate's `oauth2_boundary` tests failed in a worktree with `sccache:
-error: path must be shorter than SUN_LEN`; set the variables above, or `RUSTC_WRAPPER=` (empty).
+The compile cache is the host's: see `~/beyond10x/AGENTS.md` § One compile cache.
 A unit that edits `ess/domains` or a cited contract runs, with its targeted tests, the gate's
 generation and drift steps (`connectors-build metadata-entities --check`, `ess-boundary`, `cli
 --check`, `mcp-bindings --check`, `service-metadata --check`, `connectors-docs generate --check`)

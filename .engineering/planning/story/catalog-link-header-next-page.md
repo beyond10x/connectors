@@ -2,16 +2,17 @@
 format: aep.planning-md/3
 id: story:catalog-link-header-next-page
 kind: story
-status: active
+status: archived
 title: A read follows the Link header's next page on the definition's own origin
 summary: Only rel=next is exposed; a next URL on another origin is refused
 relations:
 - serves: vision:independent-contract-adapters
 - blocks: story:catalog-basecamp
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-13T10:50:31Z", actor: "human:operator", revision: 2}
 - {from: "proposed", to: "active", at: "2026-11-13T10:50:31Z", actor: "human:operator", revision: 3}
+- {from: "active", to: "archived", at: "2026-11-14T01:30:44Z", actor: "human:operator", revision: 4}
 ---
 # A read follows the Link header's next page on the definition's own origin
 

@@ -2,16 +2,17 @@
 format: aep.planning-md/3
 id: story:user-agent-names-the-project
 kind: story
-status: active
+status: implemented
 title: The HTTP User-Agent names the project's public repository
 summary: connectors/<version> (https://github.com/beyond10x/connectors) for every provider
 relations:
 - serves: vision:independent-contract-adapters
 - blocks: story:catalog-basecamp
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-11-13T10:50:29Z", actor: "human:operator", revision: 2}
 - {from: "proposed", to: "active", at: "2026-11-13T10:50:29Z", actor: "human:operator", revision: 3}
+- {from: "active", to: "implemented", at: "2026-11-14T01:30:43Z", actor: "human:operator", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 # The HTTP User-Agent names the project's public repository
 
