@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Dependencies: ESS moves from 0.97.3 to 0.97.4, which removes a synthesis slowdown and keeps
+  suites, refusals and notes byte for byte.
+
 ## 0.74.1 — 2026-11-22
 
 ### Changed
