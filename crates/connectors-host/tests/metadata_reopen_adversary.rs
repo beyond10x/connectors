@@ -39,6 +39,7 @@ fn binding(instance: &str) -> Binding {
             declaration: None,
             oauth2: None,
         },
+        token_recipient: None,
     }
 }
 

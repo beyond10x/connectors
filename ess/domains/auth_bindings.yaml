@@ -141,6 +141,7 @@ entities:
       - {name: begun_at_instance_revision, type: "Optional<String>"}
       - {name: credential_revision, type: "Optional<String>"}
       - {name: executable_digest, type: "Optional<String>"}
+      - {name: token_recipient, type: "Optional<String>"}
     relations:
       - {name: instance, kind: references, target: connectors.declarations.ServiceConfiguration, cardinality: one, via: instance_id}
       - {name: auth_profile, kind: references, target: connectors.auth_bindings.AuthProfile, cardinality: one, via: profile_record_ref}
@@ -241,6 +242,16 @@ entities:
     # revision change that leaves both unchanged is followed by revalidation
     # when the profile declaration is equal, and by a new connection under the
     # same instance id when only its evidence lifetime changed.
+    # token_recipient is the implementation's digest of the canonical recipient
+    # the profile sends the stored material to in a token exchange: the token
+    # endpoint's scheme, host, port and path and the trust roots it is verified
+    # under. Absent for a profile that exchanges nothing and on a connection
+    # saved before it was recorded. A configuration that moves it is never
+    # followed by revalidation, which would send the stored material to the new
+    # endpoint before any identity answers; it needs a new connection under the
+    # same instance id, refused before custody is opened. A connection that
+    # records none follows only a configuration whose credential side is
+    # unchanged, and its revalidation records it.
     # Fixed mediated route and parent are present together only for a via binding;
     # parent identity is this field, not duplicated route authority. Historical
     # observation coordinates impose no live observation FK or retention pin.

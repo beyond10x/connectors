@@ -299,6 +299,13 @@ pub async fn run(path: &Path) -> Result<()> {
         .transpose()
         .map_err(|refusal| Error::invalid(format!("catalog: {refusal}")))?;
     let local = config.catalog.local()?;
+    // The relay's upstream is checked against the origin the instance's
+    // credential is approved for before the bridge reads that credential:
+    // an unapproved origin refuses start with custody unopened.
+    #[cfg(unix)]
+    if let Some(git) = &config.git {
+        git::admit_upstream(git, &local)?;
+    }
     let bridge = if config.service.standing_grants.is_some() {
         Bridge::serving_writes(local, &config.credential).await?
     } else {

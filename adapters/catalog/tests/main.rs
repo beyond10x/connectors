@@ -110,6 +110,7 @@ mod parameter_types_adversary;
 mod runpod;
 mod runpod_adversary;
 mod security_git_relay;
+mod security_git_relay_origin;
 mod security_reuse_source_token_origin;
 mod selection_bounds_adversary;
 mod selection_credential;

@@ -316,6 +316,7 @@ fn disposable_registry_publication_cli_and_retirement_restart() {
             declaration: None,
             oauth2: None,
         },
+        token_recipient: None,
     };
     let baseline = |now| registry::ValidatedBaseline {
         binding: None,

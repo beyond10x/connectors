@@ -1512,6 +1512,27 @@ fn grantable(scopes: &BTreeSet<String>) -> bool {
         .iter()
         .all(|s| !s.is_empty() && !s.chars().any(char::is_whitespace))
 }
+/// The digest of a token endpoint's canonical recipient: its scheme, host,
+/// port (the default one written out) and path, and the digest of the only
+/// trust roots its client verifies it under (`token_ca_file`; none, the
+/// public roots). Two configurations that send the material to the same
+/// recipient digest equally, whatever else of them differs.
+fn token_recipient(token_url: &str, token_ca_digest: Option<String>) -> Result<String> {
+    let canonical = https_url(token_url)?;
+    let url = url::Url::parse(&canonical).map_err(|_| Failure::InvalidConfiguration)?;
+    let host = url.host_str().ok_or(Failure::InvalidConfiguration)?;
+    let port = url
+        .port_or_known_default()
+        .ok_or(Failure::InvalidConfiguration)?;
+    Ok(connectors_core::digest(&json!({
+        "scheme": url.scheme(),
+        "host": host,
+        "port": port,
+        "path": url.path().trim_end_matches('/'),
+        "token_ca_digest": token_ca_digest,
+    })))
+}
+
 /// An https URL with no credentials, query or fragment, written as its own
 /// canonical form. Returns that form with a trailing `/`.
 fn https_url(value: &str) -> Result<String> {
@@ -1887,6 +1908,22 @@ impl Local {
                 .clone()
                 .map(|oauth2| Acquisition::Grant(runtime::Grant { oauth2 }))
         };
+        // Where a token exchange sends the profile's material, as the host binds
+        // a connection to it (`registry::Binding::token_recipient`): a
+        // configuration that moves it is never followed in place.
+        let token_recipient = config
+            .auth
+            .token_url
+            .as_deref()
+            .map(|token_url| {
+                token_recipient(
+                    token_url,
+                    token_ca
+                        .as_ref()
+                        .map(|b| connectors_core::digest(&json!(b))),
+                )
+            })
+            .transpose()?;
         let token_client = match &config.auth.token_url {
             Some(token_url) => {
                 // The client's base is the token host alone; the endpoint's path
@@ -2193,10 +2230,14 @@ impl Local {
             evidence_lifetime_ms: config.auth.evidence_lifetime_ms,
             fields,
             acquisition,
+            token_recipient: None,
         };
         profile.revision = connectors_core::digest(
             &serde_json::to_value(&profile).map_err(|_| Failure::Protocol)?,
         );
+        // Bound beside the declaration, never digested into its revision, so a
+        // connection saved before it was stated keeps its profile.
+        profile.token_recipient = token_recipient;
         // The credential side of the configuration (architecture-decision-record:
         // provider-definitions-and-runtimes D12): what decides where the
         // credential is sent and how it authenticates. The bundle, its source,
@@ -2345,6 +2386,13 @@ impl Local {
     /// differ (`setup migrate` names the first).
     pub fn revision_inputs(&self) -> &BTreeMap<String, String> {
         &self.revision_inputs
+    }
+    /// The canonical API base the connection's credential is sent to (the
+    /// bootstrap's `provider_authority`). The git relay sends the same token
+    /// only to this origin, or to the Git origin a reviewed mapping names for
+    /// it (`served::git`).
+    pub fn provider_authority(&self) -> &str {
+        &self.bootstrap.provider_authority
     }
     /// Whether [`Self::upstream_token`] serves this profile: a `token`
     /// profile without a prefix, or a `github_app` profile.

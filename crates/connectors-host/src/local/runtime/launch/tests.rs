@@ -510,6 +510,7 @@ fn publish(
             declaration: None,
             oauth2: None,
         },
+        token_recipient: None,
     };
     let clock = connectors_sdk::now_ms;
     let registry = Registry::new(&paths.state);

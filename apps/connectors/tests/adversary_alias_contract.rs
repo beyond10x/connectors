@@ -83,6 +83,7 @@ fn described(id: &str, probe: bool) -> runtime::Bootstrap {
                 max_bytes: 1024,
             }],
             acquisition: None,
+            token_recipient: None,
         }],
         requirements: vec![
             requirement(READ, runtime::Effect::Read),

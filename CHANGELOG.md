@@ -65,6 +65,23 @@
   `login`'s own file is encrypted. In 0.73.0, with the `default` alias on another collection,
   only that collection's file was checked, so an item in an unencrypted `login` collection was
   still read (security review finding 11).
+- A saved client secret is no longer sent to a token endpoint the connection was not admitted
+  under. A profile that exchanges its material at a token endpoint (the catalog's
+  `oauth2_client_credentials`, which Zendesk ships, and `oauth2_refresh`) prints `token_recipient`
+  in its bootstrap profile: the digest of the endpoint's scheme, host, port and path and of its
+  token CA. The connection records it (`Connection.token_recipient`). A configuration that moves
+  it is no longer followed by `connections revalidate`: admission and capture refuse it as a
+  changed binding before custody is opened, so no secret is read and no exchange is sent, and the
+  next action is a new connection. An operation-only change still revalidates in place, and a
+  change of the API CA, admitted hosts or request prefix still follows D12. Before, the token URL
+  moved only the credential-side digest, which an in-place upgrade accepted (security review
+  2026-11-22, finding 1).
+- The git relay sends the instance's token only to the origin its credential was provisioned
+  for: `git.upstream` must be on the origin of the instance's API base, or on the Git origin a
+  reviewed mapping names for it (`https://github.com` for `https://api.github.com`). Start refuses
+  any other origin before the mounted credential is read, and every forge request, the mirror's
+  fetch included, is checked against it before the token is read. Before, the upstream and the
+  token-capable profile were accepted independently (security review 2026-11-22, finding 2).
 
 ### Documentation
 
@@ -78,6 +95,14 @@
   platform.
 - A caller that matched `metadata_unavailable` for a missing store matches `metadata_missing`, or
   `next_action` `initialize_state`, instead.
+- A connection of a token-exchanging profile saved before this release records no recipient. It
+  follows a configuration whose credential side (without one, its configuration revision) is
+  unchanged, and its next revalidation records the recipient; any other change needs a new
+  connection. A provider executable from before this release states no recipient and keeps the
+  earlier rule. A bootstrap with `token_recipient` is refused by a host from before this release:
+  update the CLI and the provider together.
+- A served instance whose `git.upstream` is on another origin than its API base, other than the
+  reviewed GitHub mapping, no longer starts.
 
 ## 0.73.0 — 2026-11-14
 

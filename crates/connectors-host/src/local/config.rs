@@ -2985,6 +2985,7 @@ mod derived_instance_tests {
                     max_bytes: 100,
                 }],
                 acquisition: None,
+                token_recipient: None,
             }],
             requirements: ids
                 .iter()

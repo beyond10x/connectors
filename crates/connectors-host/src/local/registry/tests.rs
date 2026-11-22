@@ -884,6 +884,7 @@ pub(super) fn binding() -> Binding {
             declaration: None,
             oauth2: None,
         },
+        token_recipient: None,
     }
 }
 fn baseline(subject: &str, now: u64) -> ValidatedBaseline {

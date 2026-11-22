@@ -97,6 +97,7 @@ fn profile() -> runtime::Profile {
             max_bytes: 1024,
         }],
         acquisition: None,
+        token_recipient: None,
     }
 }
 

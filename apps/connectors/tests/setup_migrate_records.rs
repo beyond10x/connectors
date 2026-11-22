@@ -114,6 +114,7 @@ fn bootstrap(alias: &str, adapter: &str) -> runtime::Bootstrap {
                 max_bytes: 1024,
             }],
             acquisition: None,
+            token_recipient: None,
         }],
         requirements: vec![runtime::Requirement {
             operation: READ.into(),

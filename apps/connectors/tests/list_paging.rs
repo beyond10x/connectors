@@ -128,6 +128,7 @@ fn bootstrap(instance: &str) -> runtime::Bootstrap {
                 max_bytes: 1024,
             }],
             acquisition: None,
+            token_recipient: None,
         }],
         requirements: OPERATIONS
             .iter()

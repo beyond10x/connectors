@@ -411,6 +411,11 @@ types:
       - {name: evidence_lifetime_ms, type: Integer}
       - {name: fields, type: "List<connectors.cli.PrivateEntryField>"}
       - {name: acquisition, type: "Optional<connectors.cli.PrivateProfileAcquisition>"}
+      # The digest of the canonical token-exchange recipient
+      # (connectors.auth_bindings.Connection.token_recipient); present only for a
+      # profile that exchanges its material at a token endpoint, and not part of
+      # the declaration the revision digests.
+      - {name: token_recipient, type: "Optional<String>"}
   # Present only for a profile whose entry is acquired by OAuth, in exactly one of
   # two forms, all nonsecret: OAuth consent for a static entry names the authorize
   # and token endpoints and the requested scopes; an oauth2_grant profile names only

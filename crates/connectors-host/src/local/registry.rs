@@ -30,6 +30,8 @@ mod cardinality_tests;
 #[cfg(test)]
 mod expiry_batch_tests;
 #[cfg(test)]
+mod recipient_tests;
+#[cfg(test)]
 mod reuse_tests;
 #[cfg(test)]
 mod stale_tests;
@@ -230,6 +232,17 @@ pub struct Binding {
     /// Absent on a binding saved before it was recorded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub executable: Option<String>,
+    /// The implementation's digest of the canonical recipient its profile
+    /// sends the stored material to in a token exchange: the token endpoint's
+    /// scheme, host, port and path, and the trust roots that endpoint is
+    /// verified under (`runtime::Profile::token_recipient`). Absent for a
+    /// profile that exchanges nothing, on a binding saved before it was
+    /// recorded, and from an implementation that states none. A configured
+    /// binding that names another recipient is never followed in place
+    /// ([`Binding::follows_in_place`]): only a new connection sends the stored
+    /// material to another recipient.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token_recipient: Option<String>,
 }
 
 /// What a configured instance binds a connection to, as an observation knows
@@ -300,6 +313,7 @@ pub(super) fn follow(saved: &Binding, configured: &Binding) -> Follow {
         || saved.adapter_id != configured.adapter_id
         || saved.provider_authority != configured.provider_authority
         || saved.profile != configured.profile
+        || !same_recipient(saved, configured)
     {
         return Follow::Changed;
     }
@@ -328,6 +342,41 @@ pub(super) fn follow(saved: &Binding, configured: &Binding) -> Follow {
     }
 }
 
+/// Whether `configured` sends the stored material to the token recipient
+/// `saved` was admitted under. Where both record one, they are equal. Where
+/// neither does, nothing tells them apart: an implementation that states none
+/// keeps the rule before the recipient was recorded. Where only one does (a
+/// binding saved before it was recorded, or an implementation that no longer
+/// states it), the recipient is unchanged only when nothing on the credential
+/// side moved: the same credential side where both record it, the same
+/// configuration revision otherwise.
+pub(super) fn same_recipient(saved: &Binding, configured: &Binding) -> bool {
+    match (&saved.token_recipient, &configured.token_recipient) {
+        (Some(saved), Some(configured)) => saved == configured,
+        (None, None) => true,
+        _ => match (&saved.credential_revision, &configured.credential_revision) {
+            (Some(saved), Some(configured)) => saved == configured,
+            _ => saved.configuration_revision == configured.configuration_revision,
+        },
+    }
+}
+
+impl Binding {
+    /// Whether a revalidation may move a connection saved under this binding
+    /// to `configured` in place, keeping its stored material: another binding
+    /// of the same instance under the same provider authority, profile
+    /// declaration and token recipient. Anything else needs a new connection,
+    /// and the stored material is not read for it.
+    pub fn follows_in_place(&self, configured: &Binding) -> bool {
+        self.instance_id == configured.instance_id
+            && self.adapter_id == configured.adapter_id
+            && self.provider_authority == configured.provider_authority
+            && self.profile == configured.profile
+            && same_recipient(self, configured)
+            && self != configured
+    }
+}
+
 #[cfg(test)]
 pub(super) fn fixture_binding(instance: &str) -> Binding {
     Binding {
@@ -347,6 +396,7 @@ pub(super) fn fixture_binding(instance: &str) -> Binding {
         },
         credential_revision: None,
         executable: None,
+        token_recipient: None,
     }
 }
 
@@ -729,9 +779,13 @@ impl Binding {
                 return Err(Failure::InvalidInput);
             }
         }
-        for id in [&self.credential_revision, &self.executable]
-            .into_iter()
-            .flatten()
+        for id in [
+            &self.credential_revision,
+            &self.executable,
+            &self.token_recipient,
+        ]
+        .into_iter()
+        .flatten()
         {
             if !connectors_core::valid_id(id) {
                 return Err(Failure::InvalidInput);

@@ -129,12 +129,14 @@ pub(super) fn changed(
 /// store projects its acquisitions' profile from it), so even a lifetime-only
 /// change is not followed in place: a new connection under the same instance
 /// id follows it (`identity_changed` is false, connect admits it).
+///
+/// Neither is a moved token recipient (`Binding::token_recipient`): the
+/// revalidation would read the stored material and send it to the new token
+/// endpoint before any identity answers. It is refused at admission and at
+/// capture, before custody is opened; a new connection under the same
+/// instance id, authorized afresh, follows it.
 fn upgradable(admitted: &Binding, configured: &Binding) -> bool {
-    admitted.instance_id == configured.instance_id
-        && admitted.adapter_id == configured.adapter_id
-        && admitted.provider_authority == configured.provider_authority
-        && admitted.profile == configured.profile
-        && admitted != configured
+    admitted.follows_in_place(configured)
 }
 
 /// Whether the configured binding changes the provider authority, or the

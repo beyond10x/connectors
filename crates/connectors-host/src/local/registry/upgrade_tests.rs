@@ -1143,6 +1143,7 @@ fn declared(lifetime: u64, scopes: &[&str], label: &str) -> StaticProfile {
             max_bytes: 1024,
         }],
         acquisition: None,
+        token_recipient: None,
     };
     profile.revision = connectors_core::digest(&serde_json::to_value(&profile).unwrap());
     profile.registry_profile()

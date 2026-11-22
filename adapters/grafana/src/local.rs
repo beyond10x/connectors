@@ -90,6 +90,7 @@ fn profile(id: &str) -> Result<Profile> {
             max_bytes: auth::TOKEN_BYTES as u32,
         }],
         acquisition: None,
+        token_recipient: None,
     };
     profile.revision =
         connectors_core::digest(&serde_json::to_value(&profile).map_err(|_| Failure::Protocol)?);

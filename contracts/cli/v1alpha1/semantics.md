@@ -1997,9 +1997,21 @@ read on `invoke`, an approval naming it and a consumer launch refuse
 it as `code = lifecycle_conflict` at `stage = admission`, never with
 `next_action = retry_status`. The next action is `revalidate_connection` only
 when a revalidation can follow the configuration upgrade: its provider
-authority and profile declaration are unchanged, its credential is neither
-known invalid nor expired, and the new provider has not already refused it
-under the configured revision. The connection's identity is the instance,
+authority and profile declaration are unchanged, so is the token recipient its
+profile exchanges the stored material at (`token_recipient`, below), its
+credential is neither known invalid nor expired, and the new provider has not
+already refused it under the configured revision. The token recipient is the
+implementation's digest of the token endpoint's scheme, host, port and path and
+the trust roots it is verified under, stated by a profile that exchanges its
+material there (the catalog's `oauth2_client_credentials` and `oauth2_refresh`).
+A configuration that moves it is never followed by revalidation, which would
+read the stored material and send it to the new endpoint before any identity
+answers: admission and capture refuse the revalidation before custody is
+opened, and the next action is `create_connection`, a connection authorized
+afresh. A connection saved before the recipient was recorded follows only a
+configuration whose credential side is unchanged (its credential-side digest,
+or without one its configuration revision), and its revalidation records the
+recipient. The connection's identity is the instance,
 adapter, provider authority and the profile's authentication, which is the
 profile declaration apart from its evidence lifetime. A configuration that
 changes only `evidence_lifetime_ms` leaves the identity unchanged, but the

@@ -147,6 +147,7 @@ impl Launching {
                 declaration: None,
                 oauth2,
             },
+            token_recipient: None,
         };
         let registry = Registry::new(&self.paths.state);
         let acquisition = registry.begin(&binding, now()).unwrap();
@@ -447,6 +448,7 @@ mod adversary {
                 declaration: None,
                 oauth2: Some(declaration(server)),
             },
+            token_recipient: None,
         };
         let registry = Registry::new(&launching.paths.state);
         let acquisition = registry.begin(&binding, now()).unwrap();

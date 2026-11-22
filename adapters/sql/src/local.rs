@@ -143,6 +143,7 @@ impl Local {
                 max_bytes: 8192,
             }],
             acquisition: None,
+            token_recipient: None,
         };
         profile.revision = connectors_core::digest(
             &serde_json::to_value(&profile).map_err(|_| Failure::Protocol)?,

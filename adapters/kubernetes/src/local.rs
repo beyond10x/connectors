@@ -271,6 +271,7 @@ impl Local {
             evidence_lifetime_ms: auth::EVIDENCE_LIFETIME_MS,
             fields: vec![field],
             acquisition: None,
+            token_recipient: None,
         };
         profile.revision = connectors_core::digest(
             &serde_json::to_value(&profile).map_err(|_| Failure::Protocol)?,

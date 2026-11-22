@@ -2061,6 +2061,9 @@ fn connection_row(
         "credential_revision",
     )?;
     copy_optional_json_field(binding, fields, "executable", "executable_digest")?;
+    // The token recipient the binding records beside them, only when recorded
+    // (registry.rs `Binding::token_recipient`).
+    copy_optional_json_field(binding, fields, "token_recipient", "token_recipient")?;
     // The binding column keeps `"lifecycle": "stale"` beside the binding while
     // the connection is Stale (registry.rs `Kept`); its `state` reads `live`.
     Ok((
@@ -3492,6 +3495,7 @@ fn connection_projection(
     for (field, key) in [
         ("credential_revision", "credential_revision"),
         ("executable_digest", "executable"),
+        ("token_recipient", "token_recipient"),
     ] {
         if let Some(value) = row.fields.get(field) {
             binding

@@ -100,13 +100,20 @@ source, the selection or the feed. A pinned entry states it as
 `credential_revision`, copied from the bootstrap like `configuration_revision`;
 a derived entry takes it from the installed provider. The binding records it
 (`Connection.credential_revision`) and the executable's SHA-256
-(`Connection.executable_digest`) beside the configuration revision.
+(`Connection.executable_digest`) beside the configuration revision. A profile
+that exchanges its material at a token endpoint (the catalog's
+`oauth2_client_credentials` and `oauth2_refresh`) also prints `token_recipient`
+in its bootstrap profile: the digest of that endpoint's scheme, host, port and
+path and of the trust roots it is verified under (the token CA), outside the
+profile's declaration revision. The binding records it as
+`Connection.token_recipient`.
 
 | Change | Connection |
 |---|---|
 | bundle, source or selection only | not stale and `ready`; reads, reconnect and approvals admit it under the new revision, with no credential source and no question; its next revalidation records the new revision |
 | provider executable only | not stale and `ready`; it follows once a validation under the new executable answers the recorded identity, which a read runs itself when the description is cached; another identity is refused as `identity_mismatch` and changes nothing |
-| CA file, token CA, admitted hosts or request prefix | `pending` with `stale` set; reads, reconnect and approvals refuse it until `connections revalidate` |
+| CA file, admitted hosts or request prefix | `pending` with `stale` set; reads, reconnect and approvals refuse it until `connections revalidate` |
+| token endpoint (scheme, host, port or path) or token CA | `pending` with `stale` set; revalidation, reads, reconnect and approvals refuse it as a changed binding before custody is opened, so the stored material is never sent to the new endpoint; a new connection, authorized afresh, follows it |
 | provider authority or profile authentication | `authentication_changed`, as below |
 
 The rest of this section is the rule for a change of the credential side, and
@@ -128,6 +135,10 @@ validation against it, and publishes the connection under the configured binding
 only when:
 
 - the instance id, `adapter_id` and provider authority are unchanged;
+- the token recipient is unchanged: the binding and the configuration name the
+  same `token_recipient`, or, for a connection saved before it was recorded, the
+  credential side (or without one the configuration revision) is unchanged. A
+  moved recipient is refused at admission and capture, before custody is opened;
 - the profile declaration is unchanged: the same id and declaration revision, so
   the same scheme, capability, purpose, subject, entry fields, minimum scopes and
   evidence lifetime. The registry keeps only the declaration's revision, which

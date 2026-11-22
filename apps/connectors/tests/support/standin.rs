@@ -181,6 +181,7 @@ fn bootstrap(args: &[String]) -> runtime::Bootstrap {
                 max_bytes: 1024,
             }],
             acquisition: None,
+            token_recipient: None,
         }],
         requirements: vec![runtime::Requirement {
             operation,
