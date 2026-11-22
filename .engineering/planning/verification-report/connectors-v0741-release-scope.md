@@ -2,10 +2,12 @@
 format: aep.planning-md/3
 id: verification-report:connectors-v0741-release-scope
 kind: verification-report
-status: draft
+status: accepted
 title: connectors 0.74.1 release scope
 summary: Scope, exclusions and evidence of the 0.74.1 cut
-revision: 1
+revision: 3
+transitions:
+- {from: "draft", to: "accepted", at: "2026-11-22T20:39:03Z", actor: "human:timo", revision: 3}
 ---
 ## Scope of connectors 0.74.1
 
@@ -27,5 +29,17 @@ versions in the repos we delivered work to default branch and can push, tag thos
 
 ## Evidence
 
-The release pull request's required checks on the release commit, then the tag, release page,
-archives, `SHA256SUMS` and image, verified after publication.
+Verified 2026-11-22 after publication:
+
+- Release pull request #273 merged as `28c0dd7a7c07fd7ce2acc660a1095b87918c2d41`; its tree
+  `cabbdee5f639` equals the pull request's tree, whose required checks passed.
+- Tag `v0.74.1` by `b10x-bot[bot]` at 18:56 CET; it peels to the merge commit, which is an
+  ancestor of `origin/main`.
+- Release page https://github.com/beyond10x/connectors/releases/tag/v0.74.1, author
+  `b10x-bot[bot]`, not a draft, Latest.
+- Release run 45052366789: all 7 jobs succeeded, no rerun.
+- The page's 5 assets: the 4 archives pass `sha256sum -c SHA256SUMS`.
+- Image `ghcr.io/beyond10x/connectors:0.74.1`, index
+  `sha256:fa30f6b9500e7c03fe08090ca9c76e0096a2da589a06f55217a6076ff99ec4d9`, platforms
+  linux/amd64 and linux/arm64, label `org.opencontainers.image.revision`
+  `28c0dd7a7c07fd7ce2acc660a1095b87918c2d41`.
