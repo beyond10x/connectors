@@ -11,7 +11,7 @@ connectors: "confluence, confluence-v1"
 
 The provider Atlassian's Confluence Cloud is two connectors served by the catalog provider:
 `confluence` reads through REST v2, and `confluence-v1` reads through REST v1 for a token whose
-scopes v2 does not accept. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+scopes v2 does not accept. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary). The
 [full Confluence guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-confluence.md)
 has every parameter and refusal.
 
@@ -38,7 +38,7 @@ token is refused at connect as `insufficient_scope` instead of failing every rea
 
 ## Enable the connector and add an instance
 
-Neither connector has a default endpoint: an instance names its site's `/wiki` root.
+Neither connector has a default endpoint: an instance sets its site's `/wiki` root.
 
 ```toml
 [connectors.confluence]
@@ -70,7 +70,7 @@ connectors invoke confluence/work page.get \
   --input-json '{"id":"65538","body-format":"storage"}'
 ```
 
-On `confluence-v1`, `spaces.list` with `{"limit":25}` lists the spaces; its `space.pages` takes a
+On `confluence-v1`, `spaces.list` with `{"limit":25}` lists the spaces. Its `space.pages` takes a
 space key where v2 takes the numeric id.
 
 ## A first guarded write
@@ -90,16 +90,16 @@ for the site:
 Reconnect with a token that carries the v2 scopes, or move the reads to `confluence-v1`. [Reconnect](../guides/reconnect-a-connection.md) `confluence/work` with `--credential-file ~/private/atlassian.json`.
 
 A pinned instance can instead carry both APIs and bind the one the token reaches each time it
-validates; the guide's
+validates. The guide's
 [one instance for either API](https://github.com/beyond10x/connectors/blob/main/docs/catalog-confluence.md#one-instance-for-either-api)
 writes its configuration.
 
 ## Limits
 
 - Verified against local HTTPS fixtures only (`adapters/catalog/tests/confluence.rs`,
-  `confluence_v1.rs`); no live Confluence site has been read through either connector.
+  `confluence_v1.rs`). No live Confluence site has been read through either connector.
 - The REST v1 document is written by this repository from Atlassian's reference pages, because
-  Atlassian's own declares no licence; its paths have not been checked against a site.
+  Atlassian's own declares no licence. Its paths have not been checked against a site.
 - `pages.changed` has no updated-since parameter: stop the walk at the first item older than your
   cutoff.
 - Take a cursor from `_links.next` percent-decoded, or it is encoded twice.

@@ -26,9 +26,9 @@ definitions add operations and a `github.app` profile this page does not cover.
 | `review_requests.list`, `issues.assigned`, `notifications.list`, `user.me`, `repos.list`, `repo.get`, `releases.list`, `release.latest`, `readme.raw`, `file.raw` | none |
 
 `review_requests.list` searches the open pull requests that request your review
-(`is:pr is:open review-requested:@me`, with `since` folded in as `updated:>=<since>`);
+(`is:pr is:open review-requested:@me`, with `since` folded in as `updated:>=<since>`).
 `issues.assigned` lists the open issues and pull requests assigned to you. `readme.raw` and
-`file.raw` answer the file's decoded text, at most 1 MiB; a directory or a binary file is refused.
+`file.raw` answer the file's decoded text, at most 1 MiB. A directory or a binary file is refused.
 Every other read answers GitHub's body unchanged.
 
 ## Prerequisites at the provider
@@ -57,7 +57,7 @@ tar -xzf connectors-definitions-0.5.2.tar.gz
 connectors-definitions-0.5.2.tar.gz: OK
 ```
 
-The file is `connectors-definitions-0.5.2/connectors/github.yaml`; its vendored GitHub OpenAPI
+The file is `connectors-definitions-0.5.2/connectors/github.yaml`, and its vendored GitHub OpenAPI
 document is under `upstream/github/` beside it. Describe one of its operations, here with each
 input's upper bound:
 
@@ -71,7 +71,7 @@ connectors invoke --definition connectors-definitions-0.5.2/connectors/github.ya
 {"connector":"github","instance":"definition","effect":"read","input":{"page":1000,"per_page":100,"since":null}}
 ```
 
-The connector is `github` and its instance `definition`; the endpoint is the definition's
+The connector is `github` and its instance `definition`, and the endpoint is the definition's
 `base_url`, `https://api.github.com`.
 
 ## Connect
@@ -104,12 +104,15 @@ connectors invoke --definition connectors-definitions-0.5.2/connectors/github.ya
   review_requests.list --input-json '{"since":"2026-01-01","per_page":100,"page":1}'
 ```
 
-Paging is the caller's: each call reads one page of at most `per_page` (100; 50 for
+Paging is the caller's: each call reads one page of at most `per_page` (100, or 50 for
 `notifications.list`), and the next call asks for `page` plus one. The walk ends on a page shorter
-than `per_page`. A search serves at most its first 1,000 results whatever `total_count` says:
-`page` above 1,000 is refused as `invalid_input` before any request, and a page past the first
-1,000 results, which GitHub answers "Only the first 1000 search results are available", is refused
-as `invalid_input`, so a walk at `per_page` 100 ends at page 10. A search page whose `incomplete_results` is `true` timed out; read it again later.
+than `per_page`.
+
+A search serves at most its first 1,000 results whatever `total_count` says. `page` above 1,000
+is refused as `invalid_input` before any request. A page past the first 1,000 results, which
+GitHub answers "Only the first 1000 search results are available", is refused as
+`invalid_input`, so a walk at `per_page` 100 ends at page 10. A search page whose
+`incomplete_results` is `true` timed out, so read it again later.
 
 ## A first guarded write
 
@@ -123,10 +126,10 @@ A token GitHub refuses makes the connection `stale`. Publish a new token on the 
 ## Limits
 
 - Verified against a scripted provider with synthetic answers only
-  (`adapters/catalog/tests/github_definition_reads.rs`); nothing on this page has run against a
+  (`adapters/catalog/tests/github_definition_reads.rs`). Nothing on this page has run against a
   live GitHub account.
-- One page per call; the provider does not walk pages or hold the cursor. A declared walk is not
-  in this release of the definition.
-- A search reaches its first 1,000 results; narrow `since` to read past them.
+- One page per call, and the provider does not walk pages or hold the cursor. A declared walk is
+  not in this release of the definition.
+- A search reaches its first 1,000 results. Narrow `since` to read past them.
 - A spent rate limit (`x-ratelimit-remaining: 0`) is refused as `rate_limited` with
   `retry_after_seconds` until `x-ratelimit-reset`, and is never retried.

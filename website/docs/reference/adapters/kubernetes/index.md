@@ -33,12 +33,13 @@ Three more operations are each enabled by their own configuration field:
 | `contexts.list` | `kubeconfig`, the absolute path of an owner-only kubeconfig, in the local configuration | lists that file's contexts (name, cluster, namespace, current flag), never credentials or servers; makes no cluster request and reads no other file |
 | `pods.exec` | `pod_exec: true`, local CLI only | runs one command, an argument vector with no shell, in a named container; a write on private protocol two that needs an approval and is recorded as an attempt; returns the exit status and stdout and stderr, each bounded, within at most 60 s; a lost stream is an unknown outcome and is never sent again |
 
-`pods.exec` is the adapter's only write; the read exchange and the standalone service never list
+`pods.exec` is the adapter's only write. The read exchange and the standalone service never list
 it, and it has no stdin or terminal. The three are checked against recorded API answers and
-streams, not a live cluster. A separate `helm_release_reads` selection
-additionally advertises the `helm_releases.*` release-state reads (history, status, values and
-manifest), whose values and manifests are disclosed only as redacted projections. It runs as a
-standalone service ([Getting started](../../../getting-started.md) starts one) or under the local
+streams, not a live cluster.
+
+A separate `helm_release_reads` selection advertises the `helm_releases.*` release-state reads:
+history, status, values and manifest. Values and manifests are disclosed only as redacted
+projections. The adapter runs as a standalone service ([Getting started](../../../getting-started.md) starts one) or under the local
 CLI with a saved bearer token, validated by one SelfSubjectReview.
 
 Real k3s acceptance on 2026-10-02 covered selected reads across restart, authenticated RBAC
@@ -50,7 +51,7 @@ workflows.
 ## Access and limits
 
 Bind the intended Kubernetes API endpoint, bearer credential and certificate authority
-explicitly. Discovery returns observations with provenance and reachability context; it does not
+explicitly. Discovery returns observations with provenance and reachability context. It does not
 connect to discovered addresses. A discovered database endpoint grants no access to the database.
 
 Resource discovery state, richer authentication, logs, mutations and mediated routes are

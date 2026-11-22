@@ -19,7 +19,7 @@ Describe stays on `GET /v1/describe`, and the request carries that descriptor's 
   execution audit before the connector is called, and the answer carries `audit_ref` and
   `audit_status`. An anchor that cannot be written refuses the call before any connector work.
 - **The attempt a write produced.** An operation that writes gets an attempt record before its
-  one dispatch, and the answer's `mutation` names it: `attempt: {instance, id}`, the
+  one dispatch, and the answer's `mutation` carries it: `attempt: {instance, id}`, the
   `original_request_id`, `replayed: false` and the `classification` (`applied` on success).
   Reads carry no `mutation`.
 - **Uncertainty kept.** A write whose answer is lost after dispatch is `outcome_unknown` with
@@ -27,5 +27,5 @@ Describe stays on `GET /v1/describe`, and the request carries that descriptor's 
 
 Retained audit observations are held in memory and are lost when the host restarts.
 
-The [advanced contract exercises](/docs/examples/contract-exercises) let you lose a response and
+In the [advanced contract exercises](/docs/examples/contract-exercises) you lose a response and
 watch the attempt stay uncertain, in a fictional in-memory model.

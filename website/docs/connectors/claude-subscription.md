@@ -33,9 +33,11 @@ another person's account.
 :::
 
 Connectors ships no client id for this sign-in. Each profile declares `client_id: null`, so no
-instance can be derived from the declaration: an instance is pinned, and its native configuration
-names the client id you are entitled to use in `oauth2_client_id`. A configuration without one is
-refused as `InvalidConfiguration`. Commands that need a Claude account are shown without output;
+instance can be derived from the declaration. An instance is pinned, and its native configuration
+sets the client id you are entitled to use in `oauth2_client_id`. A configuration without one is
+refused as `InvalidConfiguration`.
+
+Commands that need a Claude account are shown without output;
 every behaviour stated here was run against a local fake authorization server only.
 
 ## What it reads and writes
@@ -47,8 +49,9 @@ every behaviour stated here was run against a local fake authorization server on
 
 Both profiles request `user:profile` and `user:inference` and require both. `account.profile`
 reads `GET https://api.anthropic.com/api/oauth/profile`, the same read the connection's identity
-check makes; the connection's subject is the answer's `account.uuid`, kind `claude.account`. The
-connector selects no inference operation: what you do with the access token is your program's.
+check makes. The connection's subject is the answer's `account.uuid`, kind `claude.account`. The
+connector selects no inference operation. What you do with the access token is up to your
+program.
 
 ## Prerequisites at the provider
 
@@ -204,7 +207,7 @@ connectors-catalog-provider --local-config /absolute/path/claude-pasted.json --p
 ```
 
 Then pin each instance, its executable and that executable's SHA-256 in the CLI configuration.
-Keep the table of the instance whose profile you use; `mine` permits the loopback profile and
+Keep the table of the instance whose profile you use. `mine` permits the loopback profile and
 `pasted` the pasted code:
 
 ```toml
@@ -257,7 +260,7 @@ connectors connections connect --connector claude-subscription --instance mine \
   --profile claude.subscription
 ```
 
-The grant runs in the CLI process. It prints the authorization address on your terminal; open it
+The grant runs in the CLI process. It prints the authorization address on your terminal. Open it
 in a browser on the same machine and sign in to your Claude account. The provider redirects to the
 listener on `127.0.0.1`, and Connectors exchanges the code.
 
@@ -268,12 +271,12 @@ connectors connections connect --connector claude-subscription --instance pasted
   --profile claude.subscription-pasted
 ```
 
-The provider's page shows a `code#state` line instead of redirecting; paste it at the hidden
+The provider's page shows a `code#state` line instead of redirecting. Paste it at the hidden
 prompt. A line whose `state` is not the flow's own, or with more than one `#`, is refused. The
-commands below name `--instance mine`; use `--instance pasted` for a pasted-code connection.
+commands that follow use `--instance mine`. Use `--instance pasted` for a pasted-code connection.
 
-The connection is Live once the profile read with the new access token names the account and the
-grant holds both scopes. The tokens go into your platform's secret store only: no output, no
+The connection is Live once the profile read with the new access token returns the account and
+the grant holds both scopes. The tokens go into your platform's secret store only: no output, no
 configuration file and no state file holds them.
 
 ## A first read
@@ -292,9 +295,9 @@ connectors connections token --connector claude-subscription --instance mine
 connectors connections token --connector claude-subscription --instance mine --reveal
 ```
 
-Without `--reveal` it prints what was issued, never the token; with it, standard output is the
-token and one newline. Within 300 seconds of the access token's expiry the owner refreshes it
-first, with a JSON request; an answer without a refresh token keeps the one held.
+Without `--reveal` it prints what was issued and not the token. With `--reveal`, standard output
+is the token and one newline. Within 300 seconds of the access token's expiry the owner refreshes
+it first, with a JSON request. An answer without a refresh token keeps the one held.
 
 ## A first guarded write
 
@@ -312,12 +315,12 @@ connection. The Claude journeys do not run it; the generic grant journey
 ## Limits
 
 - Verified against a local fake authorization server only
-  (`adapters/catalog/tests/local_runtime/claude_subscription_journey.rs`); nothing has run against
+  (`adapters/catalog/tests/local_runtime/claude_subscription_journey.rs`). Nothing has run against
   a live Claude account. The shapes it answers are those the Claude Code 2.1.310 binary sends and
   reads, as `oauth2.sources` cites them.
 - The Claude Code binary sends `anthropic-beta: oauth-2025-04-20` beside the access token.
   Connectors sends no such header, so whether `account.profile` and the identity check are
   answered without it is unknown.
-- One redirect per profile: a failed loopback sign-in does not fall back to the pasted code; run
+- One redirect per profile: a failed loopback sign-in does not fall back to the pasted code. Run
   `connect` again on the `pasted` instance with `--profile claude.subscription-pasted`.
 - Pinned only: no client id ships, so the instance cannot be derived from the declaration.

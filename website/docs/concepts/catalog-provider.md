@@ -10,24 +10,24 @@ source: adapters/catalog/src/lib.rs, adapters/catalog/providers/gitlab/connector
 
 `connectors-catalog-provider` serves each catalog connector from a bundle compiled from its pinned
 API document ([build a catalog bundle](../guides/build-a-catalog-bundle.md)) and a reviewed
-selection of its operations; the connector's page under [Connectors](../connectors/index.md)
+selection of its operations. The connector's page under [Connectors](../connectors/index.md)
 lists them.
 
 ## Writes and their guards
 
-A write runs only after the operator's approval policy names it and a protected approval binds
+A write runs only after the operator's approval policy lists it and a protected approval binds
 its whole input. A guard is data in the selection, not code:
 
-- before the one request it reads the provider (for a merge request: open, mergeable, at the
-  pinned head, with the pinned pipeline green) and refuses unless every check holds;
-- after the request it compares the answer, and a failed check leaves the outcome **uncertain**,
-  never refused, because the provider may already have applied the write.
+- Before the one request it reads the provider and refuses unless every check holds. For a merge
+  request the checks are open, mergeable, at the pinned head, with the pinned pipeline green.
+- After the request it compares the answer. A failed check leaves the outcome **uncertain**, not
+  refused, because the provider may already have applied the write.
 
 No corrective request is ever sent. A write that carries no guard, such as GitLab `issue.create`,
-is sent once as approved; the same input approved and sent again creates a second issue.
+is sent once as approved, and the same input approved and sent again creates a second issue.
 
 Each connector's page in the repository gives its configuration, auth profiles and
-limits; the [catalog reference](../reference/adapters/catalog/index.md) links them.
+limits, and the [catalog reference](../reference/adapters/catalog/index.md) links them.
 
 ## What it does not do
 

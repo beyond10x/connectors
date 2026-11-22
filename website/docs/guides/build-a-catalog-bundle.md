@@ -36,11 +36,14 @@ target/debug/connectors-build catalog --provider gitlab \
 }
 ```
 
-The command prints a coverage report; `jq` keeps its summary. `--amendments` applies the cited
-corrections the committed GitLab bundle carries (see below); without it the bundle differs from
-the committed one. All 1,847 operations of the pinned GitLab document are inventoried. The 67 it names as unsupported are array query parameters the
-source serialises with `explode: false`; each is sent as the one value a caller gives. The full
-report lists every reason with the operations it affects.
+The command prints a coverage report, and `jq` keeps its summary. `--amendments` applies the
+cited corrections the committed GitLab bundle carries. Without it the bundle differs from the
+committed one.
+
+All 1,847 operations of the pinned GitLab document are inventoried. The 67 it reports as
+unsupported are array query parameters the source serialises with `explode: false`. Each is sent
+as the one value a caller gives. The full report lists every reason with the operations it
+affects.
 
 ## Confirm it is the committed bundle
 
@@ -71,7 +74,7 @@ so a bundle can only change with its source.
 ## Sources that are not OpenAPI
 
 - A Google Discovery document is first projected to OpenAPI 3.0.3 with
-  `connectors-build discovery`; the bundle is then built with `--derived-from` naming the
+  `connectors-build discovery`. The bundle is then built with `--derived-from` set to the
   Discovery document, and the pipeline recomputes the projection and refuses a source that
   differs from it.
 - A Swagger 2.0 document is projected to OpenAPI 3.1.0 with `connectors-build swagger` and
@@ -83,5 +86,5 @@ so a bundle can only change with its source.
   unchanged, and the bundle records the amendment file's SHA-256.
 
 A bundle alone exposes nothing. A reviewed selection set under
-`adapters/catalog/providers/<provider>/operations.json` names which operations a connector
-serves, with each one's effect; see [The catalog provider](../concepts/catalog-provider.md).
+`adapters/catalog/providers/<provider>/operations.json` lists which operations a connector
+serves, with each one's effect, as [The catalog provider](../concepts/catalog-provider.md) describes.

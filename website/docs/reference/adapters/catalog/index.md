@@ -8,7 +8,7 @@ description: The providers the catalog provider serves from pinned API documents
 
 `connectors-catalog-provider` loads a digest-verified bundle built from a pinned API document and
 exposes a reviewed selection of its operations through the local CLI, with no Rust per endpoint.
-Reads are one bound GET; writes are one bound POST, PUT, PATCH or DELETE under the host's
+Reads are one bound GET. Writes are one bound POST, PUT, PATCH or DELETE under the host's
 approval, audit and attempt controls, with an optional guard declared as data.
 [The catalog provider](../../../concepts/catalog-provider.md) explains the model, and
 [Build a catalog bundle](../../../guides/build-a-catalog-bundle.md) builds one.
@@ -39,18 +39,18 @@ Jira and Confluence share one Atlassian profile, so one account and API token se
 - **HubSpot** has no updated-since filter yet.
 - **Runpod** writes are unguarded required-approval mutations. A create without a definite answer
   is `unknown` and is never sent again. `pod.create` admits fifteen body keys, among them
-  `dockerStartCmd`, `dockerEntrypoint` and `networkVolumeId` (since 0.37.0); any other key is
+  `dockerStartCmd`, `dockerEntrypoint` and `networkVolumeId` (since 0.37.0). Any other key is
   refused as `invalid_input` before a request.
 - **Binary reads** (Slack file download, Jira `attachment.content`): the limits, redirects and the `hosts` a connection must admit are on the [Slack](../../../connectors/slack.md) and [Jira](../../../connectors/jira.md) connector pages.
 - A connection follows a rebuilt bundle or selection on its next `connections revalidate`
   without credential re-entry, when its provider authority, profile and identity are unchanged.
-  A profile can declare an `access` read that validation makes, so a credential that identifies
-  its holder but cannot read is refused as `insufficient_scope`; Confluence declares one.
+  A profile can declare an `access` read that validation makes, as Confluence does, so a
+  credential that identifies its holder but cannot read is refused as `insufficient_scope`.
 
 ## Contracts
 
 The provider realizes the shared [catalog contract](../../contracts/catalog.md)'s generic HTTP
 profile. Its native feed binding is the [GitLab feed profile](./contracts/feed.md). The catalog
 index service, which would list and locate precompiled bundles, is specified and not
-implemented; directly configured providers need no index, and catalog information grants no
+implemented. Directly configured providers need no index, and catalog information grants no
 installation or execution authority.

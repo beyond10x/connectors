@@ -53,9 +53,9 @@ pinned source under a local id with a declared effect:
 | `merge_request.discussion.resolve` | write | one PUT resolving or unresolving a discussion, guarded on it being the requested, resolvable discussion and on the answered id and state |
 | `feed.containers`, `feed.items` | read | the merge-request feed: member projects, then one project's merge requests changed since a watermark |
 
-Input is one property per declared path or query parameter, named as GitLab names it, plus a
+Input is one property per declared path or query parameter, under GitLab's own name, plus a
 `body` object where the operation takes one. Output is the provider's status, its body unchanged,
-and provenance naming the instance, the resource path and the pinned source's SHA-256. A paged
+and provenance that records the instance, the resource path and the pinned source's SHA-256. A paged
 read returns one page as GitLab answers it, and every list read bounds `per_page` to 1 through 100.
 
 ## The merge-request feed
@@ -65,44 +65,50 @@ GitLab binds the shared [feed family](../../contracts/data/feed.md) as profile
 `feed.containers` lists the projects the token's user is a member of, oldest project id first,
 continued after the last id of a full page. `feed.items` reads one project's merge requests in
 every state, oldest change first, and resumes from the watermark the previous page returned. The
-revision is the merge request's `updated_at`. Every project is listed `private`, because a public
-project may keep its merge requests to its members; `url` is null, because a project rename
-changes a merge request's link without changing its revision; deleted merge requests are not
-observed. The binding is checked against recorded GitLab answers and a stand-in provider; it has
-not been read from a running GitLab.
+revision is the merge request's `updated_at`.
+
+Every project is listed `private`, because a public project may keep its merge requests to its
+members. `url` is null, because a project rename changes a merge request's link without changing
+its revision. Deleted merge requests are not observed. The binding is checked against recorded
+GitLab answers and a stand-in provider. It has not been read from a running GitLab.
 
 ## Writes and the guard
 
 A write is a required-approval mutation under private protocol two, with the host's approval,
 audit and attempt controls ([the local runtime](../../../concepts/local-runtime.md)). The approval
 policy must name each write before an approval is issued for it, and the approval binds the whole
-input by digest. The guard is data in the selection: before the one request it reads the merge
-request and refuses unless every check holds; after it, it compares the response and leaves the
-outcome uncertain, never refused, when a check fails, because GitLab may already have applied the
-write. No corrective request is ever issued.
+input by digest.
+
+The guard is data in the selection. Before the one request it reads the merge request and refuses
+unless every check holds. After the request it compares the response. When a check fails there,
+the outcome is left uncertain, not refused, because GitLab may already have applied the write. No
+corrective request is issued.
 
 The merge guard requires the merge request to be open and mergeable, at the pinned `body.sha`,
-with the pinned `pipeline_id` as its head pipeline in status `success`; afterwards it requires
+with the pinned `pipeline_id` as its head pipeline in status `success`. Afterwards it requires
 state `merged` at the pinned head. GitLab also checks `sha` atomically on the merge. Update has no
 such precondition at GitLab, so a head that moves between the preflight read and the PUT leaves
 the outcome uncertain.
 
 `issue.create` carries no guard: before a create nothing exists to compare, so the one POST is
 sent as approved. The same input approved and sent again opens a second issue. GitLab requires
-`body.title`; every other body member, such as `assignee_ids` or `confidential`, is sent as
+`body.title`, and every other body member, such as `assignee_ids` or `confidential`, is sent as
 supplied, so read the whole input before approving.
 
 `merge_request.note.create` and `merge_request.discussion.reply` are creates too, and unguarded
 for the same reason: the same input approved and sent again adds a second note. Their bodies are
 closed to the note text (`body`, plus `internal` for a merge-request note). GitLab runs quick
 actions written in a note, such as `/close` or `/approve`, so read the text before approving.
-The text `body` is required and must be a JSON string, and `internal` a JSON boolean; a body
+
+The text `body` is required and must be a JSON string, and `internal` a JSON boolean. A body
 without its text, or with any other key such as `created_at` or `merge_request_diff_head_sha`, is
 refused before any request.
-`merge_request.discussion.resolve` takes `resolved` as a JSON boolean only (`"true"` or `1` is
-refused before any request), reads the discussion first and refuses unless it is the requested
-discussion and resolvable, sends exactly `resolved`, and requires GitLab's answer to carry the
+
+`merge_request.discussion.resolve` takes `resolved` as a JSON boolean only, and `"true"` or `1` is
+refused before any request. It reads the discussion first and refuses unless it is the requested
+discussion and resolvable. It sends exactly `resolved`, and requires GitLab's answer to carry the
 requested discussion id and state.
+
 These four are checked against a fixture in the pinned document's shapes, not against a running
 GitLab. The merge-when-pipeline-succeeds variant of the merge and the reopen variant of the
 update are `merge_request.auto_merge` and `merge_request.reopen`, each with its body member fixed.
@@ -110,15 +116,20 @@ update are `merge_request.auto_merge` and `merge_request.reopen`, each with its 
 ## Against a live GitLab
 
 The 2026-10-02 replay returned HTTP 200 for all eighteen current reads and reused saved
-credentials after an owner restart. Tags, releases and deployments returned empty lists;
+credentials after an owner restart. Tags, releases and deployments returned empty lists, and
 `job.trace` returned text. One initial revalidation returned `unavailable` before a later
 explicit retry succeeded, and that failure remains recorded and unexplained. This replay
 performed no provider writes.
 
-The earlier dedicated sandbox run answered the eleven reads then selected and the job trace as
-text; refused a merge with a stale pinned head and a merge naming the wrong pipeline before any
-request; merged one merge request with exactly one PUT; and refused an update of the merged
-request on the state check. Earlier in that run, a create opened a merge request at its pinned
+The earlier dedicated sandbox run:
+
+- answered the eleven reads then selected, and the job trace as text
+- refused a merge with a stale pinned head, and a merge with the wrong pipeline, before any
+  request
+- merged one merge request with exactly one PUT
+- refused an update of the merged request on the state check
+
+Earlier in that run, a create opened a merge request at its pinned
 head, a duplicate was refused by GitLab's 409, and a create whose branch moved between the
 preflight read and the POST was classified uncertain.
 
@@ -126,8 +137,8 @@ preflight read and the POST was classified uncertain.
 
 The `gitlab` connector ships its declaration with the catalog provider
 (`adapters/catalog/providers/gitlab/connector.json`): the endpoint `https://gitlab.com` unless an
-instance names its own host, the auth profile `gitlab.pat` with its token header, and the
-identity and scope reads. An instance of it in the CLI's configuration names only what is yours,
+instance sets its own host, the auth profile `gitlab.pat` with its token header, and the
+identity and scope reads. An instance of it in the CLI's configuration holds only what is yours,
 and the installed `connectors-catalog-provider` beside `connectors` serves it:
 
 ```toml
@@ -144,21 +155,21 @@ prompt, runs the identity and scope reads and refuses a token below the required
 The repository's [catalog provider guide](https://github.com/beyond10x/connectors/blob/main/docs/local-catalog-provider.md)
 has the complete commands, and the
 [guarded merge guide](https://github.com/beyond10x/connectors/blob/main/docs/local-gitlab-merge.md)
-the approval steps for a write. Validation evidence lasts 60 seconds; `connections revalidate`
-renews it without re-entry, `connections reconnect` replaces the credential of a connection the
-provider refused and refuses a changed identity, and `connections revoke` is local revocation
-that does not revoke the token at GitLab.
+the approval steps for a write. Validation evidence lasts 60 seconds. `connections revalidate`
+renews it without re-entry. `connections reconnect` replaces the credential of a connection the
+provider refused, and refuses a changed identity. `connections revoke` is local revocation and
+does not revoke the token at GitLab.
 
 ## Limits
 
 - The bundle carries parameters, media types and response statuses, not request or response
   schemas: a `body` is passed through and validated only by GitLab.
 - Operations that need a header or cookie parameter, a multipart or form body, or that answer
-  binary content are not served; a selection naming one is refused at load or fails at request
-  time with a safe error. The pinned source declares `commit.create`, `file.update` and
-  `project.create` as multipart only; a cited media-type correction in
+  binary content are not served. A selection that lists one is refused at load or fails at
+  request time with a safe error. The pinned source declares `commit.create`, `file.update` and
+  `project.create` as multipart only. A cited media-type correction in
   `adapters/gitlab/upstream/openapi_v3.amendments.json` sends them as JSON, as GitLab's reference
   documents them.
 - One token-header authentication profile. OAuth is not offered.
-- A guard compares scalars for equality; it cannot express ranges. Absence is expressed only as a
+- A guard compares scalars for equality and cannot express ranges. Absence is expressed only as a
   read after the write answering 404 (`tag.delete`, `branch.delete`).

@@ -10,7 +10,7 @@ connectors: "gitlab"
 # GitLab
 
 The `gitlab` connector of the provider GitLab is served by the catalog provider from the pinned
-GitLab API v4 OpenAPI document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+GitLab API v4 OpenAPI document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary). The
 [full GitLab guide](https://github.com/beyond10x/connectors/blob/main/docs/local-catalog-provider.md)
 and the [guarded merge guide](https://github.com/beyond10x/connectors/blob/main/docs/local-gitlab-merge.md)
 have every operation, guard and refusal.
@@ -30,15 +30,15 @@ notes and replies are unguarded.
 
 ## Prerequisites at the provider
 
-Create a personal access token on your GitLab host with the `api` scope; the connector declares
+Create a personal access token on your GitLab host with the `api` scope. The connector declares
 `api` as its minimum, and connecting reads the token's scopes and refuses one below it. The
 token's user needs at least the Developer role for the writes, and the right to merge into a
-protected target branch for a merge: GitLab answers a merge it forbids with `401`, so a permission
+protected target branch for a merge. GitLab answers a merge it forbids with `401`, so a permission
 problem reads as an authentication one.
 
 ## Enable the connector and add an instance
 
-The instance names the GitLab host; without `endpoint` it uses `https://gitlab.com`.
+The instance sets the GitLab host, and without `endpoint` it uses `https://gitlab.com`.
 
 ```toml
 [connectors.gitlab]
@@ -54,12 +54,14 @@ already ends in `/api/v4` is refused as `invalid_input` naming `endpoint`.
 `connections connect gitlab/work --profile gitlab.pat --endpoint https://gitlab.example.com`
 writes the same instance before it asks for the token.
 
-The instance is derived by the `connectors-catalog-provider` in the directory of `connectors`;
-keep the two binaries together. `connectors setup check` lists it as the `installed_provider`
+The instance is derived by the `connectors-catalog-provider` in the directory of `connectors`,
+so keep the two binaries together. `connectors setup check` lists it as the `installed_provider`
 prerequisite, `failed` with the reason when it does not run. A connect is then refused as
-`unavailable` at `installed_provider`, naming the provider's path and the reason, instead of
-blaming the endpoint, and so is a connect whose provider prints its bootstrap but is killed or
-exits when the host starts it for the instance. The macOS binaries are not signed: on an archive
+`unavailable` at `installed_provider`, with the provider's path and the reason, instead of
+blaming the endpoint. So is a connect whose provider prints its bootstrap but is killed or
+exits when the host starts it for the instance.
+
+The macOS binaries are not signed: on an archive
 downloaded through a browser, remove the quarantine attribute from the extracted directory first, with
 `xattr -dr com.apple.quarantine <dir>`.
 
@@ -85,7 +87,7 @@ connectors invoke gitlab/work merge_request.get \
   --input-json '{"id":"group/project","merge_request_iid":9}'
 ```
 
-A read after the 60-second validation is refused with `next_action: revalidate_connection`; see [First read](../guides/first-read.md#validation).
+A read after the 60-second validation is refused with `next_action: revalidate_connection`, as [First read](../guides/first-read.md#validation) explains.
 
 ## A first guarded write
 
@@ -104,12 +106,12 @@ Pin the merge to the head commit and the successful pipeline the read above show
 
 [Prepare, issue and invoke](../guides/guarded-write.md#prepare-issue-and-invoke) `merge_request.merge` on `gitlab/work` with `merge.json`, `--idempotency-key merge-17`.
 
-A lost answer is `unknown` and never triggers another PUT; repeating the same `--idempotency-key`
+A lost answer is `unknown` and never triggers another PUT. Repeating the same `--idempotency-key`
 observes the original attempt.
 
 ## Reconnect when the connection is Stale
 
-A token GitLab refuses (revoked, expired) makes the connection `stale`; revalidation cannot help. Publish a new token on the same
+A token GitLab refuses (revoked, expired) makes the connection `stale`, and revalidation cannot help. Publish a new token on the same
 connection. [Reconnect](../guides/reconnect-a-connection.md) `gitlab/work` with `--credential-prompt`.
 
 A token of another GitLab user is refused as an identity mismatch.
@@ -117,10 +119,10 @@ A token of another GitLab user is refused as an identity mismatch.
 ## Limits
 
 - Live GitLab evidence covers the reads, merge-request create and update and a guarded merge
-  (recorded in the [full GitLab guide](https://github.com/beyond10x/connectors/blob/main/docs/local-catalog-provider.md#what-the-sandbox-showed));
-  the newer writes are checked against fixtures in the pinned document's shapes.
-- One page per call; the provider does not walk pages or follow GitLab's `Link` header.
-- A binary answer is read whole, at most 2 MiB; uploads are not served.
+  and is recorded in the [full GitLab guide](https://github.com/beyond10x/connectors/blob/main/docs/local-catalog-provider.md#what-the-sandbox-showed).
+  The newer writes are checked against fixtures in the pinned document's shapes.
+- One page per call, and the provider does not walk pages or follow GitLab's `Link` header.
+- A binary answer is read whole, at most 2 MiB, and uploads are not served.
 - The update guard and the discussion resolve are not atomic: GitLab offers no precondition on
   their PUT.
 - `connections revoke` ends local use and does not revoke the token at GitLab.

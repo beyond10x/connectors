@@ -10,7 +10,7 @@ connectors: "calendar"
 # Google Calendar
 
 The `calendar` connector of the provider Google is served by the catalog provider from the pinned
-Calendar API v3 document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+Calendar API v3 document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary). The
 [full Calendar guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-calendar.md)
 has every parameter, paging rule and refusal.
 
@@ -46,7 +46,12 @@ profile = "google.oauth"
 
 An instance that names no profile is read-only: it uses `google.oauth.readonly`, requests
 `https://www.googleapis.com/auth/calendar.readonly` alone and offers no event write. The `profile = "google.oauth"` above
-adds the write scope; connect it with `--profile google.oauth`. A connection saved before this default is under `google.oauth` and is never rebound: keep that profile named to keep it, or `connections revoke` it and connect again. To admit only a company's accounts,
+adds the write scope, and you connect it with `--profile google.oauth`.
+
+A connection saved before this default is under `google.oauth` and is never rebound. Keep that
+profile set to keep the connection, or `connections revoke` it and connect again.
+
+To admit only a company's accounts,
 add `allowed_domains = ["example.org"]` to the table (one to eight domains): a connect, reconnect or
 revalidation whose Google account has another domain, or none, is refused as `insufficient_scope`
 before anything is stored.
@@ -71,8 +76,8 @@ connectors invoke calendar/private events.list \
   --input-json '{"calendarId":"primary","timeMin":"2026-10-01T00:00:00Z","maxResults":50}'
 ```
 
-`primary` is the signed-in user's calendar. The last page of a walk carries `nextSyncToken`;
-send it as `syncToken` to read only what changed since.
+`primary` is the signed-in user's calendar. The last page of a walk carries `nextSyncToken`,
+which you send as `syncToken` to read only what changed since.
 
 ## A first guarded write
 
@@ -100,9 +105,9 @@ Google no longer honours the refresh token and the connection turns `stale`. [Re
 
 ## Limits
 
-- Verified against a local HTTPS fixture only (`adapters/catalog/tests/google_calendar.rs`); no
+- Verified against a local HTTPS fixture only (`adapters/catalog/tests/google_calendar.rs`). No
   live calendar has been read, no live event written and no email to a guest observed.
 - The engine checks only that `sendUpdates` is present, not its value: check it before approving.
-- The `etag` pin is checked before the write only; Google offers no precondition on it.
+- The `etag` pin is checked before the write only, because Google offers no precondition on it.
 - `events.insert` carries no guard: the same input approved twice makes two events.
-- The provider does not walk pages; [a read answered `429` follows the shared rule](../guides/first-read.md#rate-limits).
+- The provider does not walk pages, and [a read answered `429` follows the shared rule](../guides/first-read.md#rate-limits).

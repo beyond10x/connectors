@@ -11,7 +11,7 @@ connectors: "hubspot"
 
 The `hubspot` connector of the provider HubSpot is served by the catalog provider from the pinned
 HubSpot CRM Objects `2026-09` document and the two owner reads of the pinned Crm Owners `2026-09`
-document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary); the
+document. Terms follow the [README vocabulary](https://github.com/beyond10x/connectors#vocabulary). The
 [full HubSpot guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-hubspot.md)
 has every parameter and refusal.
 
@@ -24,8 +24,8 @@ has every parameter and refusal.
 | `objects.list`, `object.get`, `owners.list`, `owner.get` | none |
 
 `objectType` is `contacts`, `companies`, `deals`, `line_items`, `tickets` or any other type the
-account has. A record names its owner in the `hubspot_owner_id` property (ask for it in
-`properties`); `owner.get` with that value as `ownerId` answers the owner's name, email and teams.
+account has. A record holds its owner's id in the `hubspot_owner_id` property. Ask for it in
+`properties`. `owner.get` with that value as `ownerId` answers the owner's name, email and teams.
 A deactivated owner, common on old deals, is an archived owner: read it with `"archived": true`,
 which HubSpot's document describes as returning only archived owners. `owners.list` takes the same
 parameter.
@@ -34,10 +34,11 @@ parameter.
 
 Create a private app in the HubSpot account's settings and grant it the read scopes of what you
 read. For deals, companies, line items and owners that is `crm.objects.deals.read`,
-`crm.objects.companies.read`, `crm.objects.line_items.read` and `crm.objects.owners.read`; no
+`crm.objects.companies.read`, `crm.objects.line_items.read` and `crm.objects.owners.read`. No
 contacts scope is needed. Add the matching `read` scope of any other object type you read, and
-no `write` scope. Keep its access token. The token belongs to the account, not
-a user, and connecting does not check its scopes: a missing scope shows on the read that needs
+no `write` scope. Keep its access token.
+
+The token belongs to the account, not a user, and connecting does not check its scopes: a missing scope shows on the read that needs
 it.
 
 ## Enable the connector and add an instance
@@ -61,8 +62,8 @@ connectors connections connect --connector hubspot --instance work \
 ```
 
 A token kept in a secret manager can come from an environment variable instead.
-`--credential-env` names the variable; it holds the bare token, and the value never appears on the
-command line or in any output. With 1Password, `op run` sets the variable for this one command
+`--credential-env` takes the name of the variable. The variable holds the bare token, and the
+value never appears on the command line or in any output. With 1Password, `op run` sets the variable for this one command
 only (`hubspot.env` holds `HUBSPOT_TOKEN=op://<vault>/<item>/<field>`):
 
 ```sh
@@ -70,9 +71,9 @@ op run --env-file hubspot.env -- connectors connections connect hubspot/work \
   --profile hubspot.private-app --credential-env HUBSPOT_TOKEN
 ```
 
-An unset, empty or oversized variable is refused naming the variable, never its value. The
-name is upper case letters, digits and underscores (`HUBSPOT_TOKEN`); any other word given there
-is refused without being repeated, so a token pasted in its place is not echoed, and the refusal
+An unset, empty or oversized variable is refused, and the message gives the variable and not its
+value. The name is upper case letters, digits and underscores (`HUBSPOT_TOKEN`). Any other word
+given there is refused without being repeated, so a token pasted in its place is not echoed, and the refusal
 says what a name is. A bare value may end in one line break, which is dropped.
 `--credential-env` stands beside no other credential input.
 
@@ -98,14 +99,14 @@ The connector has no write, so nothing here needs an approval.
 
 ## Reconnect when the connection is Stale
 
-A token HubSpot refuses (the private app's token was rotated or deleted) makes the connection
-`stale`. Publish the new token on the
+A token HubSpot refuses, because the private app's token was rotated or deleted, makes the
+connection `stale`. Publish the new token on the
 same connection. [Reconnect](../guides/reconnect-a-connection.md) `hubspot/work` with `--credential-file ~/private/hubspot.json`.
 
 ## Limits
 
-- Verified against a local HTTPS fixture only (`adapters/catalog/tests/hubspot.rs`); no live
+- Verified against a local HTTPS fixture only (`adapters/catalog/tests/hubspot.rs`). No live
   HubSpot account has been read.
 - No time filter: `objects.list` and `owners.list` walk every record. Search and batch read are POST
   operations, which the catalog provider does not serve as reads yet.
-- Only private-app tokens; OAuth app installs are not offered.
+- Only private-app tokens are taken, and OAuth app installs are not offered.
