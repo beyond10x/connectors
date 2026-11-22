@@ -15,7 +15,7 @@ serde.workspace = true
 serde_yaml_ng.workspace = true
 connectors-spec = { path = "../connectors-spec" }
 tempfile.workspace = true
-pulldown-cmark = "0.13.4"
+pulldown-cmark = "0.13.6"
 regex = "1"
 jsonschema.workspace = true
 ess-compiler.workspace = true
