@@ -1607,10 +1607,10 @@ mod tests {
         let approved = |upstream: &str, api: &str| {
             approved_origin(&url::Url::parse(upstream).unwrap(), api).is_ok()
         };
-        // Same origin: GitLab, GitHub Enterprise Server, a path under it.
+        // Same origin: a self-hosted forge, GitHub Enterprise Server, a path under it.
         assert!(approved(
-            "https://gitlab.example.com",
-            "https://gitlab.example.com/api/v4/"
+            "https://forge.example.com",
+            "https://forge.example.com/api/v4/"
         ));
         assert!(approved(
             "https://ghe.example.com/scm",
@@ -1619,7 +1619,7 @@ mod tests {
         // The reviewed mapping.
         assert!(approved("https://github.com", "https://api.github.com/"));
         for upstream in [
-            "https://gitlab.com",
+            "https://forge.example.org",
             "https://github.com.example.net",
             "https://github.com:8443",
             "http://github.com",
@@ -1633,11 +1633,11 @@ mod tests {
         // A mapping is for its own API origin only.
         assert!(!approved(
             "https://github.com",
-            "https://gitlab.example.com/api/v4/"
+            "https://forge.example.com/api/v4/"
         ));
         assert!(!approved(
             "https://elsewhere.example.com",
-            "https://gitlab.example.com/api/v4/"
+            "https://forge.example.com/api/v4/"
         ));
     }
 

@@ -16,6 +16,9 @@
   answers, and the selection's own write whose body reads values from the slot's answer. A
   source amendment `add_operation` can add a `post` with an `application/json` body
   (`request_media_type`).
+- A `connectors-definition/1` write can declare the same `upload` (`slot` with `op`, `with`,
+  `expect` and `url`, `path_prefix`, `send`), so `connectors-build definition import` imports the
+  Slack selection with `file.upload` and the definition lowers back to it.
 - An operation can raise its own request limit with `x-connectors-input-bytes` in its input
   schema, at most 3 MiB. The served host reads `/v1alpha2/invoke` up to the largest operation's
   limit and refuses a request over the named operation's limit as `capacity`; every other route

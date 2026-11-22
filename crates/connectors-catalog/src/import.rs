@@ -46,7 +46,7 @@ use crate::definition::{
     Download, Effect, Envelope, FeedAuthor, FeedBody, FeedContainers, FeedCursor, FeedItems,
     FeedPage, FeedPosition, FeedPrecision, FeedQuery, Guard, GuardAfter, GuardBefore, GuardRead,
     GuardRefusal, IdentitySource, MismatchCode, Operation, PagingStyle, ProviderDefinition,
-    ResponseKind, SchemaId, Source, TextRefusal,
+    ResponseKind, SchemaId, Source, TextRefusal, Upload, UploadSlot,
 };
 use crate::inventory::{Inventory, Location};
 use indexmap::IndexMap;
@@ -210,6 +210,8 @@ struct ShippedOperation {
     #[serde(default)]
     download: Option<Download>,
     #[serde(default)]
+    upload: Option<ShippedUpload>,
+    #[serde(default)]
     bounds: Option<IndexMap<String, Bound>>,
     #[serde(default)]
     required: Option<Vec<String>>,
@@ -273,6 +275,23 @@ struct ShippedPreflight {
     checks: Vec<ShippedCheck>,
     #[serde(default)]
     mismatch: Option<MismatchCode>,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ShippedUpload {
+    slot: ShippedSlot,
+    path_prefix: String,
+    send: Value,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ShippedSlot {
+    operation_id: String,
+    values: IndexMap<String, String>,
+    checks: Vec<ShippedCheck>,
+    url: String,
 }
 
 #[derive(Clone, Deserialize)]
@@ -1185,6 +1204,22 @@ fn expectations(
         }
     }
     Ok((!mapped.is_empty()).then_some(mapped))
+}
+
+/// A shipped upload in the definition notation: the slot's checks as a guard's
+/// `expect`, the rest as written.
+fn upload_notation(operation: &str, upload: &ShippedUpload) -> Result<Upload, Failure> {
+    let slot = &upload.slot;
+    Ok(Upload {
+        slot: UploadSlot {
+            op: slot.operation_id.clone(),
+            with: (!slot.values.is_empty()).then(|| slot.values.clone()),
+            expect: expectations(operation, &slot.checks)?,
+            url: slot.url.clone(),
+        },
+        path_prefix: upload.path_prefix.clone(),
+        send: upload.send.clone(),
+    })
 }
 
 struct Context<'a> {
@@ -2168,6 +2203,11 @@ pub fn import(request: &Request<'_>) -> Result<Imported, Failure> {
             response: operation.response,
             binary: operation.binary.clone(),
             download: operation.download.clone(),
+            upload: operation
+                .upload
+                .as_ref()
+                .map(|upload| upload_notation(id, upload))
+                .transpose()?,
             envelope: operation.envelope.clone(),
             rate_limit_reasons: unless_empty(&operation.rate_limit_reasons),
             refusal_texts: operation

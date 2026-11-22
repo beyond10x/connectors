@@ -867,6 +867,10 @@ fn slack_derived_from_its_declaration_is_the_documented_bot_instance() {
 /// (story:google-read-only-profiles-and-company-domain).
 /// The Calendar, Drive, Gmail and Slides revisions moved when the Discovery
 /// projector became `discovery-openapi/2` (story:drive-file-content-read).
+/// The two Slack guide pins (`e7220d48…` to `97e68e24…`, `abe8a377…` to
+/// `b004d29c…`) moved when the Slack bundle gained the two upload methods as
+/// amendments and the selection gained `file.upload` (#269); the guide's
+/// configurations did not change.
 #[test]
 fn documented_native_configurations_keep_their_revisions() {
     let pinned: BTreeMap<String, &str> = [
@@ -964,11 +968,11 @@ fn documented_native_configurations_keep_their_revisions() {
         ),
         (
             "23 catalog-slack.md",
-            "e7220d48c9c68cfbb78e363d2a6ea5d4ce3e2595c4baad8f86492b02b010f79b",
+            "97e68e24ed6ee9bde470a62345b8592f931a4eb1f220bc9e7193663375186c00",
         ),
         (
             "24 catalog-slack.md",
-            "abe8a377d7f6cc4e17df36e888e4df0c4a55cfad753b4eb1b1039ac2509a1009",
+            "b004d29c824064b1ed369d7097178535ddaf2a2142234e210549509d23f68644",
         ),
         (
             "25 catalog-zendesk.md",
