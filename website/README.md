@@ -78,6 +78,21 @@ diagram, themes, reduced motion, the mobile layout and an unavailable example mo
 checks visit the main routes in both colour modes at four widths and check one visible primary
 heading, no horizontal overflow, the sidebar's active page and the mobile menu.
 
+`npm run test:ux` is the UI loop's fast check on a built site (`npm run build` first; it never
+builds): Playwright serves `build/` with `tests/ux/serve.mjs` on port 3141 (`UX_PORT`), blocks
+every request off the local build, and runs the layout contract (no horizontal overflow; navbar,
+theme toggle and sidebar fully in view) on one page per template and every task's page at 1366x768
+and 1280x720 in both colour modes, axe-core on the template pages, every task of `ux/adapter.ts`
+by a screen-only user, the anchor tasks by keyboard alone, the finding records, and the ratchet
+against `ux/baseline.json`. A test is killed at 60 s and the run at 120 s; it prints its ten
+slowest tests. `npm run ux:baseline` takes measured values into the baseline.
+`UX_ROUND=R-nn npm run ux:round` measures a round (the whole sitemap, all six viewports) and writes
+its `report.md`, `round.json` and `shots/` under `ux/rounds/R-nn/` and its row in
+`ux/rounds/trend.md`. The whole round takes longer than the 120 s that
+kills any run, so run it in parts with `--project=measure --grep <part>` and `UX_KEEP=1`, each part
+under 120 s, then `--project=round --no-deps`. A round that cannot be split that far is a budget
+defect.
+
 For a built site, `cargo run --locked -p connectors-docs -- provenance --site website/build
 --commit <full revision>` writes `.well-known/b10x-site.json` and the route inventory
 `.well-known/b10x-routes.json`, as the `Documentation validation` workflow does before it uploads
