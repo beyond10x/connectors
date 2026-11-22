@@ -1,5 +1,5 @@
 {
-  "digest": "afcabdec3b0532291b9ad03628383156399ee4da598d6a6d57220cb5ad5e4d99",
+  "digest": "4f3e67f3a364996f8e6045ae25ac7644481ce5ec1229e9d6e891bc6085e63f17",
   "ess_crates": [
     "entity-core 0.28.0",
     "entity-core 0.32.0",
@@ -7,17 +7,17 @@
     "entity-executor 0.32.0",
     "entity-query 0.32.0",
     "entity-store 0.32.0",
-    "ess-compiler 0.97.3",
-    "ess-conformance 0.97.3",
-    "ess-domain 0.97.3",
-    "ess-entity-runtime 0.97.3",
-    "ess-gen 0.97.3",
-    "ess-http 0.97.3",
-    "ess-primitives 0.97.3",
-    "ess-service-contract 0.97.3",
-    "ess-synth 0.97.3",
-    "ess-transport 0.97.3",
-    "ess-yaml 0.97.3"
+    "ess-compiler 0.97.4",
+    "ess-conformance 0.97.4",
+    "ess-domain 0.97.4",
+    "ess-entity-runtime 0.97.4",
+    "ess-gen 0.97.4",
+    "ess-http 0.97.4",
+    "ess-primitives 0.97.4",
+    "ess-service-contract 0.97.4",
+    "ess-synth 0.97.4",
+    "ess-transport 0.97.4",
+    "ess-yaml 0.97.4"
   ],
   "files": [
     {
@@ -30,7 +30,7 @@
     },
     {
       "path": "crates/connectors-spec/toolchain.json",
-      "sha256": "0ddf82125653c558ea6ac6c290551266ca169aff4b6f248d28ceeb6d16f1ad95"
+      "sha256": "5e8656c1bb72a94755225dbc9f9a615895f5980e7d33a6074ac2c90034dfb103"
     },
     {
       "path": "ess/components.yaml",
@@ -50,7 +50,7 @@
     },
     {
       "path": "ess/domains/auth_bindings.yaml",
-      "sha256": "ae94a4bde79e4e02d4abf9359b5fd5fa9d8123cdf6bd4130c53f334676eda537"
+      "sha256": "d68636574976036d1cab2d58d9d684553e8ac41275cb6a6d4d205a1322a6aef9"
     },
     {
       "path": "ess/domains/cli.yaml",
@@ -74,7 +74,7 @@
     },
     {
       "path": "ess/domains/declarations.yaml",
-      "sha256": "3a7e090a2560449d6279ba93eda6d45b37151fbee42eb68245853c3498ed1a2e"
+      "sha256": "b49efca15c331ab3fdac34cde633ae16ac8399081a5beac7c69b15c864ee52fb"
     },
     {
       "path": "ess/domains/definitions_install.yaml",
