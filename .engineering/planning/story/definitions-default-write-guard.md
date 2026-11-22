@@ -6,7 +6,11 @@ status: draft
 title: A definition gives its writes one default guard
 relations:
 - decomposes: epic:slack-complete-web-api
-revision: 1
+- depends_on: story:slack-sdk-upstream-import
+scope:
+- confidence: inferred
+  path: crates/connectors-catalog/src/definition.rs
+revision: 2
 ---
 ## Outcome
 

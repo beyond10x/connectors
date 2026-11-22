@@ -6,7 +6,14 @@ status: draft
 title: Slack request shapes come from node-slack-sdk at a pinned commit
 relations:
 - decomposes: epic:slack-complete-web-api
-revision: 1
+scope:
+- confidence: inferred
+  path: adapters/slack/upstream
+- confidence: inferred
+  path: crates/connectors-build
+- confidence: inferred
+  path: crates/connectors-catalog/src/import.rs
+revision: 3
 ---
 ## Outcome
 
@@ -34,5 +41,9 @@ The Slack request shapes come from `slackapi/node-slack-sdk` at a pinned commit
 
 ## Scope
 
-connectors: `crates/connectors-build` (definition import), `adapters/slack/upstream/`.
+connectors: `crates/connectors-build` (the `definition import` command,
+`crates/connectors-build/src/main.rs:345`) and the importer it calls,
+`crates/connectors-catalog/src/import.rs`; `adapters/slack/upstream/`.
 connectors-definitions: `upstream/slack/`, `upstream/slack-user/`. Inferred.
+`story:definitions-default-write-guard` changes the same crate (`connectors-catalog`) and is
+ordered after this story.

@@ -7,7 +7,12 @@ title: Socket Mode events on an app-level token (out of the first wave)
 relations:
 - decomposes: epic:slack-complete-web-api
 - depends_on: story:slack-four-profile-definition-generated
-revision: 1
+- depends_on: story:slack-user-writes-by-policy
+- depends_on: story:admission-checks-token-scopes
+scope:
+- confidence: inferred
+  path: adapters/catalog/src
+revision: 2
 ---
 ## Outcome
 

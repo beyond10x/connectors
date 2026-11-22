@@ -6,7 +6,15 @@ status: draft
 title: A committed table gives each Slack method its token types, scopes and effect
 relations:
 - decomposes: epic:slack-complete-web-api
-revision: 1
+- depends_on: story:slack-sdk-upstream-import
+scope:
+- confidence: inferred
+  path: .github/workflows/slow.yml
+- confidence: inferred
+  path: adapters/slack/upstream
+- confidence: inferred
+  path: crates/connectors-build
+revision: 3
 ---
 ## Outcome
 
@@ -30,10 +38,23 @@ reads or writes. Its source is Slack's method reference pages.
 
 - Every method of `story:slack-sdk-upstream-import`'s projection has a row; a test fails on a
   method without one.
-- Ten named rows match their pages: `conversations.replies`, `chat.postMessage`,
-  `search.messages` (user only), `apps.connections.open` (app-level only), `apps.manifest.create`
-  (configuration only), `files.getUploadURLExternal`, `users.info`, `reactions.add`,
-  `admin.users.list`, `tooling.tokens.rotate`.
+- Ten named rows hold these values, compared by a test against the committed table. The values
+  are expected from Slack's method pages as known on 2026-11-23 and are confirmed against the
+  pages when the table is first generated; a page that disagrees wins, and the row and this list
+  change together with the page cited:
+
+  | method | token types | scopes | effect |
+  |---|---|---|---|
+  | `conversations.replies` | bot, user | `channels:history`, `groups:history`, `im:history`, `mpim:history` (by conversation type) | read |
+  | `chat.postMessage` | bot, user | `chat:write` | write |
+  | `search.messages` | user | `search:read` | read |
+  | `apps.connections.open` | app-level | `connections:write` | write |
+  | `apps.manifest.create` | configuration | none | write |
+  | `files.getUploadURLExternal` | bot, user | `files:write` | write |
+  | `users.info` | bot, user | `users:read` | read |
+  | `reactions.add` | bot, user | `reactions:write` | write |
+  | `admin.users.list` | user | `admin.users:read` | read |
+  | `tooling.tokens.rotate` | none (a refresh token in the body) | none | write; unverified |
 
 ## Scope
 
