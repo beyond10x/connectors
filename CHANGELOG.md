@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### Added
+
+- The Slack bot connection uploads a file: `file.upload` takes the bytes (at most 2 MiB) as
+  `content` (`base64`, `sha256`, optional `media_type`) and `body.channel_id`, `body.filename`,
+  `body.title`, optional `body.thread_ts` and `body.initial_comment`, and under one approval or
+  standing grant sends `files.getUploadURLExternal`, the bytes to the `upload_url` it answers and
+  `files.completeUploadExternal`. The `upload_url` must be `https` on `files.slack.com` under
+  `/upload/` and admitted by the connection's `hosts`, or nothing is sent there. Content that is
+  not base64, is empty, is over 2 MiB or does not match its `sha256` is refused before any
+  request, so an approval binds the bytes' digest (issue #269).
+- A catalog selection can declare `upload`: a slot request, a POST of the bytes to the URL it
+  answers, and the selection's own write whose body reads values from the slot's answer. A
+  source amendment `add_operation` can add a `post` with an `application/json` body
+  (`request_media_type`).
+- An operation can raise its own request limit with `x-connectors-input-bytes` in its input
+  schema, at most 3 MiB. The served host reads `/v1alpha2/invoke` up to the largest operation's
+  limit and refuses a request over the named operation's limit as `capacity`; every other route
+  and operation keeps 64 KiB.
+- `AuthenticatedWrite::send_bytes` sends a raw body with its media type; a write port that does
+  not implement it refuses as `unsupported`.
+- A private composition can refuse an input from itself alone (`runtime::Adapter::admit`, by
+  default none); the served catalog host answers that refusal before it records an attempt, as
+  it answers a repository the instance does not list. The catalog uses it for upload content.
+
 ### Changed
 
 - A state directory with no `metadata.sqlite3`, because it was never initialised or its store was

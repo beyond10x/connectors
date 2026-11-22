@@ -75,10 +75,11 @@ types:
       - from.count >= 1
       - {to: application/json}
 
-  # The one method an added operation may have: a read.
-  - name: connectors_catalog.amendment.ReadMethod
+  # The methods an added operation may have: `get` for a read, `post` for a write the engine
+  # sends as a selected write or as the slot of an upload (`connectors_catalog.binary.Upload`).
+  - name: connectors_catalog.amendment.AddedMethod
     kind: enum
-    variants: [get]
+    variants: [get, post]
 
   # Where a parameter of an added operation travels: its path or its query, never a header, a
   # cookie or a body.
@@ -110,21 +111,27 @@ types:
       - any: [{not: {location: path}}, {required: true}]
       - any: [{not: {location: path}}, {not: defined(repeated)}, {repeated: false}]
 
-  # A read the vendor's reference documents and its published document leaves out, such as
-  # Opsgenie's `GET /v1/incidents/{identifier}/associated-alert-ids`. The amendment's
-  # `operation_id` names it and must be one the source does not declare; its path must start
-  # with `/`, carry no parenthesised notation, query or fragment, and differ from every path the
-  # source declares for a GET, so it adds a read and never shadows or retargets one. It declares
-  # no request body and no response: the engine reads its 2xx answer as JSON, as it reads any
-  # operation that declares none. The engine still checks, when a selection loads, that the
-  # path lies under the configured base path, like every other operation of the bundle.
+  # An operation the vendor's reference documents and its published document leaves out, such
+  # as Opsgenie's `GET /v1/incidents/{identifier}/associated-alert-ids` or Slack's
+  # `POST /files.getUploadURLExternal`. The amendment's `operation_id` names it and must be one
+  # the source does not declare; its path must start with `/`, carry no parenthesised notation,
+  # query or fragment, and differ from every path the source declares for the same method, so it
+  # never shadows or retargets an operation. A `post` may declare `request_media_type`, only
+  # `application/json`, the body the engine sends; a `get` declares none. It declares no
+  # response: the engine reads its 2xx answer as JSON, as it reads any operation that declares
+  # none. The engine still checks, when a selection loads, that the path lies under the
+  # configured base path and that the selection's effect fits the method, like every other
+  # operation of the bundle.
   - name: connectors_catalog.amendment.AddedOperation
     kind: struct
     fields:
-      - {name: method, type: connectors_catalog.amendment.ReadMethod}
+      - {name: method, type: connectors_catalog.amendment.AddedMethod}
       - {name: path, type: String}
       - {name: parameters, type: "List<connectors_catalog.amendment.OperationParameter>"}
+      - {name: request_media_type, type: "Optional<String>"}
     invariants:
+      - any: [{not: defined(request_media_type)}, {request_media_type: application/json}]
+      - any: [{not: defined(request_media_type)}, {method: post}]
       - {path: {starts_with: "/"}}
       - {not: {path: {contains: "("}}}
       - {not: {path: {contains: "?"}}}

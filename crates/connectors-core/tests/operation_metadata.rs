@@ -167,3 +167,38 @@ fn operation_metadata_does_not_extend_the_closed_legacy_operation_codec() {
     assert!(parse(&legacy, "read").is_err());
     assert!(parse(&extended, "read").is_err());
 }
+
+/// issue #269: an operation raises its own request limit through its input
+/// schema, within the ceiling and never below the default; a descriptor reads
+/// at most its largest operation's limit.
+#[test]
+fn an_operation_states_its_own_request_limit_within_the_ceiling() {
+    use connectors_core::{INPUT_BYTES_CEILING, INPUT_BYTES_KEYWORD, REQUEST_LIMIT};
+    let operation = |bytes: serde_json::Value| -> connectors_core::Operation {
+        let mut schema = json!({"type": "object"});
+        if !bytes.is_null() {
+            schema[INPUT_BYTES_KEYWORD] = bytes;
+        }
+        serde_json::from_value(json!({"id": "file.upload", "description": "Upload",
+            "contract": "operations/v1alpha1", "profile": "mutation",
+            "input_schema": schema, "output_schema": {}}))
+        .unwrap()
+    };
+    assert_eq!(operation(json!(null)).request_limit(), REQUEST_LIMIT);
+    assert_eq!(operation(json!(2_861_740)).request_limit(), 2_861_740);
+    assert_eq!(operation(json!(1)).request_limit(), REQUEST_LIMIT);
+    assert_eq!(
+        operation(json!(1u64 << 40)).request_limit(),
+        INPUT_BYTES_CEILING
+    );
+    assert_eq!(operation(json!("2861740")).request_limit(), REQUEST_LIMIT);
+    let descriptor = connectors_core::Descriptor {
+        version: connectors_core::WIRE_VERSION.into(),
+        instance: "slack.fixture".into(),
+        adapter: "catalog".into(),
+        revision: "r1".into(),
+        operations: vec![operation(json!(null)), operation(json!(2_861_740))],
+        configuration_schema: json!({}),
+    };
+    assert_eq!(descriptor.request_limit(), 2_861_740);
+}

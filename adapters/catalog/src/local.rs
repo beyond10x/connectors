@@ -2993,6 +2993,9 @@ impl runtime::Adapter for Local {
         self.evict_refused(key, &result);
         result
     }
+    fn admit(&self, operation: &str, input: &Value) -> connectors_core::Result<()> {
+        self.engine.admit(operation, input)
+    }
     async fn prepare_write(
         &self,
         operation: &str,
@@ -3012,6 +3015,22 @@ impl runtime::Adapter for Local {
         let prepared = prepared?;
         // A guard that reads after the write reads with the same credential,
         // through a port that can only read.
+        // An upload's slot goes to the API base and its bytes to an admitted
+        // host, each through a port of its own under this one write.
+        let upload = prepared.uploads().then(|| Upload {
+            slot: self.http.with_credential(credential.clone()).into_write(),
+            hosts: AdmittedWrites(
+                self.hosts
+                    .iter()
+                    .map(|(origin, (port, carries))| {
+                        (
+                            origin.clone(),
+                            (port.clone(), carries.then(|| credential.clone())),
+                        )
+                    })
+                    .collect(),
+            ),
+        });
         let reader = prepared
             .reads_after()
             .then(|| self.http.with_credential(credential));
@@ -3020,6 +3039,7 @@ impl runtime::Adapter for Local {
             http: http.into_write(),
             reader,
             token: key.and_then(|key| Some((self.oauth.clone()?, key))),
+            upload,
         }))
     }
     async fn validate(&self, profile: &str, document: Secret) -> Result<Baseline> {
@@ -3188,6 +3208,27 @@ struct Write {
     reader: Option<ScopedHttp>,
     /// The cache and key of the OAuth access token the write carries.
     token: Option<(Arc<OAuth>, [u8; 32])>,
+    /// An upload's slot and byte ports; `None` otherwise.
+    upload: Option<Upload>,
+}
+/// The ports of an upload beside its completing write.
+struct Upload {
+    slot: Box<dyn connectors_sdk::AuthenticatedWrite>,
+    hosts: AdmittedWrites,
+}
+/// The admitted hosts as write ports, each with the credential when the
+/// connection says it travels there.
+struct AdmittedWrites(BTreeMap<String, AdmittedWrite>);
+/// One admitted host's port, and the credential when it travels there.
+type AdmittedWrite = (Arc<ScopedHttp>, Option<Arc<dyn Credential>>);
+impl connectors_catalog_provider::WriteHosts for AdmittedWrites {
+    fn write(&self, origin: &str) -> Option<Box<dyn connectors_sdk::AuthenticatedWrite>> {
+        let (port, credential) = self.0.get(origin)?;
+        Some(match credential {
+            Some(credential) => port.with_credential(credential.clone()).into_write(),
+            None => port.to_write(),
+        })
+    }
 }
 #[async_trait::async_trait]
 impl runtime::PreparedWrite for Write {
@@ -3199,15 +3240,17 @@ impl runtime::PreparedWrite for Write {
             http,
             reader,
             token,
+            upload,
         } = *self;
-        let outcome = prepared
-            .execute_reading(
-                http,
-                reader
-                    .as_ref()
-                    .map(|reader| reader as &dyn connectors_sdk::AuthenticatedHttp),
-            )
-            .await;
+        let reader = reader
+            .as_ref()
+            .map(|reader| reader as &dyn connectors_sdk::AuthenticatedHttp);
+        let outcome = match upload {
+            Some(Upload { slot, hosts }) => {
+                prepared.execute_upload(slot, &hosts, http, reader).await
+            }
+            None => prepared.execute_reading(http, reader).await,
+        };
         evict_refused_token(token.as_ref(), &outcome);
         outcome
     }
@@ -3219,6 +3262,7 @@ impl runtime::PreparedWrite for Write {
             http,
             reader,
             token,
+            upload: _,
         } = *self;
         let outcome = prepared
             .execute_holding(

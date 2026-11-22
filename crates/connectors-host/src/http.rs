@@ -294,6 +294,26 @@ impl ScopedHttp {
         })
     }
 
+    /// [`Self::into_write`] over a copy of this port: its target, TLS
+    /// configuration, credential (or none) and deadline. Trusted composition
+    /// only, inside the preparation of a write the host admitted, for a write
+    /// that sends to more than one captured target, such as a provider-issued
+    /// upload URL on an admitted origin.
+    pub fn to_write(&self) -> Box<dyn AuthenticatedWrite> {
+        Self {
+            client: self.client.clone(),
+            base: self.base.clone(),
+            credential: self.credential.clone(),
+            header: self.header.clone(),
+            bearer: self.bearer,
+            read_posts: self.read_posts.clone(),
+            read_post_timeout: self.read_post_timeout,
+            fixed_header: self.fixed_header.clone(),
+            provider_until: self.provider_until,
+        }
+        .into_write()
+    }
+
     /// Trusted composition only, inside the preparation of a write the host
     /// admitted: the single consuming write capability of [`Self::into_write`]
     /// that may also open one upgraded stream under `bounds`. The upgrade goes
@@ -626,6 +646,36 @@ fn budget_expired() -> Error {
     )
 }
 
+/// A write's answer: its status, its headers (at most 128 lines and 32 KiB)
+/// and its body, bounded as every write's is.
+async fn write_response(response: reqwest::Response) -> Result<HttpResponse> {
+    let status = response.status().as_u16();
+    let mut headers = std::collections::BTreeMap::new();
+    let mut bytes = 0_usize;
+    for (index, (name, value)) in response.headers().iter().enumerate() {
+        bytes = bytes
+            .saturating_add(name.as_str().len())
+            .saturating_add(value.as_bytes().len());
+        if index >= 128 || bytes > 32_768 {
+            return Err(Error::new(
+                ErrorCode::Capacity,
+                "provider response headers exceed limit",
+            ));
+        }
+        if let Ok(value) = value.to_str() {
+            keep_header(&mut headers, name.as_str(), value);
+        }
+    }
+    let body = connectors_client::bounded(response)
+        .await
+        .map_err(body_error)?;
+    Ok(HttpResponse {
+        status,
+        headers,
+        body,
+    })
+}
+
 // Deliberately private, non-Clone, and separate from the GET capability. Native
 // effect interpretation remains with the adapter: even a successful HTTP status
 // is only a response, and every transport failure can follow a committed write.
@@ -659,31 +709,45 @@ impl AuthenticatedWrite for ScopedWrite {
             request.json(body)
         };
         let response = self.http.send(request).await?;
-        let status = response.status().as_u16();
-        let mut headers = std::collections::BTreeMap::new();
-        let mut bytes = 0_usize;
-        for (index, (name, value)) in response.headers().iter().enumerate() {
-            bytes = bytes
-                .saturating_add(name.as_str().len())
-                .saturating_add(value.as_bytes().len());
-            if index >= 128 || bytes > 32_768 {
-                return Err(Error::new(
-                    ErrorCode::Capacity,
-                    "provider response headers exceed limit",
-                ));
-            }
-            if let Ok(value) = value.to_str() {
-                keep_header(&mut headers, name.as_str(), value);
-            }
+        write_response(response).await
+    }
+
+    /// The request is built by the same `request` as `send_json`'s, so the
+    /// captured target, TLS roots, credential header, no-proxy and no-redirect
+    /// policy all apply; only the body is the caller's bytes, as they are.
+    async fn send_bytes(
+        self: Box<Self>,
+        method: WriteMethod,
+        segments: &[&str],
+        query: &[(&str, String)],
+        media_type: &str,
+        body: &[u8],
+    ) -> Result<HttpResponse> {
+        let method = match method {
+            WriteMethod::Post => reqwest::Method::POST,
+            WriteMethod::Put => reqwest::Method::PUT,
+            WriteMethod::Patch => reqwest::Method::PATCH,
+            WriteMethod::Delete => reqwest::Method::DELETE,
+        };
+        // One visible-ASCII header value: nothing that could frame another.
+        if media_type.is_empty()
+            || media_type.len() > 255
+            || !media_type
+                .bytes()
+                .all(|b| b == b' ' || b.is_ascii_graphic())
+        {
+            return Err(Error::invalid("invalid media type"));
         }
-        let body = connectors_client::bounded(response)
-            .await
-            .map_err(body_error)?;
-        Ok(HttpResponse {
-            status,
-            headers,
-            body,
-        })
+        let content_type = reqwest::header::HeaderValue::from_str(media_type)
+            .map_err(|_| Error::invalid("invalid media type"))?;
+        let request = self
+            .http
+            .request(method, segments, query)
+            .await?
+            .header(reqwest::header::CONTENT_TYPE, content_type)
+            .body(body.to_vec());
+        let response = self.http.send(request).await?;
+        write_response(response).await
     }
 
     /// `connectors.transport.UpgradeOutcome` (`ess/domains/transport.yaml`).

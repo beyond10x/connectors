@@ -27,7 +27,7 @@ The outputs below come from the guide's run against a local HTTPS fixture standi
 
 | Token | Reads | Writes |
 |---|---|---|
-| bot (`slack.bot`) | `conversations.list`, `conversations.history`, `conversations.replies`, `users.list`, `users.info`, `users.lookupByEmail`, `team.info`, `emoji.list`, `auth.test`, `files.list`, `files.info`, `file.download` | `chat.postMessage`, `conversations.open`, `chat.update`, `chat.delete`, `files.delete`, each guarded: it reads `auth.test` first (`files.delete` also reads the file with `files.info`) and sends nothing unless that answers `"ok": true`, and the answer must carry `"ok": true` too |
+| bot (`slack.bot`) | `conversations.list`, `conversations.history`, `conversations.replies`, `users.list`, `users.info`, `users.lookupByEmail`, `team.info`, `emoji.list`, `auth.test`, `files.list`, `files.info`, `file.download` | `chat.postMessage`, `conversations.open`, `chat.update`, `chat.delete`, `files.delete`, `file.upload`, each guarded: it reads `auth.test` first (`files.delete` also reads the file with `files.info`) and sends nothing unless that answers `"ok": true`, and the answer must carry `"ok": true` too |
 | search (`slack.user`) | `search.messages`, `conversations.list`, `conversations.history`, `conversations.replies`, `users.list` | none |
 
 A bot reads only the conversations it is a member of. A user token reads what that person can
@@ -161,6 +161,15 @@ the file is not found. Slack's `file_not_found` and `file_deleted` are refused a
 `cant_delete_file` as `forbidden`
 ([Files in the full guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-slack.md#files)).
 
+`file.upload` uploads one file of at most 2 MiB into a channel or a thread with one approval. Its
+input is `{"body":{"channel_id":…,"thread_ts":…,"filename":…,"title":…},"content":{"base64":…,"sha256":…}}`;
+content that is not base64, is over 2 MiB or does not match its `sha256` is refused before any
+request. It reads `auth.test`, asks `files.getUploadURLExternal` for an upload URL, sends the
+bytes there only when it is on `https://files.slack.com` under `/upload/` and the connection
+admits that host, and shares the file with `files.completeUploadExternal`. Nothing is shared
+before that last request
+([Files in the full guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-slack.md#files)).
+
 ## Reconnect when the connection is Stale
 
 Slack answers a revoked token with `"ok": false` and `invalid_auth`. The connection turns `stale`,
@@ -186,6 +195,8 @@ $ printf '{"token":"xoxb-fixture-token"}' | connectors connections reconnect --c
   Slack entries to pinned instances of `slack` under their aliases.
 - Each list returns one page per call. Search pages by number (`page`, `count` 1 to 100).
 - `file.download` reads at most 2 MiB, and only on a connection whose hosts admit
-  `https://files.slack.com`. File upload is not offered. `files.delete` is not read back after
-  the write.
+  `https://files.slack.com`. `file.upload` sends at most 2 MiB, and only to an `upload_url` on
+  `https://files.slack.com` that the connection's hosts admit; through the local CLI the input
+  limit of 1 MiB and the approval limit of 272 KiB bound it further. `files.delete` is not read
+  back after the write.
 - A Slack error arrives as `200` with `"ok": false`.

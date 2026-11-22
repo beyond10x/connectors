@@ -770,7 +770,8 @@ impl<A: runtime::Adapter> connectors_sdk::Adapter for Bridge<A> {
     /// The allowed-values and repository checks, before the host anchors the
     /// call.
     fn admit(&self, operation: &str, input: &Value) -> Result<()> {
-        self.bounded(operation, input)
+        self.bounded(operation, input)?;
+        runtime::Adapter::admit(&self.adapter, operation, input)
     }
 
     async fn invoke(&self, operation: &str, input: Value) -> Result<Value> {

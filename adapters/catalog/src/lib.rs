@@ -398,11 +398,66 @@ pub struct Download {
     pub path_prefix: String,
 }
 
+/// A write whose bytes go to a URL the provider issues for them
+/// (`connectors_catalog.binary.Upload`), such as Slack's external upload: one
+/// approved write of three requests. First the `slot`, a POST of the bundle
+/// with no body, whose answer must hold every check and name the URL at the
+/// pointer `url`; then the caller's `content` bytes, POSTed as they are to
+/// that URL, which must be an `https` URL on an origin in the selection's
+/// `binary.hosts` that the connection admits ([`WriteHosts`]), its path under
+/// `path_prefix`; then the selection's own operation, the completing write,
+/// with `send` as its JSON body. `send` is a JSON value in which an object
+/// `{"input": <reference>}` is the value the reference names (`body.<key>`,
+/// or `content.length`, `content.sha256` or `content.media_type`), with
+/// `"optional": true` a member left out when it is absent, and an object
+/// `{"slot": <pointer>}` the value at that pointer of the slot's answer;
+/// anything else is sent as written. The content is refused before any
+/// request when it is not base64, is empty, is longer than `binary.max_bytes`
+/// or does not match its `sha256`; a URL the upload does not reach or the
+/// connection does not admit is refused before any byte is sent. Nothing is
+/// shared before the completing write, so every outcome before it is a
+/// refusal.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Upload {
+    pub slot: Slot,
+    pub path_prefix: String,
+    pub send: Value,
+}
+
+/// The request that issues an upload's URL (`connectors_catalog.binary.Slot`):
+/// a POST of the bundle under the base path, sent with no body, its
+/// parameters bound from references as [`Upload::send`] reads them.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Slot {
+    pub operation_id: String,
+    pub values: BTreeMap<String, String>,
+    pub checks: Vec<Check>,
+    pub url: String,
+}
+
 /// The ports for the origins a connection admits besides its API base, each
 /// carrying the connection's credential or none, as the connection declares.
 /// Trusted composition builds them; the engine only looks one up by origin.
 pub trait Hosts: Send + Sync {
     fn port(&self, origin: &str) -> Option<&dyn AuthenticatedHttp>;
+}
+
+/// The write ports of the origins a connection admits besides its API base,
+/// for an [`Upload`]'s bytes: each call yields one single-use capability to
+/// that origin, or none when the connection does not admit it. Trusted
+/// composition builds them inside the preparation of an admitted write.
+pub trait WriteHosts: Send + Sync {
+    fn write(&self, origin: &str) -> Option<Box<dyn AuthenticatedWrite>>;
+}
+
+/// A connection that admits no host to write to besides its API base.
+pub struct NoWriteHosts;
+impl WriteHosts for NoWriteHosts {
+    fn write(&self, _origin: &str) -> Option<Box<dyn AuthenticatedWrite>> {
+        None
+    }
 }
 
 /// A connection that admits no host besides its API base.
@@ -609,6 +664,10 @@ pub struct Selection {
     /// when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub download: Option<Download>,
+    /// A write whose bytes go to a URL the provider issues ([`Upload`]).
+    /// Omitted when absent, so a selection without it keeps its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upload: Option<Upload>,
     /// Bounds keyed by query parameter name; omitted when there are none, so an
     /// unbounded selection serialises as it did before bounds existed.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -1149,6 +1208,8 @@ pub struct Engine {
     downloads: Vec<Downloaded>,
     /// Each guarded selection's probe, keyed by the selection id.
     probes: BTreeMap<String, Probe>,
+    /// Each upload's slot request, keyed by the selection id.
+    slots: BTreeMap<String, Template>,
     feed: Option<feed::Feed>,
 }
 
@@ -1179,6 +1240,25 @@ pub struct Prepared {
     custody: Option<Custody>,
     /// The status by which the provider says the target changed since it was read.
     conflict_status: Option<u16>,
+    /// An upload's slot and bytes, sent before this request by
+    /// [`Prepared::execute_upload`] alone.
+    upload: Option<Box<Staged>>,
+}
+
+/// An upload bound before any request: its slot request, the checks its
+/// answer must hold, the pointer of the URL it names, where that URL may be,
+/// and the bytes.
+struct Staged {
+    slot: Request,
+    checks: Vec<(String, Pinned)>,
+    url: String,
+    hosts: Vec<String>,
+    path_prefix: String,
+    media_type: String,
+    bytes: zeroize::Zeroizing<Vec<u8>>,
+    /// The completing body's template, and what its input references read.
+    send: Value,
+    view: Value,
 }
 
 impl Engine {
@@ -1227,6 +1307,7 @@ impl Engine {
         let mut exposed = Vec::new();
         let mut downloads = Vec::new();
         let mut probes = BTreeMap::new();
+        let mut slots = BTreeMap::new();
         let mut ids = std::collections::BTreeSet::new();
         for selection in selections {
             if !connectors_core::valid_id(&selection.id) || !ids.insert(selection.id.clone()) {
@@ -1293,7 +1374,10 @@ impl Engine {
                     .iter()
                     .filter(|p| &p.name == name)
                     .collect();
-                let reason = if declared.is_empty()
+                // An upload's completing write may be one an amendment added,
+                // which declares no credential parameter; its guard's reads and
+                // its slot then still leave the name out.
+                let reason = if (declared.is_empty() && selection.upload.is_none())
                     || declared
                         .iter()
                         .any(|p| !matches!(p.location, Location::Query | Location::Header))
@@ -1638,6 +1722,16 @@ impl Engine {
                     },
                 );
             }
+            if let Some(upload) = &selection.upload {
+                let mut slot = find(&upload.slot.operation_id)?.clone();
+                slot.parameters
+                    .retain(|p| !selection.credential.contains(&p.name));
+                check_upload(selection, upload, &operation, &slot, &base_segments)?;
+                slots.insert(
+                    selection.id.clone(),
+                    Template::from_operation(&slot).map_err(|refusal| refuse(refusal.reason()))?,
+                );
+            }
             // The closed body, its members resolved to paths and checked
             // against what each may name (`closed::Closed`).
             let closed = closed::Closed::new(selection, !operation.request_media_types.is_empty())?;
@@ -1651,11 +1745,15 @@ impl Engine {
             if let Some(custody) = &selection.custody {
                 declaration.output_schema = custody_schema(custody);
             }
-            if selection.binary.is_some() {
+            // An upload sends bytes and answers its completing write's JSON.
+            if selection.binary.is_some() && selection.upload.is_none() {
                 declaration.output_schema["properties"]["body"] = binary_body_schema();
             }
             if selection.embedded_text.is_some() {
                 declaration.output_schema["properties"]["body"] = json!({"type": "string"});
+            }
+            if let (Some(_), Some(binary)) = (&selection.upload, &selection.binary) {
+                declare_upload(&mut declaration, binary);
             }
             // A folded input is declared under its own name, optional, in the
             // fold's format; it is no parameter of the operation.
@@ -1699,6 +1797,7 @@ impl Engine {
             exposed,
             downloads,
             probes,
+            slots,
             feed,
         })
     }
@@ -1716,6 +1815,21 @@ impl Engine {
     /// Every origin a selected binary read may reach besides the API base. A
     /// connection admits only these; a read reaching one it does not admit is
     /// refused before anything is sent there.
+    /// The refusal an input earns from itself alone, before anything is
+    /// recorded or sent: for an [`Upload`], content that is not base64, is
+    /// empty, is longer than `binary.max_bytes` or does not equal its
+    /// `sha256`. `Ok` for every other selection; [`Engine::prepare`] checks
+    /// the same again.
+    pub fn admit(&self, id: &str, input: &Value) -> Result<()> {
+        let Some(exposed) = self.exposed.iter().find(|e| e.selection.id == id) else {
+            return Ok(());
+        };
+        match (&exposed.selection.upload, &exposed.selection.binary) {
+            (Some(_), Some(binary)) => content(binary, input).map(|_| ()),
+            _ => Ok(()),
+        }
+    }
+
     pub fn reached_hosts(&self) -> BTreeSet<&str> {
         self.exposed
             .iter()
@@ -2084,6 +2198,17 @@ impl Engine {
         if !exposed.closed.is_empty() {
             body = exposed.closed.complete(body);
         }
+        // An upload is bound whole before any request, the guard's included:
+        // its bytes, their bound and digest, the slot and the completing body.
+        let upload = match &exposed.selection.upload {
+            None => None,
+            Some(declared) => {
+                let staged = self.stage(exposed, declared, &input)?;
+                // The completing body is built from the slot's answer.
+                body = Value::Null;
+                Some(Box::new(staged))
+            }
+        };
         let mut postflight = Vec::new();
         let mut alternatives = Vec::new();
         let mut reread = None;
@@ -2234,9 +2359,270 @@ impl Engine {
             refusal_texts: exposed.selection.refusal_texts.clone(),
             custody: exposed.selection.custody.clone(),
             conflict_status: exposed.selection.conflict_status,
+            upload,
+        })
+    }
+
+    /// An upload's content checked and its requests bound, with nothing sent:
+    /// the bytes (standard base64, not empty, at most `binary.max_bytes`, equal
+    /// to their `sha256`), the slot request and the completing body, its slot
+    /// references left for the slot's answer.
+    fn stage(&self, exposed: &Exposed, upload: &Upload, input: &Value) -> Result<Staged> {
+        let binary = exposed
+            .selection
+            .binary
+            .as_ref()
+            .ok_or_else(Error::internal)?;
+        let Content {
+            bytes,
+            sha256,
+            media_type,
+        } = content(binary, input)?;
+        let length = bytes.len() as u64;
+        // What a reference reads: the caller's body and the content's facts,
+        // never its bytes.
+        let view = json!({
+            "body": input.get("body").cloned().unwrap_or(Value::Null),
+            "content": {"length": length, "sha256": sha256, "media_type": media_type},
+        });
+        let mut bound = BTreeMap::new();
+        for (parameter, path) in &upload.slot.values {
+            let value = reference(&view, path)
+                .and_then(scalar)
+                .ok_or_else(|| refuse(format!("upload value `{path}` is absent")))?;
+            bound.insert(parameter.clone(), Supplied::One(value));
+        }
+        let template = self
+            .slots
+            .get(&exposed.selection.id)
+            .ok_or_else(Error::internal)?;
+        let slot = self.resolve(template, bound)?;
+        let checks = upload
+            .slot
+            .checks
+            .iter()
+            .map(|check| {
+                let pinned = match &check.expect {
+                    Expectation::Literal(text) => Pinned::Text(text.clone()),
+                    Expectation::Boolean(flag) => Pinned::Boolean(*flag),
+                    Expectation::Present(_) => Pinned::Present,
+                    Expectation::Input(_) => return Err(Error::internal()),
+                };
+                Ok((check.pointer.clone(), pinned))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        // Every input the completing body names is checked now; its slot
+        // references are read once the slot answers.
+        match send(&upload.send, &view, None) {
+            Ok(Some(_)) => {}
+            Ok(None) | Err(Absent::Slot(_)) => return Err(Error::internal()),
+            Err(Absent::Input(path)) => {
+                return Err(refuse(format!("upload value `{path}` is absent")));
+            }
+        }
+        Ok(Staged {
+            slot,
+            checks,
+            url: upload.slot.url.clone(),
+            hosts: binary.hosts.clone(),
+            path_prefix: upload.path_prefix.clone(),
+            media_type,
+            bytes,
+            send: upload.send.clone(),
+            view,
         })
     }
 }
+
+/// An upload's bytes, checked: their lower-case hex SHA-256 and media type.
+struct Content {
+    bytes: zeroize::Zeroizing<Vec<u8>>,
+    sha256: String,
+    media_type: String,
+}
+
+/// The `content` of an upload's input, or its refusal as `invalid_input`:
+/// `base64` that is not standard base64 with padding, no byte, more than
+/// `binary.max_bytes`, bytes whose SHA-256 is not `sha256`, or a `media_type`
+/// that is not `type/subtype`. It reads the input alone, so a host can refuse
+/// it before it records or sends anything ([`Engine::admit`]).
+fn content(binary: &Binary, input: &Value) -> Result<Content> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use sha2::{Digest as _, Sha256};
+    let content = input
+        .get("content")
+        .ok_or_else(|| refuse("`content` is absent"))?;
+    let encoded = content
+        .get("base64")
+        .and_then(Value::as_str)
+        .ok_or_else(|| refuse("`content.base64` is not a string"))?;
+    let bytes = zeroize::Zeroizing::new(
+        STANDARD
+            .decode(encoded)
+            .map_err(|_| refuse("`content.base64` is not standard base64 with padding"))?,
+    );
+    if bytes.is_empty() {
+        return Err(refuse("`content` holds no byte"));
+    }
+    let length = bytes.len() as u64;
+    if length > binary.max_bytes {
+        return Err(refuse(format!(
+            "content of {length} bytes exceeds max_bytes of {}; nothing was sent",
+            binary.max_bytes
+        )));
+    }
+    let sha256: String = Sha256::digest(bytes.as_slice())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    if content.get("sha256").and_then(Value::as_str) != Some(sha256.as_str()) {
+        return Err(refuse(
+            "`content` does not match `content.sha256`; nothing was sent",
+        ));
+    }
+    let media_type = match content.get("media_type") {
+        None => "application/octet-stream".to_owned(),
+        Some(Value::String(text)) if media_type(text) => text.to_ascii_lowercase(),
+        Some(_) => return Err(refuse("`content.media_type` is not a type/subtype")),
+    };
+    Ok(Content {
+        bytes,
+        sha256,
+        media_type,
+    })
+}
+
+/// Whether `text` is a media type an upload may name: `type/subtype`, each one
+/// to 63 letters, digits and `!#$&^_.+-`, no parameter.
+fn media_type(text: &str) -> bool {
+    let part = |part: &str| {
+        (1..=63).contains(&part.len())
+            && part
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"!#$&^_.+-".contains(&b))
+    };
+    text.split_once('/')
+        .is_some_and(|(kind, subtype)| part(kind) && part(subtype))
+}
+
+/// A reference of an upload's `send` that names nothing: an input reference
+/// the caller did not give, or a pointer the slot's answer does not hold.
+enum Absent {
+    Input(String),
+    Slot(String),
+}
+
+/// `template` with each reference replaced by the value it names, in one pass,
+/// so a value it names is never read as a reference in turn; an absent
+/// optional input reference is left out with its member. Without the slot's
+/// answer each slot reference is `null`: the pass then only checks the input.
+/// `None` only for an absent optional reference, which its member drops.
+fn send(
+    template: &Value,
+    input: &Value,
+    slot: Option<&Value>,
+) -> std::result::Result<Option<Value>, Absent> {
+    match template {
+        Value::Object(members) => {
+            if let Some(Value::String(path)) = members.get("input") {
+                let optional = members.get("optional") == Some(&Value::Bool(true));
+                return match reference(input, path).filter(|value| !value.is_null()) {
+                    Some(value) => Ok(Some(value.clone())),
+                    None if optional => Ok(None),
+                    None => Err(Absent::Input(path.clone())),
+                };
+            }
+            if let Some(Value::String(pointer)) = members.get("slot") {
+                let Some(slot) = slot else {
+                    return Ok(Some(Value::Null));
+                };
+                return match slot.pointer(pointer).filter(|value| !value.is_null()) {
+                    Some(value) => Ok(Some(value.clone())),
+                    None => Err(Absent::Slot(pointer.clone())),
+                };
+            }
+            let mut sent = serde_json::Map::new();
+            for (name, member) in members {
+                if let Some(value) = send(member, input, slot)? {
+                    sent.insert(name.clone(), value);
+                }
+            }
+            Ok(Some(Value::Object(sent)))
+        }
+        Value::Array(elements) => Ok(Some(Value::Array(
+            elements
+                .iter()
+                .map(|element| send(element, input, slot).map(|value| value.unwrap_or(Value::Null)))
+                .collect::<std::result::Result<_, _>>()?,
+        ))),
+        scalar => Ok(Some(scalar.clone())),
+    }
+}
+
+/// The references of an upload's `send`, each with whether it reads the slot's
+/// answer, or the first problem with its shape: an object naming `input` or
+/// `slot` with any other member (`optional: true` beside `input` aside), a
+/// reference that is not a string, an `optional` reference outside an object
+/// member, an input reference that is not `body.<key>` or one of the content's
+/// facts, and a slot reference that is not a JSON pointer.
+fn send_references(
+    value: &Value,
+    member: bool,
+    found: &mut Vec<(String, bool)>,
+) -> std::result::Result<(), &'static str> {
+    match value {
+        Value::Object(members) if members.contains_key("input") => {
+            let optional = match members.get("optional") {
+                None => false,
+                Some(Value::Bool(true)) if member => true,
+                Some(_) => {
+                    return Err(
+                        "an optional input reference outside an object member, or `optional` other than true",
+                    );
+                }
+            };
+            if members.len() != 1 + usize::from(optional) {
+                return Err("an input reference beside another member");
+            }
+            let Some(Value::String(path)) = members.get("input") else {
+                return Err("an input reference that is not a string");
+            };
+            let valid = path
+                .strip_prefix("body.")
+                .is_some_and(|rest| !rest.is_empty() && rest.split('.').all(|key| !key.is_empty()))
+                || CONTENT_FACTS.contains(&path.as_str());
+            if !valid {
+                return Err(
+                    "an input reference that is not `body.<key>`, `content.length`, `content.sha256` or `content.media_type`",
+                );
+            }
+            found.push((path.clone(), false));
+            Ok(())
+        }
+        Value::Object(members) if members.contains_key("slot") => {
+            if members.len() != 1 {
+                return Err("a slot reference beside another member");
+            }
+            match members.get("slot") {
+                Some(Value::String(pointer)) if pointer.starts_with('/') => {
+                    found.push((pointer.clone(), true));
+                    Ok(())
+                }
+                _ => Err("a slot reference that is not a JSON pointer"),
+            }
+        }
+        Value::Object(members) => members
+            .values()
+            .try_for_each(|value| send_references(value, true, found)),
+        Value::Array(elements) => elements
+            .iter()
+            .try_for_each(|value| send_references(value, false, found)),
+        _ => Ok(()),
+    }
+}
+
+/// The facts of an upload's content a reference may read.
+const CONTENT_FACTS: [&str; 3] = ["content.length", "content.sha256", "content.media_type"];
 
 impl Prepared {
     /// Whether the guard reads after the write, so [`Prepared::execute_reading`]
@@ -2330,6 +2716,157 @@ impl Prepared {
         self.dispatch_zeroizing(capability, reader, false).await
     }
 
+    /// Whether this write is an [`Upload`], sent only by
+    /// [`Prepared::execute_upload`].
+    pub fn uploads(&self) -> bool {
+        self.upload.is_some()
+    }
+
+    /// An [`Upload`]'s three requests, under the one approval this write was
+    /// prepared for: the slot through `slot`, the bytes through the port
+    /// `hosts` yields for the URL's origin, and the completing write through
+    /// `complete`, classified as [`Prepared::execute_reading`] classifies a
+    /// write. Before the completing write nothing is shared, so a slot or a
+    /// byte request that fails, is not answered or answers a refusal, a slot
+    /// answer that fails a check or names no URL or no value the completing
+    /// body reads, and a URL the upload does not reach or the connection does
+    /// not admit, are each refused, the last two with no byte sent.
+    pub async fn execute_upload(
+        mut self,
+        slot: Box<dyn AuthenticatedWrite>,
+        hosts: &dyn WriteHosts,
+        complete: Box<dyn AuthenticatedWrite>,
+        reader: Option<&dyn AuthenticatedHttp>,
+    ) -> WriteOutcome<Value> {
+        let Some(staged) = self.upload.take() else {
+            return self.dispatch(complete, reader).await;
+        };
+        let refused = |code, message: &str| WriteOutcome::Refused(Error::new(code, message));
+        // The slot: a POST with its query bound and no body.
+        let (segments, query) = &staged.slot;
+        let segments: Vec<&str> = segments.iter().map(String::as_str).collect();
+        let query: Vec<(&str, String)> =
+            query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
+        let Ok(answer) = slot
+            .send_json(WriteMethod::Post, &segments, &query, &Value::Null)
+            .await
+        else {
+            return refused(
+                ErrorCode::Unavailable,
+                "the upload slot was not answered; nothing was shared",
+            );
+        };
+        if let Some(error) = unshared_refusal(&answer, "the provider refused the upload slot") {
+            return WriteOutcome::Refused(error);
+        }
+        let Ok(issued) = read_body(&answer, false, &self.rate_limit_reasons) else {
+            return refused(
+                ErrorCode::UpstreamProtocol,
+                "the upload slot answered with a body this engine cannot read; nothing was shared",
+            );
+        };
+        if !staged
+            .checks
+            .iter()
+            .all(|(pointer, expected)| expected.holds(issued.pointer(pointer)))
+        {
+            return WriteOutcome::Refused(
+                Error::new(ErrorCode::Forbidden, "the provider refused the upload slot")
+                    .answered()
+                    .with_upstream_reason(connectors_core::reason::from_body(&answer.body)),
+            );
+        }
+        // The URL, held to the upload's hosts, the connection's admission and
+        // the path prefix before any byte is sent.
+        let Some(url) = issued.pointer(&staged.url).and_then(Value::as_str) else {
+            return refused(
+                ErrorCode::UpstreamProtocol,
+                "the upload slot answered without an upload URL; nothing was shared",
+            );
+        };
+        if origin(url).is_some() && Target::escapes(&url["https://".len()..]) {
+            return refused(
+                ErrorCode::Forbidden,
+                "the upload URL has a path segment that decodes to `/` or `\\`; no byte was sent",
+            );
+        }
+        let Some(target) = Target::absolute(url) else {
+            return refused(
+                ErrorCode::Forbidden,
+                "the upload URL is not an https URL this engine can send; no byte was sent",
+            );
+        };
+        if !staged.hosts.contains(&target.origin) {
+            return refused(
+                ErrorCode::Forbidden,
+                &format!(
+                    "the upload URL is on `{}`, which this upload does not reach; no byte was sent",
+                    target.origin
+                ),
+            );
+        }
+        if !target.raw_path.starts_with(&staged.path_prefix) {
+            return refused(
+                ErrorCode::Forbidden,
+                &format!(
+                    "the upload URL is not under `{}`; no byte was sent",
+                    staged.path_prefix
+                ),
+            );
+        }
+        let Some(port) = hosts.write(&target.origin) else {
+            return refused(
+                ErrorCode::Forbidden,
+                &format!(
+                    "the upload URL is on `{}`, which the connection does not admit; no byte was sent",
+                    target.origin
+                ),
+            );
+        };
+        let body = match send(&staged.send, &staged.view, Some(&issued)) {
+            Ok(Some(body)) => body,
+            Ok(None) | Err(Absent::Input(_)) => {
+                return refused(ErrorCode::Internal, "internal operation failure");
+            }
+            Err(Absent::Slot(pointer)) => {
+                return refused(
+                    ErrorCode::UpstreamProtocol,
+                    &format!(
+                        "the upload slot answered without a value at `{pointer}`; no byte was sent"
+                    ),
+                );
+            }
+        };
+        // The bytes, as they are.
+        let segments: Vec<&str> = target.segments.iter().map(String::as_str).collect();
+        let query: Vec<(&str, String)> = target
+            .query
+            .iter()
+            .map(|(name, value)| (name.as_str(), value.clone()))
+            .collect();
+        let Ok(answer) = port
+            .send_bytes(
+                WriteMethod::Post,
+                &segments,
+                &query,
+                &staged.media_type,
+                &staged.bytes,
+            )
+            .await
+        else {
+            return refused(
+                ErrorCode::Unavailable,
+                "the upload was not answered; nothing was shared",
+            );
+        };
+        if let Some(error) = unshared_refusal(&answer, "the provider refused the upload") {
+            return WriteOutcome::Refused(error);
+        }
+        // The completing write, the one that shares the file.
+        self.body = body;
+        self.dispatch(complete, reader).await
+    }
+
     /// Send once and classify; with `zeroize`, the answer's bytes are
     /// overwritten once they are read.
     async fn dispatch_zeroizing(
@@ -2338,6 +2875,13 @@ impl Prepared {
         reader: Option<&dyn AuthenticatedHttp>,
         zeroize: bool,
     ) -> WriteOutcome<Value> {
+        // An upload's completing write alone would share nothing it sent.
+        if self.upload.is_some() {
+            return WriteOutcome::Refused(Error::new(
+                ErrorCode::Forbidden,
+                "an upload is sent only with its slot and byte ports",
+            ));
+        }
         let segments: Vec<&str> = self.segments.iter().map(String::as_str).collect();
         let query: Vec<(&str, String)> = self
             .query
@@ -2515,6 +3059,32 @@ impl Prepared {
             "provenance": provenance(&self.instance, &self.resource, &self.source_revision),
         })))
     }
+}
+
+/// The refusal of an upload's slot or byte request answered outside 2xx: the
+/// code its status gives, as the provider's answer with its admitted reason.
+/// Nothing is shared before the completing write, so none leaves the effect
+/// possible. `None` for a 2xx answer.
+fn unshared_refusal(answer: &HttpResponse, message: &str) -> Option<Error> {
+    if (200..300).contains(&answer.status) {
+        return None;
+    }
+    let code = match answer.status {
+        400 | 409 | 412 | 413 | 422 => ErrorCode::InvalidInput,
+        401 => ErrorCode::Unauthorized,
+        403 => ErrorCode::Forbidden,
+        404 | 410 => ErrorCode::NotFound,
+        429 => ErrorCode::RateLimited,
+        _ => ErrorCode::Unavailable,
+    };
+    let limited = code == ErrorCode::RateLimited;
+    let mut error = Error::new(code, format!("{message}; nothing was shared"))
+        .answered()
+        .with_upstream_reason(connectors_core::reason::from_body(&answer.body));
+    if limited {
+        error.retry_after_seconds = retry_after_header(answer);
+    }
+    Some(error)
 }
 
 fn write_method(method: &str) -> Option<WriteMethod> {
@@ -3551,18 +4121,27 @@ fn fixed_query(selection: &Selection, input: &Value) -> Result<Vec<(String, Stri
 fn check_binary(selection: &Selection) -> Result<()> {
     let declared = selection.response == Some(ResponseKind::Binary);
     let Some(binary) = &selection.binary else {
-        if declared || selection.download.is_some() {
+        if declared || selection.download.is_some() || selection.upload.is_some() {
             return Err(refuse(format!(
-                "selection `{}` declares a binary response or a download without binary",
+                "selection `{}` declares a binary response, a download or an upload without binary",
                 selection.id
             )));
         }
         return Ok(());
     };
     let mut seen = BTreeSet::new();
-    let problem = if !declared {
+    // An upload's `binary` bounds the bytes it sends and names the hosts its
+    // URL may be on; it reads no binary answer.
+    let upload = selection.upload.is_some();
+    let problem = if upload && declared {
+        Some("beside a binary response on an upload")
+    } else if upload && selection.effect != Effect::Write {
+        Some("for an upload that is not a write")
+    } else if upload && binary.hosts.is_empty() {
+        Some("for an upload that reaches no host")
+    } else if !upload && !declared {
         Some("beside a response that is not binary")
-    } else if selection.effect != Effect::Read {
+    } else if !upload && selection.effect != Effect::Read {
         Some("for a write")
     } else if binary.max_bytes == 0 || binary.max_bytes > BINARY_LIMIT {
         Some("with max_bytes outside 1 to 2097152")
@@ -3632,6 +4211,130 @@ fn check_download(selection: &Selection, download: &Download) -> Result<()> {
         ))),
         None => Ok(()),
     }
+}
+
+/// What an `upload` selection must be beyond its binary members: a write whose
+/// operation takes a JSON body, with a closed caller body and none of the
+/// members a download, a credential it creates, a walk, a fixed body key or a
+/// prefixed one declare; a slot that is a POST under the base path whose every
+/// required parameter it binds, from references `send` could read, with one to
+/// sixteen checks against literals, booleans or presence and a URL pointer; a
+/// path prefix bounded by `/`, as a download's is; and a `send` object whose
+/// references are well formed, at least one of them reading the slot's answer.
+fn check_upload(
+    selection: &Selection,
+    upload: &Upload,
+    operation: &Operation,
+    slot: &Operation,
+    base_segments: &[String],
+) -> Result<()> {
+    let prefix = &upload.path_prefix;
+    let reference = |path: &str| {
+        path.strip_prefix("body.")
+            .is_some_and(|rest| rest.split('.').all(|key| !key.is_empty()))
+            || CONTENT_FACTS.contains(&path)
+    };
+    let mut references = Vec::new();
+    let shape = match upload.send.as_object() {
+        Some(members) if !members.contains_key("input") && !members.contains_key("slot") => {
+            send_references(&upload.send, false, &mut references).err()
+        }
+        _ => Some("a body that is not an object of members"),
+    };
+    let problem = if selection.effect != Effect::Write || operation.request_media_types.is_empty() {
+        Some("on an operation that is not a write taking a JSON body".to_owned())
+    } else if selection.download.is_some()
+        || selection.custody.is_some()
+        || selection.walk.is_some()
+        || !selection.body_fixed.is_empty()
+        || !selection.body_prefixes.is_empty()
+    {
+        Some("beside a download, custody, a walk, a fixed body key or a body prefix".to_owned())
+    } else if selection.body_keys.is_empty() {
+        Some("without a closed body (`body_keys`)".to_owned())
+    } else if slot.method != "post" || !path_within(&slot.path, base_segments) {
+        Some(format!(
+            "whose slot `{}` is not a POST under the base path",
+            upload.slot.operation_id
+        ))
+    } else if let Some(name) = upload
+        .slot
+        .values
+        .keys()
+        .find(|name| !slot.parameters.iter().any(|p| &p.name == *name))
+    {
+        Some(format!("whose slot binds `{name}`, which its operation does not declare"))
+    } else if let Some(parameter) = slot
+        .parameters
+        .iter()
+        .find(|p| p.required && !upload.slot.values.contains_key(&p.name))
+    {
+        Some(format!(
+            "whose slot leaves its required `{}` unbound",
+            parameter.name
+        ))
+    } else if let Some(path) = upload.slot.values.values().find(|path| !reference(path)) {
+        Some(format!("whose slot binds `{path}`, which is not a reference an upload reads"))
+    } else if upload.slot.checks.is_empty()
+        || upload.slot.checks.len() > 16
+        || upload.slot.checks.iter().any(|check| {
+            !check.pointer.starts_with('/')
+                || matches!(&check.expect, Expectation::Input(_) | Expectation::Present(false))
+                || matches!(&check.expect, Expectation::Literal(text) if text == "true" || text == "false")
+        })
+    {
+        Some("whose slot does not declare one to sixteen checks against a literal, a boolean or presence".to_owned())
+    } else if !upload.slot.url.starts_with('/') {
+        Some("whose slot URL is not a JSON pointer".to_owned())
+    } else if prefix.len() < 2
+        || !prefix.starts_with('/')
+        || !prefix.ends_with('/')
+        || prefix.contains(['?', '#', '%', '\\'])
+        || prefix
+            .split('/')
+            .any(|segment| segment == "." || segment == "..")
+    {
+        Some("whose path_prefix is not a plain path starting and ending with `/`".to_owned())
+    } else if let Some(shape) = shape {
+        Some(format!("whose send holds {shape}"))
+    } else if !references.iter().any(|(_, slot)| *slot) {
+        Some("whose send reads nothing of the slot's answer".to_owned())
+    } else {
+        None
+    };
+    match problem {
+        Some(problem) => Err(refuse(format!(
+            "selection `{}` declares an upload {problem}",
+            selection.id
+        ))),
+        None => Ok(()),
+    }
+}
+
+/// The input of an upload beside its operation's: `content`, the bytes in
+/// standard base64 with their `sha256` and an optional `media_type`, and the
+/// request size the host reads for it ([`connectors_core::INPUT_BYTES_KEYWORD`]):
+/// the encoded bytes at most `binary.max_bytes`, and the ordinary request
+/// limit for the rest of the request.
+fn declare_upload(declaration: &mut connectors_core::Operation, binary: &Binary) {
+    let encoded = binary.max_bytes.div_ceil(3) * 4;
+    declaration.input_schema["properties"]["content"] = json!({
+        "type": "object",
+        "properties": {
+            "base64": {"type": "string", "minLength": 4, "maxLength": encoded},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "media_type": {"type": "string", "minLength": 3, "maxLength": 127}
+        },
+        "required": ["base64", "sha256"],
+        "additionalProperties": false,
+    });
+    if let Some(required) = declaration.input_schema["required"].as_array_mut() {
+        required.push(json!("content"));
+        required.sort_by(|a, b| a.as_str().cmp(&b.as_str()));
+        required.dedup();
+    }
+    declaration.input_schema[connectors_core::INPUT_BYTES_KEYWORD] =
+        json!(encoded + connectors_core::REQUEST_LIMIT as u64);
 }
 
 /// One GET to an origin besides the API base: the canonical origin, the raw

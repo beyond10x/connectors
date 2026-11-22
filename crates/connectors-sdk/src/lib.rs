@@ -150,6 +150,25 @@ pub trait AuthenticatedWrite: Send {
         body: &Value,
     ) -> Result<HttpResponse>;
 
+    /// Send `body` as the request's bytes, as they are, with `media_type` as
+    /// its `Content-Type`, for a write whose provider reads raw bytes (a file
+    /// upload to a URL the provider issued). The capability is consumed
+    /// whether or not a response arrives. Ports composed without it refuse
+    /// with no I/O.
+    async fn send_bytes(
+        self: Box<Self>,
+        _method: WriteMethod,
+        _segments: &[&str],
+        _query: &[(&str, String)],
+        _media_type: &str,
+        _body: &[u8],
+    ) -> Result<HttpResponse> {
+        Err(Error::new(
+            ErrorCode::Unsupported,
+            "this write capability sends no raw bytes",
+        ))
+    }
+
     /// One PUT, through `send_json`.
     async fn put_json(
         self: Box<Self>,

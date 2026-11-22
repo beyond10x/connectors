@@ -28,7 +28,7 @@ Every connector you can configure, with its provider, how many reads and writes 
 | [Jira](./jira.md) `jira` | Atlassian | 11 | 6 | `atlassian.basic` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/jira/connector.json) |
 | [Opsgenie](./opsgenie.md) `opsgenie` | Opsgenie | 5 | 0 | `opsgenie.api-key` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/opsgenie/connector.json) |
 | [Runpod](./runpod.md) `runpod` | Runpod | 2 | 2 | `runpod.api-key` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/runpod/connector.json) |
-| [Slack](./slack.md) `slack` | Slack | 12 | 5 | `slack.bot` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/slack/connector.json) |
+| [Slack](./slack.md) `slack` | Slack | 12 | 6 | `slack.bot` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/slack/connector.json) |
 | [Zendesk](./zendesk.md) `zendesk` | Zendesk | 8 | 3 | `zendesk.oauth`, `zendesk.basic` | derived | [declaration](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/providers/zendesk/connector.json) |
 | [OpenRouter](./openrouter.md) `openrouter` | OpenRouter | 3 | 1 | `openrouter.api-key` | pinned | hand-written |
 | [GitHub](./github.md) `github` | GitHub | 10 | 0 | `github.token` | definition file | hand-written |

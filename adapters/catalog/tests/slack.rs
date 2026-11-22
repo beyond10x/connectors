@@ -182,6 +182,10 @@ fn shipped_slack_selections_are_exactly_the_bot_reads_and_writes_and_the_user_re
         if shipped.len() == SHIPPED.len() {
             expected.push("file.download");
             writes = WRITES.iter().map(|(id, _, _)| *id).collect();
+            // The upload's completing write is an amended operation, pinned
+            // in `the_shipped_upload_sends_three_requests_to_admitted_places`.
+            writes.push("file.upload");
+            writes.sort();
             expected.extend(&writes);
         }
         expected.sort();
@@ -336,7 +340,8 @@ fn the_bundle_is_derived_from_the_pinned_swagger_document() {
         entry.source_sha256,
         hex::encode(Sha256::digest(&projection))
     );
-    assert_eq!(entry.operations, 174);
+    // The 174 of the pinned document and the two upload methods amended in.
+    assert_eq!(entry.operations, 176);
     assert_eq!(entry.unsupported, 0);
     let bundle = committed();
     assert_eq!(bundle.source.file_name, "slack-web.openapi.json");
@@ -808,7 +813,7 @@ fn the_move_guide_enables_every_shipped_write_with_a_fresh_revision() {
     writes.sort();
     let mut all: Vec<String> = selected.iter().map(|s| s.id.clone()).collect();
     all.sort();
-    assert_eq!(writes.len(), 5, "{writes:?}");
+    assert_eq!(writes.len(), 6, "{writes:?}");
 
     let before = bot_revision(Some(&MOVE_START_READS));
     let after = bot_revision(None);
@@ -2687,6 +2692,86 @@ const WRITES: [(&str, &str, &str); 5] = [
     ("files.delete", "files_delete", "/api/files.delete"),
 ];
 
+/// issue #269: `file.upload` ships as a guarded write over the amended
+/// `files_completeUploadExternal`, its slot the amended
+/// `files_getUploadURLExternal`, both POSTs the bundle records; its bytes go
+/// only to `files.slack.com` under `/upload/`, at most 2 MiB, and its declared
+/// input takes them as `content` with their digest and states the larger
+/// request limit the served host reads for this operation alone.
+#[test]
+fn the_shipped_upload_sends_three_requests_to_admitted_places() {
+    let bundle = committed();
+    let selection = shipped()
+        .into_iter()
+        .find(|s| s.id == "file.upload")
+        .unwrap();
+    assert_eq!(selection.operation_id, "files_completeUploadExternal");
+    assert_eq!(selection.effect, Effect::Write);
+    let binary = selection.binary.as_ref().unwrap();
+    assert_eq!(binary.max_bytes, 2 * 1024 * 1024);
+    assert_eq!(binary.hosts, ["https://files.slack.com"]);
+    let upload = selection.upload.as_ref().unwrap();
+    assert_eq!(upload.path_prefix, "/upload/");
+    assert_eq!(upload.slot.operation_id, "files_getUploadURLExternal");
+    assert_eq!(upload.slot.url, "/upload_url");
+    for (operation_id, path, media) in [
+        (
+            "files_getUploadURLExternal",
+            "/api/files.getUploadURLExternal",
+            &[][..],
+        ),
+        (
+            "files_completeUploadExternal",
+            "/api/files.completeUploadExternal",
+            &["application/json"][..],
+        ),
+    ] {
+        let operation = bundle
+            .inventory
+            .operations
+            .iter()
+            .find(|o| o.operation_id.as_deref() == Some(operation_id))
+            .unwrap_or_else(|| panic!("`{operation_id}` is not in the bundle"));
+        assert_eq!(operation.method, "post", "`{operation_id}`");
+        assert_eq!(operation.path, path, "`{operation_id}`");
+        assert_eq!(operation.request_media_types, media, "`{operation_id}`");
+    }
+    let guard = selection.guard.as_ref().unwrap();
+    assert_eq!(guard.preflight.operation_id, "auth_test");
+    let engine = Engine::new(&bundle, BASE, &shipped()).unwrap();
+    let declaration = engine
+        .declarations(&[Effect::Write])
+        .into_iter()
+        .find(|o| o.id == "file.upload")
+        .unwrap();
+    let schema = &declaration.input_schema;
+    assert_eq!(
+        schema["properties"]["content"]["required"],
+        json!(["base64", "sha256"])
+    );
+    assert_eq!(
+        schema["properties"]["content"]["properties"]["base64"]["maxLength"],
+        json!(2_796_204)
+    );
+    assert!(
+        schema["required"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("content"))
+    );
+    assert_eq!(declaration.request_limit(), 2_796_204 + 65_536);
+    assert_eq!(
+        engine
+            .declarations(&[Effect::Read, Effect::Write])
+            .iter()
+            .filter(|o| o.request_limit() > 65_536)
+            .map(|o| o.id.as_str())
+            .collect::<Vec<_>>(),
+        ["file.upload"],
+        "no other operation raises its limit"
+    );
+}
+
 /// Prepare and commit one write on this child: the transport the host's
 /// approval coordinator drives once it holds a verified, spent approval. A
 /// refusal in prepare is the `Err`.
@@ -2730,7 +2815,9 @@ fn the_two_writes_ship_as_guarded_writes_with_a_closed_json_body() {
         .map(|o| o.id)
         .collect();
     writes.sort();
-    let ids: Vec<&str> = WRITES.iter().map(|(id, _, _)| *id).collect();
+    let mut ids: Vec<&str> = WRITES.iter().map(|(id, _, _)| *id).collect();
+    ids.push("file.upload");
+    ids.sort();
     assert_eq!(writes, ids);
     let document = pinned();
     for (id, operation_id, path) in WRITES {

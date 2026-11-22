@@ -59,7 +59,11 @@ without it the second command is refused with "provider is already indexed".
 bound to the projection's SHA-256: it records `chat_postMessage`,
 `conversations_open`, `chat_update`, `chat_delete` and `files_delete` with an
 `application/json` request body, the one body the engine sends
-([cited amendments](local-catalog-provider.md#build-the-bundle)).
+([cited amendments](local-catalog-provider.md#build-the-bundle)), and adds the
+two upload methods the pinned document predates: `files_getUploadURLExternal`,
+`POST /api/files.getUploadURLExternal` with `filename` and `length` in the
+query, and `files_completeUploadExternal`,
+`POST /api/files.completeUploadExternal` with a JSON body.
 The pinned document lists `application/json` in all five operations' `consumes`
 beside the form type, but writes their parameters as `formData`, which the
 projection carries only under the form media type.
@@ -68,7 +72,8 @@ The first command writes `slack-web.openapi.json` and its projection record
 document's host `slack.com` and base path `/api` become the projection's one
 server, `https://slack.com/api`, and the bundle records each path below it, so
 Swagger's `/conversations.list` is recorded as `/api/conversations.list`. The
-bundle carries all 174 operations and names none unsupported; its derivation
+bundle carries all 174 operations and the two added ones, 176, and names none
+unsupported; its derivation
 records format `swagger/2.0`. `adapters/catalog/tests/bundle_drift.rs`
 regenerates the projection and its record from the pinned document and the
 bundle from the projection, and refuses any of them, or the index, that a fresh
@@ -77,16 +82,16 @@ run would not reproduce byte for byte.
 ## The shipped selection set
 
 [`adapters/catalog/providers/slack/operations.json`](../adapters/catalog/providers/slack/operations.json)
-exposes twelve reads for a bot token, each `effect: read`, and five writes,
+exposes twelve reads for a bot token, each `effect: read`, and six writes,
 `chat.postMessage`, `conversations.open`, `chat.update` and `chat.delete`
-([Messages](#messages)) and `files.delete` ([Files](#files)), each
-`effect: write`.
+([Messages](#messages)) and `files.delete` and `file.upload` ([Files](#files)),
+each `effect: write`.
 [`adapters/catalog/providers/slack/user-operations.json`](../adapters/catalog/providers/slack/user-operations.json)
 exposes `search.messages`, the three conversation reads and `users.list`, and
 no write, for a user token
 ([User token](#reads-and-search-on-a-user-token-connection)). A selection id is the Slack
-method name, except `file.download`, which names no method
-([Files](#files)). `adapters/catalog/tests/slack.rs` pins both exact id lists and
+method name, except `file.download`, which names no method, and `file.upload`,
+which sends three ([Files](#files)). `adapters/catalog/tests/slack.rs` pins both exact id lists and
 each id's `operationId` and path in the pinned document, so a renamed or
 dropped id, or a source operation that moved, fails the gate. The bundle
 refuses at load any `operation_id` the projection lacks.
@@ -248,6 +253,51 @@ The input of one delete, as `--input-file` takes it for
 ```json
 {"body":{"file":"F0000000001"}}
 ```
+
+One write uploads a file and shares it, under one approval or standing grant:
+
+| id | operations, in order | scope | body | content | read before | answer |
+|---|---|---|---|---|---|---|
+| `file.upload` | `files_getUploadURLExternal` (`POST /api/files.getUploadURLExternal?filename=…&length=…`), a `POST` of the bytes to its `upload_url`, `files_completeUploadExternal` (`POST /api/files.completeUploadExternal`, JSON body) | `files:write` | `channel_id`, `filename`, `title`, required; `thread_ts`, `initial_comment` | `base64`, `sha256`, required; `media_type` | `auth.test` must answer `"ok": true` | `ok` and `files` of the last request |
+
+- **The content.** `content.base64` is the file in standard base64, at most
+  2 MiB of bytes; `content.sha256` is the lower-case hex SHA-256 of those
+  bytes. Content that is not base64, is empty, is over 2 MiB or does not
+  match its `sha256` is refused as `invalid_input` before any request. The
+  approval binds the whole input, so an approved upload cannot send other
+  bytes; on the served host the same idempotency key with other bytes is
+  `idempotency_conflict`.
+- **The upload host.** `files.getUploadURLExternal` must answer `"ok": true`
+  and a `file_id`. Its `upload_url` must be `https` on `files.slack.com` under
+  `/upload/`, and the connection must admit that host, or the write is refused
+  as `forbidden` with no byte sent. Add it to `hosts`; the bytes go with the
+  token only when `credential` is `true`:
+
+  ```json
+  "hosts": [{"origin": "https://files.slack.com", "credential": true}]
+  ```
+
+- **The share.** `files.completeUploadExternal` gets
+  `{"files":[{"id":<file_id>,"title":<title>}],"channel_id":…}` with
+  `thread_ts` and `initial_comment` when given. Nothing is shared before it,
+  so a refusal or failure of the first two requests is `refused`, never
+  `outcome_unknown`. `channel_not_found` and `not_in_channel` there are
+  refused as `not_found` and `forbidden`; any other `"ok": false`, and a
+  dispatch without a definite answer, is `outcome_unknown`.
+
+The input of one upload into a thread:
+
+```json
+{"body":{"channel_id":"C0000000001","thread_ts":"1780001000.000100","filename":"plan.pdf","title":"Plan"},
+ "content":{"base64":"JVBERi0xLjcK","sha256":"<64 hex digits>","media_type":"application/pdf"}}
+```
+
+A connection without `hosts` admitting `files.slack.com`, as a bot instance
+derived from the shipped declaration is, describes `file.upload` but refuses
+every upload as `forbidden` after `files.getUploadURLExternal`, with no byte
+sent. The local CLI keeps its limits, an input of at most 1 MiB and an
+approval request of at most 272 KiB, both counting the base64 text, so an
+upload through it is bounded by them; the served host reads the whole 2 MiB.
 
 Verified against the local fixture in `adapters/catalog/tests/slack.rs`
 (`an_approved_file_delete_reads_the_file_then_sends_one_json_body` and the two
@@ -651,14 +701,14 @@ $ connectors connections list --connector slack --instance bot | jq -c '[.result
 [{"connector":"slack","instance":"bot","connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","revision":"8da8d006-a30a-41ae-b1d4-25030548c793","state":"ready"}]
 ```
 
-### Enable the five writes on `bot`
+### Enable the six writes on `bot`
 
 Three things gate a write:
 
 - **The native configuration's selection contains it.** The shipped
   [`operations.json`](../adapters/catalog/providers/slack/operations.json) has the twelve reads and
-  the five writes (`chat.postMessage`, `conversations.open`, `chat.update`, `chat.delete` and
-  `files.delete`). A selection holding only the ten reads has to be replaced by it.
+  the six writes (`chat.postMessage`, `conversations.open`, `chat.update`, `chat.delete`,
+  `files.delete` and `file.upload`). A selection holding only the ten reads has to be replaced by it.
 - **The instance selects private protocol two.** Under `connectors-private/1` the provider
   offers its reads only.
 - **The instance permits each id.** An id missing from `permissions.operations` is denied.
@@ -676,7 +726,7 @@ the ten reads:
 $ jq -r '.operations_file | split("/") | last' ~/slack-bot.json
 bot-reads.json
 $ connectors-catalog-provider --local-config ~/slack-bot.json --print-local-bootstrap | jq -r .configuration_revision
-0b534a5bcce493783a886f374b03546094916e3799339453b15e84c12ca2bd85
+5cd5458db71741dd5f1d2cca2951ca4f8fdcc91552de658dd91392d0ca2ec2c3
 ```
 
 That selection is a ten-read file, so point `operations_file` at the shipped `operations.json` and
@@ -684,20 +734,20 @@ print the revision again:
 
 ```console
 $ connectors-catalog-provider --local-config ~/slack-bot.json --print-local-bootstrap | jq -r .configuration_revision
-c7f38801438351cea771bb3a0bf9540f64920292a809a580161dbb658e353910
+c85a4c6d80f5377437e280901855776cca213e219fa7f962892d15ef0b15063e
 ```
 
 The revision digests the selected operations, so it moved. If `operations_file` already names the
 shipped file, it does not move, and only the instance changes. Then change the instance: the new
-revision, protocol two, and the ids of the shipped file, the five writes included. As a diff of the configuration used here:
+revision, protocol two, and the ids of the shipped file, the six writes included. As a diff of the configuration used here:
 
 ```diff
--configuration_revision = "0b534a5bcce493783a886f374b03546094916e3799339453b15e84c12ca2bd85"
-+configuration_revision = "c7f38801438351cea771bb3a0bf9540f64920292a809a580161dbb658e353910"
+-configuration_revision = "5cd5458db71741dd5f1d2cca2951ca4f8fdcc91552de658dd91392d0ca2ec2c3"
++configuration_revision = "c85a4c6d80f5377437e280901855776cca213e219fa7f962892d15ef0b15063e"
 -private_protocol = "connectors-private/1"
 +private_protocol = "connectors-private/2"
 -operations = ["conversations.list", "conversations.history", "conversations.replies", "users.list", "team.info", "emoji.list", "auth.test", "files.list", "files.info", "file.download"]
-+operations = ["conversations.list", "conversations.history", "conversations.replies", "users.list", "team.info", "emoji.list", "auth.test", "users.info", "users.lookupByEmail", "files.list", "files.info", "file.download", "chat.postMessage", "conversations.open", "chat.update", "chat.delete", "files.delete"]
++operations = ["conversations.list", "conversations.history", "conversations.replies", "users.list", "team.info", "emoji.list", "auth.test", "users.info", "users.lookupByEmail", "files.list", "files.info", "file.download", "chat.postMessage", "conversations.open", "chat.update", "chat.delete", "files.delete", "file.upload"]
 ```
 
 When the revision moved, the existing connection is `pending` and the page is `stale`. That is
@@ -721,7 +771,7 @@ the same identity and no token entered, and stops the process still running the 
 $ connectors connections revalidate --connector slack --instance bot --connection conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b --expected-revision 8da8d006-a30a-41ae-b1d4-25030548c793 | jq -c '.result.connection|{identity: .external_identity, summary: (.summary|{connector,instance,connection,revision,state})}'
 {"identity":{"kind":"slack.user","subject":"U0000000001"},"summary":{"connector":"slack","instance":"bot","connection":"conn_352bbc77ccfb465fbef6d1648d68811a_f6678f6563e14eeab20fcf1c1a75ce2b","revision":"691cd61d-0a34-4ba9-8ab2-f499f90c71f6","state":"ready"}}
 $ connectors operations list --connector slack --instance bot | jq -c '[.result.operations[].id]'
-["conversations.list","conversations.history","conversations.replies","users.list","users.info","users.lookupByEmail","team.info","emoji.list","auth.test","files.list","files.info","chat.postMessage","conversations.open","chat.update","chat.delete","files.delete","file.download"]
+["conversations.list","conversations.history","conversations.replies","users.list","users.info","users.lookupByEmail","team.info","emoji.list","auth.test","files.list","files.info","chat.postMessage","conversations.open","chat.update","chat.delete","files.delete","file.upload","file.download"]
 ```
 
 When the revision did not move, the connection stays `ready` and keeps its revision; stop the
@@ -760,10 +810,10 @@ $ connectors approvals key-init --connector slack --instance bot | jq -c '.resul
 $ connectors approvals policy-status --connector slack --instance bot | jq -c '.result|{connector,instance,policy}'
 {"connector":"slack","instance":"bot","policy":null}
 $ connectors approvals policy-set --connector slack --instance bot --input-file ~/private/slack-policy.json | jq -c '.result.policy|{instance_id,operations,revision}'
-{"instance_id":"slack-bot","operations":["chat.delete","chat.postMessage","chat.update","conversations.open","files.delete"],"revision":1}
+{"instance_id":"slack-bot","operations":["chat.delete","chat.postMessage","chat.update","conversations.open","file.upload","files.delete"],"revision":1}
 ```
 
-`~/private/slack-policy.json` holds `{"operations":["chat.delete","chat.postMessage","chat.update","conversations.open","files.delete"]}`.
+`~/private/slack-policy.json` holds `{"operations":["chat.delete","chat.postMessage","chat.update","conversations.open","file.upload","files.delete"]}`.
 The policy records the configuration revision, descriptor revision, executable and clock it was
 published under; after any of them changes, publish it again with
 `--expected-revision <current>`.
@@ -865,7 +915,7 @@ ready
 $ connectors connections revalidate --connector slack --instance search --connection conn_352bbc77ccfb465fbef6d1648d68811a_c019ec9863e6448fa9d13fb2ad322cd8 --expected-revision 87b27e15-155e-4ac5-953b-22b00189b442 | jq -r '.result.connection.summary.state'
 ready
 $ connectors approvals policy-status --connector slack --instance bot | jq -c '.result.policy.operations'
-["chat.delete","chat.postMessage","chat.update","conversations.open","files.delete"]
+["chat.delete","chat.postMessage","chat.update","conversations.open","file.upload","files.delete"]
    ```
 
 Revoke before removing the instance. Once it is gone, every connection command answers

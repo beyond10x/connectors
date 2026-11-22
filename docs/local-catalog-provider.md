@@ -123,7 +123,10 @@ is one of:
   `(?x)` comment cannot match part of a value, and refusing another as ``parameter `<name>` does not match its pattern``; Grafana's
   proxy reads hold `uid` to `^[A-Za-z0-9_-]{1,40}$` this way
   ([Grafana guide](catalog-grafana.md#the-shipped-selection-set)). The operation declares no
-  body and no response, and the engine reads its answer as JSON.
+  body and no response, and the engine reads its answer as JSON. `method` may
+  also be `post`, for a write the pinned document leaves out, such as Slack's
+  `files.completeUploadExternal`; with `"request_media_type": "application/json"`
+  it takes a JSON body, without it none. A `get` names no request media type.
 
 The file must carry the source's SHA-256. An operation that is missing or
 declared twice, an entry with more than one change or none, a citation that is
@@ -757,8 +760,43 @@ The complete configuration used against the sandbox is
   starts with `path_prefix`, sent as one GET to that origin. A URL elsewhere is
   refused before any request. A `download` selection names no bundle operation;
   `path_prefix` must start and end with `/`.
+- `upload` is optional, only on a write with `binary.hosts`, a closed body
+  (`body_keys`), no `response` and no `download`: it makes the write send a
+  file's bytes, at most `binary.max_bytes`, in three requests under the one
+  approval or standing grant:
 
-  `response`, `binary` and `download` are modelled as
+  ```json
+  "upload": {
+    "slot": {"operation_id": "<POST under the base path>",
+             "values": {"<parameter>": "body.<key> | content.length | content.sha256 | content.media_type"},
+             "checks": [{"pointer": "/ok", "expect": {"boolean": true}}],
+             "url": "/<pointer of the URL in the slot's answer>"},
+    "path_prefix": "/<segment>/",
+    "send": {"<member>": {"input": "body.<key>"}, "<member>": {"slot": "/<pointer>"}}
+  }
+  ```
+
+  The caller gives the bytes as `content`: `base64` (standard, with padding),
+  `sha256` (their lower-case hex SHA-256) and an optional `media_type`
+  (`application/octet-stream` when absent). Content that is not base64, is
+  empty, is longer than `max_bytes` or does not equal its `sha256` is refused as
+  `invalid_input` before any request, the guard's included, so an approval of
+  the input binds the bytes. The slot is a POST with no body whose every
+  required parameter `values` binds; its answer must hold every check (one to
+  sixteen, against a literal, a boolean or presence). The URL at `url` must be
+  `https` on an origin in `binary.hosts` that the connection admits (`hosts`,
+  below), under `path_prefix`, or the write is refused as `forbidden` with no
+  byte sent. The bytes go as one POST with their media type, the credential
+  only where the admitted host says so. Last, the selection's own operation is
+  sent with `send` as its JSON body: `{"input": "body.<key>"}` is replaced by
+  that input (with `"optional": true`, an absent one drops its member),
+  `{"slot": "/<pointer>"}` by that value of the slot's answer. Nothing is
+  shared before that last request, so a refusal, a failure or a missing value
+  before it is `refused`; the last request is classified as any write. The
+  declared input schema states the larger request limit the host reads for the
+  operation (`x-connectors-input-bytes`); every other operation keeps 64 KiB.
+
+  `response`, `binary`, `download` and `upload` are modelled as
   `connectors_catalog.binary.BinarySelection` in `adapters/catalog/spec/ess`.
 - `bounds` is optional and narrows query parameters the source declares, each
   by exactly one of two forms:
